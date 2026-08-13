@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { sectionTabLabelState } from '@/components/shared/interactionStates';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type ManagedDialogBusinessSection = {
@@ -64,7 +65,7 @@ function ManagedDialogTabs({
         >
           <TabsList variant="line" aria-label={label} className="min-w-max">
             {allSections.map((section) => (
-              <TabsTrigger key={section.id} value={section.id}>
+              <TabsTrigger key={section.id} value={section.id} className={sectionTabLabelState}>
                 {section.label}
               </TabsTrigger>
             ))}

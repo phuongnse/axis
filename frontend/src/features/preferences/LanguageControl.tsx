@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AccountPreferenceGroupModel } from '@/components/shared/AccountSurface';
 import { AsyncContent } from '@/components/shared/AsyncContent';
+import type { EntryPreferenceGroupModel } from '@/components/shared/EntrySurface';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -131,6 +132,27 @@ export function useAccountLanguagePreferenceModel(): AccountPreferenceGroupModel
       value: item.value,
     })),
     pendingLabel: t('app.saving'),
+    value: activeLanguage,
+  };
+}
+
+export function useEntryLanguagePreferenceModel(): EntryPreferenceGroupModel {
+  const { i18n, t } = useTranslation();
+  const language = currentSiteLanguage();
+  const activeLanguage = isSupportedLanguage(i18n.resolvedLanguage)
+    ? i18n.resolvedLanguage
+    : language;
+
+  return {
+    label: t('app.language'),
+    onSelect: (value) => {
+      if (isSupportedLanguage(value)) void changeSiteLanguage(value);
+    },
+    options: supportedLanguages.map((item) => ({
+      icon: languageBadges[item.value],
+      label: t(languageLabelKeys[item.value]),
+      value: item.value,
+    })),
     value: activeLanguage,
   };
 }

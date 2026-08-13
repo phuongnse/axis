@@ -1,5 +1,9 @@
 export { DataTable } from './DataTable';
 export {
+  DataTableRecordAction,
+  type DataTableRecordActionProps,
+} from './DataTableRecordAction';
+export {
   countFilterConditions,
   createEmptyFilterExpression,
   filterData,

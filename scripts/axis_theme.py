@@ -102,6 +102,7 @@ TEXT_CONTRAST_PAIRS = (
     ("sidebar-primary-foreground", "sidebar-primary"),
     ("sidebar-accent-foreground", "sidebar-accent"),
 )
+CONTROL_BOUNDARY_BACKGROUNDS = ("background", "card", "popover")
 
 REQUIRED_COLOR_TOKENS = (
     "background",
@@ -417,10 +418,18 @@ def load_theme(root: Path) -> dict[str, Any]:
                 raise ThemeValidationError(
                     f"colors.{scheme_name}.{foreground} on {background} must have at least 4.5:1 contrast"
                 )
-        if _contrast_ratio(scheme["ring"], scheme["background"]) < 3:
-            raise ThemeValidationError(
-                f"colors.{scheme_name}.ring on background must have at least 3:1 contrast"
-            )
+        for background in CONTROL_BOUNDARY_BACKGROUNDS:
+            if _contrast_ratio(scheme["ring"], scheme[background]) < 3:
+                raise ThemeValidationError(
+                    f"colors.{scheme_name}.ring focus boundary on {background} "
+                    "must have at least 3:1 contrast"
+                )
+        for background in CONTROL_BOUNDARY_BACKGROUNDS:
+            if _contrast_ratio(scheme["input"], scheme[background]) < 3:
+                raise ThemeValidationError(
+                    f"colors.{scheme_name}.input control boundary on {background} "
+                    "must have at least 3:1 contrast"
+                )
 
     return theme
 
@@ -469,7 +478,7 @@ def _render_web_theme(theme: dict[str, Any]) -> str:
     for role in ELEVATION_ROLES:
         lines.append(f"  --shadow-axis-{_camel_to_kebab(role)}: {elevation_roles[role]};")
     for role in LAYER_ROLES:
-        lines.append(f"  --z-axis-{_camel_to_kebab(role)}: {layer_roles[role]};")
+        lines.append(f"  --z-index-axis-{_camel_to_kebab(role)}: {layer_roles[role]};")
     lines.extend(
         (
             f"  --transition-duration-axis-state: {motion_roles['stateDuration']};",

@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "profileId": "axis-ui-v1",
+  "modes": [
+    "compact",
+    "dark",
+    "desktop",
+    "keyboard",
+    "light",
+    "locale",
+    "pointer",
+    "reduced-motion",
+    "screen-reader",
+    "zoom-reflow"
+  ],
+  "invalidationTriggers": [
+    "acceptance",
+    "constitution",
+    "consumer",
+    "evidence",
+    "surface-owner",
+    "theme"
+  ],
+  "requirements": {
+    "behavior.anatomy-layout": {
+      "category": "behavior",
+      "evidenceKinds": ["browser", "component"],
+      "requiredModes": ["compact", "desktop"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "behavior.interaction-focus-keyboard": {
+      "category": "behavior",
+      "evidenceKinds": ["browser", "component"],
+      "requiredModes": ["keyboard", "pointer"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "behavior.localization-content-resilience": {
+      "category": "behavior",
+      "evidenceKinds": ["browser", "component"],
+      "requiredModes": ["compact", "desktop", "locale", "zoom-reflow"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "behavior.responsive-scroll-overflow": {
+      "category": "behavior",
+      "evidenceKinds": ["browser"],
+      "requiredModes": ["compact", "desktop", "zoom-reflow"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "behavior.state-feedback-async-recovery": {
+      "category": "behavior",
+      "evidenceKinds": ["browser", "component"],
+      "requiredModes": ["keyboard", "pointer"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "lifecycle.consumer-ownership-adoption": {
+      "category": "lifecycle",
+      "evidenceKinds": ["component"],
+      "requiredModes": [],
+      "invalidatedBy": ["consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "lifecycle.retirement-compatibility": {
+      "category": "lifecycle",
+      "evidenceKinds": ["assessment", "component"],
+      "requiredModes": [],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner"],
+      "allowNotApplicable": false
+    },
+    "standard.human-centred-evaluation": {
+      "category": "standard",
+      "evidenceKinds": ["assessment", "review"],
+      "requiredModes": [],
+      "invalidatedBy": [
+        "acceptance",
+        "constitution",
+        "consumer",
+        "evidence",
+        "surface-owner",
+        "theme"
+      ],
+      "allowNotApplicable": false
+    },
+    "standard.interaction-principles": {
+      "category": "standard",
+      "evidenceKinds": ["assessment", "browser", "component", "review"],
+      "requiredModes": ["keyboard", "pointer"],
+      "invalidatedBy": [
+        "acceptance",
+        "constitution",
+        "consumer",
+        "evidence",
+        "surface-owner",
+        "theme"
+      ],
+      "allowNotApplicable": false
+    },
+    "standard.wcag-2-2-aa": {
+      "category": "standard",
+      "evidenceKinds": ["assessment", "browser", "component", "review"],
+      "requiredModes": [
+        "compact",
+        "desktop",
+        "keyboard",
+        "locale",
+        "reduced-motion",
+        "screen-reader",
+        "zoom-reflow"
+      ],
+      "invalidatedBy": [
+        "acceptance",
+        "constitution",
+        "consumer",
+        "evidence",
+        "surface-owner",
+        "theme"
+      ],
+      "allowNotApplicable": false
+    },
+    "visual.color-tone-contrast": {
+      "category": "visual",
+      "evidenceKinds": ["perceptual"],
+      "requiredModes": ["dark", "light"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": false
+    },
+    "visual.density-touch-target": {
+      "category": "visual",
+      "evidenceKinds": ["browser", "component"],
+      "requiredModes": ["compact", "desktop", "keyboard", "pointer"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": false
+    },
+    "visual.elevation-layer": {
+      "category": "visual",
+      "evidenceKinds": ["perceptual"],
+      "requiredModes": ["dark", "light"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": false
+    },
+    "visual.iconography": {
+      "category": "visual",
+      "evidenceKinds": ["component", "perceptual"],
+      "requiredModes": ["compact", "dark", "desktop", "light"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": true
+    },
+    "visual.motion": {
+      "category": "visual",
+      "evidenceKinds": ["browser", "component"],
+      "requiredModes": ["keyboard", "pointer", "reduced-motion"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": true
+    },
+    "visual.spacing": {
+      "category": "visual",
+      "evidenceKinds": ["perceptual"],
+      "requiredModes": ["compact", "desktop", "zoom-reflow"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": false
+    },
+    "visual.surface-border-radius": {
+      "category": "visual",
+      "evidenceKinds": ["perceptual"],
+      "requiredModes": ["dark", "light"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": false
+    },
+    "visual.typography-hierarchy": {
+      "category": "visual",
+      "evidenceKinds": ["perceptual"],
+      "requiredModes": ["compact", "dark", "desktop", "light", "locale", "zoom-reflow"],
+      "invalidatedBy": ["constitution", "consumer", "evidence", "surface-owner", "theme"],
+      "allowNotApplicable": false
+    }
+  }
+}

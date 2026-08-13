@@ -100,7 +100,13 @@ describe('Button', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Default' })).toHaveClass('bg-primary');
-    expect(screen.getByRole('button', { name: 'Outline' })).toHaveClass('border-border', 'h-7');
+    expect(screen.getByRole('button', { name: 'Outline' })).toHaveClass(
+      'border-border',
+      'bg-transparent',
+      'dark:border-border',
+      'dark:bg-transparent',
+      'h-7',
+    );
     expect(screen.getByRole('button', { name: 'Destructive' })).toHaveClass('text-destructive');
     expect(screen.getByRole('button', { name: 'Link' })).toHaveClass('hover:underline');
   });

@@ -1,5 +1,9 @@
 export { changeSiteLanguage, currentSiteLanguage, i18n } from './i18n';
-export { LanguageControl, useAccountLanguagePreferenceModel } from './LanguageControl';
+export {
+  LanguageControl,
+  useAccountLanguagePreferenceModel,
+  useEntryLanguagePreferenceModel,
+} from './LanguageControl';
 export {
   applyDocumentLanguage,
   DEFAULT_LANGUAGE,
@@ -12,9 +16,12 @@ export {
   type SupportedLanguage,
   supportedLanguages,
 } from './language-store';
-export { PreferencesMenu } from './PreferencesMenu';
 export { PreferencesProfileSync } from './PreferencesProfileSync';
-export { ThemeControl, useAccountThemePreferenceModel } from './ThemeControl';
+export {
+  ThemeControl,
+  useAccountThemePreferenceModel,
+  useEntryThemePreferenceModel,
+} from './ThemeControl';
 export {
   applyDocumentTheme,
   DEFAULT_THEME_MODE,
@@ -31,3 +38,4 @@ export {
   useThemePreference,
 } from './theme-store';
 export type { TranslationKey } from './translations';
+export { useEntryPreferencesModel } from './useEntryPreferences';

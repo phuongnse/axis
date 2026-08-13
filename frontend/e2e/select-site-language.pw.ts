@@ -162,7 +162,7 @@ async function openPreferencesWithoutMovingForm(page: Page): Promise<void> {
 }
 
 async function openAuthenticatedPreferences(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
   await expect(page.getByRole('button', { name: 'Vietnamese' })).toBeVisible();
 }
 
@@ -204,7 +204,7 @@ test.describe('select site language', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
 
     await openAuthenticatedPreferences(page);
     await page.getByRole('button', { name: 'Vietnamese' }).click();

@@ -108,7 +108,7 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
 }
 
 async function openAuthenticatedPreferences(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
   await expect(page.getByRole('button', { name: 'Dark' })).toBeVisible();
 }
 
@@ -159,7 +159,7 @@ test.describe('select site theme', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
 
     await openAuthenticatedPreferences(page);
     await page.getByRole('button', { name: 'Dark' }).click();
@@ -171,7 +171,7 @@ test.describe('select site theme', () => {
     await page.reload();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
     await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 30_000 });
     await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark');
     await expect.poll(() => page.evaluate(() => localStorage.getItem('axis.theme'))).toBe('dark');

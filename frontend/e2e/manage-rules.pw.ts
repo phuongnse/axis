@@ -349,6 +349,25 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       ]),
     });
   });
+  await page.route('**/api/module-navigation', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        availableContributionIds: [
+          'identity.memberships',
+          'identity.service-identities',
+          'authorization.product-roles',
+          'businessObjects.definitions',
+          'rules.fieldDefinitions',
+          'solutions.management',
+        ],
+      }),
+    });
+  });
+  await page.route('**/api/auth/sign-out', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
 }
 
 async function mockRulesApi(page: Page, canStartCreate = true): Promise<CapturedRequest[]> {
@@ -844,8 +863,10 @@ test('rule catalog exposes inputs and read-only built-in details', async ({ page
   await expect(details.getByText('customer.status')).toBeVisible();
   await expect(details.getByText('field-validation')).toBeVisible();
   const footer = page.locator('[data-slot="managed-dialog-footer"]');
-  await expect(footer.getByRole('button')).toHaveCount(1);
-  await expect(footer.getByRole('button', { name: 'Close' })).toBeVisible();
+  await expect(footer.getByRole('button', { name: 'Windows (1)' })).toBeVisible();
+  const footerActions = footer.locator('[data-slot="managed-dialog-footer-actions"]');
+  await expect(footerActions.getByRole('button')).toHaveCount(1);
+  await expect(footerActions.getByRole('button', { name: 'Close' })).toBeVisible();
   await details.getByRole('tab', { name: 'System info' }).click();
   await expect(details.getByText('field.required')).toBeVisible();
   await expect(details.getByText('Expression language')).toBeVisible();

@@ -10,8 +10,10 @@ import {
   type DataTableDefinition,
   type DataTableMessages,
   type DataTableQueryState,
+  DataTableRecordAction,
 } from '@/components/shared/data-table';
-import { Button } from '@/components/ui/button';
+import { PageAction } from '@/components/shared/PageLayout';
+import { axisStyles } from '@/theme.generated';
 
 interface Item {
   id: string;
@@ -205,6 +207,33 @@ function clientDefinition(
 describe('DataTable', () => {
   afterEach(() => vi.useRealTimers());
 
+  it('keeps record actions on the cell content edge without shrinking their target', async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    render(<DataTableRecordAction onClick={onOpen}>Customer</DataTableRecordAction>);
+
+    const action = screen.getByRole('button', { name: 'Customer' });
+    expect(action).toHaveAttribute('data-slot', 'data-table-record-action');
+    expect(action).toHaveClass(
+      'justify-start',
+      '-ml-px',
+      'px-0',
+      'text-left',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
+    expect(action).not.toHaveClass('px-2.5');
+    expect(action.querySelector('[data-slot="data-table-record-action-label"]')).toHaveClass(
+      'min-w-0',
+      'truncate',
+    );
+
+    await user.click(action);
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
   it('reserves initial rows, delays skeletons, and does not use background refresh as loading', async () => {
     vi.useFakeTimers();
     const definition = clientDefinition({ loading: true });
@@ -231,10 +260,10 @@ describe('DataTable', () => {
       <DataTable
         definition={clientDefinition({
           renderToolbarActions: ({ rows, queryState }) => (
-            <Button type="button" variant="outline">
+            <PageAction type="button" variant="outline">
               Export {rows.length} rows with {countFilterConditions(queryState.filterExpression)}{' '}
               filters
-            </Button>
+            </PageAction>
           ),
         })}
       />,
@@ -250,11 +279,23 @@ describe('DataTable', () => {
     ).toBeInTheDocument();
     const nameHeader = within(table).getByRole('columnheader', { name: /Name/ });
     const nameSort = within(nameHeader).getByRole('button', { name: 'Name: Sort ascending' });
+    expect(nameSort).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
     expect(nameHeader).toHaveClass('first:pl-3');
     expect(nameHeader.querySelector('[data-slot="data-table-column-label"]')).not.toBeNull();
     const alphaCell = within(table).getByText('Alpha').closest('td');
-    expect(alphaCell).toHaveClass('align-top', 'first:pl-3');
-    expect(alphaCell?.querySelector('[data-slot="data-table-cell-content"]')).not.toBeNull();
+    expect(alphaCell).toHaveClass('py-1', 'align-middle', 'first:pl-3');
+    const alphaCellContent = alphaCell?.querySelector('[data-slot="data-table-cell-content"]');
+    expect(alphaCellContent).toHaveClass(
+      'items-center',
+      axisStyles.spacing.gap.inline,
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+    );
     expect(within(table).queryByText('Gamma')).not.toBeInTheDocument();
 
     expect(table.querySelectorAll('[data-slot="table"]')).toHaveLength(1);
@@ -393,9 +434,9 @@ describe('DataTable', () => {
           initialState: { grouping: ['department'], expanded: true },
           renderDetail: (row) => <div>{row.original.name} detail</div>,
           renderBulkActions: (rows, clear) => (
-            <Button type="button" onClick={clear}>
+            <PageAction type="button" onClick={clear}>
               Archive {rows.length}
-            </Button>
+            </PageAction>
           ),
         })}
       />,

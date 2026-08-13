@@ -31,6 +31,14 @@ export function solutionInstallationsQueryOptions() {
   });
 }
 
+export function solutionVersionQueryOptions(versionId: string) {
+  return queryOptions({
+    queryKey: solutionQueryKeys.version(versionId),
+    queryFn: () => getSolutionVersion(versionId),
+    enabled: versionId.length > 0,
+  });
+}
+
 export function solutionOperationQueryOptions(operationId: string) {
   return queryOptions({
     queryKey: solutionQueryKeys.operation(operationId),

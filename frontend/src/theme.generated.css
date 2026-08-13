@@ -81,12 +81,12 @@
   --shadow-axis-floating: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-axis-managed: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-axis-dock: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --z-axis-base: 0;
-  --z-axis-sticky: 10;
-  --z-axis-floating: 30;
-  --z-axis-modal: 40;
-  --z-axis-managed: 50;
-  --z-axis-notification: 60;
+  --z-index-axis-base: 0;
+  --z-index-axis-sticky: 10;
+  --z-index-axis-floating: 30;
+  --z-index-axis-modal: 40;
+  --z-index-axis-managed: 50;
+  --z-index-axis-notification: 60;
   --transition-duration-axis-state: 150ms;
   --transition-duration-axis-floating: 100ms;
   --ease-axis-state: cubic-bezier(0, 0, 0.2, 1);
@@ -124,7 +124,7 @@
   --warning: oklch(0.52 0.12 75);
   --warning-foreground: oklch(0.985 0.004 88);
   --border: oklch(0.86 0.014 285);
-  --input: oklch(0.89 0.012 285);
+  --input: oklch(0.64 0.012 285);
   --ring: oklch(0.56 0.11 324);
   --chart-1: oklch(0.58 0.12 324);
   --chart-2: oklch(0.67 0.11 210);
@@ -165,7 +165,7 @@
   --warning: oklch(0.78 0.12 75);
   --warning-foreground: oklch(0.16 0.014 285);
   --border: oklch(0.3 0.018 285);
-  --input: oklch(0.32 0.02 285);
+  --input: oklch(0.53 0.02 285);
   --ring: oklch(0.72 0.11 324);
   --chart-1: oklch(0.72 0.12 324);
   --chart-2: oklch(0.72 0.11 210);

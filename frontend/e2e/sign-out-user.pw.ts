@@ -112,7 +112,7 @@ async function signIn(page: Page, email: string): Promise<void> {
   await fillSignInForm(page, email);
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-  await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
 }
 
 test.describe('sign out user', () => {
@@ -132,7 +132,7 @@ test.describe('sign out user', () => {
     await createVerifiedUser(request, email);
     await signIn(page, email);
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     await page.getByRole('button', { name: 'Sign out' }).click();
 
     await expect(page).toHaveURL(/\/sign-in$/, { timeout: 30_000 });
@@ -143,7 +143,7 @@ test.describe('sign out user', () => {
 
     await page.goto('/sign-in');
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Account menu/ })).toHaveCount(0);
 
     await page.goto('/');
     await expect(page).toHaveURL(/\/sign-in$/, { timeout: 30_000 });
@@ -153,7 +153,7 @@ test.describe('sign out user', () => {
     await page.goto('/sign-in');
 
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Account menu/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   });
 });

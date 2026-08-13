@@ -1,5 +1,13 @@
-import { Maximize2Icon, Minimize2Icon, MinusIcon, RotateCcwIcon, XIcon } from 'lucide-react';
 import {
+  Layers3Icon,
+  Maximize2Icon,
+  Minimize2Icon,
+  MinusIcon,
+  RotateCcwIcon,
+  XIcon,
+} from 'lucide-react';
+import {
+  type ComponentProps,
   createContext,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -13,10 +21,18 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type DraggableData, Rnd } from 'react-rnd';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import {
+  opaquePopoverTriggerSurface,
+  persistentItemHighlight,
+} from '@/components/shared/interactionStates';
+import {
+  type ManagedWindowEntry,
   type ManagedWindowPreset,
   type ManagedWindowRect,
+  useManagedWindowActions,
   useManagedWindowRuntime,
+  useManagedWindowStore,
 } from '@/components/shared/ManagedWindowManager';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +42,14 @@ import {
   DialogPortal,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { type SurfaceIdFor, surfaceContractAttributes } from '@/lib/ui-foundation';
 import { cn } from '@/lib/utils';
 import { axisStyles } from '@/theme.generated';
@@ -45,6 +69,31 @@ type WorkArea = {
 };
 
 const ManagedDialogFullscreenContext = createContext(false);
+
+const managedDialogControlGeometry = cn(
+  axisStyles.density.minHeight.touchTarget,
+  axisStyles.density.minWidth.touchTarget,
+  axisStyles.density.minHeight.compactControlAtSmall,
+  axisStyles.density.minWidth.compactControlAtSmall,
+);
+
+type ManagedDialogActionProps = Omit<ComponentProps<typeof Button>, 'className'>;
+
+function ManagedDialogAction(props: ManagedDialogActionProps) {
+  return <Button {...props} className={managedDialogControlGeometry} />;
+}
+
+type ManagedDialogAsyncActionProps = Omit<ComponentProps<typeof AsyncButton>, 'className'>;
+
+function ManagedDialogAsyncAction(props: ManagedDialogAsyncActionProps) {
+  return <AsyncButton {...props} className={managedDialogControlGeometry} />;
+}
+
+type ManagedDialogIconActionProps = Omit<ComponentProps<typeof Button>, 'className'>;
+
+function ManagedDialogIconAction(props: ManagedDialogIconActionProps) {
+  return <Button {...props} className={managedDialogControlGeometry} />;
+}
 
 export interface ManagedDialogProps {
   children: ReactNode;
@@ -84,6 +133,14 @@ export function ManagedDialog({
     registerCloseRequest,
     requestClose,
   } = useManagedWindowRuntime();
+  const windows = useManagedWindowStore((state) => state.windows);
+  const windowOrder = useManagedWindowStore((state) => state.windowOrder);
+  const activeWindowId = useManagedWindowStore((state) => state.activeWindowId);
+  const { restoreWindow } = useManagedWindowActions();
+  const windowEntries = windowOrder.flatMap((candidateWindowId) => {
+    const candidateEntry = windows[candidateWindowId];
+    return candidateEntry ? [[candidateWindowId, candidateEntry] as const] : [];
+  });
   const [workArea, setWorkArea] = useState(() => readWorkArea(portalContainer));
   const expandedFocusRef = useRef<HTMLElement | null>(null);
   const previousModeRef = useRef(entry?.mode);
@@ -257,7 +314,7 @@ export function ManagedDialog({
       modal={false}
       disablePointerDismissal
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && expanded && active) requestConsumerClose();
+        if (!nextOpen && expanded && active) requestClose(windowId);
       }}
     >
       <DialogPortal container={portalContainer} className="pointer-events-auto">
@@ -316,64 +373,92 @@ export function ManagedDialog({
           >
             <div
               data-slot="managed-dialog-header"
-              className="managed-dialog-drag-handle flex shrink-0 cursor-move items-center justify-between gap-4 border-b p-4"
+              className="managed-dialog-drag-handle flex shrink-0 cursor-default select-none flex-col gap-1 border-b p-4 sm:cursor-move"
             >
-              <div className="min-w-0 space-y-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div
+                data-slot="managed-dialog-header-primary"
+                className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+              >
+                <div
+                  data-slot="managed-dialog-header-identity"
+                  className="flex min-w-0 flex-wrap items-center gap-2"
+                >
                   <DialogTitle>{title}</DialogTitle>
                   {titleAccessory}
                   {dirty ? <span className="sr-only">{t('dialog.unsaved')}</span> : null}
                 </div>
-                {description ? <DialogDescription>{description}</DialogDescription> : null}
+                <div
+                  data-slot="managed-dialog-header-controls"
+                  className="flex shrink-0 items-center gap-1 self-center sm:self-center"
+                >
+                  <ManagedDialogIconAction
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('dialog.reset')}
+                    title={t('dialog.reset')}
+                    onClick={reset}
+                  >
+                    <RotateCcwIcon />
+                  </ManagedDialogIconAction>
+                  <ManagedDialogIconAction
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('dialog.minimize')}
+                    title={t('dialog.minimize')}
+                    onClick={minimize}
+                  >
+                    <MinusIcon />
+                  </ManagedDialogIconAction>
+                  <ManagedDialogIconAction
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={sizeActionLabel}
+                    title={sizeActionLabel}
+                    disabled={isCompact || (entry.preset === 'fullscreen' && !canRestoreSize)}
+                    onClick={toggleMaximize}
+                  >
+                    {showingFullscreen ? <Minimize2Icon /> : <Maximize2Icon />}
+                  </ManagedDialogIconAction>
+                  <ManagedDialogIconAction
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={closeDisabled}
+                    aria-label={t('dialog.close')}
+                    title={t('dialog.close')}
+                    onClick={() => requestClose(windowId)}
+                  >
+                    <XIcon />
+                  </ManagedDialogIconAction>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('dialog.reset')}
-                  title={t('dialog.reset')}
-                  onClick={reset}
-                >
-                  <RotateCcwIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('dialog.minimize')}
-                  title={t('dialog.minimize')}
-                  onClick={minimize}
-                >
-                  <MinusIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={sizeActionLabel}
-                  title={sizeActionLabel}
-                  disabled={isCompact || (entry.preset === 'fullscreen' && !canRestoreSize)}
-                  onClick={toggleMaximize}
-                >
-                  {showingFullscreen ? <Minimize2Icon /> : <Maximize2Icon />}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={closeDisabled}
-                  aria-label={t('dialog.close')}
-                  title={t('dialog.close')}
-                  onClick={() => requestClose(windowId)}
-                >
-                  <XIcon />
-                </Button>
-              </div>
+              {description ? (
+                <DialogDescription className="min-w-0">{description}</DialogDescription>
+              ) : null}
             </div>
             <ManagedDialogFullscreenContext.Provider value={effectivePreset === 'fullscreen'}>
               {children}
-              <ManagedDialogFooter>{footer}</ManagedDialogFooter>
+              <ManagedDialogFooter
+                switcher={
+                  active ? (
+                    <ManagedWindowMenu
+                      label={t('dialog.windows', { count: windowEntries.length })}
+                      entries={windowEntries}
+                      activeWindowId={activeWindowId}
+                      contentAlign="start"
+                      onSelect={(candidateWindowId, candidateEntry) => {
+                        if (candidateEntry.mode === 'docked') restoreWindow(candidateWindowId);
+                        else focusWindow(candidateWindowId);
+                      }}
+                    />
+                  ) : null
+                }
+              >
+                {footer}
+              </ManagedDialogFooter>
             </ManagedDialogFullscreenContext.Provider>
           </Rnd>
         </DialogPopup>
@@ -383,30 +468,114 @@ export function ManagedDialog({
 }
 
 export function ManagedDialogBody({ className, ...props }: React.ComponentProps<'div'>) {
-  const fullscreen = useContext(ManagedDialogFullscreenContext);
   return (
     <div
       data-slot="dialog-body"
-      className={cn('min-h-0 flex-1 overflow-y-auto p-4', fullscreen && 'pb-20', className)}
+      className={cn('min-h-0 flex-1 overflow-y-auto p-4', className)}
       {...props}
     />
   );
 }
 
-function ManagedDialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
+function ManagedDialogFooter({ children, switcher }: { children: ReactNode; switcher: ReactNode }) {
   const fullscreen = useContext(ManagedDialogFullscreenContext);
   return (
     <div
       data-slot="managed-dialog-footer"
       className={cn(
-        'flex shrink-0 flex-col-reverse gap-2 border-t bg-muted/50 p-4 sm:flex-row sm:justify-end',
-        fullscreen && 'pr-40',
-        className,
+        'flex shrink-0 flex-col gap-2 border-t bg-muted/50 p-4 sm:flex-row sm:items-center',
+        fullscreen && 'pb-20',
       )}
-      {...props}
-    />
+    >
+      {switcher ? (
+        <div data-slot="managed-dialog-footer-switcher" className="shrink-0 self-start">
+          {switcher}
+        </div>
+      ) : null}
+      <div
+        data-slot="managed-dialog-footer-actions"
+        className="flex flex-col-reverse gap-2 sm:ml-auto sm:flex-row sm:justify-end"
+      >
+        {children}
+      </div>
+    </div>
   );
 }
+
+function ManagedWindowMenu({
+  label,
+  compactLabel,
+  entries,
+  activeWindowId,
+  contentAlign = 'end',
+  onSelect,
+}: {
+  label: string;
+  compactLabel?: string;
+  entries: readonly (readonly [string, ManagedWindowEntry])[];
+  activeWindowId: string | null;
+  contentAlign?: 'start' | 'end';
+  onSelect: (windowId: string, entry: ManagedWindowEntry) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={compactLabel ? label : undefined}
+        title={compactLabel ? label : undefined}
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(
+              'pointer-events-auto h-full shrink-0',
+              managedDialogControlGeometry,
+              opaquePopoverTriggerSurface,
+            )}
+          />
+        }
+      >
+        {compactLabel ? null : <Layers3Icon />}
+        <span>{compactLabel ?? label}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align={contentAlign} className="w-72">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{label}</DropdownMenuLabel>
+          {entries.map(([candidateWindowId, candidateEntry]) => {
+            const candidateActive = candidateWindowId === activeWindowId;
+            return (
+              <DropdownMenuItem
+                key={candidateWindowId}
+                aria-current={candidateActive ? 'true' : undefined}
+                className={candidateActive ? persistentItemHighlight : undefined}
+                onClick={() => onSelect(candidateWindowId, candidateEntry)}
+              >
+                <span className="min-w-0 flex-1 truncate">{candidateEntry.title}</span>
+                {candidateEntry.dirty ? (
+                  <span data-slot="managed-window-dirty-indicator" title={t('dialog.unsaved')}>
+                    <span aria-hidden="true">•</span>
+                    <span className="sr-only">{t('dialog.unsaved')}</span>
+                  </span>
+                ) : null}
+                <span className="text-xs text-muted-foreground">
+                  {candidateEntry.mode === 'docked' ? t('dialog.minimized') : t('dialog.expanded')}
+                </span>
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export {
+  ManagedDialogAction,
+  ManagedDialogAsyncAction,
+  ManagedDialogIconAction,
+  ManagedWindowMenu,
+  managedDialogControlGeometry,
+};
 
 function readWorkArea(container: HTMLElement | null): WorkArea {
   if (container) {
@@ -501,16 +670,15 @@ function trapFocus(event: ReactKeyboardEvent<HTMLDivElement>) {
     event.preventDefault();
     return;
   }
-  const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-  const nextIndex = event.shiftKey
-    ? currentIndex <= 0
-      ? focusable.length - 1
-      : currentIndex - 1
-    : currentIndex < 0 || currentIndex === focusable.length - 1
-      ? 0
-      : currentIndex + 1;
-  event.preventDefault();
-  focusable[nextIndex]?.focus();
+  const current = event.target instanceof HTMLElement ? event.target : document.activeElement;
+  const currentIndex = focusable.indexOf(current as HTMLElement);
+  if (event.shiftKey && currentIndex === 0) {
+    event.preventDefault();
+    focusable.at(-1)?.focus();
+  } else if (!event.shiftKey && currentIndex === focusable.length - 1) {
+    event.preventDefault();
+    focusable[0]?.focus();
+  }
 }
 
 function firstFocusable(container: HTMLElement) {
@@ -522,7 +690,19 @@ function focusableElements(container: HTMLElement) {
     ...container.querySelectorAll<HTMLElement>(
       'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
     ),
-  ].filter(
-    (element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true',
-  );
+  ].filter((element) => {
+    if (
+      element.closest('[hidden], [aria-hidden="true"], [inert]') ||
+      element.hasAttribute('hidden') ||
+      element.getAttribute('aria-hidden') === 'true'
+    ) {
+      return false;
+    }
+    for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+      const style = window.getComputedStyle(current);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      if (current === container) break;
+    }
+    return true;
+  });
 }

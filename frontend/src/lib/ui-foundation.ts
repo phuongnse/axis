@@ -23,7 +23,8 @@ const activeSurfaceContracts = {
   'service-identity-windows': 'managed-task-window',
   'session-unavailable': 'entry-surface',
   'sign-in': 'entry-surface',
-  'solution-delivery': 'process-workbench',
+  'solution-delivery': 'resource-workspace',
+  'solution-delivery-windows': 'managed-task-window',
   'verify-email': 'entry-surface',
 } as const satisfies Record<string, SurfaceContractId>;
 

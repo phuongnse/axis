@@ -224,7 +224,7 @@ export function RuleBindingUsagePanel({
             <li key={usage.bindingId} className="space-y-3 py-4 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2">
                 <MetadataTag>{usage.targetType ?? '—'}</MetadataTag>
-                <StatusBadge tone={usage.enabled ? 'success' : 'muted'}>
+                <StatusBadge state={usage.enabled ? 'positive' : 'inactive'}>
                   {usage.enabled ? t('rules.bindingEnabled') : t('rules.bindingDisabled')}
                 </StatusBadge>
               </div>

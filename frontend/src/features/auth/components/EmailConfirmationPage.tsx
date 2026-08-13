@@ -8,10 +8,11 @@ import {
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
-import { PreferencesMenu } from '@/features/preferences';
+import { useEntryPreferencesModel } from '@/features/preferences';
 
 export function EmailConfirmationPage() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
   const context = loadRegistrationContext();
   const { resend, state, reset } = useResendVerification();
 
@@ -24,7 +25,7 @@ export function EmailConfirmationPage() {
   return (
     <EntrySurface
       surfaceId="email-confirmation"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('auth.confirm.title')}
       footer={
         <InlinePromptAction prompt={t('auth.confirm.useAnother')}>

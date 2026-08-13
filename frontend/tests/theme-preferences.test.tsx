@@ -1,16 +1,18 @@
-import { act, cleanup, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import { useAuthStore } from '@/features/auth/auth-store';
 import {
-  PreferencesMenu,
   PreferencesProfileSync,
   resolveInitialThemeMode,
   setThemeMode,
   THEME_STORAGE_KEY,
   ThemeControl,
+  useEntryPreferencesModel,
 } from '@/features/preferences';
+import { axisStyles } from '@/theme.generated';
 import { renderWithRouter } from './render-with-router';
 
 function jsonResponse(data: unknown): Response {
@@ -44,13 +46,25 @@ function setAuthenticatedSession() {
 
 function TranslatedFormHarness() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
 
   return (
-    <form>
-      <PreferencesMenu />
-      <label htmlFor="email">{t('auth.email')}</label>
-      <input id="email" />
-    </form>
+    <EntrySurface surfaceId="registration" preferences={preferences} title="Registration">
+      <form>
+        <label htmlFor="email">{t('auth.email')}</label>
+        <input id="email" />
+      </form>
+    </EntrySurface>
+  );
+}
+
+function EntryPreferencesHarness() {
+  const preferences = useEntryPreferencesModel();
+
+  return (
+    <EntrySurface surfaceId="registration" preferences={preferences} title="Registration">
+      <span>Registration form</span>
+    </EntrySurface>
   );
 }
 
@@ -151,19 +165,37 @@ describe('theme preferences', () => {
 
   it('labels the preferences trigger as a shared preferences menu', async () => {
     const user = userEvent.setup();
-    await renderWithRouter(<PreferencesMenu />, { path: '/register' });
+    await renderWithRouter(<EntryPreferencesHarness />, { path: '/register' });
 
     const trigger = screen.getByRole('button', { name: 'Preferences' });
     expect(trigger).toHaveTextContent('Preferences');
     expect(trigger).not.toHaveTextContent('EN');
     expect(trigger).not.toHaveTextContent('English');
+    expect(trigger).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
 
-    await user.click(trigger);
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
+    const preferences = document.querySelector<HTMLElement>('[data-slot="entry-preferences"]');
+    expect(preferences).not.toBeNull();
+    expect(preferences).toHaveAccessibleName('Preferences');
+    expect(preferences).toHaveAttribute('aria-label', 'Preferences');
+    expect(within(preferences as HTMLElement).queryByText('Preferences')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'System' })).toHaveTextContent('System');
     expect(screen.getByRole('button', { name: 'System' })).not.toHaveTextContent('Light');
     expect(screen.getByRole('button', { name: 'Light' })).toHaveTextContent('Light');
     expect(screen.getByRole('button', { name: 'Dark' })).toHaveTextContent('Dark');
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+    expect(document.querySelector('[data-slot="entry-preferences"]')).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 
   it('keeps selected theme usable when storage cannot be written', async () => {
@@ -184,7 +216,7 @@ describe('theme preferences', () => {
     const preference = installColorSchemePreference(true);
     setThemeMode('system', { persist: false });
 
-    await renderWithRouter(<PreferencesMenu />, { path: '/register' });
+    await renderWithRouter(<EntryPreferencesHarness />, { path: '/register' });
 
     expect(document.documentElement).toHaveClass('dark');
     expect(document.documentElement.dataset.themeMode).toBe('system');

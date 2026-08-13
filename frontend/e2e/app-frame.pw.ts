@@ -20,6 +20,18 @@ const profile = {
   ],
 };
 
+const longIdentityProfile = {
+  ...profile,
+  email: 'alexandria.montgomery-sanchez@enterprise-reference-platform.example.com',
+  fullName: 'Alexandria Catherine Montgomery-Sanchez',
+};
+
+interface AuthenticatedSessionOptions {
+  language?: 'en' | 'vi';
+  theme?: 'dark' | 'light' | 'system';
+  userProfile?: typeof profile;
+}
+
 const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[]) => ({
   definitionKey,
   name,
@@ -65,12 +77,18 @@ const fieldRuleDefinitions = {
   pageSize: 100,
 };
 
-async function mockAuthenticatedSession(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
-    localStorage.setItem('axis.language', 'en');
-    localStorage.setItem('axis.theme', 'light');
-  });
+async function mockAuthenticatedSession(
+  page: Page,
+  { language = 'en', theme = 'light', userProfile = profile }: AuthenticatedSessionOptions = {},
+): Promise<void> {
+  await page.addInitScript(
+    ({ initialLanguage, initialTheme }) => {
+      (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
+      localStorage.setItem('axis.language', initialLanguage);
+      localStorage.setItem('axis.theme', initialTheme);
+    },
+    { initialLanguage: language, initialTheme: theme },
+  );
 
   await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
@@ -80,10 +98,10 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
         authenticated: true,
         csrfToken: 'app-frame-csrf-token',
         user: {
-          userId: profile.id,
-          workspaceId: profile.workspaceId,
-          email: profile.email,
-          name: profile.fullName,
+          userId: userProfile.id,
+          workspaceId: userProfile.workspaceId,
+          email: userProfile.email,
+          name: userProfile.fullName,
         },
       }),
     });
@@ -93,7 +111,7 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(profile),
+      body: JSON.stringify({ ...userProfile, language, theme }),
     });
   });
 
@@ -103,10 +121,10 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       contentType: 'application/json',
       body: JSON.stringify([
         {
-          workspaceId: profile.workspaces[0].id,
-          name: profile.workspaces[0].name,
-          slug: profile.workspaces[0].slug,
-          type: profile.workspaces[0].type,
+          workspaceId: userProfile.workspaces[0].id,
+          name: userProfile.workspaces[0].name,
+          slug: userProfile.workspaces[0].slug,
+          type: userProfile.workspaces[0].type,
           organizationId: null,
           isCurrent: true,
         },
@@ -187,6 +205,113 @@ async function expectNoDocumentScroll(page: Page): Promise<void> {
     .toBe(true);
 }
 
+async function expectAccountIdentityResilience(
+  page: Page,
+  expectedProfile: Pick<typeof profile, 'email' | 'fullName'>,
+): Promise<void> {
+  const accountSurface = page.locator('[data-slot="account-surface"]');
+  const identity = page.getByRole('region', { name: /Account|Tài khoản/ });
+
+  const inspectText = (text: string) =>
+    identity.getByText(text, { exact: true }).evaluate((element) => {
+      const style = getComputedStyle(element);
+      const bounds = element.getBoundingClientRect();
+      return {
+        clientWidth: element.clientWidth,
+        fontSize: Number.parseFloat(style.fontSize),
+        fontWeight: style.fontWeight,
+        height: bounds.height,
+        inlineEnd: bounds.right,
+        inlineStart: bounds.left,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        overflowWrap: style.overflowWrap,
+        scrollWidth: element.scrollWidth,
+        whiteSpace: style.whiteSpace,
+      };
+    });
+
+  const [surfaceBounds, primary, secondary] = await Promise.all([
+    accountSurface.boundingBox(),
+    inspectText(expectedProfile.fullName),
+    inspectText(expectedProfile.email),
+  ]);
+  if (!surfaceBounds) throw new Error('Account surface layout was not measurable.');
+
+  const [avatarBounds, primaryBounds] = await Promise.all([
+    identity.locator('[data-slot="avatar"]').boundingBox(),
+    identity.getByText(expectedProfile.fullName, { exact: true }).boundingBox(),
+  ]);
+  if (!avatarBounds || !primaryBounds) {
+    throw new Error('Account identity alignment was not measurable.');
+  }
+  expect(
+    Math.abs(avatarBounds.y - primaryBounds.y),
+    'identity avatar remains top-aligned',
+  ).toBeLessThanOrEqual(1);
+
+  expect(primary.fontSize).toBeCloseTo(14, 1);
+  expect(primary.fontWeight).toBe('500');
+  expect(secondary.fontSize).toBeCloseTo(12, 1);
+  expect(secondary.fontWeight).toBe('400');
+  for (const textLayout of [primary, secondary]) {
+    expect(textLayout.whiteSpace).toBe('normal');
+    expect(textLayout.overflowWrap).toBe('anywhere');
+    expect(textLayout.height).toBeGreaterThan(textLayout.lineHeight);
+    expect(textLayout.scrollWidth).toBeLessThanOrEqual(textLayout.clientWidth + 1);
+    expect(textLayout.inlineStart).toBeGreaterThanOrEqual(surfaceBounds.x - 1);
+    expect(textLayout.inlineEnd).toBeLessThanOrEqual(surfaceBounds.x + surfaceBounds.width + 1);
+  }
+}
+
+async function expectAccountTargetGeometry(page: Page, minimumHeight: 32 | 44): Promise<void> {
+  const targets = page
+    .locator('[data-slot="account-surface"]')
+    .getByRole('button')
+    .or(page.getByRole('button', { name: /Account menu|Menu tài khoản/ }));
+  await targets.evaluateAll((elements) =>
+    Promise.allSettled(
+      elements.flatMap((element) => element.getAnimations()).map((animation) => animation.finished),
+    ),
+  );
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => ({
+      height: element.getBoundingClientRect().height,
+      name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '',
+    })),
+  );
+
+  expect(measurements.length).toBeGreaterThan(5);
+  expect(
+    measurements.every(({ height }) => height >= minimumHeight - 1),
+    `all Account targets meet the ${minimumHeight}px target: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+}
+
+function observeUnexpectedRuntimeErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  return errors;
+}
+
+async function expectVisibleFocusIndicator(target: Locator): Promise<void> {
+  const focusStyle = await target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      boxShadow: style.boxShadow,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth),
+    };
+  });
+  expect(
+    focusStyle.boxShadow !== 'none' ||
+      (focusStyle.outlineStyle !== 'none' && focusStyle.outlineWidth > 0),
+    JSON.stringify(focusStyle),
+  ).toBe(true);
+}
+
 async function expectRulesCatalogScrolls(page: Page): Promise<void> {
   const viewport = page.locator('[data-slot="data-table"] [data-slot="data-table-viewport"]');
   await expect(viewport).toBeVisible();
@@ -211,7 +336,10 @@ async function expectShellRegionsFitViewport(page: Page): Promise<void> {
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   const regions = [
     { name: 'top bar content', locator: page.locator('header > div') },
-    { name: 'module navigation', locator: page.getByRole('navigation', { name: 'Modules' }) },
+    {
+      name: 'module navigation',
+      locator: page.locator('[data-slot="module-navigation-boundary"] nav'),
+    },
     { name: 'main content', locator: page.getByRole('main') },
     { name: 'footer content', locator: page.locator('footer > div') },
   ];
@@ -315,6 +443,107 @@ async function colorDistance(page: Page, first: string, second: string) {
   );
 }
 
+async function expectVisibleTextContrast(
+  root: Locator,
+  minimumTextNodeCount: number,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const results = await root.evaluate((root) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('Expected a 2D canvas context');
+
+        const rgba = (color: string): [number, number, number, number] => {
+          context.clearRect(0, 0, 1, 1);
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const value = context.getImageData(0, 0, 1, 1).data;
+          return [value[0], value[1], value[2], value[3] / 255];
+        };
+        const composite = (
+          foreground: [number, number, number, number],
+          background: [number, number, number, number],
+        ): [number, number, number, number] => {
+          const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+          if (alpha === 0) return [0, 0, 0, 0];
+          return [
+            (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) /
+              alpha,
+            (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) /
+              alpha,
+            (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) /
+              alpha,
+            alpha,
+          ];
+        };
+        const luminance = ([red, green, blue]: [number, number, number, number]) => {
+          const linear = [red, green, blue].map((channel) => {
+            const value = channel / 255;
+            return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+          });
+          return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+        };
+
+        const textByElement = new Map<HTMLElement, string[]>();
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const text = node.textContent?.trim();
+          const element = node.parentElement;
+          if (!text || !element) continue;
+          const bounds = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          if (
+            bounds.width <= 1 ||
+            bounds.height <= 1 ||
+            style.display === 'none' ||
+            style.visibility === 'hidden'
+          ) {
+            continue;
+          }
+          textByElement.set(element, [...(textByElement.get(element) ?? []), text]);
+        }
+
+        return [...textByElement].map(([element, text]) => {
+          const layers: [number, number, number, number][] = [];
+          for (let node: Element | null = element; node; node = node.parentElement) {
+            layers.push(rgba(getComputedStyle(node).backgroundColor));
+          }
+          let background: [number, number, number, number] = [255, 255, 255, 1];
+          for (const layer of layers.reverse()) background = composite(layer, background);
+          const foreground = composite(rgba(getComputedStyle(element).color), background);
+          const foregroundLuminance = luminance(foreground);
+          const backgroundLuminance = luminance(background);
+
+          return {
+            background: getComputedStyle(element).backgroundColor,
+            color: getComputedStyle(element).color,
+            ratio:
+              (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+              (Math.min(foregroundLuminance, backgroundLuminance) + 0.05),
+            text: text.join(' '),
+          };
+        });
+      });
+
+      return {
+        failures: results.filter(({ ratio }) => ratio < 4.5),
+        hasCoverage: results.length >= minimumTextNodeCount,
+      };
+    })
+    .toEqual({ failures: [], hasCoverage: true });
+}
+
+async function expectAccountTextContrast(page: Page): Promise<void> {
+  await expectVisibleTextContrast(page.locator('[data-slot="account-surface"]'), 10);
+}
+
+async function expectAuthenticatedFrameTextContrast(page: Page): Promise<void> {
+  await expectVisibleTextContrast(page.locator('[data-axis-surface-id="authenticated-frame"]'), 6);
+}
+
 async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise<void> {
   await expectCanonicalTestLanguage(page);
   const accountSurface = page.locator('[data-slot="account-surface"]');
@@ -323,10 +552,55 @@ async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise
   await expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
   await expect(accountSurface.locator('[aria-busy="true"]')).toHaveCount(0);
   await accountSurface.evaluate((element) =>
-    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    Promise.allSettled(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
   );
   await page.mouse.move(1, 1);
   await expect(accountSurface).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+  });
+}
+
+async function expectAuthenticatedFrameTargetGeometry(
+  page: Page,
+  minimumHeight: 32 | 44,
+): Promise<void> {
+  const frame = page.locator('[data-axis-surface-id="authenticated-frame"]');
+  const targets = frame.getByRole('link').or(frame.getByRole('button'));
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => ({
+      height: element.getBoundingClientRect().height,
+      name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '',
+    })),
+  );
+
+  expect(measurements.length).toBeGreaterThan(3);
+  expect(
+    measurements.every(({ height }) => height >= minimumHeight - 1),
+    `all authenticated-frame targets meet the ${minimumHeight}px target: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+}
+
+async function expectAuthenticatedFrameScreenshot(
+  page: Page,
+  name: string,
+  { canonicalLanguage = true }: { canonicalLanguage?: boolean } = {},
+): Promise<void> {
+  if (canonicalLanguage) await expectCanonicalTestLanguage(page);
+  const frame = page.locator('[data-axis-surface-id="authenticated-frame"]');
+  await expect(frame).toBeVisible();
+  await expect(frame).toHaveAttribute('data-axis-surface-contract', 'authenticated-frame');
+  await expect(frame.locator('[data-slot="account-surface"]')).toHaveCount(0);
+  await frame.evaluate((element) =>
+    Promise.allSettled(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
+  );
+  await page.mouse.move(1, 1);
+  await expect(frame).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
     scale: 'css',
@@ -407,7 +681,7 @@ test.describe('app frame', () => {
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
 
     for (const mode of ['light', 'dark'] as const) {
-      await page.getByRole('button', { name: 'Account menu' }).click();
+      await page.getByRole('button', { name: /Account menu/ }).click();
       if (mode === 'dark') {
         await page.getByRole('button', { name: 'Dark' }).click();
         await expect(page.locator('html')).toHaveClass(/dark/);
@@ -492,8 +766,9 @@ test.describe('app frame', () => {
   test('AT-004 account surface visual contract covers canonical EN light and dark desktop and compact', async ({
     page,
   }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await mockAuthenticatedSession(page);
+    await mockAuthenticatedSession(page, { userProfile: longIdentityProfile });
     await page.route('**/api/users/me/preferences/language', async (route) => {
       const language = JSON.parse(route.request().postData() ?? '{}').language ?? 'en';
       await route.fulfill({
@@ -514,11 +789,14 @@ test.describe('app frame', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await expectAppFrameReady(page, 'Dashboard');
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     await expect(page.getByRole('button', { name: 'Personal' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expectAccountIdentityResilience(page, longIdentityProfile);
+    await expectAccountTargetGeometry(page, 32);
     await expectAccountRegionRhythmAndActionAffordance(page);
+    await expectAccountTextContrast(page);
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-desktop-en');
 
     const darkDesktopOption = page.getByRole('button', { name: 'Dark' });
@@ -526,9 +804,11 @@ test.describe('app frame', () => {
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(darkDesktopOption).toHaveAttribute('aria-pressed', 'true');
     await expect(darkDesktopOption).not.toHaveAttribute('aria-busy');
+    await expectAccountTextContrast(page);
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-en');
 
     await page.setViewportSize({ width: 390, height: 844 });
+    await expectAccountTargetGeometry(page, 44);
     await expectAccountRegionRhythmAndActionAffordance(page);
     await expectNoPageOverflow(page);
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-en');
@@ -539,9 +819,204 @@ test.describe('app frame', () => {
     await expect(lightCompactOption).toHaveAttribute('aria-pressed', 'true');
     await expect(lightCompactOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-en');
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('AT-005 authenticated frame visual contract covers canonical EN light and dark desktop and compact', async ({
+    page,
+  }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { userProfile: longIdentityProfile });
+    await page.route('**/api/users/me/preferences/language', async (route) => {
+      const language = JSON.parse(route.request().postData() ?? '{}').language ?? 'en';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ language }),
+      });
+    });
+    await page.route('**/api/users/me/preferences/theme', async (route) => {
+      const theme = JSON.parse(route.request().postData() ?? '{}').theme ?? 'light';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ theme }),
+      });
+    });
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Dashboard');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(page.getByRole('main')).toHaveText('');
+    await expectShellRegionsFitViewport(page);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    await expectAuthenticatedFrameTargetGeometry(page, 32);
+    await expectAuthenticatedFrameTextContrast(page);
+
+    const frame = page.locator('[data-axis-surface-id="authenticated-frame"]');
+    const ariaTree = await frame.ariaSnapshot();
+    for (const semanticEntry of ['banner', 'navigation "Modules"', 'main', 'contentinfo']) {
+      expect(ariaTree).toContain(semanticEntry);
+    }
+    const rulesLink = page.getByRole('link', { name: 'Rules' });
+    await rulesLink.focus();
+    await expectVisibleFocusIndicator(rulesLink);
+    await expect(rulesLink).toBeInViewport();
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-light-desktop-en');
+
+    await page.getByRole('button', { name: /Account menu/ }).click();
+    await invokePreferenceAction(page, page.getByRole('button', { name: 'Dark' }), 'theme');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page.keyboard.press('Escape');
+    await rulesLink.focus();
+    await expectVisibleFocusIndicator(rulesLink);
+    await expectAuthenticatedFrameTextContrast(page);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-dark-desktop-en');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectShellRegionsFitViewport(page);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    await expectAuthenticatedFrameTargetGeometry(page, 44);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-dark-compact-en');
+
+    await page.getByRole('button', { name: /Account menu/ }).click();
+    await invokePreferenceAction(page, page.getByRole('button', { name: 'Light' }), 'theme');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await page.keyboard.press('Escape');
+    await rulesLink.focus();
+    await expectVisibleFocusIndicator(rulesLink);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-light-compact-en');
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('AT-002 Authenticated Frame reflows at the VI 320 CSS pixel boundary', async ({ page }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, {
+      language: 'vi',
+      userProfile: longIdentityProfile,
+    });
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Bảng điều khiển');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-axis-surface-id="authenticated-frame"], [data-axis-surface-id="authenticated-frame"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+    await expectShellRegionsFitViewport(page);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    await expectAuthenticatedFrameTargetGeometry(page, 44);
+    await expectAuthenticatedFrameTextContrast(page);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-light-compact-vi-reflow', {
+      canonicalLanguage: false,
+    });
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('AT-002 Account reflows localized identity and controls at the 320 CSS pixel boundary', async ({
+    page,
+  }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, {
+      language: 'vi',
+      userProfile: longIdentityProfile,
+    });
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveTitle('Axis Platform');
+    await expectAppFrameReady(page, 'Bảng điều khiển');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+
+    const accountTrigger = page.getByRole('button', { name: /Menu tài khoản/ });
+    await expect(accountTrigger).toHaveAccessibleName(new RegExp(longIdentityProfile.fullName));
+    await accountTrigger.click();
+
+    const accountSurface = page.locator('[data-slot="account-surface"]');
+    await expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
+    await expect(accountSurface).toHaveAttribute('data-axis-surface-id', 'account-actions');
+    await expect(page.getByRole('button', { name: 'Cá nhân' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expectAccountIdentityResilience(page, longIdentityProfile);
+
+    const ariaTree = await accountSurface.ariaSnapshot();
+    for (const semanticEntry of [
+      'dialog "Menu tài khoản"',
+      'region "Tài khoản"',
+      'region "Workspace"',
+      'region "Tùy chọn"',
+      'group "Ngôn ngữ"',
+      'group "Giao diện"',
+      'button "Đăng xuất"',
+    ]) {
+      expect(ariaTree).toContain(semanticEntry);
+    }
+
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-slot="account-surface"], [data-slot="account-surface"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+
+    await expectAccountIdentityResilience(page, longIdentityProfile);
+    await expectAccountTargetGeometry(page, 44);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    const surfaceOverflow = await accountSurface.evaluate((surface) => ({
+      clientWidth: surface.clientWidth,
+      offenders: Array.from(surface.querySelectorAll<HTMLElement>('*'))
+        .map((element) => ({
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          slot: element.dataset.slot ?? element.dataset.axisAccountRegion ?? element.tagName,
+        }))
+        .filter(({ clientWidth, scrollWidth }) => scrollWidth > clientWidth + 1),
+      scrollWidth: surface.scrollWidth,
+    }));
+    expect(
+      surfaceOverflow.scrollWidth,
+      JSON.stringify(surfaceOverflow.offenders),
+    ).toBeLessThanOrEqual(surfaceOverflow.clientWidth + 1);
+
+    await page.mouse.move(1, 1);
+    await expect(accountSurface).toHaveScreenshot('account-surface-light-compact-vi-reflow.png', {
+      animations: 'disabled',
+      caret: 'hide',
+      scale: 'css',
+    });
+
+    const signOut = page.getByRole('button', { name: 'Đăng xuất' });
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      if (await signOut.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(signOut).toBeFocused();
+    await expectVisibleFocusIndicator(signOut);
+    await expect(signOut).toBeInViewport();
+    expect(runtimeErrors).toEqual([]);
   });
 
   test('AT-002 compact Account keeps a long Workspace set keyboard-reachable', async ({ page }) => {
+    const longWorkspaceName = 'Organization Arbeitsunfaehigkeitsbescheinigungsverwaltung 01';
     await mockAuthenticatedSession(page);
     await page.unroute('**/api/workspace-context/eligible');
     await page.route('**/api/workspace-context/eligible', async (route) => {
@@ -559,7 +1034,10 @@ test.describe('app frame', () => {
           },
           ...Array.from({ length: 12 }, (_, index) => ({
             workspaceId: `33333333-3333-4333-8333-${String(index + 1).padStart(12, '0')}`,
-            name: `Organization Workspace ${String(index + 1).padStart(2, '0')}`,
+            name:
+              index === 0
+                ? longWorkspaceName
+                : `Organization Workspace ${String(index + 1).padStart(2, '0')}`,
             slug: `organization-workspace-${index + 1}`,
             type: 'Organization',
             organizationId: `44444444-4444-4444-8444-${String(index + 1).padStart(12, '0')}`,
@@ -572,12 +1050,33 @@ test.describe('app frame', () => {
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await expectAppFrameReady(page, 'Dashboard');
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     const firstOrganization = page.getByRole('button', {
-      name: 'Organization Workspace 01',
+      name: longWorkspaceName,
     });
     const signOut = page.getByRole('button', { name: 'Sign out' });
     await expect(firstOrganization).toBeVisible();
+    const labelLayout = await firstOrganization
+      .locator('[data-slot="option-item-label"]')
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          clientWidth: element.clientWidth,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(style.lineHeight),
+          overflowWrap: style.overflowWrap,
+          scrollWidth: element.scrollWidth,
+          whiteSpace: style.whiteSpace,
+        };
+      });
+    expect(labelLayout.fontSize).toBe('14px');
+    expect(labelLayout.fontWeight).toBe('500');
+    expect(labelLayout.whiteSpace).toBe('normal');
+    expect(labelLayout.overflowWrap).toBe('break-word');
+    expect(labelLayout.height).toBeGreaterThan(labelLayout.lineHeight);
+    expect(labelLayout.scrollWidth).toBeLessThanOrEqual(labelLayout.clientWidth + 1);
     await firstOrganization.focus();
 
     for (let attempt = 0; attempt < 32; attempt += 1) {
@@ -586,6 +1085,7 @@ test.describe('app frame', () => {
     }
 
     await expect(signOut).toBeFocused();
+    await expectVisibleFocusIndicator(signOut);
     await expect(signOut).toBeInViewport();
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
@@ -751,13 +1251,15 @@ test.describe('app frame', () => {
     const moduleNavigation = page.getByRole('navigation', { name: 'Modules' });
     await expect(moduleNavigation).toBeVisible();
     await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toBeVisible();
-    const accountTrigger = page.getByRole('button', { name: 'Account menu' });
+    const accountTrigger = page.getByRole('button', { name: /Account menu/ });
     await expect(accountTrigger).toContainText(organizationWorkspace.name);
     await accountTrigger.click();
     const accountView = page.locator('[data-slot="account-surface"]');
     await expect(accountView).toBeVisible();
     await accountView.evaluate((element) =>
-      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      Promise.allSettled(
+        element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      ),
     );
     const organizationWorkspaceOption = accountView.getByRole('button', {
       name: organizationWorkspace.name,
@@ -890,13 +1392,7 @@ test.describe('app frame', () => {
   test('AT-002 desktop and mobile frame render without console errors or document overflow', async ({
     page,
   }) => {
-    const pageErrors: string[] = [];
-    page.on('console', (message) => {
-      if (message.type() === 'error') {
-        pageErrors.push(message.text());
-      }
-    });
-    page.on('pageerror', (error) => pageErrors.push(error.message));
+    const pageErrors = observeUnexpectedRuntimeErrors(page);
 
     await mockAuthenticatedSession(page);
     let completeThemeSave: (() => void) | undefined;
@@ -935,7 +1431,7 @@ test.describe('app frame', () => {
     await expect(page.getByRole('contentinfo')).toContainText('Axis Platform');
     await expect(page.getByRole('contentinfo')).toContainText('2026');
     await expectShellRegionsFitViewport(page);
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     const accountIdentity = page.getByRole('region', { name: 'Account' });
     await expect(accountIdentity.getByText(profile.fullName)).toBeVisible();
     await expect(accountIdentity.getByText(profile.email)).toBeVisible();
@@ -947,7 +1443,9 @@ test.describe('app frame', () => {
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     const accountMenu = page.locator('[data-slot="account-surface"]');
     await accountMenu.evaluate((element) =>
-      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      Promise.allSettled(
+        element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      ),
     );
     const initialMenuBox = await accountMenu.boundingBox();
     const darkOption = page.getByRole('button', { name: 'Dark' });
@@ -986,7 +1484,7 @@ test.describe('app frame', () => {
     await expect(page.getByRole('main')).toHaveText('');
     await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
     await expectShellRegionsFitViewport(page);
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);

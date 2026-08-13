@@ -39,6 +39,9 @@ Every non-trivial dossier covers:
    In both cases list retired identifiers and the post-edit `rg` sweep. Do not add compatibility “just in case.” Otherwise write `N/A because no supported surface is retired`.
 5. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
 6. **Verification plan** — list exact development checks and review-readiness checks. Do not call review-only artifacts gates.
+7. **UI review unit** — for constitution, profile, theme, surface-owner, or visible-consumer work, name exactly one foundation, owner, or consumer; choose the largest coherent boundary with one owner, contract, invalidation set, and review decision, normally the whole foundation/surface or a complete consumer. Do not fragment one owner into typography, spacing, individual regions, or other implementation details unless ownership, acceptance, verification, or safe rollback is genuinely independent; record that rationale when splitting. Name the candidate review boundary, applicable profile requirements and current gaps, invalidation triggers, and the conditions that stop and reopen the unit. Otherwise write `N/A because the change does not affect visible UI or its conformance system`.
+
+For project-owner communication, collapse the manifest's independent lifecycle, acceptance, and perceptual controls into one review-unit roll-up: `In progress`, `Awaiting review`, or `Complete`. Requested changes return the same unit to `In progress`. Raw machine states remain audit detail and must not be presented as three separate decisions for the reviewer.
 
 Skip a row only with an explicit `N/A because ...`.
 

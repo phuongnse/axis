@@ -22,6 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  dataTableCheckboxHitArea,
+  dataTableControlHeight,
+  dataTableTargetGeometry,
+} from './geometry';
 
 export function ShadcnQueryBuilderAction({
   handleOnClick,
@@ -41,6 +46,7 @@ export function ShadcnQueryBuilderAction({
       aria-label={remove ? title : undefined}
       title={title}
       disabled={disabled}
+      className={dataTableTargetGeometry}
       onClick={handleOnClick}
     >
       <Icon aria-hidden />
@@ -77,6 +83,7 @@ export function ShadcnQueryBuilderSelector({
               title={title}
               disabled={disabled}
               data-testid={testID}
+              className={dataTableTargetGeometry}
             />
           }
         >
@@ -114,7 +121,7 @@ export function ShadcnQueryBuilderSelector({
         if (nextValue !== null) handleOnChange(nextValue);
       }}
     >
-      <SelectTrigger data-testid={testID} title={title}>
+      <SelectTrigger data-testid={testID} title={title} className={dataTableTargetGeometry}>
         <SelectValue>{selectedLabels[0] ?? title}</SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -150,10 +157,11 @@ function MultiSelectOption({
 }) {
   const id = useId();
   return (
-    <Label htmlFor={id}>
+    <Label htmlFor={id} className={dataTableControlHeight}>
       <Checkbox
         id={id}
         checked={checked}
+        className={dataTableCheckboxHitArea}
         onCheckedChange={(value) => onCheckedChange(Boolean(value))}
       />
       {option.label}
@@ -188,6 +196,7 @@ export function ShadcnQueryBuilderValueEditor(props: ValueEditorProps): JSX.Elem
           <span key={index === 0 ? 'minimum' : 'maximum'} className="contents">
             {index === 1 ? separator : null}
             <Input
+              className={dataTableControlHeight}
               type={inputType ?? 'text'}
               value={current[index] ?? ''}
               disabled={disabled}
@@ -206,6 +215,7 @@ export function ShadcnQueryBuilderValueEditor(props: ValueEditorProps): JSX.Elem
   const list = operator === 'in' || operator === 'notIn';
   return (
     <Input
+      className={dataTableControlHeight}
       data-testid={testID}
       type={list ? 'text' : (inputType ?? 'text')}
       value={list && Array.isArray(value) ? value.join(', ') : (value ?? '')}

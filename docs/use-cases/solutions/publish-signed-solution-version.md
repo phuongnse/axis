@@ -96,13 +96,14 @@ Allow a Workspace lifecycle administrator to publish one trusted, immutable sign
 
 | Surface | Required contract |
 |---|---|
-| Publish entry | States the solution/version and package identity before confirmation; the primary action is unavailable until a package is selected. |
+| Collection entry | The Solutions route presents one primary solution-version table that combines immutable release identity with current-Workspace installation state. Publish is owned by that table's toolbar, and the collection remains available while a focused publishing task is open. |
+| Publish entry | Opens as a stable managed task, states the solution/version and package identity before confirmation, and keeps the primary action unavailable until a package is selected. |
 | Publish confirmation | Explains that the release becomes immutable and will be checked against trusted-publisher policy; confirmation receives focus only when actionable. |
 | Verifying/publishing | Announces verification and mutation progress without repeatedly stealing focus. Cancellation/dismissal cannot imply that a server mutation was undone. |
 | Result | Shows safe identity, version, hash, publisher/key, Axis OpenAPI digest, provenance, and next action. It never renders raw package bytes, signatures, secrets, or another Workspace's data. |
 | Failure/recovery | Identifies a safe package-local reason and recovery action; trust, conflict, validation, unavailable configuration, and retryable transport failures remain distinct. |
 
-Required UI quality: status and result information are programmatically labelled; the full result and recovery path are keyboard-accessible and announced; compact and desktop layouts preserve long keys, hashes, and provenance without overflow; universal UI copy is localized; no secret, raw package, signature, or cross-Workspace data is rendered.
+Required UI quality: the collection follows the [Collection Page](../../foundations/data-display/collection-page.md) contract and publishing follows the [Managed Dialog](../../foundations/overlays/managed-dialog.md) task contract; status and result information are programmatically labelled; the full result and recovery path are keyboard-accessible and announced; compact and desktop layouts preserve long keys, hashes, and provenance without overflow; universal UI copy is localized; no secret, raw package, signature, or cross-Workspace data is rendered.
 
 > **Implementation status**
 >

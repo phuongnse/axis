@@ -11,11 +11,12 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
   type DataTableQueryState,
+  DataTableRecordAction,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { PageAction } from '@/components/shared/PageLayout';
 import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
-import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
+import { StatusBadge, type StatusBadgeState } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ApiError } from '@/lib/api';
@@ -270,9 +271,7 @@ function RuleIdentityCell({
   return (
     <div className="min-w-0 whitespace-normal">
       {onOpen ? (
-        <PageAction data-slot="rule-table-value" type="button" variant="link" onClick={onOpen}>
-          {name}
-        </PageAction>
+        <DataTableRecordAction onClick={onOpen}>{name}</DataTableRecordAction>
       ) : (
         <p data-slot="rule-table-value" className="font-semibold text-foreground">
           {name}
@@ -312,14 +311,14 @@ function RuleOriginCell({ definition }: { definition: RuleDefinitionSummary }) {
 function RuleStatusCell({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
   const label = definition.status ? t(`rules.status${definition.status}`) : '—';
-  const tone: StatusBadgeTone =
+  const state: StatusBadgeState =
     definition.status === 'Active'
-      ? 'success'
-      : definition.status === 'Draft' || definition.status === 'Inactive'
+      ? 'positive'
+      : definition.status === 'Draft'
         ? 'neutral'
-        : 'muted';
+        : 'inactive';
   return (
-    <StatusBadge data-slot="rule-table-value" tone={tone}>
+    <StatusBadge data-slot="rule-table-value" state={state}>
       {label}
     </StatusBadge>
   );

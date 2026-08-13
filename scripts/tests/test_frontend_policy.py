@@ -506,10 +506,268 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
 
 
 class TestUiFoundationContracts(unittest.TestCase):
+    assessment_evidence = (
+        "docs/foundations/data-display/collection-page.assessment.md"
+    )
+    component_evidence = "frontend/tests/resource-workspace.test.tsx"
+    browser_evidence = "frontend/e2e/resource-workspace.pw.ts"
+    snapshot = (
+        "frontend/e2e/resource-workspace.pw.ts-snapshots/"
+        "resource-workspace-light-desktop-en-chromium-linux.png"
+    )
+    spec = "docs/foundations/data-display/collection-page.md"
+    acceptance_component = f"{spec}#AT-001"
+    acceptance_visual = f"{spec}#AT-002"
+    requirement_ids = (
+        "behavior.anatomy-layout",
+        "lifecycle.consumer-ownership-adoption",
+        "lifecycle.retirement-compatibility",
+        "standard.human-centred-evaluation",
+        "standard.interaction-principles",
+        "standard.wcag-2-2-aa",
+        "visual.color-tone-contrast",
+        "visual.iconography",
+    )
+
+    def profile(self) -> dict[str, object]:
+        return {
+            "schemaVersion": 1,
+            "profileId": "axis-ui-v1",
+            "modes": [
+                "compact",
+                "dark",
+                "desktop",
+                "keyboard",
+                "light",
+                "locale",
+                "pointer",
+                "reduced-motion",
+                "screen-reader",
+                "zoom-reflow",
+            ],
+            "invalidationTriggers": [
+                "acceptance",
+                "constitution",
+                "consumer",
+                "evidence",
+                "surface-owner",
+                "theme",
+            ],
+            "requirements": {
+                "behavior.anatomy-layout": {
+                    "category": "behavior",
+                    "evidenceKinds": ["browser", "component"],
+                    "requiredModes": ["compact", "desktop"],
+                    "invalidatedBy": ["constitution", "evidence"],
+                    "allowNotApplicable": False,
+                },
+                "lifecycle.consumer-ownership-adoption": {
+                    "category": "lifecycle",
+                    "evidenceKinds": ["component"],
+                    "requiredModes": [],
+                    "invalidatedBy": ["consumer", "evidence", "surface-owner"],
+                    "allowNotApplicable": False,
+                },
+                "lifecycle.retirement-compatibility": {
+                    "category": "lifecycle",
+                    "evidenceKinds": ["assessment", "component"],
+                    "requiredModes": [],
+                    "invalidatedBy": [
+                        "constitution",
+                        "consumer",
+                        "evidence",
+                        "surface-owner",
+                    ],
+                    "allowNotApplicable": False,
+                },
+                "standard.human-centred-evaluation": {
+                    "category": "standard",
+                    "evidenceKinds": ["assessment", "review"],
+                    "requiredModes": [],
+                    "invalidatedBy": [
+                        "acceptance",
+                        "constitution",
+                        "consumer",
+                        "evidence",
+                        "surface-owner",
+                        "theme",
+                    ],
+                    "allowNotApplicable": False,
+                },
+                "standard.interaction-principles": {
+                    "category": "standard",
+                    "evidenceKinds": [
+                        "assessment",
+                        "browser",
+                        "component",
+                        "review",
+                    ],
+                    "requiredModes": ["keyboard", "pointer"],
+                    "invalidatedBy": [
+                        "acceptance",
+                        "constitution",
+                        "consumer",
+                        "evidence",
+                        "surface-owner",
+                        "theme",
+                    ],
+                    "allowNotApplicable": False,
+                },
+                "standard.wcag-2-2-aa": {
+                    "category": "standard",
+                    "evidenceKinds": [
+                        "assessment",
+                        "browser",
+                        "component",
+                        "review",
+                    ],
+                    "requiredModes": [
+                        "compact",
+                        "desktop",
+                        "keyboard",
+                        "locale",
+                        "reduced-motion",
+                        "screen-reader",
+                        "zoom-reflow",
+                    ],
+                    "invalidatedBy": [
+                        "acceptance",
+                        "constitution",
+                        "consumer",
+                        "evidence",
+                        "surface-owner",
+                        "theme",
+                    ],
+                    "allowNotApplicable": False,
+                },
+                "visual.color-tone-contrast": {
+                    "category": "visual",
+                    "evidenceKinds": ["perceptual"],
+                    "requiredModes": ["dark", "light"],
+                    "invalidatedBy": ["constitution", "evidence"],
+                    "allowNotApplicable": False,
+                },
+                "visual.iconography": {
+                    "category": "visual",
+                    "evidenceKinds": ["component", "perceptual"],
+                    "requiredModes": ["compact", "dark", "desktop", "light"],
+                    "invalidatedBy": ["constitution", "evidence"],
+                    "allowNotApplicable": True,
+                },
+            },
+        }
+
+    def contract(
+        self,
+        *,
+        state: str = "defined",
+        component: str | None = None,
+        browser: str | None = None,
+        perceptual_status: str = "missing",
+        artifacts: list[str] | None = None,
+        acceptance_status: str = "pending",
+        coverage: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return {
+            "state": state,
+            "spec": self.spec,
+            "coverageProfile": "axis-ui-v1",
+            "acceptance": {
+                "status": acceptance_status,
+            },
+            "evidence": {
+                "assessment": [self.assessment_evidence],
+                "component": [component or self.component_evidence],
+                "browser": [browser or self.browser_evidence],
+                "perceptual": {
+                    "status": perceptual_status,
+                    "artifacts": artifacts or [],
+                },
+                "coverage": coverage
+                if coverage is not None
+                else {
+                    "covered": {},
+                    "gaps": list(self.requirement_ids),
+                    "notApplicable": {},
+                },
+            },
+        }
+
+    def complete_coverage(self) -> dict[str, object]:
+        return {
+            "covered": {
+                "behavior.anatomy-layout": {
+                    "acceptance": [self.acceptance_component],
+                    "evidence": [self.browser_evidence, self.component_evidence],
+                    "modes": ["compact", "desktop"],
+                },
+                "lifecycle.consumer-ownership-adoption": {
+                    "acceptance": [self.acceptance_component],
+                    "evidence": [self.component_evidence],
+                    "modes": [],
+                },
+                "lifecycle.retirement-compatibility": {
+                    "acceptance": [self.acceptance_component],
+                    "evidence": [self.assessment_evidence, self.component_evidence],
+                    "modes": [],
+                },
+                "standard.human-centred-evaluation": {
+                    "acceptance": [self.acceptance_component],
+                    "evidence": [self.assessment_evidence],
+                    "modes": [],
+                },
+                "standard.interaction-principles": {
+                    "acceptance": [self.acceptance_component],
+                    "evidence": [
+                        self.assessment_evidence,
+                        self.browser_evidence,
+                        self.component_evidence,
+                    ],
+                    "modes": ["keyboard", "pointer"],
+                },
+                "standard.wcag-2-2-aa": {
+                    "acceptance": [self.acceptance_component],
+                    "evidence": [
+                        self.assessment_evidence,
+                        self.browser_evidence,
+                        self.component_evidence,
+                    ],
+                    "modes": [
+                        "compact",
+                        "desktop",
+                        "keyboard",
+                        "locale",
+                        "reduced-motion",
+                        "screen-reader",
+                        "zoom-reflow",
+                    ],
+                },
+                "visual.color-tone-contrast": {
+                    "acceptance": [self.acceptance_visual],
+                    "evidence": [self.snapshot],
+                    "modes": ["dark", "light"],
+                },
+            },
+            "gaps": [],
+            "notApplicable": {
+                "visual.iconography": "The fixture surface has no icon role."
+            },
+        }
+
+    def accepted_contract(self, state: str = "enforced") -> dict[str, object]:
+        return self.contract(
+            state=state,
+            perceptual_status="accepted",
+            artifacts=[self.snapshot],
+            acceptance_status="accepted",
+            coverage=self.complete_coverage(),
+        )
+
     def issues_for_foundation(
         self,
         *,
         manifest_changes: dict[str, object] | None = None,
+        profile: dict[str, object] | None = None,
         files: dict[str, str] | None = None,
         missing_files: set[str] | None = None,
     ) -> list[str]:
@@ -518,27 +776,34 @@ class TestUiFoundationContracts(unittest.TestCase):
             manifest_path = root / "frontend/ui-foundation.json"
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             manifest = {
-                "schemaVersion": 5,
-                "contracts": {
-                    "resource-workspace": {
-                        "state": "defined",
-                        "spec": "docs/foundations/data-display/collection-page.md",
-                        "evidence": {
-                            "component": ["frontend/tests/resource-workspace.test.tsx"],
-                            "browser": ["frontend/e2e/resource-workspace.pw.ts"],
-                            "perceptual": [],
-                        },
-                    }
-                },
+                "schemaVersion": 7,
+                "contracts": {"resource-workspace": self.contract()},
                 "enforcedContracts": {},
             }
             manifest.update(manifest_changes or {})
             manifest_path.write_text(f"{json.dumps(manifest)}\n", encoding="utf-8")
 
             default_files = {
+                "frontend/ui-coverage-profile.json": f"{json.dumps(profile or self.profile())}\n",
                 "frontend/src/lib/ui-foundation.ts": "export {};\n",
                 "frontend/src/lib/active-surface-registry.ts": "export {};\n",
-                "docs/foundations/data-display/collection-page.md": "# Collection Page\n",
+                self.spec: (
+                    "# Collection Page\n\n"
+                    "## Acceptance Test Matrix\n\n"
+                    "| ID | Boundary | Scenario | Covers AC | Verification | Required |\n"
+                    "|---|---|---|---|---|---|\n"
+                    "| AT-001 | UI component | Component proof | AC-001 | UI component test | Yes |\n"
+                    "| AT-002 | Layout smoke | Visual proof | AC-001 | Browser-capable visual smoke | Yes |\n"
+                ),
+                "docs/foundations/data-display/collection-page.evidence.md": (
+                    "# Collection Page Evidence\n\n"
+                    "## Acceptance Evidence\n\n"
+                    "| AT ID | Evidence | Commands |\n"
+                    "|---|---|---|\n"
+                    f"| AT-001 | `{self.assessment_evidence}`, `{self.component_evidence}`, `{self.browser_evidence}` | `python scripts/axis.py frontend test tests/resource-workspace.test.tsx` |\n"
+                    f"| AT-002 | `{self.snapshot}` | `python scripts/axis.py local-dev e2e -- e2e/resource-workspace.pw.ts` |\n"
+                ),
+                self.assessment_evidence: "# Collection Page Standards Assessment\n",
                 "frontend/tests/resource-workspace.test.tsx": "export {};\n",
                 "frontend/e2e/resource-workspace.pw.ts": "export {};\n",
                 "frontend/src/features/rules/components/RulesPage.tsx": (
@@ -561,20 +826,48 @@ class TestUiFoundationContracts(unittest.TestCase):
 
     def test_rejects_unknown_schema(self) -> None:
         issues = self.issues_for_foundation(manifest_changes={"schemaVersion": 4})
-        self.assertIn("`schemaVersion` must be 5", "\n".join(issues))
+        self.assertIn("`schemaVersion` must be 7", "\n".join(issues))
+
+    def test_rejects_missing_or_invalid_coverage_profile(self) -> None:
+        issues = self.issues_for_foundation(
+            missing_files={"frontend/ui-coverage-profile.json"}
+        )
+        self.assertIn("governed UI coverage profile is missing", "\n".join(issues))
+
+        invalid_profile = self.profile()
+        invalid_profile["requirements"]["behavior.anatomy-layout"]["requiredModes"] = [
+            "tablet"
+        ]
+        issues = self.issues_for_foundation(profile=invalid_profile)
+        self.assertIn("contains unknown values: tablet", "\n".join(issues))
+
+        weakened_profile = self.profile()
+        weakened_profile["requirements"].pop("standard.wcag-2-2-aa")
+        issues = self.issues_for_foundation(profile=weakened_profile)
+        self.assertIn(
+            "missing baseline requirements: standard.wcag-2-2-aa",
+            "\n".join(issues),
+        )
+
+        unassessed_profile = self.profile()
+        unassessed_profile["requirements"]["standard.wcag-2-2-aa"][
+            "evidenceKinds"
+        ].remove("assessment")
+        issues = self.issues_for_foundation(profile=unassessed_profile)
+        self.assertIn(
+            "missing baseline evidence kinds: assessment", "\n".join(issues)
+        )
+
+    def test_rejects_contract_profile_drift(self) -> None:
+        contract = self.contract()
+        contract["coverageProfile"] = "axis-ui-v2"
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}}
+        )
+        self.assertIn("must match", "\n".join(issues))
 
     def test_rejects_unknown_contract_state(self) -> None:
-        contracts = {
-            "resource-workspace": {
-                "state": "accepted",
-                "spec": "docs/foundations/data-display/collection-page.md",
-                "evidence": {
-                    "component": ["frontend/tests/resource-workspace.test.tsx"],
-                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
-                    "perceptual": [],
-                },
-            }
-        }
+        contracts = {"resource-workspace": self.contract(state="accepted")}
         issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
         self.assertIn("state` must be one of: defined, enforced, verified", "\n".join(issues))
 
@@ -582,38 +875,177 @@ class TestUiFoundationContracts(unittest.TestCase):
         for state in ("verified", "enforced"):
             with self.subTest(state=state):
                 contracts = {
-                    "resource-workspace": {
-                        "state": state,
-                        "spec": "docs/foundations/data-display/collection-page.md",
-                        "evidence": {
-                            "component": ["frontend/tests/resource-workspace.test.tsx"],
-                            "browser": ["frontend/e2e/resource-workspace.pw.ts"],
-                            "perceptual": [],
-                        },
-                    }
+                    "resource-workspace": self.contract(
+                        state=state,
+                        perceptual_status="candidate",
+                        artifacts=[self.snapshot],
+                        acceptance_status="accepted",
+                        coverage=self.complete_coverage(),
+                    )
                 }
-                issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
+                issues = self.issues_for_foundation(
+                    manifest_changes={"contracts": contracts},
+                    files={self.snapshot: "snapshot"},
+                )
                 self.assertIn(
-                    f"cannot be `{state}` without version-controlled perceptual evidence",
+                    f"cannot be `{state}` without accepted perceptual evidence",
                     "\n".join(issues),
                 )
 
-    def test_accepts_enforced_contract_with_versioned_perceptual_evidence(self) -> None:
-        snapshot = (
-            "frontend/e2e/resource-workspace.pw.ts-snapshots/"
-            "resource-workspace-light-desktop-en-chromium-linux.png"
-        )
-        contracts = {
-            "resource-workspace": {
-                "state": "enforced",
-                "spec": "docs/foundations/data-display/collection-page.md",
-                "evidence": {
-                    "component": ["frontend/tests/resource-workspace.test.tsx"],
-                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
-                    "perceptual": [snapshot],
-                },
-            }
+    def test_rejects_advanced_state_without_project_owner_acceptance(self) -> None:
+        contract = self.accepted_contract(state="verified")
+        contract["acceptance"] = {
+            "status": "pending",
         }
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}},
+            files={self.snapshot: "snapshot"},
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("without accepted review state", joined)
+        self.assertIn("cannot mark perceptual evidence accepted", joined)
+
+    def test_rejects_unknown_acceptance_state(self) -> None:
+        contract = self.contract()
+        contract["acceptance"] = {
+            "status": "self-approved",
+        }
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}},
+        )
+
+        self.assertIn("must be one of: accepted, pending", "\n".join(issues))
+
+    def test_rejects_accepted_review_on_defined_contract(self) -> None:
+        contract = self.accepted_contract(state="defined")
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}},
+            files={self.snapshot: "snapshot"},
+        )
+
+        self.assertIn("cannot retain accepted review", "\n".join(issues))
+
+    def test_rejects_advanced_state_with_profile_gap(self) -> None:
+        contract = self.accepted_contract(state="verified")
+        entry = contract["evidence"]["coverage"]["covered"].pop(
+            "behavior.anatomy-layout"
+        )
+        self.assertIsNotNone(entry)
+        contract["evidence"]["coverage"]["gaps"] = ["behavior.anatomy-layout"]
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}},
+            files={self.snapshot: "snapshot"},
+        )
+
+        self.assertIn("cannot be `verified` with coverage gaps", "\n".join(issues))
+
+    def test_rejects_duplicate_or_unclassified_requirement(self) -> None:
+        contract = self.accepted_contract()
+        contract["evidence"]["coverage"]["gaps"] = [
+            "lifecycle.retirement-compatibility"
+        ]
+        issues = self.issues_for_foundation(
+            manifest_changes={
+                "contracts": {"resource-workspace": contract},
+                "enforcedContracts": {"resource-workspace": True},
+            },
+            files={self.snapshot: "snapshot"},
+        )
+        self.assertIn("classifies requirements more than once", "\n".join(issues))
+
+        contract = self.contract()
+        contract["evidence"]["coverage"]["gaps"].remove("visual.iconography")
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}}
+        )
+        self.assertIn("leaves requirements unclassified", "\n".join(issues))
+
+    def test_rejects_forbidden_not_applicable_requirement(self) -> None:
+        contract = self.accepted_contract()
+        contract["evidence"]["coverage"]["covered"].pop(
+            "lifecycle.retirement-compatibility"
+        )
+        contract["evidence"]["coverage"]["notApplicable"][
+            "lifecycle.retirement-compatibility"
+        ] = "No old path."
+        issues = self.issues_for_foundation(
+            manifest_changes={
+                "contracts": {"resource-workspace": contract},
+                "enforcedContracts": {"resource-workspace": True},
+            },
+            files={self.snapshot: "snapshot"},
+        )
+        self.assertIn("is forbidden by the active profile", "\n".join(issues))
+
+    def test_rejects_untraced_or_undeclared_coverage_evidence(self) -> None:
+        contract = self.accepted_contract()
+        entry = contract["evidence"]["coverage"]["covered"][
+            "behavior.anatomy-layout"
+        ]
+        entry["acceptance"] = [self.acceptance_visual]
+        entry["evidence"].append("frontend/tests/other.test.tsx")
+        issues = self.issues_for_foundation(
+            manifest_changes={
+                "contracts": {"resource-workspace": contract},
+                "enforcedContracts": {"resource-workspace": True},
+            },
+            files={
+                self.snapshot: "snapshot",
+                "frontend/tests/other.test.tsx": "export {};\n",
+            },
+        )
+        joined = "\n".join(issues)
+        self.assertIn("must reference declared contract evidence", joined)
+        self.assertIn("is not traced by the declared acceptance evidence", joined)
+
+    def test_rejects_missing_required_mode_or_evidence_kind(self) -> None:
+        contract = self.accepted_contract()
+        entry = contract["evidence"]["coverage"]["covered"][
+            "behavior.anatomy-layout"
+        ]
+        entry["modes"] = ["compact"]
+        entry["evidence"] = [self.component_evidence]
+        issues = self.issues_for_foundation(
+            manifest_changes={
+                "contracts": {"resource-workspace": contract},
+                "enforcedContracts": {"resource-workspace": True},
+            },
+            files={self.snapshot: "snapshot"},
+        )
+        joined = "\n".join(issues)
+        self.assertIn("missing required modes: desktop", joined)
+        self.assertIn("requires `browser` evidence", joined)
+
+        contract = self.accepted_contract()
+        contract["evidence"]["coverage"]["covered"][
+            "standard.human-centred-evaluation"
+        ]["evidence"] = []
+        issues = self.issues_for_foundation(
+            manifest_changes={
+                "contracts": {"resource-workspace": contract},
+                "enforcedContracts": {"resource-workspace": True},
+            },
+            files={self.snapshot: "snapshot"},
+        )
+        self.assertIn("requires `assessment` evidence", "\n".join(issues))
+
+    def test_rejects_unknown_acceptance_id(self) -> None:
+        contract = self.accepted_contract()
+        contract["evidence"]["coverage"]["covered"]["behavior.anatomy-layout"][
+            "acceptance"
+        ] = [f"{self.spec}#AT-999"]
+        issues = self.issues_for_foundation(
+            manifest_changes={
+                "contracts": {"resource-workspace": contract},
+                "enforcedContracts": {"resource-workspace": True},
+            },
+            files={self.snapshot: "snapshot"},
+        )
+        self.assertIn("references unknown acceptance id", "\n".join(issues))
+
+    def test_accepts_enforced_contract_with_accepted_complete_evidence(self) -> None:
+        contracts = {"resource-workspace": self.accepted_contract()}
         self.assertEqual(
             [],
             self.issues_for_foundation(
@@ -621,23 +1053,16 @@ class TestUiFoundationContracts(unittest.TestCase):
                     "contracts": contracts,
                     "enforcedContracts": {"resource-workspace": True},
                 },
-                files={snapshot: "snapshot"},
+                files={self.snapshot: "snapshot"},
             ),
         )
 
     def test_rejects_enforced_registry_state_drift(self) -> None:
-        enforced_contract = {
-            "resource-workspace": {
-                "state": "enforced",
-                "spec": "docs/foundations/data-display/collection-page.md",
-                "evidence": {
-                    "component": ["frontend/tests/resource-workspace.test.tsx"],
-                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
-                    "perceptual": [],
-                },
-            }
-        }
-        issues = self.issues_for_foundation(manifest_changes={"contracts": enforced_contract})
+        enforced_contract = {"resource-workspace": self.accepted_contract()}
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": enforced_contract},
+            files={self.snapshot: "snapshot"},
+        )
         self.assertIn("missing from `enforcedContracts`", "\n".join(issues))
 
         issues = self.issues_for_foundation(
@@ -647,30 +1072,19 @@ class TestUiFoundationContracts(unittest.TestCase):
 
     def test_rejects_missing_evidence_file(self) -> None:
         contracts = {
-            "resource-workspace": {
-                "state": "defined",
-                "spec": "docs/foundations/data-display/collection-page.md",
-                "evidence": {
-                    "component": ["frontend/tests/missing.test.tsx"],
-                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
-                    "perceptual": [],
-                },
-            }
+            "resource-workspace": self.contract(
+                component="frontend/tests/missing.test.tsx"
+            )
         }
         issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
         self.assertIn("does not exist: frontend/tests/missing.test.tsx", "\n".join(issues))
 
     def test_rejects_evidence_outside_owned_test_roots(self) -> None:
         contracts = {
-            "resource-workspace": {
-                "state": "defined",
-                "spec": "docs/foundations/data-display/collection-page.md",
-                "evidence": {
-                    "component": ["frontend/src/components/shared/ResourceWorkspace.tsx"],
-                    "browser": ["frontend/src/browser-proof.ts"],
-                    "perceptual": [],
-                },
-            }
+            "resource-workspace": self.contract(
+                component="frontend/src/components/shared/ResourceWorkspace.tsx",
+                browser="frontend/src/browser-proof.ts",
+            )
         }
         issues = self.issues_for_foundation(
             manifest_changes={"contracts": contracts},
@@ -682,6 +1096,17 @@ class TestUiFoundationContracts(unittest.TestCase):
         joined = "\n".join(issues)
         self.assertIn("component evidence must be a frontend .test.tsx file", joined)
         self.assertIn("browser evidence must be a frontend/e2e .pw.ts file", joined)
+
+        contract = self.contract()
+        contract["evidence"]["assessment"] = ["docs/assessment.md"]
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": {"resource-workspace": contract}},
+            files={"docs/assessment.md": "# Unowned assessment\n"},
+        )
+        self.assertIn(
+            "assessment evidence must be a docs/foundations .assessment.md file",
+            "\n".join(issues),
+        )
 
     def test_rejects_missing_typed_foundation_source(self) -> None:
         issues = self.issues_for_foundation(

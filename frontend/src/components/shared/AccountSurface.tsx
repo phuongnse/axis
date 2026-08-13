@@ -92,11 +92,23 @@ export interface AccountSurfaceProps {
   workspace: AccountWorkspaceModel;
 }
 
-const accountSectionActionGeometry = cn(
+const accountActionTypography = cn(
+  axisStyles.typography.scale.label,
+  axisStyles.typography.weight.label,
+);
+
+const accountTargetGeometry = cn(
   axisStyles.density.minHeight.touchTarget,
-  'w-full justify-center',
   axisStyles.density.minHeight.compactControlAtSmall,
 );
+
+const accountSectionActionGeometry = cn(
+  accountTargetGeometry,
+  accountActionTypography,
+  'w-full justify-center whitespace-normal',
+);
+
+const accountInlineActionGeometry = cn(accountTargetGeometry, accountActionTypography);
 
 function AccountWorkspaceOptionButton({
   busy,
@@ -164,7 +176,7 @@ export function AccountWorkspaceSection({
           axisStyles.typography.weight.label,
         )}
       >
-        <PanelsTopLeft className="size-3.5" aria-hidden />
+        <PanelsTopLeft className={axisStyles.icon.size.control} aria-hidden />
         {t('workspace.label')}
       </div>
 
@@ -176,7 +188,13 @@ export function AccountWorkspaceSection({
       >
         {loadState === 'error' ? (
           <StatusNotice tone="destructive" title={t('workspace.unavailable')}>
-            <Button type="button" size="sm" variant="outline" onClick={onRetryLoad}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={accountInlineActionGeometry}
+              onClick={onRetryLoad}
+            >
               {t('app.retry')}
             </Button>
           </StatusNotice>
@@ -220,14 +238,24 @@ export function AccountWorkspaceSection({
         {feedback === 'outcome-unknown' ? (
           <StatusNotice tone="warning">
             <span>{t('workspace.switchOutcomeUnknown')}</span>{' '}
-            <Button type="button" variant="link" onClick={onRetryContext}>
+            <Button
+              type="button"
+              variant="link"
+              className={accountInlineActionGeometry}
+              onClick={onRetryContext}
+            >
               {t('workspace.retryRefresh')}
             </Button>
           </StatusNotice>
         ) : feedback === 'refresh-failed' ? (
           <StatusNotice tone="destructive">
             <span>{t('workspace.refreshFailedDescription')}</span>{' '}
-            <Button type="button" variant="link" onClick={onRetryContext}>
+            <Button
+              type="button"
+              variant="link"
+              className={accountInlineActionGeometry}
+              onClick={onRetryContext}
+            >
               {t('workspace.retryRefresh')}
             </Button>
           </StatusNotice>
@@ -290,7 +318,13 @@ function AccountPreferenceGroup({
         <div id={statusId} aria-live="polite">
           <StatusNotice tone="destructive">
             <span>{model.feedback.message}</span>{' '}
-            <Button type="button" variant="link" size="sm" onClick={model.onRetry}>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className={accountInlineActionGeometry}
+              onClick={model.onRetry}
+            >
               <RotateCcw aria-hidden />
               {model.feedback.retryLabel}
             </Button>
@@ -331,24 +365,30 @@ export function AccountSurface({
             className={cn(
               axisStyles.density.minHeight.touchTarget,
               'max-w-64 text-foreground',
+              axisStyles.density.minHeight.compactControlAtSmall,
               axisStyles.spacing.gap.inline,
               axisStyles.spacing.padding.inline.inline,
+              axisStyles.typography.scale.label,
+              axisStyles.typography.weight.label,
               transientItemHighlight,
             )}
-            aria-label={t('nav.accountMenu')}
-            title={t('nav.accountMenu')}
+            aria-label={t('nav.accountMenuContext', { context: identity.triggerLabel })}
+            title={t('nav.accountMenuContext', { context: identity.triggerLabel })}
           >
             {identity.triggerKind === 'organization' ? (
               <Avatar aria-hidden>
                 <AvatarFallback>
-                  <Building2 className="size-4" />
+                  <Building2 className={axisStyles.icon.size.control} />
                 </AvatarFallback>
               </Avatar>
             ) : (
               <AccountAvatar initials={identity.initials} size="md" />
             )}
             <span className="hidden min-w-0 truncate sm:inline">{identity.triggerLabel}</span>
-            <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+            <ChevronDown
+              className={cn(axisStyles.icon.size.control, 'text-muted-foreground')}
+              aria-hidden
+            />
           </Button>
         }
       />
@@ -356,7 +396,7 @@ export function AccountSurface({
         {...surfaceContractAttributes('account-surface', surfaceId)}
         data-slot="account-surface"
         align="end"
-        className="max-h-(--available-height) w-80 max-w-full gap-0 overflow-y-auto p-0"
+        className="max-h-(--available-height) w-80 max-w-(--available-width) gap-0 overflow-y-auto p-0"
         aria-label={t('nav.accountMenu')}
       >
         <section
@@ -364,7 +404,7 @@ export function AccountSurface({
           data-axis-account-region="identity"
           aria-label={t('app.account')}
           className={cn(
-            'flex min-w-0 items-center',
+            'flex min-w-0 items-start',
             axisStyles.spacing.gap.inline,
             axisStyles.spacing.padding.all.region,
           )}
@@ -373,7 +413,7 @@ export function AccountSurface({
           <div className="min-w-0 flex-1">
             <div
               className={cn(
-                'truncate',
+                'whitespace-normal wrap-anywhere',
                 axisStyles.typography.scale.label,
                 axisStyles.typography.weight.label,
               )}
@@ -383,7 +423,7 @@ export function AccountSurface({
             {identity.secondaryLabel ? (
               <div
                 className={cn(
-                  'truncate text-muted-foreground',
+                  'whitespace-normal wrap-anywhere text-muted-foreground',
                   axisStyles.typography.scale.metadata,
                 )}
               >
@@ -417,7 +457,7 @@ export function AccountSurface({
               axisStyles.typography.weight.label,
             )}
           >
-            <Settings2 className="size-3.5" aria-hidden />
+            <Settings2 className={axisStyles.icon.size.control} aria-hidden />
             {t('app.preferences')}
           </div>
           <div className={cn('grid', axisStyles.spacing.gap.region)}>
@@ -440,7 +480,10 @@ export function AccountSurface({
             type="button"
             variant="destructive"
             size="sm"
-            className={accountSectionActionGeometry}
+            className={cn(
+              accountSectionActionGeometry,
+              'border-destructive/30 text-foreground dark:border-destructive/40 [&_[data-slot=async-button-icon]]:text-destructive',
+            )}
             data-axis-account-role="section-action"
             icon={<LogOut />}
             pending={signingOut}

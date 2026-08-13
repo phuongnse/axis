@@ -5,19 +5,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { EntrySurface } from '@/components/shared/EntrySurface';
+import {
+  EntryAsyncAction,
+  EntryInput,
+  type EntryPreferencesModel,
+  EntrySurface,
+} from '@/components/shared/EntrySurface';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
-import { currentSiteLanguage, PreferencesMenu } from '@/features/preferences';
+import { currentSiteLanguage, useEntryPreferencesModel } from '@/features/preferences';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -36,11 +39,13 @@ function VerifyEmailOutcome({
   kind,
   email,
   onResend,
+  preferences,
   resendLoading,
 }: {
   kind: VerifyEmailErrorKind;
   email: string;
   onResend: (email: string) => Promise<void>;
+  preferences: EntryPreferencesModel;
   resendLoading: boolean;
 }) {
   const { t } = useTranslation();
@@ -104,7 +109,7 @@ function VerifyEmailOutcome({
   return (
     <EntrySurface
       surfaceId="verify-email"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={config.title}
       footer={footer}
     >
@@ -119,7 +124,7 @@ function VerifyEmailOutcome({
           >
             <Field data-invalid={errors.email ? true : undefined}>
               <FieldLabel htmlFor="resend-email">{t('auth.email')}</FieldLabel>
-              <Input
+              <EntryInput
                 id="resend-email"
                 type="email"
                 autoComplete="email"
@@ -138,17 +143,16 @@ function VerifyEmailOutcome({
                 <FieldError id="resend-email-error">{errors.email.message}</FieldError>
               ) : null}
             </Field>
-            <AsyncButton
+            <EntryAsyncAction
               type="submit"
               size="lg"
-              className="w-full"
               disabled={kind === 'rate_limited' || resendLoading}
               icon={<Mail aria-hidden />}
               pending={resendLoading}
               pendingLabel={t('auth.sending')}
             >
               {t('auth.resendVerification')}
-            </AsyncButton>
+            </EntryAsyncAction>
           </form>
         ) : null}
       </div>
@@ -158,6 +162,7 @@ function VerifyEmailOutcome({
 
 export function VerifyEmailPage() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
   const token = useQueryParam('token');
   const context = loadRegistrationContext();
   const { submit, completeSignIn, loading, errorKind, sessionEstablished } = useVerifyEmail();
@@ -204,6 +209,7 @@ export function VerifyEmailPage() {
         kind="invalid"
         email={context?.email ?? ''}
         onResend={async () => {}}
+        preferences={preferences}
         resendLoading={false}
       />
     );
@@ -213,7 +219,7 @@ export function VerifyEmailPage() {
     return (
       <EntrySurface
         surfaceId="verify-email"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('verify.title')}
         footer={
           <>
@@ -237,6 +243,7 @@ export function VerifyEmailPage() {
         kind={errorKind}
         email={context?.email ?? ''}
         onResend={resend}
+        preferences={preferences}
         resendLoading={resendState === 'sending'}
       />
     );
@@ -246,7 +253,7 @@ export function VerifyEmailPage() {
     return (
       <EntrySurface
         surfaceId="verify-email"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('verify.success.title')}
         footer={
           <>
@@ -259,10 +266,9 @@ export function VerifyEmailPage() {
       >
         <div className="space-y-4" aria-live="polite">
           <StatusNotice tone="success">{t('verify.success.body')}</StatusNotice>
-          <AsyncButton
+          <EntryAsyncAction
             type="button"
             size="lg"
-            className="w-full"
             onClick={continueToDashboard}
             disabled={handoffStarted}
             icon={<ArrowRight aria-hidden />}
@@ -270,7 +276,7 @@ export function VerifyEmailPage() {
             pendingLabel={t('verify.success.continuing')}
           >
             {t('verify.success.action')}
-          </AsyncButton>
+          </EntryAsyncAction>
         </div>
       </EntrySurface>
     );
@@ -279,7 +285,7 @@ export function VerifyEmailPage() {
   return (
     <EntrySurface
       surfaceId="verify-email"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('verify.title')}
       footer={
         <>

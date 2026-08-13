@@ -58,7 +58,14 @@ export function OptionItemContent({ busy = false, children, icon }: OptionItemCo
       >
         {busy ? <Spinner className="size-3.5" /> : icon}
       </span>
-      <span data-slot="option-item-label" className="min-w-0 flex-1 truncate text-left">
+      <span
+        data-slot="option-item-label"
+        className={cn(
+          'min-w-0 flex-1 whitespace-normal break-words text-left',
+          axisStyles.typography.scale.label,
+          axisStyles.typography.weight.label,
+        )}
+      >
         {children}
       </span>
     </>

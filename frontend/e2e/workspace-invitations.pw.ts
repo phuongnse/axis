@@ -122,13 +122,13 @@ async function signIn(page: Page, email: string): Promise<void> {
 }
 
 async function signOut(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 }
 
 async function createOrganizationAndEnter(page: Page, organizationName: string): Promise<void> {
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
   await page.getByRole('button', { name: 'Create Organization' }).click();
   const createDialog = page.getByRole('dialog', { name: 'Create Organization' });
   await createDialog.getByRole('textbox', { name: 'Organization name' }).fill(organizationName);
@@ -138,7 +138,7 @@ async function createOrganizationAndEnter(page: Page, organizationName: string):
     .getByRole('button', { name: 'Enter Workspace' })
     .click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('button', { name: 'Account menu' })).toContainText(organizationName, {
+  await expect(page.getByRole('button', { name: /Account menu/ })).toContainText(organizationName, {
     timeout: 30_000,
   });
 }

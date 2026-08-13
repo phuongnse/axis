@@ -124,7 +124,7 @@ describe('BusinessObjectsPage', () => {
     expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
     expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
-    expectPageActionSizing(recordAction);
+    expectDataTableRecordAction(recordAction);
     expectPageActionSizing(createAction);
   });
 
@@ -1141,12 +1141,23 @@ function emptyPage() {
 
 function expectPageActionSizing(action: HTMLElement) {
   expect(action).toHaveAttribute('data-slot', 'button');
+  expectInteractiveActionSizing(action);
+}
+
+function expectInteractiveActionSizing(action: HTMLElement) {
   expect(action).toHaveClass(
     axisStyles.density.minHeight.touchTarget,
     axisStyles.density.minWidth.touchTarget,
     axisStyles.density.minHeight.compactControlAtSmall,
     axisStyles.density.minWidth.compactControlAtSmall,
   );
+}
+
+function expectDataTableRecordAction(action: HTMLElement) {
+  expectInteractiveActionSizing(action);
+  expect(action).toHaveAttribute('data-slot', 'data-table-record-action');
+  expect(action).toHaveClass('-ml-px', 'justify-start', 'px-0', 'text-left');
+  expect(action).not.toHaveClass('px-2.5');
 }
 
 function pageWith(detail: ReturnType<typeof definitionDetail>) {

@@ -33,6 +33,7 @@ class TestAxisTheme(unittest.TestCase):
             "info-foreground",
             "success-foreground",
             "warning-foreground",
+            "input",
             "ring",
             "sidebar-foreground",
             "sidebar-primary-foreground",
@@ -205,12 +206,47 @@ class TestAxisTheme(unittest.TestCase):
                 with self.assertRaisesRegex(axis_theme.ThemeValidationError, message):
                     axis_theme.load_theme(root)
 
-    def test_load_theme_rejects_insufficient_text_and_focus_contrast(self) -> None:
+    def test_load_theme_rejects_insufficient_text_focus_and_control_contrast(self) -> None:
         invalid_cases = (
-            ("foreground", "background", "at least 4.5:1 contrast"),
-            ("ring", "background", "at least 3:1 contrast"),
+            ("foreground", "background", (), "at least 4.5:1 contrast"),
+            (
+                "ring",
+                "background",
+                (),
+                "focus boundary on background must have at least 3:1 contrast",
+            ),
+            (
+                "ring",
+                "card",
+                ("card",),
+                "focus boundary on card must have at least 3:1 contrast",
+            ),
+            (
+                "ring",
+                "popover",
+                ("popover",),
+                "focus boundary on popover must have at least 3:1 contrast",
+            ),
+            (
+                "input",
+                "background",
+                (),
+                "control boundary on background must have at least 3:1 contrast",
+            ),
+            (
+                "input",
+                "card",
+                ("background",),
+                "control boundary on card must have at least 3:1 contrast",
+            ),
+            (
+                "input",
+                "popover",
+                ("background", "card"),
+                "control boundary on popover must have at least 3:1 contrast",
+            ),
         )
-        for token, copied_from, message in invalid_cases:
+        for token, copied_from, darkened_surfaces, message in invalid_cases:
             with self.subTest(token=token), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 definition = self.definition()
@@ -218,6 +254,15 @@ class TestAxisTheme(unittest.TestCase):
                 assert isinstance(colors, dict)
                 light = colors["light"]
                 assert isinstance(light, dict)
+                for surface in darkened_surfaces:
+                    light[surface] = "oklch(0 0 0)"
+                    if surface == "background":
+                        for foreground in ("foreground", "muted-foreground", "destructive", "ring"):
+                            light[foreground] = "oklch(1 0 0)"
+                    else:
+                        light[f"{surface}-foreground"] = "oklch(1 0 0)"
+                if token == "input" and darkened_surfaces:
+                    light["ring"] = "oklch(0.5 0 0)"
                 light[token] = light[copied_from]
                 self.write_source(root, definition)
 
@@ -243,7 +288,8 @@ class TestAxisTheme(unittest.TestCase):
             self.assertIn("--text-axis-page-title: 1.5rem;", web)
             self.assertIn("--spacing-axis-touch-target: 2.75rem;", web)
             self.assertIn("--radius-axis-managed: 1rem;", web)
-            self.assertIn("--z-axis-notification: 60;", web)
+            self.assertIn("--z-index-axis-notification: 60;", web)
+            self.assertNotIn("--z-axis-notification", web)
             self.assertIn("content: {\n    delayMs: 300", runtime)
             self.assertIn("minimumMs: 600", runtime)
             self.assertIn(

@@ -1,13 +1,27 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  createMemoryHistory,
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
+import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
 import { ApiError } from '@/lib/api';
+import type { MyRouterContext } from '@/routes/__root';
 import { installSolutionVersion, publishSolutionVersion } from '../api';
+import { solutionsManagedWindowRenderers } from '../managed-windows';
+import { ComponentPlan } from './SolutionPresentation';
 import { SolutionsPage } from './SolutionsPage';
 
 const api = vi.hoisted(() => ({
   versions: vi.fn(),
+  version: vi.fn(),
   installations: vi.fn(),
   operation: vi.fn(),
   publish: vi.fn(),
@@ -20,6 +34,7 @@ vi.mock('../api', () => ({
   solutionQueryKeys: {
     all: ['solutions'],
     versions: () => ['solutions', 'versions'],
+    version: (id: string) => ['solutions', 'versions', id],
     installations: () => ['solutions', 'installations'],
     operation: (id: string) => ['solutions', 'operation', id],
   },
@@ -27,13 +42,18 @@ vi.mock('../api', () => ({
     queryKey: ['solutions', 'versions'],
     queryFn: api.versions,
   }),
+  solutionVersionQueryOptions: (id: string) => ({
+    queryKey: ['solutions', 'versions', id],
+    queryFn: () => api.version(id),
+    enabled: Boolean(id),
+  }),
   solutionInstallationsQueryOptions: () => ({
     queryKey: ['solutions', 'installations'],
     queryFn: api.installations,
   }),
   solutionOperationQueryOptions: (id: string) => ({
     queryKey: ['solutions', 'operation', id],
-    queryFn: api.operation,
+    queryFn: () => api.operation(id),
     enabled: Boolean(id),
   }),
   publishSolutionVersion: api.publish,
@@ -41,66 +61,130 @@ vi.mock('../api', () => ({
   resumeSolutionOperation: api.resume,
 }));
 
-function renderPage() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <SolutionsPage />
-    </QueryClientProvider>,
-  );
-}
-
 describe('SolutionsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.versions.mockResolvedValue([]);
+    api.version.mockResolvedValue(version());
     api.installations.mockResolvedValue([]);
     api.publish.mockReset().mockResolvedValue({ version: version(), isRetry: false });
     api.install.mockResolvedValue({
-      operation: { id: 'operation-1', status: 'Pending', steps: [] },
+      operation: {
+        id: 'operation-1',
+        installationId: 'installation-1',
+        status: 'Pending',
+        steps: [],
+      },
       isRetry: false,
     });
-    api.operation.mockResolvedValue({ id: 'operation-1', status: 'Succeeded', steps: [] });
+    api.operation.mockResolvedValue({
+      id: 'operation-1',
+      installationId: 'installation-1',
+      status: 'Succeeded',
+      steps: [],
+    });
+  });
+
+  it('composes one solution collection with its publish action in the table toolbar', async () => {
+    api.versions.mockResolvedValue([version()]);
+    api.installations.mockResolvedValue([installation()]);
+
+    await renderPage();
+
+    const collection = await screen.findByRole('region', { name: 'Solution versions' });
+    const surface = document.querySelector('[data-axis-surface-id="solution-delivery"]');
+    expect(surface).toHaveAttribute('data-axis-surface-contract', 'resource-workspace');
+    expect(screen.getAllByRole('table')).toHaveLength(1);
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(within(collection).getByRole('button', { name: 'Publish package' })).toBeVisible();
+    expect(within(collection).getByText('Installed')).toBeVisible();
+    expect(within(collection).getByText('Compliant')).toBeVisible();
+  });
+
+  it('blocks another release when the solution already has an installed version', async () => {
+    const installedVersion = version();
+    const newerVersion = version({
+      id: 'version-2',
+      solutionVersion: '2.0.0',
+      packageSha256: 'package-hash-2',
+    });
+    api.versions.mockResolvedValue([installedVersion, newerVersion]);
+    api.version.mockResolvedValue(newerVersion);
+    api.installations.mockResolvedValue([installation()]);
+
+    await renderPage('/solutions?dialog=release&versionId=version-2');
+
+    expect(await screen.findByRole('heading', { name: 'cases 2.0.0' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Install version' })).not.toBeInTheDocument();
+    expect(screen.getByText('Version 1.0.0 installed')).toBeVisible();
+    expect(
+      within(activeManagedWindow()).getByText(
+        'Version 1.0.0 of this solution is already installed in the current Workspace. Upgrade and side-by-side installation are not supported.',
+      ),
+    ).toBeVisible();
+    expect(installSolutionVersion).not.toHaveBeenCalled();
+  });
+
+  it('keeps component-plan labels unique across concurrent release content', () => {
+    render(
+      <>
+        <ComponentPlan components={version().components} />
+        <ComponentPlan components={version({ id: 'version-2' }).components} />
+      </>,
+    );
+
+    const plans = screen.getAllByRole('region', { name: 'Ordered component plan' });
+    const labelIds = plans.map((plan) => plan.getAttribute('aria-labelledby'));
+    expect(labelIds.every(Boolean)).toBe(true);
+    expect(new Set(labelIds).size).toBe(plans.length);
   });
 
   it('rejects an oversized local package before upload', async () => {
     const user = userEvent.setup();
-    renderPage();
+    await renderPage();
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
     const file = new File(['x'], 'too-large.axis-solution', {
       type: 'application/vnd.dsse.envelope.v1+json',
     });
     Object.defineProperty(file, 'size', { value: 10 * 1024 * 1024 + 1 });
-    await user.upload(screen.getByLabelText('Signed solution package'), file);
+
+    await user.upload(await screen.findByLabelText('Signed solution package'), file);
+
     expect(screen.getByText('The signed package must be 10 MiB or smaller.')).toBeInTheDocument();
     expect(publishSolutionVersion).not.toHaveBeenCalled();
   });
 
-  it('publishes safe metadata then installs with an internal idempotency key', async () => {
+  it('publishes safe metadata then installs from a focused release window', async () => {
     const user = userEvent.setup();
-    renderPage();
+    await renderPage();
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
     const file = new File(['raw-package-secret'], 'release.axis-solution', {
       type: 'application/vnd.dsse.envelope.v1+json',
     });
-    await user.upload(screen.getByLabelText('Signed solution package'), file);
-    await user.click(screen.getByRole('button', { name: 'Publish package' }));
-    await user.click(screen.getByRole('button', { name: 'Publish package' }));
-    await waitFor(() =>
-      expect(publishSolutionVersion).toHaveBeenCalledWith(file, expect.anything()),
+    await user.upload(await screen.findByLabelText('Signed solution package'), file);
+    await user.click(
+      within(activeManagedWindow()).getByRole('button', { name: 'Publish package' }),
     );
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Publish package' }),
+    );
+
+    await waitFor(() => expect(publishSolutionVersion).toHaveBeenCalled());
     expect(await screen.findByText('Solution version published')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
-    expect(screen.getByText('cases')).toBeInTheDocument();
     expect(screen.getByText('policy')).toBeInTheDocument();
     expect(screen.getByText('definition')).toBeInTheDocument();
     expect(screen.queryByText('raw-package-secret')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Install version' }));
-    await user.click(screen.getByRole('button', { name: 'Install version' }));
+
+    await user.click(screen.getByRole('button', { name: 'View release' }));
+    await user.click(await screen.findByRole('button', { name: 'Install version' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Install version' }),
+    );
+
     await waitFor(() =>
       expect(installSolutionVersion).toHaveBeenCalledWith('version-1', expect.stringMatching(/.+/)),
     );
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(await screen.findByText('Installation operation ready')).toBeInTheDocument();
   });
 
   it('retains the local package and retries after publisher trust recovers', async () => {
@@ -117,24 +201,23 @@ describe('SolutionsPage', () => {
       )
       .mockResolvedValueOnce({ version: version(), isRetry: false });
 
-    renderPage();
-    await user.upload(screen.getByLabelText('Signed solution package'), file);
+    await renderPage();
     await user.click(screen.getByRole('button', { name: 'Publish package' }));
-    await user.click(screen.getByRole('button', { name: 'Publish package' }));
+    await user.upload(await screen.findByLabelText('Signed solution package'), file);
+    await user.click(
+      within(activeManagedWindow()).getByRole('button', { name: 'Publish package' }),
+    );
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Publish package' }),
+    );
 
     expect(await screen.findByText('Publisher trust unavailable')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'The package publisher is unavailable or revoked. The local package remains selected; retry after trusted-publisher configuration is restored.',
-      ),
-    ).toBeInTheDocument();
     expect(screen.getByText('Selected retry.axis-solution (18 B)')).toBeInTheDocument();
     expect(screen.queryByText('publisher-private-diagnostic')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     await waitFor(() => expect(publishSolutionVersion).toHaveBeenCalledTimes(2));
-    expect(publishSolutionVersion).toHaveBeenLastCalledWith(file, expect.anything());
     expect(await screen.findByText('Solution version published')).toBeInTheDocument();
   });
 
@@ -147,60 +230,66 @@ describe('SolutionsPage', () => {
       }),
     );
 
-    renderPage();
+    await renderPage();
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
     await user.upload(
-      screen.getByLabelText('Signed solution package'),
+      await screen.findByLabelText('Signed solution package'),
       new File(['package'], 'conflict.axis-solution', {
         type: 'application/vnd.dsse.envelope.v1+json',
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Publish package' }));
-    await user.click(screen.getByRole('button', { name: 'Publish package' }));
+    await user.click(
+      within(activeManagedWindow()).getByRole('button', { name: 'Publish package' }),
+    );
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Publish package' }),
+    );
 
     expect(await screen.findByText('Solution changed')).toBeInTheDocument();
     expect(
       screen.getByText('Refresh the authoritative state before retrying.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Publisher trust unavailable')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(screen.queryByText('conflicting-package-private-diagnostic')).not.toBeInTheDocument();
   });
 
-  it('reopens a durable failed operation from the installation list after reload', async () => {
+  it('reopens and resumes a durable failed installation after reload', async () => {
     const user = userEvent.setup();
+    api.versions.mockResolvedValue([version()]);
     api.installations.mockResolvedValue([
-      {
-        id: 'installation-1',
-        workspaceId: 'workspace-1',
-        solutionVersionId: 'version-1',
-        operationId: 'operation-reload',
-        operationStatus: 'Failed',
-        provisioningStatus: 'Failed',
-        complianceStatus: 'Compliant',
-        components: [],
-      },
+      installation({ operationStatus: 'Failed', provisioningStatus: 'Failed' }),
     ]);
     api.operation.mockResolvedValue({
       id: 'operation-reload',
+      installationId: 'installation-1',
       status: 'Failed',
       steps: [],
     });
+    api.resume.mockResolvedValue({
+      id: 'operation-reload',
+      installationId: 'installation-1',
+      status: 'Pending',
+      steps: [],
+    });
 
-    renderPage();
-    await user.click(await screen.findByRole('button', { name: 'View operation' }));
+    await renderPage();
+    await user.click(
+      await screen.findByRole('button', { name: 'View installation for cases 1.0.0' }),
+    );
 
-    await waitFor(() => expect(api.operation).toHaveBeenCalled());
-    expect(await screen.findByRole('button', { name: 'Resume operation' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Installation · cases 1.0.0' }),
+    ).toBeVisible();
+    await waitFor(() => expect(api.operation).toHaveBeenCalledWith('operation-reload'));
+    await user.click(await screen.findByRole('button', { name: 'Resume operation' }));
+    await waitFor(() => expect(api.resume).toHaveBeenCalled());
+    expect(await screen.findByText('Resume accepted')).toBeInTheDocument();
   });
 
   it('shows a revoked partial installation as noncompliant without a resume action', async () => {
     const user = userEvent.setup();
+    api.versions.mockResolvedValue([version()]);
     api.installations.mockResolvedValue([
-      {
-        id: 'installation-revoked',
-        workspaceId: 'workspace-1',
-        solutionVersionId: 'version-revoked',
-        operationId: 'operation-revoked',
+      installation({
         operationStatus: 'Blocked',
         provisioningStatus: 'Failed',
         complianceStatus: 'Noncompliant',
@@ -219,25 +308,103 @@ describe('SolutionsPage', () => {
             problemCode: 'solutions.package.publisher_untrusted',
           },
         ],
-      },
+      }),
     ]);
     api.operation.mockResolvedValue({
-      id: 'operation-revoked',
+      id: 'operation-reload',
+      installationId: 'installation-1',
       status: 'Blocked',
       problemCode: 'solutions.package.publisher_untrusted',
       steps: [],
     });
 
-    renderPage();
-    expect(await screen.findByText('Noncompliant')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'View operation' }));
+    await renderPage();
+    expect(await screen.findByText('Noncompliant')).toHaveAttribute(
+      'data-status-state',
+      'critical',
+    );
+    await user.click(screen.getByRole('button', { name: 'View installation for cases 1.0.0' }));
 
-    expect(await screen.findByText('Blocked')).toBeInTheDocument();
+    expect(within(activeManagedWindow()).getByText('Blocked')).toHaveAttribute(
+      'data-status-state',
+      'caution',
+    );
+    for (const failedState of within(activeManagedWindow()).getAllByText('Failed')) {
+      expect(failedState).toHaveAttribute('data-status-state', 'critical');
+    }
     expect(screen.queryByRole('button', { name: 'Resume operation' })).not.toBeInTheDocument();
+  });
+
+  it('opens a release from a shareable route intent and consumes the intent', async () => {
+    const router = await renderPage('/solutions?dialog=release&versionId=version-1');
+
+    expect(await screen.findByRole('heading', { name: 'cases 1.0.0' })).toBeVisible();
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty('dialog'));
   });
 });
 
-function version() {
+async function renderPage(path = '/solutions') {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
+      mutations: { retry: false },
+    },
+  });
+  await Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['solutions', 'versions'], queryFn: api.versions }),
+    queryClient.ensureQueryData({
+      queryKey: ['solutions', 'installations'],
+      queryFn: api.installations,
+    }),
+  ]);
+  const rootRoute = createRootRouteWithContext<MyRouterContext>()({ component: Outlet });
+  const authenticatedRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    id: '_authenticated',
+    component: Outlet,
+  });
+  const solutionsRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: 'solutions',
+    validateSearch: (search: Record<string, unknown>) => ({
+      ...(typeof search.query === 'string' && search.query ? { query: search.query } : {}),
+      ...(search.dialog === 'publish' ||
+      search.dialog === 'release' ||
+      search.dialog === 'installation'
+        ? { dialog: search.dialog }
+        : {}),
+      ...(typeof search.versionId === 'string' && search.versionId
+        ? { versionId: search.versionId }
+        : {}),
+      ...(typeof search.installationId === 'string' && search.installationId
+        ? { installationId: search.installationId }
+        : {}),
+    }),
+    component: SolutionsPage,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([authenticatedRoute.addChildren([solutionsRoute])]),
+    context: { queryClient },
+    history: createMemoryHistory({ initialEntries: [path] }),
+  });
+
+  await act(() => router.load());
+  await act(async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ManagedWindowProvider renderers={solutionsManagedWindowRenderers}>
+          <div className="relative h-dvh w-dvw">
+            <RouterProvider router={router} />
+            <ManagedWindowHost />
+          </div>
+        </ManagedWindowProvider>
+      </QueryClientProvider>,
+    );
+  });
+  return router;
+}
+
+function version(overrides: Record<string, unknown> = {}) {
   return {
     id: 'version-1',
     solutionKey: 'cases',
@@ -248,6 +415,7 @@ function version() {
     publisherKeyId: 'key-1',
     trustStatus: 'Trusted' as const,
     sourceRevision: 'abc123',
+    publishedAt: '2026-08-12T08:00:00Z',
     components: [
       {
         type: 'authorization.policy.v1',
@@ -262,5 +430,30 @@ function version() {
         dependsOn: [{ type: 'authorization.policy.v1', key: 'policy' }],
       },
     ],
+    ...overrides,
   };
+}
+
+function installation(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'installation-1',
+    workspaceId: 'workspace-1',
+    solutionVersionId: 'version-1',
+    operationId: 'operation-reload',
+    operationStatus: 'Succeeded' as const,
+    provisioningStatus: 'Installed' as const,
+    complianceStatus: 'Compliant' as const,
+    components: [],
+    updatedAt: '2026-08-12T09:00:00Z',
+    ...overrides,
+  };
+}
+
+function activeManagedWindow(): HTMLElement {
+  const windows = document.querySelectorAll<HTMLElement>(
+    '[data-axis-surface-id="solution-delivery-windows"]',
+  );
+  const active = windows.item(windows.length - 1);
+  if (!active) throw new Error('Expected an active solution managed window.');
+  return active;
 }

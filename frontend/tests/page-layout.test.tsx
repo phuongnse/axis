@@ -1,6 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  EntryAction,
+  type EntryActionLinkProps,
+  type EntryActionProps,
+  EntryAsyncAction,
+  type EntryAsyncActionProps,
+  EntryConsentCheckbox,
+  type EntryConsentCheckboxProps,
+  EntryConsentLabel,
+  type EntryConsentLabelProps,
+  EntryInput,
+  type EntryInputProps,
+} from '../src/components/shared/EntrySurface';
+import {
   EntryLayout,
   type EntryLayoutProps,
   PageAction,
@@ -58,6 +71,57 @@ describe('EntryLayout', () => {
 
     expect(container.querySelector('[data-slot="entry-utilities"]')).toBeNull();
     expectTypeOf<EntryLayoutProps>().not.toHaveProperty('className');
+  });
+});
+
+describe('Entry controls', () => {
+  it('owns compact touch targets and efficient desktop density without style escape hatches', () => {
+    render(
+      <div>
+        <EntryInput aria-label="Email" />
+        <EntryConsentCheckbox aria-label="Accept consent" />
+        <EntryConsentLabel htmlFor="terms">Accept terms</EntryConsentLabel>
+        <EntryAction type="button">Retry</EntryAction>
+        <EntryAsyncAction
+          type="button"
+          icon={<span aria-hidden>+</span>}
+          pending={false}
+          pendingLabel="Saving"
+        >
+          Save
+        </EntryAsyncAction>
+      </div>,
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+    );
+    expect(screen.getByText('Accept terms')).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      'items-start',
+    );
+    expect(screen.getByRole('checkbox', { name: 'Accept consent' })).toHaveClass('mt-0.5');
+    for (const action of [
+      screen.getByRole('button', { name: 'Retry' }),
+      screen.getByRole('button', { name: 'Save' }),
+    ]) {
+      expect(action).toHaveClass(
+        axisStyles.density.minHeight.touchTarget,
+        axisStyles.density.minWidth.touchTarget,
+        axisStyles.density.minHeight.compactControlAtSmall,
+        axisStyles.density.minWidth.compactControlAtSmall,
+        'w-full',
+      );
+    }
+
+    expectTypeOf<EntryInputProps>().not.toHaveProperty('className');
+    expectTypeOf<EntryActionProps>().not.toHaveProperty('className');
+    expectTypeOf<EntryActionLinkProps>().not.toHaveProperty('className');
+    expectTypeOf<EntryAsyncActionProps>().not.toHaveProperty('className');
+    expectTypeOf<EntryConsentCheckboxProps>().not.toHaveProperty('className');
+    expectTypeOf<EntryConsentLabelProps>().not.toHaveProperty('className');
   });
 });
 

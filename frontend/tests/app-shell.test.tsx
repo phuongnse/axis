@@ -31,6 +31,7 @@ const navigateMock = vi.fn();
 const routerInvalidateMock = vi.fn(() => Promise.resolve());
 const moduleNavigationAvailabilityMock = vi.hoisted(() => vi.fn());
 const testWindowRenderers: ManagedWindowRendererRegistry = {
+  'busy-test': BusyTestWindowRenderer,
   test: TestWindowRenderer,
   'sizing-test': SizingTestWindowRenderer,
 };
@@ -283,7 +284,7 @@ describe('AppShell', () => {
     expect(appHeader).toHaveClass('bg-card');
     expect(appHeader).not.toHaveClass('bg-card/95', 'backdrop-blur');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    const accountMenu = screen.getByRole('button', { name: /Account menu/ });
     await waitFor(() => expect(accountMenu).toHaveTextContent('Axis Reference Product'));
     await user.click(accountMenu);
     expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
@@ -384,7 +385,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    const accountMenu = screen.getByRole('button', { name: /Account menu/ });
     await waitFor(() => expect(accountMenu).toHaveTextContent('Ada Lovelace'));
     expect(accountMenu).toHaveTextContent('AL');
     expect(accountMenu).not.toHaveTextContent('Personal workspace');
@@ -449,15 +450,38 @@ describe('AppShell', () => {
     const view = render(shell(<TestWindowLauncher />));
 
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
-    expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Windows (1)' })).toBeVisible();
+    const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
+    expect(dialog).toBeVisible();
+    const footer = dialog.querySelector<HTMLElement>('[data-slot="managed-dialog-footer"]');
+    expect(footer).not.toBeNull();
+    expect(
+      within(footer as HTMLElement).getByRole('button', { name: 'Windows (1)' }),
+    ).toBeVisible();
+    expect(document.querySelector('[data-slot="managed-window-tray"]')).toBeNull();
 
     view.rerender(shell(<section>Another authenticated route</section>));
     expect(screen.getByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
     toast.success('Persistent window saved');
     expect(await screen.findByText('Persistent window saved')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Minimize dialog' }));
+    expect(
+      screen.queryByRole('dialog', { name: 'Persistent test window' }),
+    ).not.toBeInTheDocument();
+    const tray = document.querySelector<HTMLElement>('[data-slot="managed-window-tray"]');
+    expect(tray).not.toBeNull();
+    await user.click(within(tray as HTMLElement).getByRole('button', { name: 'Windows (1)' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Persistent test window/ }));
+    const restoredDialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
+    expect(
+      within(
+        restoredDialog.querySelector<HTMLElement>(
+          '[data-slot="managed-dialog-footer"]',
+        ) as HTMLElement,
+      ).getByRole('button', { name: 'Windows (1)' }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() =>
@@ -466,6 +490,33 @@ describe('AppShell', () => {
       ).not.toBeInTheDocument(),
     );
     expect(screen.queryByRole('button', { name: 'Windows (1)' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a busy managed window open when Escape requests closure', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
+          <BusyTestWindowLauncher />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open busy test window' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Busy test window' });
+    expect(within(dialog).getByRole('button', { name: 'Close dialog' })).toBeDisabled();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog', { name: 'Busy test window' })).toBeVisible();
   });
 
   it('keeps the account surface and shell geometry stable through the authoritative context cutover', async () => {
@@ -548,7 +599,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
 
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    const accountMenu = screen.getByRole('button', { name: /Account menu/ });
     await user.click(accountMenu);
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
@@ -639,7 +690,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
     await waitFor(() => expect(routerInvalidateMock).toHaveBeenCalledOnce());
@@ -664,7 +715,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
     await waitFor(() =>
@@ -682,7 +733,7 @@ describe('AppShell', () => {
     expect(document.querySelector('[data-slot="authenticated-route-content"]')).toHaveClass(
       'invisible',
     );
-    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /Account menu/ })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
@@ -712,7 +763,33 @@ describe('AppShell', () => {
     expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass(
       axisStyles.elevation.managed,
     );
-    expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass('items-center');
+    expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
+      'flex',
+      'flex-col',
+      'gap-1',
+    );
+    expect(dialog.querySelector('[data-slot="managed-dialog-header-primary"]')).toHaveClass(
+      'flex-col',
+      'sm:flex-row',
+      'sm:items-center',
+      'sm:justify-between',
+    );
+    expect(dialog.querySelector('[data-slot="managed-dialog-header-controls"]')).toHaveClass(
+      'self-center',
+      'sm:self-center',
+    );
+    const headerButtons = dialog.querySelectorAll(
+      '[data-slot="managed-dialog-header"] [data-slot="button"]',
+    );
+    expect(headerButtons).toHaveLength(4);
+    for (const button of headerButtons) {
+      expect(button).toHaveClass(
+        axisStyles.density.minHeight.touchTarget,
+        axisStyles.density.minWidth.touchTarget,
+        axisStyles.density.minHeight.compactControlAtSmall,
+        axisStyles.density.minWidth.compactControlAtSmall,
+      );
+    }
   });
 
   it('keeps the Windows trigger fully opaque in dark mode', async () => {
@@ -736,8 +813,43 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     const windowsTrigger = await screen.findByRole('button', { name: 'Windows (1)' });
 
+    expect(windowsTrigger).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
     expect(windowsTrigger).toHaveClass('bg-popover', 'dark:bg-popover', 'dark:hover:bg-muted');
     expect(windowsTrigger).not.toHaveClass('dark:bg-input/30', 'dark:hover:bg-input/50');
+  });
+
+  it('keeps the Windows trigger keyboard-reachable past non-rendered body controls', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
+          <TestWindowLauncher />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open test window' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
+    const windowsTrigger = within(dialog).getByRole('button', { name: 'Windows (1)' });
+    within(dialog).getByRole('button', { name: 'Reset dialog' }).focus();
+    for (let index = 0; index < 8 && document.activeElement !== windowsTrigger; index += 1) {
+      await user.tab();
+    }
+
+    expect(windowsTrigger).toHaveFocus();
   });
 
   it('offers an explicit footer Close action when a renderer is unavailable', async () => {
@@ -758,9 +870,16 @@ describe('AppShell', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
     const footer = dialog.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
-    expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeEnabled();
+    const close = within(footer as HTMLElement).getByRole('button', { name: 'Close' });
+    expect(close).toBeEnabled();
+    expect(close).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
 
-    await user.click(within(footer as HTMLElement).getByRole('button', { name: 'Close' }));
+    await user.click(close);
     await waitFor(() =>
       expect(
         screen.queryByRole('dialog', { name: 'Persistent test window' }),
@@ -808,8 +927,12 @@ describe('AppShell', () => {
       await user.click(screen.getByRole('button', { name: 'Open overflowing window' }));
       const overflowingDialog = await screen.findByRole('dialog', { name: 'Overflowing window' });
       expect(overflowingDialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
-        'items-center',
+        'flex',
+        'flex-col',
       );
+      expect(
+        overflowingDialog.querySelector('[data-slot="managed-dialog-header-primary"]'),
+      ).toHaveClass('flex-col', 'sm:flex-row', 'sm:items-center', 'sm:justify-between');
       const overflowingWindow = overflowingDialog.querySelector(
         '[data-slot="managed-dialog-window"]',
       );
@@ -865,7 +988,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
@@ -902,7 +1025,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     const signOutButton = screen.getByRole('button', { name: 'Sign out' });
     await user.click(signOutButton);
 
@@ -936,7 +1059,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -983,7 +1106,53 @@ function TestWindowRenderer() {
         </button>
       }
     >
-      <ManagedDialogBody>Persistent state</ManagedDialogBody>
+      <ManagedDialogBody>
+        Persistent state
+        <span style={{ display: 'none' }}>
+          <button type="button">Non-rendered action</button>
+        </span>
+      </ManagedDialogBody>
+    </ManagedDialog>
+  );
+}
+
+function BusyTestWindowLauncher() {
+  const { openWindow } = useManagedWindowActions();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        openWindow({
+          id: 'test:busy',
+          kind: 'busy-test',
+          resourceKey: 'busy',
+          title: 'Busy test window',
+        })
+      }
+    >
+      Open busy test window
+    </button>
+  );
+}
+
+function BusyTestWindowRenderer() {
+  const { windowId, closeWindow } = useCurrentManagedWindow();
+  return (
+    <ManagedDialog
+      surfaceId="managed-window-host"
+      open
+      title="Busy test window"
+      closeDisabled
+      onOpenChange={(open) => {
+        if (!open) closeWindow(windowId);
+      }}
+      footer={
+        <button type="button" disabled>
+          Close
+        </button>
+      }
+    >
+      <ManagedDialogBody>Busy state</ManagedDialogBody>
     </ManagedDialog>
   );
 }

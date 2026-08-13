@@ -13,10 +13,6 @@ import {
 } from '../src/components/shared/AuthenticatedFrame';
 import { EntrySurface, type EntrySurfaceProps } from '../src/components/shared/EntrySurface';
 import type { ManagedDialogProps } from '../src/components/shared/ManagedDialog';
-import {
-  ProcessWorkbench,
-  type ProcessWorkbenchProps,
-} from '../src/components/shared/ProcessWorkbench';
 import type { ResourceWorkspaceProps } from '../src/components/shared/ResourceWorkspace';
 import {
   activeSurfaceContracts,
@@ -29,15 +25,18 @@ type UnboundedContentSlot<T> = {
   [Key in keyof T]-?: ReactNode extends NonNullable<T[Key]> ? Key : never;
 }[keyof T];
 
-vi.mock('@/features/preferences', () => ({
-  PreferencesMenu: () => <div data-slot="test-preferences">Preferences</div>,
-}));
-
 describe('surface contracts', () => {
   it('binds active surface ids to finite contracts at compile time', () => {
     expect(activeSurfaceContracts['account-actions']).toBe('account-surface');
-    expect(activeSurfaceContracts['solution-delivery']).toBe('process-workbench');
-    expectTypeOf<EnforcedSurfaceContractId>().toEqualTypeOf<'account-surface'>();
+    expect(activeSurfaceContracts['solution-delivery']).toBe('resource-workspace');
+    expect(activeSurfaceContracts['solution-delivery-windows']).toBe('managed-task-window');
+    expectTypeOf<EnforcedSurfaceContractId>().toEqualTypeOf<
+      | 'account-surface'
+      | 'authenticated-frame'
+      | 'entry-surface'
+      | 'managed-task-window'
+      | 'resource-workspace'
+    >();
     expectTypeOf<SurfaceIdFor<'entry-surface'>>().toEqualTypeOf<
       | 'email-confirmation'
       | 'invitation-acceptance'
@@ -88,7 +87,21 @@ describe('surface contracts', () => {
     const { container } = render(
       <EntrySurface
         surfaceId="sign-in"
-        utilities={<div data-slot="test-utilities">Utilities</div>}
+        preferences={{
+          label: 'Preferences',
+          language: {
+            label: 'Language',
+            onSelect: vi.fn(),
+            options: [{ icon: 'EN', label: 'English', value: 'en' }],
+            value: 'en',
+          },
+          theme: {
+            label: 'Theme',
+            onSelect: vi.fn(),
+            options: [{ icon: 'System', label: 'System', value: 'system' }],
+            value: 'system',
+          },
+        }}
         title="Sign in"
         banner={<p role="alert">Session expired</p>}
         footer={<a href="/register">Create account</a>}
@@ -108,26 +121,6 @@ describe('surface contracts', () => {
     expect(surface).toContainElement(screen.getByRole('link', { name: 'Create account' }));
   });
 
-  it('owns workbench route scrolling and page hierarchy', () => {
-    const { container } = render(
-      <ProcessWorkbench
-        surfaceId="solution-delivery"
-        title="Solutions"
-        description="Publish and install immutable releases."
-      >
-        <section aria-label="Release pipeline">Pipeline</section>
-      </ProcessWorkbench>,
-    );
-
-    const layout = container.querySelector('[data-slot="page-layout"]');
-    const workbench = container.querySelector('[data-slot="process-workbench"]');
-    expect(layout).toHaveAttribute('data-scroll-mode', 'route');
-    expect(workbench).toHaveAttribute('data-axis-surface-contract', 'process-workbench');
-    expect(workbench).toHaveAttribute('data-axis-surface-id', 'solution-delivery');
-    expect(layout).toContainElement(screen.getByRole('heading', { level: 1, name: 'Solutions' }));
-    expect(layout).toContainElement(screen.getByRole('region', { name: 'Release pipeline' }));
-  });
-
   it('classifies generic content capabilities at every finite owner boundary', () => {
     expectTypeOf<AccountSurfaceProps['workspace']>().toEqualTypeOf<AccountWorkspaceModel>();
     expectTypeOf<AccountSurfaceProps['preferences']>().toEqualTypeOf<AccountPreferencesModel>();
@@ -143,13 +136,10 @@ describe('surface contracts', () => {
       | 'notifications'
     >();
     expectTypeOf<UnboundedContentSlot<EntrySurfaceProps>>().toEqualTypeOf<
-      'banner' | 'children' | 'footer' | 'utilities'
+      'banner' | 'children' | 'footer'
     >();
     expectTypeOf<UnboundedContentSlot<ManagedDialogProps>>().toEqualTypeOf<
       'children' | 'description' | 'footer' | 'titleAccessory'
-    >();
-    expectTypeOf<UnboundedContentSlot<ProcessWorkbenchProps>>().toEqualTypeOf<
-      'children' | 'description' | 'title'
     >();
     expectTypeOf<UnboundedContentSlot<ResourceWorkspaceProps>>().toEqualTypeOf<
       'children' | 'description' | 'status' | 'title'

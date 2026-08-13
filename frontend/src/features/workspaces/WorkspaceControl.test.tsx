@@ -277,7 +277,7 @@ describe('useWorkspaceControl', () => {
       </TestBoundary>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(await screen.findByRole('button', { name: 'Create Organization' }));
 
     expect(screen.getByRole('dialog', { name: 'Create Organization' })).toBeVisible();

@@ -4,7 +4,6 @@ import { AuthenticatedFrame } from '@/components/shared/AuthenticatedFrame';
 import { EntrySurface } from '@/components/shared/EntrySurface';
 import { ManagedDialog } from '@/components/shared/ManagedDialog';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
-import { ProcessWorkbench } from '@/components/shared/ProcessWorkbench';
 import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { EmailConfirmationPage } from '@/features/auth/components/EmailConfirmationPage';
 import { RegisterPage } from '@/features/auth/components/RegisterPage';
@@ -23,6 +22,7 @@ import { RulesPage } from '@/features/rules/components/RulesPage';
 import { ServiceIdentitiesPage } from '@/features/service-identities/components/ServiceIdentitiesPage';
 import { serviceIdentitiesManagedWindowRenderers } from '@/features/service-identities/managed-windows';
 import { SolutionsPage } from '@/features/solutions/components/SolutionsPage';
+import { solutionsManagedWindowRenderers } from '@/features/solutions/managed-windows';
 import type { ActiveSurfaceId, SurfaceContractId } from '@/lib/ui-foundation';
 import { Route as AuthenticatedRoute } from '@/routes/_authenticated';
 
@@ -31,7 +31,6 @@ const surfaceContractOwners = {
   'authenticated-frame': AuthenticatedFrame,
   'entry-surface': EntrySurface,
   'managed-task-window': ManagedDialog,
-  'process-workbench': ProcessWorkbench,
   'resource-workspace': ResourceWorkspace,
 } satisfies Record<SurfaceContractId, unknown>;
 
@@ -57,6 +56,7 @@ const activeSurfaceImplementations = {
   'session-unavailable': SessionUnavailablePage,
   'sign-in': SignInPage,
   'solution-delivery': SolutionsPage,
+  'solution-delivery-windows': solutionsManagedWindowRenderers,
   'verify-email': VerifyEmailPage,
 } satisfies Record<ActiveSurfaceId, unknown>;
 

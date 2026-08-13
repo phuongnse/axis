@@ -52,7 +52,7 @@ Apply this boundary across every Axis feature, not as a feature-local convention
 
 | Meaning | Use | Do not use |
 |---|---|---|
-| Lifecycle, availability, origin, or durable state | `StatusBadge` with its semantic tone | Raw `Badge`, plain color, or a status-styled heading |
+| Lifecycle, availability, origin, or durable state | `StatusBadge` with its semantic state | Raw `Badge`, plain color, or a status-styled heading |
 | Short taxonomy, capability, constraint, identifier, or syntax token scanned among peers | `MetadataTag` | A tag for a sentence, field label, section label, or isolated value |
 | Numeric count attached to a control | The owning shared control's count treatment | A feature-local raw `Badge` |
 | Page, section, field, step, or relationship label | Semantic heading, label, or restrained typography | Badge or tag |
@@ -62,7 +62,7 @@ Apply this boundary across every Axis feature, not as a feature-local convention
 | Result or effect | Plain result copy; `StatusNotice` when feedback needs prominence | Severity badge plus duplicate explanatory prose |
 | Guidance or explanation | Concise prose, inline help, tooltip, or a mode-appropriate guide | Badge, tag, or authoring help on read-only views |
 
-The badge family is only for short, non-sentence labels whose compact shape materially improves scanning among peers. It is not a generic emphasis device. Feature code uses `StatusBadge` or `MetadataTag`, never raw `Badge`. Feature and shared consumers use `StatusNotice` for page, form, dialog, and menu feedback; raw `Alert` remains private to that owner. If neither semantic pattern fits, choose structure or typography instead of adding another wrapper.
+The badge family is only for short, non-sentence labels whose compact shape materially improves scanning among peers. It is not a generic emphasis device. Feature code classifies durable meaning as informative, positive, caution, critical, neutral, or inactive; `StatusBadge` alone maps that finite state to color and treatment, and brand color is not a status. Feature code uses `StatusBadge` or `MetadataTag`, never raw `Badge`. Feature and shared consumers use `StatusNotice` for page, form, dialog, and menu feedback; raw `Alert` remains private to that owner. If neither semantic pattern fits, choose structure or typography instead of adding another wrapper.
 
 ## Review Evidence
 

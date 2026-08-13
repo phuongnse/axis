@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.type-tests.tsbuildinfo"
+  },
+  "include": [
+    "src/components/shared/StatusBadge.tsx",
+    "src/lib/ui-foundation.ts",
+    "tests/types/**/*.ts"
+  ]
+}

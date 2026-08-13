@@ -2,8 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, ShieldMinus } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AsyncButton } from '@/components/shared/AsyncButton';
-import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import {
+  ManagedDialog,
+  ManagedDialogAction,
+  ManagedDialogAsyncAction,
+  ManagedDialogBody,
+} from '@/components/shared/ManagedDialog';
 import {
   type ManagedWindowDescriptor,
   type ManagedWindowRendererProps,
@@ -23,7 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import {
   Select,
@@ -197,15 +200,15 @@ function ProductRoleAssignDialog({
         }}
         footer={
           <>
-            <Button
+            <ManagedDialogAction
               type="button"
               variant="outline"
               disabled={mutation.isPending}
               onClick={requestClose}
             >
               {t('app.cancel')}
-            </Button>
-            <AsyncButton
+            </ManagedDialogAction>
+            <ManagedDialogAsyncAction
               type="submit"
               form={formId}
               disabled={mutation.isPending || !selectedSubject || !selectedRole}
@@ -214,7 +217,7 @@ function ProductRoleAssignDialog({
               pendingLabel={t('productRoles.assigning')}
             >
               {t('productRoles.assign')}
-            </AsyncButton>
+            </ManagedDialogAsyncAction>
           </>
         }
       >
@@ -371,7 +374,7 @@ function ProductRoleAssignmentDialog({
       title={subjectName}
       description={t('productRoles.currentDescription')}
       titleAccessory={
-        <StatusBadge tone={assignment.isActive ? 'success' : 'muted'}>
+        <StatusBadge state={assignment.isActive ? 'positive' : 'inactive'}>
           {assignment.isActive ? t('productRoles.active') : t('productRoles.revokedStatus')}
         </StatusBadge>
       }
@@ -381,14 +384,19 @@ function ProductRoleAssignmentDialog({
       }}
       footer={
         <>
-          <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onClose}>
+          <ManagedDialogAction
+            type="button"
+            variant="outline"
+            disabled={mutation.isPending}
+            onClick={onClose}
+          >
             {t('app.close')}
-          </Button>
+          </ManagedDialogAction>
           {actionable ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
-                  <AsyncButton
+                  <ManagedDialogAsyncAction
                     type="button"
                     variant="destructive"
                     disabled={mutation.isPending}
@@ -397,7 +405,7 @@ function ProductRoleAssignmentDialog({
                     pendingLabel={t('productRoles.revoking')}
                   >
                     {t('productRoles.revoke')}
-                  </AsyncButton>
+                  </ManagedDialogAsyncAction>
                 }
               />
               <AlertDialogContent>
@@ -455,9 +463,9 @@ function UnavailableDialog({ title, onClose }: { title: string; onClose: () => v
         if (!open) onClose();
       }}
       footer={
-        <Button type="button" variant="outline" onClick={onClose}>
+        <ManagedDialogAction type="button" variant="outline" onClick={onClose}>
           {t('app.close')}
-        </Button>
+        </ManagedDialogAction>
       }
     >
       <ManagedDialogBody>

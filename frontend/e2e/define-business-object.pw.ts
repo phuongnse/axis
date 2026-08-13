@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type TestInfo, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { expectCanonicalTestLanguage } from './canonical-test-language';
 
 const profile = {
@@ -699,8 +699,21 @@ function seededDefinitions(count: number): BusinessObjectDefinitionDetail[] {
   );
 }
 
-async function attachGoldenScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  await expectCanonicalTestLanguage(page);
+async function expectResourceWorkspaceScreenshot(
+  page: Page,
+  name: string,
+  { canonicalLanguage = true }: { canonicalLanguage?: boolean } = {},
+): Promise<void> {
+  if (canonicalLanguage) await expectCanonicalTestLanguage(page);
+  const workspace = page.locator('[data-slot="resource-workspace"]');
+  await expect(workspace).toBeVisible();
+  await expect(workspace).toHaveAttribute('data-axis-surface-contract', 'resource-workspace');
+  await expect(workspace).toHaveAttribute('data-axis-surface-id', 'business-object-definitions');
+  await page.evaluate(() =>
+    Promise.allSettled(
+      document.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
+  );
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     document
@@ -708,10 +721,565 @@ async function attachGoldenScreenshot(page: Page, testInfo: TestInfo, name: stri
       ?.scrollIntoView({ block: 'nearest', inline: 'center' });
   });
   await page.mouse.move(1, 1);
-  await testInfo.attach(name, {
-    body: await page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' }),
-    contentType: 'image/png',
+  await expect(page).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: true,
+    scale: 'css',
   });
+}
+
+async function expectRecordActionAlignedToCellContent(page: Page): Promise<void> {
+  const label = page
+    .getByRole('region', { name: 'Definitions' })
+    .getByRole('button', { name: 'Customer' })
+    .locator('[data-slot="data-table-record-action-label"]');
+  await expect(label).toBeVisible();
+  await expect
+    .poll(() =>
+      label.evaluate((element) => {
+        const content = element.closest('[data-slot="data-table-cell-content"]');
+        if (!content) return Number.POSITIVE_INFINITY;
+        return Math.abs(
+          element.getBoundingClientRect().left - content.getBoundingClientRect().left,
+        );
+      }),
+    )
+    .toBeLessThanOrEqual(0.5);
+}
+
+async function expectManagedTaskWindowScreenshot(
+  page: Page,
+  name: string,
+  { canonicalLanguage = true }: { canonicalLanguage?: boolean } = {},
+): Promise<void> {
+  if (canonicalLanguage) await expectCanonicalTestLanguage(page);
+  const activeWindow = page.locator('[data-slot="managed-dialog-window"][data-active="true"]');
+  await expect(activeWindow).toBeVisible();
+  await expect(activeWindow).toHaveAttribute('data-axis-surface-contract', 'managed-task-window');
+  await expect(activeWindow).toHaveAttribute('data-axis-surface-id', 'business-object-editor');
+  await page.evaluate(() =>
+    Promise.allSettled(
+      document.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
+  );
+  await page.evaluate(() => {
+    document
+      .querySelector<HTMLElement>(
+        '[data-slot="managed-dialog-window"][data-active="true"] ' +
+          '[data-slot="managed-dialog-footer"] [data-slot="dropdown-menu-trigger"]',
+      )
+      ?.focus({ preventScroll: true });
+    window.getSelection()?.removeAllRanges();
+    for (const control of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      '[data-slot="managed-dialog-window"] input, [data-slot="managed-dialog-window"] textarea',
+    )) {
+      const end = control.value.length;
+      control.setSelectionRange(end, end);
+    }
+  });
+  await page.mouse.move(1, 1);
+  await expect(page).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: true,
+    scale: 'css',
+  });
+}
+
+async function expectManagedTaskWindowTextContrast(
+  root: Locator,
+  minimumTextNodeCount: number,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const results = await root.evaluate((root) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('Expected a 2D canvas context');
+
+        const rgba = (color: string): [number, number, number, number] => {
+          context.clearRect(0, 0, 1, 1);
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const value = context.getImageData(0, 0, 1, 1).data;
+          return [value[0], value[1], value[2], value[3] / 255];
+        };
+        const composite = (
+          foreground: [number, number, number, number],
+          background: [number, number, number, number],
+        ): [number, number, number, number] => {
+          const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+          if (alpha === 0) return [0, 0, 0, 0];
+          return [
+            (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) /
+              alpha,
+            (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) /
+              alpha,
+            (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) /
+              alpha,
+            alpha,
+          ];
+        };
+        const luminance = ([red, green, blue]: [number, number, number, number]) => {
+          const linear = [red, green, blue].map((channel) => {
+            const value = channel / 255;
+            return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+          });
+          return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+        };
+
+        const textByElement = new Map<HTMLElement, string[]>();
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const text = node.textContent?.trim();
+          const element = node.parentElement;
+          if (!text || !element || element.closest(':disabled,[aria-disabled="true"]')) continue;
+          const bounds = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          if (
+            bounds.width <= 1 ||
+            bounds.height <= 1 ||
+            style.display === 'none' ||
+            style.visibility === 'hidden'
+          ) {
+            continue;
+          }
+          textByElement.set(element, [...(textByElement.get(element) ?? []), text]);
+        }
+
+        return [...textByElement].map(([element, text]) => {
+          const layers: [number, number, number, number][] = [];
+          for (let node: Element | null = element; node; node = node.parentElement) {
+            layers.push(rgba(getComputedStyle(node).backgroundColor));
+          }
+          let background: [number, number, number, number] = [255, 255, 255, 1];
+          for (const layer of layers.reverse()) background = composite(layer, background);
+          const foreground = composite(rgba(getComputedStyle(element).color), background);
+          const foregroundLuminance = luminance(foreground);
+          const backgroundLuminance = luminance(background);
+
+          return {
+            ratio:
+              (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+              (Math.min(foregroundLuminance, backgroundLuminance) + 0.05),
+            text: text.join(' '),
+          };
+        });
+      });
+
+      return {
+        coverageShortfall: Math.max(0, minimumTextNodeCount - results.length),
+        failures: results.filter(({ ratio }) => ratio < 4.5),
+      };
+    })
+    .toEqual({ coverageShortfall: 0, failures: [] });
+}
+
+async function expectManagedTaskWindowNonTextContrast(page: Page): Promise<void> {
+  const activeWindow = page.locator('[data-slot="managed-dialog-window"][data-active="true"]');
+  const windowsTrigger = activeWindow
+    .locator('[data-slot="managed-dialog-footer"]')
+    .getByRole('button', { name: /Windows \(\d+\)/ });
+  const tabBudget = await activeWindow
+    .locator(
+      'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
+        'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    )
+    .evaluateAll(
+      (elements) =>
+        elements.filter((element) => {
+          const bounds = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return (
+            bounds.width > 0 &&
+            bounds.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            !element.closest('[hidden], [aria-hidden="true"], [inert]')
+          );
+        }).length + 1,
+    );
+  await activeWindow.getByRole('button', { name: 'Reset dialog' }).focus();
+  const restingSwitcherBorder = await windowsTrigger.evaluate(
+    (element) => getComputedStyle(element).borderTopColor,
+  );
+  for (let index = 0; index < tabBudget; index += 1) {
+    if (await windowsTrigger.evaluate((element) => document.activeElement === element)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(windowsTrigger).toBeFocused();
+  await expectVisibleFocusIndicator(windowsTrigger);
+  await expect
+    .poll(() => windowsTrigger.evaluate((element) => getComputedStyle(element).borderTopColor))
+    .not.toBe(restingSwitcherBorder);
+
+  const readSamples = () =>
+    page.evaluate(() => {
+      type Rgba = [number, number, number, number];
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('Expected a 2D canvas context');
+      const rgba = (color: string): Rgba => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const value = context.getImageData(0, 0, 1, 1).data;
+        return [value[0], value[1], value[2], value[3] / 255];
+      };
+      const composite = (foreground: Rgba, background: Rgba): Rgba => {
+        const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+        if (alpha === 0) return [0, 0, 0, 0];
+        return [
+          (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) /
+            alpha,
+          (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) /
+            alpha,
+          (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) /
+            alpha,
+          alpha,
+        ];
+      };
+      const luminance = ([red, green, blue]: Rgba) => {
+        const linear = [red, green, blue].map((channel) => {
+          const value = channel / 255;
+          return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+      };
+      const ratio = (first: Rgba, second: Rgba) => {
+        const firstLuminance = luminance(first);
+        const secondLuminance = luminance(second);
+        return (
+          (Math.max(firstLuminance, secondLuminance) + 0.05) /
+          (Math.min(firstLuminance, secondLuminance) + 0.05)
+        );
+      };
+      const effectiveBackground = (element: Element | null): Rgba => {
+        const layers: Rgba[] = [];
+        for (let node = element; node; node = node.parentElement) {
+          layers.push(rgba(getComputedStyle(node).backgroundColor));
+        }
+        let background: Rgba = [255, 255, 255, 1];
+        for (const layer of layers.reverse()) background = composite(layer, background);
+        return background;
+      };
+      const samples: Array<{ label: string; ratio: number }> = [];
+      const active = document.querySelector<HTMLElement>(
+        '[data-slot="managed-dialog-window"][data-active="true"]',
+      );
+      if (!active) throw new Error('Managed task window is missing');
+
+      for (const [index, button] of [
+        ...active.querySelectorAll<HTMLElement>(
+          '[data-slot="managed-dialog-header"] [data-slot="button"]:not(:disabled)',
+        ),
+      ].entries()) {
+        const background = effectiveBackground(button);
+        samples.push({
+          label: `header-control-${index + 1}`,
+          ratio: ratio(composite(rgba(getComputedStyle(button).color), background), background),
+        });
+      }
+
+      const input = active.querySelector<HTMLElement>('[data-slot="input"]:not(:disabled)');
+      if (input) {
+        const outside = effectiveBackground(input.parentElement);
+        samples.push({
+          label: 'editable-field-boundary',
+          ratio: ratio(composite(rgba(getComputedStyle(input).borderTopColor), outside), outside),
+        });
+      }
+
+      const trigger = active.querySelector<HTMLElement>(
+        '[data-slot="managed-dialog-footer"] [data-slot="dropdown-menu-trigger"]',
+      );
+      if (!trigger) throw new Error('Managed task window switcher is missing');
+      const triggerOutside = effectiveBackground(trigger.parentElement);
+      samples.push({
+        label: 'focused-window-switcher-border',
+        ratio: ratio(
+          composite(rgba(getComputedStyle(trigger).borderTopColor), triggerOutside),
+          triggerOutside,
+        ),
+      });
+
+      const dock = document.querySelector<HTMLElement>(
+        '[data-slot="managed-window-tray"] [data-slot="managed-window-dock"]',
+      );
+      if (dock) {
+        for (const [index, button] of [
+          ...dock.querySelectorAll<HTMLElement>('[data-slot="button"]:not(:disabled)'),
+        ].entries()) {
+          const background = effectiveBackground(button);
+          samples.push({
+            label: `dock-control-${index + 1}`,
+            ratio: ratio(composite(rgba(getComputedStyle(button).color), background), background),
+          });
+        }
+      }
+      return samples;
+    });
+
+  await expect
+    .poll(async () => (await readSamples()).filter((sample) => sample.ratio < 3))
+    .toEqual([]);
+  const results = await readSamples();
+  expect(results.length).toBeGreaterThanOrEqual(6);
+
+  await windowsTrigger.click();
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  await expectManagedTaskWindowTextContrast(menu, 3);
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+}
+
+async function expectManagedTaskWindowContrast(page: Page): Promise<void> {
+  await expectManagedTaskWindowTextContrast(
+    page.locator('[data-slot="managed-dialog-window"][data-active="true"]'),
+    10,
+  );
+  await expectManagedTaskWindowNonTextContrast(page);
+}
+
+async function expectManagedTaskWindowTargetGeometry(
+  page: Page,
+  minimumSize: 32 | 44,
+): Promise<void> {
+  const targets = page.locator(
+    '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-header"] [data-slot="button"], ' +
+      '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="button"], ' +
+      '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="dropdown-menu-trigger"], ' +
+      '[data-slot="managed-window-tray"] [data-slot="button"], ' +
+      '[data-slot="managed-window-tray"] [data-slot="dropdown-menu-trigger"]',
+  );
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        height: bounds.height,
+        name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '',
+        width: bounds.width,
+      };
+    }),
+  );
+  expect(measurements.length).toBeGreaterThan(0);
+  for (const measurement of measurements) {
+    expect(measurement.width, `${measurement.name} width`).toBeGreaterThanOrEqual(minimumSize);
+    expect(measurement.height, `${measurement.name} height`).toBeGreaterThanOrEqual(minimumSize);
+  }
+}
+
+async function expectManagedTaskWindowDesktopGeometry(
+  page: Page,
+  activeWindow: Locator,
+): Promise<void> {
+  const workArea = page.locator('[data-slot="managed-window-expanded-layer"]');
+  const [workAreaBox, initialBox, minimum] = await Promise.all([
+    workArea.boundingBox(),
+    activeWindow.boundingBox(),
+    activeWindow.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        height: Number.parseFloat(style.minHeight),
+        width: Number.parseFloat(style.minWidth),
+      };
+    }),
+  ]);
+  if (!workAreaBox || !initialBox)
+    throw new Error('Managed task window work-area geometry missing');
+  expect(initialBox.width).toBeCloseTo(workAreaBox.width * 0.5, 0);
+  expect(initialBox.height).toBeCloseTo(workAreaBox.height * 0.75, 0);
+  expect(minimum.width).toBeCloseTo(workAreaBox.width * 0.35, 0);
+  expect(minimum.height).toBeCloseTo(workAreaBox.height * 0.5, 0);
+
+  await activeWindow.getByRole('button', { name: 'Maximize dialog' }).click();
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.width)
+    .toBeCloseTo(workAreaBox.width, 0);
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.height)
+    .toBeCloseTo(workAreaBox.height, 0);
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.x)
+    .toBeCloseTo(workAreaBox.x, 0);
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.y)
+    .toBeCloseTo(workAreaBox.y, 0);
+  await activeWindow.getByRole('button', { name: 'Restore dialog size' }).click();
+  await expect.poll(async () => await activeWindow.boundingBox()).toEqual(initialBox);
+
+  const header = activeWindow.locator('[data-slot="managed-dialog-header"]');
+  await header.dblclick({ position: { x: 24, y: 24 } });
+  await expect(activeWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await header.dblclick({ position: { x: 24, y: 24 } });
+  await expect.poll(async () => await activeWindow.boundingBox()).toEqual(initialBox);
+}
+
+async function expectManagedTaskWindowHeaderControlGeometry(
+  activeWindow: Locator,
+  mode: 'compact' | 'desktop',
+): Promise<void> {
+  const header = activeWindow.locator('[data-slot="managed-dialog-header"]');
+  const primary = header.locator('[data-slot="managed-dialog-header-primary"]');
+  const identity = header.locator('[data-slot="managed-dialog-header-identity"]');
+  const controls = header.locator('[data-slot="managed-dialog-header-controls"]');
+  const description = header.locator('[data-slot="dialog-description"]');
+  const [headerBox, primaryBox, identityBox, controlsBox, descriptionBox] = await Promise.all([
+    header.boundingBox(),
+    primary.boundingBox(),
+    identity.boundingBox(),
+    controls.boundingBox(),
+    description.boundingBox(),
+  ]);
+  if (!headerBox || !primaryBox || !identityBox || !controlsBox || !descriptionBox)
+    throw new Error('Managed task window header geometry missing');
+
+  await expect
+    .poll(() => header.evaluate((element) => getComputedStyle(element).userSelect))
+    .toBe('none');
+
+  if (mode === 'desktop') {
+    expect(
+      Math.abs(identityBox.y + identityBox.height / 2 - (controlsBox.y + controlsBox.height / 2)),
+    ).toBeLessThanOrEqual(1);
+    expect(controlsBox.x).toBeGreaterThan(identityBox.x);
+    return;
+  }
+
+  expect(identityBox.y + identityBox.height).toBeLessThanOrEqual(controlsBox.y);
+  expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(descriptionBox.y);
+  expect(
+    Math.abs(controlsBox.x + controlsBox.width / 2 - (headerBox.x + headerBox.width / 2)),
+  ).toBeLessThanOrEqual(1);
+}
+
+async function openOverlappingManagedDefinitionWindows(page: Page): Promise<{
+  catalog: Locator;
+  customerWindow: Locator;
+  definitionTwoWindow: Locator;
+}> {
+  const catalog = page.getByRole('region', { name: 'Definitions' });
+  await catalog.getByRole('button', { name: 'Customer', exact: true }).click();
+  const customerWindow = page
+    .getByRole('dialog', { name: 'Customer' })
+    .locator('[data-slot="managed-dialog-window"]');
+  await expect(customerWindow).toBeVisible();
+
+  const header = customerWindow.locator('[data-slot="managed-dialog-header"]');
+  const headerBox = await header.boundingBox();
+  if (!headerBox) throw new Error('Managed task window header geometry missing');
+  await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    headerBox.x + headerBox.width / 2 + 120,
+    headerBox.y + headerBox.height / 2 + 24,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+
+  await catalog.getByRole('button', { name: 'Definition 02', exact: true }).click();
+  const definitionTwoWindow = page
+    .getByRole('dialog', { name: 'Definition 02' })
+    .locator('[data-slot="managed-dialog-window"]');
+  await expect(definitionTwoWindow).toBeVisible();
+  await expect(definitionTwoWindow).toHaveAttribute('data-active', 'true');
+
+  const [customerBox, definitionTwoBox] = await Promise.all([
+    customerWindow.boundingBox(),
+    definitionTwoWindow.boundingBox(),
+  ]);
+  if (!customerBox || !definitionTwoBox) throw new Error('Managed task window geometry missing');
+  expect(
+    Math.min(customerBox.x + customerBox.width, definitionTwoBox.x + definitionTwoBox.width) -
+      Math.max(customerBox.x, definitionTwoBox.x),
+  ).toBeGreaterThan(0);
+  expect(
+    Math.min(customerBox.y + customerBox.height, definitionTwoBox.y + definitionTwoBox.height) -
+      Math.max(customerBox.y, definitionTwoBox.y),
+  ).toBeGreaterThan(0);
+
+  return { catalog, customerWindow, definitionTwoWindow };
+}
+
+async function prepareCompactManagedTaskWindowCandidate(
+  page: Page,
+  catalog: Locator,
+  definitionTwoWindow: Locator,
+): Promise<void> {
+  await definitionTwoWindow.getByRole('button', { name: 'Minimize dialog' }).click();
+  await catalog.getByRole('button', { name: 'Definition 03', exact: true }).click();
+  const definitionThreeWindow = page
+    .getByRole('dialog', { name: 'Definition 03' })
+    .locator('[data-slot="managed-dialog-window"]');
+  await definitionThreeWindow.getByRole('button', { name: 'Minimize dialog' }).click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(definitionTwoWindow).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Customer' })).toBeVisible();
+  const activeFooter = page.locator(
+    '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"]',
+  );
+  const activeWindow = page.locator('[data-slot="managed-dialog-window"][data-active="true"]');
+  await expectManagedTaskWindowHeaderControlGeometry(activeWindow, 'compact');
+  const windowsTrigger = activeFooter.getByRole('button', { name: 'Windows (3)' });
+  await expect(windowsTrigger).toBeVisible();
+  await expect(
+    page.locator('[data-slot="managed-window-tray"]').getByText('+1', { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('[data-slot="managed-window-dock"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-slot="managed-window-tray"]').getByRole('button', { name: 'Windows (3)' }),
+  ).toHaveCount(0);
+
+  const footerButtons = page.locator(
+    '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="button"], ' +
+      '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="dropdown-menu-trigger"]',
+  );
+  const tray = page.locator('[data-slot="managed-window-tray"]');
+  const [buttonBoxes, trayBox] = await Promise.all([
+    footerButtons.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const bounds = button.getBoundingClientRect();
+        return { bottom: bounds.bottom, top: bounds.top };
+      }),
+    ),
+    tray.boundingBox(),
+  ]);
+  if (!trayBox) throw new Error('Managed task window tray geometry missing');
+  for (const buttonBox of buttonBoxes) {
+    expect(buttonBox.bottom).toBeLessThanOrEqual(trayBox.y);
+  }
+  const trayTarget = tray.locator('[data-slot="button"]').first();
+  await expect
+    .poll(() =>
+      trayTarget.evaluate((button) => {
+        const bounds = button.getBoundingClientRect();
+        const topmost = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        );
+        const tray = button.closest<HTMLElement>('[data-slot="managed-window-tray"]');
+        const expandedLayer = document.querySelector<HTMLElement>(
+          '[data-slot="managed-window-expanded-layer"]',
+        );
+        return {
+          expandedLayerZIndex: expandedLayer ? getComputedStyle(expandedLayer).zIndex : null,
+          trayIsTopmost: Boolean(topmost?.closest('[data-slot="managed-window-tray"]')),
+          trayZIndex: tray ? getComputedStyle(tray).zIndex : null,
+        };
+      }),
+    )
+    .toEqual({
+      expandedLayerZIndex: '40',
+      trayIsTopmost: true,
+      trayZIndex: '50',
+    });
 }
 
 async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
@@ -719,6 +1287,62 @@ async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
   await expect
     .poll(() => viewport.evaluate((element) => element.scrollWidth <= element.clientWidth))
     .toBe(true);
+}
+
+async function expectResourceWorkspaceTargetGeometry(
+  page: Page,
+  minimumSize: 32 | 44,
+): Promise<void> {
+  const targets = page
+    .locator('[data-slot="resource-workspace"]')
+    .locator(
+      '[data-slot="button"]:not([data-slot="data-table-resizer"]), ' +
+        '[data-slot="data-table-record-action"], [data-slot="input-group-control"], ' +
+        '[data-slot="select-trigger"]',
+    );
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        height: bounds.height,
+        name:
+          element.getAttribute('aria-label') ??
+          element.textContent?.trim() ??
+          element.getAttribute('data-slot') ??
+          '',
+        slot: element.getAttribute('data-slot'),
+        width: bounds.width,
+      };
+    }),
+  );
+
+  expect(measurements.length).toBeGreaterThanOrEqual(10);
+  expect(
+    measurements.every(({ height }) => height >= minimumSize - 1),
+    `Resource Workspace targets meet the ${minimumSize}px height: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+  expect(
+    measurements
+      .filter(({ slot }) => slot === 'button' || slot === 'data-table-record-action')
+      .every(({ width }) => width >= minimumSize - 1),
+    `Resource Workspace buttons meet the ${minimumSize}px width: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+}
+
+async function expectVisibleFocusIndicator(target: Locator): Promise<void> {
+  const focusStyle = await target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      boxShadow: style.boxShadow,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth),
+    };
+  });
+  expect(
+    focusStyle.boxShadow !== 'none' ||
+      (focusStyle.outlineStyle !== 'none' && focusStyle.outlineWidth > 0),
+    JSON.stringify(focusStyle),
+  ).toBe(true);
 }
 
 async function expectActiveModuleNavigationItemIsRevealed(page: Page): Promise<void> {
@@ -785,6 +1409,15 @@ async function expectReducedMotion(locator: Locator): Promise<void> {
     .toBeLessThanOrEqual(0.1);
 }
 
+function observeUnexpectedRuntimeErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  return errors;
+}
+
 test.describe('define business object', () => {
   test('denied create affordance blocks toolbar and deep-link launch', async ({ page }) => {
     await mockAuthenticatedSession(page);
@@ -799,7 +1432,8 @@ test.describe('define business object', () => {
 
   test('AT-004 canonical EN resource workspace visual matrix stays touch-safe and motion-safe', async ({
     page,
-  }, testInfo) => {
+  }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mockAuthenticatedSession(page, { language: 'en', theme: 'light' });
     await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(20) });
@@ -831,9 +1465,21 @@ test.describe('define business object', () => {
     await expect(toolbar.locator('[data-slot="data-table-toolbar-actions"]')).toBeVisible();
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
+    await expectRecordActionAlignedToCellContent(page);
+    await expectResourceWorkspaceTargetGeometry(page, 32);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-desktop-en');
+    const ariaTree = await page.locator('[data-slot="resource-workspace"]').ariaSnapshot();
+    for (const semanticEntry of [
+      'heading "Business objects"',
+      'region "Definitions"',
+      'textbox "Search business objects"',
+      'button "New definition"',
+      'table',
+    ]) {
+      expect(ariaTree).toContain(semanticEntry);
+    }
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-light-desktop-en');
 
     await page.setViewportSize({ width: 390, height: 844 });
     const newDefinition = page.getByRole('button', { name: 'New definition' });
@@ -843,6 +1489,7 @@ test.describe('define business object', () => {
     expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
     await newDefinition.focus();
     await expect(newDefinition).toBeFocused();
+    await expectVisibleFocusIndicator(newDefinition);
     await expect(page.getByRole('link', { name: 'Business objects', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
@@ -854,10 +1501,11 @@ test.describe('define business object', () => {
       .poll(() => toolbar.evaluate((element) => element.scrollWidth <= element.clientWidth))
       .toBe(true);
     await expectDataTableScrollsInternally(page, { horizontally: true });
+    await expectResourceWorkspaceTargetGeometry(page, 44);
     await expectActiveModuleNavigationItemIsRevealed(page);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-compact-en');
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-light-compact-en');
 
     const rulesLink = page.getByRole('link', { name: 'Rules' });
     const restingBackground = await rulesLink.evaluate(
@@ -869,7 +1517,7 @@ test.describe('define business object', () => {
       .not.toBe(restingBackground);
     await expectReducedMotion(rulesLink);
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     const accountMenu = page.locator('[data-axis-surface-id="account-actions"]');
     await expect(accountMenu).toBeVisible();
     await expectReducedMotion(accountMenu);
@@ -881,15 +1529,154 @@ test.describe('define business object', () => {
       'aria-current',
       'page',
     );
+    await expectResourceWorkspaceTargetGeometry(page, 44);
+    await expectDarkReadableContrast(description);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-compact-en');
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-dark-compact-en');
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
+    await expectResourceWorkspaceTargetGeometry(page, 32);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-desktop-en');
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-dark-desktop-en');
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('AT-004 Resource Workspace reflows localized collection content at the 320 CSS pixel boundary', async ({
+    page,
+  }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { language: 'vi', theme: 'light' });
+    await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(20) });
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto('/business-objects', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await expect(
+      page.getByRole('heading', { name: 'Business objects', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'Định nghĩa contract dữ liệu dùng lại trong workspace. Định nghĩa chưa publish còn chỉnh được; bản publish là phiên bản ổn định.',
+      ),
+    ).toBeVisible();
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-slot="resource-workspace"], [data-slot="resource-workspace"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+
+    await expectDataTableScrollsInternally(page, { horizontally: true });
+    await expectResourceWorkspaceTargetGeometry(page, 44);
+    await expectActiveModuleNavigationItemIsRevealed(page);
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    const search = page.getByLabel('Tìm business object');
+    await search.focus();
+    await expectVisibleFocusIndicator(search);
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-light-compact-vi-reflow', {
+      canonicalLanguage: false,
+    });
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`AT-004 Managed Task Window ${theme} desktop and compact candidate stays layered and touch-safe`, async ({
+      page,
+    }) => {
+      const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await mockAuthenticatedSession(page, { language: 'en', theme });
+      await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(3) });
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto('/business-objects');
+
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      if (theme === 'dark') await expect(page.locator('html')).toHaveClass(/dark/);
+      else await expect(page.locator('html')).not.toHaveClass(/dark/);
+
+      const { catalog, customerWindow, definitionTwoWindow } =
+        await openOverlappingManagedDefinitionWindows(page);
+      await expect(customerWindow).not.toHaveAttribute('data-active', 'true');
+      await expectManagedTaskWindowDesktopGeometry(page, definitionTwoWindow);
+      await expectManagedTaskWindowHeaderControlGeometry(definitionTwoWindow, 'desktop');
+      await expect(
+        definitionTwoWindow
+          .locator('[data-slot="managed-dialog-footer"]')
+          .getByRole('button', { name: 'Windows (2)' }),
+      ).toBeVisible();
+      await expect(page.locator('[data-slot="managed-window-tray"]')).toHaveCount(0);
+      await expectManagedTaskWindowTargetGeometry(page, 32);
+      await expectReducedMotion(definitionTwoWindow);
+      const ariaTree = await definitionTwoWindow.ariaSnapshot();
+      for (const semanticEntry of [
+        'heading "Definition 02"',
+        'tab "General"',
+        'tab "Fields"',
+        'textbox "Name"',
+        'button "Windows (2)"',
+        'button "Cancel"',
+        'button "Save changes"',
+        'button "Publish"',
+      ]) {
+        expect(ariaTree).toContain(semanticEntry);
+      }
+      await expectManagedTaskWindowContrast(page);
+      await expectNoDesktopDocumentScroll(page);
+      await expectNoPageOverflow(page);
+      await expectManagedTaskWindowScreenshot(page, `managed-task-window-${theme}-desktop-en`);
+
+      await prepareCompactManagedTaskWindowCandidate(page, catalog, definitionTwoWindow);
+      await expectManagedTaskWindowTargetGeometry(page, 44);
+      await expectManagedTaskWindowContrast(page);
+      await expectNoDesktopDocumentScroll(page);
+      await expectNoPageOverflow(page);
+      await expectManagedTaskWindowScreenshot(page, `managed-task-window-${theme}-compact-en`);
+      expect(runtimeErrors).toEqual([]);
+    });
+  }
+
+  test('AT-004 Managed Task Window reflows VI at the 320 CSS pixel boundary', async ({ page }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { language: 'vi', theme: 'light' });
+    await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(1) });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/business-objects');
+
+    const catalog = page.getByRole('region', { name: 'Định nghĩa' });
+    await catalog.getByRole('button', { name: 'Customer', exact: true }).click();
+    await page.setViewportSize({ width: 320, height: 900 });
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-slot="managed-dialog-window"], [data-slot="managed-dialog-window"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+
+    await expectManagedTaskWindowHeaderControlGeometry(
+      page.locator('[data-slot="managed-dialog-window"][data-active="true"]'),
+      'compact',
+    );
+    await expectManagedTaskWindowTargetGeometry(page, 44);
+    await expectReducedMotion(page.locator('[data-slot="managed-dialog-window"]'));
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    await expectManagedTaskWindowScreenshot(page, 'managed-task-window-light-compact-vi-reflow', {
+      canonicalLanguage: false,
+    });
+    expect(runtimeErrors).toEqual([]);
   });
 
   test('AT-005 resource workspace integrates independent managed definition windows', async ({
@@ -1043,7 +1830,7 @@ test.describe('define business object', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Customer draft');
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('button', { name: 'Windows (1)' })).toHaveCount(0);

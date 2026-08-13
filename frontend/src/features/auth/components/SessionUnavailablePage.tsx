@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
-import { EntrySurface } from '@/components/shared/EntrySurface';
+import { EntryAction, EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
-import { PreferencesMenu } from '@/features/preferences';
+import { useEntryPreferencesModel } from '@/features/preferences';
 
 interface SessionUnavailablePageProps {
   onRetry: () => void;
@@ -11,20 +10,21 @@ interface SessionUnavailablePageProps {
 
 export function SessionUnavailablePage({ onRetry }: SessionUnavailablePageProps) {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
 
   return (
     <EntrySurface
       surfaceId="session-unavailable"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('auth.sessionUnavailableTitle')}
     >
       <div className="space-y-4">
         <StatusNotice tone="warning" title={t('auth.sessionUnavailableTitle')}>
           {t('auth.sessionUnavailableBody')}
         </StatusNotice>
-        <Button type="button" className="w-full" onClick={onRetry}>
+        <EntryAction type="button" onClick={onRetry}>
           {t('auth.sessionUnavailableRetry')}
-        </Button>
+        </EntryAction>
       </div>
     </EntrySurface>
   );
