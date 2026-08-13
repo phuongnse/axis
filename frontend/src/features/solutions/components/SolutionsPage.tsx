@@ -22,6 +22,7 @@ import {
   solutionVersionQueryOptions,
   solutionVersionsQueryOptions,
 } from '../api';
+import { findExistingSolutionInstallation } from '../installation-availability';
 import {
   solutionInstallationWindowDescriptor,
   solutionPublishWindowDescriptor,
@@ -38,6 +39,7 @@ const route = getRouteApi('/_authenticated/solutions');
 
 type SolutionRow = SolutionVersionSummaryDto & {
   installation?: SolutionInstallationStatusDto;
+  otherInstalledVersion?: SolutionVersionSummaryDto;
 };
 
 export function SolutionsPage() {
@@ -124,17 +126,17 @@ export function SolutionsPage() {
   );
 
   const rows = useMemo(() => {
-    const installationsByVersion = new Map(
-      (installationsQuery.data ?? []).flatMap((installation) =>
-        installation.solutionVersionId
-          ? ([[installation.solutionVersionId, installation]] as const)
-          : [],
-      ),
-    );
-    const joined = (versionsQuery.data ?? []).map<SolutionRow>((version) => ({
-      ...version,
-      installation: version.id ? installationsByVersion.get(version.id) : undefined,
-    }));
+    const versions = versionsQuery.data ?? [];
+    const installations = installationsQuery.data ?? [];
+    const joined = versions.map<SolutionRow>((version) => {
+      const existing = findExistingSolutionInstallation(version, versions, installations);
+      return {
+        ...version,
+        installation: existing?.isExactVersion ? existing.installation : undefined,
+        otherInstalledVersion:
+          existing && !existing.isExactVersion ? existing.installedVersion : undefined,
+      };
+    });
     return filterSolutions(joined, tableQuery.globalFilter);
   }, [installationsQuery.data, tableQuery.globalFilter, versionsQuery.data]);
 
@@ -200,7 +202,9 @@ export function SolutionsPage() {
       },
       {
         id: 'installation',
-        accessorFn: (row) => row.installation?.provisioningStatus ?? 'NotInstalled',
+        accessorFn: (row) =>
+          row.installation?.provisioningStatus ??
+          (row.otherInstalledVersion ? 'OtherVersionInstalled' : 'NotInstalled'),
         size: 230,
         minSize: 210,
         meta: {
@@ -210,6 +214,10 @@ export function SolutionsPage() {
             kind: 'singleChoice',
             options: [
               { value: 'NotInstalled', label: t('solutions.notInstalled') },
+              {
+                value: 'OtherVersionInstalled',
+                label: t('solutions.anotherVersionInstalled'),
+              },
               { value: 'Installing', label: t('solutions.installingStatus') },
               { value: 'Installed', label: t('solutions.installedStatus') },
               { value: 'Failed', label: t('solutions.failedStatus') },
@@ -222,6 +230,14 @@ export function SolutionsPage() {
             <div className="flex min-w-0 items-center gap-2">
               {installation ? (
                 <ProvisioningStatusBadge status={installation.provisioningStatus} />
+              ) : row.original.otherInstalledVersion ? (
+                <StatusBadge state="caution">
+                  {t('solutions.versionInstalled', {
+                    version:
+                      row.original.otherInstalledVersion.solutionVersion ??
+                      t('solutions.notAvailable'),
+                  })}
+                </StatusBadge>
               ) : (
                 <StatusBadge state="neutral">{t('solutions.notInstalled')}</StatusBadge>
               )}
@@ -369,6 +385,7 @@ function filterSolutions(rows: readonly SolutionRow[], query: string): SolutionR
         row.installation?.provisioningStatus,
         row.installation?.complianceStatus,
         row.installation?.operationStatus,
+        row.otherInstalledVersion?.solutionVersion,
       ].join(' '),
     ).includes(normalized),
   );

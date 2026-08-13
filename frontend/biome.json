@@ -45,7 +45,6 @@
         "src/components/shared/AuthenticatedFrame.tsx",
         "src/components/shared/EntrySurface.tsx",
         "src/components/shared/ManagedDialog.tsx",
-        "src/components/shared/ProcessWorkbench.tsx",
         "src/components/shared/ResourceWorkspace.tsx"
       ],
       "linter": {

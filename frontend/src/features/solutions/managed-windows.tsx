@@ -51,6 +51,7 @@ import {
   SolutionTrustBadge,
   VersionFacts,
 } from './components/SolutionPresentation';
+import { findExistingSolutionInstallation } from './installation-availability';
 
 const SOLUTION_PUBLISH_KIND = 'solutions.publish';
 const SOLUTION_RELEASE_KIND = 'solutions.release';
@@ -384,8 +385,24 @@ function SolutionReleaseDialog({
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [installKey] = useState(createIdempotencyKey);
   const versionQuery = useQuery(solutionVersionQueryOptions(versionId));
+  const versionsQuery = useQuery(solutionVersionsQueryOptions());
+  const installationsQuery = useQuery(solutionInstallationsQueryOptions());
   const version = versionQuery.data;
-  const installable = version?.id !== undefined && version.trustStatus === 'Trusted';
+  const existingInstallation = version
+    ? findExistingSolutionInstallation(
+        version,
+        versionsQuery.data ?? [],
+        installationsQuery.data ?? [],
+      )
+    : undefined;
+  const availabilityPending = versionsQuery.isPending || installationsQuery.isPending;
+  const availabilityError = versionsQuery.isError || installationsQuery.isError;
+  const installable =
+    !availabilityPending &&
+    !availabilityError &&
+    version?.id !== undefined &&
+    version.trustStatus === 'Trusted' &&
+    !existingInstallation;
   const mutation = useMutation({
     mutationFn: () => installSolutionVersion(versionId, installKey),
     onSuccess: async (result) => {
@@ -483,16 +500,22 @@ function SolutionReleaseDialog({
           </div>
         ) : null}
         <AsyncContent
-          pending={versionQuery.isPending}
-          error={versionQuery.isError}
+          pending={versionQuery.isPending || availabilityPending}
+          error={versionQuery.isError || availabilityError}
           pendingLabel={t('solutions.releaseLoading')}
         >
-          {versionQuery.isError || !version ? (
+          {versionQuery.isError || availabilityError || !version ? (
             <StatusNotice tone="destructive" title={t('solutions.releaseLoadFailed')}>
               <ManagedDialogAction
                 type="button"
                 variant="outline"
-                onClick={() => void versionQuery.refetch()}
+                onClick={() =>
+                  void Promise.all([
+                    versionQuery.refetch(),
+                    versionsQuery.refetch(),
+                    installationsQuery.refetch(),
+                  ])
+                }
               >
                 {t('app.retry')}
               </ManagedDialogAction>
@@ -503,7 +526,13 @@ function SolutionReleaseDialog({
               <ComponentPlan components={version.components ?? []} />
               {!installable ? (
                 <StatusNotice tone="warning" title={t('solutions.installUnavailable')}>
-                  {t('solutions.installUnavailableDescription')}
+                  {existingInstallation
+                    ? t('solutions.installUnavailableExistingDescription', {
+                        version:
+                          existingInstallation.installedVersion.solutionVersion ??
+                          t('solutions.notAvailable'),
+                      })
+                    : t('solutions.installUnavailableDescription')}
                 </StatusNotice>
               ) : null}
             </div>

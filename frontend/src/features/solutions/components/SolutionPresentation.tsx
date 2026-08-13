@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatusBadge, type StatusBadgeState } from '@/components/shared/StatusBadge';
 import type {
@@ -64,12 +65,13 @@ export function VersionFacts({ version }: { version: SolutionVersionSummaryDto }
 
 export function ComponentPlan({ components }: { components: SolutionComponentPlanDto[] }) {
   const { t } = useTranslation();
+  const titleId = useId();
   if (components.length === 0) {
     return <p className="text-sm text-muted-foreground">{t('solutions.componentPlanEmpty')}</p>;
   }
   return (
-    <section className="grid gap-2" aria-labelledby="solution-component-plan-title">
-      <h3 id="solution-component-plan-title" className="font-medium">
+    <section className="grid gap-2" aria-labelledby={titleId}>
+      <h3 id={titleId} className="font-medium">
         {t('solutions.componentPlanLabel')}
       </h3>
       <ol className="grid gap-2">

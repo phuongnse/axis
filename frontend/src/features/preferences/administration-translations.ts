@@ -129,6 +129,7 @@ export const administrationTranslations = {
 
     'solutions.actionFailed': 'Solution action failed',
     'solutions.actionFailedDescription': 'Check the connection and try again.',
+    'solutions.anotherVersionInstalled': 'Another version installed',
     'solutions.buildId': 'Build ID',
     'solutions.compliant': 'Compliant',
     'solutions.componentPlanLabel': 'Ordered component plan',
@@ -154,6 +155,8 @@ export const administrationTranslations = {
     'solutions.installUnavailable': 'Installation unavailable',
     'solutions.installUnavailableDescription':
       'Only a trusted release with a safe version identity can be installed.',
+    'solutions.installUnavailableExistingDescription':
+      'Version {version} of this solution is already installed in the current Workspace. Upgrade and side-by-side installation are not supported.',
     'solutions.installationDetailsDescription':
       'Authoritative provisioning, compliance, and ordered operation outcomes for this Workspace installation.',
     'solutions.installationId': 'Installation identifier',
@@ -166,6 +169,7 @@ export const administrationTranslations = {
     'solutions.noncompliant': 'Noncompliant',
     'solutions.notAvailable': 'Not available',
     'solutions.notInstalled': 'Not installed',
+    'solutions.versionInstalled': 'Version {version} installed',
     'solutions.openApiHash': 'Axis OpenAPI digest',
     'solutions.operationBlocked': 'Blocked',
     'solutions.operationFailed': 'Failed',
@@ -376,6 +380,7 @@ export const administrationTranslations = {
 
     'solutions.actionFailed': 'Thao tác solution thất bại',
     'solutions.actionFailedDescription': 'Kiểm tra kết nối rồi thử lại.',
+    'solutions.anotherVersionInstalled': 'Một version khác đã được cài',
     'solutions.buildId': 'Build ID',
     'solutions.compliant': 'Tuân thủ',
     'solutions.componentPlanLabel': 'Kế hoạch component theo thứ tự',
@@ -401,6 +406,8 @@ export const administrationTranslations = {
     'solutions.installUnavailable': 'Không thể cài đặt',
     'solutions.installUnavailableDescription':
       'Chỉ release đáng tin cậy có định danh an toàn mới được cài.',
+    'solutions.installUnavailableExistingDescription':
+      'Version {version} của solution này đã được cài trong Workspace hiện tại. Chưa hỗ trợ nâng cấp hoặc cài song song.',
     'solutions.installationDetailsDescription':
       'Trạng thái provisioning, compliance và kết quả operation theo thứ tự của installation này.',
     'solutions.installationId': 'Định danh installation',
@@ -413,6 +420,7 @@ export const administrationTranslations = {
     'solutions.noncompliant': 'Không tuân thủ',
     'solutions.notAvailable': 'Không có',
     'solutions.notInstalled': 'Chưa cài',
+    'solutions.versionInstalled': 'Đã cài version {version}',
     'solutions.openApiHash': 'Axis OpenAPI digest',
     'solutions.operationBlocked': 'Bị chặn',
     'solutions.operationFailed': 'Thất bại',

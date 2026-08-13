@@ -16,6 +16,7 @@ import { ApiError } from '@/lib/api';
 import type { MyRouterContext } from '@/routes/__root';
 import { installSolutionVersion, publishSolutionVersion } from '../api';
 import { solutionsManagedWindowRenderers } from '../managed-windows';
+import { ComponentPlan } from './SolutionPresentation';
 import { SolutionsPage } from './SolutionsPage';
 
 const api = vi.hoisted(() => ({
@@ -98,6 +99,44 @@ describe('SolutionsPage', () => {
     expect(within(collection).getByRole('button', { name: 'Publish package' })).toBeVisible();
     expect(within(collection).getByText('Installed')).toBeVisible();
     expect(within(collection).getByText('Compliant')).toBeVisible();
+  });
+
+  it('blocks another release when the solution already has an installed version', async () => {
+    const installedVersion = version();
+    const newerVersion = version({
+      id: 'version-2',
+      solutionVersion: '2.0.0',
+      packageSha256: 'package-hash-2',
+    });
+    api.versions.mockResolvedValue([installedVersion, newerVersion]);
+    api.version.mockResolvedValue(newerVersion);
+    api.installations.mockResolvedValue([installation()]);
+
+    await renderPage('/solutions?dialog=release&versionId=version-2');
+
+    expect(await screen.findByRole('heading', { name: 'cases 2.0.0' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Install version' })).not.toBeInTheDocument();
+    expect(screen.getByText('Version 1.0.0 installed')).toBeVisible();
+    expect(
+      within(activeManagedWindow()).getByText(
+        'Version 1.0.0 of this solution is already installed in the current Workspace. Upgrade and side-by-side installation are not supported.',
+      ),
+    ).toBeVisible();
+    expect(installSolutionVersion).not.toHaveBeenCalled();
+  });
+
+  it('keeps component-plan labels unique across concurrent release content', () => {
+    render(
+      <>
+        <ComponentPlan components={version().components} />
+        <ComponentPlan components={version({ id: 'version-2' }).components} />
+      </>,
+    );
+
+    const plans = screen.getAllByRole('region', { name: 'Ordered component plan' });
+    const labelIds = plans.map((plan) => plan.getAttribute('aria-labelledby'));
+    expect(labelIds.every(Boolean)).toBe(true);
+    expect(new Set(labelIds).size).toBe(plans.length);
   });
 
   it('rejects an oversized local package before upload', async () => {
@@ -365,7 +404,7 @@ async function renderPage(path = '/solutions') {
   return router;
 }
 
-function version() {
+function version(overrides: Record<string, unknown> = {}) {
   return {
     id: 'version-1',
     solutionKey: 'cases',
@@ -391,6 +430,7 @@ function version() {
         dependsOn: [{ type: 'authorization.policy.v1', key: 'policy' }],
       },
     ],
+    ...overrides,
   };
 }
 
