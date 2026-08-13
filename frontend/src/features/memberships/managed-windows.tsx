@@ -49,6 +49,7 @@ import {
   revokeWorkspaceProductBuilder,
   workspaceInvitationKeys,
   workspaceProductBuilderKeys,
+  workspaceProductBuildersQueryOptions,
 } from './api';
 
 const MEMBERSHIP_INVITE_KIND = 'memberships.invite';
@@ -217,7 +218,24 @@ function MembershipProductBuilderDialog({
       });
       await queryClient.invalidateQueries({ queryKey: workspaceProductBuilderKeys.all });
     },
-    onError: (error) => setFeedback(productBuilderProblemFeedback(error, t)),
+    onError: async (error, variables) => {
+      setFeedback(productBuilderProblemFeedback(error, t));
+      if (!(error instanceof ApiError) || error.status !== 409) return;
+
+      try {
+        const members = await queryClient.fetchQuery(workspaceProductBuildersQueryOptions());
+        const currentMember = members.find((candidate) => candidate.userId === variables.userId);
+        if (currentMember) {
+          setMember(currentMember);
+        }
+      } catch {
+        setFeedback({
+          tone: 'warning',
+          title: t('memberships.productBuilderUnavailable'),
+          body: t('memberships.productBuilderUnavailableDescription'),
+        });
+      }
+    },
   });
 
   const userId = member.userId;

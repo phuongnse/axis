@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { ApiError } from '@/lib/api';
 import { axisStyles } from '@/theme.generated';
 import {
   grantWorkspaceProductBuilder,
@@ -115,6 +116,42 @@ describe('MembershipManagementPage', () => {
         expectedRevision: 2,
       }),
     );
+  });
+
+  it('refreshes the authoritative member revision before retrying a Product Builder conflict', async () => {
+    const user = userEvent.setup();
+    api.productBuilders
+      .mockResolvedValueOnce([productBuilderMember()])
+      .mockResolvedValueOnce([{ ...productBuilderMember(), membershipRevision: 4 }]);
+    api.grantProductBuilder
+      .mockRejectedValueOnce(new ApiError(409, { code: 'identity.membership.revisionConflict' }))
+      .mockResolvedValueOnce({
+        ...productBuilderMember(),
+        isProductBuilder: true,
+        membershipRevision: 5,
+      });
+    renderPage();
+
+    await user.click(screen.getByRole('tab', { name: 'Members' }));
+    const table = await screen.findByRole('region', {
+      name: 'Active Workspace member authoring authority',
+    });
+    await user.click(within(table).getByRole('button', { name: 'Builder Member' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Builder Member' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Grant Product Builder' }));
+    expect(await within(dialog).findByText('Membership changed')).toBeVisible();
+    await waitFor(() => expect(api.productBuilders).toHaveBeenCalledTimes(2));
+
+    await user.click(within(dialog).getByRole('button', { name: 'Grant Product Builder' }));
+    await waitFor(() => {
+      expect(grantWorkspaceProductBuilder).toHaveBeenNthCalledWith(1, 'builder-user', {
+        expectedRevision: 1,
+      });
+      expect(grantWorkspaceProductBuilder).toHaveBeenNthCalledWith(2, 'builder-user', {
+        expectedRevision: 4,
+      });
+    });
   });
 
   it('composes the shared resource workspace and launches the invitation task in a managed window', async () => {
