@@ -1,6 +1,8 @@
+using Axis.Rules.Application;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Domain;
 using Axis.Rules.Infrastructure.Persistence;
+using Axis.Shared.Application;
 using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
 
@@ -64,10 +66,12 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
         int take,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
+        RuleDefinitionSortField? sortBy = null,
+        CollectionSortDirection? sortDirection = null,
         CancellationToken cancellationToken = default)
     {
         IQueryable<RuleDefinition> query = Filter(context.RuleDefinitions.AsNoTracking(), workspaceId, status);
-        return await Order(Search(query, searchQuery), searchQuery)
+        return await Order(Search(query, searchQuery), searchQuery, sortBy, sortDirection)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
@@ -115,8 +119,100 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
 
     private static IOrderedQueryable<RuleDefinition> Order(
         IQueryable<RuleDefinition> definitions,
-        string? searchQuery)
+        string? searchQuery,
+        RuleDefinitionSortField? sortBy,
+        CollectionSortDirection? sortDirection)
     {
+        if ((sortBy is null) != (sortDirection is null))
+            throw new ArgumentException("A rule definition sort field and direction must be provided together.");
+
+        if (sortBy == RuleDefinitionSortField.Name)
+        {
+            return sortDirection switch
+            {
+                CollectionSortDirection.Ascending => definitions
+                    .OrderBy(definition => EF.Functions.Collate(definition.Name, "C"))
+                    .ThenBy(definition => definition.Key)
+                    .ThenBy(definition => definition.Id),
+                CollectionSortDirection.Descending => definitions
+                    .OrderByDescending(definition => EF.Functions.Collate(definition.Name, "C"))
+                    .ThenBy(definition => definition.Key)
+                    .ThenBy(definition => definition.Id),
+                _ => throw new ArgumentOutOfRangeException(nameof(sortDirection)),
+            };
+        }
+
+        if (sortBy == RuleDefinitionSortField.Origin)
+        {
+            return definitions
+                .OrderBy(definition => EF.Functions.Collate(definition.Name, "C"))
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id);
+        }
+
+        if (sortBy == RuleDefinitionSortField.Status)
+        {
+            IOrderedQueryable<RuleDefinition> ordered = sortDirection switch
+            {
+                CollectionSortDirection.Ascending => definitions
+                    .OrderBy(definition => definition.ArchivedAt != null
+                        ? "Archived"
+                        : definition.ActiveVersion != null
+                            ? "Active"
+                            : definition.LatestPublishedVersion != null
+                                ? "Inactive"
+                                : "Draft"),
+                CollectionSortDirection.Descending => definitions
+                    .OrderByDescending(definition => definition.ArchivedAt != null
+                        ? "Archived"
+                        : definition.ActiveVersion != null
+                            ? "Active"
+                            : definition.LatestPublishedVersion != null
+                                ? "Inactive"
+                                : "Draft"),
+                _ => throw new ArgumentOutOfRangeException(nameof(sortDirection)),
+            };
+            return ThenByMergedCatalogIdentity(ordered);
+        }
+
+        if (sortBy == RuleDefinitionSortField.ActiveVersion)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.ActiveVersion == null).ThenBy(definition => definition.ActiveVersion)
+                : definitions.OrderBy(definition => definition.ActiveVersion == null).ThenByDescending(definition => definition.ActiveVersion));
+
+        if (sortBy == RuleDefinitionSortField.LatestVersion)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.LatestPublishedVersion == null).ThenBy(definition => definition.LatestPublishedVersion)
+                : definitions.OrderBy(definition => definition.LatestPublishedVersion == null).ThenByDescending(definition => definition.LatestPublishedVersion));
+
+        if (sortBy == RuleDefinitionSortField.Revision)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.Revision)
+                : definitions.OrderByDescending(definition => definition.Revision));
+
+        if (sortBy == RuleDefinitionSortField.CreatedBy)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => EF.Property<string>(definition, "CreatedByActorDisplayName") == null).ThenBy(definition => EF.Functions.Collate(EF.Property<string>(definition, "CreatedByActorDisplayName"), "C"))
+                : definitions.OrderBy(definition => EF.Property<string>(definition, "CreatedByActorDisplayName") == null).ThenByDescending(definition => EF.Functions.Collate(EF.Property<string>(definition, "CreatedByActorDisplayName"), "C")));
+
+        if (sortBy == RuleDefinitionSortField.CreatedAt)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.CreatedAt)
+                : definitions.OrderByDescending(definition => definition.CreatedAt));
+
+        if (sortBy == RuleDefinitionSortField.ModifiedBy)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => EF.Property<string>(definition, "UpdatedByActorDisplayName") == null).ThenBy(definition => EF.Functions.Collate(EF.Property<string>(definition, "UpdatedByActorDisplayName"), "C"))
+                : definitions.OrderBy(definition => EF.Property<string>(definition, "UpdatedByActorDisplayName") == null).ThenByDescending(definition => EF.Functions.Collate(EF.Property<string>(definition, "UpdatedByActorDisplayName"), "C")));
+
+        if (sortBy == RuleDefinitionSortField.ModifiedAt)
+            return ThenByMergedCatalogIdentity(sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.UpdatedAt)
+                : definitions.OrderByDescending(definition => definition.UpdatedAt));
+
+        if (sortBy is not null)
+            throw new ArgumentOutOfRangeException(nameof(sortBy));
+
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
             return definitions
@@ -143,4 +239,11 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
             .ThenBy(definition => definition.Key)
             .ThenBy(definition => definition.Id);
     }
+
+    private static IOrderedQueryable<RuleDefinition> ThenByMergedCatalogIdentity(
+        IOrderedQueryable<RuleDefinition> definitions) =>
+        definitions
+            .ThenBy(definition => EF.Functions.Collate(definition.Name, "C"))
+            .ThenBy(definition => definition.Key)
+            .ThenBy(definition => definition.Id);
 }

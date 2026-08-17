@@ -77,7 +77,9 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
         assignedBody.TryGetProperty("userId", out _).Should().BeFalse();
         assignedBody.GetProperty("roleKey").GetString().Should().Be("caseworker");
         assignedBody.GetProperty("isActive").GetBoolean().Should().BeTrue();
+        AssertCompleteProvenance(assignedBody, administrator.UserId, 1);
         retryBody.GetProperty("revision").GetInt32().Should().Be(1);
+        AssertCompleteProvenance(retryBody, administrator.UserId, 1);
 
         HttpResponseMessage changedContent = await SendMutationAsync(
             "/api/product-role-assignments/assign",
@@ -95,6 +97,7 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
         JsonElement revokedBody = await ReadJsonAsync(revoked);
         revokedBody.GetProperty("isActive").GetBoolean().Should().BeFalse();
         revokedBody.GetProperty("revision").GetInt32().Should().Be(2);
+        AssertCompleteProvenance(revokedBody, administrator.UserId, 2);
 
         HttpResponseMessage management = await fixture.Client.GetAsync(
             "/api/product-role-assignments?language=vi",
@@ -109,11 +112,12 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
             .Should().Contain(value =>
                 value.GetProperty("roleKey").GetString() == "caseworker" &&
                 value.GetProperty("displayName").GetString() == "Chuyên viên");
-        managementBody.GetProperty("assignments").EnumerateArray()
-            .Should().Contain(value =>
+        JsonElement listedAssignment = managementBody.GetProperty("assignments").EnumerateArray()
+            .Should().ContainSingle(value =>
                 value.GetProperty("roleKey").GetString() == "caseworker" &&
                 !value.GetProperty("isActive").GetBoolean() &&
-                value.GetProperty("revision").GetInt32() == 2);
+                value.GetProperty("revision").GetInt32() == 2).Subject;
+        AssertCompleteProvenance(listedAssignment, administrator.UserId, 2);
 
         Guid foreignUserId = await SeedForeignWorkspaceSubjectAsync();
         HttpResponseMessage unavailableTarget = await SendMutationAsync(
@@ -154,6 +158,25 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
             .Should().Be(assignmentCorrelation);
         assignedAuditEnvelope.GetProperty("CorrelationId").GetString()
             .Should().NotBe(assignmentKey);
+    }
+
+    private static void AssertCompleteProvenance(
+        JsonElement resource,
+        Guid expectedActorId,
+        int expectedRevision)
+    {
+        JsonElement metadata = resource.GetProperty("metadata");
+        metadata.GetProperty("revision").GetInt32().Should().Be(expectedRevision);
+        foreach (string actorProperty in new[] { "createdBy", "modifiedBy" })
+        {
+            JsonElement actor = metadata.GetProperty(actorProperty);
+            actor.GetProperty("kind").GetString().Should().Be("User");
+            actor.GetProperty("subjectId").GetGuid().Should().Be(expectedActorId);
+            actor.GetProperty("displayName").GetString().Should().Be("Workspace Administrator");
+        }
+
+        metadata.GetProperty("createdAt").GetDateTimeOffset().Should().NotBe(default);
+        metadata.GetProperty("modifiedAt").GetDateTimeOffset().Should().NotBe(default);
     }
 
     [Fact]

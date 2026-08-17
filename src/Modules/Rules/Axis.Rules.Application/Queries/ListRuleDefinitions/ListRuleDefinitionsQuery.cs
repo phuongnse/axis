@@ -11,5 +11,7 @@ public sealed record ListRuleDefinitionsQuery(
     RuleOrigin? Origin = null,
     RuleLifecycleStatus? Status = null,
     string? SearchQuery = null,
-    string? Language = null)
+    string? Language = null,
+    RuleDefinitionSortField? SortBy = null,
+    CollectionSortDirection? SortDirection = null)
     : IQuery<Result<PagedResult<RuleDefinitionSummaryDto>>>;

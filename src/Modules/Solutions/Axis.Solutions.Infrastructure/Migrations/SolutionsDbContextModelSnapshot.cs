@@ -38,6 +38,22 @@ namespace Axis.Solutions.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<string>("CreatedByKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("created_by_kind");
+
+                    b.Property<Guid?>("CreatedBySubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_subject_id");
+
                     b.Property<string>("ProvisioningStatus")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -62,6 +78,22 @@ namespace Axis.Solutions.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedByDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("updated_by_display_name");
+
+                    b.Property<string>("UpdatedByKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("updated_by_kind");
+
+                    b.Property<Guid?>("UpdatedBySubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_subject_id");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
@@ -243,6 +275,22 @@ namespace Axis.Solutions.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("BuiltAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("built_at");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<string>("CreatedByKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("created_by_kind");
+
+                    b.Property<Guid?>("CreatedBySubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_subject_id");
 
                     b.Property<byte[]>("Envelope")
                         .IsRequired()

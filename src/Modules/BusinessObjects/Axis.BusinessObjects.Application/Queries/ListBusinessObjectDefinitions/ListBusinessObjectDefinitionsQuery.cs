@@ -9,5 +9,7 @@ public sealed record ListBusinessObjectDefinitionsQuery(
     int PageSize,
     string? SearchQuery = null,
     string? Language = null,
+    BusinessObjectDefinitionSortField? SortBy = null,
+    CollectionSortDirection? SortDirection = null,
     string? CorrelationId = null)
     : IQuery<Result<PagedResult<BusinessObjectDefinitionListItemDto>>>;

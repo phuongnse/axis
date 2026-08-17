@@ -319,7 +319,7 @@ public sealed class ManageServiceIdentityIntegrationTests(IdentityDatabaseFixtur
             new IdentityUnitOfWork(context),
             new ServiceIdentityClientProjection(context));
         return await handler.Handle(
-            new CreateServiceIdentityCommand(actorId, workspaceId, clientId, $"create-{Guid.NewGuid():N}"),
+            new CreateServiceIdentityCommand(actorId, workspaceId, clientId, $"create-{Guid.NewGuid():N}", "Axis Admin"),
             TestContext.Current.CancellationToken);
     }
 
@@ -341,7 +341,7 @@ public sealed class ManageServiceIdentityIntegrationTests(IdentityDatabaseFixtur
             new IdentityUnitOfWork(context),
             projectionFactory?.Invoke(context) ?? new ServiceIdentityClientProjection(context));
         return await handler.Handle(
-            new AddServiceIdentityKeyCommand(actorId, workspaceId, identityId, revision, jwk, correlation),
+            new AddServiceIdentityKeyCommand(actorId, workspaceId, identityId, revision, jwk, correlation, "Axis Admin"),
             TestContext.Current.CancellationToken);
     }
 
@@ -363,7 +363,7 @@ public sealed class ManageServiceIdentityIntegrationTests(IdentityDatabaseFixtur
             new IdentityUnitOfWork(context),
             projectionFactory?.Invoke(context) ?? new ServiceIdentityClientProjection(context));
         return await handler.Handle(
-            new RevokeServiceIdentityKeyCommand(actorId, workspaceId, identityId, keyId, revision, correlation),
+            new RevokeServiceIdentityKeyCommand(actorId, workspaceId, identityId, keyId, revision, correlation, "Axis Admin"),
             TestContext.Current.CancellationToken);
     }
 

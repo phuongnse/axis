@@ -99,7 +99,10 @@ public sealed class ExchangeWorkspaceInvitationHandlerTests
             OpaqueTokenGenerator.Hash(Fixture.RawToken),
             "delivery-envelope",
             "delivery-correlation");
+        ActorSnapshot actor = ActorSnapshot.User(invitation.InviterUserId, "Invitation Administrator");
+        invitation.InitializeMetadata(actor);
         invitation.Revoke(invitation.Revision, now);
+        invitation.RecordModification(actor, now);
         fixture.Invitations.GetByTokenHashAsync(
                 OpaqueTokenGenerator.Hash(Fixture.RawToken),
                 Arg.Any<CancellationToken>())
@@ -112,6 +115,28 @@ public sealed class ExchangeWorkspaceInvitationHandlerTests
             audit.WorkspaceId == invitation.WorkspaceId
             && audit.TargetId == invitation.Id
             && audit.Outcome == "revoked");
+    }
+
+    [Fact]
+    public async Task Exchange_WhenKnownInvitationSucceeds_RecordsAnonymousModificationProvenance()
+    {
+        Fixture fixture = new();
+        WorkspaceInvitation invitation = fixture.UseKnownInvitation();
+        ActorSnapshot createdBy = invitation.CreatedBy;
+        DateTime createdAt = invitation.CreatedAt;
+
+        Result<WorkspaceInvitationExchangeDto> result = await fixture.Handle();
+
+        result.IsSuccess.Should().BeTrue();
+        invitation.CreatedBy.Should().Be(createdBy);
+        invitation.CreatedAt.Should().Be(createdAt);
+        invitation.UpdatedBy.Should().Be(ActorSnapshot.Anonymous());
+        invitation.UpdatedAt.Should().BeAfter(createdAt);
+        fixture.Audits.Should().ContainSingle(audit =>
+            audit.ActorKind == AuditActorKindV1.Anonymous
+            && audit.WorkspaceId == invitation.WorkspaceId
+            && audit.TargetId == invitation.Id
+            && audit.Outcome == "exchanged");
     }
 
     private sealed class Fixture
@@ -158,6 +183,32 @@ public sealed class ExchangeWorkspaceInvitationHandlerTests
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public List<AuditEventV1> Audits { get; } = [];
         public bool ReturnAuditReadBack { get; init; } = true;
+
+        public WorkspaceInvitation UseKnownInvitation()
+        {
+            DateTime createdAt = DateTime.UtcNow.AddMinutes(-1);
+            WorkspaceInvitation invitation = WorkspaceInvitation.Create(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "recipient@example.com",
+                WorkspaceMembershipRole.Member,
+                createdAt,
+                createdAt.AddDays(7),
+                OpaqueTokenGenerator.Hash(RawToken),
+                "delivery-envelope",
+                "delivery-correlation");
+            invitation.InitializeMetadata(ActorSnapshot.User(invitation.InviterUserId, "Invitation Administrator"));
+            Invitations.GetByTokenHashAsync(
+                    OpaqueTokenGenerator.Hash(RawToken),
+                    Arg.Any<CancellationToken>())
+                .Returns(invitation);
+            Invitations.GetByHandoffHashAsync(
+                    Arg.Any<string>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(invitation);
+            return invitation;
+        }
 
         public Task<Result<WorkspaceInvitationExchangeDto>> Handle(string rawToken = RawToken) => handler.Handle(
             new ExchangeWorkspaceInvitationCommand(

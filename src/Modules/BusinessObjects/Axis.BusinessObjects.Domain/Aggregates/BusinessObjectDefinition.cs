@@ -16,6 +16,14 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
     public int? LatestPublishedVersionNumber { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    private ActorKind CreatedByKind { get; set; }
+    private Guid? CreatedBySubjectId { get; set; }
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByKind { get; set; }
+    private Guid? UpdatedBySubjectId { get; set; }
+    private string UpdatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    public ActorSnapshot UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
     public Guid? InstalledSolutionVersionId { get; private set; }
     public string? InstalledComponentKey { get; private set; }
     public string? InstalledComponentHash { get; private set; }
@@ -26,11 +34,19 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
     public IReadOnlyList<BusinessObjectFieldDefinition> Fields => _fields.AsReadOnly();
     public IReadOnlyList<BusinessObjectDefinitionVersion> Versions => _versions.AsReadOnly();
 
+    private BusinessObjectDefinition()
+        : base(default)
+    {
+        Name = string.Empty;
+        Key = null!;
+    }
+
     private BusinessObjectDefinition(
         BusinessObjectDefinitionId id,
         Guid workspaceId,
         string name,
         BusinessObjectDefinitionKey key,
+        ActorSnapshot createdBy,
         DateTime createdAt)
         : base(id)
     {
@@ -41,16 +57,20 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
         Revision = 1;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+        StampCreated(createdBy);
     }
 
     public static Result<BusinessObjectDefinition> CreateUnpublished(
         Guid workspaceId,
         string name,
         BusinessObjectDefinitionKey key,
+        ActorSnapshot createdBy,
         DateTime createdAt)
     {
         if (workspaceId == Guid.Empty)
             return Result.Failure<BusinessObjectDefinition>("Workspace scope is required.");
+        if (!createdBy.IsValid)
+            return Result.Failure<BusinessObjectDefinition>("Creating actor is required.");
 
         Result normalizedName = ValidateName(name);
         if (normalizedName.IsFailure)
@@ -63,7 +83,18 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
             workspaceId,
             name.Trim(),
             key,
+            createdBy,
             createdAt);
+    }
+
+    public Result RecordModification(ActorSnapshot actor)
+    {
+        if (!actor.IsValid)
+            return Result.Failure(ErrorCodes.InvalidInput, "Modifying actor is required.");
+        UpdatedByKind = actor.Kind;
+        UpdatedBySubjectId = actor.SubjectId;
+        UpdatedByDisplayName = actor.DisplayName;
+        return Result.Success();
     }
 
     public Result SaveUnpublished(
@@ -242,6 +273,27 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
 
         _fields.Clear();
         _fields.AddRange(nextFields);
+    }
+
+    private void StampCreated(ActorSnapshot actor)
+    {
+        CreatedByKind = actor.Kind;
+        CreatedBySubjectId = actor.SubjectId;
+        CreatedByDisplayName = actor.DisplayName;
+        UpdatedByKind = actor.Kind;
+        UpdatedBySubjectId = actor.SubjectId;
+        UpdatedByDisplayName = actor.DisplayName;
+    }
+
+    private static ActorSnapshot Snapshot(
+        ActorKind kind,
+        Guid? subjectId,
+        string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Business object definition provenance is incomplete.");
     }
 
     private static Result<BusinessObjectFieldDefinitionId> ResolveFieldIdentity(

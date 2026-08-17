@@ -32,7 +32,15 @@ public sealed class BuiltInRuleCatalogTests
             definition.LatestPublishedVersion == 1 &&
             definition.Origin == RuleOrigin.BuiltIn &&
             definition.Status == RuleLifecycleStatus.Active &&
-            definition.ActiveVersion == 1);
+            definition.ActiveVersion == 1 &&
+            definition.CreatedByActor.Kind == Axis.Shared.Domain.Primitives.ActorKind.System &&
+            definition.CreatedByActor.DisplayName == "System" &&
+            definition.UpdatedByActor.Kind == Axis.Shared.Domain.Primitives.ActorKind.System &&
+            definition.UpdatedByActor.DisplayName == "System" &&
+            definition.CreatedAt != default &&
+            definition.CreatedAt.Kind == DateTimeKind.Utc &&
+            definition.UpdatedAt == definition.CreatedAt &&
+            definition.Versions.Single().PublishedAt == definition.CreatedAt);
         definitions.Should().OnlyContain(definition =>
             definition.Inputs.Select(input => input.Key).Distinct(StringComparer.Ordinal).Count() ==
             definition.Inputs.Count);

@@ -55,6 +55,14 @@ const systemSummary = {
     },
   ],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  updatedAt: '2026-07-10T23:30:07Z',
+  metadata: {
+    revision: null,
+    createdBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    createdAt: '2026-07-10T23:30:07Z',
+    modifiedBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    modifiedAt: '2026-07-10T23:30:07Z',
+  },
   actions: {
     canEditDraft: false,
     canCreateVersion: false,
@@ -91,6 +99,22 @@ const workspaceSummary = {
     },
   ],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  updatedAt: '2026-01-01T00:00:00Z',
+  metadata: {
+    revision: 2,
+    createdBy: {
+      kind: 'User',
+      subjectId: '11111111-1111-4111-8111-111111111111',
+      displayName: 'Rules User',
+    },
+    createdAt: '2026-01-01T00:00:00Z',
+    modifiedBy: {
+      kind: 'User',
+      subjectId: '11111111-1111-4111-8111-111111111111',
+      displayName: 'Rules User',
+    },
+    modifiedAt: '2026-01-01T00:00:00Z',
+  },
   actions: {
     canEditDraft: true,
     canCreateVersion: true,
@@ -121,10 +145,11 @@ function requiredDetail() {
         inputs: systemSummary.inputs,
         output: systemSummary.output,
         condition: requiredCondition(),
+        createdAt: '2026-07-10T23:30:07Z',
       },
     ],
-    createdAt: null,
-    updatedAt: null,
+    createdAt: '2026-07-10T23:30:07Z',
+    updatedAt: '2026-07-10T23:30:07Z',
     archivedAt: null,
   };
 }
@@ -522,6 +547,7 @@ describe('RulesPage', () => {
       }),
     );
     const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Versions' }));
     await user.click(await within(editor).findByRole('button', { name: 'Archive' }));
     const confirmation = await screen.findByRole('alertdialog', { name: 'Archive this rule?' });
     await user.click(within(confirmation).getByRole('button', { name: 'Archive' }));
@@ -570,6 +596,7 @@ describe('RulesPage', () => {
     const cancel = within(footer as HTMLElement).getByRole('button', { name: 'Cancel' });
     expect(cancel).toBeEnabled();
 
+    await user.click(within(editor).getByRole('tab', { name: 'Versions' }));
     await user.click(within(editor).getByRole('button', { name: 'Archive' }));
     const confirmation = await screen.findByRole('alertdialog', { name: 'Archive this rule?' });
     await user.click(within(confirmation).getByRole('button', { name: 'Archive' }));
@@ -642,8 +669,146 @@ describe('RulesPage', () => {
     expect(within(catalog).getByRole('button', { name: 'Credit threshold' })).toBeInTheDocument();
     expect(within(catalog).getByText('Value, Threshold')).toBeInTheDocument();
     expect(within(catalog).getByRole('columnheader', { name: 'Inputs' })).toBeInTheDocument();
+    expect(within(catalog).getByRole('button', { name: 'Rule: Sort ascending' })).toBeVisible();
+    expect(within(catalog).getByRole('button', { name: 'Origin: Sort ascending' })).toBeVisible();
+    expect(within(catalog).getByRole('button', { name: 'Status: Sort ascending' })).toBeVisible();
+    expect(
+      within(catalog).queryByRole('button', { name: 'Inputs: Sort ascending' }),
+    ).not.toBeInTheDocument();
     expect(within(catalog).queryByText('Field')).not.toBeInTheDocument();
     expect(within(catalog).queryByText('Validation')).not.toBeInTheDocument();
+  });
+
+  it('uses the shared N/A placeholder for missing catalog values', async () => {
+    const incompleteSummary = {
+      ...workspaceSummary,
+      definitionKey: 'incomplete_rule',
+      name: 'Incomplete rule',
+      origin: null,
+      status: null,
+      inputs: [],
+      documentation: documentation('Incomplete rule', 'Incomplete rule metadata.'),
+    };
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = new URL(input.toString(), 'https://axis.test');
+      if (url.pathname === '/api/rules') {
+        return Promise.resolve(
+          jsonResponse({ items: [incompleteSummary], totalCount: 1, page: 1, pageSize: 20 }),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+
+    const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
+    const row = within(catalog).getByRole('button', { name: 'Incomplete rule' }).closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getAllByText('N/A')).toHaveLength(5);
+    expect(row?.querySelector('[data-status-state]')).toBeNull();
+  });
+
+  it('keeps catalog sorting URL-backed and sends it to the whole-dataset query', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) =>
+      Promise.resolve(respondForRules(input, init)),
+    );
+
+    const { router } = await renderWithRouter(<RulesPage />, {
+      path: '/rules?page=2&query=credit',
+      authenticatedPath: 'rules',
+    });
+    const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
+
+    await user.click(within(catalog).getByRole('button', { name: 'Rule: Sort ascending' }));
+
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        page: 1,
+        query: 'credit',
+        sortBy: 'Name',
+        sortDirection: 'Ascending',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(fetch).mock.calls.some(([input]) => {
+          const url = new URL(input.toString(), 'https://axis.test');
+          return (
+            url.pathname === '/api/rules' &&
+            url.searchParams.get('sortBy') === 'Name' &&
+            url.searchParams.get('sortDirection') === 'Ascending'
+          );
+        }),
+      ).toBe(true),
+    );
+    expect(within(catalog).getByRole('columnheader', { name: 'Rule' })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+
+    await user.click(within(catalog).getByRole('button', { name: 'Rule: Sort descending' }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        sortBy: 'Name',
+        sortDirection: 'Descending',
+      }),
+    );
+
+    await user.click(within(catalog).getByRole('button', { name: 'Rule: Clear sorting' }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ page: 1, query: 'credit' }));
+
+    const supportedSorts = [
+      ['Origin', 'Origin'],
+      ['Status', 'Status'],
+      ['Active version', 'ActiveVersion'],
+      ['Latest version', 'LatestVersion'],
+      ['Revision', 'Revision'],
+      ['Modified by', 'ModifiedBy'],
+      ['Modified at', 'ModifiedAt'],
+    ] as const;
+    for (const [label, sortBy] of supportedSorts) {
+      await user.click(within(catalog).getByRole('button', { name: `${label}: Sort ascending` }));
+      await waitFor(() =>
+        expect(router.state.location.search).toMatchObject({
+          sortBy,
+          sortDirection: 'Ascending',
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          vi.mocked(fetch).mock.calls.some(([input]) => {
+            const url = new URL(input.toString(), 'https://axis.test');
+            return (
+              url.pathname === '/api/rules' &&
+              url.searchParams.get('sortBy') === sortBy &&
+              url.searchParams.get('sortDirection') === 'Ascending'
+            );
+          }),
+        ).toBe(true),
+      );
+    }
+  });
+
+  it('consumes a dialog deep link without discarding catalog search and sort state', async () => {
+    vi.mocked(fetch).mockImplementation((input, init) =>
+      Promise.resolve(respondForRules(input, init)),
+    );
+
+    const { router } = await renderWithRouter(<RulesPage />, {
+      path: '/rules?page=2&query=credit&sortBy=Name&sortDirection=Descending&dialog=edit&definitionKey=credit_threshold',
+      authenticatedPath: 'rules',
+    });
+
+    expect(await screen.findByRole('dialog', { name: 'Credit threshold' })).toBeVisible();
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        page: 2,
+        query: 'credit',
+        sortBy: 'Name',
+        sortDirection: 'Descending',
+      }),
+    );
   });
 
   it('shows the platform input-logic-output contract for a built-in rule', async () => {
@@ -661,8 +826,8 @@ describe('RulesPage', () => {
       within(details)
         .getAllByRole('tab')
         .map((tab) => tab.textContent),
-    ).toEqual(['General', 'Rule behavior', 'Usage', 'System info']);
-    expect(within(details).getByText('Require a value.')).toBeVisible();
+    ).toEqual(['General', 'Rule behavior', 'Test rule', 'Versions', 'Usage', 'System info']);
+    expect(within(details).getAllByText('Require a value.').length).toBeGreaterThanOrEqual(1);
     await user.click(within(details).getByRole('tab', { name: 'Rule behavior' }));
     const behavior = details.querySelector<HTMLElement>('[data-slot="rule-behavior-summary"]');
     expect(behavior).not.toBeNull();
@@ -720,7 +885,9 @@ describe('RulesPage', () => {
     ).not.toBeInTheDocument();
     await user.click(within(details).getByRole('tab', { name: 'System info' }));
     expect(within(details).getByText('field.required')).toBeVisible();
-    expect(within(details).getByText('Expression language')).toBeVisible();
+    expect(within(details).getByText('N/A')).toBeVisible();
+    expect(details).not.toHaveTextContent('—');
+    expect(within(details).getAllByText('Expression language').length).toBeGreaterThanOrEqual(1);
     const footer = details.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
     const footerActions = within(footer as HTMLElement).getByRole('button', {
@@ -731,6 +898,35 @@ describe('RulesPage', () => {
     expect(
       within(footer as HTMLElement).getByRole('button', { name: 'Windows (1)' }),
     ).toBeVisible();
+  });
+
+  it('uses the canonical N/A value when a condition input reference is unavailable', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(
+          jsonResponse(
+            workspaceDetail({
+              condition: {
+                ...thresholdCondition(),
+                left: { kind: 'Input', reference: 'missing_input', arguments: [] },
+              },
+            }),
+          ),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
+    await user.click(within(catalog).getByRole('button', { name: 'Credit threshold' }));
+
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    expect(await within(editor).findByText('N/A')).toBeVisible();
+    expect(editor).not.toHaveTextContent('—');
   });
 
   it('edits a binding with its current revision', async () => {
@@ -1020,8 +1216,10 @@ describe('RulesPage', () => {
     await user.clear(dsl);
     await user.type(dsl, 'value > th');
     await user.click(within(editor).getByRole('button', { name: 'Show suggestions' }));
-    const suggestions = await within(editor).findByRole('listbox');
-    await user.click(within(suggestions).getByRole('option', { name: 'Threshold' }));
+    const suggestions = await within(editor).findByRole('region', {
+      name: 'Expression suggestions',
+    });
+    await user.click(within(suggestions).getByRole('button', { name: 'Threshold' }));
     expect(dsl).toHaveValue('value > threshold');
 
     await user.clear(dsl);
@@ -1032,7 +1230,9 @@ describe('RulesPage', () => {
     expect(editor.querySelector('[data-slot="rule-expression"]')).toHaveTextContent(
       'Value is greater than Threshold',
     );
+    await user.click(within(editor).getByRole('tab', { name: 'Test rule' }));
     expect(within(editor).getByRole('button', { name: 'Run simulation' })).toBeDisabled();
+    await user.click(within(editor).getByRole('tab', { name: 'Versions' }));
     expect(within(editor).getByRole('button', { name: 'Create version' })).toBeDisabled();
     expect(within(editor).getByRole('button', { name: 'Activate version' })).toBeDisabled();
     expect(
@@ -1056,7 +1256,8 @@ describe('RulesPage', () => {
     const discard = await screen.findByRole('alertdialog', { name: 'Discard unsaved changes?' });
     await user.click(within(discard).getByRole('button', { name: 'Keep editing' }));
     expect(editor).toBeVisible();
-    expect(dsl).toHaveValue('invalid expression');
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    expect(within(editor).getByLabelText('Expression syntax')).toHaveValue('invalid expression');
   });
 
   it('simulates typed samples and confirms independent version activation lifecycle', async () => {
@@ -1160,11 +1361,16 @@ describe('RulesPage', () => {
       }),
     );
     const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Test rule' }));
     await user.type(within(editor).getByLabelText('Value'), '15');
     await user.type(within(editor).getByLabelText('Threshold'), '10');
     await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
-    expect(await within(editor).findByText('Condition matched')).toBeVisible();
-    expect(within(editor).getAllByText(/Version 1/).length).toBeGreaterThanOrEqual(1);
+    const simulationRegion = within(editor).getByRole('region', { name: 'Simulation' });
+    expect((await within(simulationRegion).findAllByText('Condition matched')).length).toBe(2);
+    expect(within(simulationRegion).getByText('Draft')).toBeVisible();
+    await user.clear(within(editor).getByLabelText('Value'));
+    await user.type(within(editor).getByLabelText('Value'), '16');
+    expect(within(simulationRegion).queryAllByText('Condition matched')).toHaveLength(0);
     const simulationRequest = requests.find((request) => request.url.endsWith('/draft/simulate'));
     expect(simulationRequest?.body).toEqual({
       inputs: {
@@ -1180,6 +1386,7 @@ describe('RulesPage', () => {
       ),
     ).toBeVisible();
 
+    await user.click(within(editor).getByRole('tab', { name: 'Versions' }));
     await user.click(within(editor).getByRole('button', { name: 'Create version' }));
     let confirmation = await screen.findByRole('alertdialog', {
       name: 'Create immutable version?',
@@ -1197,7 +1404,7 @@ describe('RulesPage', () => {
     );
     expect(await screen.findByText('Rule lifecycle updated')).toBeVisible();
 
-    await within(editor).findByText('Version 2');
+    expect((await within(editor).findAllByText('Version 2')).length).toBeGreaterThanOrEqual(1);
     await user.click(within(editor).getByRole('button', { name: 'Activate version' }));
     confirmation = await screen.findByRole('alertdialog', { name: 'Activate this version?' });
     await user.click(within(confirmation).getByRole('button', { name: 'Activate version' }));
@@ -1253,7 +1460,7 @@ describe('RulesPage', () => {
       within(editor)
         .getAllByRole('heading', { level: 3 })
         .map((heading) => heading.textContent),
-    ).toEqual(['Inputs', 'Logic', 'What this means', 'Outputs', 'Simulation']);
+    ).toEqual(['Inputs', 'Logic', 'What this means', 'Outputs']);
     expect(editor.querySelector('[data-slot="rule-behavior-summary"]')).toBeNull();
     expect(within(editor).queryByLabelText('Expression')).not.toBeInTheDocument();
     expect(within(editor).getByLabelText('What to check')).toBeInTheDocument();
@@ -1342,7 +1549,9 @@ describe('RulesPage', () => {
         { key: 'value', label: 'Value' },
         { key: 'threshold', label: 'Threshold' },
       ],
-      condition: expect.any(Object),
+      condition: {
+        left: { kind: 'Input', reference: 'value' },
+      },
     });
   });
 
@@ -1459,7 +1668,20 @@ describe('RulesPage', () => {
 
     expect(await within(editor).findByText(/changed elsewhere/i)).toBeVisible();
     expect(within(editor).getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.click(within(editor).getByRole('button', { name: 'Refresh current rule' }));
+    expect(name).toHaveValue('Local stale change');
+    await user.click(within(editor).getByRole('button', { name: 'Reload server copy' }));
+    const reload = await screen.findByRole('alertdialog', { name: 'Reload the latest rule?' });
+    expect(name).toHaveValue('Local stale change');
+    await user.click(within(reload).getByRole('button', { name: 'Keep my changes' }));
+    expect(name).toHaveValue('Local stale change');
+
+    await user.click(within(editor).getByRole('button', { name: 'Reload server copy' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog', { name: 'Reload the latest rule?' })).getByRole(
+        'button',
+        { name: 'Reload and replace' },
+      ),
+    );
     await waitFor(() => expect(name).toHaveValue('Concurrent threshold'));
     await waitFor(() =>
       expect(within(editor).getByRole('button', { name: 'Save draft' })).toBeEnabled(),
@@ -1552,7 +1774,13 @@ describe('RulesPage', () => {
     const expression = within(editor).getByLabelText('Expression syntax');
     await user.clear(expression);
     await user.type(expression, 'stale expression');
-    await user.click(within(editor).getByRole('button', { name: 'Refresh current rule' }));
+    await user.click(within(editor).getByRole('button', { name: 'Reload server copy' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog', { name: 'Reload the latest rule?' })).getByRole(
+        'button',
+        { name: 'Reload and replace' },
+      ),
+    );
     await waitFor(() => expect(staleProjectionCalls).toBe(1));
     await waitFor(() => expect(detailReads).toBe(2));
 
@@ -1677,7 +1905,7 @@ describe('RulesPage', () => {
     await waitFor(() => expect(showSuggestions).toBeEnabled());
     expect(expression).toHaveValue('value > threshold newer');
     expect(
-      within(editor).queryByRole('option', { name: 'Stale suggestion' }),
+      within(editor).queryByRole('button', { name: 'Stale suggestion' }),
     ).not.toBeInTheDocument();
   });
 
@@ -1735,7 +1963,7 @@ describe('RulesPage', () => {
     if (ordering === 'completion-first') {
       unformattedCompletion.resolve(jsonResponse(staleSuggestion));
       expect(
-        await within(editor).findByRole('option', { name: 'Unformatted range' }),
+        await within(editor).findByRole('button', { name: 'Unformatted range' }),
       ).toBeVisible();
       formattingProjection.resolve(jsonResponse(formattedProjection));
     } else {
@@ -1750,7 +1978,7 @@ describe('RulesPage', () => {
     );
     expect(expression).toHaveValue('integer(1)');
     expect(
-      within(editor).queryByRole('option', { name: 'Unformatted range' }),
+      within(editor).queryByRole('button', { name: 'Unformatted range' }),
     ).not.toBeInTheDocument();
   });
 
@@ -1806,7 +2034,13 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
 
     expect(await within(editor).findByText(/changed elsewhere/i)).toBeVisible();
-    await user.click(within(editor).getByRole('button', { name: 'Refresh current rule' }));
+    await user.click(within(editor).getByRole('button', { name: 'Reload server copy' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog', { name: 'Reload the latest rule?' })).getByRole(
+        'button',
+        { name: 'Reload and replace' },
+      ),
+    );
     const name = within(editor).getByLabelText('Name');
     await waitFor(() => expect(name).toHaveValue('Server copy'));
     expect(refreshCount).toBe(1);
@@ -1876,12 +2110,19 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
 
     expect(await within(editor).findByText(/changed elsewhere/i)).toBeVisible();
-    await user.click(within(editor).getByRole('button', { name: 'Refresh current rule' }));
+    await user.click(within(editor).getByRole('button', { name: 'Reload server copy' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog', { name: 'Reload the latest rule?' })).getByRole(
+        'button',
+        { name: 'Reload and replace' },
+      ),
+    );
     await screen.findByRole('dialog', { name: 'Archived server copy' });
     expect(within(editor).queryByLabelText('Name')).not.toBeInTheDocument();
     expect(within(editor).queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
     expect(within(editor).queryByRole('region', { name: 'Simulation' })).not.toBeInTheDocument();
-    expect(within(editor).getByText('Latest version').nextElementSibling).toHaveTextContent('—');
+    await user.click(within(editor).getByRole('tab', { name: 'Versions' }));
+    expect(within(editor).getByText('No immutable versions have been created.')).toBeVisible();
     expect(postCount).toBe(1);
     expect(refreshCount).toBe(1);
   });
@@ -1893,6 +2134,22 @@ describe('RulesPage', () => {
       label: 'Published only',
       types: ['Decimal'],
       isRequired: true,
+      allowMultiple: false,
+      allowedValues: [],
+    };
+    const publishedSegments = {
+      key: 'segments',
+      label: 'Segments',
+      types: ['Text'],
+      isRequired: true,
+      allowMultiple: true,
+      allowedValues: ['retail', 'enterprise'],
+    };
+    const optionalTimestamp = {
+      key: 'observed_at',
+      label: 'Observed at',
+      types: ['DateTime'],
+      isRequired: false,
       allowMultiple: false,
       allowedValues: [],
     };
@@ -1912,7 +2169,7 @@ describe('RulesPage', () => {
         {
           version: 1,
           name: 'Credit threshold',
-          inputs: [publishedInput],
+          inputs: [publishedInput, publishedSegments, optionalTimestamp],
           condition: thresholdCondition(),
         },
       ],
@@ -1955,15 +2212,226 @@ describe('RulesPage', () => {
     expect(editor.querySelector('[data-slot="rule-behavior-summary"]')).not.toBeNull();
     expect(within(editor).queryByRole('button', { name: 'Add input' })).not.toBeInTheDocument();
     expect(within(editor).queryByLabelText('Draft only')).not.toBeInTheDocument();
+    await user.click(within(editor).getByRole('tab', { name: 'Test rule' }));
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+    expect(within(editor).getAllByText('Enter at least one sample value.')).toHaveLength(2);
+    expect(simulationBody).toBeUndefined();
     await user.type(within(editor).getByLabelText('Published only'), '42');
+    await user.click(within(editor).getByRole('checkbox', { name: 'retail' }));
+    await user.click(within(editor).getByRole('checkbox', { name: 'enterprise' }));
     await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
     const simulation = within(editor).getByRole('region', { name: 'Simulation' });
-    await waitFor(() => expect(simulation).toHaveTextContent('Condition matched · Version 1'));
+    await waitFor(() => expect(simulation).toHaveTextContent('Condition matched'));
+    expect(simulation).toHaveTextContent('Version 1');
     expect(simulationBody).toEqual({
-      inputs: { published_only: { type: 'Decimal', values: ['42'] } },
+      inputs: {
+        published_only: { type: 'Decimal', values: ['42'] },
+        segments: { type: 'Text', values: ['retail', 'enterprise'] },
+      },
     });
+    const observedAt = within(editor).getByLabelText('Observed at');
+    await user.type(observedAt, '2026-01-02T10:30:00');
+    expect(within(simulation).queryByText('Condition matched')).not.toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+    expect(
+      within(editor).getByText('Enter a value that matches this input contract.'),
+    ).toBeVisible();
+    expect(simulationBody).toEqual({
+      inputs: {
+        published_only: { type: 'Decimal', values: ['42'] },
+        segments: { type: 'Text', values: ['retail', 'enterprise'] },
+      },
+    });
+    await user.clear(observedAt);
+    await user.type(observedAt, '2026-01-02T10:30:00+07:00');
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+    await waitFor(() =>
+      expect(simulationBody).toEqual({
+        inputs: {
+          published_only: { type: 'Decimal', values: ['42'] },
+          segments: { type: 'Text', values: ['retail', 'enterprise'] },
+          observed_at: {
+            type: 'DateTime',
+            values: ['2026-01-02T03:30:00.000Z'],
+          },
+        },
+      }),
+    );
     const footer = editor.querySelector('[data-slot="managed-dialog-footer"]');
     expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeVisible();
+  });
+
+  it('validates sample values at the RuleValue boundaries before simulation', async () => {
+    const user = userEvent.setup();
+    const textAtLimit = 'x'.repeat(4000);
+    const publishedInputs = [
+      {
+        key: 'minimum_integer',
+        label: 'Minimum integer',
+        types: ['Integer'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'maximum_integer',
+        label: 'Maximum integer',
+        types: ['Integer'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'maximum_decimal',
+        label: 'Maximum decimal',
+        types: ['Decimal'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'minimum_decimal',
+        label: 'Minimum decimal',
+        types: ['Decimal'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'decimal_precision',
+        label: 'Decimal precision',
+        types: ['Decimal'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'bounded_text',
+        label: 'Bounded text',
+        types: ['Text'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'observed_at',
+        label: 'Observed at',
+        types: ['DateTime'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+    ];
+    const published = workspaceDetail({
+      status: 'Archived',
+      archivedAt: '2026-01-02T00:00:00Z',
+      latestVersion: 1,
+      activeVersion: null,
+      versions: [
+        {
+          version: 1,
+          name: 'Credit threshold',
+          inputs: publishedInputs,
+          condition: requiredCondition(),
+        },
+      ],
+      actions: {
+        canEditDraft: false,
+        canCreateVersion: false,
+        canActivateVersion: false,
+        canDeactivate: false,
+        canArchive: false,
+      },
+    });
+    let simulationBody: Record<string, unknown> | undefined;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold')) return Promise.resolve(jsonResponse(published));
+      if (url.endsWith('/rules/credit_threshold/versions/1/simulate')) {
+        simulationBody = JSON.parse(String(init?.body));
+        return Promise.resolve(
+          jsonResponse({
+            definitionKey: 'credit_threshold',
+            definitionVersion: 1,
+            isMatch: true,
+            diagnostics: [],
+          }),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Test rule' }));
+    const setValue = async (label: string, value: string) => {
+      const input = within(editor).getByLabelText(label);
+      await user.click(input);
+      await user.paste(value);
+    };
+
+    await setValue('Minimum integer', '-9223372036854775809');
+    await setValue('Maximum integer', '9223372036854775808');
+    await setValue('Maximum decimal', '79228162514264337593543950336');
+    await setValue('Minimum decimal', '-79228162514264337593543950336');
+    await setValue('Decimal precision', '0.12345678901234567890123456786');
+    await setValue('Bounded text', `${textAtLimit}x`);
+    await setValue('Observed at', '2026-01-02T10:30:00');
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+
+    expect(
+      within(editor).getAllByText('Enter a value that matches this input contract.'),
+    ).toHaveLength(6);
+    expect(simulationBody).toBeUndefined();
+
+    for (const [label, value] of [
+      ['Minimum integer', '-9223372036854775808'],
+      ['Maximum integer', '9223372036854775807'],
+      ['Maximum decimal', '79228162514264337593543950335'],
+      ['Minimum decimal', '-79228162514264337593543950335'],
+      ['Bounded text', textAtLimit],
+      ['Observed at', '2026-01-02T10:30:00+07:00'],
+    ] as const) {
+      const input = within(editor).getByLabelText(label);
+      await user.clear(input);
+      await user.click(input);
+      await user.paste(value);
+    }
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+
+    const invalidInputs = publishedInputs
+      .filter(
+        (input) =>
+          within(editor)
+            .getByLabelText(input.label)
+            .closest('[data-slot="field"]')
+            ?.getAttribute('data-invalid') === 'true',
+      )
+      .map((input) => ({
+        label: input.label,
+        value: (within(editor).getByLabelText(input.label) as HTMLInputElement).value,
+      }));
+    expect(invalidInputs).toEqual([]);
+    expect(
+      within(editor).queryAllByText('Enter a value that matches this input contract.'),
+    ).toHaveLength(0);
+    await waitFor(() => expect(simulationBody).toBeDefined());
+    const submittedInputs = simulationBody?.inputs as Record<
+      string,
+      { type: string; values: string[] }
+    >;
+    expect(submittedInputs.minimum_integer.values).toEqual(['-9223372036854775808']);
+    expect(submittedInputs.maximum_integer.values).toEqual(['9223372036854775807']);
+    expect(submittedInputs.maximum_decimal.values).toEqual(['79228162514264337593543950335']);
+    expect(submittedInputs.minimum_decimal.values).toEqual(['-79228162514264337593543950335']);
+    expect(submittedInputs.decimal_precision.values).toEqual(['0.1234567890123456789012345679']);
+    expect(submittedInputs.bounded_text.values[0]).toHaveLength(4000);
+    expect(submittedInputs.observed_at.values).toEqual(['2026-01-02T03:30:00.000Z']);
   });
 
   it('does not fabricate a version or simulation for an archived draft without versions', async () => {
@@ -1997,8 +2465,10 @@ describe('RulesPage', () => {
       }),
     );
     const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
-    const latestVersion = within(editor).getByText('Latest version');
-    expect(latestVersion.nextElementSibling).toHaveTextContent('—');
+    await user.click(within(editor).getByRole('tab', { name: 'Versions' }));
+    expect(within(editor).getByText('No immutable versions have been created.')).toBeVisible();
+    await user.click(within(editor).getByRole('tab', { name: 'Test rule' }));
+    expect(within(editor).getByText('No immutable version is available to test.')).toBeVisible();
     expect(within(editor).queryByRole('region', { name: 'Simulation' })).not.toBeInTheDocument();
     expect(
       within(editor).queryByRole('button', { name: 'Run simulation' }),
@@ -2016,10 +2486,11 @@ describe('RulesPage', () => {
     const editor = await screen.findByRole('dialog', { name: 'New workspace rule' });
     await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
     await user.click(within(editor).getByRole('button', { name: 'Add input' }));
+    await user.type(within(editor).getByLabelText('Key'), 'customer_name');
     await user.type(within(editor).getByLabelText('Input name'), 'Customer name');
     await user.click(within(editor).getByRole('button', { name: 'Add condition' }));
     await user.click(within(editor).getByLabelText('What to check'));
-    await user.click(await screen.findByRole('option', { name: 'A calculated value' }));
+    await user.click(await screen.findByRole('option', { name: 'Function' }));
 
     expect(within(editor).getByLabelText('What to check: Choose a calculation')).toHaveTextContent(
       'Length',

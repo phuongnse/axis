@@ -1,5 +1,7 @@
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application;
+
 namespace Axis.Identity.Application.Repositories;
 
 public interface IWorkspaceMembershipRepository
@@ -47,6 +49,7 @@ public sealed record ActiveWorkspaceHumanProjection(
     Guid UserId,
     string DisplayName,
     string Email,
-    WorkspaceMembershipRole WorkspaceRole = WorkspaceMembershipRole.Member,
-    bool IsProductBuilder = false,
-    int MembershipRevision = 1);
+    WorkspaceMembershipRole WorkspaceRole,
+    bool IsProductBuilder,
+    int MembershipRevision,
+    ResourceMetadataDto Metadata);

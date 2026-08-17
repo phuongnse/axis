@@ -46,6 +46,7 @@ public sealed class CreateBusinessObjectDefinitionHandler(
             workspaceId,
             command.Name,
             key.Value,
+            BusinessObjectActor.From(currentSubject),
             DateTime.UtcNow);
         if (definition.IsFailure)
             return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(definition.Error);

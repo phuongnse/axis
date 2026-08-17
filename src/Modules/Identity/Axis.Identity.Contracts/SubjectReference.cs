@@ -26,4 +26,5 @@ public sealed record SubjectReferenceDto(
 public interface ICurrentSubject
 {
     SubjectReference Subject { get; }
+    string DisplayName { get; }
 }

@@ -32,6 +32,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public RuleSubjectReference UpdatedBySubject { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    private ActorKind CreatedByActorKind { get; set; }
+    private Guid? CreatedByActorSubjectId { get; set; }
+    private string CreatedByActorDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByActorKind { get; set; }
+    private Guid? UpdatedByActorSubjectId { get; set; }
+    private string UpdatedByActorDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedByActor => Snapshot(CreatedByActorKind, CreatedByActorSubjectId, CreatedByActorDisplayName);
+    public ActorSnapshot UpdatedByActor => Snapshot(UpdatedByActorKind, UpdatedByActorSubjectId, UpdatedByActorDisplayName);
     private RuleSubjectKind? ArchivedBySubjectKind { get; set; }
     private Guid? ArchivedBySubjectId { get; set; }
     public RuleSubjectReference? ArchivedBySubject =>
@@ -57,6 +65,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         string description,
         RuleOrigin origin,
         RuleSubjectReference createdBySubject,
+        ActorSnapshot createdByActor,
         DateTime createdAt)
         : base(id)
     {
@@ -72,6 +81,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         UpdatedBySubject = createdBySubject;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+        StampCreated(createdByActor);
     }
 
     public static Result<RuleDefinition> CreateDraft(
@@ -80,6 +90,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         string name,
         string description,
         RuleSubjectReference createdBySubject,
+        ActorSnapshot createdByActor,
         DateTime createdAt)
     {
         if (workspaceId == Guid.Empty)
@@ -87,6 +98,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         if (createdBySubject.Id == Guid.Empty || !Enum.IsDefined(createdBySubject.Kind))
             return Result.Failure<RuleDefinition>("Creating subject is required.");
+        if (!createdByActor.IsValid)
+            return Result.Failure<RuleDefinition>("Creating actor is required.");
 
         Result<RuleDefinitionKey> canonicalKey = RuleDefinitionKey.Create(key.Value);
         if (canonicalKey.IsFailure)
@@ -104,6 +117,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             description.Trim(),
             RuleOrigin.Workspace,
             createdBySubject,
+            createdByActor,
             createdAt);
     }
 
@@ -115,7 +129,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleReferenceDocumentation documentation,
         IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
-        RuleOutputContract output)
+        RuleOutputContract output,
+        DateTime publishedAt)
     {
         Result identity = ValidateIdentity(name, description);
         if (identity.IsFailure)
@@ -127,6 +142,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         if (version <= 0)
             return Result.Failure<RuleDefinition>("Built-in rule version must be positive.");
+
+        if (publishedAt == default || publishedAt.Kind != DateTimeKind.Utc)
+            return Result.Failure<RuleDefinition>("Built-in rule publication time must be UTC.");
 
         if (documentation is null || !documentation.IsComplete("en", "vi"))
             return Result.Failure<RuleDefinition>("Built-in rule documentation is incomplete.");
@@ -143,7 +161,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             description.Trim(),
             RuleOrigin.BuiltIn,
             default,
-            default)
+            ActorSnapshot.System(),
+            publishedAt)
         {
             Documentation = documentation,
             Revision = 0,
@@ -153,8 +172,36 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             Output = output,
         };
         definition._inputs.AddRange(inputs);
-        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, null, default));
+        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, null, publishedAt));
         return definition;
+    }
+
+    public Result RecordModification(ActorSnapshot actor)
+    {
+        if (!actor.IsValid)
+            return Result.Failure(ErrorCodes.InvalidInput, "Modifying actor is required.");
+        UpdatedByActorKind = actor.Kind;
+        UpdatedByActorSubjectId = actor.SubjectId;
+        UpdatedByActorDisplayName = actor.DisplayName;
+        return Result.Success();
+    }
+
+    private void StampCreated(ActorSnapshot actor)
+    {
+        CreatedByActorKind = actor.Kind;
+        CreatedByActorSubjectId = actor.SubjectId;
+        CreatedByActorDisplayName = actor.DisplayName;
+        UpdatedByActorKind = actor.Kind;
+        UpdatedByActorSubjectId = actor.SubjectId;
+        UpdatedByActorDisplayName = actor.DisplayName;
+    }
+
+    private static ActorSnapshot Snapshot(ActorKind kind, Guid? subjectId, string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Rule definition provenance is incomplete.");
     }
 
     public Result SaveDraft(

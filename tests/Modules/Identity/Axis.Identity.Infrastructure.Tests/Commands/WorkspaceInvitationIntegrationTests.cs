@@ -13,6 +13,7 @@ using Axis.Identity.Infrastructure.Persistence.Entities;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Identity.Infrastructure.Tests.Fixtures;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +69,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             persisted.CurrentToken.Status.Should().Be(InvitationTokenStatus.Exchanged);
             persisted.Handoffs.Should().ContainSingle(handoff =>
                 handoff.Status == InvitationHandoffStatus.Active);
+            persisted.UpdatedBy.Should().Be(ActorSnapshot.Anonymous());
         }
 
         List<IdentityAuditOutboxRecord> audits = await observer.Set<IdentityAuditOutboxRecord>()
@@ -107,6 +109,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 OpaqueTokenGenerator.Hash(rawToken),
                 "protected:delivery",
                 "stable-delivery-correlation");
+            invitation.InitializeMetadata(ActorSnapshot.User(inviter.Id, inviter.FullName));
             message = new InvitationDeliveryMessage(
                 invitation.Id,
                 1,
@@ -190,6 +193,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 OpaqueTokenGenerator.Hash(rawToken),
                 "protected:delivery",
                 "exhausted-delivery-correlation");
+            invitation.InitializeMetadata(ActorSnapshot.User(inviterId, "Invitation Administrator"));
             invitationId = invitation.Id;
             seed.WorkspaceInvitations.Add(invitation);
             await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -258,6 +262,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 OpaqueTokenGenerator.Create().TokenHash,
                 "protected-envelope",
                 "expiry-delivery");
+            invitation.InitializeMetadata(ActorSnapshot.User(inviterId, "Invitation Administrator"));
             invitationId = invitation.Id;
             seed.WorkspaceInvitations.Add(invitation);
             await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -735,12 +740,13 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
         Workspace workspace = await context.Workspaces.SingleAsync(
             candidate => candidate.Id == workspaceId,
             TestContext.Current.CancellationToken);
+        Guid inviterId = (await context.WorkspaceMemberships.SingleAsync(
+            membership => membership.WorkspaceId == workspaceId,
+            TestContext.Current.CancellationToken)).UserId;
         WorkspaceInvitation invitation = WorkspaceInvitation.Create(
             workspace.OrganizationId!.Value,
             workspace.Id,
-            (await context.WorkspaceMemberships.SingleAsync(
-                membership => membership.WorkspaceId == workspaceId,
-                TestContext.Current.CancellationToken)).UserId,
+            inviterId,
             recipientEmail,
             requestedRole,
             now,
@@ -748,6 +754,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             tokenHash,
             "protected-envelope",
             "acceptance-delivery");
+        invitation.InitializeMetadata(ActorSnapshot.User(inviterId, "Invitation Administrator"));
         invitation.Exchange(
                 tokenHash,
                 handoffHash,
@@ -755,6 +762,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 now,
                 invitation.Revision)
             .Should().Be(InvitationExchangeOutcome.Exchanged);
+        invitation.RecordModification(ActorSnapshot.Anonymous(), now);
 
         context.Users.Add(recipient);
         context.WorkspaceInvitations.Add(invitation);
@@ -784,6 +792,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             tokenHash,
             "protected-race-envelope",
             "race-delivery");
+        invitation.InitializeMetadata(ActorSnapshot.User(administratorId, "Invitation Administrator"));
         context.WorkspaceInvitations.Add(invitation);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         return (administratorId, workspaceId, invitation.Id, rawToken);
@@ -811,7 +820,8 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 workspaceId,
                 invitationId,
                 1,
-                "revoke-race"),
+                "revoke-race",
+                "Workspace Admin"),
             TestContext.Current.CancellationToken);
     }
 
@@ -1088,8 +1098,10 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             Guid workspaceId,
             int offset,
             int limit,
+            WorkspaceInvitationSortField? sortBy = null,
+            CollectionSortDirection? sortDirection = null,
             CancellationToken ct = default) =>
-            inner.ListForWorkspaceAsync(workspaceId, offset, limit, ct);
+            inner.ListForWorkspaceAsync(workspaceId, offset, limit, sortBy, sortDirection, ct);
 
         public Task<int> CountForWorkspaceAsync(Guid workspaceId, CancellationToken ct = default) =>
             inner.CountForWorkspaceAsync(workspaceId, ct);
@@ -1161,8 +1173,10 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             Guid workspaceId,
             int offset,
             int limit,
+            WorkspaceInvitationSortField? sortBy = null,
+            CollectionSortDirection? sortDirection = null,
             CancellationToken ct = default) =>
-            inner.ListForWorkspaceAsync(workspaceId, offset, limit, ct);
+            inner.ListForWorkspaceAsync(workspaceId, offset, limit, sortBy, sortDirection, ct);
 
         public Task<int> CountForWorkspaceAsync(Guid workspaceId, CancellationToken ct = default) =>
             inner.CountForWorkspaceAsync(workspaceId, ct);

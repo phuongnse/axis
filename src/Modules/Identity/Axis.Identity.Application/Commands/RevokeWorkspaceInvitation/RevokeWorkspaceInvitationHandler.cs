@@ -52,7 +52,11 @@ public sealed class RevokeWorkspaceInvitationHandler(
 
         try
         {
-            invitation.Revoke(command.ExpectedRevision, timeProvider.GetUtcNow().UtcDateTime);
+            DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+            invitation.Revoke(command.ExpectedRevision, now);
+            invitation.RecordModification(
+                ActorSnapshot.User(command.ActorUserId, command.ActorDisplayName),
+                now);
         }
         catch (InvalidOperationException)
         {

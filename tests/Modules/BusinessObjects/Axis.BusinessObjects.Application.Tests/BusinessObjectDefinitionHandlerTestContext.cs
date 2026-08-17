@@ -33,6 +33,7 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
     public FakeCurrentSubject CurrentSubject { get; } = new()
     {
         Subject = IdentitySubjectReference.Human(UserId),
+        DisplayName = "Ada Lovelace",
     };
 
     public BusinessObjectDefinitionHandlerTestContext()
@@ -72,6 +73,7 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
             WorkspaceId,
             name,
             BusinessObjectDefinitionKey.Create(key).Value,
+            ActorSnapshot.User(UserId, "Ada Lovelace"),
             DateTime.UtcNow);
 
         result.IsSuccess.Should().BeTrue();
@@ -100,6 +102,7 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
     internal sealed class FakeCurrentSubject : ICurrentSubject
     {
         public IdentitySubjectReference Subject { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
     }
 }
 

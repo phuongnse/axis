@@ -59,6 +59,44 @@ public sealed class ArchiveRuleDefinitionHandlerTests
     }
 
     [Fact]
+    public async Task Archive_WhenDefinitionIsAlreadyArchived_PreservesModificationProvenanceWithoutPersistence()
+    {
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.DraftDefinition();
+        Guid originalActorId = Guid.Parse("44444444-4444-4444-8444-444444444444");
+        ActorSnapshot originalActor = ActorSnapshot.User(originalActorId, "Grace Hopper");
+        definition.RecordModification(originalActor).IsSuccess.Should().BeTrue();
+        definition.Archive(
+                definition.Revision,
+                Axis.Rules.Domain.RuleSubjectReference.Human(originalActorId),
+                DateTime.UtcNow.AddMinutes(-1))
+            .IsSuccess.Should().BeTrue();
+        int archivedRevision = definition.Revision;
+        DateTime archivedAt = definition.UpdatedAt;
+        _context.Repository.GetByKeyForWorkspaceAsync(
+                definition.Key,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        ArchiveRuleDefinitionHandler sut = new(
+            _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
+            _context.Repository,
+            _context.UnitOfWork);
+
+        Result<RuleDefinitionDetailDto> result = await sut.Handle(
+            new ArchiveRuleDefinitionCommand(definition.Key.Value, archivedRevision),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        definition.Revision.Should().Be(archivedRevision);
+        definition.UpdatedAt.Should().Be(archivedAt);
+        definition.UpdatedByActor.Should().Be(originalActor);
+        await _context.UnitOfWork.DidNotReceive()
+            .SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Archive_WhenDefinitionIsBuiltIn_ReturnsNotFoundWithoutPersistence()
     {
         ArchiveRuleDefinitionHandler sut = new(

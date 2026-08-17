@@ -1,7 +1,9 @@
+using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
 using Axis.BusinessObjects.Infrastructure.Persistence;
+using Axis.Shared.Application;
 using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
 
@@ -88,6 +90,8 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
         int pageSize,
         string? searchQuery = null,
         bool publishedOnly = false,
+        BusinessObjectDefinitionSortField? sortBy = null,
+        CollectionSortDirection? sortDirection = null,
         CancellationToken ct = default) =>
         await Order(
                 Search(
@@ -96,7 +100,9 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
                             .Where(definition => definition.WorkspaceId == workspaceId),
                         publishedOnly),
                     searchQuery),
-                searchQuery)
+                searchQuery,
+                sortBy,
+                sortDirection)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -129,14 +135,23 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
 
     private static IOrderedQueryable<BusinessObjectDefinition> Order(
         IQueryable<BusinessObjectDefinition> definitions,
-        string? searchQuery)
+        string? searchQuery,
+        BusinessObjectDefinitionSortField? sortBy,
+        CollectionSortDirection? sortDirection)
     {
+        if (sortBy.HasValue && sortDirection.HasValue)
+            return OrderExplicitly(definitions, sortBy.Value, sortDirection.Value);
+
+        if (sortBy.HasValue || sortDirection.HasValue)
+            throw new ArgumentException("Definition sort field and direction must be supplied together.");
+
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
             return definitions
                 .OrderByDescending(definition => definition.UpdatedAt)
                 .ThenBy(definition => definition.Name)
-                .ThenBy(definition => definition.Key);
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id);
         }
 
         string query = searchQuery.Trim().ToLowerInvariant();
@@ -154,8 +169,96 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
                     EF.Functions.Unaccent(query),
                     EF.Property<string>(definition, "SearchText")))
             .ThenBy(definition => definition.Name)
-            .ThenBy(definition => definition.Key);
+            .ThenBy(definition => definition.Key)
+            .ThenBy(definition => definition.Id);
     }
+
+    private static IOrderedQueryable<BusinessObjectDefinition> OrderExplicitly(
+        IQueryable<BusinessObjectDefinition> definitions,
+        BusinessObjectDefinitionSortField sortBy,
+        CollectionSortDirection sortDirection) =>
+        (sortBy, sortDirection) switch
+        {
+            (BusinessObjectDefinitionSortField.Name, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Name, CollectionSortDirection.Descending) => definitions
+                .OrderByDescending(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Key, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.Key)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Key, CollectionSortDirection.Descending) => definitions
+                .OrderByDescending(definition => definition.Key)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Status, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.Status)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Status, CollectionSortDirection.Descending) => definitions
+                .OrderByDescending(definition => definition.Status)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Version, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.LatestPublishedVersionNumber == null)
+                .ThenBy(definition => definition.LatestPublishedVersionNumber)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Version, CollectionSortDirection.Descending) => definitions
+                .OrderBy(definition => definition.LatestPublishedVersionNumber == null)
+                .ThenByDescending(definition => definition.LatestPublishedVersionNumber)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Revision, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.Revision)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.Revision, CollectionSortDirection.Descending) => definitions
+                .OrderByDescending(definition => definition.Revision)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.CreatedBy, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => EF.Property<string>(definition, "CreatedByDisplayName") == null)
+                .ThenBy(definition => EF.Property<string>(definition, "CreatedByDisplayName"))
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.CreatedBy, CollectionSortDirection.Descending) => definitions
+                .OrderBy(definition => EF.Property<string>(definition, "CreatedByDisplayName") == null)
+                .ThenByDescending(definition => EF.Property<string>(definition, "CreatedByDisplayName"))
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.CreatedAt, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.CreatedAt)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.CreatedAt, CollectionSortDirection.Descending) => definitions
+                .OrderByDescending(definition => definition.CreatedAt)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.ModifiedBy, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => EF.Property<string>(definition, "UpdatedByDisplayName") == null)
+                .ThenBy(definition => EF.Property<string>(definition, "UpdatedByDisplayName"))
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.ModifiedBy, CollectionSortDirection.Descending) => definitions
+                .OrderBy(definition => EF.Property<string>(definition, "UpdatedByDisplayName") == null)
+                .ThenByDescending(definition => EF.Property<string>(definition, "UpdatedByDisplayName"))
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.ModifiedAt, CollectionSortDirection.Ascending) => definitions
+                .OrderBy(definition => definition.UpdatedAt)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            (BusinessObjectDefinitionSortField.ModifiedAt, CollectionSortDirection.Descending) => definitions
+                .OrderByDescending(definition => definition.UpdatedAt)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id),
+            _ => throw new ArgumentOutOfRangeException(nameof(sortBy), sortBy, "Definition sort is invalid."),
+        };
 
     private IQueryable<BusinessObjectDefinition> DefinitionsWithGraph() =>
         context.BusinessObjectDefinitions

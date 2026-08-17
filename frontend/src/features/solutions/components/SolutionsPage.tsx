@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -56,11 +57,6 @@ export function SolutionsPage() {
     sorting: [],
     grouping: [],
   }));
-  const dateFormatter = useMemo(
-    () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
-    [i18n.language],
-  );
-
   useEffect(() => {
     setTableQuery((current) =>
       current.globalFilter === (search.query ?? '')
@@ -163,7 +159,11 @@ export function SolutionsPage() {
         accessorKey: 'solutionKey',
         size: 220,
         minSize: 180,
-        meta: { label: t('solutions.solutionKey'), searchable: true },
+        meta: {
+          label: t('solutions.solutionKey'),
+          cell: { kind: 'action' },
+          searchable: true,
+        },
         cell: ({ row }) => (
           <DataTableRecordAction
             onFocus={() => prefetchVersion(row.original.id)}
@@ -179,7 +179,11 @@ export function SolutionsPage() {
         accessorKey: 'solutionVersion',
         size: 120,
         minSize: 110,
-        meta: { label: t('solutions.version'), searchable: true },
+        meta: {
+          label: t('solutions.version'),
+          cell: { kind: 'version' },
+          searchable: true,
+        },
       },
       {
         id: 'trust',
@@ -188,6 +192,7 @@ export function SolutionsPage() {
         minSize: 120,
         meta: {
           label: t('solutions.trustStatus'),
+          cell: { kind: 'status' },
           searchable: false,
           filter: {
             kind: 'singleChoice',
@@ -209,6 +214,7 @@ export function SolutionsPage() {
         minSize: 210,
         meta: {
           label: t('solutions.installationStatus'),
+          cell: { kind: 'action' },
           searchable: false,
           filter: {
             kind: 'singleChoice',
@@ -263,6 +269,7 @@ export function SolutionsPage() {
         minSize: 140,
         meta: {
           label: t('solutions.complianceStatus'),
+          cell: { kind: 'status' },
           searchable: false,
           filter: {
             kind: 'singleChoice',
@@ -284,7 +291,11 @@ export function SolutionsPage() {
         accessorFn: (row) => row.installation?.operationStatus,
         size: 150,
         minSize: 140,
-        meta: { label: t('solutions.operationStatus'), searchable: false },
+        meta: {
+          label: t('solutions.operationStatus'),
+          cell: { kind: 'status' },
+          searchable: false,
+        },
         cell: ({ row }) =>
           row.original.installation?.operationStatus ? (
             <OperationStatusBadge status={row.original.installation.operationStatus} />
@@ -292,18 +303,19 @@ export function SolutionsPage() {
             t('solutions.notAvailable')
           ),
       },
-      {
-        id: 'published',
-        accessorKey: 'publishedAt',
-        size: 190,
-        minSize: 180,
-        meta: { label: t('solutions.publishedAt'), searchable: false },
-        cell: ({ row }) => formatDate(row.original.publishedAt, dateFormatter, t),
-      },
+      ...createResourceMetadataColumns<SolutionRow>(
+        {
+          revision: t('metadata.revision'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { includeRevision: false, locale: i18n.language },
+      ),
     ];
 
     return {
       ariaLabel: t('solutions.tableLabel'),
+      locale: i18n.language,
       source: { mode: 'client', data: rows, pagination: { pageSize: 20 } },
       columns,
       messages: createDataTableMessages(t, {
@@ -340,7 +352,7 @@ export function SolutionsPage() {
       },
     };
   }, [
-    dateFormatter,
+    i18n.language,
     installationsQuery.isError,
     installationsQuery.isPending,
     installationsQuery.refetch,
@@ -397,14 +409,4 @@ function normalizeSearch(value: string): string {
 
 function solutionIdentity(version: SolutionVersionSummaryDto, t: (key: string) => string): string {
   return `${version.solutionKey ?? t('solutions.releaseTitle')} ${version.solutionVersion ?? ''}`.trim();
-}
-
-function formatDate(
-  value: string | undefined,
-  formatter: Intl.DateTimeFormat,
-  t: (key: string) => string,
-): string {
-  if (!value) return t('solutions.notAvailable');
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? t('solutions.notAvailable') : formatter.format(date);
 }

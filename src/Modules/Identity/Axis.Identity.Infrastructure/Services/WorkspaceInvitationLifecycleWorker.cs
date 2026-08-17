@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -74,6 +75,9 @@ internal sealed class WorkspaceInvitationLifecycleWorker(
             }
 
             invitation.Expire(invitation.Revision, now);
+            invitation.RecordModification(
+                ActorSnapshot.System(),
+                now);
             await scope.ServiceProvider.GetRequiredService<IIdentityAuditOutbox>().EnqueueAsync(
                 CreateExpiryAudit(invitation, now),
                 ct);
@@ -112,6 +116,9 @@ internal sealed class WorkspaceInvitationLifecycleWorker(
             }
 
             invitation.PurgeTerminalMaterial(invitation.Revision, now);
+            invitation.RecordModification(
+                ActorSnapshot.System(),
+                now);
             await SaveIgnoringConcurrentWinner(
                 scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
                 ct);

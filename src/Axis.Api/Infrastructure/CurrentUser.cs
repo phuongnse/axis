@@ -27,4 +27,8 @@ public sealed class CurrentUser(IHttpContextAccessor accessor)
     public string Email =>
         Principal?.GetClaim(OpenIddictConstants.Claims.Email)
         ?? throw new InvalidOperationException("No email claim");
+
+    public string DisplayName =>
+        Principal?.GetClaim(OpenIddictConstants.Claims.Name)
+        ?? throw new InvalidOperationException("No name claim");
 }

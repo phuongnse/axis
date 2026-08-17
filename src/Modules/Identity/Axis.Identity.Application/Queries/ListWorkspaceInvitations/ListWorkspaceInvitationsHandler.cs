@@ -1,6 +1,7 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 
@@ -26,6 +27,16 @@ public sealed class ListWorkspaceInvitationsHandler(
                 IdentityProblemCodes.InvitationPageInvalid);
         }
 
+        if ((query.SortBy.HasValue && !Enum.IsDefined(query.SortBy.Value))
+            || (query.SortDirection.HasValue && !Enum.IsDefined(query.SortDirection.Value))
+            || (query.SortBy.HasValue != query.SortDirection.HasValue))
+        {
+            return Result.Failure<WorkspaceInvitationPageDto>(
+                ErrorCodes.InvalidInput,
+                "Invitation sort is invalid.",
+                IdentityProblemCodes.InvitationPageInvalid);
+        }
+
         Workspace? workspace = await workspaces.GetByIdAsync(query.WorkspaceId, ct);
         if (workspace?.OrganizationId is not Guid organizationId)
             return NotFound();
@@ -47,6 +58,8 @@ public sealed class ListWorkspaceInvitationsHandler(
             query.WorkspaceId,
             offset,
             query.PageSize,
+            query.SortBy,
+            query.SortDirection,
             ct);
         int total = await invitations.CountForWorkspaceAsync(query.WorkspaceId, ct);
         return Result.Success(new WorkspaceInvitationPageDto(

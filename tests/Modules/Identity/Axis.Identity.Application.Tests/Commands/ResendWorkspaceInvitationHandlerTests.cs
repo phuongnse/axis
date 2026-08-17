@@ -30,7 +30,7 @@ public sealed class ResendWorkspaceInvitationHandlerTests
             unitOfWork);
 
         Result<WorkspaceInvitationLifecycleDto> result = await handler.Handle(
-            new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "correlation"),
+            new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "correlation", "Axis Admin"),
             CancellationToken.None);
 
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);

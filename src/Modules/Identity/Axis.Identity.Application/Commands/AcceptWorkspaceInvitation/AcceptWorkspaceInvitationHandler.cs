@@ -129,8 +129,9 @@ public sealed class AcceptWorkspaceInvitationHandler(
             ct);
         workspaceMembership = await EstablishWorkspaceMembership(
             invitation,
-            command.UserId,
+            user,
             workspaceMembership,
+            now,
             ct);
 
         InvitationAcceptanceOutcome outcome = invitation.Accept(
@@ -139,6 +140,9 @@ public sealed class AcceptWorkspaceInvitationHandler(
             invitation.Revision);
         if (outcome != InvitationAcceptanceOutcome.Accepted)
             return await PersistRejected(invitation, command, outcome, now, ct);
+        invitation.RecordModification(
+            ActorSnapshot.User(command.UserId, user.FullName),
+            now);
 
         Guid auditEventId = Guid.NewGuid();
         await auditOutbox.EnqueueAsync(
@@ -256,21 +260,28 @@ public sealed class AcceptWorkspaceInvitationHandler(
 
     private async Task<WorkspaceMembership> EstablishWorkspaceMembership(
         WorkspaceInvitation invitation,
-        Guid userId,
+        User user,
         WorkspaceMembership? membership,
+        DateTime now,
         CancellationToken ct)
     {
         if (membership is null)
         {
             membership = WorkspaceMembership.CreateOrganizationMember(
                 invitation.WorkspaceId,
-                userId,
+                user.Id,
                 invitation.RequestedRole);
+            membership.InitializeMetadata(
+                ActorSnapshot.User(user.Id, user.FullName),
+                now);
             await workspaceMemberships.AddAsync(membership, ct);
         }
         else if (membership.Status == MembershipStatus.Removed)
         {
             membership.RestoreFromInvitation(invitation.RequestedRole, membership.Revision);
+            membership.RecordModification(
+                ActorSnapshot.User(user.Id, user.FullName),
+                now);
         }
 
         return membership;

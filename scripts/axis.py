@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date
+from enum import Enum
 import hashlib
 import importlib
 import importlib.util
@@ -27,6 +28,7 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, TextIO
@@ -138,6 +140,7 @@ LOCAL_DEV_SERVICE_SHELL: dict[str, str] = {
     "e2e": "bash",
 }
 LOCAL_DEV_DEFAULT_SHELL = "sh"
+LOCAL_DEV_HTTPS_SERVICES = frozenset({"api", "web", "e2e"})
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -163,6 +166,13 @@ from axis_frontend_policy import (  # noqa: E402
 
 class CheckError(RuntimeError):
     """Raised when a command fails."""
+
+
+class LocalDevCertificateState(Enum):
+    READY = "ready"
+    OPENSSL_UNAVAILABLE = "openssl-unavailable"
+    MISSING_OR_INVALID = "missing-or-invalid"
+    MANAGED_TRUST_MARKER_INVALID = "managed-trust-marker-invalid"
 
 
 def configure_cli_text_streams() -> None:
@@ -1725,6 +1735,7 @@ def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root
             continue
 
         transition_ids: set[str] = set()
+        transition_contracts: dict[str, tuple[str, str, str, str]] = {}
         edges: set[tuple[str, str]] = set()
         adjacency: dict[str, set[str]] = {state: set() for state in states}
         for index, transition in enumerate(transitions, 1):
@@ -1753,6 +1764,7 @@ def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root
             if transition_id in transition_ids:
                 issues.append(f"{label} transition ID `{transition_id}` is duplicated")
             transition_ids.add(transition_id)
+            transition_contracts[transition_id] = (source, target, owner, evidence)
             if source not in state_set or target not in state_set:
                 issues.append(f"{transition_label} references an undeclared state `{source} -> {target}`")
             else:
@@ -1771,6 +1783,55 @@ def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root
                 used_roles.add(owner_id)
                 if owner_id not in semantic_roles:
                     issues.append(f"{transition_label} references unknown semantic role `{owner_id}`")
+
+        if workflow_name == "review":
+            required_review_transitions = {
+                "create-checkpoint": (
+                    "focused-proof",
+                    "checkpoint",
+                    "skill:axis-pull-request",
+                    "focused-proof-and-clean-immutable-checkpoint",
+                ),
+                "verify-readiness": (
+                    "checkpoint",
+                    "readiness-verified",
+                    "skill:axis-review-readiness",
+                    "ready-verdict-for-exact-checkpoint-and-comparison-base",
+                ),
+                "approve-review": (
+                    "readiness-verified",
+                    "review-approved",
+                    "role:independent-reviewer",
+                    "completed-review-pass",
+                ),
+                "request-changes": (
+                    "readiness-verified",
+                    "changes-requested",
+                    "role:independent-reviewer",
+                    "completed-review-findings",
+                ),
+                "resolve-findings": (
+                    "changes-requested",
+                    "focused-proof",
+                    "skill:axis-review-feedback",
+                    "classified-findings-and-focused-proof",
+                ),
+                "publish": (
+                    "review-approved",
+                    "published",
+                    "skill:axis-pull-request",
+                    "validated-remote-state",
+                ),
+            }
+            if initial != "focused-proof":
+                issues.append(f"{label} must begin at `focused-proof`")
+            for transition_id, expected in required_review_transitions.items():
+                if transition_contracts.get(transition_id) != expected:
+                    source, target, owner, evidence = expected
+                    issues.append(
+                        f"{label} must route `{transition_id}` from `{source}` to `{target}` "
+                        f"with owner `{owner}` and evidence `{evidence}`"
+                    )
 
         if initial in state_set:
             reachable = {initial}
@@ -2983,11 +3044,13 @@ def playwright_chromium_status(env: dict[str, str] | None = None) -> tuple[bool,
                 "import { chromium } from '@playwright/test';"
                 "import { existsSync } from 'node:fs';"
                 "const path = chromium.executablePath();"
+                "console.log(path);"
                 "if (!existsSync(path)) {"
                 "  console.error(path);"
-                "  process.exit(1);"
+                "  process.exit(2);"
                 "}"
-                "console.log(path);"
+                "const browser = await chromium.launch({ headless: true });"
+                "await browser.close();"
             ),
         ],
         cwd=FRONTEND_DIR,
@@ -2996,10 +3059,35 @@ def playwright_chromium_status(env: dict[str, str] | None = None) -> tuple[bool,
         env=env,
         timeout=PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS,
     )
-    detail = (probe.stdout or probe.stderr or "").strip().splitlines()
-    browser_path = detail[-1] if detail else "Playwright Chromium executable not found"
+    stdout_lines = (probe.stdout or "").strip().splitlines()
+    stderr = (probe.stderr or "").strip()
+    browser_path = (
+        stdout_lines[-1]
+        if stdout_lines
+        else stderr.splitlines()[-1]
+        if stderr
+        else "Playwright Chromium executable not found"
+    )
     if probe.returncode == 0:
         return True, browser_path
+    if probe.returncode != 2:
+        missing_library = re.search(
+            r"error while loading shared libraries: ([^:\s]+)",
+            stderr,
+        )
+        reason = (
+            f"missing native library `{missing_library.group(1)}`"
+            if missing_library
+            else "the installed browser process exited before becoming ready"
+        )
+        return (
+            False,
+            f"{browser_path} is installed but cannot launch ({reason}); required Axis browser "
+            "evidence runs through `python scripts/axis.py local-dev e2e -- <playwright-args>` "
+            "in the Compose-managed browser runtime; explicit host-browser debugging requires "
+            "Playwright's publisher-documented native OS prerequisites, which Axis does not "
+            "install with sudo or an OS package manager",
+        )
     return (
         False,
         f"{browser_path}; run `python scripts/axis.py frontend install-browsers`",
@@ -3015,7 +3103,7 @@ def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
     if not ok:
         print(f"playwright-browsers: FAIL - {detail}", file=sys.stderr)
         return 1
-    print(f"playwright-browsers: OK (chromium: {detail})")
+    print(f"playwright-browsers: OK (host Chromium launched: {detail})")
     return 0
 
 
@@ -3229,6 +3317,13 @@ def mcp_command(args: argparse.Namespace) -> int:
     ).returncode
 
 
+def normalize_migration_source_encoding(migrations_dir: Path) -> None:
+    for source in sorted(migrations_dir.glob("*.cs")):
+        content = source.read_bytes()
+        if content.startswith(b"\xef\xbb\xbf"):
+            source.write_bytes(content[3:])
+
+
 def migration_command(args: argparse.Namespace) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
@@ -3237,6 +3332,19 @@ def migration_command(args: argparse.Namespace) -> int:
         raise CheckError(f"Unknown migration command: {args.migration_command}")
     if args.migration_command == "add" and MIGRATION_NAME_RE.fullmatch(args.name) is None:
         raise CheckError("migration add: name must be PascalCase letters and digits")
+
+    tool_restore = run(
+        [
+            exe("dotnet"),
+            "tool",
+            "restore",
+            "--tool-manifest",
+            str(ROOT / "dotnet-tools.json"),
+        ],
+        check=False,
+    )
+    if tool_restore.returncode != 0:
+        return tool_restore.returncode
 
     project, context, connection_key = MIGRATION_TARGETS[args.module]
     build = run(
@@ -3277,11 +3385,14 @@ def migration_command(args: argparse.Namespace) -> int:
             "--force",
             "--no-build",
         ])
-    return run(
+    result = run(
         ef_args,
         check=False,
         env={connection_key: DESIGN_TIME_CONNECTION_STRING},
-    ).returncode
+    )
+    if result.returncode == 0:
+        normalize_migration_source_encoding(project.parent / "Migrations")
+    return result.returncode
 
 
 def run_frontend_npm(
@@ -3368,6 +3479,15 @@ def frontend_command(args: argparse.Namespace) -> int:
         if vitest_args:
             npm_args.extend(["--", *vitest_args])
         return run_frontend_npm(npm_args).returncode
+    if command == "test-related":
+        related_inputs = frontend_test_related_inputs(changed_paths_since(args.since))
+        if not related_inputs:
+            print("frontend test-related: no related frontend source or unit-test inputs")
+            return 0
+        print(f"frontend test-related: {len(related_inputs)} changed input(s)")
+        return run_frontend_npm(
+            ["exec", "--", "vitest", "related", *related_inputs, "--run"]
+        ).returncode
     if command == "gen-api-types":
         generated_path = FRONTEND_DIR / "src" / "lib" / "api-generated"
 
@@ -3413,6 +3533,12 @@ def check_docker(_args: argparse.Namespace | None = None) -> int:
 DOTNET_SOLUTION_LEVEL_RE = re.compile(
     r"^(Directory[.].*|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)"
 )
+FRONTEND_TEST_SUITE_LEVEL_PATHS = {
+    "frontend/src/test/setup.ts",
+    "frontend/vite.config.ts",
+    "frontend/vitest.config.ts",
+}
+FRONTEND_TEST_RELATED_SUFFIXES = {".css", ".js", ".json", ".jsx", ".ts", ".tsx"}
 
 
 def is_dotnet_path(path: str) -> bool:
@@ -3425,6 +3551,35 @@ def is_frontend_path(path: str) -> bool:
         "openapi.json",
         ".github/workflows/build-and-test.yml",
     }
+
+
+def frontend_related_source_paths(paths: list[str]) -> list[str]:
+    return sorted(
+        path.removeprefix("frontend/")
+        for path in paths
+        if path.startswith("frontend/src/")
+        and not path.startswith(("frontend/e2e/", "frontend/tests/"))
+        and path not in FRONTEND_TEST_SUITE_LEVEL_PATHS
+        and Path(path).suffix.lower() in FRONTEND_TEST_RELATED_SUFFIXES
+        and (ROOT / path).is_file()
+    )
+
+
+def frontend_test_related_inputs(paths: list[str]) -> list[str]:
+    suite_level_paths = sorted(set(paths) & FRONTEND_TEST_SUITE_LEVEL_PATHS)
+    if suite_level_paths:
+        raise CheckError(
+            "frontend test-related: shared test-runtime changes require the full frontend test command: "
+            + ", ".join(suite_level_paths)
+        )
+    changed_unit_tests = [
+        path.removeprefix("frontend/")
+        for path in paths
+        if path.startswith("frontend/tests/")
+        and path.endswith((".ts", ".tsx"))
+        and (ROOT / path).is_file()
+    ]
+    return sorted(set(frontend_related_source_paths(paths) + changed_unit_tests))
 
 
 def is_markdown_link_path(path: str) -> bool:
@@ -3501,7 +3656,63 @@ def dotnet_projects_for_changed_paths(paths: list[str]) -> tuple[list[str], list
         if (ROOT / architecture_tests).is_file():
             test_projects.add(architecture_tests)
 
+    if "openapi.json" in paths:
+        api_tests = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        if (ROOT / api_tests).is_file():
+            test_projects.add(api_tests)
+
     return sorted(build_projects), sorted(test_projects)
+
+
+def dotnet_test_class_filters(
+    paths: list[str],
+    test_projects: list[str],
+) -> dict[str, list[str]]:
+    selected_projects = set(test_projects)
+    source_related_projects: set[str] = set()
+    full_projects: set[str] = set()
+    filters: dict[str, set[str]] = {}
+
+    api_tests = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+    api_source_paths = {
+        path for path in paths if path.startswith("src/Axis.Api/")
+    }
+    if (
+        "openapi.json" in paths
+        and api_tests in selected_projects
+        and api_source_paths <= {"src/Axis.Api/appsettings.json"}
+    ):
+        filters.setdefault(api_tests, set()).add("OpenApiDocumentTests")
+
+    for path in paths:
+        if path.startswith("src/"):
+            source_project = nearest_csproj(path)
+            if source_project is not None:
+                related_test = related_test_project_for_source_project(source_project)
+                if related_test is not None:
+                    source_related_projects.add(related_test)
+            continue
+        if not path.startswith("tests/"):
+            continue
+        project = nearest_csproj(path)
+        if project is None or project not in selected_projects:
+            continue
+        if path.endswith("Tests.cs"):
+            filters.setdefault(project, set()).add(Path(path).stem)
+        else:
+            full_projects.add(project)
+
+    for project in source_related_projects:
+        if project not in filters:
+            full_projects.add(project)
+
+    if any(path.startswith("src/") for path in paths):
+        full_projects.add("tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj")
+    return {
+        project: sorted(class_names)
+        for project, class_names in sorted(filters.items())
+        if project not in full_projects
+    }
 
 
 def dotnet_format_changed_paths(paths: list[str]) -> int:
@@ -3524,17 +3735,70 @@ def dotnet_format_changed_paths(paths: list[str]) -> int:
     )
 
 
+def direct_dotnet_project_references(project: str) -> set[str]:
+    project_path = ROOT / project
+    try:
+        document = ET.parse(project_path)
+    except (OSError, ET.ParseError):
+        return set()
+
+    references: set[str] = set()
+    for element in document.iter():
+        if element.tag.rsplit("}", 1)[-1] != "ProjectReference":
+            continue
+        include = element.get("Include")
+        if not include:
+            continue
+        reference_path = project_path.parent / Path(include.replace("\\", "/"))
+        try:
+            references.add(reference_path.resolve().relative_to(ROOT.resolve()).as_posix())
+        except ValueError:
+            continue
+    return references
+
+
+def minimal_dotnet_build_projects(projects: list[str]) -> list[str]:
+    selected = set(projects)
+    redundant: set[str] = set()
+
+    for root_project in selected:
+        pending = list(direct_dotnet_project_references(root_project))
+        visited: set[str] = set()
+        while pending:
+            reference = pending.pop()
+            if reference in visited:
+                continue
+            visited.add(reference)
+            if reference in selected:
+                redundant.add(reference)
+            pending.extend(direct_dotnet_project_references(reference))
+
+    return sorted(selected - redundant)
+
+
 def dotnet_build_projects(projects: list[str]) -> int:
-    for project in projects:
+    roots = minimal_dotnet_build_projects(projects)
+    print(f"dotnet-build-changed: {len(roots)} root project(s) cover {len(projects)} changed project(s)")
+    for project in roots:
         result = run([exe("dotnet"), "build", project, "--nologo"], check=False)
         if result.returncode != 0:
             return result.returncode
     return 0
 
 
-def dotnet_test_projects(projects: list[str]) -> int:
+def dotnet_test_projects(
+    projects: list[str],
+    class_filters: dict[str, list[str]] | None = None,
+) -> int:
     for project in projects:
-        result = run([exe("dotnet"), "test", project, "--nologo"], check=False)
+        command = [exe("dotnet"), "test", project, "--nologo"]
+        project_filters = (class_filters or {}).get(project, [])
+        if project_filters:
+            command.extend([
+                "--filter",
+                "|".join(f"FullyQualifiedName~{class_name}" for class_name in project_filters),
+            ])
+        result = run(command, check=False)
         if result.returncode != 0:
             return result.returncode
     return 0
@@ -3584,6 +3848,7 @@ def verify(args: argparse.Namespace) -> int:
         for path in paths
     )
     build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
+    dotnet_class_filters = dotnet_test_class_filters(paths, test_projects)
 
     frontend = any(is_frontend_path(path) for path in paths)
     renovate_config = ".github/renovate.json5" in paths
@@ -3592,11 +3857,18 @@ def verify(args: argparse.Namespace) -> int:
     )
     mcp_source_changed = any(path.startswith("src/Axis.Mcp/") for path in paths)
     mcp_api_coverage = "openapi.json" in paths or mcp_source_changed
-    frontend_tests_only = frontend and all(
-        path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
+    frontend_test_suite_level = any(path in FRONTEND_TEST_SUITE_LEVEL_PATHS for path in paths)
+    frontend_related_sources = frontend_related_source_paths(paths)
+    changed_unit_tests = [
+        path.removeprefix("frontend/")
         for path in paths
-        if is_frontend_path(path)
-    )
+        if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))
+    ]
+    changed_e2e_tests = [
+        path.removeprefix("frontend/")
+        for path in paths
+        if path.startswith("frontend/e2e/") and path.endswith((".ts", ".tsx"))
+    ]
 
     markdown_paths = [path for path in paths if path.endswith(".md") and (ROOT / path).is_file()]
     markdown_links_global = any(path in {"lychee.toml", ".github/workflows/build-and-test.yml"} for path in paths)
@@ -3645,7 +3917,13 @@ def verify(args: argparse.Namespace) -> int:
                     step(".NET build (changed projects)", lambda: dotnet_build_projects(build_projects))
                 step(".NET format (changed files)", lambda: dotnet_format_changed_paths(paths))
                 if test_projects:
-                    step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
+                    if dotnet_class_filters:
+                        step(
+                            ".NET test (related projects/classes)",
+                            lambda: dotnet_test_projects(test_projects, dotnet_class_filters),
+                        )
+                    else:
+                        step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
             if dotnet_package_scan:
                 step(".NET vulnerable packages", lambda: check_vulnerable_packages())
 
@@ -3656,39 +3934,40 @@ def verify(args: argparse.Namespace) -> int:
             if frontend_api_types:
                 step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
-            if frontend_tests_only:
-                changed_unit_tests = [
-                    path.removeprefix("frontend/")
-                    for path in paths
-                    if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))
-                ]
-                changed_e2e_tests = [
-                    path.removeprefix("frontend/")
-                    for path in paths
-                    if path.startswith("frontend/e2e/") and path.endswith((".ts", ".tsx"))
-                ]
-                if changed_unit_tests:
-                    step(
-                        "frontend test (changed test files)",
-                        lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
-                    )
-                if changed_e2e_tests:
-                    step(
-                        "frontend e2e (changed test files)",
-                        lambda: run_local_dev_browser(
-                            changed_e2e_tests,
-                            overlays=read_local_dev_topology() or (),
-                        ),
-                    )
-            else:
+            if frontend_test_suite_level:
                 step(
-                    "frontend test",
+                    "frontend test (suite-level runtime change)",
                     lambda: frontend_command(
                         argparse.Namespace(
                             frontend_command="test",
                             test_paths=[],
                             name=None,
                         )
+                    ),
+                )
+            elif frontend_related_sources:
+                related_inputs = frontend_test_related_inputs(paths)
+                step(
+                    "frontend test (related files)",
+                    lambda: run_frontend_npm(
+                        ["exec", "--", "vitest", "related", *related_inputs, "--run"]
+                    ).returncode,
+                )
+            elif changed_unit_tests:
+                step(
+                    "frontend test (changed test files)",
+                    lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
+                )
+            if changed_e2e_tests and getattr(args, "reuse_focused_browser_evidence", False):
+                print()
+                print("> frontend e2e (focused proof)")
+                print("REUSE frontend e2e (focused proof from the clean checkpoint)")
+            elif changed_e2e_tests:
+                step(
+                    "frontend e2e (changed test files)",
+                    lambda: run_local_dev_browser(
+                        changed_e2e_tests,
+                        overlays=read_local_dev_topology() or (),
                     ),
                 )
 
@@ -3820,6 +4099,23 @@ def run_review_readiness_policy(
 
 
 def review_readiness(args: argparse.Namespace) -> int:
+    since = getattr(args, "since", None)
+    full_branch = bool(getattr(args, "full_branch", False))
+    policy_only = bool(getattr(args, "policy_only", False))
+    if since and full_branch:
+        print(
+            "review-readiness: FAIL - select only one scope: --since <checkpoint> or --full-branch",
+            file=sys.stderr,
+        )
+        return 1
+    if not policy_only and not since and not full_branch:
+        print(
+            "review-readiness: FAIL - select an explicit scope: --since <checkpoint> for a follow-up "
+            "delta or --full-branch for the complete publishable branch",
+            file=sys.stderr,
+        )
+        return 1
+
     if working_tree_paths():
         print(
             "review-readiness: FAIL - create an intentional checkpoint commit before review-boundary verification",
@@ -3828,16 +4124,16 @@ def review_readiness(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        _scope, paths = verify_scope_paths(getattr(args, "since", None))
+        _scope, paths = verify_scope_paths(since)
     except CheckError as exc:
         print(exc, file=sys.stderr)
         return 1
 
-    policy_only = bool(getattr(args, "policy_only", False))
-    since = getattr(args, "since", None)
     executed: list[str] = []
     if not policy_only:
-        if verify(args) != 0:
+        verify_args = argparse.Namespace(**vars(args))
+        verify_args.reuse_focused_browser_evidence = True
+        if verify(verify_args) != 0:
             print("review-readiness: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
         executed.append("verify")
@@ -3865,8 +4161,8 @@ def review_readiness(args: argparse.Namespace) -> int:
 def pre_push(args: argparse.Namespace) -> int:
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running review-readiness.")
-        return review_readiness(argparse.Namespace(since=None, policy_only=False))
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full-branch review-readiness.")
+        return review_readiness(argparse.Namespace(since=None, full_branch=True, policy_only=False))
 
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -3902,7 +4198,10 @@ def pre_push(args: argparse.Namespace) -> int:
 
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
-    print("  Run `python scripts/axis.py review-readiness` before independent review.")
+    print(
+        "  Run `python scripts/axis.py review-readiness --full-branch` for the first review or "
+        "`--since <checkpoint>` for a follow-up."
+    )
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -4079,6 +4378,8 @@ def ensure_mcp_api_ready(health_url: str, root_ca: Path) -> bool:
         return True
 
     if require_docker_compose("mcp serve") != 0:
+        return False
+    if require_local_dev_certificates("mcp serve") != 0:
         return False
 
     print(
@@ -4317,6 +4618,11 @@ def local_dev_up_args(
     return local_dev_compose_args(*args, overlays=overlays)
 
 
+def local_dev_services_require_certificates(services: Iterable[str]) -> bool:
+    selected = set(services)
+    return not selected or not selected.isdisjoint(LOCAL_DEV_HTTPS_SERVICES)
+
+
 def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     command = exec_command[1:] if exec_command[:1] == ["--"] else exec_command
     if command:
@@ -4388,7 +4694,11 @@ def run_local_dev_browser(
     service: str = "e2e",
     build_services: Iterable[str] = (),
     snapshot_output: Path | None = None,
+    command_label: str = "local-dev e2e",
 ) -> int:
+    certificate_rc = require_local_dev_certificates(command_label)
+    if certificate_rc != 0:
+        return certificate_rc
     overlays = tuple(overlays)
     runtime_services = list(build_services)
     if runtime_services:
@@ -4433,6 +4743,7 @@ def local_dev_smoke(
         ["e2e/local-dev-smoke.pw.ts"],
         overlays=overlays,
         service="e2e",
+        command_label="local-dev smoke",
     )
 
 
@@ -4561,6 +4872,49 @@ def local_dev_certificates_valid(openssl: str) -> bool:
     return True
 
 
+def local_dev_certificate_state(openssl: str | None) -> LocalDevCertificateState:
+    if openssl is None:
+        return LocalDevCertificateState.OPENSSL_UNAVAILABLE
+    if local_dev_certificates_valid(openssl):
+        return LocalDevCertificateState.READY
+    if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
+        return LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+    return LocalDevCertificateState.MISSING_OR_INVALID
+
+
+def local_dev_certificate_remediation(state: LocalDevCertificateState) -> str:
+    if state is LocalDevCertificateState.READY:
+        return "valid local CA and localhost certificate"
+    if state is LocalDevCertificateState.OPENSSL_UNAVAILABLE:
+        return (
+            "OpenSSL is required to validate local HTTPS certificates; install OpenSSL on "
+            "PATH or Git for Windows, then run `python scripts/axis.py local-dev certs`"
+        )
+    if state is LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID:
+        return (
+            "local HTTPS certificate material is missing or invalid while an Axis-managed trust "
+            "marker is present; reconcile it with `python scripts/axis.py local-dev untrust-certs`, "
+            "`python scripts/axis.py local-dev certs --renew`, then "
+            "`python scripts/axis.py local-dev trust-certs`"
+        )
+    return (
+        "local HTTPS certificate material is missing or invalid; run "
+        "`python scripts/axis.py local-dev certs`"
+    )
+
+
+def require_local_dev_certificates(label: str) -> int:
+    state = local_dev_certificate_state(find_openssl())
+    if state is LocalDevCertificateState.READY:
+        return 0
+    print(
+        f"{label}: local HTTPS certificate preflight failed: "
+        f"{local_dev_certificate_remediation(state)}",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def local_dev_cert_host() -> str:
     system = platform.system().lower()
     if os.name == "nt" or system == "windows":
@@ -4576,6 +4930,13 @@ def local_dev_cert_host() -> str:
 def local_dev_host_trust_status() -> tuple[str, str]:
     trust_command = "`python scripts/axis.py local-dev trust-certs`"
     if not LOCAL_ROOT_CA_CER.is_file():
+        if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
+            return (
+                "WARN",
+                local_dev_certificate_remediation(
+                    LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+                ),
+            )
         return "WARN", "local root CA is missing; run `python scripts/axis.py local-dev certs`"
 
     host = local_dev_cert_host()
@@ -4777,8 +5138,10 @@ def local_dev_certs(args: argparse.Namespace | None = None) -> int:
 
     if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
         print(
-            "local-dev certs: the current root CA was trusted by Axis; run "
-            "`python scripts/axis.py local-dev untrust-certs` before replacing it",
+            "local-dev certs: "
+            + local_dev_certificate_remediation(
+                LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+            ),
             file=sys.stderr,
         )
         return 1
@@ -4883,6 +5246,10 @@ def local_dev(args: argparse.Namespace) -> int:
         )
 
     if command == "up":
+        if local_dev_services_require_certificates(args.services):
+            certificate_rc = require_local_dev_certificates("local-dev up")
+            if certificate_rc != 0:
+                return certificate_rc
         result = run(
             local_dev_up_args(*args.services, build=args.build, overlays=overlays),
             check=False,
@@ -4915,6 +5282,10 @@ def local_dev(args: argparse.Namespace) -> int:
         return result.returncode
 
     if command in {"start", "stop", "restart"}:
+        if command != "stop" and local_dev_services_require_certificates(args.services):
+            certificate_rc = require_local_dev_certificates(f"local-dev {command}")
+            if certificate_rc != 0:
+                return certificate_rc
         return run(
             local_dev_compose_args(command, *args.services, overlays=overlays),
             check=False,
@@ -4924,6 +5295,10 @@ def local_dev(args: argparse.Namespace) -> int:
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
+        if local_dev_services_require_certificates(args.services):
+            certificate_rc = require_local_dev_certificates("local-dev recreate")
+            if certificate_rc != 0:
+                return certificate_rc
         result = run(
             local_dev_up_args(
                 *args.services,
@@ -5045,6 +5420,9 @@ def local_dev(args: argparse.Namespace) -> int:
             ).returncode
 
     if command == "reset-db":
+        certificate_rc = require_local_dev_certificates("local-dev reset-db")
+        if certificate_rc != 0:
+            return certificate_rc
         if not explicit_confirmation(
             args,
             command="local-dev reset-db",
@@ -5066,6 +5444,9 @@ def local_dev(args: argparse.Namespace) -> int:
         return up.returncode
 
     if command == "reset-all":
+        certificate_rc = require_local_dev_certificates("local-dev reset-all")
+        if certificate_rc != 0:
+            return certificate_rc
         if not explicit_confirmation(
             args,
             command="local-dev reset-all",
@@ -5264,7 +5645,13 @@ def setup_external_preflight(profile: str) -> int:
 
 
 def setup_preflight(profile: str) -> int:
-    rc = doctor(argparse.Namespace(profile=profile, strict=True))
+    rc = doctor(
+        argparse.Namespace(
+            profile=profile,
+            strict=True,
+            allow_certificate_bootstrap=True,
+        )
+    )
     if rc != 0:
         if profile == "review" and not setup_tool_ready("lychee"):
             print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
@@ -5414,6 +5801,7 @@ def doctor(args: argparse.Namespace) -> int:
     if profile not in axis_setup.DOCTOR_PROFILES:
         raise CheckError(f"Unknown doctor profile: {profile}")
     groups = set(axis_setup.DOCTOR_PROFILES[: axis_setup.DOCTOR_PROFILES.index(profile) + 1])
+    allow_certificate_bootstrap = getattr(args, "allow_certificate_bootstrap", False)
     rows: list[tuple[str, str, str]] = []
 
     def record(status: str, label: str, detail: str) -> None:
@@ -5454,18 +5842,23 @@ def doctor(args: argparse.Namespace) -> int:
         openssl = find_openssl()
         if openssl:
             record("OK", "openssl", openssl)
-            certificates_valid = local_dev_certificates_valid(openssl)
+            certificate_state = local_dev_certificate_state(openssl)
+            certificate_status = (
+                "OK"
+                if certificate_state is LocalDevCertificateState.READY
+                else "WARN"
+                if allow_certificate_bootstrap
+                else "FAIL"
+            )
             record(
-                "OK" if certificates_valid else "WARN",
+                certificate_status,
                 "local HTTPS certificates",
-                "valid local CA and localhost certificate"
-                if certificates_valid
-                else "missing or invalid; run `python scripts/axis.py local-dev certs`",
+                local_dev_certificate_remediation(certificate_state),
             )
             trust_status, trust_detail = local_dev_host_trust_status()
             record(trust_status, "host browser trust", trust_detail)
         else:
-            record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
+            record("FAIL", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
 
         docker_status, docker_detail = _command_version("docker", "--version")
         if docker_status == "FAIL":
@@ -5604,7 +5997,10 @@ def build_parser(
     setup_parser.add_argument(
         "--browsers",
         action="store_true",
-        help="Install host Playwright Chromium for explicit host-browser debugging",
+        help=(
+            "Install the host Playwright Chromium binary for explicit debugging; "
+            "native OS prerequisites remain external"
+        ),
     )
     setup_parser.add_argument(
         "--plan-only",
@@ -5673,6 +6069,11 @@ def build_parser(
         help="Verify a clean checkpoint before independent review",
     )
     review_readiness_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    review_readiness_parser.add_argument(
+        "--full-branch",
+        action="store_true",
+        help="Explicitly verify the complete publishable branch diff",
+    )
     review_readiness_parser.add_argument(
         "--policy-only",
         action="store_true",
@@ -5755,7 +6156,13 @@ def build_parser(
         help="Apply compatible npm audit fixes to package-lock.json without force or install scripts",
     )
     frontend_sync_lock.set_defaults(func=frontend_command)
-    frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
+    frontend_sub.add_parser(
+        "install-browsers",
+        help=(
+            "Install the optional host Playwright Chromium binary; "
+            "native OS prerequisites remain external"
+        ),
+    ).set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
     frontend_format = frontend_sub.add_parser(
         "format",
@@ -5777,6 +6184,16 @@ def build_parser(
     )
     frontend_test.add_argument("-t", "--name", help="Run tests whose full name matches this pattern")
     frontend_test.set_defaults(func=frontend_command)
+    frontend_test_related = frontend_sub.add_parser(
+        "test-related",
+        help="Run the dependency-related frontend unit scope changed since a checkpoint",
+    )
+    frontend_test_related.add_argument(
+        "--since",
+        required=True,
+        help="Immutable checkpoint used to discover the bounded changed input set",
+    )
+    frontend_test_related.set_defaults(func=frontend_command)
     frontend_gen_api = frontend_sub.add_parser("gen-api-types", help="Generate TypeScript API types from OpenAPI")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
@@ -5903,7 +6320,10 @@ def build_parser(
         "frontend-dependency-versions",
         help="Require exact versions for direct npm dependencies",
     ).set_defaults(func=check_frontend_dependency_versions)
-    check_sub.add_parser("playwright-browsers", help="Check Playwright Chromium availability").set_defaults(func=check_playwright_browsers)
+    check_sub.add_parser(
+        "playwright-browsers",
+        help="Launch-probe the optional host Playwright Chromium runtime",
+    ).set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages", help="Audit NuGet dependencies for vulnerabilities").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser(
         "frontend-vulnerable-packages",

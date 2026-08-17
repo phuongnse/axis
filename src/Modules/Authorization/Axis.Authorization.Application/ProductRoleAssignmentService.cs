@@ -4,6 +4,7 @@ using System.Text.Json;
 using Axis.Audit.Contracts;
 using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Authorization.Application;
 
@@ -41,11 +42,10 @@ public sealed record StoredProductRoleAssignment(
     bool IsActive,
     int Revision,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? RevokedAt)
-{
-    public ProductRoleAssignment ToContract() =>
-        new(WorkspaceId, Subject, PolicyVersionId, RoleKey, IsActive, Revision);
-}
+    DateTimeOffset? RevokedAt,
+    DateTimeOffset UpdatedAt,
+    ActorSnapshot CreatedBy,
+    ActorSnapshot UpdatedBy);
 
 public sealed record ProductRoleIdempotencyRecord(
     Guid WorkspaceId,
@@ -112,6 +112,7 @@ public sealed record AssignProductRoleRequest(
     string RoleKey,
     string IdempotencyKey,
     string CorrelationId,
+    string ActorDisplayName,
     int? ExpectedRevision = null);
 
 public sealed record RevokeProductRoleRequest(
@@ -122,11 +123,12 @@ public sealed record RevokeProductRoleRequest(
     string RoleKey,
     string IdempotencyKey,
     string CorrelationId,
+    string ActorDisplayName,
     int ExpectedRevision);
 
 public sealed record ProductRoleAssignmentResult(
     bool IsSuccess,
-    ProductRoleAssignment? Assignment,
+    StoredProductRoleAssignment? Assignment,
     string? Error);
 
 public sealed class ProductRoleAssignmentService(
@@ -150,6 +152,7 @@ public sealed class ProductRoleAssignmentService(
             request.RoleKey,
             request.IdempotencyKey,
             request.CorrelationId,
+            request.ActorDisplayName,
             request.ExpectedRevision,
             cancellationToken);
 
@@ -165,6 +168,7 @@ public sealed class ProductRoleAssignmentService(
             request.RoleKey,
             request.IdempotencyKey,
             request.CorrelationId,
+            request.ActorDisplayName,
             request.ExpectedRevision,
             cancellationToken);
 
@@ -177,12 +181,14 @@ public sealed class ProductRoleAssignmentService(
         string roleKey,
         string idempotencyKey,
         string correlationId,
+        string actorDisplayName,
         int? expectedRevision,
         CancellationToken cancellationToken)
     {
         roleKey = roleKey?.Trim() ?? string.Empty;
         idempotencyKey = idempotencyKey?.Trim() ?? string.Empty;
         correlationId = correlationId?.Trim() ?? string.Empty;
+        actorDisplayName = actorDisplayName?.Trim() ?? string.Empty;
         if (workspaceId == Guid.Empty
             || actor.Kind != SubjectKind.Human
             || actor.Id == Guid.Empty
@@ -192,6 +198,7 @@ public sealed class ProductRoleAssignmentService(
             || roleKey.Length is 0 or > 200
             || idempotencyKey.Length is 0 or > 120
             || correlationId.Length is 0 or > AuditEventV1Validator.MaximumCorrelationIdLength
+            || actorDisplayName.Length is 0 or > ActorSnapshot.MaximumDisplayNameLength
             || (operation == "revoke" && expectedRevision is null))
         {
             return await AuditInvalidRequestAsync(
@@ -248,7 +255,7 @@ public sealed class ProductRoleAssignmentService(
                 }
 
                 await unitOfWork.RollbackAsync(cancellationToken);
-                return new(true, canonical.ToContract(), null);
+                return new(true, canonical, null);
             }
 
             StoredProductRoleAssignment? current = await assignments.GetAsync(
@@ -271,6 +278,7 @@ public sealed class ProductRoleAssignmentService(
             }
 
             DateTimeOffset now = clock.GetUtcNow();
+            ActorSnapshot actorSnapshot = ActorSnapshot.User(actor.Id, actorDisplayName);
             StoredProductRoleAssignment changed = current switch
             {
                 null => new(
@@ -282,18 +290,26 @@ public sealed class ProductRoleAssignmentService(
                     IsActive: true,
                     Revision: 1,
                     CreatedAt: now,
-                    RevokedAt: null),
+                    RevokedAt: null,
+                    UpdatedAt: now,
+                    CreatedBy: actorSnapshot,
+                    UpdatedBy: actorSnapshot),
+                { IsActive: true } when operation == "assign" => current,
                 _ when operation == "assign" => current with
                 {
                     IsActive = true,
-                    Revision = current.IsActive ? current.Revision : current.Revision + 1,
+                    Revision = current.Revision + 1,
                     RevokedAt = null,
+                    UpdatedAt = now,
+                    UpdatedBy = actorSnapshot,
                 },
                 _ => current with
                 {
                     IsActive = false,
                     Revision = current.Revision + 1,
                     RevokedAt = now,
+                    UpdatedAt = now,
+                    UpdatedBy = actorSnapshot,
                 },
             };
 
@@ -342,7 +358,7 @@ public sealed class ProductRoleAssignmentService(
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);
-            return new(true, changed.ToContract(), null);
+            return new(true, changed, null);
         }
         catch (AuthorizationPersistenceConflictException)
         {

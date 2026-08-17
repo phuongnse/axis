@@ -1,3 +1,4 @@
+using Axis.Shared.Domain.Primitives;
 using Axis.Solutions.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -22,6 +23,17 @@ internal sealed class SolutionVersionConfiguration : IEntityTypeConfiguration<So
         builder.Property(x => x.BuiltAt).HasColumnName("built_at").IsRequired();
         builder.Property(x => x.SourceUri).HasColumnName("source_uri").HasMaxLength(2048).IsRequired();
         builder.Property(x => x.PublishedAt).HasColumnName("published_at").IsRequired();
+        builder.Property<ActorKind>("CreatedByKind")
+            .HasColumnName("created_by_kind")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+        builder.Property<Guid?>("CreatedBySubjectId").HasColumnName("created_by_subject_id");
+        builder.Property<string>("CreatedByDisplayName")
+            .HasColumnName("created_by_display_name")
+            .HasMaxLength(ActorSnapshot.MaximumDisplayNameLength)
+            .IsRequired();
+        builder.Ignore(x => x.CreatedBy);
         builder.HasIndex(x => new { x.SolutionKey, x.Version })
             .IsUnique()
             .HasDatabaseName("ux_solution_versions_identity");

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { resourceMetadata } from '@/test/resourceMetadata';
 import { axisStyles } from '@/theme.generated';
 import { addServiceIdentityKey, createServiceIdentity, revokeServiceIdentityKey } from '../api';
 import { serviceIdentitiesManagedWindowRenderers } from '../managed-windows';
@@ -82,6 +83,12 @@ describe('ServiceIdentitiesPage', () => {
     expect(content).toContainElement(table);
     expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: 'Client identifier: Sort ascending' }),
+    ).toBeVisible();
+    expect(
+      within(table).getByRole('button', { name: 'Signing keys: Sort ascending' }),
+    ).toBeVisible();
     expect(create).toHaveClass(
       axisStyles.density.minHeight.touchTarget,
       axisStyles.density.minWidth.touchTarget,
@@ -215,13 +222,15 @@ describe('ServiceIdentitiesPage', () => {
 });
 
 function identity(overrides: Record<string, unknown> = {}) {
+  const revision = typeof overrides.revision === 'number' ? overrides.revision : 2;
   return {
     id: 'service-1',
     clientId: 'worker-one',
     workspaceId: 'workspace-1',
     status: 'Active',
     workspaceGrantStatus: 'Active',
-    revision: 2,
+    revision,
+    metadata: resourceMetadata(revision),
     subject: { kind: 'Service', subjectId: 'service-1' },
     keys: [],
     ...overrides,

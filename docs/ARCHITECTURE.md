@@ -18,6 +18,7 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 - Cross-module global search, when required by an owning contract, uses one materialized read model built from published module contracts rather than querying module internals or merging provider-native scores.
 - Domain projects have zero external dependencies.
 - `Axis.Shared.*` is for shared primitives and cross-cutting helpers only, not product behavior.
+- Current-state resource provenance uses the shared storage-neutral `ActorSnapshot` primitive: `User`, `ServiceIdentity`, `Anonymous`, or `System`, a stable subject identifier when one exists, and a bounded canonical display name. Anonymous is limited to a resolved-resource mutation initiated through a valid unauthenticated capability; System is limited to work initiated by the runtime. Each module owns where that snapshot and its timestamps are persisted; clients never submit actor metadata, and Audit remains append-only history rather than a read-time reconstruction dependency.
 - Module-owned data changes use EF Core migrations.
 - Event sourcing is opt-in and requires an approved event store, replay, projection, and versioning design before source changes.
 - New product behavior starts in an owning use-case spec before source changes.

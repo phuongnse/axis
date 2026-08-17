@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
+using Axis.Shared.Application;
 
 namespace Axis.Authorization.Application;
 
@@ -17,7 +19,24 @@ public sealed record ProductRoleAssignmentDto(
     Guid PolicyVersionId,
     string RoleKey,
     bool IsActive,
-    int Revision);
+    int Revision,
+    [property: Required] ResourceMetadataDto Metadata)
+{
+    public static ProductRoleAssignmentDto From(StoredProductRoleAssignment value) =>
+        new(
+            value.WorkspaceId,
+            SubjectReferenceDto.From(value.Subject),
+            value.PolicyVersionId,
+            value.RoleKey,
+            value.IsActive,
+            value.Revision,
+            ResourceMetadataMapping.From(
+                value.Revision,
+                value.CreatedBy,
+                value.CreatedAt,
+                value.UpdatedBy,
+                value.UpdatedAt));
+}
 
 public sealed record ProductRoleManagementResult(
     bool IsSuccess,
@@ -61,13 +80,7 @@ public sealed class ProductRoleManagementQueryService(
             .ThenBy(value => value.RoleKey, StringComparer.Ordinal)
             .ToArray();
         ProductRoleAssignmentDto[] current = (await assignments.ListAsync(workspaceId, cancellationToken))
-            .Select(value => new ProductRoleAssignmentDto(
-                value.WorkspaceId,
-                SubjectReferenceDto.From(value.Subject),
-                value.PolicyVersionId,
-                value.RoleKey,
-                value.IsActive,
-                value.Revision))
+            .Select(ProductRoleAssignmentDto.From)
             .OrderBy(value => value.Subject.Kind)
             .ThenBy(value => value.Subject.SubjectId)
             .ThenBy(value => value.RoleKey, StringComparer.Ordinal)

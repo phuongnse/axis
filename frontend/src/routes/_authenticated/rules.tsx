@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ruleDefinitionsListQueryOptions } from '@/features/rules';
+import type { CollectionSortDirection, RuleDefinitionSortField } from '@/lib/api-generated';
 import type { MyRouterContext } from '../__root';
 
 export const Route = createFileRoute('/_authenticated/rules')({
@@ -12,7 +13,22 @@ export interface RulesRouteSearch {
   query?: string;
   dialog?: 'create' | 'edit';
   definitionKey?: string;
+  sortBy?: RuleTableSortField;
+  sortDirection?: CollectionSortDirection;
 }
+
+type RuleTableSortField = Exclude<RuleDefinitionSortField, 'CreatedBy' | 'CreatedAt'>;
+
+const ruleDefinitionSortFields: readonly RuleTableSortField[] = [
+  'Name',
+  'Origin',
+  'Status',
+  'ActiveVersion',
+  'LatestVersion',
+  'Revision',
+  'ModifiedBy',
+  'ModifiedAt',
+];
 
 export function loadRulesRoute({ queryClient }: MyRouterContext) {
   return queryClient.ensureQueryData(ruleDefinitionsListQueryOptions());
@@ -27,10 +43,20 @@ function validateRulesSearch(search: Record<string, unknown>): RulesRouteSearch 
     typeof search.definitionKey === 'string' && search.definitionKey
       ? search.definitionKey
       : undefined;
+  const sortBy = isRuleDefinitionSortField(search.sortBy) ? search.sortBy : undefined;
+  const sortDirection =
+    search.sortDirection === 'Ascending' || search.sortDirection === 'Descending'
+      ? search.sortDirection
+      : undefined;
   return {
     page,
     ...(query ? { query } : {}),
     ...(dialog ? { dialog } : {}),
     ...(definitionKey ? { definitionKey } : {}),
+    ...(sortBy && sortDirection ? { sortBy, sortDirection } : {}),
   };
+}
+
+function isRuleDefinitionSortField(value: unknown): value is RuleTableSortField {
+  return ruleDefinitionSortFields.some((field) => field === value);
 }

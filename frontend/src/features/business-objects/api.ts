@@ -22,13 +22,30 @@ export type BusinessObjectFieldRuleInput = ApiTypes.BusinessObjectFieldRuleInput
 
 export const businessObjectDefinitionsDefaultPageSize = 20;
 export const businessObjectDefinitionStaleTimeMs = 1000 * 60 * 5;
+export type BusinessObjectDefinitionSortField = ApiTypes.BusinessObjectDefinitionSortField;
+export type CollectionSortDirection = ApiTypes.CollectionSortDirection;
 
 export const businessObjectDefinitionQueryKeys = {
   all: ['business-object-definitions'] as const,
   actions: () => [...businessObjectDefinitionQueryKeys.all, 'actions'] as const,
   lists: () => [...businessObjectDefinitionQueryKeys.all, 'list'] as const,
-  list: (page: number, pageSize: number, query: string, language: string) =>
-    [...businessObjectDefinitionQueryKeys.lists(), page, pageSize, query, language] as const,
+  list: (
+    page: number,
+    pageSize: number,
+    query: string,
+    language: string,
+    sortBy?: BusinessObjectDefinitionSortField,
+    sortDirection?: CollectionSortDirection,
+  ) =>
+    [
+      ...businessObjectDefinitionQueryKeys.lists(),
+      page,
+      pageSize,
+      query,
+      language,
+      sortBy,
+      sortDirection,
+    ] as const,
   details: () => [...businessObjectDefinitionQueryKeys.all, 'detail'] as const,
   detail: (id: string) => [...businessObjectDefinitionQueryKeys.all, 'detail', id] as const,
 };
@@ -46,10 +63,20 @@ export function businessObjectDefinitionsListQueryOptions(
   pageSize = businessObjectDefinitionsDefaultPageSize,
   query = '',
   language = 'en',
+  sortBy?: BusinessObjectDefinitionSortField,
+  sortDirection?: CollectionSortDirection,
 ) {
   return queryOptions({
-    queryKey: businessObjectDefinitionQueryKeys.list(page, pageSize, query, language),
-    queryFn: ({ signal }) => listBusinessObjectDefinitions(page, pageSize, query, language, signal),
+    queryKey: businessObjectDefinitionQueryKeys.list(
+      page,
+      pageSize,
+      query,
+      language,
+      sortBy,
+      sortDirection,
+    ),
+    queryFn: ({ signal }) =>
+      listBusinessObjectDefinitions(page, pageSize, query, language, sortBy, sortDirection, signal),
     staleTime: businessObjectDefinitionStaleTimeMs,
   });
 }
@@ -67,11 +94,17 @@ export async function listBusinessObjectDefinitions(
   pageSize: number,
   query = '',
   language = 'en',
+  sortBy?: BusinessObjectDefinitionSortField,
+  sortDirection?: CollectionSortDirection,
   signal?: AbortSignal,
 ) {
   const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (query.trim()) search.set('query', query.trim());
   search.set('language', language);
+  if (sortBy && sortDirection) {
+    search.set('sortBy', sortBy);
+    search.set('sortDirection', sortDirection);
+  }
   return fetchApi<BusinessObjectDefinitionPage>(
     `/business-object-definitions?${search.toString()}`,
     { signal },

@@ -696,7 +696,7 @@ function BusinessObjectReadOnlyDetails({
                             {field.label ?? t('businessObjects.newField')}
                           </h4>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <MetadataTag>{field.fieldKey ?? '—'}</MetadataTag>
+                            <MetadataTag>{field.fieldKey ?? t('table.emptyValue')}</MetadataTag>
                             <MetadataTag>
                               {t(`businessObjects.fieldType${field.fieldType ?? 'Text'}`)}
                             </MetadataTag>
@@ -720,7 +720,7 @@ function BusinessObjectReadOnlyDetails({
                                   <ul className="space-y-1 font-normal">
                                     {(field.choiceConfiguration.options ?? []).map((option) => (
                                       <li key={option.id ?? option.optionKey}>
-                                        {option.label ?? option.optionKey ?? '—'}
+                                        {option.label ?? option.optionKey ?? t('table.emptyValue')}
                                         {option.optionKey ? (
                                           <span className="text-muted-foreground">
                                             {' '}
@@ -1796,7 +1796,7 @@ function toRuleContractValue(value: string, type?: RuleInputValueType): string {
 }
 
 function ruleDisplayName(
-  definition: RuleDefinitionSummary,
+  definition: Pick<RuleDefinitionSummary, 'name' | 'definitionKey' | 'documentation'>,
   locale: string,
   t: ReturnType<typeof useTranslation>['t'],
 ): string {

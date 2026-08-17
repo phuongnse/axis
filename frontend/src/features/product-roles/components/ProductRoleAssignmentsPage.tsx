@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -35,42 +36,35 @@ export function ProductRoleAssignmentsPage() {
   const subjects = data?.subjects ?? [];
   const roles = data?.roles ?? [];
   const assignments = (data?.assignments ?? []).filter((assignment) => assignment.isActive);
-  const tableQuery = useMemo<DataTableQueryState>(
-    () => ({
-      globalFilter: '',
-      filterExpression: createEmptyFilterExpression(),
-      sorting: [],
-      grouping: [],
-    }),
-    [],
-  );
+  const [tableQuery, setTableQuery] = useState<DataTableQueryState>(() => ({
+    globalFilter: '',
+    filterExpression: createEmptyFilterExpression(),
+    sorting: [],
+    grouping: [],
+  }));
   const tableDefinition = useMemo<DataTableDefinition<ProductRoleAssignmentDto>>(() => {
     const columns: DataTableColumnDef<ProductRoleAssignmentDto>[] = [
       {
         id: 'subject',
+        accessorFn: (assignment) =>
+          findSubject(subjects, assignment)?.displayName ?? assignment.subject?.subjectId,
         size: 280,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('productRoles.subject') },
+        meta: { label: t('productRoles.subject'), cell: { kind: 'action' } },
         cell: ({ row }) => {
           const subject = findSubject(subjects, row.original);
           const title = subject?.displayName ?? t('productRoles.unknownSubject');
           const role = findRole(roles, row.original);
           return (
-            <div className="min-w-0">
-              <DataTableRecordAction
-                onClick={() =>
-                  openWindow(
-                    productRoleAssignmentWindowDescriptor(row.original, subject, role, title),
-                  )
-                }
-              >
-                {title}
-              </DataTableRecordAction>
-              {subject?.secondaryLabel ? (
-                <p className="truncate text-xs text-muted-foreground">{subject.secondaryLabel}</p>
-              ) : null}
-            </div>
+            <DataTableRecordAction
+              onClick={() =>
+                openWindow(
+                  productRoleAssignmentWindowDescriptor(row.original, subject, role, title),
+                )
+              }
+            >
+              {title}
+            </DataTableRecordAction>
           );
         },
       },
@@ -79,46 +73,42 @@ export function ProductRoleAssignmentsPage() {
         accessorFn: (assignment) => assignment.subject?.kind,
         size: 130,
         minSize: 120,
-        enableSorting: false,
-        meta: { label: t('productRoles.kind') },
+        meta: { label: t('productRoles.kind'), cell: { kind: 'status' } },
       },
       {
         id: 'role',
+        accessorFn: (assignment) => findRole(roles, assignment)?.displayName ?? assignment.roleKey,
         size: 280,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('productRoles.role') },
-        cell: ({ row }) => {
-          const role = findRole(roles, row.original);
-          return (
-            <div className="min-w-0">
-              <p className="truncate font-medium">{role?.displayName ?? row.original.roleKey}</p>
-              {role?.description ? (
-                <p className="truncate text-xs text-muted-foreground">{role.description}</p>
-              ) : null}
-            </div>
-          );
-        },
+        meta: { label: t('productRoles.role'), cell: { kind: 'text' } },
       },
       {
         id: 'policy',
+        accessorFn: (assignment) => {
+          const role = findRole(roles, assignment);
+          return role?.policyKey ?? assignment.policyVersionId;
+        },
         size: 220,
         minSize: 190,
-        enableSorting: false,
-        meta: { label: t('productRoles.policy') },
-        cell: ({ row }) => {
-          const role = findRole(roles, row.original);
-          return role?.policyKey ?? row.original.policyVersionId ?? t('productRoles.notAvailable');
-        },
+        meta: { label: t('productRoles.policy'), cell: { kind: 'identifier' } },
       },
       {
         id: 'status',
+        accessorFn: () => 'Active',
         size: 130,
         minSize: 120,
         enableSorting: false,
-        meta: { label: t('productRoles.status') },
+        meta: { label: t('productRoles.status'), cell: { kind: 'status' } },
         cell: () => <StatusBadge state="positive">{t('productRoles.active')}</StatusBadge>,
       },
+      ...createResourceMetadataColumns<ProductRoleAssignmentDto>(
+        {
+          revision: t('metadata.revision'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: language },
+      ),
     ];
 
     const emptyDescription =
@@ -130,6 +120,7 @@ export function ProductRoleAssignmentsPage() {
 
     return {
       ariaLabel: t('productRoles.listLabel'),
+      locale: language,
       source: {
         mode: 'client',
         data: assignments,
@@ -146,7 +137,7 @@ export function ProductRoleAssignmentsPage() {
       }),
       getRowId: assignmentKey,
       queryState: tableQuery,
-      onQueryStateChange: () => undefined,
+      onQueryStateChange: setTableQuery,
       columnControls: true,
       grouping: false,
       renderToolbarActions:
@@ -180,6 +171,7 @@ export function ProductRoleAssignmentsPage() {
     managementQuery.isPending,
     managementQuery.isSuccess,
     managementQuery.refetch,
+    language,
     openWindow,
     roles,
     subjects,

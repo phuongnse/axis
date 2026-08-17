@@ -91,10 +91,18 @@ public static class BusinessObjectDefinitionEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? query = null,
-        [FromQuery] string? language = null)
+        [FromQuery] string? language = null,
+        [FromQuery] BusinessObjectDefinitionSortField? sortBy = null,
+        [FromQuery] CollectionSortDirection? sortDirection = null)
     {
         Result<PagedResult<BusinessObjectDefinitionListItemDto>> result = await mediator.Send(
-            new ListBusinessObjectDefinitionsQuery(page, pageSize, query, language),
+            new ListBusinessObjectDefinitionsQuery(
+                page,
+                pageSize,
+                query,
+                language,
+                sortBy,
+                sortDirection),
             ct);
 
         return result.IsFailure

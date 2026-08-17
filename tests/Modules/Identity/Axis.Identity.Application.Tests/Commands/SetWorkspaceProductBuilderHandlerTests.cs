@@ -4,6 +4,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -33,6 +34,9 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
     public async Task SetProductBuilder_WhenGrantIsEquivalent_ReturnsCanonicalStateWithoutIncrementingRevision()
     {
         TestContext context = new();
+        DateTime originalModifiedAt = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ActorSnapshot originalActor = ActorSnapshot.User(context.Target.Id, context.Target.FullName);
+        context.TargetMembership.InitializeMetadata(originalActor, originalModifiedAt);
         context.TargetMembership.SetProductBuilder(true, context.TargetMembership.Revision);
         int revision = context.TargetMembership.Revision;
 
@@ -43,6 +47,8 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.MembershipRevision.Should().Be(revision);
         context.TargetMembership.Revision.Should().Be(revision);
+        context.TargetMembership.UpdatedAt.Should().Be(originalModifiedAt);
+        context.TargetMembership.UpdatedBy.Should().Be(originalActor);
     }
 
     [Fact]
@@ -150,7 +156,11 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
                         Target.Email.Value,
                         _targetMembership.Role,
                         _targetMembership.IsProductBuilder,
-                        _targetMembership.Revision),
+                        _targetMembership.Revision,
+                        Metadata(
+                            _targetMembership.Revision,
+                            Target.Id,
+                            Target.FullName)),
                 });
             Audit.EnqueueAsync(Arg.Any<AuditEventV1>(), Arg.Any<CancellationToken>())
                 .Returns(call =>
@@ -174,13 +184,24 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
                 Audit,
                 TimeProvider.System,
                 UnitOfWork).Handle(
-                    new SetWorkspaceProductBuilderCommand(
+            new SetWorkspaceProductBuilderCommand(
                         Actor.Id,
                         Workspace.Id,
                         targetUserId ?? Target.Id,
                         enabled,
                         expectedRevision ?? _targetMembership.Revision,
-                        "correlation"),
-                    CancellationToken.None);
+                "correlation",
+                Actor.FullName),
+            CancellationToken.None);
+
+        private static ResourceMetadataDto Metadata(
+            int revision,
+            Guid actorId,
+            string displayName)
+        {
+            DateTimeOffset timestamp = new(2026, 8, 17, 0, 0, 0, TimeSpan.Zero);
+            ResourceActorDto actor = new(ActorKind.User, actorId, displayName);
+            return new ResourceMetadataDto(revision, actor, timestamp, actor, timestamp);
+        }
     }
 }

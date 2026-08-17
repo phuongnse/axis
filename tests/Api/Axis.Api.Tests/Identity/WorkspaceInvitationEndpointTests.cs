@@ -54,6 +54,50 @@ public sealed class WorkspaceInvitationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task ListInvitations_WhenSortPairIsSpecified_OrdersTheWholeDataset()
+    {
+        await CreateVerifiedBrowserSessionAsync(UniqueEmail());
+        Guid workspaceId = await CreateOrganizationWorkspaceAsync();
+        await SwitchWorkspaceAsync(workspaceId);
+        string suffix = Guid.NewGuid().ToString("N");
+        string alphaEmail = $"alpha-{suffix}@example.com";
+        string zuluEmail = $"zulu-{suffix}@example.com";
+
+        (await fixture.PostBrowserJsonAsync(
+            "/api/workspace-invitations",
+            new { email = alphaEmail, requestedRole = "Member" },
+            TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await fixture.PostBrowserJsonAsync(
+            "/api/workspace-invitations",
+            new { email = zuluEmail, requestedRole = "Member" },
+            TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        JsonElement body = await fixture.Client.GetFromJsonAsync<JsonElement>(
+            "/api/workspace-invitations?page=1&pageSize=20&sortBy=Email&sortDirection=Descending",
+            Json,
+            TestContext.Current.CancellationToken);
+
+        body.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("recipientEmail").GetString())
+            .Where(email => email == alphaEmail || email == zuluEmail)
+            .Should().Equal(zuluEmail, alphaEmail);
+    }
+
+    [Fact]
+    public async Task ListInvitations_WhenDeliverySortIsSpecified_AcceptsThePublicContract()
+    {
+        await CreateVerifiedBrowserSessionAsync(UniqueEmail());
+        Guid workspaceId = await CreateOrganizationWorkspaceAsync();
+        await SwitchWorkspaceAsync(workspaceId);
+
+        HttpResponseMessage response = await fixture.Client.GetAsync(
+            "/api/workspace-invitations?page=1&pageSize=20&sortBy=Delivery&sortDirection=Ascending",
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task AT003_WhenInvitationRoleIsUnsupported_ReturnsFieldCodeWithoutMutation()
     {
         await CreateVerifiedBrowserSessionAsync(UniqueEmail());

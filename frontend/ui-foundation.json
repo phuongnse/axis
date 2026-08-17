@@ -1114,26 +1114,28 @@
               "acceptance": [
                 "docs/foundations/data-display/collection-page.md#AT-001",
                 "docs/foundations/data-display/collection-page.md#AT-004",
+                "docs/foundations/data-display/collection-page.md#AT-005",
                 "docs/foundations/data-display/collection-page.md#AT-006"
               ],
               "evidence": [
                 "docs/foundations/data-display/resource-workspace.assessment.md",
                 "frontend/e2e/define-business-object.pw.ts",
-                "frontend/e2e/manage-rules.pw.ts",
-                "frontend/tests/data-table.test.tsx",
-                "frontend/tests/resource-workspace.test.tsx"
+                "frontend/tests/business-objects-page.test.tsx",
+                "frontend/tests/data-table.test.tsx"
               ],
               "modes": ["keyboard", "pointer"]
             },
             "standard.wcag-2-2-aa": {
               "acceptance": [
                 "docs/foundations/data-display/collection-page.md#AT-001",
+                "docs/foundations/data-display/collection-page.md#AT-003",
                 "docs/foundations/data-display/collection-page.md#AT-004",
                 "docs/foundations/data-display/collection-page.md#AT-006"
               ],
               "evidence": [
                 "docs/foundations/data-display/resource-workspace.assessment.md",
                 "frontend/e2e/define-business-object.pw.ts",
+                "frontend/tests/business-objects-page.test.tsx",
                 "frontend/tests/data-table.test.tsx",
                 "frontend/tests/resource-workspace.test.tsx",
                 "frontend/tests/surface-contracts.test.tsx"

@@ -370,7 +370,8 @@ public static class SolutionEndpoints
             CorrelationId(context),
             currentSubject.Subject.Kind == SubjectKind.Service
                 ? SolutionSubjectKind.Service
-                : SolutionSubjectKind.Human);
+                : SolutionSubjectKind.Human,
+            currentSubject.DisplayName);
 
     private static string CorrelationId(HttpContext context) =>
         context.Items.TryGetValue(CorrelationIdMiddleware.HttpContextItemKey, out object? value)

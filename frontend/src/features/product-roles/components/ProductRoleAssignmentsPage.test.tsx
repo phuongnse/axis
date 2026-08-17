@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { resourceMetadata } from '@/test/resourceMetadata';
 import { axisStyles } from '@/theme.generated';
 import { assignProductRole, revokeProductRole } from '../api';
 import { productRolesManagedWindowRenderers } from '../managed-windows';
@@ -42,8 +43,8 @@ describe('ProductRoleAssignmentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.list.mockResolvedValue(management());
-    api.assign.mockResolvedValue({ ...management().assignments[0], revision: 5 });
-    api.revoke.mockResolvedValue({ ...management().assignments[0], isActive: false, revision: 5 });
+    api.assign.mockResolvedValue(productRoleAssignment({ revision: 5 }));
+    api.revoke.mockResolvedValue(productRoleAssignment({ isActive: false, revision: 5 }));
   });
 
   it('composes the shared resource workspace and revokes from a managed assignment window', async () => {
@@ -64,17 +65,27 @@ describe('ProductRoleAssignmentsPage', () => {
     expect(content).toContainElement(table);
     expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: 'Active subject: Sort ascending' }),
+    ).toBeVisible();
+    expect(
+      within(table).getByRole('button', { name: 'Installed product role: Sort ascending' }),
+    ).toBeVisible();
+    expect(
+      within(table).queryByRole('button', { name: 'Status: Sort ascending' }),
+    ).not.toBeInTheDocument();
     expect(assign).toHaveClass(
       axisStyles.density.minHeight.touchTarget,
       axisStyles.density.minWidth.touchTarget,
       axisStyles.density.minHeight.compactControlAtSmall,
       axisStyles.density.minWidth.compactControlAtSmall,
     );
-    expect(within(table).getByText('Reviews submitted cases.')).toBeInTheDocument();
+    expect(within(table).queryByText('Reviews submitted cases.')).not.toBeInTheDocument();
 
     await user.click(within(table).getByRole('button', { name: 'Alex Nguyen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Alex Nguyen' });
     expect(within(dialog).getByText('Case reviewer')).toBeInTheDocument();
+    expect(within(dialog).getByText('Reviews submitted cases.')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Revoke role' }));
     const confirmation = await screen.findByRole('alertdialog', {
       name: 'Revoke this exact product role?',
@@ -219,15 +230,20 @@ function management() {
         description: 'Reviews submitted cases.',
       },
     ],
-    assignments: [
-      {
-        workspaceId: 'workspace-1',
-        subject: { kind: 'Human', subjectId: 'user-1' },
-        policyVersionId: 'policy-version-1',
-        roleKey: 'case.reviewer',
-        isActive: true,
-        revision: 4,
-      },
-    ],
+    assignments: [productRoleAssignment()],
+  };
+}
+
+function productRoleAssignment(overrides: Record<string, unknown> = {}) {
+  const revision = typeof overrides.revision === 'number' ? overrides.revision : 4;
+  return {
+    workspaceId: 'workspace-1',
+    subject: { kind: 'Human', subjectId: 'user-1' },
+    policyVersionId: 'policy-version-1',
+    roleKey: 'case.reviewer',
+    isActive: true,
+    revision,
+    metadata: resourceMetadata(revision),
+    ...overrides,
   };
 }

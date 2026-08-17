@@ -3,17 +3,23 @@ import { fetchApi } from '@/lib/api';
 import type {
   ChangeWorkspaceInvitationRequest,
   ChangeWorkspaceProductBuilderRequest,
+  CollectionSortDirection,
   InviteWorkspaceMemberDto,
   InviteWorkspaceMemberRequest,
   WorkspaceInvitationLifecycleDto,
   WorkspaceInvitationPageDto,
+  WorkspaceInvitationSortField,
   WorkspaceProductBuilderDto,
 } from '@/lib/api-generated';
 
 export const workspaceInvitationKeys = {
   all: ['workspace-invitations'] as const,
-  list: (page: number, pageSize: number) =>
-    ['workspace-invitations', 'list', page, pageSize] as const,
+  list: (
+    page: number,
+    pageSize: number,
+    sortBy?: WorkspaceInvitationSortField,
+    sortDirection?: CollectionSortDirection,
+  ) => ['workspace-invitations', 'list', page, pageSize, sortBy, sortDirection] as const,
 };
 
 export const workspaceProductBuilderKeys = {
@@ -47,13 +53,20 @@ export function revokeWorkspaceProductBuilder(
   });
 }
 
-export function workspaceInvitationsQueryOptions(page = 1, pageSize = 20) {
+export function workspaceInvitationsQueryOptions(
+  page = 1,
+  pageSize = 20,
+  sortBy?: WorkspaceInvitationSortField,
+  sortDirection?: CollectionSortDirection,
+) {
+  const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (sortBy && sortDirection) {
+    search.set('sortBy', sortBy);
+    search.set('sortDirection', sortDirection);
+  }
   return queryOptions({
-    queryKey: workspaceInvitationKeys.list(page, pageSize),
-    queryFn: () =>
-      fetchApi<WorkspaceInvitationPageDto>(
-        `/workspace-invitations?page=${page}&pageSize=${pageSize}`,
-      ),
+    queryKey: workspaceInvitationKeys.list(page, pageSize, sortBy, sortDirection),
+    queryFn: () => fetchApi<WorkspaceInvitationPageDto>(`/workspace-invitations?${search}`),
   });
 }
 

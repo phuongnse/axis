@@ -14,6 +14,7 @@ Own the user-authorized publication state machine: immutable readiness evidence,
 Follow [reference.md](../reference.md).
 - Non-metadata publication **Requires** a current `$axis-review-readiness` **Ready** result.
 - A non-trivial publishable diff **Requires** the configured independent reviewer; primary verification is not the review.
+- Never start or delegate independent review while readiness is pending or running. The **Ready** result must name the exact immutable checkpoint and comparison base that the reviewer receives.
 - This workflow **Delegates** triggered review findings to `$axis-review-feedback`; they **Return to** this workflow with fresh delta evidence.
 - Do not push, create, or mark ready while required evidence or valid findings remain open.
 - Branches follow [CONTRIBUTING.md § Branches and commits](../../../CONTRIBUTING.md#branches-and-commits); project convention overrides tool defaults.
@@ -28,11 +29,12 @@ Follow [reference.md](../reference.md).
 ## Workflow
 
 1. Classify the requested action, authorization, and branch state. Create or rename branches through the contributing owner before readiness.
-2. For publication actions, obtain a clean committed checkpoint; this workflow **Delegates** readiness to `$axis-review-readiness` and stops on **Not ready**.
-3. Decide the pre-PR review checkpoint using [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint). Obtain the configured independent reviewer unless a completed review already covers the exact checkpoint; this workflow **Delegates** valid findings to `$axis-review-feedback`; rerun readiness/review only for the immutable follow-up delta.
-4. When metadata changes, draft a Conventional Commit title and only `Summary`, `Linked spec`, and `Requirements & rules followed` body sections. Validate the exact branch and draft with `python scripts/axis.py check pr`.
-5. Perform only the requested GitHub action with the validated metadata. Keep draft status unless the user requested ready state.
-6. After publication, report remote state and let CI own post-push checks; do not rerun local guards without a new diff or failure.
+2. For publication actions, obtain focused proof from the implementation owner, then create one clean immutable checkpoint. Do not create the checkpoint before the focused proof is current.
+3. Decide the comparison base using [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint), then **Delegates** readiness to `$axis-review-readiness` with the exact checkpoint and base. Stop on **Not ready** and keep review unstarted until the **Ready** verdict returns for that pair.
+4. Only after **Ready**, obtain the configured independent reviewer for the exact checkpoint/base unless a completed review already covers that pair. This workflow **Delegates** valid findings to `$axis-review-feedback`; findings return with focused proof, then repeat clean checkpoint → scoped readiness → review only for the immutable follow-up delta.
+5. When metadata changes, draft a Conventional Commit title and only `Summary`, `Linked spec`, and `Requirements & rules followed` body sections. Validate the exact branch and draft with `python scripts/axis.py check pr`.
+6. Perform only the requested GitHub action with the validated metadata. Keep draft status unless the user requested ready state.
+7. After publication, report remote state and let CI own post-push checks; do not rerun local guards without a new diff or failure.
 
 ## Output
 

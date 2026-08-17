@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Axis.Audit.Contracts;
+using Axis.Shared.Domain.Primitives;
 using Axis.Solutions.Application;
 using Axis.Solutions.Contracts;
 using Axis.Solutions.Domain;
@@ -19,7 +20,7 @@ public sealed class SolutionOrchestratorTests
         Audit audit = new();
         UnitOfWork unitOfWork = new();
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-preflight", SolutionSubjectKind.Human);
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-preflight", SolutionSubjectKind.Human, "Axis Admin");
         Adapter adapter = new("authorization.policy.v1", fail: true);
         SolutionOrchestrator orchestrator = new(
             new SolutionPackageVerifier(keys),
@@ -60,7 +61,7 @@ public sealed class SolutionOrchestratorTests
         Audit audit = new();
         UnitOfWork unitOfWork = new();
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-race", SolutionSubjectKind.Human);
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-race", SolutionSubjectKind.Human, "Axis Admin");
         byte[] envelope = CreateSignedEnvelope(key, digest);
         Guid canonicalVersionId = Guid.Empty;
         unitOfWork.OnNextSave = () =>
@@ -79,6 +80,7 @@ public sealed class SolutionOrchestratorTests
                 proposed.BuiltAt,
                 new Uri(proposed.SourceUri),
                 proposed.PublishedAt);
+            canonical.InitializeMetadata(proposed.CreatedBy);
             canonicalVersionId = canonical.Id;
             versions.Version = canonical;
             return new SolutionPersistenceException(
@@ -120,7 +122,7 @@ public sealed class SolutionOrchestratorTests
         Audit audit = new();
         UnitOfWork unitOfWork = new();
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-conflict", SolutionSubjectKind.Human);
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-conflict", SolutionSubjectKind.Human, "Axis Admin");
         byte[] requestedEnvelope = CreateSignedEnvelope(key, digest);
         byte[] canonicalEnvelope = CreateSignedEnvelope(key, digest, "other-build");
         string canonicalPackageSha256 = Convert.ToHexString(SHA256.HashData(canonicalEnvelope)).ToLowerInvariant();
@@ -141,6 +143,7 @@ public sealed class SolutionOrchestratorTests
                 proposed.BuiltAt,
                 new Uri(proposed.SourceUri),
                 proposed.PublishedAt);
+            canonical.InitializeMetadata(proposed.CreatedBy);
             canonicalVersionId = canonical.Id;
             versions.Version = canonical;
             return new SolutionPersistenceException(
@@ -257,6 +260,9 @@ public sealed class SolutionOrchestratorTests
             context.Now,
             new Uri("https://example.test/reference"),
             context.Now);
+        otherVersion.InitializeMetadata(ActorSnapshot.User(
+            context.Actor.SubjectId,
+            context.Actor.DisplayName));
         context.Versions.Version = otherVersion;
 
         SolutionPackageException failure = await Assert.ThrowsAsync<SolutionPackageException>(() =>
@@ -336,6 +342,9 @@ public sealed class SolutionOrchestratorTests
             context.Now,
             new Uri("https://example.test/reference"),
             context.Now);
+        winningVersion.InitializeMetadata(ActorSnapshot.User(
+            context.Actor.SubjectId,
+            context.Actor.DisplayName));
         context.UnitOfWork.OnNextSave = () =>
         {
             context.Installations.Items.Clear();
@@ -629,7 +638,8 @@ public sealed class SolutionOrchestratorTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "test-correlation",
-            SolutionSubjectKind.Human);
+            SolutionSubjectKind.Human,
+            "Axis Admin");
         public SolutionOrchestrator Orchestrator { get; }
         public InstallSolutionRequest Request { get; }
         public Harness(
@@ -647,6 +657,7 @@ public sealed class SolutionOrchestratorTests
                 : [new("authorization.policy.v1", preflightFails)];
             Adapter = Adapters[0];
             SolutionVersion version = SolutionVersion.Create("reference_application", "0.1.0", new string('a', 64), [1], new string('b', 64), "axis", "release_key", new string('c', 40), "build", Now, new Uri("https://example.test/reference"), Now);
+            version.InitializeMetadata(ActorSnapshot.User(Actor.SubjectId, Actor.DisplayName));
             Versions.Version = version;
             Versions.Components = Adapters
                 .Select((value, index) => new VerifiedSolutionComponent(

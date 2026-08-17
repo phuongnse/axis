@@ -2,6 +2,7 @@ using Axis.Identity.Application.Queries.ListAssignableSubjects;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -23,7 +24,16 @@ public sealed class ListAssignableSubjectsHandlerTests
                 actorId,
                 WorkspaceMembershipRole.Administrator));
         memberships.ListActiveForWorkspaceAsync(workspaceId, Arg.Any<CancellationToken>())
-            .Returns([new ActiveWorkspaceHumanProjection(humanId, "Active Human", "active@example.com")]);
+            .Returns([
+                new ActiveWorkspaceHumanProjection(
+                    humanId,
+                    "Active Human",
+                    "active@example.com",
+                    WorkspaceMembershipRole.Member,
+                    false,
+                    1,
+                    Metadata(humanId, "Active Human")),
+            ]);
 
         ServiceIdentity active = ServiceIdentity.Create(workspaceId, "service-active", DateTime.UtcNow);
         ServiceIdentity revoked = ServiceIdentity.Create(workspaceId, "service-revoked", DateTime.UtcNow);
@@ -72,5 +82,12 @@ public sealed class ListAssignableSubjectsHandlerTests
         await identities.DidNotReceive().ListAsync(
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
+    }
+
+    private static ResourceMetadataDto Metadata(Guid actorId, string displayName)
+    {
+        DateTimeOffset timestamp = new(2026, 8, 17, 0, 0, 0, TimeSpan.Zero);
+        ResourceActorDto actor = new(ActorKind.User, actorId, displayName);
+        return new ResourceMetadataDto(1, actor, timestamp, actor, timestamp);
     }
 }

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -46,6 +47,8 @@ export function BusinessObjectsPage() {
       businessObjectDefinitionsDefaultPageSize,
       debouncedSearch,
       i18n.language,
+      search.sortBy,
+      search.sortDirection,
     ),
   );
   const collectionActionsQuery = useQuery(businessObjectDefinitionCollectionActionsQueryOptions());
@@ -57,20 +60,23 @@ export function BusinessObjectsPage() {
     () => ({
       globalFilter: search.query ?? '',
       filterExpression: createEmptyFilterExpression(),
-      sorting: [],
+      sorting:
+        search.sortBy && search.sortDirection
+          ? [
+              {
+                id: businessObjectColumnId(search.sortBy),
+                desc: search.sortDirection === 'Descending',
+              },
+            ]
+          : [],
       grouping: [],
     }),
-    [search.query],
+    [search.query, search.sortBy, search.sortDirection],
   );
   const launchDefinitionQuery = useQuery({
     ...businessObjectDefinitionDetailQueryOptions(search.recordId ?? ''),
     enabled: (search.dialog === 'view' || search.dialog === 'edit') && Boolean(search.recordId),
   });
-  const dateFormatter = useMemo(
-    () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
-    [i18n.language],
-  );
-
   const openDefinition = useCallback(
     (definition: BusinessObjectDefinitionListItem) => {
       if (!definition.id) return;
@@ -142,8 +148,7 @@ export function BusinessObjectsPage() {
         accessorKey: 'name',
         size: 280,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('businessObjects.name') },
+        meta: { label: t('businessObjects.name'), cell: { kind: 'action' } },
         cell: ({ row }) => (
           <DataTableRecordAction
             onFocus={() => prefetchDefinition(row.original.id)}
@@ -159,16 +164,18 @@ export function BusinessObjectsPage() {
         accessorKey: 'objectKey',
         size: 200,
         minSize: 180,
-        enableSorting: false,
-        meta: { label: t('businessObjects.objectKey') },
+        meta: { label: t('businessObjects.objectKey'), cell: { kind: 'identifier' } },
       },
       {
         id: 'status',
         accessorKey: 'status',
         size: 150,
         minSize: 140,
-        enableSorting: false,
-        meta: { label: t('businessObjects.status'), searchable: false },
+        meta: {
+          label: t('businessObjects.status'),
+          cell: { kind: 'status' },
+          searchable: false,
+        },
         cell: ({ row }) => <DefinitionStatusBadge status={row.original.status} />,
       },
       {
@@ -176,31 +183,25 @@ export function BusinessObjectsPage() {
         accessorKey: 'latestPublishedVersionNumber',
         size: 130,
         minSize: 120,
-        enableSorting: false,
-        meta: { label: t('businessObjects.version'), searchable: false },
-        cell: ({ row }) =>
-          row.original.latestPublishedVersionNumber
-            ? t('businessObjects.latestVersion', {
-                version: row.original.latestPublishedVersionNumber,
-              })
-            : t('businessObjects.notAvailable'),
+        meta: {
+          label: t('businessObjects.version'),
+          cell: { kind: 'version' },
+          searchable: false,
+        },
       },
-      {
-        id: 'updated',
-        accessorKey: 'updatedAt',
-        size: 190,
-        minSize: 180,
-        enableSorting: false,
-        meta: { label: t('businessObjects.updated'), searchable: false },
-        cell: ({ row }) =>
-          row.original.updatedAt
-            ? dateFormatter.format(new Date(row.original.updatedAt))
-            : t('businessObjects.notAvailable'),
-      },
+      ...createResourceMetadataColumns<BusinessObjectDefinitionListItem>(
+        {
+          revision: t('metadata.revision'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {
       ariaLabel: t('businessObjects.listTitle'),
+      locale: i18n.language,
       source: {
         mode: 'page',
         data: definitions,
@@ -228,11 +229,15 @@ export function BusinessObjectsPage() {
         definition.id ?? definition.objectKey ?? definition.name ?? 'definition',
       queryState: tableQuery,
       onQueryStateChange: (next) => {
+        const sort = next.sorting[0];
+        const sortBy = sort ? businessObjectSortField(sort.id) : undefined;
         void navigate({
           search: (current) => ({
             ...current,
             page: 1,
             query: next.globalFilter.trim() || undefined,
+            sortBy,
+            sortDirection: sortBy ? (sort?.desc ? 'Descending' : 'Ascending') : undefined,
           }),
         });
       },
@@ -260,13 +265,13 @@ export function BusinessObjectsPage() {
     };
   }, [
     canStartCreate,
-    dateFormatter,
     definitions,
     definitionsQuery.data?.pageSize,
     definitionsQuery.data?.totalCount,
     definitionsQuery.isError,
     definitionsQuery.isPending,
     definitionsQuery.refetch,
+    i18n.language,
     navigate,
     openDefinition,
     openWindow,
@@ -309,4 +314,23 @@ function DefinitionStatusBadge({ status }: { status?: 'Unpublished' | 'Published
   ) : (
     <StatusBadge state="neutral">{t('businessObjects.unpublished')}</StatusBadge>
   );
+}
+
+function businessObjectColumnId(
+  sortBy: 'Name' | 'Key' | 'Status' | 'Version' | 'Revision' | 'ModifiedBy' | 'ModifiedAt',
+) {
+  return `${sortBy[0].toLowerCase()}${sortBy.slice(1)}`;
+}
+
+function businessObjectSortField(
+  columnId: string,
+): 'Name' | 'Key' | 'Status' | 'Version' | 'Revision' | 'ModifiedBy' | 'ModifiedAt' | undefined {
+  if (columnId === 'name') return 'Name';
+  if (columnId === 'key') return 'Key';
+  if (columnId === 'status') return 'Status';
+  if (columnId === 'version') return 'Version';
+  if (columnId === 'revision') return 'Revision';
+  if (columnId === 'modifiedBy') return 'ModifiedBy';
+  if (columnId === 'modifiedAt') return 'ModifiedAt';
+  return undefined;
 }

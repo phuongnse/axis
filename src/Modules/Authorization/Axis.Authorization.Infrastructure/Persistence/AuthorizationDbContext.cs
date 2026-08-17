@@ -15,6 +15,13 @@ public sealed class AuthorizationDbContext(DbContextOptions<AuthorizationDbConte
             row.ToTable("authorization_product_role_assignments"); row.HasKey(value => value.Id); row.Property(value => value.Id).HasColumnName("id"); row.Property(value => value.WorkspaceId).HasColumnName("workspace_id"); row.Property(value => value.SubjectKind).HasColumnName("subject_kind"); row.Property(value => value.SubjectId).HasColumnName("subject_id"); row.Property(value => value.PolicyVersionId).HasColumnName("policy_version_id"); row.Property(value => value.RoleKey).HasColumnName("role_key").HasMaxLength(200);
             row.Property(value => value.IsActive).HasColumnName("is_active"); row.Property(value => value.Revision).HasColumnName("revision"); row.Property<uint>("xmin").IsRowVersion();
             row.Property(value => value.CreatedAt).HasColumnName("created_at"); row.Property(value => value.RevokedAt).HasColumnName("revoked_at");
+            row.Property(value => value.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            row.Property(value => value.CreatedByKind).HasColumnName("created_by_kind").HasMaxLength(32).IsRequired();
+            row.Property(value => value.CreatedBySubjectId).HasColumnName("created_by_subject_id");
+            row.Property(value => value.CreatedByDisplayName).HasColumnName("created_by_display_name").HasMaxLength(200).IsRequired();
+            row.Property(value => value.UpdatedByKind).HasColumnName("updated_by_kind").HasMaxLength(32).IsRequired();
+            row.Property(value => value.UpdatedBySubjectId).HasColumnName("updated_by_subject_id");
+            row.Property(value => value.UpdatedByDisplayName).HasColumnName("updated_by_display_name").HasMaxLength(200).IsRequired();
             row.HasIndex(value => new { value.WorkspaceId, value.SubjectKind, value.SubjectId, value.PolicyVersionId, value.RoleKey }).IsUnique();
         });
         modelBuilder.Entity<AuthorizationIdempotencyRow>(row =>
@@ -53,7 +60,26 @@ public sealed class AuthorizationDbContext(DbContextOptions<AuthorizationDbConte
     }
 }
 
-public sealed class ProductRoleAssignmentRow { public Guid Id { get; set; } public Guid WorkspaceId { get; set; } public string SubjectKind { get; set; } = null!; public Guid SubjectId { get; set; } public Guid PolicyVersionId { get; set; } public string RoleKey { get; set; } = null!; public bool IsActive { get; set; } public int Revision { get; set; } public DateTimeOffset CreatedAt { get; set; } public DateTimeOffset? RevokedAt { get; set; } }
+public sealed class ProductRoleAssignmentRow
+{
+    public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public string SubjectKind { get; set; } = null!;
+    public Guid SubjectId { get; set; }
+    public Guid PolicyVersionId { get; set; }
+    public string RoleKey { get; set; } = null!;
+    public bool IsActive { get; set; }
+    public int Revision { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public string CreatedByKind { get; set; } = null!;
+    public Guid? CreatedBySubjectId { get; set; }
+    public string CreatedByDisplayName { get; set; } = null!;
+    public string UpdatedByKind { get; set; } = null!;
+    public Guid? UpdatedBySubjectId { get; set; }
+    public string UpdatedByDisplayName { get; set; } = null!;
+}
 public sealed class AuthorizationIdempotencyRow { public Guid WorkspaceId { get; set; } public string IdempotencyKey { get; set; } = null!; public string RequestDigest { get; set; } = null!; public string Operation { get; set; } = null!; public Guid AssignmentId { get; set; } public Guid AuditEventId { get; set; } public DateTimeOffset CreatedAt { get; set; } }
 public sealed class AuthorizationAuditOutboxRow
 {

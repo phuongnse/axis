@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import type * as ApiTypes from '../src/lib/api-generated';
 
 type JsonObject = Record<string, unknown>;
-type CapturedRequest = { method: string; path: string; body?: JsonObject };
+type CapturedRequest = { method: string; path: string; query?: string; body?: JsonObject };
 type MockRuleDetail = ApiTypes.RuleDefinitionDetailDto & JsonObject;
 
 const profile = {
@@ -66,6 +66,14 @@ const builtInRules = [
         ]
       : [input('value', 'Value', types as string[], definitionKey !== 'field.required')],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  updatedAt: now,
+  metadata: {
+    revision: null,
+    createdBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    createdAt: now,
+    modifiedBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    modifiedAt: now,
+  },
 }));
 
 function requiredCondition(): ApiTypes.RuleConditionNodeDto {
@@ -164,8 +172,8 @@ function builtInDetail(definitionKey: string): MockRuleDetail | null {
         createdAt: now,
       },
     ],
-    createdAt: null,
-    updatedAt: null,
+    createdAt: now,
+    updatedAt: now,
     archivedAt: null,
   } as MockRuleDetail;
 }
@@ -393,7 +401,7 @@ async function mockRulesApi(page: Page, canStartCreate = true): Promise<Captured
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
-    const captured: CapturedRequest = { method: request.method(), path };
+    const captured: CapturedRequest = { method: request.method(), path, query: url.search };
     requests.push(captured);
 
     if (request.method() === 'GET' && path === '/api/rules/actions') {
@@ -469,6 +477,17 @@ async function mockRulesApi(page: Page, canStartCreate = true): Promise<Captured
           .toLowerCase()
           .includes(query),
       );
+      const sortBy = url.searchParams.get('sortBy');
+      if (sortBy === 'Name' || sortBy === 'Origin' || sortBy === 'Status') {
+        const direction = url.searchParams.get('sortDirection') === 'Descending' ? -1 : 1;
+        const field = sortBy === 'Name' ? 'name' : sortBy.toLowerCase();
+        items.sort(
+          (left, right) =>
+            String(left[field as keyof typeof left]).localeCompare(
+              String(right[field as keyof typeof right]),
+            ) * direction,
+        );
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -545,6 +564,13 @@ async function mockRulesApi(page: Page, canStartCreate = true): Promise<Captured
           canActivateVersion: false,
           canDeactivate: false,
           canArchive: true,
+        },
+        metadata: {
+          revision: 1,
+          createdBy: { kind: 'User', subjectId: profile.id, displayName: profile.fullName },
+          createdAt: now,
+          modifiedBy: { kind: 'User', subjectId: profile.id, displayName: profile.fullName },
+          modifiedAt: now,
         },
         createdAt: now,
         updatedAt: now,
@@ -687,7 +713,7 @@ async function mockRulesApi(page: Page, canStartCreate = true): Promise<Captured
           definitionKey: detail.definitionKey,
           definitionVersion: path.includes('/versions/') ? detail.activeVersion : null,
           isMatch,
-          diagnostics: [],
+          diagnostics: [{ nodeId: detail.condition?.nodeId, isMatch }],
           correlationId: 'rules-e2e',
         }),
       });
@@ -774,7 +800,7 @@ test('denied create affordance blocks rule toolbar and deep-link launch', async 
 
 test('rule catalog exposes inputs and read-only built-in details', async ({ page }) => {
   await mockAuthenticatedSession(page);
-  await mockRulesApi(page);
+  const requests = await mockRulesApi(page);
   await page.goto('/rules');
 
   await expect(page.getByRole('heading', { name: 'Rules' })).toBeVisible();
@@ -783,11 +809,81 @@ test('rule catalog exposes inputs and read-only built-in details', async ({ page
   await expect(page.getByText('Value').first()).toBeVisible();
   await expect(page.getByText('Applies to')).toHaveCount(0);
 
+  const catalog = page.getByRole('region', { name: 'Rules catalog' });
+  await expect(catalog.getByRole('columnheader', { name: 'Created by' })).toHaveCount(0);
+  await expect(catalog.getByRole('columnheader', { name: 'Created at' })).toHaveCount(0);
+  await expect(catalog.getByRole('columnheader', { name: 'Modified by' })).toBeVisible();
+  await expect(catalog.getByRole('columnheader', { name: 'Modified at' })).toBeVisible();
+  await catalog.getByRole('button', { name: 'Columns', exact: true }).click();
+  const columnsMenu = page.getByRole('menu');
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Created by' })).toHaveCount(0);
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Created at' })).toHaveCount(0);
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Modified by' })).toBeVisible();
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Modified at' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  const firstRuleCell = catalog.getByRole('row').nth(1).locator('td').first();
+  await expect(catalog.getByRole('row').nth(1)).toContainText('System');
+  await expect(firstRuleCell).toHaveAttribute('data-cell-kind', 'action');
+  await expect(firstRuleCell).toContainText('Required value');
+  await expect(firstRuleCell).not.toContainText('Required value validation.');
+  await expect
+    .poll(() => firstRuleCell.evaluate((cell) => getComputedStyle(cell).verticalAlign))
+    .toBe('middle');
+  await expect(firstRuleCell.locator('..')).toHaveAttribute('data-row-layout', 'single-line');
+  const wrappedRuleRow = catalog.getByRole('row').filter({ hasText: 'Date range' }).first();
+  const wrappedRuleCell = wrappedRuleRow.locator('td[data-cell-kind="action"]');
+  const wrappedInputsCell = wrappedRuleRow.locator('td[data-cell-kind="list"]');
+  await expect(wrappedRuleRow).toHaveAttribute('data-row-layout', 'multiline');
+  await expect(wrappedRuleCell).toHaveCSS('vertical-align', 'top');
+  await expect(wrappedInputsCell).toHaveCSS('vertical-align', 'top');
+  await expect
+    .poll(() =>
+      wrappedRuleRow.evaluate((row) => {
+        const actionLabel = row.querySelector<HTMLElement>(
+          '[data-slot="data-table-record-action-label"]',
+        );
+        const wrappedValue = row.querySelector<HTMLElement>(
+          'td[data-cell-kind="list"] [data-slot="data-table-value"]',
+        );
+        if (!actionLabel || !wrappedValue) return Number.POSITIVE_INFINITY;
+        return Math.abs(
+          actionLabel.getBoundingClientRect().top - wrappedValue.getClientRects()[0].top,
+        );
+      }),
+    )
+    .toBeLessThanOrEqual(2);
+  await expect(catalog.getByRole('button', { name: 'Origin: Sort ascending' })).toBeVisible();
+  await expect(catalog.getByRole('button', { name: 'Status: Sort ascending' })).toBeVisible();
+  await expect(catalog.getByRole('button', { name: 'Inputs: Sort ascending' })).toHaveCount(0);
+  await catalog.getByRole('button', { name: 'Rule: Sort ascending' }).click();
+  await expect(page).toHaveURL(/sortBy=Name&sortDirection=Ascending/);
+  await expect(catalog.getByRole('columnheader', { name: 'Rule' })).toHaveAttribute(
+    'aria-sort',
+    'ascending',
+  );
+  await expect(catalog.getByRole('row').nth(1)).toContainText('Choice selection count');
+  await expect
+    .poll(() =>
+      requests.some(
+        (request) =>
+          request.path === '/api/rules' &&
+          request.query?.includes('sortBy=Name') &&
+          request.query?.includes('sortDirection=Ascending'),
+      ),
+    )
+    .toBe(true);
+  await catalog.getByRole('button', { name: 'Rule: Sort descending' }).click();
+  await expect(catalog.getByRole('row').nth(1)).toContainText('Text pattern');
+  await catalog.getByRole('button', { name: 'Rule: Clear sorting' }).click();
+  await expect(catalog.getByRole('row').nth(1)).toContainText('Required value');
+
   await page.getByRole('button', { name: 'Required value' }).click();
   const details = page.locator('[data-slot="managed-dialog-window"]');
   await expect(details.getByRole('tab')).toHaveText([
     'General',
     'Rule behavior',
+    'Test rule',
+    'Versions',
     'Usage',
     'System info',
   ]);
@@ -795,7 +891,9 @@ test('rule catalog exposes inputs and read-only built-in details', async ({ page
   await expect
     .poll(() => tabScroller.evaluate((element) => element.scrollWidth <= element.clientWidth))
     .toBe(true);
-  await expect(details.getByText('Required value validation.')).toBeVisible();
+  await expect(details.locator('[data-slot="dialog-description"]')).toHaveText(
+    'Required value validation.',
+  );
   await details.getByRole('tab', { name: 'Rule behavior' }).click();
   await expect(details.getByRole('heading', { name: 'Inputs' })).toBeVisible();
   await expect(details.getByRole('heading', { name: 'Logic' })).toBeVisible();
@@ -869,7 +967,7 @@ test('rule catalog exposes inputs and read-only built-in details', async ({ page
   await expect(footerActions.getByRole('button', { name: 'Close' })).toBeVisible();
   await details.getByRole('tab', { name: 'System info' }).click();
   await expect(details.getByText('field.required')).toBeVisible();
-  await expect(details.getByText('Expression language')).toBeVisible();
+  await expect(details.getByRole('tabpanel').getByText('Expression language')).toBeVisible();
 });
 
 test('built-in date range presents optional bounds as conditional assertions', async ({ page }) => {
@@ -934,6 +1032,7 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   ]);
   expect(saveBody.condition?.predicateOperator).toBe('Equal');
   expect(saveBody.condition?.left?.kind).toBe('Input');
+  expect(saveBody.condition?.left?.reference).toBe('value');
   await expect(
     page.getByLabel('Credit threshold').getByText('Draft', { exact: true }),
   ).toBeVisible();
@@ -943,21 +1042,29 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   await editor.getByLabel('Expression syntax').fill('value');
   await editor.getByLabel('Expression syntax').blur();
   await editor.getByRole('button', { name: 'Show suggestions' }).click();
-  await expect(editor.getByRole('option', { name: 'value' })).toBeVisible();
-  await editor.getByRole('option', { name: 'value' }).click();
+  await expect(editor.getByRole('button', { name: 'value' })).toBeVisible();
+  await editor.getByRole('button', { name: 'value' }).click();
   await editor.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved').last()).toBeVisible();
+  await editor.getByRole('tab', { name: 'Test rule' }).click();
   const simulation = editor.getByRole('region', { name: 'Simulation' });
   await simulation.getByLabel('Value').fill('yes');
   await simulation.getByRole('button', { name: 'Run simulation' }).click();
-  await expect(simulation.getByText('Condition matched')).toBeVisible();
+  await expect(simulation.locator('[data-slot="alert-title"]')).toHaveText('Condition matched');
+  await expect(simulation.getByRole('heading', { name: 'Why this matched' })).toBeVisible();
+  await expect(simulation.locator('[data-slot="rule-expression"]')).toBeVisible();
   await simulation.getByLabel('Value').fill('no');
+  await expect(simulation.locator('[data-slot="alert-title"]')).toHaveCount(0);
   await simulation.getByRole('button', { name: 'Run simulation' }).click();
-  await expect(simulation.getByText('No match')).toBeVisible();
+  await expect(simulation.locator('[data-slot="alert-title"]')).toHaveText('No match');
+  await expect(simulation.getByRole('heading', { name: 'Why this did not match' })).toBeVisible();
 
+  await editor.getByRole('tab', { name: 'Versions' }).click();
   await editor.getByRole('button', { name: 'Create version' }).click();
   await page.getByRole('button', { name: 'Create version' }).last().click();
-  await expect(editor.getByLabel('Version history').getByText('Version 1')).toBeVisible();
+  await expect(
+    editor.getByLabel('Version history').getByText('Version 1', { exact: true }).first(),
+  ).toBeVisible();
   await editor.getByRole('button', { name: 'Activate version' }).click();
   await page.getByRole('button', { name: 'Activate version' }).last().click();
   await expect(editor.getByText('Active', { exact: true })).toBeVisible();

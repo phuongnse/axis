@@ -12,7 +12,14 @@ export {
   pruneFilterExpression,
 } from './filtering';
 export { createDataTableMessages } from './messages';
+export {
+  createResourceMetadataColumns,
+  type ResourceMetadataColumnLabels,
+  type ResourceMetadataRow,
+  type ResourceMetadataValue,
+} from './resourceMetadata';
 export type {
+  DataTableCellDefinition,
   DataTableClientSource,
   DataTableColumnDef,
   DataTableColumnMeta,

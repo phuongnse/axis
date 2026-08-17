@@ -2,8 +2,8 @@ import { Copyright } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { axisStyles } from '@/theme.generated';
+import packageMetadata from '../../../package.json';
 
-const APP_VERSION = '0.1.0';
 const COPYRIGHT_YEAR = '2026';
 
 export function AppFooter() {
@@ -23,7 +23,7 @@ export function AppFooter() {
           axisStyles.spacing.padding.inline.pageWideAtLarge,
         )}
       >
-        <p className="font-medium">{t('nav.version', { version: APP_VERSION })}</p>
+        <p className="font-medium">{t('nav.version', { version: packageMetadata.version })}</p>
 
         <p className="inline-flex items-center gap-1.5 font-medium">
           <span>{t('app.productName')}</span>

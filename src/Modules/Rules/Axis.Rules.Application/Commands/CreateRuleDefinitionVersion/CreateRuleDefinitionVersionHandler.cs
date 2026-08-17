@@ -45,6 +45,9 @@ public sealed class CreateRuleDefinitionVersionHandler(
             return created.ErrorCode == ErrorCodes.Conflict
                 ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(created.Error)
                 : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(created.Error);
+        Result provenance = definition.RecordModification(RuleActor.From(currentSubject));
+        if (provenance.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(provenance.Error);
 
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (ConcurrencyException) { return RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>("The rule definition has changed."); }

@@ -9,15 +9,17 @@ import {
   searchMatchHighlight,
 } from '@/components/shared/interactionStates';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { cn } from '@/lib/utils';
 import type {
@@ -63,18 +65,21 @@ export function RuleExpressionGuide({
   };
 
   return (
-    <Sheet open={resolvedOpen} onOpenChange={setOpen}>
+    <Dialog open={resolvedOpen} onOpenChange={setOpen}>
       {trigger ? (
-        <SheetTrigger render={<Button type="button" variant="outline" size="sm" />}>
+        <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
           <BookOpenText data-icon="inline-start" aria-hidden />
           {t('rules.expressionGuideAction')}
-        </SheetTrigger>
+        </DialogTrigger>
       ) : null}
-      <SheetContent className="gap-0 overflow-hidden sm:max-w-2xl">
-        <SheetHeader className="border-b">
-          <SheetTitle>{t('rules.expressionGuideTitle')}</SheetTitle>
-          <SheetDescription>{t('rules.expressionGuideDescription')}</SheetDescription>
-        </SheetHeader>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-screen flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+      >
+        <DialogHeader className="shrink-0 border-b p-4">
+          <DialogTitle>{t('rules.expressionGuideTitle')}</DialogTitle>
+          <DialogDescription>{t('rules.expressionGuideDescription')}</DialogDescription>
+        </DialogHeader>
         <ExpressionGuideContent
           open={resolvedOpen}
           request={{
@@ -86,8 +91,13 @@ export function RuleExpressionGuide({
           }}
           target={target}
         />
-      </SheetContent>
-    </Sheet>
+        <DialogFooter className="mx-0 mb-0 shrink-0">
+          <DialogClose render={<Button type="button" variant="outline" />}>
+            {t('app.close')}
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

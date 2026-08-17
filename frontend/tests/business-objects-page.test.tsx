@@ -82,6 +82,7 @@ describe('BusinessObjectsPage', () => {
   });
 
   it('composes the proving resource workspace from shared page patterns', async () => {
+    const user = userEvent.setup();
     const detail = definitionDetail();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
@@ -91,7 +92,7 @@ describe('BusinessObjectsPage', () => {
       throw new Error(`Unexpected fetch: ${path}`);
     });
 
-    await renderPage();
+    const router = await renderPage();
 
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
     const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
@@ -124,8 +125,34 @@ describe('BusinessObjectsPage', () => {
     expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
     expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: 'Name: Sort ascending' })).toBeVisible();
     expectDataTableRecordAction(recordAction);
     expectPageActionSizing(createAction);
+
+    await user.click(within(table).getByRole('button', { name: 'Name: Sort ascending' }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        page: 1,
+        sortBy: 'Name',
+        sortDirection: 'Ascending',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(fetch).mock.calls.some(([input]) => {
+          const url = new URL(input.toString(), 'https://axis.test');
+          return (
+            url.pathname === '/api/business-object-definitions' &&
+            url.searchParams.get('sortBy') === 'Name' &&
+            url.searchParams.get('sortDirection') === 'Ascending'
+          );
+        }),
+      ).toBe(true),
+    );
+    expect(within(table).getByRole('columnheader', { name: 'Name' })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
   });
 
   it('keeps collection loading and retryable list failure inside the stable page', async () => {
@@ -1080,6 +1107,9 @@ async function renderPage(path = '/business-objects?page=1') {
       ...(typeof search.recordId === 'string' && search.recordId
         ? { recordId: search.recordId }
         : {}),
+      ...(isBusinessObjectSortField(search.sortBy) && isSortDirection(search.sortDirection)
+        ? { sortBy: search.sortBy, sortDirection: search.sortDirection }
+        : {}),
     }),
     component: BusinessObjectsPage,
   });
@@ -1101,6 +1131,20 @@ async function renderPage(path = '/business-objects?page=1') {
     </QueryClientProvider>,
   );
   return router;
+}
+
+function isBusinessObjectSortField(value: unknown) {
+  return (
+    value === 'Name' ||
+    value === 'Key' ||
+    value === 'Status' ||
+    value === 'Version' ||
+    value === 'Updated'
+  );
+}
+
+function isSortDirection(value: unknown) {
+  return value === 'Ascending' || value === 'Descending';
 }
 
 function testQueryClient() {
@@ -1171,6 +1215,7 @@ function pageWith(detail: ReturnType<typeof definitionDetail>) {
         revision: detail.revision,
         latestPublishedVersionNumber: null,
         updatedAt: detail.updatedAt,
+        metadata: definitionMetadata(detail.revision),
       },
     ],
     totalCount: 1,
@@ -1196,6 +1241,7 @@ function definitionDetail({
     latestPublishedVersionNumber: null,
     createdAt: now,
     updatedAt: now,
+    metadata: definitionMetadata(revision),
     actions: { canSave: true, canPublish: true },
     fields: fields ?? [
       {
@@ -1218,5 +1264,20 @@ function definitionDetail({
       },
     ],
     latestPublishedVersion: null,
+  };
+}
+
+function definitionMetadata(revision: number) {
+  const actor = {
+    kind: 'User',
+    subjectId: '11111111-1111-4111-8111-111111111111',
+    displayName: 'Business Objects User',
+  };
+  return {
+    revision,
+    createdBy: actor,
+    createdAt: now,
+    modifiedBy: actor,
+    modifiedAt: now,
   };
 }

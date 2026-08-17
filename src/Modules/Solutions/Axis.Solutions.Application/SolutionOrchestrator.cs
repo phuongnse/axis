@@ -1,4 +1,5 @@
 using Axis.Audit.Contracts;
+using Axis.Shared.Domain.Primitives;
 using Axis.Solutions.Contracts;
 using Axis.Solutions.Domain;
 
@@ -67,6 +68,7 @@ public sealed class SolutionOrchestrator(
             package.EnvelopeBytes, package.AxisOpenApiSha256, package.PublisherId, package.PublisherKeyId,
             package.Provenance.SourceRevision, package.Provenance.BuildId, package.Provenance.BuiltAt,
             package.Provenance.SourceUri, request.RequestedAt);
+        version.InitializeMetadata(Actor(request.Actor));
         await versions.AddAsync(version, package.Components, cancellationToken);
         SolutionAuditEvent published = NewAudit("solutions.version.published", null, version.Id, null, null, "succeeded", null, request.RequestedAt, actor: request.Actor);
         await audit.EnqueueAsync(published, cancellationToken);
@@ -139,6 +141,7 @@ public sealed class SolutionOrchestrator(
             version.SolutionKey,
             version.Id,
             request.RequestedAt);
+        installation.InitializeMetadata(Actor(request.Actor));
         SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
             request.WorkspaceId,
             request.Actor.SubjectId,
@@ -232,7 +235,14 @@ public sealed class SolutionOrchestrator(
                 (SolutionProvisioningStatus)installation.ProvisioningStatus,
                 (SolutionComplianceStatus)installation.ComplianceStatus,
                 components,
-                installation.UpdatedAt));
+                installation.UpdatedAt,
+                installation.Revision,
+                new SolutionResourceMetadataDto(
+                    installation.Revision,
+                    ResourceActor(installation.CreatedBy),
+                    installation.CreatedAt,
+                    ResourceActor(installation.UpdatedBy),
+                    installation.UpdatedAt)));
         }
         return result;
     }
@@ -344,7 +354,10 @@ public sealed class SolutionOrchestrator(
                 }
                 operation.Confirm(step.Id, epoch, clock.GetUtcNow());
                 if (operation.Status == InstallationOperationStatus.Succeeded)
+                {
                     installation.MarkInstalled(clock.GetUtcNow());
+                    installation.RecordModification(ActorSnapshot.System());
+                }
                 stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "succeeded", null, clock.GetUtcNow(), operation: operation);
                 await audit.EnqueueAsync(stepAudit, cancellationToken);
             }
@@ -360,6 +373,7 @@ public sealed class SolutionOrchestrator(
                 SolutionInstallationStep step = operation.Steps.Single(x => x.Status == InstallationStepStatus.Applying);
                 operation.Block(step.Id, epoch, exception.ProblemCode, clock.GetUtcNow());
                 installation.MarkFailed(clock.GetUtcNow());
+                installation.RecordModification(ActorSnapshot.System());
                 stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "blocked", exception.ProblemCode, clock.GetUtcNow(), operation: operation);
                 await audit.EnqueueAsync(stepAudit, cancellationToken);
             }
@@ -382,6 +396,7 @@ public sealed class SolutionOrchestrator(
         List<Guid> auditEventIds = [];
         foreach (SolutionInstallation installation in affected)
         {
+            int originalRevision = installation.Revision;
             installation.MarkNoncompliant(now);
             if (installation.ProvisioningStatus == ProvisioningStatus.Installing)
             {
@@ -391,6 +406,8 @@ public sealed class SolutionOrchestrator(
                 foreach (SolutionInstallationOperation operation in installationOperations)
                     operation.BlockBeforeNextMutation("solutions.package.publisher_untrusted", now);
             }
+            if (installation.Revision != originalRevision)
+                installation.RecordModification(ActorSnapshot.System());
             SolutionAuditEvent auditEvent = NewAudit("solutions.installation.noncompliant", installation.WorkspaceId, null, installation.Id, null, "revoked", "solutions.package.publisher_untrusted", now);
             auditEventIds.Add(auditEvent.EventId);
             await audit.EnqueueAsync(auditEvent, cancellationToken);
@@ -504,7 +521,10 @@ public sealed class SolutionOrchestrator(
         CancellationToken cancellationToken)
     {
         if (installation.ProvisioningStatus == ProvisioningStatus.Installing)
+        {
             installation.MarkFailed(now);
+            installation.RecordModification(ActorSnapshot.System());
+        }
         operation.BlockBeforeNextMutation("solutions.package.axis_openapi_mismatch", now);
         await PersistAuditAsync(
             NewAudit(
@@ -527,12 +547,18 @@ public sealed class SolutionOrchestrator(
         CancellationToken cancellationToken,
         SolutionActor? actor = null)
     {
+        int originalRevision = installation.Revision;
         installation.MarkNoncompliant(now);
         if (installation.ProvisioningStatus == ProvisioningStatus.Installing)
         {
             installation.MarkFailed(now);
             operation.BlockBeforeNextMutation("solutions.package.publisher_untrusted", now);
         }
+        if (installation.Revision != originalRevision)
+            installation.RecordModification(
+                actor is null
+                    ? ActorSnapshot.System()
+                    : Actor(actor));
         SolutionAuditEvent auditEvent = NewAudit(
             "solutions.installation.noncompliant",
             installation.WorkspaceId,
@@ -760,6 +786,20 @@ public sealed class SolutionOrchestrator(
                 component.Sha256,
                 component.DependsOn.Select(dependency =>
                     new SolutionComponentIdentityDto(dependency.Type, dependency.Key)).ToArray()))
-            .ToArray());
+            .ToArray(),
+            new SolutionResourceMetadataDto(
+                null,
+                ResourceActor(value.CreatedBy),
+                value.PublishedAt,
+                ResourceActor(value.CreatedBy),
+                value.PublishedAt));
     public static SolutionOperationStatusDto ToDto(SolutionInstallationOperation value) => new(value.Id, value.InstallationId, (SolutionOperationStatus)value.Status, value.LeaseEpoch, value.ProblemCode, value.Steps.OrderBy(x => x.Order).Select(x => new SolutionComponentStatusDto(x.Type, x.Key, x.Sha256, (SolutionStepStatus)x.Status, x.ProblemCode)).ToArray(), value.UpdatedAt);
+
+    private static ActorSnapshot Actor(SolutionActor actor) =>
+        actor.SubjectKind == SolutionSubjectKind.Service
+            ? ActorSnapshot.ServiceIdentity(actor.SubjectId, actor.DisplayName)
+            : ActorSnapshot.User(actor.SubjectId, actor.DisplayName);
+
+    private static SolutionResourceActorDto ResourceActor(ActorSnapshot actor) =>
+        new(actor.Kind.ToString(), actor.SubjectId, actor.DisplayName);
 }

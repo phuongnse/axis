@@ -31,17 +31,21 @@ const valueTypes: ValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime
 
 export function RuleConditionComposer({
   condition,
+  definitionKey,
   inputs,
   language,
   onChange,
 }: {
   condition: Condition | null;
+  definitionKey?: string;
   inputs: DraftInput[];
   language: Language | undefined;
   onChange: (condition: Condition | null) => void;
 }) {
   const { t } = useTranslation();
-  const usableInputs = inputs.filter((input) => Boolean(input.label?.trim()));
+  const usableInputs = inputs.filter(
+    (input) => Boolean(input.key?.trim()) && Boolean(input.label?.trim()),
+  );
   const canStart = Boolean(language && usableInputs.length > 0);
 
   if (!language) {
@@ -77,7 +81,11 @@ export function RuleConditionComposer({
           </h3>
           <p className="text-xs text-muted-foreground">{t('rules.conditionsHelp')}</p>
         </div>
-        <RuleExpressionGuide expressionLanguageVersion={language.version} />
+        <RuleExpressionGuide
+          expressionLanguageVersion={language.version}
+          definitionKey={definitionKey}
+          inputs={usableInputs}
+        />
       </div>
       {usableInputs.length === 0 ? (
         <p role="status" className="text-sm text-muted-foreground">
@@ -198,7 +206,7 @@ function ConditionGroup({
             }
           >
             <SelectTrigger id={pathId(path, 'group')} aria-label={t('rules.conditionJoin')}>
-              <SelectValue>{groupLabel(operator, i18n.language, t)}</SelectValue>
+              <SelectValue>{groupLabel(operator, language, i18n.language, t)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {(language.logicalOperators ?? []).map((candidate) => {
@@ -210,7 +218,7 @@ function ConditionGroup({
                     value={candidate.operator}
                     disabled={disabled}
                   >
-                    {groupLabel(candidate.operator, i18n.language, t)}
+                    {groupLabel(candidate.operator, language, i18n.language, t)}
                   </SelectItem>
                 );
               })}
@@ -405,7 +413,7 @@ function ValueComposer({
   depth?: number;
   onChange: (operand: Operand) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const source = sourceKind(operand);
   const compatibleInputs = inputs.filter((input) => inputMatchesShapes(input, acceptedShapes));
   const calculations = functionsForShapes(acceptedShapes, inputs, language, depth);
@@ -423,19 +431,19 @@ function ValueComposer({
         <FieldLabel htmlFor={`${path}-source`}>{label}</FieldLabel>
         <Select value={source} onValueChange={(value) => selectSource(value as SourceKind)}>
           <SelectTrigger id={`${path}-source`} aria-label={label}>
-            <SelectValue>{sourceLabel(source, t)}</SelectValue>
+            <SelectValue>{sourceLabel(source, language, i18n.language, t)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="input" disabled={compatibleInputs.length === 0}>
-              {sourceLabel('input', t)}
+              {sourceLabel('input', language, i18n.language, t)}
             </SelectItem>
             {allowFixedValue ? (
               <SelectItem value="literal" disabled={!canUseFixedValue}>
-                {sourceLabel('literal', t)}
+                {sourceLabel('literal', language, i18n.language, t)}
               </SelectItem>
             ) : null}
             <SelectItem value="calculation" disabled={calculations.length === 0}>
-              {sourceLabel('calculation', t)}
+              {sourceLabel('calculation', language, i18n.language, t)}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -448,11 +456,13 @@ function ValueComposer({
             onValueChange={(reference) => onChange({ kind: 'Input', reference, arguments: [] })}
           >
             <SelectTrigger id={`${path}-input`} aria-label={`${label}: ${t('rules.chooseInput')}`}>
-              <SelectValue>{inputLabel(operand.reference, inputs)}</SelectValue>
+              <SelectValue>
+                {inputLabel(operand.reference, inputs, t('table.emptyValue'))}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {compatibleInputs.map((input) => (
-                <SelectItem key={input.label} value={input.label ?? ''}>
+                <SelectItem key={input.key} value={input.key ?? ''}>
                   {input.label}
                 </SelectItem>
               ))}
@@ -648,20 +658,39 @@ function sourceKind(operand: Operand): SourceKind {
   return 'input';
 }
 
-function sourceLabel(source: SourceKind, t: ReturnType<typeof useTranslation>['t']) {
-  if (source === 'literal') return t('rules.fixedValue');
-  if (source === 'calculation') return t('rules.calculatedValue');
-  return t('rules.ruleInput');
+function sourceLabel(
+  source: SourceKind,
+  language: Language,
+  locale: string,
+  t: ReturnType<typeof useTranslation>['t'],
+) {
+  const kind = source === 'literal' ? 'Literal' : source === 'calculation' ? 'Function' : 'Input';
+  const definition = (language.operandKinds ?? []).find((candidate) => candidate.kind === kind);
+  const fallback =
+    source === 'literal'
+      ? t('rules.fixedValue')
+      : source === 'calculation'
+        ? t('rules.calculatedValue')
+        : t('rules.ruleInput');
+  return referenceLabel(definition?.documentation, locale, fallback);
 }
 
 function groupLabel(
   operator: ApiTypes.RuleLogicalOperator,
-  _language: string,
+  language: Language,
+  locale: string,
   t: ReturnType<typeof useTranslation>['t'],
 ) {
-  if (operator === 'Any') return t('rules.conditionAny');
-  if (operator === 'Not') return t('rules.conditionNot');
-  return t('rules.conditionAll');
+  const definition = (language.logicalOperators ?? []).find(
+    (candidate) => candidate.operator === operator,
+  );
+  const fallback =
+    operator === 'Any'
+      ? t('rules.conditionAny')
+      : operator === 'Not'
+        ? t('rules.conditionNot')
+        : t('rules.conditionAll');
+  return referenceLabel(definition?.documentation, locale, fallback);
 }
 
 function createClause(inputs: DraftInput[], language: Language): Condition | null {
@@ -784,7 +813,7 @@ function createCalculationOperand(
 }
 
 function inputOperand(input: DraftInput): Operand {
-  return { kind: 'Input', reference: input.label, arguments: [] };
+  return { kind: 'Input', reference: input.key, arguments: [] };
 }
 
 function literalOperand(type: ValueType): Operand {
@@ -841,7 +870,7 @@ function operandShape(
   language: Language,
 ): OperandShape | null {
   if (operand.kind === 'Input') {
-    const input = inputs.find((candidate) => candidate.label === operand.reference);
+    const input = inputs.find((candidate) => candidate.key === operand.reference);
     return input
       ? {
           types: (input.types ?? []).filter(isValueType),
@@ -913,8 +942,12 @@ function isValueType(value: unknown): value is ValueType {
   return typeof value === 'string' && valueTypes.includes(value as ValueType);
 }
 
-function inputLabel(reference: string | null | undefined, inputs: DraftInput[]) {
-  return inputs.find((input) => input.label === reference)?.label ?? '—';
+function inputLabel(
+  reference: string | null | undefined,
+  inputs: DraftInput[],
+  emptyValue: string,
+) {
+  return inputs.find((input) => input.key === reference)?.label ?? emptyValue;
 }
 
 function updateAtPath(root: Condition, path: NodePath, next: Condition): Condition {

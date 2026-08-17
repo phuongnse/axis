@@ -105,6 +105,9 @@ public sealed class ResendWorkspaceInvitationHandler(
                 tokenHash,
                 envelopeProtector.Protect(message),
                 $"workspace-invitation:{invitation.Id:N}:{generation}");
+            invitation.RecordModification(
+                ActorSnapshot.User(command.ActorUserId, command.ActorDisplayName),
+                now);
         }
         catch (InvalidOperationException)
         {

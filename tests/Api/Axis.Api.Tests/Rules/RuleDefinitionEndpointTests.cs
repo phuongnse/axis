@@ -534,7 +534,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        body.GetProperty("items").EnumerateArray()
+        JsonElement[] items = body.GetProperty("items").EnumerateArray().ToArray();
+        items
             .Select(definition => definition.GetProperty("definitionKey").GetString())
             .Should().Contain([
                 RuleDefinitionKeys.Required,
@@ -542,6 +543,16 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 RuleDefinitionKeys.DateTimeRange,
                 RuleDefinitionKeys.ChoiceSelectionCount,
             ]);
+        items.All(definition =>
+        {
+            JsonElement metadata = definition.GetProperty("metadata");
+            return metadata.GetProperty("createdBy").GetProperty("kind").GetString() == "System"
+                && metadata.GetProperty("createdBy").GetProperty("displayName").GetString() == "System"
+                && metadata.GetProperty("createdAt").GetDateTimeOffset() != default
+                && metadata.GetProperty("modifiedBy").GetProperty("kind").GetString() == "System"
+                && metadata.GetProperty("modifiedBy").GetProperty("displayName").GetString() == "System"
+                && metadata.GetProperty("modifiedAt").GetDateTimeOffset() != default;
+        }).Should().BeTrue();
         body.GetProperty("totalCount").GetInt32().Should().Be(9);
 
         HttpResponseMessage searchResponse = await SendWithBearerAsync(
@@ -555,6 +566,61 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             .Should().Contain(RuleDefinitionKeys.Required)
             .And.NotContain(RuleDefinitionKeys.DateTimeRange);
         search.GetProperty("totalCount").GetInt32().Should().BeLessThan(9);
+    }
+
+    [Fact]
+    public async Task ListRuleDefinitions_WhenNameSortIsExplicit_SortsLocalizedWholeCatalogBeforePaging()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules?page=1&pageSize=6&language=vi&sortBy=Name&sortDirection=Ascending",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        body.GetProperty("items").EnumerateArray()
+            .Select(definition => definition.GetProperty("definitionKey").GetString())
+            .Should().Equal(
+                RuleDefinitionKeys.Required,
+                RuleDefinitionKeys.DateRange,
+                RuleDefinitionKeys.DateTimeRange,
+                RuleDefinitionKeys.NumericRange,
+                RuleDefinitionKeys.TextPattern,
+                RuleDefinitionKeys.ChoiceSelectionCount);
+    }
+
+    [Theory]
+    [InlineData("Origin")]
+    [InlineData("Status")]
+    public async Task ListRuleDefinitions_WhenScalarEnumSortIsExplicit_AcceptsThePublicContract(
+        string sortBy)
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules?page=1&pageSize=20&sortBy={sortBy}&sortDirection=Ascending",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Theory]
+    [InlineData("sortBy=Name")]
+    [InlineData("sortDirection=Ascending")]
+    [InlineData("sortBy=999&sortDirection=Ascending")]
+    public async Task ListRuleDefinitions_WhenSortParametersAreIncompleteOrInvalid_ReturnsBadRequest(string sortQuery)
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules?page=1&pageSize=20&{sortQuery}",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

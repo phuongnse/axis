@@ -217,6 +217,7 @@ public static class ConnectEndpoints
 
             ClaimsIdentity identity = new(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             identity.AddClaim(new Claim(Claims.Subject, service.ServiceIdentityId.ToString()));
+            identity.AddClaim(new Claim(Claims.Name, request.ClientId));
             identity.AddClaim(new Claim("workspace_id", service.WorkspaceId.ToString()));
             identity.AddClaim(new Claim("subject_kind", "service"));
             identity.AddClaim(new Claim("service_key_id", service.KeyId.ToString()));

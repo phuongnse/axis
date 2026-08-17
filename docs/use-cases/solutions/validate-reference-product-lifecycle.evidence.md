@@ -6,21 +6,23 @@
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/scripts/build-solution.test.mjs` | `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/npm run test:unit` |
-| AT-002 | `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/scripts/build-solution.test.mjs`, `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/tests/product.pw.ts` | `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/npm run test:unit`, `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/npm run test:e2e` |
-| AT-003 | `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/tests/product.pw.ts` | `external://axis-reference-product@217cbc6a072977a250b013eecdd9997c3e62266e/npm run test:e2e` |
+| AT-001 | `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/scripts/build-solution.test.mjs`, `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/scripts/local-dev.test.mjs` | `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/npm run test:unit` |
+| AT-002 | `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/scripts/build-solution.test.mjs`, `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/tests/product.pw.ts` | `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/npm run test:unit`; `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/npm run test:e2e -- -- -g "administrator installs the signed release before the applicant submits through the product BFF"` |
+| AT-003 | `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/tests/product.pw.ts` | `external://axis-reference-product@b8568d9ded047f497ac62d4df56ac682fc0b33f8/npm run test:e2e -- -- -g "administrator installs the signed release before the applicant submits through the product BFF"` |
 | AT-004 | `tests/Architecture/Axis.Architecture.Tests/ReferenceProductBoundaryTests.cs` | `python scripts/axis.py dotnet test tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj --filter FullyQualifiedName~ReferenceProductBoundaryTests` |
 
 ## Immutable Checkpoint
 
-- External source commit: `217cbc6a072977a250b013eecdd9997c3e62266e`.
-- Signed solution identity: `reference_application` version `0.1.2`; build ID `reference-product-0.1.2`; publisher/key `axis_reference_product/release`.
-- Signed payload `sourceRevision`: `217cbc6a072977a250b013eecdd9997c3e62266e`.
-- Axis OpenAPI SHA-256 in the signed payload, external source, and Axis configuration: `ee28c66776e404441c6458244824e50b1e2dc32c00407ea2746703cf9134a47f`.
-- Preserved release `0.1.1` remains unchanged. The ignored private release key was reused at mode `0600`; it was not rotated or written to repository evidence.
+- External source commit: `b8568d9ded047f497ac62d4df56ac682fc0b33f8`.
+- Stable publication intent: `reference_application` version `0.1.0`.
+- Signed development solution identity: `reference_application` version `0.1.0-dev.gb8568d9ded04`; build ID `reference-product-0.1.0-dev.gb8568d9ded04`; publisher/key `axis_reference_product/release`.
+- Signed payload `sourceRevision`: `b8568d9ded047f497ac62d4df56ac682fc0b33f8`.
+- Axis OpenAPI SHA-256 in the signed payload, external source, and Axis configuration: `5ca3b6e62c1950ed3a1524f04f4e38226a187f7e0119ec9d5ac9a101b7135548`.
+- The ignored private signing key was preserved at mode `0600`; it was not rotated or written to repository evidence. Stable version selection, development snapshot identity, and clean cutover remain independent lifecycle decisions.
 
 ## Current Verification
 
-- The external `check` workflow passes package tests 23/23, production build, BFF tests 28/28, generated-client synchronization, and both architecture checks; `test:unit` passes frontend 9/9 and package tests 23/23.
-- The external `test:e2e` workflow passes 1/1 against a newly created Organization Workspace. The administrator creates and revokes a service identity, publishes and installs signed release `0.1.2`, assigns Applicant, completes the authenticated record journey through the BFF, revokes the exact role, and signs out without exposing OAuth artifacts.
+- The external `test:unit` workflow passes frontend 9/9 and Node contract/workflow tests 29/29; the production frontend build passes.
+- The explicitly approved clean cutover removes the prior local volumes once, recreates the current initial schemas, and brings every product-owned service to healthy without changing stable publication intent.
+- The focused external `test:e2e` workflow passes 1/1 against a newly created Organization Workspace. The administrator publishes and installs signed development snapshot `0.1.0-dev.gb8568d9ded04`, assigns Applicant, completes the authenticated record journey through the BFF, revokes the exact role, and signs out without exposing OAuth artifacts.
 - Axis `ReferenceProductBoundaryTests` passes 1/1, and the external architecture checks pass 2/2. Together they reject product identifiers or provisioning paths in Axis production, module-internal Axis dependencies in the product, and any browser lifecycle path outside the public Solutions surface.

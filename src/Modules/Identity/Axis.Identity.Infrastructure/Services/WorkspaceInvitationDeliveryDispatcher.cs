@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -96,10 +97,14 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
 
         try
         {
+            DateTime now = timeProvider.GetUtcNow().UtcDateTime;
             invitation.MarkDeliveryAttempt(
                 invitation.Revision,
-                timeProvider.GetUtcNow().UtcDateTime.Add(Backoff(token.DeliveryAttempts + 1)),
+                now.Add(Backoff(token.DeliveryAttempts + 1)),
                 null);
+            invitation.RecordModification(
+                ActorSnapshot.System(),
+                now);
             await uow.SaveChangesAsync(ct);
             uow.ClearTracking();
         }
@@ -144,10 +149,14 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
                 }
                 else
                 {
+                    DateTime now = timeProvider.GetUtcNow().UtcDateTime;
                     failed.RecordDeliveryFailure(
                         failed.Revision,
-                        timeProvider.GetUtcNow().UtcDateTime.Add(Backoff(failed.CurrentToken.DeliveryAttempts)),
+                        now.Add(Backoff(failed.CurrentToken.DeliveryAttempts)),
                         "delivery.transient");
+                    failed.RecordModification(
+                        ActorSnapshot.System(),
+                        now);
                     await SaveIgnoringWinner(uow, ct);
                 }
             }
@@ -165,7 +174,11 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
             return;
         }
 
+        DateTime deliveredAt = timeProvider.GetUtcNow().UtcDateTime;
         delivered.MarkDelivered(delivered.Revision);
+        delivered.RecordModification(
+            ActorSnapshot.System(),
+            deliveredAt);
         await EnqueueDeliveryAudit(
             services,
             delivered,
@@ -188,7 +201,11 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
             return;
         }
 
+        DateTime failedAt = timeProvider.GetUtcNow().UtcDateTime;
         invitation.MarkTerminalDeliveryFailure(invitation.Revision, errorCode);
+        invitation.RecordModification(
+            ActorSnapshot.System(),
+            failedAt);
         await EnqueueDeliveryAudit(
             services,
             invitation,

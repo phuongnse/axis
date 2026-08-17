@@ -28,8 +28,8 @@ Follow [reference.md](../reference.md).
 2. Classify correctness, boundary, test, docs/status, generated output, readability, or false positive.
 3. Implement the smallest defensible resolution; preserve behavior, safety, and test honesty.
 4. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) to valid findings. Promote a rule only when the evidence supports a reusable decision or invariant, even if first observed once.
-5. Run focused proof, commit only when the caller authorized a follow-up change, and produce delta-ready evidence for `$axis-review-readiness`.
-6. Return to the caller with the reviewed checkpoint, changed paths, classifications, evidence, and unresolved decisions; do not auto-publish.
+5. Run focused proof and return the working delta to `$axis-pull-request`; this workflow does not skip directly to review. The caller creates the clean immutable follow-up checkpoint, obtains scoped `$axis-review-readiness` for its exact checkpoint/base, and only then delegates review again.
+6. Return to the caller with the reviewed checkpoint, changed paths, classifications, focused evidence, and unresolved decisions; do not commit, review, or auto-publish unless the caller separately authorized that exact action.
 
 ## Output
 

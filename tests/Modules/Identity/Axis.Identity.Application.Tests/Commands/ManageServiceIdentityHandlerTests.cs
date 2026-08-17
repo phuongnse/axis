@@ -30,7 +30,7 @@ public sealed class ManageServiceIdentityHandlerTests
                 uow,
                 Substitute.For<IServiceIdentityClientProjection>())
             .Handle(
-                new CreateServiceIdentityCommand(Guid.NewGuid(), Guid.NewGuid(), "svc-a", "corr"),
+                new CreateServiceIdentityCommand(Guid.NewGuid(), Guid.NewGuid(), "svc-a", "corr", "Axis Admin"),
                 CancellationToken.None);
 
         result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
@@ -57,7 +57,7 @@ public sealed class ManageServiceIdentityHandlerTests
                 uow,
                 Substitute.For<IServiceIdentityClientProjection>())
             .Handle(
-                new CreateServiceIdentityCommand(Guid.NewGuid(), Guid.NewGuid(), "svc-a", "corr"),
+                new CreateServiceIdentityCommand(Guid.NewGuid(), Guid.NewGuid(), "svc-a", "corr", "Axis Admin"),
                 CancellationToken.None);
 
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
@@ -90,7 +90,7 @@ public sealed class ManageServiceIdentityHandlerTests
                 Substitute.For<IUnitOfWork>(),
                 projection)
             .Handle(
-                new CreateServiceIdentityCommand(actorId, workspaceId, "svc-a", "corr"),
+                new CreateServiceIdentityCommand(actorId, workspaceId, "svc-a", "corr", "Axis Admin"),
                 TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
@@ -123,6 +123,7 @@ public sealed class ManageServiceIdentityHandlerTests
         Guid actorId = Guid.NewGuid();
         Guid workspaceId = Guid.NewGuid();
         ServiceIdentity identity = ServiceIdentity.Create(workspaceId, "svc-key-lifecycle", DateTime.UtcNow);
+        identity.InitializeMetadata(ActorSnapshot.User(actorId, "Axis Admin"));
         IServiceIdentityRepository identities = RepositoryFor(identity);
         MemoryAuditOutbox audits = new MemoryAuditOutbox();
         IServiceIdentityClientProjection projection = Substitute.For<IServiceIdentityClientProjection>();
@@ -132,21 +133,21 @@ public sealed class ManageServiceIdentityHandlerTests
 
         Result<ServiceIdentityDto> added = await new AddServiceIdentityKeyHandler(
             memberships, identities, audits, TimeProvider.System, uow, projection).Handle(
-                new AddServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, 1, firstJwk, "add-corr"),
+                new AddServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, 1, firstJwk, "add-corr", "Axis Admin"),
                 TestContext.Current.CancellationToken);
         Result<ServiceIdentityDto> overlap = await new AddServiceIdentityKeyHandler(
             memberships, identities, audits, TimeProvider.System, uow, projection).Handle(
-                new AddServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, 2, PublicJwk("key-b"), "overlap-corr"),
+                new AddServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, 2, PublicJwk("key-b"), "overlap-corr", "Axis Admin"),
                 TestContext.Current.CancellationToken);
         Guid firstKeyId = identity.Keys.Single(key => key.Kid == "key-a").Id;
         int revokeRevision = identity.Revision;
         Result<ServiceIdentityDto> revoked = await new RevokeServiceIdentityKeyHandler(
             memberships, identities, audits, TimeProvider.System, uow, projection).Handle(
-                new RevokeServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, firstKeyId, revokeRevision, "revoke-corr"),
+                new RevokeServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, firstKeyId, revokeRevision, "revoke-corr", "Axis Admin"),
                 TestContext.Current.CancellationToken);
         Result<ServiceIdentityDto> retry = await new RevokeServiceIdentityKeyHandler(
             memberships, identities, audits, TimeProvider.System, uow, projection).Handle(
-                new RevokeServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, firstKeyId, revokeRevision, "retry-corr"),
+                new RevokeServiceIdentityKeyCommand(actorId, workspaceId, identity.Id, firstKeyId, revokeRevision, "retry-corr", "Axis Admin"),
                 TestContext.Current.CancellationToken);
 
         added.IsSuccess.Should().BeTrue();
@@ -166,7 +167,8 @@ public sealed class ManageServiceIdentityHandlerTests
                     identity.Id,
                     identity.Revision,
                     RenameKid(firstJwk, "key-c"),
-                    "resurrection-corr"),
+                    "resurrection-corr",
+                    "Axis Admin"),
                 TestContext.Current.CancellationToken);
         resurrection.IsFailure.Should().BeTrue();
         resurrection.ProblemCode.Should().Be("identity.serviceIdentity.conflict");
@@ -178,6 +180,7 @@ public sealed class ManageServiceIdentityHandlerTests
         Guid actorId = Guid.NewGuid();
         Guid workspaceId = Guid.NewGuid();
         ServiceIdentity identity = ServiceIdentity.Create(workspaceId, "svc-revoke", DateTime.UtcNow);
+        identity.InitializeMetadata(ActorSnapshot.User(actorId, "Axis Admin"));
         IServiceIdentityRepository identities = RepositoryFor(identity);
         IWorkspaceMembershipRepository memberships = ActiveAdministrator(actorId, workspaceId);
         MemoryAuditOutbox audits = new MemoryAuditOutbox();
@@ -190,10 +193,10 @@ public sealed class ManageServiceIdentityHandlerTests
             Substitute.For<IServiceIdentityClientProjection>());
 
         Result<ServiceIdentityDto> first = await handler.Handle(
-            new RevokeServiceIdentityCommand(actorId, workspaceId, identity.Id, 1, "first-corr"),
+            new RevokeServiceIdentityCommand(actorId, workspaceId, identity.Id, 1, "first-corr", "Axis Admin"),
             TestContext.Current.CancellationToken);
         Result<ServiceIdentityDto> retry = await handler.Handle(
-            new RevokeServiceIdentityCommand(actorId, workspaceId, identity.Id, 1, "retry-corr"),
+            new RevokeServiceIdentityCommand(actorId, workspaceId, identity.Id, 1, "retry-corr", "Axis Admin"),
             TestContext.Current.CancellationToken);
 
         first.IsSuccess.Should().BeTrue();
@@ -222,7 +225,7 @@ public sealed class ManageServiceIdentityHandlerTests
             TimeProvider.System,
             Substitute.For<IUnitOfWork>(),
             Substitute.For<IServiceIdentityClientProjection>()).Handle(
-                new CreateServiceIdentityCommand(actorId, workspaceId, "svc-no-audit-read", "corr"),
+                new CreateServiceIdentityCommand(actorId, workspaceId, "svc-no-audit-read", "corr", "Axis Admin"),
                 TestContext.Current.CancellationToken);
 
         result.IsFailure.Should().BeTrue();

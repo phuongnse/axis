@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { getRouteApi } from '@tanstack/react-router';
 import { MailPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -18,6 +20,7 @@ import { StatusBadge, type StatusBadgeState } from '@/components/shared/StatusBa
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type {
   WorkspaceInvitationLifecycleDto,
+  WorkspaceInvitationSortField,
   WorkspaceProductBuilderDto,
 } from '@/lib/api-generated';
 import { workspaceInvitationsQueryOptions, workspaceProductBuildersQueryOptions } from '../api';
@@ -27,41 +30,51 @@ import {
   membershipProductBuilderWindowDescriptor,
 } from '../managed-windows';
 
+const route = getRouteApi('/_authenticated/memberships');
+
 export function MembershipManagementPage() {
   const { t, i18n } = useTranslation();
   const { openWindow } = useManagedWindowActions();
+  const search = route.useSearch();
+  const navigate = route.useNavigate();
   const productBuildersQuery = useQuery(workspaceProductBuildersQueryOptions());
   const members = productBuildersQuery.data ?? [];
-  const [invitationPagination, setInvitationPagination] = useState({ pageIndex: 0, pageSize: 20 });
-  const invitationsQuery = useQuery(
-    workspaceInvitationsQueryOptions(
-      invitationPagination.pageIndex + 1,
-      invitationPagination.pageSize,
-    ),
+  const invitationPagination = useMemo(
+    () => ({ pageIndex: search.page - 1, pageSize: search.pageSize }),
+    [search.page, search.pageSize],
   );
-  const invitations = invitationsQuery.data?.items ?? [];
-  const dateFormatter = useMemo(
-    () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
-    [i18n.language],
-  );
-  const memberTableQuery = useMemo<DataTableQueryState>(
-    () => ({
-      globalFilter: '',
-      filterExpression: createEmptyFilterExpression(),
-      sorting: [],
-      grouping: [],
-    }),
-    [],
-  );
+  const [memberTableQuery, setMemberTableQuery] = useState<DataTableQueryState>(() => ({
+    globalFilter: '',
+    filterExpression: createEmptyFilterExpression(),
+    sorting: [],
+    grouping: [],
+  }));
   const invitationTableQuery = useMemo<DataTableQueryState>(
     () => ({
       globalFilter: '',
       filterExpression: createEmptyFilterExpression(),
-      sorting: [],
+      sorting:
+        search.sortBy && search.sortDirection
+          ? [
+              {
+                id: invitationColumnId(search.sortBy),
+                desc: search.sortDirection === 'Descending',
+              },
+            ]
+          : [],
       grouping: [],
     }),
-    [],
+    [search.sortBy, search.sortDirection],
   );
+  const invitationsQuery = useQuery(
+    workspaceInvitationsQueryOptions(
+      search.page,
+      search.pageSize,
+      search.sortBy,
+      search.sortDirection,
+    ),
+  );
+  const invitations = invitationsQuery.data?.items ?? [];
   const memberTableDefinition = useMemo<DataTableDefinition<WorkspaceProductBuilderDto>>(() => {
     const columns: DataTableColumnDef<WorkspaceProductBuilderDto>[] = [
       {
@@ -69,8 +82,7 @@ export function MembershipManagementPage() {
         accessorKey: 'displayName',
         size: 260,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('memberships.productBuilderMember') },
+        meta: { label: t('memberships.productBuilderMember'), cell: { kind: 'action' } },
         cell: ({ row }) => {
           const title = row.original.displayName ?? t('memberships.productBuilderUnknownMember');
           return (
@@ -89,8 +101,7 @@ export function MembershipManagementPage() {
         accessorKey: 'email',
         size: 260,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('memberships.email') },
+        meta: { label: t('memberships.email'), cell: { kind: 'text' } },
         cell: ({ row }) => row.original.email ?? t('memberships.notAvailable'),
       },
       {
@@ -98,8 +109,7 @@ export function MembershipManagementPage() {
         accessorKey: 'workspaceRole',
         size: 190,
         minSize: 170,
-        enableSorting: false,
-        meta: { label: t('memberships.role') },
+        meta: { label: t('memberships.role'), cell: { kind: 'status' } },
         cell: ({ row }) => t(`memberships.role${row.original.workspaceRole ?? 'Member'}`),
       },
       {
@@ -107,8 +117,7 @@ export function MembershipManagementPage() {
         accessorKey: 'isProductBuilder',
         size: 170,
         minSize: 150,
-        enableSorting: false,
-        meta: { label: t('memberships.productBuilder') },
+        meta: { label: t('memberships.productBuilder'), cell: { kind: 'boolean' } },
         cell: ({ row }) => (
           <StatusBadge state={row.original.isProductBuilder ? 'positive' : 'inactive'}>
             {row.original.isProductBuilder
@@ -117,10 +126,19 @@ export function MembershipManagementPage() {
           </StatusBadge>
         ),
       },
+      ...createResourceMetadataColumns<WorkspaceProductBuilderDto>(
+        {
+          revision: t('metadata.revision'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {
       ariaLabel: t('memberships.productBuilderTableLabel'),
+      locale: i18n.language,
       source: {
         mode: 'client',
         data: members,
@@ -137,7 +155,7 @@ export function MembershipManagementPage() {
       }),
       getRowId: (member) => member.userId ?? member.email ?? 'workspace-member',
       queryState: memberTableQuery,
-      onQueryStateChange: () => undefined,
+      onQueryStateChange: setMemberTableQuery,
       columnControls: true,
       grouping: false,
       loading: productBuildersQuery.isPending,
@@ -151,6 +169,7 @@ export function MembershipManagementPage() {
     productBuildersQuery.isError,
     productBuildersQuery.isPending,
     productBuildersQuery.refetch,
+    i18n.language,
     t,
   ]);
   const invitationTableDefinition = useMemo<
@@ -162,8 +181,7 @@ export function MembershipManagementPage() {
         accessorKey: 'recipientEmail',
         size: 260,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('memberships.email') },
+        meta: { label: t('memberships.email'), cell: { kind: 'action' } },
         cell: ({ row }) => {
           const email = row.original.recipientEmail ?? t('memberships.recipientRemoved');
           return row.original.invitationId ? (
@@ -182,8 +200,7 @@ export function MembershipManagementPage() {
         accessorKey: 'requestedRole',
         size: 190,
         minSize: 170,
-        enableSorting: false,
-        meta: { label: t('memberships.role') },
+        meta: { label: t('memberships.role'), cell: { kind: 'status' } },
         cell: ({ row }) => t(`memberships.role${row.original.requestedRole ?? 'Member'}`),
       },
       {
@@ -191,8 +208,7 @@ export function MembershipManagementPage() {
         accessorKey: 'status',
         size: 140,
         minSize: 130,
-        enableSorting: false,
-        meta: { label: t('memberships.status') },
+        meta: { label: t('memberships.status'), cell: { kind: 'status' } },
         cell: ({ row }) => (
           <StatusBadge state={invitationState(row.original.status)}>
             {t(`memberships.status${row.original.status ?? 'Pending'}`)}
@@ -204,8 +220,7 @@ export function MembershipManagementPage() {
         accessorKey: 'deliveryStatus',
         size: 150,
         minSize: 140,
-        enableSorting: false,
-        meta: { label: t('memberships.delivery') },
+        meta: { label: t('memberships.delivery'), cell: { kind: 'status' } },
         cell: ({ row }) => (
           <StatusBadge state={deliveryState(row.original.deliveryStatus)}>
             {t(`memberships.delivery${row.original.deliveryStatus ?? 'Pending'}`)}
@@ -217,24 +232,36 @@ export function MembershipManagementPage() {
         accessorKey: 'expiresAt',
         size: 210,
         minSize: 190,
-        enableSorting: false,
-        meta: { label: t('memberships.expires') },
-        cell: ({ row }) =>
-          row.original.expiresAt
-            ? dateFormatter.format(new Date(row.original.expiresAt))
-            : t('memberships.notAvailable'),
+        meta: { label: t('memberships.expires'), cell: { kind: 'dateTime' } },
       },
+      ...createResourceMetadataColumns<WorkspaceInvitationLifecycleDto>(
+        {
+          revision: t('metadata.revision'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {
       ariaLabel: t('memberships.tableLabel'),
+      locale: i18n.language,
       source: {
         mode: 'page',
         data: invitations,
         pagination: invitationPagination,
         rowCount: invitationsQuery.data?.totalCount ?? 0,
         pageSizeOptions: [20, 50, 100],
-        onPaginationChange: setInvitationPagination,
+        onPaginationChange: (pagination) => {
+          void navigate({
+            search: (current) => ({
+              ...current,
+              page: pagination.pageIndex + 1,
+              pageSize: pagination.pageSize,
+            }),
+          });
+        },
       },
       columns,
       messages: createDataTableMessages(t, {
@@ -248,7 +275,22 @@ export function MembershipManagementPage() {
       getRowId: (invitation) =>
         invitation.invitationId ?? invitation.recipientEmail ?? 'workspace-invitation',
       queryState: invitationTableQuery,
-      onQueryStateChange: () => undefined,
+      onQueryStateChange: (next) => {
+        const sortBy = invitationSortField(next.sorting[0]?.id);
+        void navigate({
+          replace: true,
+          search: (current) => ({
+            ...current,
+            page: 1,
+            sortBy,
+            sortDirection: sortBy
+              ? next.sorting[0]?.desc
+                ? 'Descending'
+                : 'Ascending'
+              : undefined,
+          }),
+        });
+      },
       columnControls: true,
       grouping: false,
       renderToolbarActions: invitationsQuery.isSuccess
@@ -268,7 +310,7 @@ export function MembershipManagementPage() {
       onRetry: () => void invitationsQuery.refetch(),
     };
   }, [
-    dateFormatter,
+    i18n.language,
     invitationPagination,
     invitations,
     invitationsQuery.data?.totalCount,
@@ -276,6 +318,7 @@ export function MembershipManagementPage() {
     invitationsQuery.isPending,
     invitationsQuery.isSuccess,
     invitationsQuery.refetch,
+    navigate,
     openWindow,
     t,
     invitationTableQuery,
@@ -316,4 +359,22 @@ function deliveryState(status: string | undefined): StatusBadgeState {
   if (status === 'Pending') return 'informative';
   if (status === 'Failed') return 'critical';
   return 'neutral';
+}
+
+function invitationSortField(
+  columnId: string | undefined,
+): Exclude<WorkspaceInvitationSortField, 'Created' | 'CreatedBy'> | undefined {
+  if (columnId === 'email') return 'Email';
+  if (columnId === 'status') return 'Status';
+  if (columnId === 'role') return 'Role';
+  if (columnId === 'delivery') return 'Delivery';
+  if (columnId === 'expires') return 'Expires';
+  if (columnId === 'revision') return 'Revision';
+  if (columnId === 'modifiedBy') return 'ModifiedBy';
+  if (columnId === 'modifiedAt') return 'ModifiedAt';
+  return undefined;
+}
+
+function invitationColumnId(sortBy: WorkspaceInvitationSortField): string {
+  return `${sortBy[0].toLowerCase()}${sortBy.slice(1)}`;
 }

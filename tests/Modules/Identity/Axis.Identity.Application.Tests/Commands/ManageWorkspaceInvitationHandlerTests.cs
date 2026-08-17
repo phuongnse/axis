@@ -153,7 +153,8 @@ public sealed class ManageWorkspaceInvitationHandlerTests
                     Invitation.WorkspaceId,
                     Invitation.Id,
                     Invitation.Revision,
-                    "revoke-correlation"),
+                    "revoke-correlation",
+                    "Workspace Admin"),
                 CancellationToken.None);
 
         public Task<Result<WorkspaceInvitationLifecycleDto>> Resend() =>
@@ -175,7 +176,8 @@ public sealed class ManageWorkspaceInvitationHandlerTests
                     Invitation.WorkspaceId,
                     Invitation.Id,
                     Invitation.Revision,
-                    "resend-correlation"),
+                    "resend-correlation",
+                    "Workspace Admin"),
                 CancellationToken.None);
     }
 }

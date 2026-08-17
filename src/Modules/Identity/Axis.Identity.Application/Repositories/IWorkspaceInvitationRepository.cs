@@ -1,4 +1,5 @@
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Application;
 
 namespace Axis.Identity.Application.Repositories;
 
@@ -19,6 +20,8 @@ public interface IWorkspaceInvitationRepository
         Guid workspaceId,
         int offset,
         int limit,
+        WorkspaceInvitationSortField? sortBy = null,
+        CollectionSortDirection? sortDirection = null,
         CancellationToken ct = default);
     Task<int> CountForWorkspaceAsync(Guid workspaceId, CancellationToken ct = default);
     Task<IReadOnlyList<WorkspaceInvitation>> ListDueDeliveryAsync(

@@ -24,7 +24,8 @@ public sealed class SetWorkspaceProductBuilderHandler(
             || command.WorkspaceId == Guid.Empty
             || command.TargetUserId == Guid.Empty
             || command.ExpectedRevision <= 0
-            || string.IsNullOrWhiteSpace(command.CorrelationId))
+            || string.IsNullOrWhiteSpace(command.CorrelationId)
+            || string.IsNullOrWhiteSpace(command.ActorDisplayName))
             return Invalid();
 
         Workspace? workspace = await workspaces.GetByIdAsync(command.WorkspaceId, ct);
@@ -56,7 +57,14 @@ public sealed class SetWorkspaceProductBuilderHandler(
 
         try
         {
+            bool stateChanged = target.IsProductBuilder != command.Enabled;
             target.SetProductBuilder(command.Enabled, command.ExpectedRevision);
+            if (stateChanged)
+            {
+                target.RecordModification(
+                    ActorSnapshot.User(command.ActorUserId, command.ActorDisplayName),
+                    timeProvider.GetUtcNow().UtcDateTime);
+            }
         }
         catch (InvalidOperationException)
         {
@@ -112,7 +120,8 @@ public sealed class SetWorkspaceProductBuilderHandler(
                     projection.WorkspaceRole.ToString(),
                     projection.IsProductBuilder,
                     projection.MembershipRevision,
-                    CanChange: true));
+                    CanChange: true,
+                    projection.Metadata));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

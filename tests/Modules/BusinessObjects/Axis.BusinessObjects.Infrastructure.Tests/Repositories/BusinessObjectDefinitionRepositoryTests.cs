@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
@@ -206,9 +207,11 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         Func<Task> act = () => _ctx.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO business_object_definitions
                 (id, workspace_id, name, object_key, status, revision, created_at, updated_at,
+                 created_by_kind, created_by_display_name, updated_by_kind, updated_by_display_name,
                  installed_component_key)
             VALUES
                 ({id}, {workspaceId}, {"Partial"}, {objectKey}, {"Published"}, {3}, {now}, {now},
+                 {"System"}, {ActorSnapshot.SystemDisplayName}, {"System"}, {ActorSnapshot.SystemDisplayName},
                  {objectKey})
             """, TestContext.Current.CancellationToken);
 
@@ -426,6 +429,8 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 10,
                 "customer",
                 false,
+                null,
+                null,
                 TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> accentAndOrder =
             await _repository.ListForWorkspaceAsync(
@@ -434,6 +439,8 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 10,
                 "uu tien hoa don",
                 false,
+                null,
+                null,
                 TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> typoMatch =
             await _repository.ListForWorkspaceAsync(
@@ -442,6 +449,8 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 10,
                 "inovice",
                 false,
+                null,
+                null,
                 TestContext.Current.CancellationToken);
 
         ranked.Select(definition => definition.Id).Should().Equal(exact.Id, prefix.Id);
@@ -462,6 +471,82 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             "inovice",
             false,
             TestContext.Current.CancellationToken)).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(BusinessObjectDefinitionSortField.Name, true)]
+    [InlineData(BusinessObjectDefinitionSortField.Key, false)]
+    [InlineData(BusinessObjectDefinitionSortField.Status, true)]
+    [InlineData(BusinessObjectDefinitionSortField.Version, true)]
+    [InlineData(BusinessObjectDefinitionSortField.ModifiedAt, false)]
+    public async Task ListForWorkspaceAsync_WhenSortIsExplicit_OrdersWholeDatasetByRequestedField(
+        BusinessObjectDefinitionSortField sortBy,
+        bool alphaFirst)
+    {
+        Guid workspaceId = Guid.NewGuid();
+        DateTime now = DateTime.UtcNow;
+        BusinessObjectDefinition alpha = CreateUnpublished(
+            workspaceId,
+            "Alpha",
+            UniqueKey("zulu"),
+            now.AddHours(-3));
+        alpha.SaveUnpublished(
+            alpha.Name,
+            [Field("name", "Name", 0)],
+            expectedRevision: 1,
+            now.AddHours(-1)).IsSuccess.Should().BeTrue();
+        alpha.Publish(
+            expectedRevision: 2,
+            SubjectReference.Human(Guid.NewGuid()),
+            now.AddHours(-1)).IsSuccess.Should().BeTrue();
+        BusinessObjectDefinition beta = CreateUnpublished(
+            workspaceId,
+            "Beta",
+            UniqueKey("alpha"),
+            now.AddHours(-2));
+        await _repository.AddAsync(alpha, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(beta, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<BusinessObjectDefinition> rows = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            1,
+            20,
+            sortBy: sortBy,
+            sortDirection: CollectionSortDirection.Ascending,
+            ct: TestContext.Current.CancellationToken);
+
+        rows.Select(definition => definition.Id).Should().Equal(
+            alphaFirst ? [alpha.Id, beta.Id] : [beta.Id, alpha.Id]);
+    }
+
+    [Fact]
+    public async Task ListForWorkspaceAsync_WhenSortIsExplicit_OverridesSearchRelevanceAndHonorsDirection()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        BusinessObjectDefinition exact = CreateUnpublished(
+            workspaceId,
+            "Customer",
+            UniqueKey("customer"));
+        BusinessObjectDefinition prefix = CreateUnpublished(
+            workspaceId,
+            "Customer archive",
+            UniqueKey("customer_archive"));
+        await _repository.AddAsync(exact, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(prefix, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<BusinessObjectDefinition> rows = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            1,
+            20,
+            "customer",
+            false,
+            BusinessObjectDefinitionSortField.Name,
+            CollectionSortDirection.Descending,
+            TestContext.Current.CancellationToken);
+
+        rows.Select(definition => definition.Id).Should().Equal(prefix.Id, exact.Id);
     }
 
     [Fact]
@@ -505,13 +590,18 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         await act.Should().ThrowAsync<ConcurrencyException>();
     }
 
-    private static BusinessObjectDefinition CreateUnpublished(Guid workspaceId, string name, string key)
+    private static BusinessObjectDefinition CreateUnpublished(
+        Guid workspaceId,
+        string name,
+        string key,
+        DateTime? createdAt = null)
     {
         Result<BusinessObjectDefinition> result = BusinessObjectDefinition.CreateUnpublished(
             workspaceId,
             name,
             BusinessObjectDefinitionKey.Create(key).Value,
-            DateTime.UtcNow);
+            ActorSnapshot.User(Guid.NewGuid(), "Ada Lovelace"),
+            createdAt ?? DateTime.UtcNow);
         result.IsSuccess.Should().BeTrue();
         return result.Value;
     }

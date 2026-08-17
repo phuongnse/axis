@@ -75,6 +75,7 @@ Allow a Workspace lifecycle administrator to publish one trusted, immutable sign
 - **AC-015** The publish journey owns immutable package availability only; installing components, upgrade, rollback, uninstall, marketplace, overlays, workspace trust, package dependencies, and product data migrations are out of scope.
 - **AC-016** Package dependencies are unsupported by this contract, and Solutions accepts only typed module-owned component documents rather than opaque generic JSON.
 - **AC-017** Signed publication is the only release-availability path; no compatibility, fallback, flag, or alternate publication path exists.
+- **AC-018** The solution-version collection exposes server-owned immutable-resource metadata in the Resource Workspace trailing order: semantic solution version, modified actor, and modified time, while revision remains not applicable. Creation actor/time remain available to resource detail and audit owners but are absent from the collection definition and column menu; both underlying timestamps and actors identify the one publication event. Human actor cells show the authenticated publisher's display name, and publisher trust identity remains a separate domain fact.
 
 ## Acceptance Test Matrix
 
@@ -84,7 +85,7 @@ Allow a Workspace lifecycle administrator to publish one trusted, immutable sign
 | AT-002 | Infrastructure boundary | Immutable version uniqueness, exact retry, conflicting bytes, exact envelope-byte retention, audit-outbox atomicity/read-back, and safe projection persistence | AC-004, AC-005, AC-009, AC-010, AC-013 | Infrastructure integration test | Yes |
 | AT-003 | Application boundary | Ledger reconciliation activates a valid revision atomically across replicas; rejects invalid config, missing/revived/substituted keys; and blocks unknown/revoked publication | AC-003, AC-008, AC-009, AC-012 | Application test | Yes |
 | AT-004 | API boundary | Authenticated personal `Owner` and organization `Administrator` publish/read-back authority succeeds, while organization `Member` and inactive membership deny with stable safe errors, no raw package default, and generated contract parity | AC-001, AC-004, AC-006, AC-010 | Domain test + API integration test | Yes |
-| AT-005 | Browser journey | Publishing identifies the immutable release, confirms the consequence, shows safe success read-back, and supports validation/trust/conflict/retry states with keyboard and screen-reader recovery | AC-004, AC-005, AC-006, AC-009 | UI component test + Browser automation | Yes |
+| AT-005 | Browser journey | Publishing identifies the immutable release, confirms the consequence, shows safe success read-back and canonical version/modified-only collection metadata, and supports validation/trust/conflict/retry states with keyboard and screen-reader recovery | AC-004, AC-005, AC-006, AC-009, AC-018 | UI component test + Browser automation | Yes |
 | AT-006 | API/MCP boundaries | MCP local-path regular-file/size checks upload bytes without raw-content output, while API/MCP expose no publisher mutation or excluded lifecycle/compatibility behavior | AC-014, AC-015, AC-016, AC-017 | Architecture test + MCP contract test | Yes |
 
 ## Out Of Scope

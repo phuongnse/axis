@@ -1,15 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { businessObjectDefinitionsListQueryOptions } from '@/features/business-objects';
 import { ruleDefinitionsListQueryOptions } from '@/features/rules';
+import type { BusinessObjectDefinitionSortField } from '@/lib/api-generated';
 import type { MyRouterContext } from '../__root';
 
 export type BusinessObjectsDialogMode = 'create' | 'edit' | 'view';
+type BusinessObjectsTableSortField = Exclude<
+  BusinessObjectDefinitionSortField,
+  'CreatedBy' | 'CreatedAt'
+>;
 
 export interface BusinessObjectsRouteSearch {
   page: number;
   query?: string;
   dialog?: BusinessObjectsDialogMode;
   recordId?: string;
+  sortBy?: BusinessObjectsTableSortField;
+  sortDirection?: 'Ascending' | 'Descending';
 }
 
 export const Route = createFileRoute('/_authenticated/business-objects')({
@@ -38,11 +45,26 @@ function validateBusinessObjectsSearch(
     typeof search.recordId === 'string' && search.recordId ? search.recordId : undefined;
 
   const query = typeof search.query === 'string' && search.query.trim() ? search.query : undefined;
+  const sortBy =
+    search.sortBy === 'Name' ||
+    search.sortBy === 'Key' ||
+    search.sortBy === 'Status' ||
+    search.sortBy === 'Version' ||
+    search.sortBy === 'Revision' ||
+    search.sortBy === 'ModifiedBy' ||
+    search.sortBy === 'ModifiedAt'
+      ? search.sortBy
+      : undefined;
+  const sortDirection =
+    search.sortDirection === 'Ascending' || search.sortDirection === 'Descending'
+      ? search.sortDirection
+      : undefined;
 
   return {
     page,
     ...(query ? { query } : {}),
     ...(dialog ? { dialog } : {}),
     ...(recordId ? { recordId } : {}),
+    ...(sortBy && sortDirection ? { sortBy, sortDirection } : {}),
   };
 }

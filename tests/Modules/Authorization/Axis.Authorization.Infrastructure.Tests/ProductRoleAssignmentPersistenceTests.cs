@@ -102,6 +102,7 @@ public sealed class ProductRoleAssignmentPersistenceTests(AuthorizationDatabaseF
             test.AssignRequest.RoleKey,
             "revoke-1",
             "corr-revoke-1",
+            "Axis Admin",
             assigned.Assignment!.Revision);
 
         ProductRoleAssignmentResult result = await RevokeAsync(revoke);
@@ -160,6 +161,7 @@ public sealed class ProductRoleAssignmentPersistenceTests(AuthorizationDatabaseF
             test.AssignRequest.RoleKey,
             "revoke-1",
             "corr-revoke-1",
+            "Axis Admin",
             assigned.Assignment!.Revision);
         RevokeProductRoleRequest second = first with { IdempotencyKey = "revoke-2" };
 
@@ -234,7 +236,8 @@ public sealed class ProductRoleAssignmentPersistenceTests(AuthorizationDatabaseF
                 policyVersionId,
                 "Applicant",
                 "assign-1",
-                "corr-assign-1"));
+                "corr-assign-1",
+                "Axis Admin"));
     }
 
     private Task<ProductRoleAssignmentResult> AssignAsync(

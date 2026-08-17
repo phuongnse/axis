@@ -2,6 +2,7 @@ using Axis.Identity.Application.Queries.ListWorkspaceProductBuilders;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -30,8 +31,22 @@ public sealed class ListWorkspaceProductBuildersHandlerTests
                 WorkspaceMembershipRole.Administrator));
         memberships.ListActiveForWorkspaceAsync(workspace.Id, Arg.Any<CancellationToken>())
             .Returns([
-                new(actorId, "Administrator", "admin@example.com", WorkspaceMembershipRole.Administrator, false, 1),
-                new(targetId, "Builder", "builder@example.com", WorkspaceMembershipRole.Member, true, 4),
+                new(
+                    actorId,
+                    "Administrator",
+                    "admin@example.com",
+                    WorkspaceMembershipRole.Administrator,
+                    false,
+                    1,
+                    Metadata(1, actorId, "Administrator")),
+                new(
+                    targetId,
+                    "Builder",
+                    "builder@example.com",
+                    WorkspaceMembershipRole.Member,
+                    true,
+                    4,
+                    Metadata(4, targetId, "Builder")),
             ]);
 
         Result<IReadOnlyList<WorkspaceProductBuilderDto>> result =
@@ -41,8 +56,32 @@ public sealed class ListWorkspaceProductBuildersHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().ContainEquivalentOf(new WorkspaceProductBuilderDto(
-            actorId, "Administrator", "admin@example.com", "Administrator", false, 1, false));
+            actorId,
+            "Administrator",
+            "admin@example.com",
+            "Administrator",
+            false,
+            1,
+            false,
+            Metadata(1, actorId, "Administrator")));
         result.Value.Should().ContainEquivalentOf(new WorkspaceProductBuilderDto(
-            targetId, "Builder", "builder@example.com", "Member", true, 4, true));
+            targetId,
+            "Builder",
+            "builder@example.com",
+            "Member",
+            true,
+            4,
+            true,
+            Metadata(4, targetId, "Builder")));
+    }
+
+    private static ResourceMetadataDto Metadata(
+        int revision,
+        Guid actorId,
+        string displayName)
+    {
+        DateTimeOffset timestamp = new(2026, 8, 17, 0, 0, 0, TimeSpan.Zero);
+        ResourceActorDto actor = new(ActorKind.User, actorId, displayName);
+        return new ResourceMetadataDto(revision, actor, timestamp, actor, timestamp);
     }
 }

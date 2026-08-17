@@ -9,6 +9,7 @@
     <ProjectReference Include="..\Axis.Solutions.Contracts\Axis.Solutions.Contracts.csproj" />
     <ProjectReference Include="..\Axis.Solutions.Domain\Axis.Solutions.Domain.csproj" />
     <ProjectReference Include="..\..\Audit\Axis.Audit.Contracts\Axis.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Axis.Shared.Domain\Axis.Shared.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />

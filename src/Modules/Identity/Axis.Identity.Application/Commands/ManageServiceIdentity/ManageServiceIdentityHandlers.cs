@@ -58,10 +58,12 @@ public sealed class CreateServiceIdentityHandler(
                 : Conflict();
         }
 
+        DateTime now = clock.GetUtcNow().UtcDateTime;
         ServiceIdentity identity = ServiceIdentity.Create(
             command.WorkspaceId,
             clientId,
-            clock.GetUtcNow().UtcDateTime);
+            now);
+        identity.InitializeMetadata(ActorSnapshot.User(command.ActorUserId, command.ActorDisplayName));
         await identities.AddAsync(identity, ct);
         if (!await TryStageProjectionAsync(projection, identity, uow, ct))
             return Conflict();
@@ -428,13 +430,15 @@ public sealed class AddServiceIdentityKeyHandler(
         ServiceIdentityKey key;
         try
         {
+            DateTime now = clock.GetUtcNow().UtcDateTime;
             key = identity.AddKey(
                 parsed!.Kid,
                 parsed.Thumbprint,
                 parsed.X,
                 parsed.Y,
                 c.ExpectedRevision,
-                clock.GetUtcNow().UtcDateTime);
+                now);
+            identity.RecordModification(ActorSnapshot.User(c.ActorUserId, c.ActorDisplayName), now);
         }
         catch (InvalidOperationException)
         {
@@ -520,7 +524,9 @@ public sealed class RevokeServiceIdentityKeyHandler(
         bool changed;
         try
         {
-            changed = identity.RevokeKey(c.KeyId, c.ExpectedRevision, clock.GetUtcNow().UtcDateTime);
+            DateTime now = clock.GetUtcNow().UtcDateTime;
+            changed = identity.RevokeKey(c.KeyId, c.ExpectedRevision, now);
+            if (changed) identity.RecordModification(ActorSnapshot.User(c.ActorUserId, c.ActorDisplayName), now);
         }
         catch (InvalidOperationException)
         {
@@ -603,7 +609,9 @@ public sealed class RevokeServiceIdentityHandler(
         bool changed;
         try
         {
-            changed = identity.Revoke(c.ExpectedRevision, clock.GetUtcNow().UtcDateTime);
+            DateTime now = clock.GetUtcNow().UtcDateTime;
+            changed = identity.Revoke(c.ExpectedRevision, now);
+            if (changed) identity.RecordModification(ActorSnapshot.User(c.ActorUserId, c.ActorDisplayName), now);
         }
         catch (InvalidOperationException)
         {

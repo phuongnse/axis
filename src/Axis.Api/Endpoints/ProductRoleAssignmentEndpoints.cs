@@ -24,7 +24,7 @@ public static class ProductRoleAssignmentEndpoints
         group.MapPost("/assign", Assign)
             .WithName("AssignProductRole")
             .WithSummary("Assign an exact installed product role to a current-Workspace subject")
-            .Produces<ProductRoleAssignmentResponse>()
+            .Produces<ProductRoleAssignmentDto>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -35,7 +35,7 @@ public static class ProductRoleAssignmentEndpoints
         group.MapPost("/revoke", Revoke)
             .WithName("RevokeProductRole")
             .WithSummary("Revoke an exact product-role assignment")
-            .Produces<ProductRoleAssignmentResponse>()
+            .Produces<ProductRoleAssignmentDto>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -74,6 +74,7 @@ public static class ProductRoleAssignmentEndpoints
                 request.RoleKey ?? string.Empty,
                 idempotencyKey ?? string.Empty,
                 CorrelationId(context),
+                currentUser.DisplayName,
                 request.ExpectedRevision),
             cancellationToken);
 
@@ -100,6 +101,7 @@ public static class ProductRoleAssignmentEndpoints
                 request.RoleKey ?? string.Empty,
                 idempotencyKey ?? string.Empty,
                 CorrelationId(context),
+                currentUser.DisplayName,
                 request.ExpectedRevision),
             cancellationToken);
 
@@ -136,7 +138,7 @@ public static class ProductRoleAssignmentEndpoints
     private static IResult ToResult(ProductRoleAssignmentResult result)
     {
         if (result.IsSuccess && result.Assignment is not null)
-            return Results.Ok(ProductRoleAssignmentResponse.From(result.Assignment));
+            return Results.Ok(ProductRoleAssignmentDto.From(result.Assignment));
 
         string error = result.Error ?? "unavailable";
         int statusCode = error switch
@@ -199,24 +201,6 @@ public static class ProductRoleAssignmentEndpoints
         Guid PolicyVersionId,
         string RoleKey,
         int ExpectedRevision);
-
-    public sealed record ProductRoleAssignmentResponse(
-        Guid WorkspaceId,
-        SubjectReferenceDto Subject,
-        Guid PolicyVersionId,
-        string RoleKey,
-        bool IsActive,
-        int Revision)
-    {
-        internal static ProductRoleAssignmentResponse From(ProductRoleAssignment value) =>
-            new(
-                value.WorkspaceId,
-                SubjectReferenceDto.From(value.Subject),
-                value.PolicyVersionId,
-                value.RoleKey,
-                value.IsActive,
-                value.Revision);
-    }
 
     public sealed record ProductRoleManagementResponse(
         IReadOnlyList<AssignableSubjectDto> Subjects,

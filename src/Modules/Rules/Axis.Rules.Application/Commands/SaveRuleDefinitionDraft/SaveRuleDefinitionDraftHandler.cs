@@ -62,6 +62,9 @@ public sealed class SaveRuleDefinitionDraftHandler(
             return saved.ErrorCode == ErrorCodes.Conflict
                 ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(saved.Error)
                 : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(saved.Error);
+        Result provenance = definition.RecordModification(RuleActor.From(currentSubject));
+        if (provenance.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(provenance.Error);
 
         try
         {

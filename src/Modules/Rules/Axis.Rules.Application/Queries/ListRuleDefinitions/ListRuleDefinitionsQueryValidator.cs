@@ -21,5 +21,23 @@ public sealed class ListRuleDefinitionsQueryValidator : AbstractValidator<ListRu
         RuleFor(query => query.Language)
             .MaximumLength(16)
             .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
+
+        RuleFor(query => query.SortBy)
+            .Must(sortBy => sortBy is null || Enum.IsDefined(sortBy.Value))
+            .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
+
+        RuleFor(query => query.SortDirection)
+            .Must(direction => direction is null || Enum.IsDefined(direction.Value))
+            .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
+
+        RuleFor(query => query.SortDirection)
+            .NotNull()
+            .When(query => query.SortBy is not null)
+            .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
+
+        RuleFor(query => query.SortBy)
+            .NotNull()
+            .When(query => query.SortDirection is not null)
+            .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
     }
 }

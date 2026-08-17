@@ -259,5 +259,6 @@ public sealed class BusinessObjectRecordApplicationTests
     private sealed class FakeCurrentSubject : ICurrentSubject
     {
         public IdentitySubjectReference Subject => IdentitySubjectReference.Human(UserId);
+        public string DisplayName => "Ada Lovelace";
     }
 }

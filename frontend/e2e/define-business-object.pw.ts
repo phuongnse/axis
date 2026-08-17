@@ -34,6 +34,14 @@ const builtInRule = (definitionKey: string, name: string, targetTypeKeys: string
   expressionLanguageVersion: 1,
   latestVersion: 1,
   activeVersion: 1,
+  updatedAt: now,
+  metadata: {
+    revision: null,
+    createdBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    createdAt: now,
+    modifiedBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    modifiedAt: now,
+  },
   output: { type: 'Boolean', cardinality: 'Scalar' },
   inputs: [
     {
@@ -145,6 +153,13 @@ function unpublishedDetail({
     latestPublishedVersionNumber: null as number | null,
     createdAt: now,
     updatedAt: now,
+    metadata: {
+      revision,
+      createdBy: { kind: 'User', subjectId: profile.id, displayName: profile.fullName },
+      createdAt: now,
+      modifiedBy: { kind: 'User', subjectId: profile.id, displayName: profile.fullName },
+      modifiedAt: now,
+    },
     actions: { canSave: true, canPublish: true },
     fields: fields.map((field, index) => ({
       id: index === 0 ? fieldId : `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
@@ -360,6 +375,7 @@ async function mockBusinessObjectDefinitionApi(
         revision: definition.revision,
         latestPublishedVersionNumber: definition.latestPublishedVersionNumber,
         updatedAt: definition.updatedAt,
+        metadata: definition.metadata,
       }));
       const query = url.searchParams.get('query')?.trim().toLocaleLowerCase();
       const items = query
@@ -709,18 +725,18 @@ async function expectResourceWorkspaceScreenshot(
   await expect(workspace).toBeVisible();
   await expect(workspace).toHaveAttribute('data-axis-surface-contract', 'resource-workspace');
   await expect(workspace).toHaveAttribute('data-axis-surface-id', 'business-object-definitions');
-  await page.evaluate(() =>
-    Promise.allSettled(
-      document.getAnimations({ subtree: true }).map((animation) => animation.finished),
-    ),
-  );
+  await page.mouse.move(1, 1);
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     document
       .querySelector<HTMLElement>('[data-slot="module-navigation-items"] [aria-current="page"]')
       ?.scrollIntoView({ block: 'nearest', inline: 'center' });
   });
-  await page.mouse.move(1, 1);
+  await page.evaluate(() =>
+    Promise.allSettled(
+      document.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
+  );
   await expect(page).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
@@ -1282,13 +1298,6 @@ async function prepareCompactManagedTaskWindowCandidate(
     });
 }
 
-async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
-  const viewport = page.locator('[data-slot="data-table-viewport"]');
-  await expect
-    .poll(() => viewport.evaluate((element) => element.scrollWidth <= element.clientWidth))
-    .toBe(true);
-}
-
 async function expectResourceWorkspaceTargetGeometry(
   page: Page,
   minimumSize: 32 | 44,
@@ -1373,6 +1382,7 @@ async function expectDataTableScrollsInternally(
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
   if (options.horizontally) {
+    await expect(viewport).toHaveAttribute('data-horizontal-overflow', 'compact');
     await expect
       .poll(() => viewport.evaluate((element) => element.scrollWidth > element.clientWidth))
       .toBe(true);
@@ -1381,6 +1391,25 @@ async function expectDataTableScrollsInternally(
   }
 
   await viewport.evaluate((element) => element.scrollTo({ left: 0, top: 0 }));
+}
+
+async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
+  const viewport = page.locator('[data-slot="data-table-viewport"]');
+  await expect(viewport).toHaveAttribute('data-horizontal-overflow', 'fitted');
+  await expect
+    .poll(() =>
+      viewport.evaluate((element) =>
+        JSON.stringify({
+          fits: element.scrollWidth <= element.clientWidth + 1,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          tableWidth:
+            element.querySelector<HTMLElement>('[data-slot="table"]')?.getBoundingClientRect()
+              .width ?? 0,
+        }),
+      ),
+    )
+    .toContain('"fits":true');
 }
 
 async function expectReducedMotion(locator: Locator): Promise<void> {
@@ -1463,6 +1492,27 @@ test.describe('define business object', () => {
     await expect(toolbar).toBeVisible();
     await expect(toolbar.getByLabel('Search business objects')).toBeVisible();
     await expect(toolbar.locator('[data-slot="data-table-toolbar-actions"]')).toBeVisible();
+    const versionHeader = catalog.getByRole('columnheader', { name: 'Version' });
+    const revisionHeader = catalog.getByRole('columnheader', { name: 'Revision' });
+    const firstDataRow = catalog.getByRole('row').nth(1);
+    const versionCell = firstDataRow.locator('td[data-cell-kind="version"]');
+    const revisionCell = firstDataRow.locator('td[data-cell-kind="revision"]');
+    const actorCells = firstDataRow.locator('td[data-cell-kind="actor"]');
+    const dateTimeCells = firstDataRow.locator('td[data-cell-kind="dateTime"]');
+    await expect(versionHeader).toHaveAttribute('data-align', 'start');
+    await expect(revisionHeader).toHaveAttribute('data-align', 'start');
+    await expect(versionCell).toHaveAttribute('data-align', 'start');
+    await expect(versionCell).toHaveCSS('text-align', 'start');
+    await expect(versionCell).toHaveCSS('vertical-align', 'middle');
+    await expect(firstDataRow).toHaveAttribute('data-row-layout', 'single-line');
+    await expect(versionCell).toHaveText('N/A');
+    await expect(revisionCell).toHaveText('r1');
+    await expect(actorCells).toHaveCount(1);
+    await expect(actorCells).toHaveText('Objects User');
+    await expect(dateTimeCells).toHaveCount(1);
+    for (const dateTimeCell of await dateTimeCells.all()) {
+      await expect(dateTimeCell).not.toContainText(now);
+    }
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
     await expectRecordActionAlignedToCellContent(page);
@@ -1563,14 +1613,15 @@ test.describe('define business object', () => {
         'Định nghĩa contract dữ liệu dùng lại trong workspace. Định nghĩa chưa publish còn chỉnh được; bản publish là phiên bản ổn định.',
       ),
     ).toBeVisible();
-    await page.evaluate(() => {
-      for (const element of document.querySelectorAll<HTMLElement>(
-        '[data-slot="resource-workspace"], [data-slot="resource-workspace"] *',
-      )) {
-        element.style.setProperty('letter-spacing', '0.12em', 'important');
-        element.style.setProperty('line-height', '1.5', 'important');
-        element.style.setProperty('word-spacing', '0.16em', 'important');
-      }
+    await page.addStyleTag({
+      content: `
+        [data-slot="resource-workspace"],
+        [data-slot="resource-workspace"] * {
+          letter-spacing: 0.12em !important;
+          line-height: 1.5 !important;
+          word-spacing: 0.16em !important;
+        }
+      `,
     });
 
     await expectDataTableScrollsInternally(page, { horizontally: true });

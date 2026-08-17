@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -23,19 +24,16 @@ import {
 } from '../managed-windows';
 
 export function ServiceIdentitiesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { openWindow } = useManagedWindowActions();
   const identitiesQuery = useQuery(serviceIdentitiesQueryOptions());
   const identities = identitiesQuery.data ?? [];
-  const tableQuery = useMemo<DataTableQueryState>(
-    () => ({
-      globalFilter: '',
-      filterExpression: createEmptyFilterExpression(),
-      sorting: [],
-      grouping: [],
-    }),
-    [],
-  );
+  const [tableQuery, setTableQuery] = useState<DataTableQueryState>(() => ({
+    globalFilter: '',
+    filterExpression: createEmptyFilterExpression(),
+    sorting: [],
+    grouping: [],
+  }));
   const tableDefinition = useMemo<DataTableDefinition<ServiceIdentityDto>>(() => {
     const columns: DataTableColumnDef<ServiceIdentityDto>[] = [
       {
@@ -43,8 +41,7 @@ export function ServiceIdentitiesPage() {
         accessorKey: 'clientId',
         size: 260,
         minSize: 220,
-        enableSorting: false,
-        meta: { label: t('serviceIdentities.clientId') },
+        meta: { label: t('serviceIdentities.clientId'), cell: { kind: 'action' } },
         cell: ({ row }) => {
           const title = row.original.clientId ?? t('serviceIdentities.notAvailable');
           return (
@@ -61,17 +58,14 @@ export function ServiceIdentitiesPage() {
         accessorFn: (identity) => identity.subject?.subjectId,
         size: 280,
         minSize: 240,
-        enableSorting: false,
-        meta: { label: t('serviceIdentities.subject') },
-        cell: ({ row }) => row.original.subject?.subjectId ?? t('serviceIdentities.notAvailable'),
+        meta: { label: t('serviceIdentities.subject'), cell: { kind: 'identifier' } },
       },
       {
         id: 'status',
         accessorKey: 'status',
         size: 140,
         minSize: 120,
-        enableSorting: false,
-        meta: { label: t('serviceIdentities.status') },
+        meta: { label: t('serviceIdentities.status'), cell: { kind: 'status' } },
         cell: ({ row }) => (
           <StatusBadge state={row.original.status === 'Active' ? 'positive' : 'inactive'}>
             {row.original.status === 'Active'
@@ -85,29 +79,28 @@ export function ServiceIdentitiesPage() {
         accessorKey: 'workspaceGrantStatus',
         size: 170,
         minSize: 150,
-        enableSorting: false,
-        meta: { label: t('serviceIdentities.grantStatus') },
+        meta: { label: t('serviceIdentities.grantStatus'), cell: { kind: 'status' } },
       },
       {
         id: 'keys',
+        accessorFn: (identity) => identity.keys?.length ?? 0,
         size: 130,
         minSize: 110,
-        enableSorting: false,
-        meta: { label: t('serviceIdentities.keysTitle') },
-        cell: ({ row }) => String(row.original.keys?.length ?? 0),
+        meta: { label: t('serviceIdentities.keysTitle'), cell: { kind: 'number' } },
       },
-      {
-        id: 'revision',
-        accessorKey: 'revision',
-        size: 120,
-        minSize: 100,
-        enableSorting: false,
-        meta: { label: t('serviceIdentities.revision') },
-      },
+      ...createResourceMetadataColumns<ServiceIdentityDto>(
+        {
+          revision: t('metadata.revision'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {
       ariaLabel: t('serviceIdentities.listTitle'),
+      locale: i18n.language,
       source: {
         mode: 'client',
         data: identities,
@@ -124,7 +117,7 @@ export function ServiceIdentitiesPage() {
       }),
       getRowId: (identity) => identity.id ?? identity.clientId ?? 'service-identity',
       queryState: tableQuery,
-      onQueryStateChange: () => undefined,
+      onQueryStateChange: setTableQuery,
       columnControls: true,
       grouping: false,
       renderToolbarActions: identitiesQuery.isSuccess
@@ -151,6 +144,7 @@ export function ServiceIdentitiesPage() {
     identitiesQuery.isPending,
     identitiesQuery.isSuccess,
     identitiesQuery.refetch,
+    i18n.language,
     openWindow,
     t,
     tableQuery,

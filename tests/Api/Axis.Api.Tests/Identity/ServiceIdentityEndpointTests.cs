@@ -31,6 +31,11 @@ public sealed class ServiceIdentityEndpointTests(ApiTestFixture fixture)
         createdBody.GetProperty("clientId").GetString().Should().Be(clientId);
         createdBody.TryGetProperty("clientSecret", out _).Should().BeFalse();
         createdBody.TryGetProperty("privateKey", out _).Should().BeFalse();
+        JsonElement createdMetadata = createdBody.GetProperty("metadata");
+        createdMetadata.GetProperty("createdBy").GetProperty("displayName").GetString()
+            .Should().Be("Workspace Administrator");
+        createdMetadata.GetProperty("modifiedBy").GetProperty("displayName").GetString()
+            .Should().Be("Workspace Administrator");
 
         HttpResponseMessage listed = await fixture.Client.GetAsync(
             "/api/service-identities",
@@ -55,6 +60,8 @@ public sealed class ServiceIdentityEndpointTests(ApiTestFixture fixture)
         JsonElement revokedBody = await ReadJsonAsync(revoked);
         revokedBody.GetProperty("status").GetString().Should().Be("Revoked");
         revokedBody.GetProperty("workspaceGrantStatus").GetString().Should().Be("Revoked");
+        revokedBody.GetProperty("metadata").GetProperty("modifiedBy").GetProperty("displayName").GetString()
+            .Should().Be("Workspace Administrator");
     }
 
     [Fact]

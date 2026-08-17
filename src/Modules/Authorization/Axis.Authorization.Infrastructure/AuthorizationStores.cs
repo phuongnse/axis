@@ -4,6 +4,7 @@ using Axis.Authorization.Application;
 using Axis.Authorization.Contracts;
 using Axis.Authorization.Infrastructure.Persistence;
 using Axis.Identity.Contracts;
+using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -78,6 +79,13 @@ internal sealed class ProductRoleAssignmentStore(AuthorizationDbContext context)
                 Revision = value.Revision,
                 CreatedAt = value.CreatedAt,
                 RevokedAt = value.RevokedAt,
+                UpdatedAt = value.UpdatedAt,
+                CreatedByKind = value.CreatedBy.Kind.ToString(),
+                CreatedBySubjectId = value.CreatedBy.SubjectId,
+                CreatedByDisplayName = value.CreatedBy.DisplayName,
+                UpdatedByKind = value.UpdatedBy.Kind.ToString(),
+                UpdatedBySubjectId = value.UpdatedBy.SubjectId,
+                UpdatedByDisplayName = value.UpdatedBy.DisplayName,
             },
             cancellationToken).AsTask();
 
@@ -96,6 +104,10 @@ internal sealed class ProductRoleAssignmentStore(AuthorizationDbContext context)
         row.IsActive = value.IsActive;
         row.Revision = value.Revision;
         row.RevokedAt = value.RevokedAt;
+        row.UpdatedAt = value.UpdatedAt;
+        row.UpdatedByKind = value.UpdatedBy.Kind.ToString();
+        row.UpdatedBySubjectId = value.UpdatedBy.SubjectId;
+        row.UpdatedByDisplayName = value.UpdatedBy.DisplayName;
     }
 
     public Task AddIdempotencyAsync(
@@ -136,7 +148,25 @@ internal sealed class ProductRoleAssignmentStore(AuthorizationDbContext context)
             row.IsActive,
             row.Revision,
             row.CreatedAt,
-            row.RevokedAt);
+            row.RevokedAt,
+            row.UpdatedAt,
+            Actor(row.CreatedByKind, row.CreatedBySubjectId, row.CreatedByDisplayName),
+            Actor(row.UpdatedByKind, row.UpdatedBySubjectId, row.UpdatedByDisplayName));
+
+    private static ActorSnapshot Actor(
+        string kind,
+        Guid? subjectId,
+        string displayName)
+    {
+        if (!Enum.TryParse(kind, out ActorKind actorKind)
+            || string.IsNullOrWhiteSpace(displayName))
+            throw new InvalidOperationException("Product-role assignment provenance is incomplete.");
+
+        ActorSnapshot actor = new(actorKind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Product-role assignment provenance is invalid.");
+    }
 }
 
 internal sealed class InstalledProductRoleStore(AuthorizationDbContext context)

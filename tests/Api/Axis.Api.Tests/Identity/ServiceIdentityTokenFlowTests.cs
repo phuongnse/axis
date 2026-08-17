@@ -16,6 +16,7 @@ using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using BusinessObjectRecordId = Axis.BusinessObjects.Domain.ValueObjects.BusinessObjectRecordId;
@@ -326,6 +327,7 @@ public sealed class ServiceIdentityTokenFlowTests(ApiTestFixture fixture)
 
         AuthorizationDbContext authorization = scope.ServiceProvider
             .GetRequiredService<AuthorizationDbContext>();
+        DateTimeOffset assignedAt = DateTimeOffset.UtcNow;
         await authorization.Assignments.AddAsync(new ProductRoleAssignmentRow
         {
             Id = Guid.NewGuid(),
@@ -336,7 +338,12 @@ public sealed class ServiceIdentityTokenFlowTests(ApiTestFixture fixture)
             RoleKey = "ServiceCreator",
             IsActive = true,
             Revision = 1,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = assignedAt,
+            UpdatedAt = assignedAt,
+            CreatedByKind = ActorKind.System.ToString(),
+            CreatedByDisplayName = ActorSnapshot.SystemDisplayName,
+            UpdatedByKind = ActorKind.System.ToString(),
+            UpdatedByDisplayName = ActorSnapshot.SystemDisplayName,
         }, cancellationToken);
         await authorization.SaveChangesAsync(cancellationToken);
     }

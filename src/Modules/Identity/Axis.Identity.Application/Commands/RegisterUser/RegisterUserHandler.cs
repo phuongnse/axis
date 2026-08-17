@@ -136,8 +136,12 @@ public sealed class RegisterUserHandler(
             command.AcceptedPrivacyVersion);
 
         await workspaceRepo.AddAsync(personalWorkspace, cancellationToken);
-        await workspaceMembershipRepo.AddAsync(
-            WorkspaceMembership.CreatePersonalOwner(personalWorkspace.Id, user.Id),
-            cancellationToken);
+        WorkspaceMembership membership = WorkspaceMembership.CreatePersonalOwner(
+            personalWorkspace.Id,
+            user.Id);
+        membership.InitializeMetadata(
+            ActorSnapshot.User(user.Id, user.FullName),
+            user.CreatedAt);
+        await workspaceMembershipRepo.AddAsync(membership, cancellationToken);
     }
 }

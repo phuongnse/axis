@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/solutions/README.md](./README.md) · [docs/architecture/solutions.md](../../architecture/solutions.md) · [docs/architecture/solution-package-v1.md](../../architecture/solution-package-v1.md) · [AGENTS.md](../../../AGENTS.md)
 
-> **Contract status:** Implemented and verified at the immutable two-repository `0.1.2` public-contract checkpoint.
+> **Contract status:** Implemented and verified at the immutable two-repository `0.1.0-dev.gb8568d9ded04` public-contract checkpoint, with stable publication intent held at `0.1.0`.
 
 ## Purpose
 
@@ -86,6 +86,6 @@ The publish and install administrator screens follow their owning contracts. The
 >
 > **Deferred follow-ups:** Only the explicitly out-of-scope lifecycle capabilities above.
 >
-> **Verification:** [validate-reference-product-lifecycle.evidence.md](./validate-reference-product-lifecycle.evidence.md) binds the external source, package tests, signed payload, architecture proof, and authentic blank-Workspace browser lifecycle to reference-product commit `217cbc6a072977a250b013eecdd9997c3e62266e`. Release `0.1.2` carries that exact `sourceRevision` and Axis OpenAPI digest `ee28c66776e404441c6458244824e50b1e2dc32c00407ea2746703cf9134a47f`; the governed browser journey publishes and installs it before exercising the authenticated product through the BFF.
+> **Verification:** [validate-reference-product-lifecycle.evidence.md](./validate-reference-product-lifecycle.evidence.md) binds the external source, package tests, signed payload, architecture proof, and authentic blank-Workspace browser lifecycle to reference-product commit `b8568d9ded047f497ac62d4df56ac682fc0b33f8`. Development snapshot `0.1.0-dev.gb8568d9ded04` carries that exact `sourceRevision` and Axis OpenAPI digest `5ca3b6e62c1950ed3a1524f04f4e38226a187f7e0119ec9d5ac9a101b7135548`; the governed focused browser journey publishes and installs it before exercising the authenticated product through the BFF. The stable version remains `0.1.0` and changes only at an intentional publication boundary.
 >
 > **Decisions:** This use case owns recurring proof that the external reference product consumes the same supported solution lifecycle as any customer product. [docs/architecture/solution-package-v1.md](../../architecture/solution-package-v1.md) owns package bytes and [docs/architecture/solutions.md](../../architecture/solutions.md) owns lifecycle realization.

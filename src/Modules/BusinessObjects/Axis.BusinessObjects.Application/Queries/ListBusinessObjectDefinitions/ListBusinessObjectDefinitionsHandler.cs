@@ -61,6 +61,8 @@ public sealed class ListBusinessObjectDefinitionsHandler(
                 query.PageSize,
                 query.SearchQuery,
                 publishedOnly,
+                query.SortBy,
+                query.SortDirection,
                 cancellationToken);
 
         return new PagedResult<BusinessObjectDefinitionListItemDto>(

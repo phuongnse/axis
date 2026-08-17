@@ -31,6 +31,8 @@ public sealed class ActivateRuleDefinitionVersionHandler(
         if (definition is null) return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
         Result activated = definition.ActivateVersion(command.ExpectedRevision, command.Version, RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject), DateTime.UtcNow);
         if (activated.IsFailure) return activated.ErrorCode == ErrorCodes.Conflict ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(activated.Error) : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(activated.Error);
+        Result provenance = definition.RecordModification(RuleActor.From(currentSubject));
+        if (provenance.IsFailure) return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(provenance.Error);
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (ConcurrencyException) { return RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>("The rule definition has changed."); }
         return RuleContractMapper.ToDetailDto(definition, canManage: true);

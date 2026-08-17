@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   countFilterConditions,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -41,7 +42,7 @@ const items: Item[] = [
   {
     id: '2',
     name: 'Beta',
-    amount: 20,
+    amount: 1234.5,
     created: '2026-02-01',
     occurredAt: '2026-02-01T10:00:00Z',
     active: false,
@@ -118,6 +119,7 @@ const messages: DataTableMessages = {
   maximum: 'Maximum',
   trueValue: 'Yes',
   falseValue: 'No',
+  emptyValue: 'N/A',
   allValues: 'All values',
   rowsPerPage: 'Rows per page',
   pageStatus: (page, count) => `Page ${page} of ${count}`,
@@ -141,36 +143,33 @@ const columns: DataTableColumnDef<Item>[] = [
     accessorKey: 'name',
     meta: {
       label: 'Name',
+      cell: { kind: 'text' },
       searchable: true,
       filter: { kind: 'text' },
     },
-    cell: ({ row }) => row.original.name,
   },
   {
     accessorKey: 'amount',
-    meta: { label: 'Amount', filter: { kind: 'number' } },
-    cell: ({ row }) => row.original.amount,
+    meta: { label: 'Amount', cell: { kind: 'number' }, filter: { kind: 'number' } },
   },
   {
     accessorKey: 'created',
-    meta: { label: 'Created', filter: { kind: 'date' } },
-    cell: ({ row }) => row.original.created,
+    meta: { label: 'Created', cell: { kind: 'date' }, filter: { kind: 'date' } },
   },
   {
     accessorKey: 'occurredAt',
-    meta: { label: 'Occurred', filter: { kind: 'dateTime' } },
-    cell: ({ row }) => row.original.occurredAt,
+    meta: { label: 'Occurred', cell: { kind: 'dateTime' }, filter: { kind: 'dateTime' } },
   },
   {
     accessorKey: 'active',
-    meta: { label: 'Active', filter: { kind: 'boolean' } },
-    cell: ({ row }) => (row.original.active ? 'Active' : 'Inactive'),
+    meta: { label: 'Active', cell: { kind: 'boolean' }, filter: { kind: 'boolean' } },
   },
   {
     accessorKey: 'status',
     enableGrouping: true,
     meta: {
       label: 'Status',
+      cell: { kind: 'status' },
       filter: {
         kind: 'singleChoice',
         options: [
@@ -179,14 +178,12 @@ const columns: DataTableColumnDef<Item>[] = [
         ],
       },
     },
-    cell: ({ row }) => row.original.status,
   },
   {
     accessorKey: 'department',
     enableGrouping: true,
     aggregationFn: 'count',
-    meta: { label: 'Department' },
-    cell: ({ row }) => row.original.department,
+    meta: { label: 'Department', cell: { kind: 'text' } },
     aggregatedCell: ({ getValue }) => `${String(getValue())} records`,
   },
 ];
@@ -196,6 +193,7 @@ function clientDefinition(
 ): DataTableDefinition<Item> {
   return {
     ariaLabel: 'Records',
+    locale: 'en-US',
     source: { mode: 'client', data: items, pagination: { pageSize: 2 } },
     columns,
     messages,
@@ -205,7 +203,321 @@ function clientDefinition(
 }
 
 describe('DataTable', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('uses the shared N/A placeholder for a missing cell value', async () => {
+    const missingValueColumns: DataTableColumnDef<Item>[] = [
+      {
+        id: 'missing',
+        accessorFn: () => undefined,
+        meta: { label: 'Missing', cell: { kind: 'text' } },
+      },
+    ];
+    render(
+      <DataTable
+        definition={clientDefinition({
+          source: { mode: 'client', data: [items[0]], pagination: { pageSize: 1 } },
+          columns: missingValueColumns,
+        })}
+      />,
+    );
+
+    const cell = (await screen.findByText('N/A')).closest('td');
+    await waitFor(() => expect(cell).toHaveAttribute('data-cell-kind', 'text'));
+  });
+
+  it('fits columns to a regular viewport and reserves horizontal overflow for compact widths', () => {
+    const originalClientWidth = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientWidth',
+    );
+    let viewportWidth = 1024;
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return this.getAttribute('data-slot') === 'data-table-viewport' ? viewportWidth : 0;
+      },
+    });
+
+    const sizingColumns: DataTableColumnDef<Item>[] = [
+      {
+        accessorKey: 'name',
+        size: 700,
+        minSize: 300,
+        meta: { label: 'Name', cell: { kind: 'text' } },
+      },
+      {
+        accessorKey: 'status',
+        size: 100,
+        minSize: 120,
+        meta: { label: 'Status', cell: { kind: 'status' } },
+      },
+      {
+        accessorKey: 'department',
+        size: 100,
+        minSize: 120,
+        meta: { label: 'Department', cell: { kind: 'text' } },
+      },
+    ];
+
+    try {
+      for (viewportWidth of [768, 1024, 1280]) {
+        const desktop = render(
+          <DataTable definition={clientDefinition({ columns: sizingColumns })} />,
+        );
+        const desktopViewport = desktop.container.querySelector<HTMLElement>(
+          '[data-slot="data-table-viewport"]',
+        );
+        expect(desktopViewport).toHaveAttribute('data-horizontal-overflow', 'fitted');
+        expect(desktopViewport?.querySelector('table')).toHaveStyle({ width: '100%' });
+        const widths = [...(desktopViewport?.querySelectorAll('col') ?? [])].map((column) =>
+          Number.parseFloat((column as HTMLElement).style.width),
+        );
+        expect(widths).toHaveLength(3);
+        expect(widths[0]).toBeGreaterThanOrEqual(300);
+        expect(widths[1]).toBeGreaterThanOrEqual(120);
+        expect(widths[2]).toBeGreaterThanOrEqual(120);
+        expect(
+          desktopViewport?.querySelector('[data-slot="data-table-column-label"]'),
+        ).toHaveAttribute('title', 'Name');
+        expect(desktopViewport?.querySelector('[data-slot="data-table-value"]')).toHaveAttribute(
+          'title',
+          'Alpha',
+        );
+        desktop.unmount();
+      }
+
+      viewportWidth = 768;
+      const compressedMinimums = [280, 200, 170, 180];
+      const compressedColumns: DataTableColumnDef<Item>[] = [
+        {
+          id: 'rule',
+          accessorKey: 'name',
+          size: 330,
+          minSize: compressedMinimums[0],
+          meta: { label: 'Rule', cell: { kind: 'text' } },
+        },
+        {
+          id: 'inputs',
+          accessorKey: 'department',
+          size: 220,
+          minSize: compressedMinimums[1],
+          meta: { label: 'Inputs', cell: { kind: 'list' } },
+        },
+        {
+          id: 'createdBy',
+          accessorKey: 'status',
+          size: 190,
+          minSize: compressedMinimums[2],
+          meta: { label: 'Created by', cell: { kind: 'actor' } },
+        },
+        {
+          id: 'createdAt',
+          accessorKey: 'occurredAt',
+          size: 190,
+          minSize: compressedMinimums[3],
+          meta: { label: 'Created at', cell: { kind: 'dateTime' } },
+        },
+      ];
+      const compressed = render(
+        <DataTable definition={clientDefinition({ columns: compressedColumns })} />,
+      );
+      const compressedViewport = compressed.container.querySelector<HTMLElement>(
+        '[data-slot="data-table-viewport"]',
+      );
+      const compressedWidths = [...(compressedViewport?.querySelectorAll('col') ?? [])].map(
+        (column) => Number.parseFloat((column as HTMLElement).style.width),
+      );
+      const compressedMinimumTotal = compressedMinimums.reduce((total, width) => total + width, 0);
+      expect(compressedViewport).toHaveAttribute('data-horizontal-overflow', 'fitted');
+      expect(compressedWidths).toHaveLength(compressedMinimums.length);
+      compressedWidths.forEach((width, index) => {
+        expect(width).toBeCloseTo(
+          (viewportWidth * compressedMinimums[index]) / compressedMinimumTotal,
+          4,
+        );
+      });
+      expect(compressedWidths.reduce((total, width) => total + width, 0)).toBeCloseTo(
+        viewportWidth,
+        4,
+      );
+      compressed.unmount();
+
+      viewportWidth = 390;
+      const compact = render(<DataTable definition={clientDefinition()} />);
+      const compactViewport = compact.container.querySelector<HTMLElement>(
+        '[data-slot="data-table-viewport"]',
+      );
+      const compactTable = compactViewport?.querySelector('table');
+      expect(compactViewport).toHaveAttribute('data-horizontal-overflow', 'compact');
+      expect(Number.parseFloat(compactTable?.style.width ?? '0')).toBeGreaterThan(viewportWidth);
+      compact.unmount();
+    } finally {
+      if (originalClientWidth) {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth');
+      }
+    }
+  });
+
+  it('sorts complete modified actor metadata by localized display name', async () => {
+    type MetadataRow = {
+      id: string;
+      name: string;
+      metadata: {
+        revision: number;
+        createdBy: { displayName: string };
+        createdAt: string;
+        modifiedBy: { displayName: string };
+        modifiedAt: string;
+      };
+    };
+    const metadataRows: MetadataRow[] = [
+      {
+        id: 'first',
+        name: 'First record',
+        metadata: {
+          revision: 1,
+          createdBy: { displayName: 'Ada Lovelace' },
+          createdAt: '2026-01-01T00:00:00Z',
+          modifiedBy: { displayName: 'Zed User' },
+          modifiedAt: '2026-01-02T00:00:00Z',
+        },
+      },
+      {
+        id: 'second',
+        name: 'Second record',
+        metadata: {
+          revision: 2,
+          createdBy: { displayName: 'Zed User' },
+          createdAt: '2026-01-01T00:00:00Z',
+          modifiedBy: { displayName: 'Ada Lovelace' },
+          modifiedAt: '2026-01-02T00:00:00Z',
+        },
+      },
+      {
+        id: 'system',
+        name: 'System record',
+        metadata: {
+          revision: 3,
+          createdBy: { displayName: 'System' },
+          createdAt: '2026-01-01T00:00:00Z',
+          modifiedBy: { displayName: 'System' },
+          modifiedAt: '2026-01-02T00:00:00Z',
+        },
+      },
+    ];
+    const metadataColumns: DataTableColumnDef<MetadataRow>[] = [
+      {
+        accessorKey: 'name',
+        meta: { label: 'Name', cell: { kind: 'text' } },
+      },
+      ...createResourceMetadataColumns<MetadataRow>(
+        {
+          revision: 'Revision',
+          modifiedBy: 'Modified by',
+          modifiedAt: 'Modified at',
+        },
+        { locale: 'en-US' },
+      ),
+    ];
+    const user = userEvent.setup();
+    const rendered = render(
+      <DataTable
+        definition={{
+          ariaLabel: 'Metadata records',
+          locale: 'en-US',
+          source: { mode: 'client', data: metadataRows, pagination: false },
+          columns: metadataColumns,
+          messages,
+          getRowId: (row) => row.id,
+        }}
+      />,
+    );
+    const rowNames = () =>
+      [...rendered.container.querySelectorAll('tbody tr')].map(
+        (row) => row.querySelector('td')?.textContent,
+      );
+
+    await user.click(screen.getByRole('button', { name: 'Modified by: Sort ascending' }));
+    await waitFor(() =>
+      expect(rowNames()).toEqual(['Second record', 'System record', 'First record']),
+    );
+  });
+
+  it('formats semantic values and reserves end alignment for quantities', async () => {
+    type TypedRow = {
+      id: string;
+      version: number;
+      revision: number;
+      actor: { displayName: string };
+      actorKind: string;
+      quantity: number;
+    };
+    const typedColumns: DataTableColumnDef<TypedRow>[] = [
+      {
+        accessorKey: 'version',
+        meta: { label: 'Version', cell: { kind: 'version' } },
+      },
+      {
+        accessorKey: 'revision',
+        meta: { label: 'Revision', cell: { kind: 'revision' } },
+      },
+      {
+        accessorKey: 'actor',
+        meta: { label: 'Modified by', cell: { kind: 'actor' } },
+      },
+      {
+        accessorKey: 'actorKind',
+        meta: { label: 'Invalid actor source', cell: { kind: 'actor' } },
+      },
+      {
+        accessorKey: 'quantity',
+        meta: { label: 'Quantity', cell: { kind: 'number' } },
+      },
+    ];
+    const row: TypedRow = {
+      id: 'typed',
+      version: 7,
+      revision: 12,
+      actor: { displayName: 'Ada Lovelace' },
+      actorKind: 'Human',
+      quantity: 1234,
+    };
+
+    render(
+      <DataTable
+        definition={{
+          ariaLabel: 'Typed values',
+          locale: 'en-US',
+          source: { mode: 'client', data: [row], pagination: false },
+          columns: typedColumns,
+          messages,
+          getRowId: (value) => value.id,
+        }}
+      />,
+    );
+
+    for (const value of ['v7', 'r12', 'Ada Lovelace']) {
+      const cell = (await screen.findByText(value)).closest('td');
+      expect(cell).toHaveAttribute('data-align', 'start');
+      expect(cell).toHaveClass('align-middle');
+      expect(cell?.querySelector('[data-slot="data-table-cell-content"]')).toHaveClass(
+        'items-center',
+      );
+    }
+    expect((await screen.findByText('v7')).closest('tr')).toHaveAttribute(
+      'data-row-layout',
+      'single-line',
+    );
+    expect((await screen.findByText('1,234')).closest('td')).toHaveAttribute('data-align', 'end');
+    expect(screen.queryByText('Human')).not.toBeInTheDocument();
+    expect(screen.getAllByText('N/A')).toHaveLength(1);
+  });
 
   it('keeps record actions on the cell content edge without shrinking their target', async () => {
     const user = userEvent.setup();
@@ -232,6 +544,57 @@ describe('DataTable', () => {
 
     await user.click(action);
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it('top-aligns the whole row to the first line when one typed cell wraps', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockImplementation(function () {
+      const line = { width: 40, height: 20, top: 0 } as DOMRect;
+      return this.textContent?.includes('Alpha, Beta')
+        ? ([line, { ...line, top: 20 }] as unknown as DOMRectList)
+        : ([line] as unknown as DOMRectList);
+    });
+    type WrappedRow = { id: string; name: string; tags: string[] };
+    const wrappedColumns: DataTableColumnDef<WrappedRow>[] = [
+      {
+        accessorKey: 'name',
+        meta: { label: 'Name', cell: { kind: 'text' } },
+        cell: ({ getValue }) => (
+          <DataTableRecordAction onClick={() => undefined}>
+            {String(getValue())}
+          </DataTableRecordAction>
+        ),
+      },
+      {
+        accessorKey: 'tags',
+        meta: { label: 'Tags', cell: { kind: 'list' } },
+      },
+    ];
+
+    render(
+      <DataTable
+        definition={{
+          ariaLabel: 'Wrapped records',
+          locale: 'en-US',
+          source: {
+            mode: 'client',
+            data: [{ id: 'wrapped', name: 'Customer', tags: ['Alpha', 'Beta'] }],
+            pagination: false,
+          },
+          columns: wrappedColumns,
+          messages,
+          getRowId: (row) => row.id,
+        }}
+      />,
+    );
+
+    const row = screen.getByRole('row', { name: /Customer Alpha, Beta/ });
+    await waitFor(() => expect(row).toHaveAttribute('data-row-layout', 'multiline'));
+    for (const cell of row.querySelectorAll('td')) {
+      expect(cell).toHaveClass('align-top');
+      expect(cell.querySelector('[data-slot="data-table-cell-content"]')).toHaveClass(
+        'items-start',
+      );
+    }
   });
 
   it('reserves initial rows, delays skeletons, and does not use background refresh as loading', async () => {
@@ -278,6 +641,7 @@ describe('DataTable', () => {
       }),
     ).toBeInTheDocument();
     const nameHeader = within(table).getByRole('columnheader', { name: /Name/ });
+    expect(nameHeader).not.toHaveAttribute('aria-sort');
     const nameSort = within(nameHeader).getByRole('button', { name: 'Name: Sort ascending' });
     expect(nameSort).toHaveClass(
       axisStyles.density.minHeight.touchTarget,
@@ -296,6 +660,16 @@ describe('DataTable', () => {
       axisStyles.density.minHeight.touchTarget,
       axisStyles.density.minHeight.compactControlAtSmall,
     );
+    const amountHeader = within(table).getByRole('columnheader', { name: /Amount/ });
+    const amountCell = within(table).getByText('10').closest('td');
+    expect(amountHeader).toHaveAttribute('data-align', 'end');
+    expect(amountHeader).toHaveClass('text-right');
+    expect(amountCell).toHaveAttribute('data-cell-kind', 'number');
+    expect(amountCell).toHaveAttribute('data-align', 'end');
+    expect(amountCell).toHaveClass('text-right', 'tabular-nums');
+    expect(within(table).getByText('1,234.5')).toBeInTheDocument();
+    expect(within(table).getByText('Jan 1, 2026')).toBeInTheDocument();
+    expect(within(table).getByText('Yes')).toBeInTheDocument();
     expect(within(table).queryByText('Gamma')).not.toBeInTheDocument();
 
     expect(table.querySelectorAll('[data-slot="table"]')).toHaveLength(1);
@@ -318,9 +692,14 @@ describe('DataTable', () => {
 
     expect(within(table).queryByLabelText('Search records')).not.toBeInTheDocument();
     await user.click(nameSort);
+    expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
     expect(
       within(table).getByRole('button', { name: 'Name: Sort descending' }),
     ).toBeInTheDocument();
+    await user.click(within(table).getByRole('button', { name: 'Name: Sort descending' }));
+    expect(nameHeader).toHaveAttribute('aria-sort', 'descending');
+    await user.click(within(table).getByRole('button', { name: 'Name: Clear sorting' }));
+    expect(nameHeader).not.toHaveAttribute('aria-sort');
   });
 
   it('evaluates nested typed filters and clears hidden-column conditions', async () => {
@@ -393,6 +772,7 @@ describe('DataTable', () => {
         <DataTable
           definition={{
             ariaLabel: 'Server records',
+            locale: 'en-US',
             source: {
               mode: 'page',
               data: [items[0]],
@@ -460,6 +840,7 @@ describe('DataTable', () => {
       <DataTable
         definition={{
           ariaLabel: 'Infinite records',
+          locale: 'en-US',
           source: {
             mode: 'infinite',
             data: items.slice(0, 2),
