@@ -82,13 +82,13 @@ Token storage, delivery retry, resend, concurrency, audit, and cleanup realizati
 - **AC-015** Invite, resend, revoke, denied authority, delivery, and terminal outcomes produce correlated append-only redacted audit records.
 - **AC-016** REST/OpenAPI and typed MCP operations expose invite, resend, revoke, and lifecycle reads with server-derived Organization, Workspace, inviter, and authority.
 - **AC-017** Membership management and invitation forms are keyboard and screen-reader operable, compact-layout safe, and provide recovery for terminal delivery failure.
-- **AC-018** The invitation collection exposes complete server-owned current-state metadata in the Resource Workspace order: revision, created actor/time, and modified actor/time. Human actor cells show the authenticated administrator's display name; resend, revoke, and acceptance update modification provenance without changing creation provenance.
+- **AC-018** The invitation collection exposes server-owned current-state metadata in the Resource Workspace order: revision when applicable, modified actor, and modified time. Creation actor/time remain available to resource detail and audit owners but are absent from the collection definition and column menu. Human actor cells show the authenticated administrator's display name; resend, revoke, and acceptance update modification provenance without changing the underlying creation provenance.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Browser journey | Administrator creates an invitation and reads its pending delivery outcome plus complete current-state metadata accessibly | AC-001, AC-003, AC-004, AC-017, AC-018 | UI component test + Browser automation | Yes |
+| AT-001 | Browser journey | Administrator creates an invitation and reads its pending delivery outcome plus the canonical revision/modified-only collection metadata accessibly | AC-001, AC-003, AC-004, AC-017, AC-018 | UI component test + Browser automation | Yes |
 | AT-002 | Application/Infrastructure boundaries | Creation, equivalent retry, different-role request, and concurrent retry persist one canonical pending invitation with durable delivery and a correlated redacted audit outcome for every attempt | AC-002, AC-009, AC-015 | Application test + Infrastructure integration test | Yes |
 | AT-003 | UI/API boundaries | Invalid target, role, email, authority, and existing membership return non-disclosing outcomes without invitation mutation | AC-007, AC-008, AC-010, AC-014 | UI component test + API integration test | Yes |
 | AT-004 | Infrastructure boundary | Crash and ambiguous provider outcomes retry localized delivery without creating a second valid link or exposing internal or secret material | AC-003, AC-011 | Infrastructure integration test | Yes |

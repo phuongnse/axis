@@ -54,6 +54,8 @@ Use this protocol whenever progress depends on state outside the repository or o
 
 Delegated review is asynchronous. A reviewer reported as `running` or `pending`, and a bounded wait that returns no result, means **review pending**, not review failure or a readiness verdict. Keep the reviewer alive, continue bounded waits, and close the review only after a final completed result or an explicit runtime failure.
 
+Delegated review starts only after the review workflow has focused proof, a clean immutable checkpoint, and a `$axis-review-readiness` **Ready** verdict bound to that exact checkpoint and comparison base. A pending or running readiness command is not evidence and cannot overlap reviewer execution.
+
 Review read-only means no intentional edits to tracked source, tests, contracts, migrations, documentation, Git state, or PR state. A reviewer reuses current parent evidence and may run only the smallest focused check needed to reproduce a finding or fill a missing or invalidated evidence gap; normal ignored outputs and temporary files are allowed. If a command would modify a tracked artifact, the reviewer must stop and report that boundary instead of silently changing it.
 
 Use this compact handoff when asking the user:

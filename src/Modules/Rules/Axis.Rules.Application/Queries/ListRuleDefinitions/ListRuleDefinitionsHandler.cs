@@ -205,9 +205,9 @@ public sealed class ListRuleDefinitionsHandler(
             RuleDefinitionSortField.Revision => definition.Origin == DomainOrigin.BuiltIn
                 ? null
                 : definition.Revision.ToString("D10"),
-            RuleDefinitionSortField.CreatedBy => definition.CreatedByActor?.DisplayName,
+            RuleDefinitionSortField.CreatedBy => definition.CreatedByActor.DisplayName,
             RuleDefinitionSortField.CreatedAt => definition.CreatedAt.ToUniversalTime().ToString("O"),
-            RuleDefinitionSortField.ModifiedBy => definition.UpdatedByActor?.DisplayName,
+            RuleDefinitionSortField.ModifiedBy => definition.UpdatedByActor.DisplayName,
             RuleDefinitionSortField.ModifiedAt => definition.UpdatedAt.ToUniversalTime().ToString("O"),
             _ => throw new ArgumentOutOfRangeException(nameof(sortBy)),
         };

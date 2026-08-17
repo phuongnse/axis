@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Axis.Solutions.Contracts;
 
 public enum SolutionTrustStatus
@@ -38,16 +40,16 @@ public enum SolutionStepStatus
 }
 
 public sealed record SolutionResourceActorDto(
-    string Kind,
+    [property: Required] string Kind,
     Guid? SubjectId,
-    string DisplayName);
+    [property: Required] string DisplayName);
 
 public sealed record SolutionResourceMetadataDto(
     long? Revision,
-    SolutionResourceActorDto? CreatedBy,
-    DateTimeOffset? CreatedAt,
-    SolutionResourceActorDto? ModifiedBy,
-    DateTimeOffset? ModifiedAt);
+    [property: Required] SolutionResourceActorDto CreatedBy,
+    [property: Required] DateTimeOffset CreatedAt,
+    [property: Required] SolutionResourceActorDto ModifiedBy,
+    [property: Required] DateTimeOffset ModifiedAt);
 
 public sealed record SolutionVersionSummaryDto(
     Guid Id,
@@ -64,7 +66,7 @@ public sealed record SolutionVersionSummaryDto(
     Uri SourceUri,
     DateTimeOffset PublishedAt,
     IReadOnlyList<SolutionComponentPlanDto> Components,
-    SolutionResourceMetadataDto Metadata);
+    [property: Required] SolutionResourceMetadataDto Metadata);
 
 public sealed record SolutionComponentIdentityDto(string Type, string Key);
 
@@ -92,7 +94,7 @@ public sealed record SolutionInstallationStatusDto(
     IReadOnlyList<SolutionComponentStatusDto> Components,
     DateTimeOffset UpdatedAt,
     int Revision,
-    SolutionResourceMetadataDto Metadata);
+    [property: Required] SolutionResourceMetadataDto Metadata);
 
 public sealed record SolutionOperationStatusDto(
     Guid Id,

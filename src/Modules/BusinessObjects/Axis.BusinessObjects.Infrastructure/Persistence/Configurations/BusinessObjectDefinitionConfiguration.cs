@@ -73,24 +73,28 @@ internal sealed class BusinessObjectDefinitionConfiguration : IEntityTypeConfigu
             .HasColumnName("updated_at")
             .IsRequired();
 
-        builder.Property<ActorKind?>("CreatedByKind")
+        builder.Property<ActorKind>("CreatedByKind")
             .HasColumnName("created_by_kind")
             .HasConversion<string>()
-            .HasMaxLength(32);
+            .HasMaxLength(32)
+            .IsRequired();
         builder.Property<Guid?>("CreatedBySubjectId")
             .HasColumnName("created_by_subject_id");
-        builder.Property<string?>("CreatedByDisplayName")
+        builder.Property<string>("CreatedByDisplayName")
             .HasColumnName("created_by_display_name")
-            .HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
-        builder.Property<ActorKind?>("UpdatedByKind")
+            .HasMaxLength(ActorSnapshot.MaximumDisplayNameLength)
+            .IsRequired();
+        builder.Property<ActorKind>("UpdatedByKind")
             .HasColumnName("updated_by_kind")
             .HasConversion<string>()
-            .HasMaxLength(32);
+            .HasMaxLength(32)
+            .IsRequired();
         builder.Property<Guid?>("UpdatedBySubjectId")
             .HasColumnName("updated_by_subject_id");
-        builder.Property<string?>("UpdatedByDisplayName")
+        builder.Property<string>("UpdatedByDisplayName")
             .HasColumnName("updated_by_display_name")
-            .HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
+            .HasMaxLength(ActorSnapshot.MaximumDisplayNameLength)
+            .IsRequired();
         builder.Ignore(definition => definition.CreatedBy);
         builder.Ignore(definition => definition.UpdatedBy);
 

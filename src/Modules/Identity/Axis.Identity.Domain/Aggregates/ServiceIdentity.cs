@@ -19,28 +19,28 @@ public sealed class ServiceIdentity : AggregateRoot<Guid>
     public ServiceIdentityStatus Status { get; private set; }
     public ServiceWorkspaceGrantStatus WorkspaceGrantStatus { get; private set; }
     public DateTime CreatedAt { get; private set; }
-    public DateTime? UpdatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
     public DateTime? RevokedAt { get; private set; }
-    private ActorKind? CreatedByKind { get; set; }
+    private ActorKind CreatedByKind { get; set; }
     private Guid? CreatedBySubjectId { get; set; }
-    private string? CreatedByDisplayName { get; set; }
-    private ActorKind? UpdatedByKind { get; set; }
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByKind { get; set; }
     private Guid? UpdatedBySubjectId { get; set; }
-    private string? UpdatedByDisplayName { get; set; }
-    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
-    public ActorSnapshot? UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
+    private string UpdatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    public ActorSnapshot UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
     public int Revision { get; private set; }
     public IReadOnlyList<ServiceIdentityKey> Keys => _keys;
     public IReadOnlyList<ServiceIdentityKeyTombstone> Tombstones => _tombstones;
     public static ServiceIdentity Create(Guid workspaceId, string clientId, DateTime now) => new(Guid.NewGuid(), workspaceId, clientId.Trim(), now);
     public void InitializeMetadata(ActorSnapshot actor)
     {
-        if (!actor.IsValid || CreatedBy is not null) throw new InvalidOperationException("Service identity creation provenance is invalid.");
+        if (!actor.IsValid || CreatedByDisplayName.Length > 0) throw new InvalidOperationException("Service identity creation provenance is invalid.");
         StampCreated(actor);
     }
     public void RecordModification(ActorSnapshot actor, DateTime now)
     {
-        if (!actor.IsValid || (UpdatedAt.HasValue && now < UpdatedAt.Value)) throw new InvalidOperationException("Service identity modification provenance is invalid.");
+        if (!actor.IsValid || now < UpdatedAt) throw new InvalidOperationException("Service identity modification provenance is invalid.");
         UpdatedAt = now; UpdatedByKind = actor.Kind; UpdatedBySubjectId = actor.SubjectId; UpdatedByDisplayName = actor.DisplayName;
     }
     public ServiceIdentityKey AddKey(string kid, string thumbprint, string x, string y, int expectedRevision, DateTime now)
@@ -73,5 +73,9 @@ public sealed class ServiceIdentity : AggregateRoot<Guid>
     private void EnsureActive(int revision) { EnsureRevision(revision); if (Status != ServiceIdentityStatus.Active || WorkspaceGrantStatus != ServiceWorkspaceGrantStatus.Active) throw new InvalidOperationException("Service identity is revoked."); }
     private void EnsureRevision(int revision) { if (Revision != revision) throw new InvalidOperationException("Service identity revision is stale."); }
     private void StampCreated(ActorSnapshot actor) { CreatedByKind = actor.Kind; CreatedBySubjectId = actor.SubjectId; CreatedByDisplayName = actor.DisplayName; UpdatedByKind = actor.Kind; UpdatedBySubjectId = actor.SubjectId; UpdatedByDisplayName = actor.DisplayName; }
-    private static ActorSnapshot? Snapshot(ActorKind? kind, Guid? subjectId, string? displayName) => kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName) ? ActorSnapshot.Create(actorKind, subjectId, displayName) : null;
+    private static ActorSnapshot Snapshot(ActorKind kind, Guid? subjectId, string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid ? actor : throw new InvalidOperationException("Service identity provenance is incomplete.");
+    }
 }

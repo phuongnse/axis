@@ -71,10 +71,8 @@ internal static class RuleContractMapper
             new DateTimeOffset(DateTime.SpecifyKind(definition.UpdatedAt, DateTimeKind.Utc)));
     }
 
-    private static RuleResourceActorDto? ToActor(ActorSnapshot? actor) =>
-        actor is { } value
-            ? new RuleResourceActorDto(value.Kind.ToString(), value.SubjectId, value.DisplayName)
-            : null;
+    private static RuleResourceActorDto ToActor(ActorSnapshot actor) =>
+        new(actor.Kind.ToString(), actor.SubjectId, actor.DisplayName);
 
     public static RuleDefinitionVersionDto ToDto(RuleDefinitionVersion version) =>
         new(

@@ -34,6 +34,7 @@
 
 `$axis-pull-request` owns trigger decisions, checkpoint commits, independent review, feedback loops, and publication. This playbook owns verification command behavior:
 
+- The enforced sequence is focused proof, clean immutable checkpoint, readiness bound to the exact checkpoint/comparison base, then independent review. Readiness and review never run concurrently.
 - First review covers the committed publishable branch diff; follow-up review covers only the new immutable checkpoint delta when earlier evidence remains valid.
 - Follow-up verification uses `python scripts/axis.py review-readiness --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
 - Reviewer unavailability or unresolved valid findings blocks publication unless the user explicitly approves the exact skip or deferral.
@@ -60,13 +61,15 @@
 - Use `python scripts/axis.py mcp serve` as the single local MCP entrypoint; it reuses a healthy stack or starts `local-dev up`, builds the bridge with diagnostics on stderr, and then keeps stdout protocol-only. The wrapper defaults to read access; the repository Codex registration opts into write during active development, while each mutation still requires task-level approval. Pass `--no-build` only when the bridge output is already current. See [docs/playbooks/mcp.md](./mcp.md).
 - Use `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` when an API operation, MCP tool, auth boundary, or mutation policy changes. These are the maintained MCP parity and safety checks.
 - `local-dev shell` is an unrestricted diagnostic escape hatch, not a finite workflow or evidence route. Volume-destructive local-dev commands require explicit `--yes`.
-- Use `python scripts/axis.py review-readiness` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
+- Use `python scripts/axis.py review-readiness --full-branch` on a clean checkpoint commit for the first review of the complete publishable branch, or `python scripts/axis.py review-readiness --since <reviewed-checkpoint>` for an immutable follow-up delta. Local review readiness requires one explicit scope so an omitted base cannot trigger an accidental branch-wide verification run. Either route runs changed-path verification plus the deterministic policy profile shared with CI; CI may continue to use `--policy-only` without a local execution scope.
 - Pass current verification evidence to delegated reviewers. The primary owns routine checks; reviewers do not repeat passing suites and run only the smallest reproducer for a finding or evidence gap.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind review-readiness, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
+- Frontend source verification uses Vitest's dependency graph to run related tests plus any changed test files. Only frontend dependency, Vite/Vitest configuration, TypeScript project, or shared test-setup changes trigger the full frontend unit suite; browser evidence remains acceptance- and diff-triggered.
+- A changed .NET test class without source, project, or shared-fixture changes runs that class only. Source or shared test infrastructure changes run the affected test project because their impact is broader than one test file.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
 - Use `python scripts/axis.py check pr` to validate the current or CI head branch plus PR title/body before publication.
-- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run `review-readiness`; ordinary pre-push remains a quick gate.
+- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run full-branch `review-readiness`; ordinary pre-push remains a quick gate.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 
 ## Script Rules

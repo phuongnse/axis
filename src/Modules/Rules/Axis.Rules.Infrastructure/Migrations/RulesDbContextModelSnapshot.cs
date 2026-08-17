@@ -208,11 +208,13 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("CreatedByActorDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_actor_display_name");
 
                     b.Property<string>("CreatedByActorKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("created_by_actor_kind");
@@ -285,11 +287,13 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnName("updated_at");
 
                     b.Property<string>("UpdatedByActorDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("updated_by_actor_display_name");
 
                     b.Property<string>("UpdatedByActorKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("updated_by_actor_kind");

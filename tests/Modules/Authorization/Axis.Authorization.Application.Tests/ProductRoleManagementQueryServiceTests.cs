@@ -1,5 +1,6 @@
 using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 
@@ -60,7 +61,10 @@ public sealed class ProductRoleManagementQueryServiceTests
                     true,
                     3,
                     DateTimeOffset.UtcNow,
-                    null),
+                    null,
+                    DateTimeOffset.UtcNow,
+                    ActorSnapshot.User(actorId, "Administrator"),
+                    ActorSnapshot.User(actorId, "Administrator")),
             ]);
 
         ProductRoleManagementResult result = await new ProductRoleManagementQueryService(

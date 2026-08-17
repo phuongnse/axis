@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Axis.Api.Tests.Administration;
 using Axis.Api.Tests.Helpers;
+using Axis.Shared.Domain.Primitives;
 using Axis.Solutions.Application;
 using Axis.Solutions.Domain;
 using Axis.Solutions.Infrastructure.Persistence;
@@ -297,19 +298,24 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             INSERT INTO solution_versions
                 (id, solution_key, version, package_sha256, envelope, axis_openapi_sha256,
                  publisher_id, publisher_key_id, source_revision, build_id, built_at,
-                 source_uri, published_at)
+                 source_uri, published_at, created_by_kind, created_by_display_name)
             VALUES
                 ({versionId}, {"foreign_" + suffix}, {"1.0.0-" + suffix}, {hash},
                  {new byte[] { 1 }}, {hash}, {"publisher"}, {"key"}, {suffix},
-                 {"build-" + suffix}, {now}, {"https://example.test/foreign"}, {now})
+                 {"build-" + suffix}, {now}, {"https://example.test/foreign"}, {now},
+                 {"System"}, {ActorSnapshot.SystemDisplayName})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_installations
                 (id, workspace_id, solution_key, solution_version_id, provisioning_status,
-                 compliance_status, created_at, updated_at, revision)
+                 compliance_status, created_at, updated_at, revision,
+                 created_by_kind, created_by_subject_id, created_by_display_name,
+                 updated_by_kind, updated_by_subject_id, updated_by_display_name)
             VALUES
                 ({installationId}, {foreignWorkspaceId}, {"foreign_" + suffix}, {versionId}, {"Installing"},
-                 {"Compliant"}, {now}, {now}, {0})
+                 {"Compliant"}, {now}, {now}, {0},
+                 {"User"}, {actorSubjectId}, {"Foreign Operator"},
+                 {"User"}, {actorSubjectId}, {"Foreign Operator"})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_installation_operations
@@ -358,6 +364,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             now,
             new Uri("https://example.test/revoked"),
             now);
+        version.InitializeMetadata(ActorSnapshot.System());
         VerifiedSolutionComponent[] components =
         [
             new("authorization.policy.v1", "policy", new string('e', 64), [1], []),
@@ -373,6 +380,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             .GetRequiredService<ISolutionsUnitOfWork>();
         await versions.AddAsync(version, components, TestContext.Current.CancellationToken);
         SolutionInstallation installation = SolutionInstallation.Create(workspaceId, version.SolutionKey, version.Id, now);
+        installation.InitializeMetadata(ActorSnapshot.System());
         await installations.AddAsync(installation, TestContext.Current.CancellationToken);
         SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
             workspaceId,
@@ -421,11 +429,12 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             INSERT INTO solution_versions
                 (id, solution_key, version, package_sha256, envelope, axis_openapi_sha256,
                  publisher_id, publisher_key_id, source_revision, build_id, built_at,
-                 source_uri, published_at)
+                 source_uri, published_at, created_by_kind, created_by_display_name)
             VALUES
                 ({versionId}, {"read_" + suffix}, {"1.0.0-" + suffix}, {hash},
                  {new byte[] { 1 }}, {hash}, {"missing_publisher"}, {"missing_key"}, {suffix},
-                 {"build-" + suffix}, {now}, {"https://example.test/read"}, {now})
+                 {"build-" + suffix}, {now}, {"https://example.test/read"}, {now},
+                 {"System"}, {ActorSnapshot.SystemDisplayName})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_components
@@ -458,10 +467,14 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_installations
                 (id, workspace_id, solution_key, solution_version_id, provisioning_status,
-                 compliance_status, created_at, updated_at, revision)
+                 compliance_status, created_at, updated_at, revision,
+                 created_by_kind, created_by_subject_id, created_by_display_name,
+                 updated_by_kind, updated_by_subject_id, updated_by_display_name)
             VALUES
                 ({installationId}, {workspaceId}, {solutionKey}, {versionId}, {"Failed"},
-                 {"Compliant"}, {now}, {now}, {0})
+                 {"Compliant"}, {now}, {now}, {0},
+                 {"User"}, {actorSubjectId}, {"Blocked Installer"},
+                 {"User"}, {actorSubjectId}, {"Blocked Installer"})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_installation_operations

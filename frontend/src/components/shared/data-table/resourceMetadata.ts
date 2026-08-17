@@ -1,19 +1,19 @@
 import type { DataTableColumnDef } from './types';
 
 export interface ResourceMetadataActorValue {
-  displayName?: string | null;
+  displayName: string;
 }
 
 export interface ResourceMetadataValue {
   revision?: number | null;
-  createdBy?: ResourceMetadataActorValue | null;
-  createdAt?: string | null;
-  modifiedBy?: ResourceMetadataActorValue | null;
-  modifiedAt?: string | null;
+  createdBy: ResourceMetadataActorValue;
+  createdAt: string;
+  modifiedBy: ResourceMetadataActorValue;
+  modifiedAt: string;
 }
 
 export interface ResourceMetadataRow {
-  metadata?: ResourceMetadataValue | null;
+  metadata: ResourceMetadataValue;
 }
 
 export interface ResourceMetadataColumnLabels {
@@ -40,7 +40,7 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
   if (options.includeRevision !== false) {
     columns.push({
       id: 'revision',
-      accessorFn: (row) => row.metadata?.revision,
+      accessorFn: (row) => row.metadata.revision,
       size: 120,
       minSize: 110,
       enableGrouping: false,
@@ -51,7 +51,7 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
   columns.push(
     {
       id: 'modifiedBy',
-      accessorFn: (row) => actorValue(row.metadata?.modifiedBy),
+      accessorFn: (row) => row.metadata.modifiedBy,
       size: 190,
       minSize: 170,
       sortUndefined: 'last',
@@ -62,7 +62,7 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
     },
     {
       id: 'modifiedAt',
-      accessorFn: (row) => row.metadata?.modifiedAt,
+      accessorFn: (row) => row.metadata.modifiedAt,
       size: 190,
       minSize: 180,
       enableGrouping: false,
@@ -71,12 +71,6 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
   );
 
   return columns;
-}
-
-function actorValue(
-  actor: ResourceMetadataActorValue | null | undefined,
-): ResourceMetadataActorValue | undefined {
-  return actorDisplayName(actor) ? (actor ?? undefined) : undefined;
 }
 
 function actorDisplayName(actor: unknown): string {

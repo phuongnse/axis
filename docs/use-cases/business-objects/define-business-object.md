@@ -71,7 +71,7 @@ Let a Workspace Product Builder define and publish a workspace-scoped business o
 - **AC-016** Defining business objects does not create records, workflow definitions, workflow states, reports, automations, or permissions beyond the current authenticated workspace boundary.
 - **AC-017** Object definition publication records enough metadata for audit/history surfaces to identify who published the version and when.
 - **AC-018** Unpublished save and publish operations are atomic; failed validation, workspace-scope rejection, concurrency conflicts, or persistence failures leave the previous unpublished state and published versions unchanged.
-- **AC-019** The definition collection exposes complete server-owned current-state metadata in the Resource Workspace order: published version when present, revision, created actor/time, and modified actor/time. Human actor cells show the authenticated user's display name; actor identity is never accepted from the client.
+- **AC-019** The definition collection exposes server-owned current-state metadata in the Resource Workspace order: published version when present, revision when applicable, modified actor, and modified time. Creation actor/time remain available to resource detail and audit owners but are absent from the collection definition and column menu. Human actor cells show the authenticated user's display name; actor identity is never accepted from the client.
 
 ## Acceptance Test Matrix
 
@@ -87,7 +87,7 @@ Let a Workspace Product Builder define and publish a workspace-scoped business o
 | AT-008 | API/Application boundaries | Missing Workspace or Product Builder authority, unavailable authority, and cross-Workspace definition access are rejected without mutation or resource disclosure | AC-013, AC-014 | API integration test + Application test | Yes |
 | AT-009 | Domain boundary | Business Objects boundaries keep workspace lifecycle outside the module and prevent Identity internals from becoming business-object dependencies | AC-015 | Architecture test | Yes |
 | AT-010 | API boundary | Object definition endpoints expose the approved request and response contract without advanced field, record, or workflow artifacts | AC-003, AC-016 | API integration test | Yes |
-| AT-011 | UI/API boundaries | Business object definition screens expose server-owned search, unpublished definition creation, text field editing, validation errors, publish action, pagination, definition availability states, and complete sortable current-state metadata with generated contract parity | AC-001, AC-002, AC-003, AC-007, AC-008, AC-009, AC-010, AC-011, AC-019 | UI component test + API integration test | Yes |
+| AT-011 | UI/API boundaries | Business object definition screens expose server-owned search, unpublished definition creation, text field editing, validation errors, publish action, pagination, definition availability states, and the sortable version/revision/modified-only collection metadata contract with generated parity | AC-001, AC-002, AC-003, AC-007, AC-008, AC-009, AC-010, AC-011, AC-019 | UI component test + API integration test | Yes |
 | AT-012 | Browser journey | User defines and publishes a business object from an authenticated workspace route while the field editor can focus inside the shell without console errors, document scrolling, or horizontal overflow | AC-001, AC-002, AC-005, AC-008, AC-013, AC-014 | Browser automation | Yes |
 
 ## Out Of Scope
@@ -105,7 +105,7 @@ Let a Workspace Product Builder define and publish a workspace-scoped business o
 | Screen | Required contract |
 |---|---|
 | Authenticated navigation | Expose the Business Objects authoring contribution only from the server-projected Product Builder decision; global navigation rendering remains owned by the module-navigation foundation. |
-| Business object collection | Render one primary table with name, key, unpublished/published availability, latest published version context, paging, consumer-defined actions, and the canonical trailing revision/created/modified metadata group without an action column. |
+| Business object collection | Render one primary table with name, key, unpublished/published availability, latest published version context, paging, consumer-defined actions, and the canonical trailing version/revision/modified-only metadata group without an action column. |
 | Definition window | Open or focus stable create/view/edit identities through [Collection Page](../../foundations/data-display/collection-page.md), consume [Detail Sections](../../foundations/data-display/detail-sections.md) with General first and definition-owned sections after it, capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
 | Field definition editor | Let the user add, order, remove, and rename text fields while keeping stable field keys visible, validated, and saved against the current revision. |
 | Publish review | Before mutation, summarize the stable object key, field count, configured-rule count, and immutable-version consequence; keep publication blocked until required definition and field identity rules pass. |

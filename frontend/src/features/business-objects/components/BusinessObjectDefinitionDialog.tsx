@@ -1796,7 +1796,7 @@ function toRuleContractValue(value: string, type?: RuleInputValueType): string {
 }
 
 function ruleDisplayName(
-  definition: RuleDefinitionSummary,
+  definition: Pick<RuleDefinitionSummary, 'name' | 'definitionKey' | 'documentation'>,
   locale: string,
   t: ReturnType<typeof useTranslation>['t'],
 ): string {

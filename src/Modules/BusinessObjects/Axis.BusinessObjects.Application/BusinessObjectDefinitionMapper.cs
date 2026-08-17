@@ -45,9 +45,9 @@ internal static class BusinessObjectDefinitionMapper
     private static ResourceMetadataDto ToMetadata(BusinessObjectDefinition definition) =>
         new(
             definition.Revision,
-            definition.CreatedBy is { } createdBy ? ResourceActorDto.From(createdBy) : null,
+            ResourceActorDto.From(definition.CreatedBy),
             AsOffset(definition.CreatedAt),
-            definition.UpdatedBy is { } updatedBy ? ResourceActorDto.From(updatedBy) : null,
+            ResourceActorDto.From(definition.UpdatedBy),
             AsOffset(definition.UpdatedAt));
 
     private static DateTimeOffset AsOffset(DateTime value) =>

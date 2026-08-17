@@ -25,7 +25,7 @@ Normative and informative references:
 | Appearance | Light and dark; deterministic reduced-motion media; rest, hover, keyboard-focus, disabled, current-page, selection, status, and retry states |
 | Content | Canonical EN plus VI; Business Objects as the maximal visual representative; twenty rows, long localized description/control text, and WCAG text-spacing overrides |
 | Input/semantics | Pointer and keyboard journeys; one `h1`; named collection region; native table/header/cell semantics; labels, current page, selected rows, busy/status feedback, and named controls |
-| Visual | Five current candidate captures: light/dark × desktop/compact plus VI at the 320 CSS-pixel text-spacing/reflow boundary |
+| Visual | Five current accepted captures: light/dark × desktop/compact plus VI at the 320 CSS-pixel text-spacing/reflow boundary |
 | Deterministic checks | Typed owner/id contract; six-consumer real-symbol registry; component state evidence; browser surface markers, accessibility-tree snapshot, focus treatment, 32/44 CSS-pixel geometry, internal/document overflow, theme, locale, reduced motion, and exact screenshot comparison; clean-cutover sweep |
 
 Automation supports but does not make the perceptual or standards-review decision. Business Objects is representative because it exercises the complete page header, description, search, column control, primary action, maximal column set, status badges, paging, regular-width column fitting, and compact horizontal overflow. Focused component evidence covers owner options and states not visible in one ready-state capture, while the six consumer suites establish product adoption without treating feature semantics as surface-owned.
@@ -34,7 +34,7 @@ Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1
 
 ## WCAG 2.2 A/AA applicability
 
-`Technical pass` means no failure was found within the declared page/process and current representative matrix. `N/A` means the scoped page/process contains no content or operation to which the criterion applies. These current technical findings apply only to this declared review unit, remain subject to project-owner review, and are not a product-wide certification claim.
+`Technical pass` means no failure was found within the declared page/process and current representative matrix. `N/A` means the scoped page/process contains no content or operation to which the criterion applies. These accepted technical findings apply only to this declared review unit and are not a product-wide certification claim.
 
 | Criterion | Result | Scoped evidence or rationale |
 |---|---|---|
@@ -56,7 +56,7 @@ Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1
 | 1.4.5 Images of Text | Technical pass | No image of text. |
 | 1.4.10 Reflow | Technical pass | At 320 CSS pixels, the page has no horizontal document overflow; the table exposes its own horizontal and vertical scrolling as required by the data relationship. |
 | 1.4.11 Non-text Contrast | Technical pass | Control, table, current-page, status, selection, and focus boundaries use canonical semantic theme pairs and are rendered in both themes. |
-| 1.4.12 Text Spacing | Technical pass | The VI matrix applies the WCAG letter/word/line spacing values, then rechecks document overflow, internal table scrolling, target geometry, focus, and the current candidate capture. |
+| 1.4.12 Text Spacing | Technical pass | The VI matrix applies the WCAG letter/word/line spacing values, then rechecks document overflow, internal table scrolling, target geometry, focus, and the current accepted capture. |
 | 1.4.13 Content on Hover or Focus | Technical pass | Toolbar menus remain dismissible and do not make essential information hover-only; the representative hover treatment is reduced-motion safe. |
 | 2.1.1 Keyboard | Technical pass | Search, table sort/actions, selection, paging, retry, and consumer actions use native or accessible controls; browser and component evidence operate them by keyboard. |
 | 2.1.2 No Keyboard Trap | Technical pass | The collection itself creates no trap; toolbar popups use standard dismissible behavior. Managed windows are outside this review unit. |
@@ -106,9 +106,9 @@ These are current technical findings for the declared Resource Workspace review 
 | Learnability | All six consumers reuse one page/table grammar, semantic state mapping, density system, and paging/query placement. |
 | Controllability | Query and paging changes require direct operation; record launch is explicit; retry is local; table state remains available when a separate managed workflow opens. |
 | Use-error robustness | Loading and failure states preserve page context; retry remains local; selection/query state is explicit; feature workflows retain validation, authorization, conflict, and dirty-close policy. |
-| User engagement | Calm page hierarchy, one dominant collection, restrained borders/elevation, semantic state use, vertically centered one-line rows, first-line-aligned expanding list rows, regular-width fitting, and stable compact overflow keep attention on the data task; the candidate matrix awaits the project owner's perceptual judgment. |
+| User engagement | Calm page hierarchy, one dominant collection, restrained borders/elevation, semantic state use, vertically centered one-line rows, first-line-aligned expanding list rows, regular-width fitting, and stable compact overflow keep attention on the data task; the accepted matrix records the project owner's perceptual judgment. |
 
-The human-centred lifecycle evidence evaluates one coherent shared boundary and exercises adverse width, locale, text spacing, theme, motion, row volume, query, paging, loading, empty, error, denial, and recovery conditions. Technical evidence is current; project-owner review of the replacement candidate remains pending for this review unit.
+The human-centred lifecycle evidence evaluates one coherent shared boundary and exercises adverse width, locale, text spacing, theme, motion, row volume, query, paging, loading, empty, error, denial, and recovery conditions. Technical evidence and project-owner review are complete for this review unit.
 
 ## Ownership and retirement
 

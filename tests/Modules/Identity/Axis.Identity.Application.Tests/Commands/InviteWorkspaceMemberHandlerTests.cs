@@ -91,6 +91,7 @@ public sealed class InviteWorkspaceMemberHandlerTests
             "existing-hash",
             "existing-envelope",
             "existing-correlation");
+        canonical.InitializeMetadata(ActorSnapshot.User(fixture.Inviter.Id, "Ada Admin"));
         fixture.Invitations.GetPendingForRecipientAsync(
                 fixture.Workspace.Id,
                 "recipient@example.com",
@@ -224,6 +225,7 @@ public sealed class InviteWorkspaceMemberHandlerTests
             "existing-hash",
             "existing-envelope",
             "existing-correlation");
+        canonical.InitializeMetadata(ActorSnapshot.User(fixture.Inviter.Id, "Ada Admin"));
         fixture.Invitations.GetPendingForRecipientAsync(
                 fixture.Workspace.Id,
                 "recipient@example.com",
@@ -347,6 +349,7 @@ public sealed class InviteWorkspaceMemberHandlerTests
                 "existing-hash",
                 "existing-envelope",
                 "existing-correlation");
+            canonical.InitializeMetadata(ActorSnapshot.User(Inviter.Id, "Ada Admin"));
             Invitations.GetPendingForRecipientAsync(
                     Workspace.Id,
                     "recipient@example.com",

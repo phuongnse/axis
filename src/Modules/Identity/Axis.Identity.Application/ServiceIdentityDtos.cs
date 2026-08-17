@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application;
@@ -5,7 +6,7 @@ using Axis.Shared.Application;
 namespace Axis.Identity.Application;
 
 public sealed record ServiceIdentityKeyDto(Guid Id, string Kid, string Thumbprint, string Status);
-public sealed record ServiceIdentityDto(Guid Id, string ClientId, Guid WorkspaceId, string Status, string WorkspaceGrantStatus, int Revision, IReadOnlyList<ServiceIdentityKeyDto> Keys, ResourceMetadataDto Metadata)
+public sealed record ServiceIdentityDto(Guid Id, string ClientId, Guid WorkspaceId, string Status, string WorkspaceGrantStatus, int Revision, IReadOnlyList<ServiceIdentityKeyDto> Keys, [property: Required] ResourceMetadataDto Metadata)
 {
     public SubjectReferenceDto Subject => SubjectReferenceDto.From(SubjectReference.Service(Id));
 }

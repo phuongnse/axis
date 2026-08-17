@@ -17,6 +17,7 @@ public readonly record struct ActorSnapshot(ActorKind Kind, Guid? SubjectId, str
         && !string.IsNullOrWhiteSpace(DisplayName)
         && DisplayName == DisplayName.Trim()
         && DisplayName.Length <= MaximumDisplayNameLength
+        && (Kind != ActorKind.System || DisplayName == SystemDisplayName)
         && (Kind == ActorKind.System
             ? SubjectId is null
             : SubjectId is Guid subjectId && subjectId != Guid.Empty);

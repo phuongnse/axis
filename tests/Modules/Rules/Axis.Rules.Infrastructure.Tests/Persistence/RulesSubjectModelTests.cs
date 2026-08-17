@@ -36,6 +36,13 @@ public sealed class RulesSubjectModelTests
             .Should().Equal("created_by_subject_id", "created_by_subject_kind");
         Columns(binding, nameof(RuleBinding.UpdatedBySubject))
             .Should().Equal("updated_by_subject_id", "updated_by_subject_kind");
+
+        Required(definition, nameof(RuleDefinition.CreatedAt));
+        Required(definition, nameof(RuleDefinition.UpdatedAt));
+        Required(definition, "CreatedByActorKind");
+        Required(definition, "CreatedByActorDisplayName");
+        Required(definition, "UpdatedByActorKind");
+        Required(definition, "UpdatedByActorDisplayName");
     }
 
     private static IReadOnlyList<string> Columns(IEntityType entity, string complexProperty) =>
@@ -44,4 +51,7 @@ public sealed class RulesSubjectModelTests
             .Select(property => property.GetColumnName())
             .Order(StringComparer.Ordinal)
             .ToArray();
+
+    private static void Required(IEntityType entity, string property) =>
+        entity.FindProperty(property)!.IsNullable.Should().BeFalse();
 }

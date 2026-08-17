@@ -16,14 +16,14 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
     public int? LatestPublishedVersionNumber { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
-    private ActorKind? CreatedByKind { get; set; }
+    private ActorKind CreatedByKind { get; set; }
     private Guid? CreatedBySubjectId { get; set; }
-    private string? CreatedByDisplayName { get; set; }
-    private ActorKind? UpdatedByKind { get; set; }
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByKind { get; set; }
     private Guid? UpdatedBySubjectId { get; set; }
-    private string? UpdatedByDisplayName { get; set; }
-    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
-    public ActorSnapshot? UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
+    private string UpdatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    public ActorSnapshot UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
     public Guid? InstalledSolutionVersionId { get; private set; }
     public string? InstalledComponentKey { get; private set; }
     public string? InstalledComponentHash { get; private set; }
@@ -285,13 +285,16 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
         UpdatedByDisplayName = actor.DisplayName;
     }
 
-    private static ActorSnapshot? Snapshot(
-        ActorKind? kind,
+    private static ActorSnapshot Snapshot(
+        ActorKind kind,
         Guid? subjectId,
-        string? displayName) =>
-        kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName)
-            ? ActorSnapshot.Create(actorKind, subjectId, displayName)
-            : null;
+        string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Business object definition provenance is incomplete.");
+    }
 
     private static Result<BusinessObjectFieldDefinitionId> ResolveFieldIdentity(
         BusinessObjectFieldDefinitionSpec spec,

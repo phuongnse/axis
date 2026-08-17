@@ -40,11 +40,15 @@ public sealed class ArchiveRuleDefinitionHandler(
         if (definition is null)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
+        bool wasArchived = definition.ArchivedAt is not null;
         Result archived = definition.Archive(command.ExpectedRevision, RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject), DateTime.UtcNow);
         if (archived.IsFailure)
             return archived.ErrorCode == ErrorCodes.Conflict
                 ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(archived.Error)
                 : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(archived.Error);
+        if (wasArchived)
+            return RuleContractMapper.ToDetailDto(definition, canManage: true);
+
         Result provenance = definition.RecordModification(RuleActor.From(currentSubject));
         if (provenance.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(provenance.Error);

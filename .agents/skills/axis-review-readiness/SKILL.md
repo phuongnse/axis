@@ -16,6 +16,7 @@ Follow [reference.md](../reference.md).
 - The implementation checkpoint must be clean with respect to tracked files; normal ignored build/test artifacts or temporary files created by review commands do not make it dirty.
 - Failed, missing, or stale required evidence cannot become a green claim.
 - This workflow does not perform independent review. A caller obtains the configured reviewer only after a **Ready** verdict and reuses a completed result for the exact same checkpoint.
+- Return **Ready** only with the exact immutable checkpoint SHA and comparison base; a running command or an unbound pass cannot advance the review workflow.
 
 ## Inputs
 
@@ -27,11 +28,11 @@ Follow [reference.md](../reference.md).
 
 1. Inspect `git status --short` and the committed diff from its merge base; classify changed path owners and stack manifests.
 2. Reconcile the diff with the Design Gate, sign-off, retirement, and contract decisions. For frontend UI work, confirm the diff contains one declared review unit, then run `python scripts/axis.py check ui-foundation` and `python scripts/axis.py frontend ci`; reject a missing or contract-incompatible typed surface id, an incomplete real-symbol inventory, absent rendered owner evidence, candidate artifacts recorded as accepted, an incomplete or untraced profile partition, an unsupported standards claim, missing project-owner acceptance, a retained legacy composition, or an `enforced` claim with gaps or without current component/browser/visual/standards/retirement evidence. Do not accept filename or import-text scans as ownership proof, and do not treat a passing trace checker as proof of semantic, perceptual, WCAG, or ISO adequacy.
-3. Audit product evidence only when behavior/status is touched: AC coverage, implementation status, evidence sidecar, and exact deferrals. Build the review verification set from the diff owners and their acceptance evidence; run missing or invalidated focused browser commands, never the full Playwright suite unless the diff is cross-cutting across every browser surface.
+3. Audit product evidence only when behavior/status is touched: AC coverage, implementation status, evidence sidecar, and exact deferrals. Build the review verification set from the diff owners and their acceptance evidence; run missing or invalidated focused browser evidence, and use broad browser verification only when the diff invalidates every browser surface.
 4. Audit minimality after correctness: prefer existing code, the standard library, native platform capabilities, and installed dependencies before custom code; reject speculative abstractions, dependencies, flags, or files without weakening required safety, accessibility, or ACs.
-5. Run `python scripts/axis.py review-readiness` once, or `--since <checkpoint>` for an immutable follow-up delta. Debug failures with narrow checks only.
+5. Run `python scripts/axis.py review-readiness --full-branch` once for the complete publishable branch, or `python scripts/axis.py review-readiness --since <checkpoint>` for an immutable follow-up delta. The explicit scope prevents an accidental branch-wide verification run. Debug failures with narrow checks only.
 6. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md); update one owner only when evidence justifies promotion or retirement.
-7. Return the verdict and evidence to the caller. Independent review and publication are separate workflows.
+7. Return the verdict, exact checkpoint SHA, comparison base, and evidence to the caller. Independent review and publication are separate workflows; the caller may delegate review only after this **Ready** result.
 
 ## Output
 

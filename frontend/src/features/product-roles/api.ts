@@ -24,7 +24,7 @@ export function listProductRoleAssignments(language: string): Promise<ProductRol
 export function assignProductRole(
   request: ApiTypes.AssignProductRoleBody,
   idempotencyKey: string,
-): Promise<ApiTypes.ProductRoleAssignmentResponse> {
+): Promise<ApiTypes.ProductRoleAssignmentDto> {
   return fetchApi('/product-role-assignments/assign', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
@@ -35,7 +35,7 @@ export function assignProductRole(
 export function revokeProductRole(
   request: ApiTypes.RevokeProductRoleBody,
   idempotencyKey: string,
-): Promise<ApiTypes.ProductRoleAssignmentResponse> {
+): Promise<ApiTypes.ProductRoleAssignmentDto> {
   return fetchApi('/product-role-assignments/revoke', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },

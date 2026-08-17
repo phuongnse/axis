@@ -800,11 +800,6 @@ public sealed class SolutionOrchestrator(
             ? ActorSnapshot.ServiceIdentity(actor.SubjectId, actor.DisplayName)
             : ActorSnapshot.User(actor.SubjectId, actor.DisplayName);
 
-    private static SolutionResourceActorDto? ResourceActor(ActorSnapshot? actor) =>
-        actor is ActorSnapshot value
-            ? new SolutionResourceActorDto(
-                value.Kind.ToString(),
-                value.SubjectId,
-                value.DisplayName)
-            : null;
+    private static SolutionResourceActorDto ResourceActor(ActorSnapshot actor) =>
+        new(actor.Kind.ToString(), actor.SubjectId, actor.DisplayName);
 }

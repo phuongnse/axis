@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Axis.Audit.Contracts;
+using Axis.Shared.Domain.Primitives;
 using Axis.Solutions.Application;
 using Axis.Solutions.Contracts;
 using Axis.Solutions.Domain;
@@ -79,6 +80,7 @@ public sealed class SolutionOrchestratorTests
                 proposed.BuiltAt,
                 new Uri(proposed.SourceUri),
                 proposed.PublishedAt);
+            canonical.InitializeMetadata(proposed.CreatedBy);
             canonicalVersionId = canonical.Id;
             versions.Version = canonical;
             return new SolutionPersistenceException(
@@ -141,6 +143,7 @@ public sealed class SolutionOrchestratorTests
                 proposed.BuiltAt,
                 new Uri(proposed.SourceUri),
                 proposed.PublishedAt);
+            canonical.InitializeMetadata(proposed.CreatedBy);
             canonicalVersionId = canonical.Id;
             versions.Version = canonical;
             return new SolutionPersistenceException(
@@ -257,6 +260,9 @@ public sealed class SolutionOrchestratorTests
             context.Now,
             new Uri("https://example.test/reference"),
             context.Now);
+        otherVersion.InitializeMetadata(ActorSnapshot.User(
+            context.Actor.SubjectId,
+            context.Actor.DisplayName));
         context.Versions.Version = otherVersion;
 
         SolutionPackageException failure = await Assert.ThrowsAsync<SolutionPackageException>(() =>
@@ -336,6 +342,9 @@ public sealed class SolutionOrchestratorTests
             context.Now,
             new Uri("https://example.test/reference"),
             context.Now);
+        winningVersion.InitializeMetadata(ActorSnapshot.User(
+            context.Actor.SubjectId,
+            context.Actor.DisplayName));
         context.UnitOfWork.OnNextSave = () =>
         {
             context.Installations.Items.Clear();
@@ -648,6 +657,7 @@ public sealed class SolutionOrchestratorTests
                 : [new("authorization.policy.v1", preflightFails)];
             Adapter = Adapters[0];
             SolutionVersion version = SolutionVersion.Create("reference_application", "0.1.0", new string('a', 64), [1], new string('b', 64), "axis", "release_key", new string('c', 40), "build", Now, new Uri("https://example.test/reference"), Now);
+            version.InitializeMetadata(ActorSnapshot.User(Actor.SubjectId, Actor.DisplayName));
             Versions.Version = version;
             Versions.Components = Adapters
                 .Select((value, index) => new VerifiedSolutionComponent(

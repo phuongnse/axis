@@ -80,12 +80,12 @@ internal sealed class ProductRoleAssignmentStore(AuthorizationDbContext context)
                 CreatedAt = value.CreatedAt,
                 RevokedAt = value.RevokedAt,
                 UpdatedAt = value.UpdatedAt,
-                CreatedByKind = value.CreatedBy?.Kind.ToString(),
-                CreatedBySubjectId = value.CreatedBy?.SubjectId,
-                CreatedByDisplayName = value.CreatedBy?.DisplayName,
-                UpdatedByKind = value.UpdatedBy?.Kind.ToString(),
-                UpdatedBySubjectId = value.UpdatedBy?.SubjectId,
-                UpdatedByDisplayName = value.UpdatedBy?.DisplayName,
+                CreatedByKind = value.CreatedBy.Kind.ToString(),
+                CreatedBySubjectId = value.CreatedBy.SubjectId,
+                CreatedByDisplayName = value.CreatedBy.DisplayName,
+                UpdatedByKind = value.UpdatedBy.Kind.ToString(),
+                UpdatedBySubjectId = value.UpdatedBy.SubjectId,
+                UpdatedByDisplayName = value.UpdatedBy.DisplayName,
             },
             cancellationToken).AsTask();
 
@@ -105,9 +105,9 @@ internal sealed class ProductRoleAssignmentStore(AuthorizationDbContext context)
         row.Revision = value.Revision;
         row.RevokedAt = value.RevokedAt;
         row.UpdatedAt = value.UpdatedAt;
-        row.UpdatedByKind = value.UpdatedBy?.Kind.ToString();
-        row.UpdatedBySubjectId = value.UpdatedBy?.SubjectId;
-        row.UpdatedByDisplayName = value.UpdatedBy?.DisplayName;
+        row.UpdatedByKind = value.UpdatedBy.Kind.ToString();
+        row.UpdatedBySubjectId = value.UpdatedBy.SubjectId;
+        row.UpdatedByDisplayName = value.UpdatedBy.DisplayName;
     }
 
     public Task AddIdempotencyAsync(
@@ -153,17 +153,19 @@ internal sealed class ProductRoleAssignmentStore(AuthorizationDbContext context)
             Actor(row.CreatedByKind, row.CreatedBySubjectId, row.CreatedByDisplayName),
             Actor(row.UpdatedByKind, row.UpdatedBySubjectId, row.UpdatedByDisplayName));
 
-    private static ActorSnapshot? Actor(
-        string? kind,
+    private static ActorSnapshot Actor(
+        string kind,
         Guid? subjectId,
-        string? displayName)
+        string displayName)
     {
         if (!Enum.TryParse(kind, out ActorKind actorKind)
             || string.IsNullOrWhiteSpace(displayName))
-            return null;
+            throw new InvalidOperationException("Product-role assignment provenance is incomplete.");
 
         ActorSnapshot actor = new(actorKind, subjectId, displayName);
-        return actor.IsValid ? actor : null;
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Product-role assignment provenance is invalid.");
     }
 }
 

@@ -19,7 +19,7 @@ internal sealed class WorkspaceInvitationConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.RequestedRole).HasColumnName("requested_role").HasConversion<string>();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
-        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(x => x.ExpiresAt).HasColumnName("expires_at");
         builder.Property(x => x.AcceptedAt).HasColumnName("accepted_at");
         builder.Property(x => x.RevokedAt).HasColumnName("revoked_at");
@@ -51,12 +51,12 @@ internal sealed class WorkspaceInvitationConfiguration : IEntityTypeConfiguratio
 
     private static void ConfigureMetadata(EntityTypeBuilder<WorkspaceInvitation> builder)
     {
-        builder.Property<ActorKind?>("CreatedByKind").HasColumnName("created_by_kind").HasConversion<string>().HasMaxLength(32);
+        builder.Property<ActorKind>("CreatedByKind").HasColumnName("created_by_kind").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property<Guid?>("CreatedBySubjectId").HasColumnName("created_by_subject_id");
-        builder.Property<string?>("CreatedByDisplayName").HasColumnName("created_by_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
-        builder.Property<ActorKind?>("UpdatedByKind").HasColumnName("updated_by_kind").HasConversion<string>().HasMaxLength(32);
+        builder.Property<string>("CreatedByDisplayName").HasColumnName("created_by_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength).IsRequired();
+        builder.Property<ActorKind>("UpdatedByKind").HasColumnName("updated_by_kind").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property<Guid?>("UpdatedBySubjectId").HasColumnName("updated_by_subject_id");
-        builder.Property<string?>("UpdatedByDisplayName").HasColumnName("updated_by_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
+        builder.Property<string>("UpdatedByDisplayName").HasColumnName("updated_by_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength).IsRequired();
         builder.Ignore(x => x.CreatedBy); builder.Ignore(x => x.UpdatedBy);
     }
 

@@ -364,15 +364,15 @@ describe('DataTable', () => {
     }
   });
 
-  it('sorts modified actor metadata by localized display name with deterministic missing values', async () => {
+  it('sorts complete modified actor metadata by localized display name', async () => {
     type MetadataRow = {
       id: string;
       name: string;
-      metadata?: {
+      metadata: {
         revision: number;
-        createdBy?: { displayName?: string | null };
+        createdBy: { displayName: string };
         createdAt: string;
-        modifiedBy?: { displayName?: string | null };
+        modifiedBy: { displayName: string };
         modifiedAt: string;
       };
     };
@@ -399,7 +399,17 @@ describe('DataTable', () => {
           modifiedAt: '2026-01-02T00:00:00Z',
         },
       },
-      { id: 'missing', name: 'Missing actor' },
+      {
+        id: 'system',
+        name: 'System record',
+        metadata: {
+          revision: 3,
+          createdBy: { displayName: 'System' },
+          createdAt: '2026-01-01T00:00:00Z',
+          modifiedBy: { displayName: 'System' },
+          modifiedAt: '2026-01-02T00:00:00Z',
+        },
+      },
     ];
     const metadataColumns: DataTableColumnDef<MetadataRow>[] = [
       {
@@ -435,7 +445,7 @@ describe('DataTable', () => {
 
     await user.click(screen.getByRole('button', { name: 'Modified by: Sort ascending' }));
     await waitFor(() =>
-      expect(rowNames()).toEqual(['Second record', 'First record', 'Missing actor']),
+      expect(rowNames()).toEqual(['Second record', 'System record', 'First record']),
     );
   });
 

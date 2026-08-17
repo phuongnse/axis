@@ -39,11 +39,13 @@ namespace Axis.Solutions.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_display_name");
 
                     b.Property<string>("CreatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("created_by_kind");
@@ -78,11 +80,13 @@ namespace Axis.Solutions.Infrastructure.Migrations
                         .HasColumnName("updated_at");
 
                     b.Property<string>("UpdatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("updated_by_display_name");
 
                     b.Property<string>("UpdatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("updated_by_kind");
@@ -273,11 +277,13 @@ namespace Axis.Solutions.Infrastructure.Migrations
                         .HasColumnName("built_at");
 
                     b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_display_name");
 
                     b.Property<string>("CreatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("created_by_kind");

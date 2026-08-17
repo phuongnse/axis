@@ -28,16 +28,16 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
     public MembershipStatus Status { get; private set; }
     public bool IsProductBuilder { get; private set; }
     public int Revision { get; private set; }
-    public DateTime? CreatedAt { get; private set; }
-    public DateTime? UpdatedAt { get; private set; }
-    private ActorKind? CreatedByKind { get; set; }
+    public DateTime CreatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
+    private ActorKind CreatedByKind { get; set; }
     private Guid? CreatedBySubjectId { get; set; }
-    private string? CreatedByDisplayName { get; set; }
-    private ActorKind? UpdatedByKind { get; set; }
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByKind { get; set; }
     private Guid? UpdatedBySubjectId { get; set; }
-    private string? UpdatedByDisplayName { get; set; }
-    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
-    public ActorSnapshot? UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
+    private string UpdatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    public ActorSnapshot UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
     public bool HasLifecycleAdministratorAuthority =>
         Status == MembershipStatus.Active
         && Role is WorkspaceMembershipRole.Owner or WorkspaceMembershipRole.Administrator;
@@ -60,13 +60,13 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
 
     public void InitializeMetadata(ActorSnapshot actor, DateTime now)
     {
-        if (!actor.IsValid || now == default || CreatedBy is not null) throw new InvalidOperationException("Membership creation provenance is invalid.");
+        if (!actor.IsValid || now == default || CreatedByDisplayName.Length > 0) throw new InvalidOperationException("Membership creation provenance is invalid.");
         CreatedAt = now; UpdatedAt = now; StampCreated(actor);
     }
 
     public void RecordModification(ActorSnapshot actor, DateTime now)
     {
-        if (!actor.IsValid || now == default || (UpdatedAt.HasValue && now < UpdatedAt.Value)) throw new InvalidOperationException("Membership modification provenance is invalid.");
+        if (!actor.IsValid || now == default || (UpdatedAt != default && now < UpdatedAt)) throw new InvalidOperationException("Membership modification provenance is invalid.");
         UpdatedAt = now; UpdatedByKind = actor.Kind; UpdatedBySubjectId = actor.SubjectId; UpdatedByDisplayName = actor.DisplayName;
     }
 
@@ -143,5 +143,9 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
     }
 
     private void StampCreated(ActorSnapshot actor) { CreatedByKind = actor.Kind; CreatedBySubjectId = actor.SubjectId; CreatedByDisplayName = actor.DisplayName; UpdatedByKind = actor.Kind; UpdatedBySubjectId = actor.SubjectId; UpdatedByDisplayName = actor.DisplayName; }
-    private static ActorSnapshot? Snapshot(ActorKind? kind, Guid? subjectId, string? displayName) => kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName) ? ActorSnapshot.Create(actorKind, subjectId, displayName) : null;
+    private static ActorSnapshot Snapshot(ActorKind kind, Guid? subjectId, string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid ? actor : throw new InvalidOperationException("Workspace membership provenance is incomplete.");
+    }
 }

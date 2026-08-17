@@ -1,5 +1,6 @@
 namespace Axis.Identity.Application;
 
+using System.ComponentModel.DataAnnotations;
 using Axis.Shared.Application;
 
 public sealed record WorkspaceProductBuilderDto(
@@ -10,4 +11,4 @@ public sealed record WorkspaceProductBuilderDto(
     bool IsProductBuilder,
     int MembershipRevision,
     bool CanChange,
-    ResourceMetadataDto Metadata);
+    [property: Required] ResourceMetadataDto Metadata);

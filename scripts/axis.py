@@ -1734,6 +1734,7 @@ def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root
             continue
 
         transition_ids: set[str] = set()
+        transition_contracts: dict[str, tuple[str, str, str, str]] = {}
         edges: set[tuple[str, str]] = set()
         adjacency: dict[str, set[str]] = {state: set() for state in states}
         for index, transition in enumerate(transitions, 1):
@@ -1762,6 +1763,7 @@ def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root
             if transition_id in transition_ids:
                 issues.append(f"{label} transition ID `{transition_id}` is duplicated")
             transition_ids.add(transition_id)
+            transition_contracts[transition_id] = (source, target, owner, evidence)
             if source not in state_set or target not in state_set:
                 issues.append(f"{transition_label} references an undeclared state `{source} -> {target}`")
             else:
@@ -1780,6 +1782,55 @@ def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root
                 used_roles.add(owner_id)
                 if owner_id not in semantic_roles:
                     issues.append(f"{transition_label} references unknown semantic role `{owner_id}`")
+
+        if workflow_name == "review":
+            required_review_transitions = {
+                "create-checkpoint": (
+                    "focused-proof",
+                    "checkpoint",
+                    "skill:axis-pull-request",
+                    "focused-proof-and-clean-immutable-checkpoint",
+                ),
+                "verify-readiness": (
+                    "checkpoint",
+                    "readiness-verified",
+                    "skill:axis-review-readiness",
+                    "ready-verdict-for-exact-checkpoint-and-comparison-base",
+                ),
+                "approve-review": (
+                    "readiness-verified",
+                    "review-approved",
+                    "role:independent-reviewer",
+                    "completed-review-pass",
+                ),
+                "request-changes": (
+                    "readiness-verified",
+                    "changes-requested",
+                    "role:independent-reviewer",
+                    "completed-review-findings",
+                ),
+                "resolve-findings": (
+                    "changes-requested",
+                    "focused-proof",
+                    "skill:axis-review-feedback",
+                    "classified-findings-and-focused-proof",
+                ),
+                "publish": (
+                    "review-approved",
+                    "published",
+                    "skill:axis-pull-request",
+                    "validated-remote-state",
+                ),
+            }
+            if initial != "focused-proof":
+                issues.append(f"{label} must begin at `focused-proof`")
+            for transition_id, expected in required_review_transitions.items():
+                if transition_contracts.get(transition_id) != expected:
+                    source, target, owner, evidence = expected
+                    issues.append(
+                        f"{label} must route `{transition_id}` from `{source}` to `{target}` "
+                        f"with owner `{owner}` and evidence `{evidence}`"
+                    )
 
         if initial in state_set:
             reachable = {initial}
@@ -3274,6 +3325,19 @@ def migration_command(args: argparse.Namespace) -> int:
     if args.migration_command == "add" and MIGRATION_NAME_RE.fullmatch(args.name) is None:
         raise CheckError("migration add: name must be PascalCase letters and digits")
 
+    tool_restore = run(
+        [
+            exe("dotnet"),
+            "tool",
+            "restore",
+            "--tool-manifest",
+            str(ROOT / "dotnet-tools.json"),
+        ],
+        check=False,
+    )
+    if tool_restore.returncode != 0:
+        return tool_restore.returncode
+
     project, context, connection_key = MIGRATION_TARGETS[args.module]
     build = run(
         [
@@ -3449,6 +3513,18 @@ def check_docker(_args: argparse.Namespace | None = None) -> int:
 DOTNET_SOLUTION_LEVEL_RE = re.compile(
     r"^(Directory[.].*|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)"
 )
+FRONTEND_TEST_SUITE_LEVEL_PATHS = {
+    "frontend/package-lock.json",
+    "frontend/package.json",
+    "frontend/src/test/setup.ts",
+    "frontend/tsconfig.app.json",
+    "frontend/tsconfig.json",
+    "frontend/tsconfig.node.json",
+    "frontend/tsconfig.type-tests.json",
+    "frontend/vite.config.ts",
+    "frontend/vitest.config.ts",
+}
+FRONTEND_TEST_RELATED_SUFFIXES = {".css", ".js", ".json", ".jsx", ".ts", ".tsx"}
 
 
 def is_dotnet_path(path: str) -> bool:
@@ -3461,6 +3537,18 @@ def is_frontend_path(path: str) -> bool:
         "openapi.json",
         ".github/workflows/build-and-test.yml",
     }
+
+
+def frontend_related_source_paths(paths: list[str]) -> list[str]:
+    return sorted(
+        path.removeprefix("frontend/")
+        for path in paths
+        if path.startswith("frontend/src/")
+        and not path.startswith(("frontend/e2e/", "frontend/tests/"))
+        and path not in FRONTEND_TEST_SUITE_LEVEL_PATHS
+        and Path(path).suffix.lower() in FRONTEND_TEST_RELATED_SUFFIXES
+        and (ROOT / path).is_file()
+    )
 
 
 def is_markdown_link_path(path: str) -> bool:
@@ -3540,6 +3628,41 @@ def dotnet_projects_for_changed_paths(paths: list[str]) -> tuple[list[str], list
     return sorted(build_projects), sorted(test_projects)
 
 
+def dotnet_test_class_filters(
+    paths: list[str],
+    test_projects: list[str],
+) -> dict[str, list[str]]:
+    selected_projects = set(test_projects)
+    full_projects: set[str] = set()
+    filters: dict[str, set[str]] = {}
+
+    for path in paths:
+        if path.startswith("src/"):
+            source_project = nearest_csproj(path)
+            if source_project is not None:
+                related_test = related_test_project_for_source_project(source_project)
+                if related_test is not None:
+                    full_projects.add(related_test)
+            continue
+        if not path.startswith("tests/"):
+            continue
+        project = nearest_csproj(path)
+        if project is None or project not in selected_projects:
+            continue
+        if path.endswith("Tests.cs"):
+            filters.setdefault(project, set()).add(Path(path).stem)
+        else:
+            full_projects.add(project)
+
+    if any(path.startswith("src/") for path in paths):
+        full_projects.add("tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj")
+    return {
+        project: sorted(class_names)
+        for project, class_names in sorted(filters.items())
+        if project not in full_projects
+    }
+
+
 def dotnet_format_changed_paths(paths: list[str]) -> int:
     include = [
         path
@@ -3568,9 +3691,19 @@ def dotnet_build_projects(projects: list[str]) -> int:
     return 0
 
 
-def dotnet_test_projects(projects: list[str]) -> int:
+def dotnet_test_projects(
+    projects: list[str],
+    class_filters: dict[str, list[str]] | None = None,
+) -> int:
     for project in projects:
-        result = run([exe("dotnet"), "test", project, "--nologo"], check=False)
+        command = [exe("dotnet"), "test", project, "--nologo"]
+        project_filters = (class_filters or {}).get(project, [])
+        if project_filters:
+            command.extend([
+                "--filter",
+                "|".join(f"FullyQualifiedName~{class_name}" for class_name in project_filters),
+            ])
+        result = run(command, check=False)
         if result.returncode != 0:
             return result.returncode
     return 0
@@ -3620,6 +3753,7 @@ def verify(args: argparse.Namespace) -> int:
         for path in paths
     )
     build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
+    dotnet_class_filters = dotnet_test_class_filters(paths, test_projects)
 
     frontend = any(is_frontend_path(path) for path in paths)
     renovate_config = ".github/renovate.json5" in paths
@@ -3628,11 +3762,18 @@ def verify(args: argparse.Namespace) -> int:
     )
     mcp_source_changed = any(path.startswith("src/Axis.Mcp/") for path in paths)
     mcp_api_coverage = "openapi.json" in paths or mcp_source_changed
-    frontend_tests_only = frontend and all(
-        path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
+    frontend_test_suite_level = any(path in FRONTEND_TEST_SUITE_LEVEL_PATHS for path in paths)
+    frontend_related_sources = frontend_related_source_paths(paths)
+    changed_unit_tests = [
+        path.removeprefix("frontend/")
         for path in paths
-        if is_frontend_path(path)
-    )
+        if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))
+    ]
+    changed_e2e_tests = [
+        path.removeprefix("frontend/")
+        for path in paths
+        if path.startswith("frontend/e2e/") and path.endswith((".ts", ".tsx"))
+    ]
 
     markdown_paths = [path for path in paths if path.endswith(".md") and (ROOT / path).is_file()]
     markdown_links_global = any(path in {"lychee.toml", ".github/workflows/build-and-test.yml"} for path in paths)
@@ -3681,7 +3822,13 @@ def verify(args: argparse.Namespace) -> int:
                     step(".NET build (changed projects)", lambda: dotnet_build_projects(build_projects))
                 step(".NET format (changed files)", lambda: dotnet_format_changed_paths(paths))
                 if test_projects:
-                    step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
+                    if dotnet_class_filters:
+                        step(
+                            ".NET test (related projects/classes)",
+                            lambda: dotnet_test_projects(test_projects, dotnet_class_filters),
+                        )
+                    else:
+                        step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
             if dotnet_package_scan:
                 step(".NET vulnerable packages", lambda: check_vulnerable_packages())
 
@@ -3692,39 +3839,36 @@ def verify(args: argparse.Namespace) -> int:
             if frontend_api_types:
                 step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
-            if frontend_tests_only:
-                changed_unit_tests = [
-                    path.removeprefix("frontend/")
-                    for path in paths
-                    if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))
-                ]
-                changed_e2e_tests = [
-                    path.removeprefix("frontend/")
-                    for path in paths
-                    if path.startswith("frontend/e2e/") and path.endswith((".ts", ".tsx"))
-                ]
-                if changed_unit_tests:
-                    step(
-                        "frontend test (changed test files)",
-                        lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
-                    )
-                if changed_e2e_tests:
-                    step(
-                        "frontend e2e (changed test files)",
-                        lambda: run_local_dev_browser(
-                            changed_e2e_tests,
-                            overlays=read_local_dev_topology() or (),
-                        ),
-                    )
-            else:
+            if frontend_test_suite_level:
                 step(
-                    "frontend test",
+                    "frontend test (suite-level runtime change)",
                     lambda: frontend_command(
                         argparse.Namespace(
                             frontend_command="test",
                             test_paths=[],
                             name=None,
                         )
+                    ),
+                )
+            elif frontend_related_sources:
+                related_inputs = sorted(set(frontend_related_sources + changed_unit_tests))
+                step(
+                    "frontend test (related files)",
+                    lambda: run_frontend_npm(
+                        ["exec", "vitest", "related", *related_inputs, "--run"]
+                    ).returncode,
+                )
+            elif changed_unit_tests:
+                step(
+                    "frontend test (changed test files)",
+                    lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
+                )
+            if changed_e2e_tests:
+                step(
+                    "frontend e2e (changed test files)",
+                    lambda: run_local_dev_browser(
+                        changed_e2e_tests,
+                        overlays=read_local_dev_topology() or (),
                     ),
                 )
 
@@ -3856,6 +4000,23 @@ def run_review_readiness_policy(
 
 
 def review_readiness(args: argparse.Namespace) -> int:
+    since = getattr(args, "since", None)
+    full_branch = bool(getattr(args, "full_branch", False))
+    policy_only = bool(getattr(args, "policy_only", False))
+    if since and full_branch:
+        print(
+            "review-readiness: FAIL - select only one scope: --since <checkpoint> or --full-branch",
+            file=sys.stderr,
+        )
+        return 1
+    if not policy_only and not since and not full_branch:
+        print(
+            "review-readiness: FAIL - select an explicit scope: --since <checkpoint> for a follow-up "
+            "delta or --full-branch for the complete publishable branch",
+            file=sys.stderr,
+        )
+        return 1
+
     if working_tree_paths():
         print(
             "review-readiness: FAIL - create an intentional checkpoint commit before review-boundary verification",
@@ -3864,13 +4025,11 @@ def review_readiness(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        _scope, paths = verify_scope_paths(getattr(args, "since", None))
+        _scope, paths = verify_scope_paths(since)
     except CheckError as exc:
         print(exc, file=sys.stderr)
         return 1
 
-    policy_only = bool(getattr(args, "policy_only", False))
-    since = getattr(args, "since", None)
     executed: list[str] = []
     if not policy_only:
         if verify(args) != 0:
@@ -3901,8 +4060,8 @@ def review_readiness(args: argparse.Namespace) -> int:
 def pre_push(args: argparse.Namespace) -> int:
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running review-readiness.")
-        return review_readiness(argparse.Namespace(since=None, policy_only=False))
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full-branch review-readiness.")
+        return review_readiness(argparse.Namespace(since=None, full_branch=True, policy_only=False))
 
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -3938,7 +4097,10 @@ def pre_push(args: argparse.Namespace) -> int:
 
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
-    print("  Run `python scripts/axis.py review-readiness` before independent review.")
+    print(
+        "  Run `python scripts/axis.py review-readiness --full-branch` for the first review or "
+        "`--since <checkpoint>` for a follow-up."
+    )
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -5806,6 +5968,11 @@ def build_parser(
         help="Verify a clean checkpoint before independent review",
     )
     review_readiness_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    review_readiness_parser.add_argument(
+        "--full-branch",
+        action="store_true",
+        help="Explicitly verify the complete publishable branch diff",
+    )
     review_readiness_parser.add_argument(
         "--policy-only",
         action="store_true",

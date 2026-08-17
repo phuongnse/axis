@@ -2229,8 +2229,21 @@ describe('RulesPage', () => {
         segments: { type: 'Text', values: ['retail', 'enterprise'] },
       },
     });
-    await user.type(within(editor).getByLabelText('Observed at'), '2026-01-02T10:30');
+    const observedAt = within(editor).getByLabelText('Observed at');
+    await user.type(observedAt, '2026-01-02T10:30:00');
     expect(within(simulation).queryByText('Condition matched')).not.toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+    expect(
+      within(editor).getByText('Enter a value that matches this input contract.'),
+    ).toBeVisible();
+    expect(simulationBody).toEqual({
+      inputs: {
+        published_only: { type: 'Decimal', values: ['42'] },
+        segments: { type: 'Text', values: ['retail', 'enterprise'] },
+      },
+    });
+    await user.clear(observedAt);
+    await user.type(observedAt, '2026-01-02T10:30:00+07:00');
     await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
     await waitFor(() =>
       expect(simulationBody).toEqual({
@@ -2239,13 +2252,186 @@ describe('RulesPage', () => {
           segments: { type: 'Text', values: ['retail', 'enterprise'] },
           observed_at: {
             type: 'DateTime',
-            values: [new Date('2026-01-02T10:30').toISOString()],
+            values: ['2026-01-02T03:30:00.000Z'],
           },
         },
       }),
     );
     const footer = editor.querySelector('[data-slot="managed-dialog-footer"]');
     expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeVisible();
+  });
+
+  it('validates sample values at the RuleValue boundaries before simulation', async () => {
+    const user = userEvent.setup();
+    const textAtLimit = 'x'.repeat(4000);
+    const publishedInputs = [
+      {
+        key: 'minimum_integer',
+        label: 'Minimum integer',
+        types: ['Integer'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'maximum_integer',
+        label: 'Maximum integer',
+        types: ['Integer'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'maximum_decimal',
+        label: 'Maximum decimal',
+        types: ['Decimal'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'minimum_decimal',
+        label: 'Minimum decimal',
+        types: ['Decimal'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'decimal_precision',
+        label: 'Decimal precision',
+        types: ['Decimal'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'bounded_text',
+        label: 'Bounded text',
+        types: ['Text'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+      {
+        key: 'observed_at',
+        label: 'Observed at',
+        types: ['DateTime'],
+        isRequired: true,
+        allowMultiple: false,
+        allowedValues: [],
+      },
+    ];
+    const published = workspaceDetail({
+      status: 'Archived',
+      archivedAt: '2026-01-02T00:00:00Z',
+      latestVersion: 1,
+      activeVersion: null,
+      versions: [
+        {
+          version: 1,
+          name: 'Credit threshold',
+          inputs: publishedInputs,
+          condition: requiredCondition(),
+        },
+      ],
+      actions: {
+        canEditDraft: false,
+        canCreateVersion: false,
+        canActivateVersion: false,
+        canDeactivate: false,
+        canArchive: false,
+      },
+    });
+    let simulationBody: Record<string, unknown> | undefined;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold')) return Promise.resolve(jsonResponse(published));
+      if (url.endsWith('/rules/credit_threshold/versions/1/simulate')) {
+        simulationBody = JSON.parse(String(init?.body));
+        return Promise.resolve(
+          jsonResponse({
+            definitionKey: 'credit_threshold',
+            definitionVersion: 1,
+            isMatch: true,
+            diagnostics: [],
+          }),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Test rule' }));
+    const setValue = async (label: string, value: string) => {
+      const input = within(editor).getByLabelText(label);
+      await user.click(input);
+      await user.paste(value);
+    };
+
+    await setValue('Minimum integer', '-9223372036854775809');
+    await setValue('Maximum integer', '9223372036854775808');
+    await setValue('Maximum decimal', '79228162514264337593543950336');
+    await setValue('Minimum decimal', '-79228162514264337593543950336');
+    await setValue('Decimal precision', '0.12345678901234567890123456786');
+    await setValue('Bounded text', `${textAtLimit}x`);
+    await setValue('Observed at', '2026-01-02T10:30:00');
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+
+    expect(
+      within(editor).getAllByText('Enter a value that matches this input contract.'),
+    ).toHaveLength(6);
+    expect(simulationBody).toBeUndefined();
+
+    for (const [label, value] of [
+      ['Minimum integer', '-9223372036854775808'],
+      ['Maximum integer', '9223372036854775807'],
+      ['Maximum decimal', '79228162514264337593543950335'],
+      ['Minimum decimal', '-79228162514264337593543950335'],
+      ['Bounded text', textAtLimit],
+      ['Observed at', '2026-01-02T10:30:00+07:00'],
+    ] as const) {
+      const input = within(editor).getByLabelText(label);
+      await user.clear(input);
+      await user.click(input);
+      await user.paste(value);
+    }
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+
+    const invalidInputs = publishedInputs
+      .filter(
+        (input) =>
+          within(editor)
+            .getByLabelText(input.label)
+            .closest('[data-slot="field"]')
+            ?.getAttribute('data-invalid') === 'true',
+      )
+      .map((input) => ({
+        label: input.label,
+        value: (within(editor).getByLabelText(input.label) as HTMLInputElement).value,
+      }));
+    expect(invalidInputs).toEqual([]);
+    expect(
+      within(editor).queryAllByText('Enter a value that matches this input contract.'),
+    ).toHaveLength(0);
+    await waitFor(() => expect(simulationBody).toBeDefined());
+    const submittedInputs = simulationBody?.inputs as Record<
+      string,
+      { type: string; values: string[] }
+    >;
+    expect(submittedInputs.minimum_integer.values).toEqual(['-9223372036854775808']);
+    expect(submittedInputs.maximum_integer.values).toEqual(['9223372036854775807']);
+    expect(submittedInputs.maximum_decimal.values).toEqual(['79228162514264337593543950335']);
+    expect(submittedInputs.minimum_decimal.values).toEqual(['-79228162514264337593543950335']);
+    expect(submittedInputs.decimal_precision.values).toEqual(['0.1234567890123456789012345679']);
+    expect(submittedInputs.bounded_text.values[0]).toHaveLength(4000);
+    expect(submittedInputs.observed_at.values).toEqual(['2026-01-02T03:30:00.000Z']);
   });
 
   it('does not fabricate a version or simulation for an archived draft without versions', async () => {

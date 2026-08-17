@@ -207,9 +207,11 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         Func<Task> act = () => _ctx.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO business_object_definitions
                 (id, workspace_id, name, object_key, status, revision, created_at, updated_at,
+                 created_by_kind, created_by_display_name, updated_by_kind, updated_by_display_name,
                  installed_component_key)
             VALUES
                 ({id}, {workspaceId}, {"Partial"}, {objectKey}, {"Published"}, {3}, {now}, {now},
+                 {"System"}, {ActorSnapshot.SystemDisplayName}, {"System"}, {ActorSnapshot.SystemDisplayName},
                  {objectKey})
             """, TestContext.Current.CancellationToken);
 

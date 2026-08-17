@@ -14,36 +14,36 @@ public sealed record ResourceActorDto(
 
 public sealed record ResourceMetadataDto(
     long? Revision,
-    ResourceActorDto? CreatedBy,
-    DateTimeOffset? CreatedAt,
-    ResourceActorDto? ModifiedBy,
-    DateTimeOffset? ModifiedAt);
+    [property: Required] ResourceActorDto CreatedBy,
+    [property: Required] DateTimeOffset CreatedAt,
+    [property: Required] ResourceActorDto ModifiedBy,
+    [property: Required] DateTimeOffset ModifiedAt);
 
 public static class ResourceMetadataMapping
 {
     public static ResourceMetadataDto From(
         long? revision,
-        ActorSnapshot? createdBy,
-        DateTimeOffset? createdAt,
-        ActorSnapshot? modifiedBy,
-        DateTimeOffset? modifiedAt) =>
+        ActorSnapshot createdBy,
+        DateTimeOffset createdAt,
+        ActorSnapshot modifiedBy,
+        DateTimeOffset modifiedAt) =>
         new(
             revision,
-            createdBy is { } created ? ResourceActorDto.From(created) : null,
+            ResourceActorDto.From(createdBy),
             createdAt,
-            modifiedBy is { } modified ? ResourceActorDto.From(modified) : null,
+            ResourceActorDto.From(modifiedBy),
             modifiedAt);
 
     public static ResourceMetadataDto From(
         long? revision,
-        ActorSnapshot? createdBy,
-        DateTime? createdAt,
-        ActorSnapshot? modifiedBy,
-        DateTime? modifiedAt) =>
+        ActorSnapshot createdBy,
+        DateTime createdAt,
+        ActorSnapshot modifiedBy,
+        DateTime modifiedAt) =>
         new(
             revision,
-            createdBy is { } created ? ResourceActorDto.From(created) : null,
-            createdAt.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(createdAt.Value, DateTimeKind.Utc)) : null,
-            modifiedBy is { } modified ? ResourceActorDto.From(modified) : null,
-            modifiedAt.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(modifiedAt.Value, DateTimeKind.Utc)) : null);
+            ResourceActorDto.From(createdBy),
+            new DateTimeOffset(DateTime.SpecifyKind(createdAt, DateTimeKind.Utc)),
+            ResourceActorDto.From(modifiedBy),
+            new DateTimeOffset(DateTime.SpecifyKind(modifiedAt, DateTimeKind.Utc)));
 }

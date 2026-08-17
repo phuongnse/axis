@@ -43,13 +43,9 @@ public sealed record StoredProductRoleAssignment(
     int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RevokedAt,
-    DateTimeOffset? UpdatedAt = null,
-    ActorSnapshot? CreatedBy = null,
-    ActorSnapshot? UpdatedBy = null)
-{
-    public ProductRoleAssignment ToContract() =>
-        new(WorkspaceId, Subject, PolicyVersionId, RoleKey, IsActive, Revision);
-}
+    DateTimeOffset UpdatedAt,
+    ActorSnapshot CreatedBy,
+    ActorSnapshot UpdatedBy);
 
 public sealed record ProductRoleIdempotencyRecord(
     Guid WorkspaceId,
@@ -132,7 +128,7 @@ public sealed record RevokeProductRoleRequest(
 
 public sealed record ProductRoleAssignmentResult(
     bool IsSuccess,
-    ProductRoleAssignment? Assignment,
+    StoredProductRoleAssignment? Assignment,
     string? Error);
 
 public sealed class ProductRoleAssignmentService(
@@ -259,7 +255,7 @@ public sealed class ProductRoleAssignmentService(
                 }
 
                 await unitOfWork.RollbackAsync(cancellationToken);
-                return new(true, canonical.ToContract(), null);
+                return new(true, canonical, null);
             }
 
             StoredProductRoleAssignment? current = await assignments.GetAsync(
@@ -362,7 +358,7 @@ public sealed class ProductRoleAssignmentService(
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);
-            return new(true, changed.ToContract(), null);
+            return new(true, changed, null);
         }
         catch (AuthorizationPersistenceConflictException)
         {

@@ -42,18 +42,18 @@ public sealed class SolutionInstallation
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public int Revision { get; private set; }
-    private ActorKind? CreatedByKind { get; set; }
+    private ActorKind CreatedByKind { get; set; }
     private Guid? CreatedBySubjectId { get; set; }
-    private string? CreatedByDisplayName { get; set; }
-    private ActorKind? UpdatedByKind { get; set; }
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByKind { get; set; }
     private Guid? UpdatedBySubjectId { get; set; }
-    private string? UpdatedByDisplayName { get; set; }
-    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
-    public ActorSnapshot? UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
+    private string UpdatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    public ActorSnapshot UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
 
     public void InitializeMetadata(ActorSnapshot actor)
     {
-        if (!actor.IsValid || CreatedBy is not null)
+        if (!actor.IsValid || CreatedByDisplayName.Length > 0)
             throw new InvalidOperationException("Solution-installation creation provenance is invalid.");
         CreatedByKind = actor.Kind;
         CreatedBySubjectId = actor.SubjectId;
@@ -116,11 +116,14 @@ public sealed class SolutionInstallation
         Revision++;
     }
 
-    private static ActorSnapshot? Snapshot(
-        ActorKind? kind,
+    private static ActorSnapshot Snapshot(
+        ActorKind kind,
         Guid? subjectId,
-        string? displayName) =>
-        kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName)
-            ? ActorSnapshot.Create(actorKind, subjectId, displayName)
-            : null;
+        string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Solution installation provenance is incomplete.");
+    }
 }

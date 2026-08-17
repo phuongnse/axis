@@ -33,12 +33,10 @@ public sealed class BuiltInRuleCatalogTests
             definition.Origin == RuleOrigin.BuiltIn &&
             definition.Status == RuleLifecycleStatus.Active &&
             definition.ActiveVersion == 1 &&
-            definition.CreatedByActor.HasValue &&
-            definition.CreatedByActor.Value.Kind == Axis.Shared.Domain.Primitives.ActorKind.System &&
-            definition.CreatedByActor.Value.DisplayName == "System" &&
-            definition.UpdatedByActor.HasValue &&
-            definition.UpdatedByActor.Value.Kind == Axis.Shared.Domain.Primitives.ActorKind.System &&
-            definition.UpdatedByActor.Value.DisplayName == "System" &&
+            definition.CreatedByActor.Kind == Axis.Shared.Domain.Primitives.ActorKind.System &&
+            definition.CreatedByActor.DisplayName == "System" &&
+            definition.UpdatedByActor.Kind == Axis.Shared.Domain.Primitives.ActorKind.System &&
+            definition.UpdatedByActor.DisplayName == "System" &&
             definition.CreatedAt != default &&
             definition.CreatedAt.Kind == DateTimeKind.Utc &&
             definition.UpdatedAt == definition.CreatedAt &&

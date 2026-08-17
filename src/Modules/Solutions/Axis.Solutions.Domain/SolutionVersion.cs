@@ -51,14 +51,14 @@ public sealed class SolutionVersion
     public DateTimeOffset BuiltAt { get; private set; }
     public string SourceUri { get; private set; } = string.Empty;
     public DateTimeOffset PublishedAt { get; private set; }
-    private ActorKind? CreatedByKind { get; set; }
+    private ActorKind CreatedByKind { get; set; }
     private Guid? CreatedBySubjectId { get; set; }
-    private string? CreatedByDisplayName { get; set; }
-    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
 
     public void InitializeMetadata(ActorSnapshot actor)
     {
-        if (!actor.IsValid || CreatedBy is not null)
+        if (!actor.IsValid || CreatedByDisplayName.Length > 0)
             throw new InvalidOperationException("Solution-version publication provenance is invalid.");
         CreatedByKind = actor.Kind;
         CreatedBySubjectId = actor.SubjectId;
@@ -107,11 +107,14 @@ public sealed class SolutionVersion
             publishedAt);
     }
 
-    private static ActorSnapshot? Snapshot(
-        ActorKind? kind,
+    private static ActorSnapshot Snapshot(
+        ActorKind kind,
         Guid? subjectId,
-        string? displayName) =>
-        kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName)
-            ? ActorSnapshot.Create(actorKind, subjectId, displayName)
-            : null;
+        string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Solution version provenance is incomplete.");
+    }
 }

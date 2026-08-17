@@ -90,12 +90,12 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
         Subject(builder.ComplexProperty(definition => definition.UpdatedBySubject), "updated_by_subject");
         builder.Property(definition => definition.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(definition => definition.UpdatedAt).HasColumnName("updated_at").IsRequired();
-        builder.Property<ActorKind?>("CreatedByActorKind").HasColumnName("created_by_actor_kind").HasConversion<string>().HasMaxLength(32);
+        builder.Property<ActorKind>("CreatedByActorKind").HasColumnName("created_by_actor_kind").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property<Guid?>("CreatedByActorSubjectId").HasColumnName("created_by_actor_subject_id");
-        builder.Property<string?>("CreatedByActorDisplayName").HasColumnName("created_by_actor_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
-        builder.Property<ActorKind?>("UpdatedByActorKind").HasColumnName("updated_by_actor_kind").HasConversion<string>().HasMaxLength(32);
+        builder.Property<string>("CreatedByActorDisplayName").HasColumnName("created_by_actor_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength).IsRequired();
+        builder.Property<ActorKind>("UpdatedByActorKind").HasColumnName("updated_by_actor_kind").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property<Guid?>("UpdatedByActorSubjectId").HasColumnName("updated_by_actor_subject_id");
-        builder.Property<string?>("UpdatedByActorDisplayName").HasColumnName("updated_by_actor_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
+        builder.Property<string>("UpdatedByActorDisplayName").HasColumnName("updated_by_actor_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength).IsRequired();
         builder.Ignore(definition => definition.CreatedByActor);
         builder.Ignore(definition => definition.UpdatedByActor);
         builder.Ignore(definition => definition.ArchivedBySubject);

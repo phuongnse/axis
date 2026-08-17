@@ -4,16 +4,23 @@ version = 1
 independent-reviewer = "axis_reviewer"
 
 [workflows.review]
-initial = "checkpoint"
+initial = "focused-proof"
 terminal_states = ["review-approved", "published"]
-states = ["checkpoint", "readiness-verified", "review-approved", "changes-requested", "published"]
+states = ["focused-proof", "checkpoint", "readiness-verified", "review-approved", "changes-requested", "published"]
+
+[[workflows.review.transitions]]
+id = "create-checkpoint"
+from = "focused-proof"
+to = "checkpoint"
+owner = "skill:axis-pull-request"
+evidence = "focused-proof-and-clean-immutable-checkpoint"
 
 [[workflows.review.transitions]]
 id = "verify-readiness"
 from = "checkpoint"
 to = "readiness-verified"
 owner = "skill:axis-review-readiness"
-evidence = "command:review-readiness"
+evidence = "ready-verdict-for-exact-checkpoint-and-comparison-base"
 
 [[workflows.review.transitions]]
 id = "approve-review"
@@ -32,9 +39,9 @@ evidence = "completed-review-findings"
 [[workflows.review.transitions]]
 id = "resolve-findings"
 from = "changes-requested"
-to = "checkpoint"
+to = "focused-proof"
 owner = "skill:axis-review-feedback"
-evidence = "immutable-follow-up-checkpoint"
+evidence = "classified-findings-and-focused-proof"
 
 [[workflows.review.transitions]]
 id = "publish"

@@ -123,6 +123,7 @@ public sealed class ManageServiceIdentityHandlerTests
         Guid actorId = Guid.NewGuid();
         Guid workspaceId = Guid.NewGuid();
         ServiceIdentity identity = ServiceIdentity.Create(workspaceId, "svc-key-lifecycle", DateTime.UtcNow);
+        identity.InitializeMetadata(ActorSnapshot.User(actorId, "Axis Admin"));
         IServiceIdentityRepository identities = RepositoryFor(identity);
         MemoryAuditOutbox audits = new MemoryAuditOutbox();
         IServiceIdentityClientProjection projection = Substitute.For<IServiceIdentityClientProjection>();
@@ -179,6 +180,7 @@ public sealed class ManageServiceIdentityHandlerTests
         Guid actorId = Guid.NewGuid();
         Guid workspaceId = Guid.NewGuid();
         ServiceIdentity identity = ServiceIdentity.Create(workspaceId, "svc-revoke", DateTime.UtcNow);
+        identity.InitializeMetadata(ActorSnapshot.User(actorId, "Axis Admin"));
         IServiceIdentityRepository identities = RepositoryFor(identity);
         IWorkspaceMembershipRepository memberships = ActiveAdministrator(actorId, workspaceId);
         MemoryAuditOutbox audits = new MemoryAuditOutbox();

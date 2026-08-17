@@ -32,14 +32,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public RuleSubjectReference UpdatedBySubject { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
-    private ActorKind? CreatedByActorKind { get; set; }
+    private ActorKind CreatedByActorKind { get; set; }
     private Guid? CreatedByActorSubjectId { get; set; }
-    private string? CreatedByActorDisplayName { get; set; }
-    private ActorKind? UpdatedByActorKind { get; set; }
+    private string CreatedByActorDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByActorKind { get; set; }
     private Guid? UpdatedByActorSubjectId { get; set; }
-    private string? UpdatedByActorDisplayName { get; set; }
-    public ActorSnapshot? CreatedByActor => Snapshot(CreatedByActorKind, CreatedByActorSubjectId, CreatedByActorDisplayName);
-    public ActorSnapshot? UpdatedByActor => Snapshot(UpdatedByActorKind, UpdatedByActorSubjectId, UpdatedByActorDisplayName);
+    private string UpdatedByActorDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedByActor => Snapshot(CreatedByActorKind, CreatedByActorSubjectId, CreatedByActorDisplayName);
+    public ActorSnapshot UpdatedByActor => Snapshot(UpdatedByActorKind, UpdatedByActorSubjectId, UpdatedByActorDisplayName);
     private RuleSubjectKind? ArchivedBySubjectKind { get; set; }
     private Guid? ArchivedBySubjectId { get; set; }
     public RuleSubjectReference? ArchivedBySubject =>
@@ -196,10 +196,13 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         UpdatedByActorDisplayName = actor.DisplayName;
     }
 
-    private static ActorSnapshot? Snapshot(ActorKind? kind, Guid? subjectId, string? displayName) =>
-        kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName)
-            ? ActorSnapshot.Create(actorKind, subjectId, displayName)
-            : null;
+    private static ActorSnapshot Snapshot(ActorKind kind, Guid? subjectId, string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid
+            ? actor
+            : throw new InvalidOperationException("Rule definition provenance is incomplete.");
+    }
 
     public Result SaveDraft(
         int expectedRevision,

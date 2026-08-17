@@ -108,6 +108,12 @@ type InputIssue = {
   allowedValues?: string;
 };
 
+const int64Minimum = -9223372036854775808n;
+const int64Maximum = 9223372036854775807n;
+const decimalMaximumCoefficient = '79228162514264337593543950335';
+const maximumDecimalScale = 28;
+const maximumTextLength = 4000;
+
 let sampleEntrySequence = 0;
 
 function createSampleEntry(value = ''): SampleEntry {
@@ -2186,26 +2192,15 @@ function validateSampleValues(
 function normalizeRuleValue(type: ValueType | undefined, value: string): string | null {
   if (!type) return null;
   const trimmed = value.trim();
-  if (type === 'Text') return value;
+  if (type === 'Text') return value.length <= maximumTextLength ? value : null;
   if (type === 'Integer') {
     if (!/^[+-]?\d+$/.test(trimmed)) return null;
-    try {
-      return BigInt(trimmed).toString();
-    } catch {
-      return null;
-    }
+    const unsignedDigits = trimmed.replace(/^[+-]/, '').replace(/^0+(?=\d)/, '');
+    if (unsignedDigits.length > 19) return null;
+    const parsed = BigInt(trimmed);
+    return parsed >= int64Minimum && parsed <= int64Maximum ? parsed.toString() : null;
   }
-  if (type === 'Decimal') {
-    const match = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/.exec(trimmed);
-    if (!match) return null;
-    const integer = (match[2] ?? '0').replace(/^0+(?=\d)/, '');
-    const fraction = (match[3] ?? match[4] ?? '').replace(/0+$/, '');
-    const significantDigits = `${integer}${fraction}`.replace(/^0+/, '').length;
-    if (significantDigits > 29) return null;
-    const magnitude = fraction ? `${integer}.${fraction}` : integer;
-    const sign = match[1] === '-' && magnitude !== '0' ? '-' : '';
-    return `${sign}${magnitude}`;
-  }
+  if (type === 'Decimal') return normalizeDecimal(trimmed);
   if (type === 'Boolean') return trimmed === 'true' || trimmed === 'false' ? trimmed : null;
   if (type === 'Date') {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
@@ -2215,16 +2210,75 @@ function normalizeRuleValue(type: ValueType | undefined, value: string): string 
       : null;
   }
   if (type === 'DateTime') {
+    if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed)) return null;
     const parsed = new Date(trimmed);
     return trimmed && !Number.isNaN(parsed.valueOf()) ? parsed.toISOString() : null;
   }
   return null;
 }
 
+function normalizeDecimal(value: string): string | null {
+  const match = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/.exec(value);
+  if (!match) return null;
+  const fraction = match[3] ?? match[4] ?? '';
+  const coefficient = `${match[2] ?? '0'}${fraction}`.replace(/^0+(?=\d)/, '');
+  let discardedDigits = Math.max(
+    0,
+    fraction.length - maximumDecimalScale,
+    coefficient.length - decimalMaximumCoefficient.length,
+  );
+  let roundedCoefficient = roundDecimalCoefficient(coefficient, discardedDigits);
+
+  while (!decimalCoefficientFits(roundedCoefficient) && discardedDigits < fraction.length) {
+    discardedDigits += 1;
+    roundedCoefficient = roundDecimalCoefficient(coefficient, discardedDigits);
+  }
+  if (discardedDigits > fraction.length || !decimalCoefficientFits(roundedCoefficient)) return null;
+
+  const scale = fraction.length - discardedDigits;
+  const padded = roundedCoefficient.padStart(scale + 1, '0');
+  const magnitude = scale === 0 ? padded : `${padded.slice(0, -scale)}.${padded.slice(-scale)}`;
+  const sign = match[1] === '-' && roundedCoefficient !== '0' ? '-' : '';
+  return `${sign}${magnitude}`;
+}
+
+function roundDecimalCoefficient(coefficient: string, discardedDigits: number): string {
+  if (discardedDigits === 0) return coefficient;
+  const retainedLength = coefficient.length - discardedDigits;
+  if (retainedLength < 0) return '0';
+
+  const retained = retainedLength === 0 ? '0' : coefficient.slice(0, retainedLength);
+  const discarded = retainedLength === 0 ? coefficient : coefficient.slice(retainedLength);
+  const firstDiscarded = discarded[0] ?? '0';
+  const remainingDiscarded = discarded.slice(1);
+  const roundUp =
+    firstDiscarded > '5' ||
+    (firstDiscarded === '5' &&
+      (/[1-9]/.test(remainingDiscarded) || Number(retained.at(-1)) % 2 === 1));
+  return roundUp ? incrementDecimalDigits(retained) : retained.replace(/^0+(?=\d)/, '');
+}
+
+function incrementDecimalDigits(value: string): string {
+  const digits = value.split('');
+  for (let index = digits.length - 1; index >= 0; index -= 1) {
+    if (digits[index] !== '9') {
+      digits[index] = String(Number(digits[index]) + 1);
+      return digits.join('').replace(/^0+(?=\d)/, '');
+    }
+    digits[index] = '0';
+  }
+  return `1${digits.join('')}`;
+}
+
+function decimalCoefficientFits(value: string) {
+  return (
+    value.length < decimalMaximumCoefficient.length ||
+    (value.length === decimalMaximumCoefficient.length && value <= decimalMaximumCoefficient)
+  );
+}
+
 function sampleHtmlType(type: ValueType) {
-  if (type === 'Integer' || type === 'Decimal') return 'number';
   if (type === 'Date') return 'date';
-  if (type === 'DateTime') return 'datetime-local';
   return 'text';
 }
 

@@ -104,11 +104,13 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_display_name");
 
                     b.Property<string>("CreatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("created_by_kind");
@@ -131,16 +133,18 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.Property<string>("UpdatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("updated_by_display_name");
 
                     b.Property<string>("UpdatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("updated_by_kind");
@@ -415,11 +419,13 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_display_name");
 
                     b.Property<string>("CreatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("created_by_kind");
@@ -468,16 +474,18 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("terminal_material_purged_at");
 
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.Property<string>("UpdatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("updated_by_display_name");
 
                     b.Property<string>("UpdatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("updated_by_kind");
@@ -511,16 +519,18 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
                     b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_display_name");
 
                     b.Property<string>("CreatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("created_by_kind");
@@ -550,16 +560,18 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.Property<string>("UpdatedByDisplayName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("updated_by_display_name");
 
                     b.Property<string>("UpdatedByKind")
+                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("updated_by_kind");

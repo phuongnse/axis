@@ -3757,11 +3757,13 @@ class TestVerifyGate(unittest.TestCase):
                 "frontend_command",
                 side_effect=lambda args: calls.append(args.frontend_command) or 0,
             ),
+            mock.patch.object(axis, "run_frontend_npm") as related_tests,
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(0, axis.verify(object()))
 
-        self.assertEqual(["toolchain", "versions", "audit", "ci", "test"], calls)
+        self.assertEqual(["toolchain", "versions", "audit", "ci"], calls)
+        related_tests.assert_not_called()
 
     def test_frontend_source_change_runs_version_and_vulnerability_gates(self) -> None:
         calls: list[str] = []
@@ -3769,7 +3771,7 @@ class TestVerifyGate(unittest.TestCase):
             mock.patch.object(
                 axis,
                 "verify_scope_paths",
-                return_value=("working tree", ["frontend/src/app.tsx"]),
+                return_value=("working tree", ["frontend/src/main.tsx"]),
             ),
             mock.patch.object(axis, "run_text_encoding_check", return_value=0),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
@@ -3787,6 +3789,14 @@ class TestVerifyGate(unittest.TestCase):
                 axis,
                 "frontend_command",
                 side_effect=lambda args: calls.append(args.frontend_command) or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                side_effect=lambda _args: (
+                    calls.append("test")
+                    or axis.subprocess.CompletedProcess([], 0)
+                ),
             ),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -3836,6 +3846,40 @@ class TestVerifyGate(unittest.TestCase):
 
 
 class TestReviewVerificationGates(unittest.TestCase):
+    def test_rejects_implicit_full_branch_review_scope(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths") as working_tree_paths,
+            mock.patch.object(axis, "verify") as verify,
+            mock.patch.object(axis, "run_review_readiness_policy") as policy,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = axis.review_readiness(
+                axis.argparse.Namespace(since=None, full_branch=False, policy_only=False)
+            )
+
+        self.assertEqual(1, result)
+        working_tree_paths.assert_not_called()
+        verify.assert_not_called()
+        policy.assert_not_called()
+
+    def test_rejects_conflicting_review_scopes(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths") as working_tree_paths,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = axis.review_readiness(
+                axis.argparse.Namespace(since="base", full_branch=True, policy_only=False)
+            )
+
+        self.assertEqual(1, result)
+        working_tree_paths.assert_not_called()
+
+    def test_review_readiness_parser_accepts_explicit_full_branch_scope(self) -> None:
+        args = axis.build_parser().parse_args(["review-readiness", "--full-branch"])
+
+        self.assertTrue(args.full_branch)
+        self.assertIsNone(args.since)
+
     def test_policy_tests_default_to_full_discovery(self) -> None:
         completed = axis.subprocess.CompletedProcess([], 0)
 
@@ -3881,7 +3925,9 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "run_review_readiness_policy") as policy,
             contextlib.redirect_stderr(io.StringIO()),
         ):
-            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=False))
+            result = axis.review_readiness(
+                axis.argparse.Namespace(since="base", full_branch=False, policy_only=False)
+            )
 
         self.assertEqual(1, result)
         verify.assert_not_called()
@@ -3895,7 +3941,9 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["doc drift"])) as policy,
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=False))
+            result = axis.review_readiness(
+                axis.argparse.Namespace(since=None, full_branch=True, policy_only=False)
+            )
 
         self.assertEqual(0, result)
         verify.assert_called_once()
@@ -3914,7 +3962,9 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=True))
+            result = axis.review_readiness(
+                axis.argparse.Namespace(since=None, full_branch=False, policy_only=True)
+            )
 
         self.assertEqual(0, result)
         verify.assert_not_called()
@@ -4037,6 +4087,7 @@ class TestReviewVerificationGates(unittest.TestCase):
         review_readiness.assert_called_once()
         delegated = review_readiness.call_args.args[0]
         self.assertIsNone(delegated.since)
+        self.assertTrue(delegated.full_branch)
         self.assertFalse(delegated.policy_only)
 
     def test_runs_script_checks_for_script_changes(self) -> None:
@@ -4061,12 +4112,14 @@ class TestReviewVerificationGates(unittest.TestCase):
                 calls.append("npm run ci")
             elif args[1:3] == ["run", "test"]:
                 calls.append("npm run test")
+            elif args[1:4] == ["exec", "vitest", "related"]:
+                calls.append(" ".join(args[1:]))
             else:
                 calls.append(" ".join(args[:3]))
             return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
         with (
-            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/src/App.tsx"])),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/src/main.tsx"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
             mock.patch.object(
                 axis,
@@ -4091,8 +4144,7 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "audit",
                 "frontend-toolchain",
                 "npm run ci",
-                "frontend-toolchain",
-                "npm run test",
+                "exec vitest related src/main.tsx --run",
             ],
             calls,
         )
@@ -4131,6 +4183,44 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "frontend-toolchain",
                 "run ci",
                 "exec vitest run tests/button.test.tsx",
+            ],
+            calls,
+        )
+
+    def test_runs_full_frontend_suite_for_test_runtime_change(self) -> None:
+        calls: list[str] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            if args[1:3] == ["run", "ci"]:
+                calls.append("npm run ci")
+            elif args[1:3] == ["run", "test"]:
+                calls.append("npm run test")
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(
+                axis,
+                "verify_scope_paths",
+                return_value=("working tree", ["frontend/src/test/setup.ts"]),
+            ),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(axis, "check_frontend_dependency_versions", side_effect=lambda: calls.append("versions") or 0),
+            mock.patch.object(axis, "check_frontend_vulnerable_packages", side_effect=lambda: calls.append("audit") or 0),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(
+            [
+                "frontend-toolchain",
+                "versions",
+                "audit",
+                "frontend-toolchain",
+                "npm run ci",
+                "frontend-toolchain",
+                "npm run test",
             ],
             calls,
         )
@@ -4208,6 +4298,26 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "tests/Modules/Identity/Axis.Identity.Domain.Tests/Axis.Identity.Domain.Tests.csproj",
             ],
             calls,
+        )
+
+    def test_runs_only_changed_dotnet_test_class_without_source_change(self) -> None:
+        project = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        changed_test = "tests/Api/Axis.Api.Tests/Rules/RuleDefinitionEndpointTests.cs"
+
+        with (
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", [changed_test])),
+            mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "check_test_naming", return_value=0),
+            mock.patch.object(axis, "dotnet_format_changed_paths", return_value=0),
+            mock.patch.object(axis, "dotnet_test_projects", return_value=0) as dotnet_test_projects,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        dotnet_test_projects.assert_called_once_with(
+            [project],
+            {project: ["RuleDefinitionEndpointTests"]},
         )
 
     def test_maps_mcp_source_to_mcp_contract_tests(self) -> None:
@@ -6397,12 +6507,22 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 self.assertEqual(
                     [
                         "dotnet",
+                        "tool",
+                        "restore",
+                        "--tool-manifest",
+                        str(axis.ROOT / "dotnet-tools.json"),
+                    ],
+                    calls[0],
+                )
+                self.assertEqual(
+                    [
+                        "dotnet",
                         "build",
                         project,
                         "--nologo",
                         "-m:1",
                     ],
-                    calls[0],
+                    calls[1],
                 )
                 self.assertEqual(
                     [
@@ -6421,7 +6541,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                         "Migrations",
                         "--no-build",
                     ],
-                    calls[1],
+                    calls[2],
                 )
 
     def test_cli_routes_finite_migration_add(self) -> None:
@@ -6456,8 +6576,18 @@ class TestAxisCommandWrappers(unittest.TestCase):
             / "Axis.BusinessObjects.Infrastructure.csproj"
         )
         self.assertEqual(
-            ["dotnet", "build", project, "--nologo", "-m:1"],
+            [
+                "dotnet",
+                "tool",
+                "restore",
+                "--tool-manifest",
+                str(axis.ROOT / "dotnet-tools.json"),
+            ],
             calls[0],
+        )
+        self.assertEqual(
+            ["dotnet", "build", project, "--nologo", "-m:1"],
+            calls[1],
         )
         self.assertEqual(
             [
@@ -6474,7 +6604,38 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 "--force",
                 "--no-build",
             ],
-            calls[1],
+            calls[2],
+        )
+
+    def test_migration_stops_when_repo_tool_restore_fails(self) -> None:
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(
+                axis,
+                "run",
+                side_effect=[axis.subprocess.CompletedProcess([], 23)],
+            ) as run,
+        ):
+            self.assertEqual(
+                23,
+                axis.migration_command(
+                    axis.argparse.Namespace(
+                        migration_command="add",
+                        module="rules",
+                        name="AddDecisionTables",
+                    )
+                ),
+            )
+
+        run.assert_called_once_with(
+            [
+                axis.exe("dotnet"),
+                "tool",
+                "restore",
+                "--tool-manifest",
+                str(axis.ROOT / "dotnet-tools.json"),
+            ],
+            check=False,
         )
 
     def test_cli_routes_finite_migration_remove(self) -> None:
@@ -7275,11 +7436,11 @@ class TestRepoSkillsGate(unittest.TestCase):
             "version = 1\n\n"
             "[semantic_roles]\n"
             'independent-reviewer = "axis_reviewer"\n\n'
-            "[workflows.review]\n"
+            "[workflows.approval]\n"
             'initial = "ready"\n'
             'terminal_states = ["reviewed"]\n'
             'states = ["ready", "reviewed"]\n\n'
-            "[[workflows.review.transitions]]\n"
+            "[[workflows.approval.transitions]]\n"
             'id = "review"\n'
             'from = "ready"\n'
             'to = "reviewed"\n'
@@ -7288,6 +7449,39 @@ class TestRepoSkillsGate(unittest.TestCase):
         )
 
         self.assertEqual([], self.issues_for_skill(files))
+
+    def test_rejects_review_workflow_that_bypasses_readiness(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-pull-request")
+        files[".codex/agents/axis_reviewer.toml"] = 'name = "axis_reviewer"\n'
+        files[".agents/skills/workflows.toml"] = (
+            "version = 1\n\n"
+            "[semantic_roles]\n"
+            'independent-reviewer = "axis_reviewer"\n\n'
+            "[workflows.review]\n"
+            'initial = "focused-proof"\n'
+            'terminal_states = ["review-approved"]\n'
+            'states = ["focused-proof", "checkpoint", "review-approved"]\n\n'
+            "[[workflows.review.transitions]]\n"
+            'id = "create-checkpoint"\n'
+            'from = "focused-proof"\n'
+            'to = "checkpoint"\n'
+            'owner = "skill:axis-pull-request"\n'
+            'evidence = "focused-proof-and-clean-immutable-checkpoint"\n\n'
+            "[[workflows.review.transitions]]\n"
+            'id = "approve-review"\n'
+            'from = "checkpoint"\n'
+            'to = "review-approved"\n'
+            'owner = "role:independent-reviewer"\n'
+            'evidence = "completed-review-pass"\n'
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "workflow `review` must route `verify-readiness` from `checkpoint` to `readiness-verified`",
+            "\n".join(issues),
+        )
 
     def test_rejects_legacy_vendor_adapter_directory(self) -> None:
         files = self.valid_skill_files()

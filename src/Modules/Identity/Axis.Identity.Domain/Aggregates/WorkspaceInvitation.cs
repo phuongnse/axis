@@ -61,20 +61,20 @@ public sealed class WorkspaceInvitation : AggregateRoot<Guid>
     public WorkspaceMembershipRole RequestedRole { get; private set; }
     public WorkspaceInvitationStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
-    public DateTime? UpdatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
     public DateTime ExpiresAt { get; private set; }
     public DateTime? AcceptedAt { get; private set; }
     public DateTime? RevokedAt { get; private set; }
     public DateTime? TerminalMaterialPurgedAt { get; private set; }
     public int Revision { get; private set; }
-    private ActorKind? CreatedByKind { get; set; }
+    private ActorKind CreatedByKind { get; set; }
     private Guid? CreatedBySubjectId { get; set; }
-    private string? CreatedByDisplayName { get; set; }
-    private ActorKind? UpdatedByKind { get; set; }
+    private string CreatedByDisplayName { get; set; } = string.Empty;
+    private ActorKind UpdatedByKind { get; set; }
     private Guid? UpdatedBySubjectId { get; set; }
-    private string? UpdatedByDisplayName { get; set; }
-    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
-    public ActorSnapshot? UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
+    private string UpdatedByDisplayName { get; set; } = string.Empty;
+    public ActorSnapshot CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+    public ActorSnapshot UpdatedBy => Snapshot(UpdatedByKind, UpdatedBySubjectId, UpdatedByDisplayName);
     public IReadOnlyList<InvitationTokenGeneration> TokenGenerations => tokenGenerations;
     public IReadOnlyList<InvitationHandoff> Handoffs => handoffs;
 
@@ -82,13 +82,13 @@ public sealed class WorkspaceInvitation : AggregateRoot<Guid>
 
     public void InitializeMetadata(ActorSnapshot actor)
     {
-        if (!actor.IsValid || CreatedBy is not null) throw new InvalidOperationException("Invitation creation provenance is invalid.");
+        if (!actor.IsValid || CreatedByDisplayName.Length > 0) throw new InvalidOperationException("Invitation creation provenance is invalid.");
         StampCreated(actor);
     }
 
     public void RecordModification(ActorSnapshot actor, DateTime now)
     {
-        if (!actor.IsValid || (UpdatedAt.HasValue && now < UpdatedAt.Value)) throw new InvalidOperationException("Invitation modification provenance is invalid.");
+        if (!actor.IsValid || now < UpdatedAt) throw new InvalidOperationException("Invitation modification provenance is invalid.");
         UpdatedAt = now; UpdatedByKind = actor.Kind; UpdatedBySubjectId = actor.SubjectId; UpdatedByDisplayName = actor.DisplayName;
     }
 
@@ -381,5 +381,9 @@ public sealed class WorkspaceInvitation : AggregateRoot<Guid>
             StringComparer.Ordinal.Equals(candidate.HandoffHash, handoffHash));
 
     private void StampCreated(ActorSnapshot actor) { CreatedByKind = actor.Kind; CreatedBySubjectId = actor.SubjectId; CreatedByDisplayName = actor.DisplayName; UpdatedByKind = actor.Kind; UpdatedBySubjectId = actor.SubjectId; UpdatedByDisplayName = actor.DisplayName; }
-    private static ActorSnapshot? Snapshot(ActorKind? kind, Guid? subjectId, string? displayName) => kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName) ? ActorSnapshot.Create(actorKind, subjectId, displayName) : null;
+    private static ActorSnapshot Snapshot(ActorKind kind, Guid? subjectId, string displayName)
+    {
+        ActorSnapshot actor = new(kind, subjectId, displayName);
+        return actor.IsValid ? actor : throw new InvalidOperationException("Workspace invitation provenance is incomplete.");
+    }
 }

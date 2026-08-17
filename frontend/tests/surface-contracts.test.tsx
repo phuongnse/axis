@@ -31,7 +31,11 @@ describe('surface contracts', () => {
     expect(activeSurfaceContracts['solution-delivery']).toBe('resource-workspace');
     expect(activeSurfaceContracts['solution-delivery-windows']).toBe('managed-task-window');
     expectTypeOf<EnforcedSurfaceContractId>().toEqualTypeOf<
-      'account-surface' | 'authenticated-frame' | 'entry-surface' | 'managed-task-window'
+      | 'account-surface'
+      | 'authenticated-frame'
+      | 'entry-surface'
+      | 'managed-task-window'
+      | 'resource-workspace'
     >();
     expectTypeOf<SurfaceIdFor<'entry-surface'>>().toEqualTypeOf<
       | 'email-confirmation'

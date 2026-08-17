@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application;
 
@@ -12,7 +13,7 @@ public sealed record WorkspaceInvitationLifecycleDto(
     DateTime CreatedAt,
     DateTime ExpiresAt,
     int Revision,
-    ResourceMetadataDto Metadata);
+    [property: Required] ResourceMetadataDto Metadata);
 
 public sealed record WorkspaceInvitationExchangeDto(string Outcome, string? HandoffSecret);
 

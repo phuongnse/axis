@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.Identity.Contracts;
 using Axis.Shared.Application;
@@ -75,7 +76,7 @@ public sealed record BusinessObjectDefinitionDetailDto(
     int? LatestPublishedVersionNumber,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    ResourceMetadataDto Metadata,
+    [property: Required] ResourceMetadataDto Metadata,
     IReadOnlyList<BusinessObjectFieldDefinitionDto> Fields,
     BusinessObjectDefinitionVersionDto? LatestPublishedVersion,
     BusinessObjectDefinitionActionsDto Actions);
@@ -94,7 +95,7 @@ public sealed record BusinessObjectDefinitionListItemDto(
     int Revision,
     int? LatestPublishedVersionNumber,
     DateTime UpdatedAt,
-    ResourceMetadataDto Metadata);
+    [property: Required] ResourceMetadataDto Metadata);
 
 public sealed record BusinessObjectFieldDefinitionInput(
     string FieldKey,

@@ -181,6 +181,80 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
     }
 
     [Fact]
+    public async Task ListForWorkspaceAsync_WhenPrimarySortValuesTie_PrefixesKeepMergedPagingOrder()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        RuleDefinition[] definitions =
+        [
+            ConfiguredDraft(workspaceId, UniqueKey("first"), "First placeholder"),
+            ConfiguredDraft(workspaceId, UniqueKey("second"), "Second placeholder"),
+            ConfiguredDraft(workspaceId, UniqueKey("third"), "Third placeholder"),
+            ConfiguredDraft(workspaceId, UniqueKey("fourth"), "Fourth placeholder"),
+        ];
+        foreach (RuleDefinition definition in definitions)
+        {
+            await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        }
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<RuleDefinition> initialOrder = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            skip: 0,
+            take: 4,
+            sortBy: RuleDefinitionSortField.Revision,
+            sortDirection: CollectionSortDirection.Ascending,
+            cancellationToken: TestContext.Current.CancellationToken);
+        string[] descendingNames = ["Delta rule", "Charlie rule", "Bravo rule", "Alpha rule"];
+        foreach ((RuleDefinition orderedDefinition, string name) in initialOrder.Zip(descendingNames))
+        {
+            RuleDefinition definition = definitions.Single(candidate => candidate.Id == orderedDefinition.Id);
+            definition.SaveDraft(
+                    definition.Revision,
+                    name,
+                    $"Search document for {name}.",
+                    definition.Inputs.ToArray(),
+                    definition.Condition!,
+                    RuleSubjectReference.Human(Guid.NewGuid()),
+                    DateTime.UtcNow)
+                .IsSuccess.Should().BeTrue();
+        }
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<RuleDefinition> firstPrefix = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            skip: 0,
+            take: 2,
+            sortBy: RuleDefinitionSortField.Revision,
+            sortDirection: CollectionSortDirection.Ascending,
+            cancellationToken: TestContext.Current.CancellationToken);
+        IReadOnlyList<RuleDefinition> secondPrefix = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            skip: 0,
+            take: 4,
+            sortBy: RuleDefinitionSortField.Revision,
+            sortDirection: CollectionSortDirection.Ascending,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        string[] firstPage = firstPrefix
+            .OrderBy(definition => definition.Name, StringComparer.Ordinal)
+            .Take(2)
+            .Select(definition => definition.Name)
+            .ToArray();
+        string[] secondPage = secondPrefix
+            .OrderBy(definition => definition.Name, StringComparer.Ordinal)
+            .Skip(2)
+            .Take(2)
+            .Select(definition => definition.Name)
+            .ToArray();
+
+        firstPage.Concat(secondPage).Should().Equal(
+            "Alpha rule",
+            "Bravo rule",
+            "Charlie rule",
+            "Delta rule");
+    }
+
+    [Fact]
     public async Task SaveChangesAsync_WhenDraftIsRevised_PreservesPersistedImmutableVersion()
     {
         Guid workspaceId = Guid.NewGuid();

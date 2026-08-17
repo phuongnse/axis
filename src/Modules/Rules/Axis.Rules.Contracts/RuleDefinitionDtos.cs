@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Axis.Identity.Contracts;
 
 namespace Axis.Rules.Contracts;
@@ -26,14 +27,17 @@ public sealed record RuleOutputContractDto(
     RuleValueType Type,
     RuleExpressionCardinality Cardinality);
 
-public sealed record RuleResourceActorDto(string Kind, Guid? SubjectId, string DisplayName);
+public sealed record RuleResourceActorDto(
+    [property: Required] string Kind,
+    Guid? SubjectId,
+    [property: Required] string DisplayName);
 
 public sealed record RuleResourceMetadataDto(
     long? Revision,
-    RuleResourceActorDto? CreatedBy,
-    DateTimeOffset? CreatedAt,
-    RuleResourceActorDto? ModifiedBy,
-    DateTimeOffset? ModifiedAt);
+    [property: Required] RuleResourceActorDto CreatedBy,
+    [property: Required] DateTimeOffset CreatedAt,
+    [property: Required] RuleResourceActorDto ModifiedBy,
+    [property: Required] DateTimeOffset ModifiedAt);
 
 public sealed record RuleDefinitionSummaryDto(
     string DefinitionKey,
@@ -47,8 +51,8 @@ public sealed record RuleDefinitionSummaryDto(
     int? ActiveVersion,
     IReadOnlyList<RuleInputDefinitionDto> Inputs,
     RuleOutputContractDto Output,
-    DateTime? UpdatedAt,
-    RuleResourceMetadataDto Metadata,
+    DateTime UpdatedAt,
+    [property: Required] RuleResourceMetadataDto Metadata,
     RuleDefinitionActionsDto Actions,
     RuleReferenceDocumentationDto? Documentation = null);
 
@@ -66,10 +70,10 @@ public sealed record RuleDefinitionDetailDto(
     RuleOutputContractDto Output,
     RuleConditionNodeDto? Condition,
     IReadOnlyList<RuleDefinitionVersionDto> Versions,
-    DateTime? CreatedAt,
-    DateTime? UpdatedAt,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
     DateTime? ArchivedAt,
-    RuleResourceMetadataDto Metadata,
+    [property: Required] RuleResourceMetadataDto Metadata,
     RuleDefinitionActionsDto Actions,
     RuleReferenceDocumentationDto? Documentation = null);
 
