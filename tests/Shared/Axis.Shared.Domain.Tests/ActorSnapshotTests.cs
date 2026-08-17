@@ -31,4 +31,23 @@ public sealed class ActorSnapshotTests
 
         action.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void Anonymous_WhenCreated_ReturnsCanonicalActor()
+    {
+        ActorSnapshot actor = ActorSnapshot.Anonymous();
+
+        actor.IsValid.Should().BeTrue();
+        actor.Kind.Should().Be(ActorKind.Anonymous);
+        actor.SubjectId.Should().BeNull();
+        actor.DisplayName.Should().Be(ActorSnapshot.AnonymousDisplayName);
+    }
+
+    [Fact]
+    public void Create_WhenAnonymousDisplayNameIsNotCanonical_Throws()
+    {
+        Action action = () => ActorSnapshot.Create(ActorKind.Anonymous, null, "Guest");
+
+        action.Should().Throw<ArgumentException>();
+    }
 }

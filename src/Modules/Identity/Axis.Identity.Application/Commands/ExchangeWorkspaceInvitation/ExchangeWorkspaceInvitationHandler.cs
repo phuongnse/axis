@@ -74,7 +74,7 @@ public sealed class ExchangeWorkspaceInvitationHandler(
             invitation.Revision);
         if (outcome == InvitationExchangeOutcome.Exchanged)
             invitation.RecordModification(
-                ActorSnapshot.System(),
+                ActorSnapshot.Anonymous(),
                 now);
 
         Guid auditEventId = Guid.NewGuid();

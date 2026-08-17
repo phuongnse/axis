@@ -82,7 +82,7 @@ Token storage, delivery retry, resend, concurrency, audit, and cleanup realizati
 - **AC-015** Invite, resend, revoke, denied authority, delivery, and terminal outcomes produce correlated append-only redacted audit records.
 - **AC-016** REST/OpenAPI and typed MCP operations expose invite, resend, revoke, and lifecycle reads with server-derived Organization, Workspace, inviter, and authority.
 - **AC-017** Membership management and invitation forms are keyboard and screen-reader operable, compact-layout safe, and provide recovery for terminal delivery failure.
-- **AC-018** The invitation collection exposes server-owned current-state metadata in the Resource Workspace order: revision when applicable, modified actor, and modified time. Creation actor/time remain available to resource detail and audit owners but are absent from the collection definition and column menu. Human actor cells show the authenticated administrator's display name; resend, revoke, and acceptance update modification provenance without changing the underlying creation provenance.
+- **AC-018** The invitation collection exposes server-owned current-state metadata in the Resource Workspace order: revision when applicable, modified actor, and modified time. Creation actor/time remain available to resource detail and audit owners but are absent from the collection definition and column menu. Human actor cells show the authenticated administrator's display name; successful anonymous token exchange records the canonical Anonymous actor; resend, revoke, and acceptance update modification provenance without changing the underlying creation provenance.
 
 ## Acceptance Test Matrix
 

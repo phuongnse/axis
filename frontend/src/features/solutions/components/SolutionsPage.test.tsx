@@ -14,6 +14,7 @@ import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
 import { ApiError } from '@/lib/api';
 import type { MyRouterContext } from '@/routes/__root';
+import { resourceMetadata } from '@/test/resourceMetadata';
 import { installSolutionVersion, publishSolutionVersion } from '../api';
 import { solutionsManagedWindowRenderers } from '../managed-windows';
 import { ComponentPlan } from './SolutionPresentation';
@@ -416,6 +417,7 @@ function version(overrides: Record<string, unknown> = {}) {
     trustStatus: 'Trusted' as const,
     sourceRevision: 'abc123',
     publishedAt: '2026-08-12T08:00:00Z',
+    metadata: resourceMetadata(null),
     components: [
       {
         type: 'authorization.policy.v1',
@@ -435,6 +437,7 @@ function version(overrides: Record<string, unknown> = {}) {
 }
 
 function installation(overrides: Record<string, unknown> = {}) {
+  const revision = typeof overrides.revision === 'number' ? overrides.revision : 1;
   return {
     id: 'installation-1',
     workspaceId: 'workspace-1',
@@ -445,6 +448,8 @@ function installation(overrides: Record<string, unknown> = {}) {
     complianceStatus: 'Compliant' as const,
     components: [],
     updatedAt: '2026-08-12T09:00:00Z',
+    revision,
+    metadata: resourceMetadata(revision),
     ...overrides,
   };
 }

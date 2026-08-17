@@ -3469,6 +3469,15 @@ def frontend_command(args: argparse.Namespace) -> int:
         if vitest_args:
             npm_args.extend(["--", *vitest_args])
         return run_frontend_npm(npm_args).returncode
+    if command == "test-related":
+        related_inputs = frontend_test_related_inputs(changed_paths_since(args.since))
+        if not related_inputs:
+            print("frontend test-related: no related frontend source or unit-test inputs")
+            return 0
+        print(f"frontend test-related: {len(related_inputs)} changed input(s)")
+        return run_frontend_npm(
+            ["exec", "--", "vitest", "related", *related_inputs, "--run"]
+        ).returncode
     if command == "gen-api-types":
         generated_path = FRONTEND_DIR / "src" / "lib" / "api-generated"
 
@@ -3544,6 +3553,23 @@ def frontend_related_source_paths(paths: list[str]) -> list[str]:
         and Path(path).suffix.lower() in FRONTEND_TEST_RELATED_SUFFIXES
         and (ROOT / path).is_file()
     )
+
+
+def frontend_test_related_inputs(paths: list[str]) -> list[str]:
+    suite_level_paths = sorted(set(paths) & FRONTEND_TEST_SUITE_LEVEL_PATHS)
+    if suite_level_paths:
+        raise CheckError(
+            "frontend test-related: shared test-runtime changes require the full frontend test command: "
+            + ", ".join(suite_level_paths)
+        )
+    changed_unit_tests = [
+        path.removeprefix("frontend/")
+        for path in paths
+        if path.startswith("frontend/tests/")
+        and path.endswith((".ts", ".tsx"))
+        and (ROOT / path).is_file()
+    ]
+    return sorted(set(frontend_related_source_paths(paths) + changed_unit_tests))
 
 
 def is_markdown_link_path(path: str) -> bool:
@@ -3894,11 +3920,11 @@ def verify(args: argparse.Namespace) -> int:
                     ),
                 )
             elif frontend_related_sources:
-                related_inputs = sorted(set(frontend_related_sources + changed_unit_tests))
+                related_inputs = frontend_test_related_inputs(paths)
                 step(
                     "frontend test (related files)",
                     lambda: run_frontend_npm(
-                        ["exec", "vitest", "related", *related_inputs, "--run"]
+                        ["exec", "--", "vitest", "related", *related_inputs, "--run"]
                     ).returncode,
                 )
             elif changed_unit_tests:
@@ -6126,6 +6152,16 @@ def build_parser(
     )
     frontend_test.add_argument("-t", "--name", help="Run tests whose full name matches this pattern")
     frontend_test.set_defaults(func=frontend_command)
+    frontend_test_related = frontend_sub.add_parser(
+        "test-related",
+        help="Run the dependency-related frontend unit scope changed since a checkpoint",
+    )
+    frontend_test_related.add_argument(
+        "--since",
+        required=True,
+        help="Immutable checkpoint used to discover the bounded changed input set",
+    )
+    frontend_test_related.set_defaults(func=frontend_command)
     frontend_gen_api = frontend_sub.add_parser("gen-api-types", help="Generate TypeScript API types from OpenAPI")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)

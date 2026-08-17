@@ -4,6 +4,7 @@ using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Tests.Fixtures;
 using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 
 namespace Axis.Identity.Infrastructure.Tests.Repositories;
@@ -54,6 +55,7 @@ public sealed class WorkspaceInvitationRepositoryTests(IdentityDatabaseFixture d
             now.AddDays(-2),
             now.AddDays(5));
         first.Revoke(first.Revision, now);
+        first.RecordModification(ActorSnapshot.User(inviterId, "Invitation Sort Admin"), now);
         WorkspaceInvitation second = CreateInvitation(
             Guid.NewGuid(),
             organizationId,
@@ -93,6 +95,7 @@ public sealed class WorkspaceInvitationRepositoryTests(IdentityDatabaseFixture d
             now.AddDays(-2),
             now.AddDays(5));
         delivered.MarkDelivered(delivered.Revision);
+        delivered.RecordModification(ActorSnapshot.System(), now);
         WorkspaceInvitation pending = CreateInvitation(
             Guid.NewGuid(),
             organizationId,
@@ -181,7 +184,7 @@ public sealed class WorkspaceInvitationRepositoryTests(IdentityDatabaseFixture d
         DateTime expiresAt)
     {
         string uniqueTokenHash = $"{Guid.NewGuid():N}{Guid.NewGuid():N}";
-        return WorkspaceInvitation.Create(
+        WorkspaceInvitation invitation = WorkspaceInvitation.Create(
             id,
             organizationId,
             workspaceId,
@@ -193,5 +196,7 @@ public sealed class WorkspaceInvitationRepositoryTests(IdentityDatabaseFixture d
             uniqueTokenHash,
             $"protected-{Guid.NewGuid():N}",
             $"sort-{Guid.NewGuid():N}");
+        invitation.InitializeMetadata(ActorSnapshot.User(inviterId, "Invitation Sort Admin"));
+        return invitation;
     }
 }

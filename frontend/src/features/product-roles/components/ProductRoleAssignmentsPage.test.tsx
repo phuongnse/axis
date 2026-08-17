@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { resourceMetadata } from '@/test/resourceMetadata';
 import { axisStyles } from '@/theme.generated';
 import { assignProductRole, revokeProductRole } from '../api';
 import { productRolesManagedWindowRenderers } from '../managed-windows';
@@ -42,8 +43,8 @@ describe('ProductRoleAssignmentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.list.mockResolvedValue(management());
-    api.assign.mockResolvedValue({ ...management().assignments[0], revision: 5 });
-    api.revoke.mockResolvedValue({ ...management().assignments[0], isActive: false, revision: 5 });
+    api.assign.mockResolvedValue(productRoleAssignment({ revision: 5 }));
+    api.revoke.mockResolvedValue(productRoleAssignment({ isActive: false, revision: 5 }));
   });
 
   it('composes the shared resource workspace and revokes from a managed assignment window', async () => {
@@ -229,15 +230,20 @@ function management() {
         description: 'Reviews submitted cases.',
       },
     ],
-    assignments: [
-      {
-        workspaceId: 'workspace-1',
-        subject: { kind: 'Human', subjectId: 'user-1' },
-        policyVersionId: 'policy-version-1',
-        roleKey: 'case.reviewer',
-        isActive: true,
-        revision: 4,
-      },
-    ],
+    assignments: [productRoleAssignment()],
+  };
+}
+
+function productRoleAssignment(overrides: Record<string, unknown> = {}) {
+  const revision = typeof overrides.revision === 'number' ? overrides.revision : 4;
+  return {
+    workspaceId: 'workspace-1',
+    subject: { kind: 'Human', subjectId: 'user-1' },
+    policyVersionId: 'policy-version-1',
+    roleKey: 'case.reviewer',
+    isActive: true,
+    revision,
+    metadata: resourceMetadata(revision),
+    ...overrides,
   };
 }

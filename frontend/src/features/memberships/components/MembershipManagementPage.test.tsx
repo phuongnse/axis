@@ -14,6 +14,7 @@ import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
 import { ApiError } from '@/lib/api';
 import type { MyRouterContext } from '@/routes/__root';
+import { resourceMetadata } from '@/test/resourceMetadata';
 import { axisStyles } from '@/theme.generated';
 import {
   grantWorkspaceProductBuilder,
@@ -118,19 +119,21 @@ describe('MembershipManagementPage', () => {
       requestedRole: 'Member',
       invitation: pendingInvitation(),
     });
-    api.resend.mockResolvedValue({ ...pendingInvitation(), revision: 3 });
-    api.revoke.mockResolvedValue({ ...pendingInvitation(), status: 'Revoked', revision: 3 });
+    api.resend.mockResolvedValue(pendingInvitation({ revision: 3 }));
+    api.revoke.mockResolvedValue(pendingInvitation({ status: 'Revoked', revision: 3 }));
     api.productBuilders.mockResolvedValue([productBuilderMember()]);
-    api.grantProductBuilder.mockResolvedValue({
-      ...productBuilderMember(),
-      isProductBuilder: true,
-      membershipRevision: 2,
-    });
-    api.revokeProductBuilder.mockResolvedValue({
-      ...productBuilderMember(),
-      isProductBuilder: false,
-      membershipRevision: 3,
-    });
+    api.grantProductBuilder.mockResolvedValue(
+      productBuilderMember({
+        isProductBuilder: true,
+        membershipRevision: 2,
+      }),
+    );
+    api.revokeProductBuilder.mockResolvedValue(
+      productBuilderMember({
+        isProductBuilder: false,
+        membershipRevision: 3,
+      }),
+    );
   });
 
   it('manages Product Builder independently from the Workspace lifecycle role', async () => {
@@ -170,14 +173,15 @@ describe('MembershipManagementPage', () => {
     const user = userEvent.setup();
     api.productBuilders
       .mockResolvedValueOnce([productBuilderMember()])
-      .mockResolvedValueOnce([{ ...productBuilderMember(), membershipRevision: 4 }]);
+      .mockResolvedValueOnce([productBuilderMember({ membershipRevision: 4 })]);
     api.grantProductBuilder
       .mockRejectedValueOnce(new ApiError(409, { code: 'identity.membership.revisionConflict' }))
-      .mockResolvedValueOnce({
-        ...productBuilderMember(),
-        isProductBuilder: true,
-        membershipRevision: 5,
-      });
+      .mockResolvedValueOnce(
+        productBuilderMember({
+          isProductBuilder: true,
+          membershipRevision: 5,
+        }),
+      );
     renderPage();
 
     await user.click(await screen.findByRole('tab', { name: 'Members' }));
@@ -343,7 +347,7 @@ describe('MembershipManagementPage', () => {
   it('offers recovery actions for a pending invitation with failed delivery', async () => {
     const user = userEvent.setup();
     api.list.mockResolvedValue({
-      items: [{ ...pendingInvitation(), deliveryStatus: 'Failed' }],
+      items: [pendingInvitation({ deliveryStatus: 'Failed' })],
       page: 1,
       pageSize: 20,
       totalCount: 1,
@@ -394,7 +398,7 @@ describe('MembershipManagementPage', () => {
     const user = userEvent.setup();
     api.list.mockImplementation((page: number) =>
       Promise.resolve({
-        items: [{ ...pendingInvitation(), recipientEmail: `member-${page}@example.com` }],
+        items: [pendingInvitation({ recipientEmail: `member-${page}@example.com` })],
         page,
         pageSize: 20,
         totalCount: 21,
@@ -410,7 +414,8 @@ describe('MembershipManagementPage', () => {
   });
 });
 
-function pendingInvitation() {
+function pendingInvitation(overrides: Record<string, unknown> = {}) {
+  const revision = typeof overrides.revision === 'number' ? overrides.revision : 2;
   return {
     invitationId: 'invitation-1',
     recipientEmail: 'member@example.com',
@@ -419,18 +424,24 @@ function pendingInvitation() {
     deliveryStatus: 'Pending',
     createdAt: '2026-08-06T10:00:00Z',
     expiresAt: '2026-08-13T10:00:00Z',
-    revision: 2,
+    revision,
+    metadata: resourceMetadata(revision),
+    ...overrides,
   };
 }
 
-function productBuilderMember() {
+function productBuilderMember(overrides: Record<string, unknown> = {}) {
+  const revision =
+    typeof overrides.membershipRevision === 'number' ? overrides.membershipRevision : 1;
   return {
     userId: 'builder-user',
     displayName: 'Builder Member',
     email: 'builder@example.com',
     workspaceRole: 'Member',
     isProductBuilder: false,
-    membershipRevision: 1,
+    membershipRevision: revision,
     canChange: true,
+    metadata: resourceMetadata(revision),
+    ...overrides,
   };
 }

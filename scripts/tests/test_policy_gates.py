@@ -4115,7 +4115,7 @@ class TestReviewVerificationGates(unittest.TestCase):
                 calls.append("npm run ci")
             elif args[1:3] == ["run", "test"]:
                 calls.append("npm run test")
-            elif args[1:4] == ["exec", "vitest", "related"]:
+            elif args[1:5] == ["exec", "--", "vitest", "related"]:
                 calls.append(" ".join(args[1:]))
             else:
                 calls.append(" ".join(args[:3]))
@@ -4147,7 +4147,7 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "audit",
                 "frontend-toolchain",
                 "npm run ci",
-                "exec vitest related src/main.tsx --run",
+                "exec -- vitest related src/main.tsx --run",
             ],
             calls,
         )
@@ -6761,6 +6761,38 @@ class TestAxisCommandWrappers(unittest.TestCase):
             contextlib.redirect_stderr(io.StringIO()),
         ):
             axis.main(["frontend", "test", "--watch"])
+
+    def test_frontend_test_related_maps_checkpoint_to_bounded_dependency_graph(self) -> None:
+        with mock.patch.object(
+            axis,
+            "changed_paths_since",
+            return_value=[
+                "frontend/src/main.tsx",
+                "frontend/tests/app-shell.test.tsx",
+                "src/Axis.Api/Program.cs",
+            ],
+        ):
+            calls = self.run_with_fake_process(
+                axis.frontend_command,
+                axis.argparse.Namespace(
+                    frontend_command="test-related",
+                    since="reviewed-checkpoint",
+                ),
+            )
+
+        self.assertEqual(
+            [
+                "npm",
+                "exec",
+                "--",
+                "vitest",
+                "related",
+                "src/main.tsx",
+                "tests/app-shell.test.tsx",
+                "--run",
+            ],
+            calls[0],
+        )
 
     def test_frontend_format_maps_only_selected_source_paths(self) -> None:
         calls = self.run_with_fake_process(
