@@ -556,6 +556,7 @@ function DataTableColumnHeader<TData>({
 }) {
   const sorted = column.getIsSorted();
   const configurable = column.getCanHide() || column.getCanPin();
+  const label = column.columnDef.meta?.label ?? column.id;
   return (
     <div
       className={cn(
@@ -588,7 +589,7 @@ function DataTableColumnHeader<TData>({
                 : column.toggleSorting(false)
           }
         >
-          <span data-slot="data-table-column-label" className="truncate">
+          <span data-slot="data-table-column-label" className="truncate" title={label}>
             {children}
           </span>
           {sorted === 'asc' ? (
@@ -602,6 +603,7 @@ function DataTableColumnHeader<TData>({
       ) : (
         <span
           data-slot="data-table-column-label"
+          title={label}
           className={cn('min-w-0 flex-1 truncate', align === 'end' && 'ml-auto')}
         >
           {children}
@@ -833,9 +835,11 @@ function DataTableFormattedValue({
   definition: DataTableCellDefinition;
   formatter: DataTableValueFormatter;
 }) {
+  const formatted = formatter.format(value, definition);
   return (
     <span
       data-slot="data-table-value"
+      title={formatted}
       className={cn(
         'min-w-0 max-w-full',
         definition.kind === 'list' ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap',
@@ -849,7 +853,7 @@ function DataTableFormattedValue({
           'tabular-nums',
       )}
     >
-      {formatter.format(value, definition)}
+      {formatted}
     </span>
   );
 }
@@ -958,19 +962,9 @@ function createColumnLayout<TData>(
     const flexibleColumns = columns.filter((column) => !isFixedWidthColumn(column));
     const fixedWidth = fixedColumns.reduce((total, column) => total + column.getSize(), 0);
     const flexibleBudget = Math.max(viewportWidth - fixedWidth, 0);
-    const flexiblePreferredWidth = flexibleColumns.reduce(
-      (total, column) => total + column.getSize(),
-      0,
-    );
     for (const column of fixedColumns) widths.set(column.id, column.getSize());
-    for (const column of flexibleColumns) {
-      widths.set(
-        column.id,
-        flexiblePreferredWidth > 0
-          ? (flexibleBudget * column.getSize()) / flexiblePreferredWidth
-          : 0,
-      );
-    }
+    for (const [columnId, width] of fitFlexibleColumns(flexibleColumns, flexibleBudget))
+      widths.set(columnId, width);
   }
 
   const leftOffsets = new Map<string, number>();
@@ -993,6 +987,58 @@ function createColumnLayout<TData>(
     left: (column) => leftOffsets.get(column.id),
     right: (column) => rightOffsets.get(column.id),
   };
+}
+
+function fitFlexibleColumns<TData>(
+  columns: readonly Column<TData, unknown>[],
+  budget: number,
+): ReadonlyMap<string, number> {
+  const widths = new Map<string, number>();
+  if (columns.length === 0) return widths;
+
+  const minimums = new Map(
+    columns.map((column) => [column.id, Math.max(column.columnDef.minSize ?? 20, 0)]),
+  );
+  const minimumTotal = columns.reduce((total, column) => total + (minimums.get(column.id) ?? 0), 0);
+  if (minimumTotal > budget) {
+    for (const column of columns) {
+      const minimum = minimums.get(column.id) ?? 0;
+      widths.set(column.id, minimumTotal > 0 ? (budget * minimum) / minimumTotal : 0);
+    }
+    return widths;
+  }
+
+  let remainingBudget = budget;
+  let remaining = [...columns];
+  while (remaining.length > 0) {
+    const preferredTotal = remaining.reduce((total, column) => total + column.getSize(), 0);
+    const constrained = remaining.filter((column) => {
+      const proportional =
+        preferredTotal > 0 ? (remainingBudget * column.getSize()) / preferredTotal : 0;
+      return proportional < (minimums.get(column.id) ?? 0);
+    });
+    if (constrained.length === 0) {
+      for (const column of remaining) {
+        widths.set(
+          column.id,
+          preferredTotal > 0
+            ? (remainingBudget * column.getSize()) / preferredTotal
+            : remainingBudget / remaining.length,
+        );
+      }
+      break;
+    }
+
+    for (const column of constrained) {
+      const minimum = minimums.get(column.id) ?? 0;
+      widths.set(column.id, minimum);
+      remainingBudget -= minimum;
+    }
+    const constrainedIds = new Set(constrained.map((column) => column.id));
+    remaining = remaining.filter((column) => !constrainedIds.has(column.id));
+  }
+
+  return widths;
 }
 
 function isFixedWidthColumn<TData>(column: Column<TData, unknown>): boolean {

@@ -57,10 +57,14 @@ public sealed class SetWorkspaceProductBuilderHandler(
 
         try
         {
+            bool stateChanged = target.IsProductBuilder != command.Enabled;
             target.SetProductBuilder(command.Enabled, command.ExpectedRevision);
-            target.RecordModification(
-                ActorSnapshot.User(command.ActorUserId, command.ActorDisplayName),
-                timeProvider.GetUtcNow().UtcDateTime);
+            if (stateChanged)
+            {
+                target.RecordModification(
+                    ActorSnapshot.User(command.ActorUserId, command.ActorDisplayName),
+                    timeProvider.GetUtcNow().UtcDateTime);
+            }
         }
         catch (InvalidOperationException)
         {

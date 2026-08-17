@@ -101,13 +101,16 @@ export function ProductRoleAssignmentsPage() {
         meta: { label: t('productRoles.status'), cell: { kind: 'status' } },
         cell: () => <StatusBadge state="positive">{t('productRoles.active')}</StatusBadge>,
       },
-      ...createResourceMetadataColumns<ProductRoleAssignmentDto>({
-        revision: t('metadata.revision'),
-        createdBy: t('metadata.createdBy'),
-        createdAt: t('metadata.createdAt'),
-        modifiedBy: t('metadata.modifiedBy'),
-        modifiedAt: t('metadata.modifiedAt'),
-      }),
+      ...createResourceMetadataColumns<ProductRoleAssignmentDto>(
+        {
+          revision: t('metadata.revision'),
+          createdBy: t('metadata.createdBy'),
+          createdAt: t('metadata.createdAt'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: language },
+      ),
     ];
 
     const emptyDescription =

@@ -126,13 +126,16 @@ export function MembershipManagementPage() {
           </StatusBadge>
         ),
       },
-      ...createResourceMetadataColumns<WorkspaceProductBuilderDto>({
-        revision: t('metadata.revision'),
-        createdBy: t('metadata.createdBy'),
-        createdAt: t('metadata.createdAt'),
-        modifiedBy: t('metadata.modifiedBy'),
-        modifiedAt: t('metadata.modifiedAt'),
-      }),
+      ...createResourceMetadataColumns<WorkspaceProductBuilderDto>(
+        {
+          revision: t('metadata.revision'),
+          createdBy: t('metadata.createdBy'),
+          createdAt: t('metadata.createdAt'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {
@@ -233,13 +236,16 @@ export function MembershipManagementPage() {
         minSize: 190,
         meta: { label: t('memberships.expires'), cell: { kind: 'dateTime' } },
       },
-      ...createResourceMetadataColumns<WorkspaceInvitationLifecycleDto>({
-        revision: t('metadata.revision'),
-        createdBy: t('metadata.createdBy'),
-        createdAt: t('metadata.createdAt'),
-        modifiedBy: t('metadata.modifiedBy'),
-        modifiedAt: t('metadata.modifiedAt'),
-      }),
+      ...createResourceMetadataColumns<WorkspaceInvitationLifecycleDto>(
+        {
+          revision: t('metadata.revision'),
+          createdBy: t('metadata.createdBy'),
+          createdAt: t('metadata.createdAt'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {

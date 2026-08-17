@@ -1317,11 +1317,15 @@ export function RuleEditorDialog({
                       <dl className="grid gap-5 sm:grid-cols-2">
                         <RuleDetail
                           label={t('rules.definitionKey')}
-                          value={detail.definitionKey ?? '—'}
+                          value={detail.definitionKey ?? t('table.emptyValue')}
                         />
                         <RuleDetail
                           label={t('rules.revision')}
-                          value={detail.revision == null ? '—' : String(detail.revision)}
+                          value={
+                            detail.revision == null
+                              ? t('table.emptyValue')
+                              : String(detail.revision)
+                          }
                         />
                         <RuleDetail
                           label={t('rules.expressionLanguage')}

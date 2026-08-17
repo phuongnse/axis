@@ -29,7 +29,7 @@ export function referenceContent(
 export function referenceLabel(
   documentation: ReferenceDocumentation | null | undefined,
   language: string,
-  fallback = '—',
+  fallback = 'N/A',
 ): string {
   return referenceContent(documentation, language)?.displayName || fallback;
 }

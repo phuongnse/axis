@@ -311,7 +311,7 @@ export function SolutionsPage() {
           modifiedBy: t('metadata.modifiedBy'),
           modifiedAt: t('metadata.modifiedAt'),
         },
-        { includeRevision: false },
+        { includeRevision: false, locale: i18n.language },
       ),
     ];
 

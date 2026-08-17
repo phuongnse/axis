@@ -17,6 +17,19 @@ export interface RulesRouteSearch {
   sortDirection?: CollectionSortDirection;
 }
 
+const ruleDefinitionSortFields: readonly RuleDefinitionSortField[] = [
+  'Name',
+  'Origin',
+  'Status',
+  'ActiveVersion',
+  'LatestVersion',
+  'Revision',
+  'CreatedBy',
+  'CreatedAt',
+  'ModifiedBy',
+  'ModifiedAt',
+];
+
 export function loadRulesRoute({ queryClient }: MyRouterContext) {
   return queryClient.ensureQueryData(ruleDefinitionsListQueryOptions());
 }
@@ -30,10 +43,7 @@ function validateRulesSearch(search: Record<string, unknown>): RulesRouteSearch 
     typeof search.definitionKey === 'string' && search.definitionKey
       ? search.definitionKey
       : undefined;
-  const sortBy =
-    search.sortBy === 'Name' || search.sortBy === 'Origin' || search.sortBy === 'Status'
-      ? search.sortBy
-      : undefined;
+  const sortBy = isRuleDefinitionSortField(search.sortBy) ? search.sortBy : undefined;
   const sortDirection =
     search.sortDirection === 'Ascending' || search.sortDirection === 'Descending'
       ? search.sortDirection
@@ -45,4 +55,8 @@ function validateRulesSearch(search: Record<string, unknown>): RulesRouteSearch 
     ...(definitionKey ? { definitionKey } : {}),
     ...(sortBy && sortDirection ? { sortBy, sortDirection } : {}),
   };
+}
+
+function isRuleDefinitionSortField(value: unknown): value is RuleDefinitionSortField {
+  return ruleDefinitionSortFields.some((field) => field === value);
 }

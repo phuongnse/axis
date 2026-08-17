@@ -33,6 +33,9 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
     public async Task SetProductBuilder_WhenGrantIsEquivalent_ReturnsCanonicalStateWithoutIncrementingRevision()
     {
         TestContext context = new();
+        DateTime originalModifiedAt = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ActorSnapshot originalActor = ActorSnapshot.User(context.Target.Id, context.Target.FullName);
+        context.TargetMembership.InitializeMetadata(originalActor, originalModifiedAt);
         context.TargetMembership.SetProductBuilder(true, context.TargetMembership.Revision);
         int revision = context.TargetMembership.Revision;
 
@@ -43,6 +46,8 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.MembershipRevision.Should().Be(revision);
         context.TargetMembership.Revision.Should().Be(revision);
+        context.TargetMembership.UpdatedAt.Should().Be(originalModifiedAt);
+        context.TargetMembership.UpdatedBy.Should().Be(originalActor);
     }
 
     [Fact]

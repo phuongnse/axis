@@ -456,7 +456,9 @@ function ValueComposer({
             onValueChange={(reference) => onChange({ kind: 'Input', reference, arguments: [] })}
           >
             <SelectTrigger id={`${path}-input`} aria-label={`${label}: ${t('rules.chooseInput')}`}>
-              <SelectValue>{inputLabel(operand.reference, inputs)}</SelectValue>
+              <SelectValue>
+                {inputLabel(operand.reference, inputs, t('table.emptyValue'))}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {compatibleInputs.map((input) => (
@@ -940,8 +942,12 @@ function isValueType(value: unknown): value is ValueType {
   return typeof value === 'string' && valueTypes.includes(value as ValueType);
 }
 
-function inputLabel(reference: string | null | undefined, inputs: DraftInput[]) {
-  return inputs.find((input) => input.key === reference)?.label ?? '—';
+function inputLabel(
+  reference: string | null | undefined,
+  inputs: DraftInput[],
+  emptyValue: string,
+) {
+  return inputs.find((input) => input.key === reference)?.label ?? emptyValue;
 }
 
 function updateAtPath(root: Condition, path: NodePath, next: Condition): Condition {

@@ -88,13 +88,16 @@ export function ServiceIdentitiesPage() {
         minSize: 110,
         meta: { label: t('serviceIdentities.keysTitle'), cell: { kind: 'number' } },
       },
-      ...createResourceMetadataColumns<ServiceIdentityDto>({
-        revision: t('metadata.revision'),
-        createdBy: t('metadata.createdBy'),
-        createdAt: t('metadata.createdAt'),
-        modifiedBy: t('metadata.modifiedBy'),
-        modifiedAt: t('metadata.modifiedAt'),
-      }),
+      ...createResourceMetadataColumns<ServiceIdentityDto>(
+        {
+          revision: t('metadata.revision'),
+          createdBy: t('metadata.createdBy'),
+          createdAt: t('metadata.createdAt'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {

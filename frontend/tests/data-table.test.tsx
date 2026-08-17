@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   countFilterConditions,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -241,14 +242,53 @@ describe('DataTable', () => {
       },
     });
 
+    const sizingColumns: DataTableColumnDef<Item>[] = [
+      {
+        accessorKey: 'name',
+        size: 700,
+        minSize: 300,
+        meta: { label: 'Name', cell: { kind: 'text' } },
+      },
+      {
+        accessorKey: 'status',
+        size: 100,
+        minSize: 120,
+        meta: { label: 'Status', cell: { kind: 'status' } },
+      },
+      {
+        accessorKey: 'department',
+        size: 100,
+        minSize: 120,
+        meta: { label: 'Department', cell: { kind: 'text' } },
+      },
+    ];
+
     try {
-      const desktop = render(<DataTable definition={clientDefinition()} />);
-      const desktopViewport = desktop.container.querySelector<HTMLElement>(
-        '[data-slot="data-table-viewport"]',
-      );
-      expect(desktopViewport).toHaveAttribute('data-horizontal-overflow', 'fitted');
-      expect(desktopViewport?.querySelector('table')).toHaveStyle({ width: '100%' });
-      desktop.unmount();
+      for (viewportWidth of [768, 1024, 1280]) {
+        const desktop = render(
+          <DataTable definition={clientDefinition({ columns: sizingColumns })} />,
+        );
+        const desktopViewport = desktop.container.querySelector<HTMLElement>(
+          '[data-slot="data-table-viewport"]',
+        );
+        expect(desktopViewport).toHaveAttribute('data-horizontal-overflow', 'fitted');
+        expect(desktopViewport?.querySelector('table')).toHaveStyle({ width: '100%' });
+        const widths = [...(desktopViewport?.querySelectorAll('col') ?? [])].map((column) =>
+          Number.parseFloat((column as HTMLElement).style.width),
+        );
+        expect(widths).toHaveLength(3);
+        expect(widths[0]).toBeGreaterThanOrEqual(300);
+        expect(widths[1]).toBeGreaterThanOrEqual(120);
+        expect(widths[2]).toBeGreaterThanOrEqual(120);
+        expect(
+          desktopViewport?.querySelector('[data-slot="data-table-column-label"]'),
+        ).toHaveAttribute('title', 'Name');
+        expect(desktopViewport?.querySelector('[data-slot="data-table-value"]')).toHaveAttribute(
+          'title',
+          'Alpha',
+        );
+        desktop.unmount();
+      }
 
       viewportWidth = 390;
       const compact = render(<DataTable definition={clientDefinition()} />);
@@ -266,6 +306,88 @@ describe('DataTable', () => {
         Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth');
       }
     }
+  });
+
+  it('sorts actor metadata by localized display name with deterministic missing values', async () => {
+    type MetadataRow = {
+      id: string;
+      name: string;
+      metadata?: {
+        revision: number;
+        createdBy?: { displayName?: string | null };
+        createdAt: string;
+        modifiedBy?: { displayName?: string | null };
+        modifiedAt: string;
+      };
+    };
+    const metadataRows: MetadataRow[] = [
+      {
+        id: 'first',
+        name: 'First record',
+        metadata: {
+          revision: 1,
+          createdBy: { displayName: 'Ada Lovelace' },
+          createdAt: '2026-01-01T00:00:00Z',
+          modifiedBy: { displayName: 'Zed User' },
+          modifiedAt: '2026-01-02T00:00:00Z',
+        },
+      },
+      {
+        id: 'second',
+        name: 'Second record',
+        metadata: {
+          revision: 2,
+          createdBy: { displayName: 'Zed User' },
+          createdAt: '2026-01-01T00:00:00Z',
+          modifiedBy: { displayName: 'Ada Lovelace' },
+          modifiedAt: '2026-01-02T00:00:00Z',
+        },
+      },
+      { id: 'missing', name: 'Missing actor' },
+    ];
+    const metadataColumns: DataTableColumnDef<MetadataRow>[] = [
+      {
+        accessorKey: 'name',
+        meta: { label: 'Name', cell: { kind: 'text' } },
+      },
+      ...createResourceMetadataColumns<MetadataRow>(
+        {
+          revision: 'Revision',
+          createdBy: 'Created by',
+          createdAt: 'Created at',
+          modifiedBy: 'Modified by',
+          modifiedAt: 'Modified at',
+        },
+        { locale: 'en-US' },
+      ),
+    ];
+    const user = userEvent.setup();
+    const rendered = render(
+      <DataTable
+        definition={{
+          ariaLabel: 'Metadata records',
+          locale: 'en-US',
+          source: { mode: 'client', data: metadataRows, pagination: false },
+          columns: metadataColumns,
+          messages,
+          getRowId: (row) => row.id,
+        }}
+      />,
+    );
+    const rowNames = () =>
+      [...rendered.container.querySelectorAll('tbody tr')].map(
+        (row) => row.querySelector('td')?.textContent,
+      );
+
+    await user.click(screen.getByRole('button', { name: 'Created by: Sort ascending' }));
+    await waitFor(() =>
+      expect(rowNames()).toEqual(['First record', 'Second record', 'Missing actor']),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Modified by: Sort ascending' }));
+    await waitFor(() =>
+      expect(rowNames()).toEqual(['Second record', 'First record', 'Missing actor']),
+    );
   });
 
   it('formats semantic values and reserves end alignment for quantities', async () => {

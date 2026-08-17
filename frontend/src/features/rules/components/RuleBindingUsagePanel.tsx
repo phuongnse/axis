@@ -223,19 +223,25 @@ export function RuleBindingUsagePanel({
           {usages.map((usage) => (
             <li key={usage.bindingId} className="space-y-3 py-4 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2">
-                <MetadataTag>{usage.targetType ?? '—'}</MetadataTag>
+                <MetadataTag>{usage.targetType ?? t('table.emptyValue')}</MetadataTag>
                 <StatusBadge state={usage.enabled ? 'positive' : 'inactive'}>
                   {usage.enabled ? t('rules.bindingEnabled') : t('rules.bindingDisabled')}
                 </StatusBadge>
               </div>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <UsageFact label={t('rules.bindingTarget')} value={usage.targetId ?? '—'} />
+                <UsageFact
+                  label={t('rules.bindingTarget')}
+                  value={usage.targetId ?? t('table.emptyValue')}
+                />
                 <UsageFact
                   label={t('rules.bindingTrigger')}
-                  value={usage.useCaseOrTrigger ?? '—'}
+                  value={usage.useCaseOrTrigger ?? t('table.emptyValue')}
                 />
                 <UsageFact label={t('rules.bindingPriority')} value={String(usage.priority ?? 0)} />
-                <UsageFact label={t('rules.bindingId')} value={usage.bindingId ?? '—'} />
+                <UsageFact
+                  label={t('rules.bindingId')}
+                  value={usage.bindingId ?? t('table.emptyValue')}
+                />
               </dl>
               <div className="flex flex-wrap gap-2">
                 <AsyncButton

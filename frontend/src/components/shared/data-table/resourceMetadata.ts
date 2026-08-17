@@ -26,8 +26,18 @@ export interface ResourceMetadataColumnLabels {
 
 export function createResourceMetadataColumns<TData extends ResourceMetadataRow>(
   labels: ResourceMetadataColumnLabels,
-  options: { includeRevision?: boolean } = {},
+  options: { includeRevision?: boolean; locale?: string } = {},
 ): DataTableColumnDef<TData>[] {
+  const actorCollator = new Intl.Collator(options.locale, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+  const compareActors = (left: unknown, right: unknown) => {
+    const leftName = actorDisplayName(left);
+    const rightName = actorDisplayName(right);
+    const localized = actorCollator.compare(leftName, rightName);
+    return localized !== 0 ? localized : ordinalCompare(leftName, rightName);
+  };
   const columns: DataTableColumnDef<TData>[] = [];
   if (options.includeRevision !== false) {
     columns.push({
@@ -43,9 +53,12 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
   columns.push(
     {
       id: 'createdBy',
-      accessorFn: (row) => row.metadata?.createdBy,
+      accessorFn: (row) => actorValue(row.metadata?.createdBy),
       size: 190,
       minSize: 170,
+      sortUndefined: 'last',
+      sortingFn: (left, right, columnId) =>
+        compareActors(left.getValue(columnId), right.getValue(columnId)),
       enableGrouping: false,
       meta: { label: labels.createdBy, cell: { kind: 'actor' }, searchable: false },
     },
@@ -59,9 +72,12 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
     },
     {
       id: 'modifiedBy',
-      accessorFn: (row) => row.metadata?.modifiedBy,
+      accessorFn: (row) => actorValue(row.metadata?.modifiedBy),
       size: 190,
       minSize: 170,
+      sortUndefined: 'last',
+      sortingFn: (left, right, columnId) =>
+        compareActors(left.getValue(columnId), right.getValue(columnId)),
       enableGrouping: false,
       meta: { label: labels.modifiedBy, cell: { kind: 'actor' }, searchable: false },
     },
@@ -76,4 +92,19 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
   );
 
   return columns;
+}
+
+function actorValue(
+  actor: ResourceMetadataActorValue | null | undefined,
+): ResourceMetadataActorValue | undefined {
+  return actorDisplayName(actor) ? (actor ?? undefined) : undefined;
+}
+
+function actorDisplayName(actor: unknown): string {
+  if (typeof actor !== 'object' || actor === null || !('displayName' in actor)) return '';
+  return typeof actor.displayName === 'string' ? actor.displayName.trim() : '';
+}
+
+function ordinalCompare(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }

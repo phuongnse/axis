@@ -733,20 +733,38 @@ describe('RulesPage', () => {
     await user.click(within(catalog).getByRole('button', { name: 'Rule: Clear sorting' }));
     await waitFor(() => expect(router.state.location.search).toEqual({ page: 1, query: 'credit' }));
 
-    await user.click(within(catalog).getByRole('button', { name: 'Origin: Sort ascending' }));
-    await waitFor(() =>
-      expect(router.state.location.search).toMatchObject({
-        sortBy: 'Origin',
-        sortDirection: 'Ascending',
-      }),
-    );
-    await user.click(within(catalog).getByRole('button', { name: 'Status: Sort ascending' }));
-    await waitFor(() =>
-      expect(router.state.location.search).toMatchObject({
-        sortBy: 'Status',
-        sortDirection: 'Ascending',
-      }),
-    );
+    const supportedSorts = [
+      ['Origin', 'Origin'],
+      ['Status', 'Status'],
+      ['Active version', 'ActiveVersion'],
+      ['Latest version', 'LatestVersion'],
+      ['Revision', 'Revision'],
+      ['Created by', 'CreatedBy'],
+      ['Created at', 'CreatedAt'],
+      ['Modified by', 'ModifiedBy'],
+      ['Modified at', 'ModifiedAt'],
+    ] as const;
+    for (const [label, sortBy] of supportedSorts) {
+      await user.click(within(catalog).getByRole('button', { name: `${label}: Sort ascending` }));
+      await waitFor(() =>
+        expect(router.state.location.search).toMatchObject({
+          sortBy,
+          sortDirection: 'Ascending',
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          vi.mocked(fetch).mock.calls.some(([input]) => {
+            const url = new URL(input.toString(), 'https://axis.test');
+            return (
+              url.pathname === '/api/rules' &&
+              url.searchParams.get('sortBy') === sortBy &&
+              url.searchParams.get('sortDirection') === 'Ascending'
+            );
+          }),
+        ).toBe(true),
+      );
+    }
   });
 
   it('consumes a dialog deep link without discarding catalog search and sort state', async () => {
@@ -844,6 +862,8 @@ describe('RulesPage', () => {
     ).not.toBeInTheDocument();
     await user.click(within(details).getByRole('tab', { name: 'System info' }));
     expect(within(details).getByText('field.required')).toBeVisible();
+    expect(within(details).getByText('N/A')).toBeVisible();
+    expect(details).not.toHaveTextContent('—');
     expect(within(details).getAllByText('Expression language').length).toBeGreaterThanOrEqual(1);
     const footer = details.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
@@ -855,6 +875,35 @@ describe('RulesPage', () => {
     expect(
       within(footer as HTMLElement).getByRole('button', { name: 'Windows (1)' }),
     ).toBeVisible();
+  });
+
+  it('uses the canonical N/A value when a condition input reference is unavailable', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(
+          jsonResponse(
+            workspaceDetail({
+              condition: {
+                ...thresholdCondition(),
+                left: { kind: 'Input', reference: 'missing_input', arguments: [] },
+              },
+            }),
+          ),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
+    await user.click(within(catalog).getByRole('button', { name: 'Credit threshold' }));
+
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    expect(await within(editor).findByText('N/A')).toBeVisible();
+    expect(editor).not.toHaveTextContent('—');
   });
 
   it('edits a binding with its current revision', async () => {

@@ -190,13 +190,16 @@ export function RulesPage() {
           searchable: false,
         },
       },
-      ...createResourceMetadataColumns<RuleDefinitionSummary>({
-        revision: t('metadata.revision'),
-        createdBy: t('metadata.createdBy'),
-        createdAt: t('metadata.createdAt'),
-        modifiedBy: t('metadata.modifiedBy'),
-        modifiedAt: t('metadata.modifiedAt'),
-      }),
+      ...createResourceMetadataColumns<RuleDefinitionSummary>(
+        {
+          revision: t('metadata.revision'),
+          createdBy: t('metadata.createdBy'),
+          createdAt: t('metadata.createdAt'),
+          modifiedBy: t('metadata.modifiedBy'),
+          modifiedAt: t('metadata.modifiedAt'),
+        },
+        { locale: i18n.language },
+      ),
     ];
 
     return {
