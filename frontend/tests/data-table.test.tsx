@@ -364,7 +364,7 @@ describe('DataTable', () => {
     }
   });
 
-  it('sorts actor metadata by localized display name with deterministic missing values', async () => {
+  it('sorts modified actor metadata by localized display name with deterministic missing values', async () => {
     type MetadataRow = {
       id: string;
       name: string;
@@ -409,8 +409,6 @@ describe('DataTable', () => {
       ...createResourceMetadataColumns<MetadataRow>(
         {
           revision: 'Revision',
-          createdBy: 'Created by',
-          createdAt: 'Created at',
           modifiedBy: 'Modified by',
           modifiedAt: 'Modified at',
         },
@@ -434,11 +432,6 @@ describe('DataTable', () => {
       [...rendered.container.querySelectorAll('tbody tr')].map(
         (row) => row.querySelector('td')?.textContent,
       );
-
-    await user.click(screen.getByRole('button', { name: 'Created by: Sort ascending' }));
-    await waitFor(() =>
-      expect(rowNames()).toEqual(['First record', 'Second record', 'Missing actor']),
-    );
 
     await user.click(screen.getByRole('button', { name: 'Modified by: Sort ascending' }));
     await waitFor(() =>

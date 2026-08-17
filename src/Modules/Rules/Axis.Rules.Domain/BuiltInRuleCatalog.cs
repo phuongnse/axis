@@ -4,6 +4,9 @@ namespace Axis.Rules.Domain;
 
 public static class BuiltInRuleCatalog
 {
+    public static DateTime FirstPublishedAtUtc { get; } =
+        new(2026, 7, 10, 23, 30, 7, DateTimeKind.Utc);
+
     public static IReadOnlyList<RuleDefinition> Definitions { get; } = Array.AsReadOnly<RuleDefinition>(
     [
         Definition(
@@ -117,7 +120,8 @@ public static class BuiltInRuleCatalog
             Documentation(key, displayName, description),
             inputs,
             condition,
-            RuleOutputContract.BooleanMatch);
+            RuleOutputContract.BooleanMatch,
+            FirstPublishedAtUtc);
         return definition.IsSuccess
             ? definition.Value
             : throw new InvalidOperationException(definition.Error);

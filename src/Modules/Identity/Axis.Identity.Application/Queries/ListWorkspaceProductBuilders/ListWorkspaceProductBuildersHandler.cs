@@ -44,7 +44,7 @@ public sealed class ListWorkspaceProductBuildersHandler(
                     member.IsProductBuilder,
                     member.MembershipRevision,
                     member.UserId != query.ActorUserId,
-                    member.Metadata ?? new ResourceMetadataDto(member.MembershipRevision, null, null, null, null)))
+                    member.Metadata))
                 .ToArray());
     }
 

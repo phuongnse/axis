@@ -136,7 +136,8 @@ public sealed class RuleDefinitionTests
             template.Documentation!,
             template.Inputs,
             template.Condition!,
-            template.Output).IsFailure.Should().BeTrue();
+            template.Output,
+            Now).IsFailure.Should().BeTrue();
     }
 
     [Fact]

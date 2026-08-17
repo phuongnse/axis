@@ -129,7 +129,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleReferenceDocumentation documentation,
         IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
-        RuleOutputContract output)
+        RuleOutputContract output,
+        DateTime publishedAt)
     {
         Result identity = ValidateIdentity(name, description);
         if (identity.IsFailure)
@@ -141,6 +142,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         if (version <= 0)
             return Result.Failure<RuleDefinition>("Built-in rule version must be positive.");
+
+        if (publishedAt == default || publishedAt.Kind != DateTimeKind.Utc)
+            return Result.Failure<RuleDefinition>("Built-in rule publication time must be UTC.");
 
         if (documentation is null || !documentation.IsComplete("en", "vi"))
             return Result.Failure<RuleDefinition>("Built-in rule documentation is incomplete.");
@@ -157,8 +161,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             description.Trim(),
             RuleOrigin.BuiltIn,
             default,
-            ActorSnapshot.System("Axis built-in catalog"),
-            default)
+            ActorSnapshot.System(),
+            publishedAt)
         {
             Documentation = documentation,
             Revision = 0,
@@ -168,7 +172,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             Output = output,
         };
         definition._inputs.AddRange(inputs);
-        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, null, default));
+        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, null, publishedAt));
         return definition;
     }
 

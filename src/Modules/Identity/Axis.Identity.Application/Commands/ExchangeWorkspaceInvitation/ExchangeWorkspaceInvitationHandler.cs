@@ -74,7 +74,7 @@ public sealed class ExchangeWorkspaceInvitationHandler(
             invitation.Revision);
         if (outcome == InvitationExchangeOutcome.Exchanged)
             invitation.RecordModification(
-                ActorSnapshot.System("Axis invitation token exchange"),
+                ActorSnapshot.System(),
                 now);
 
         Guid auditEventId = Guid.NewGuid();

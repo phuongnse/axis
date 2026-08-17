@@ -121,13 +121,7 @@ public sealed class SetWorkspaceProductBuilderHandler(
                     projection.IsProductBuilder,
                     projection.MembershipRevision,
                     CanChange: true,
-                    projection.Metadata
-                        ?? new ResourceMetadataDto(
-                            projection.MembershipRevision,
-                            null,
-                            null,
-                            null,
-                            null)));
+                    projection.Metadata));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

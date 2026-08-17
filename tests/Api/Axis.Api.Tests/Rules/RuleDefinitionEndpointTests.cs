@@ -534,7 +534,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        body.GetProperty("items").EnumerateArray()
+        JsonElement[] items = body.GetProperty("items").EnumerateArray().ToArray();
+        items
             .Select(definition => definition.GetProperty("definitionKey").GetString())
             .Should().Contain([
                 RuleDefinitionKeys.Required,
@@ -542,6 +543,16 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 RuleDefinitionKeys.DateTimeRange,
                 RuleDefinitionKeys.ChoiceSelectionCount,
             ]);
+        items.All(definition =>
+        {
+            JsonElement metadata = definition.GetProperty("metadata");
+            return metadata.GetProperty("createdBy").GetProperty("kind").GetString() == "System"
+                && metadata.GetProperty("createdBy").GetProperty("displayName").GetString() == "System"
+                && metadata.GetProperty("createdAt").GetDateTimeOffset() != default
+                && metadata.GetProperty("modifiedBy").GetProperty("kind").GetString() == "System"
+                && metadata.GetProperty("modifiedBy").GetProperty("displayName").GetString() == "System"
+                && metadata.GetProperty("modifiedAt").GetDateTimeOffset() != default;
+        }).Should().BeTrue();
         body.GetProperty("totalCount").GetInt32().Should().Be(9);
 
         HttpResponseMessage searchResponse = await SendWithBearerAsync(

@@ -94,11 +94,11 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
     [InlineData(RuleDefinitionSortField.Revision, CollectionSortDirection.Descending, RuleOrigin.Workspace)]
     [InlineData(RuleDefinitionSortField.CreatedBy, CollectionSortDirection.Ascending, RuleOrigin.Workspace)]
     [InlineData(RuleDefinitionSortField.CreatedBy, CollectionSortDirection.Descending, RuleOrigin.BuiltIn)]
-    [InlineData(RuleDefinitionSortField.CreatedAt, CollectionSortDirection.Ascending, RuleOrigin.Workspace)]
+    [InlineData(RuleDefinitionSortField.CreatedAt, CollectionSortDirection.Ascending, RuleOrigin.BuiltIn)]
     [InlineData(RuleDefinitionSortField.CreatedAt, CollectionSortDirection.Descending, RuleOrigin.Workspace)]
     [InlineData(RuleDefinitionSortField.ModifiedBy, CollectionSortDirection.Ascending, RuleOrigin.Workspace)]
     [InlineData(RuleDefinitionSortField.ModifiedBy, CollectionSortDirection.Descending, RuleOrigin.BuiltIn)]
-    [InlineData(RuleDefinitionSortField.ModifiedAt, CollectionSortDirection.Ascending, RuleOrigin.Workspace)]
+    [InlineData(RuleDefinitionSortField.ModifiedAt, CollectionSortDirection.Ascending, RuleOrigin.BuiltIn)]
     [InlineData(RuleDefinitionSortField.ModifiedAt, CollectionSortDirection.Descending, RuleOrigin.Workspace)]
     public async Task SearchAsync_WhenEnumSortIsExplicit_SortsWholeMatchSetBeforePaging(
         RuleDefinitionSortField sortBy,

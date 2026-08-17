@@ -13,7 +13,11 @@ type Expect<Value extends true> = Value;
 export type EnforcedContractLifecycleMatchesManifest = Expect<
   Equal<
     EnforcedSurfaceContractId,
-    'account-surface' | 'authenticated-frame' | 'entry-surface' | 'managed-task-window'
+    | 'account-surface'
+    | 'authenticated-frame'
+    | 'entry-surface'
+    | 'managed-task-window'
+    | 'resource-workspace'
   >
 >;
 export type SurfaceContractsMatchManifest = Expect<

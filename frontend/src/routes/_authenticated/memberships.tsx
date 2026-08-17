@@ -12,7 +12,7 @@ export const Route = createFileRoute('/_authenticated/memberships')({
   loader: ({ context, deps }) => loadMembershipsRoute(context, deps),
 });
 
-type InvitationTableSortField = WorkspaceInvitationSortField;
+type InvitationTableSortField = Exclude<WorkspaceInvitationSortField, 'Created' | 'CreatedBy'>;
 
 export interface MembershipsRouteSearch {
   page: number;
@@ -60,11 +60,9 @@ function isWorkspaceInvitationSortField(value: unknown): value is InvitationTabl
     value === 'Email' ||
     value === 'Status' ||
     value === 'Role' ||
-    value === 'Created' ||
     value === 'Expires' ||
     value === 'Delivery' ||
     value === 'Revision' ||
-    value === 'CreatedBy' ||
     value === 'ModifiedBy' ||
     value === 'ModifiedAt'
   );

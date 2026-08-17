@@ -13,19 +13,19 @@ export interface RulesRouteSearch {
   query?: string;
   dialog?: 'create' | 'edit';
   definitionKey?: string;
-  sortBy?: RuleDefinitionSortField;
+  sortBy?: RuleTableSortField;
   sortDirection?: CollectionSortDirection;
 }
 
-const ruleDefinitionSortFields: readonly RuleDefinitionSortField[] = [
+type RuleTableSortField = Exclude<RuleDefinitionSortField, 'CreatedBy' | 'CreatedAt'>;
+
+const ruleDefinitionSortFields: readonly RuleTableSortField[] = [
   'Name',
   'Origin',
   'Status',
   'ActiveVersion',
   'LatestVersion',
   'Revision',
-  'CreatedBy',
-  'CreatedAt',
   'ModifiedBy',
   'ModifiedAt',
 ];
@@ -57,6 +57,6 @@ function validateRulesSearch(search: Record<string, unknown>): RulesRouteSearch 
   };
 }
 
-function isRuleDefinitionSortField(value: unknown): value is RuleDefinitionSortField {
+function isRuleDefinitionSortField(value: unknown): value is RuleTableSortField {
   return ruleDefinitionSortFields.some((field) => field === value);
 }

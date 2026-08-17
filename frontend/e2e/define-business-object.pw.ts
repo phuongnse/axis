@@ -1499,9 +1499,9 @@ test.describe('define business object', () => {
     await expect(firstDataRow).toHaveAttribute('data-row-layout', 'single-line');
     await expect(versionCell).toHaveText('N/A');
     await expect(revisionCell).toHaveText('r1');
-    await expect(actorCells).toHaveCount(2);
-    await expect(actorCells).toHaveText(['Objects User', 'Objects User']);
-    await expect(dateTimeCells).toHaveCount(2);
+    await expect(actorCells).toHaveCount(1);
+    await expect(actorCells).toHaveText('Objects User');
+    await expect(dateTimeCells).toHaveCount(1);
     for (const dateTimeCell of await dateTimeCells.all()) {
       await expect(dateTimeCell).not.toContainText(now);
     }
@@ -1605,14 +1605,15 @@ test.describe('define business object', () => {
         'Định nghĩa contract dữ liệu dùng lại trong workspace. Định nghĩa chưa publish còn chỉnh được; bản publish là phiên bản ổn định.',
       ),
     ).toBeVisible();
-    await page.evaluate(() => {
-      for (const element of document.querySelectorAll<HTMLElement>(
-        '[data-slot="resource-workspace"], [data-slot="resource-workspace"] *',
-      )) {
-        element.style.setProperty('letter-spacing', '0.12em', 'important');
-        element.style.setProperty('line-height', '1.5', 'important');
-        element.style.setProperty('word-spacing', '0.16em', 'important');
-      }
+    await page.addStyleTag({
+      content: `
+        [data-slot="resource-workspace"],
+        [data-slot="resource-workspace"] * {
+          letter-spacing: 0.12em !important;
+          line-height: 1.5 !important;
+          word-spacing: 0.16em !important;
+        }
+      `,
     });
 
     await expectDataTableScrollsInternally(page, { horizontally: true });

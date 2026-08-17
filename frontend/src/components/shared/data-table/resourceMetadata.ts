@@ -18,8 +18,6 @@ export interface ResourceMetadataRow {
 
 export interface ResourceMetadataColumnLabels {
   revision: string;
-  createdBy: string;
-  createdAt: string;
   modifiedBy: string;
   modifiedAt: string;
 }
@@ -51,25 +49,6 @@ export function createResourceMetadataColumns<TData extends ResourceMetadataRow>
   }
 
   columns.push(
-    {
-      id: 'createdBy',
-      accessorFn: (row) => actorValue(row.metadata?.createdBy),
-      size: 190,
-      minSize: 170,
-      sortUndefined: 'last',
-      sortingFn: (left, right, columnId) =>
-        compareActors(left.getValue(columnId), right.getValue(columnId)),
-      enableGrouping: false,
-      meta: { label: labels.createdBy, cell: { kind: 'actor' }, searchable: false },
-    },
-    {
-      id: 'createdAt',
-      accessorFn: (row) => row.metadata?.createdAt,
-      size: 190,
-      minSize: 180,
-      enableGrouping: false,
-      meta: { label: labels.createdAt, cell: { kind: 'dateTime' }, searchable: false },
-    },
     {
       id: 'modifiedBy',
       accessorFn: (row) => actorValue(row.metadata?.modifiedBy),

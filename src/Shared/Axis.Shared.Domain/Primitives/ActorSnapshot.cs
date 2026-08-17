@@ -10,6 +10,7 @@ public enum ActorKind
 public readonly record struct ActorSnapshot(ActorKind Kind, Guid? SubjectId, string DisplayName)
 {
     public const int MaximumDisplayNameLength = 200;
+    public const string SystemDisplayName = "System";
 
     public bool IsValid =>
         Enum.IsDefined(Kind)
@@ -26,8 +27,8 @@ public readonly record struct ActorSnapshot(ActorKind Kind, Guid? SubjectId, str
     public static ActorSnapshot ServiceIdentity(Guid subjectId, string displayName) =>
         Create(ActorKind.ServiceIdentity, subjectId, displayName);
 
-    public static ActorSnapshot System(string displayName = "Axis") =>
-        Create(ActorKind.System, null, displayName);
+    public static ActorSnapshot System() =>
+        Create(ActorKind.System, null, SystemDisplayName);
 
     public static ActorSnapshot Create(ActorKind kind, Guid? subjectId, string displayName)
     {

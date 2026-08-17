@@ -5,13 +5,17 @@ import type { BusinessObjectDefinitionSortField } from '@/lib/api-generated';
 import type { MyRouterContext } from '../__root';
 
 export type BusinessObjectsDialogMode = 'create' | 'edit' | 'view';
+type BusinessObjectsTableSortField = Exclude<
+  BusinessObjectDefinitionSortField,
+  'CreatedBy' | 'CreatedAt'
+>;
 
 export interface BusinessObjectsRouteSearch {
   page: number;
   query?: string;
   dialog?: BusinessObjectsDialogMode;
   recordId?: string;
-  sortBy?: BusinessObjectDefinitionSortField;
+  sortBy?: BusinessObjectsTableSortField;
   sortDirection?: 'Ascending' | 'Descending';
 }
 
@@ -47,8 +51,6 @@ function validateBusinessObjectsSearch(
     search.sortBy === 'Status' ||
     search.sortBy === 'Version' ||
     search.sortBy === 'Revision' ||
-    search.sortBy === 'CreatedBy' ||
-    search.sortBy === 'CreatedAt' ||
     search.sortBy === 'ModifiedBy' ||
     search.sortBy === 'ModifiedAt'
       ? search.sortBy

@@ -46,10 +46,10 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                         1::integer AS sort_active_version,
                         1::integer AS sort_latest_version,
                         NULL::integer AS sort_revision,
-                        'Axis built-in catalog'::text AS sort_created_by,
-                        NULL::timestamp with time zone AS sort_created_at,
-                        'Axis built-in catalog'::text AS sort_modified_by,
-                        NULL::timestamp with time zone AS sort_modified_at,
+                        'System'::text AS sort_created_by,
+                        @built_in_published_at::timestamp with time zone AS sort_created_at,
+                        'System'::text AS sort_modified_by,
+                        @built_in_published_at::timestamp with time zone AS sort_modified_at,
                         axis_unaccent(lower(document.title)) AS title,
                         axis_unaccent(lower(document.title || ' ' || document.content)) AS content
                     FROM unnest(
@@ -179,6 +179,10 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                 {
                     TypedValue = builtInDocuments.Select(document => document.Status).ToArray(),
                 });
+            command.Parameters.AddWithValue(
+                "built_in_published_at",
+                NpgsqlDbType.TimestampTz,
+                BuiltInRuleCatalog.FirstPublishedAtUtc);
             command.Parameters.AddWithValue("include_workspace", NpgsqlDbType.Boolean, includeWorkspace);
             command.Parameters.AddWithValue("workspace_id", NpgsqlDbType.Uuid, workspaceId);
             command.Parameters.Add(

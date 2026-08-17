@@ -22,8 +22,8 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - Keeps record sections within one record workflow rather than creating a second collection workspace.
 - Keeps header, ready, loading, selected, grouped, and expandable rows on one owner-defined vertical rhythm; single-line rows vertically center their cells, scalar values remain one line, and only explicitly typed list content expands. When a list actually wraps, the whole row top-aligns so one-line siblings remain level with its first line.
 - Aligns record actions to the same leading content edge as non-interactive cell content; the table owner preserves target size, focus treatment, and truncation without page-action padding shifting the column rhythm.
-- Ends every server-managed resource row with one consistent metadata group: the resource's lifecycle version when applicable, mutable concurrency revision when applicable, `Created by`, `Created at`, `Modified by`, and `Modified at`. These columns are present rather than conditionally omitted; a value that cannot be truthfully reconstructed from historical data renders the shared `N/A` placeholder.
-- Uses server-owned actor provenance. Human mutations show the authenticated user's display name, service mutations show the service identity name, and code-owned operations show an explicit system identity. Stable subject identity remains available to disambiguate duplicate names but is not the primary cell label. Clients never submit or infer actor metadata.
+- Ends every server-managed resource row with one consistent current-state metadata group: the resource's lifecycle version when applicable, mutable concurrency revision when applicable, `Modified by`, and `Modified at`. Creation provenance remains part of the server-owned resource contract and detail/audit experiences, but `Created by` and `Created at` are not collection columns or column-menu options.
+- Uses server-owned actor provenance. Human mutations show the authenticated user's display name, service mutations show the service identity name, and every code-owned operation shows the canonical `System` identity. Stable subject identity remains available to disambiguate duplicate names but is not the primary cell label; the System actor has no subject ID. Clients never submit or infer actor metadata.
 
 ## Alternate / error flows
 
@@ -50,7 +50,7 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - **AC-010** The foundation is product-neutral and does not own feature DTOs, authorization, mutations, localized copy, record validation, or window mechanics.
 - **AC-011** A consumer may use a dedicated record route only when its documented workflow requires multi-record comparison, long-running work, or a layout that cannot remain usable in the managed-window contract.
 - **AC-012** The shared Resource Workspace owner provides one localized page context, optional status, one primary table, app-owned responsive density, typed locale-formatted cells, row-level adaptive vertical alignment, aligned record actions, regular-width column fitting, and compact-owned data overflow across registered consumers without absorbing managed-window or feature semantics.
-- **AC-013** Every registered server-managed collection places its complete current-state metadata after domain columns in the canonical order: lifecycle version when applicable, revision when applicable, created actor/time, and modified actor/time. Version and revision use identifier semantics; actors use authenticated server-owned display names; timestamps use localized absolute date-time formatting; and unknowable historical values remain explicit `N/A` rather than fabricated provenance.
+- **AC-013** Every registered server-managed collection places its current-state metadata after domain columns in the canonical order: lifecycle version when applicable, revision when applicable, modified actor, and modified time. Creation actor/time remain available to resource detail and audit owners but are absent from the table definition and column menu. Version and revision use identifier semantics; actors use authenticated server-owned display names; timestamps use localized absolute date-time formatting; and unknowable historical values remain explicit `N/A` rather than fabricated provenance.
 
 ## Acceptance Test Matrix
 
@@ -93,7 +93,7 @@ Required UI quality: collection and record-window controls must be keyboard-reac
 >
 > **Implemented:** The shared data table provides one primary collection workspace with internal vertical scrolling, compact-only horizontal scrolling, regular-width column fitting, toolbar action composition, required semantic cell kinds, locale formatting, type-owned horizontal alignment, measured row-level vertical alignment, responsive row density, and stable loading geometry. Current collection consumers use URL parameters as one-time launch intents, request stable app-scoped window identities, preserve route-owned collection state, retain independent drafts across authenticated navigation, and guard dirty closure without replacing sibling records.
 >
-> **Gaps vs spec:** The canonical trailing metadata group is being implemented across the six registered consumers and remains under project-owner review.
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** Full workspace persistence, profile-backed collection preferences, native pop-outs, and dedicated multi-record workspaces remain out of scope.
 >

@@ -129,8 +129,6 @@ export function MembershipManagementPage() {
       ...createResourceMetadataColumns<WorkspaceProductBuilderDto>(
         {
           revision: t('metadata.revision'),
-          createdBy: t('metadata.createdBy'),
-          createdAt: t('metadata.createdAt'),
           modifiedBy: t('metadata.modifiedBy'),
           modifiedAt: t('metadata.modifiedAt'),
         },
@@ -239,8 +237,6 @@ export function MembershipManagementPage() {
       ...createResourceMetadataColumns<WorkspaceInvitationLifecycleDto>(
         {
           revision: t('metadata.revision'),
-          createdBy: t('metadata.createdBy'),
-          createdAt: t('metadata.createdAt'),
           modifiedBy: t('metadata.modifiedBy'),
           modifiedAt: t('metadata.modifiedAt'),
         },
@@ -367,21 +363,18 @@ function deliveryState(status: string | undefined): StatusBadgeState {
 
 function invitationSortField(
   columnId: string | undefined,
-): WorkspaceInvitationSortField | undefined {
+): Exclude<WorkspaceInvitationSortField, 'Created' | 'CreatedBy'> | undefined {
   if (columnId === 'email') return 'Email';
   if (columnId === 'status') return 'Status';
   if (columnId === 'role') return 'Role';
   if (columnId === 'delivery') return 'Delivery';
   if (columnId === 'expires') return 'Expires';
   if (columnId === 'revision') return 'Revision';
-  if (columnId === 'createdBy') return 'CreatedBy';
-  if (columnId === 'createdAt') return 'Created';
   if (columnId === 'modifiedBy') return 'ModifiedBy';
   if (columnId === 'modifiedAt') return 'ModifiedAt';
   return undefined;
 }
 
 function invitationColumnId(sortBy: WorkspaceInvitationSortField): string {
-  if (sortBy === 'Created') return 'createdAt';
   return `${sortBy[0].toLowerCase()}${sortBy.slice(1)}`;
 }

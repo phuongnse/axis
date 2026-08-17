@@ -66,6 +66,14 @@ const builtInRules = [
         ]
       : [input('value', 'Value', types as string[], definitionKey !== 'field.required')],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  updatedAt: now,
+  metadata: {
+    revision: null,
+    createdBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    createdAt: now,
+    modifiedBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    modifiedAt: now,
+  },
 }));
 
 function requiredCondition(): ApiTypes.RuleConditionNodeDto {
@@ -164,8 +172,8 @@ function builtInDetail(definitionKey: string): MockRuleDetail | null {
         createdAt: now,
       },
     ],
-    createdAt: null,
-    updatedAt: null,
+    createdAt: now,
+    updatedAt: now,
     archivedAt: null,
   } as MockRuleDetail;
 }
@@ -557,6 +565,13 @@ async function mockRulesApi(page: Page, canStartCreate = true): Promise<Captured
           canDeactivate: false,
           canArchive: true,
         },
+        metadata: {
+          revision: 1,
+          createdBy: { kind: 'User', subjectId: profile.id, displayName: profile.fullName },
+          createdAt: now,
+          modifiedBy: { kind: 'User', subjectId: profile.id, displayName: profile.fullName },
+          modifiedAt: now,
+        },
         createdAt: now,
         updatedAt: now,
         archivedAt: null,
@@ -795,7 +810,19 @@ test('rule catalog exposes inputs and read-only built-in details', async ({ page
   await expect(page.getByText('Applies to')).toHaveCount(0);
 
   const catalog = page.getByRole('region', { name: 'Rules catalog' });
+  await expect(catalog.getByRole('columnheader', { name: 'Created by' })).toHaveCount(0);
+  await expect(catalog.getByRole('columnheader', { name: 'Created at' })).toHaveCount(0);
+  await expect(catalog.getByRole('columnheader', { name: 'Modified by' })).toBeVisible();
+  await expect(catalog.getByRole('columnheader', { name: 'Modified at' })).toBeVisible();
+  await catalog.getByRole('button', { name: 'Columns', exact: true }).click();
+  const columnsMenu = page.getByRole('menu');
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Created by' })).toHaveCount(0);
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Created at' })).toHaveCount(0);
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Modified by' })).toBeVisible();
+  await expect(columnsMenu.getByRole('menuitemcheckbox', { name: 'Modified at' })).toBeVisible();
+  await page.keyboard.press('Escape');
   const firstRuleCell = catalog.getByRole('row').nth(1).locator('td').first();
+  await expect(catalog.getByRole('row').nth(1)).toContainText('System');
   await expect(firstRuleCell).toHaveAttribute('data-cell-kind', 'action');
   await expect(firstRuleCell).toContainText('Required value');
   await expect(firstRuleCell).not.toContainText('Required value validation.');

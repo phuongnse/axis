@@ -55,6 +55,14 @@ const systemSummary = {
     },
   ],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  updatedAt: '2026-07-10T23:30:07Z',
+  metadata: {
+    revision: null,
+    createdBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    createdAt: '2026-07-10T23:30:07Z',
+    modifiedBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    modifiedAt: '2026-07-10T23:30:07Z',
+  },
   actions: {
     canEditDraft: false,
     canCreateVersion: false,
@@ -91,6 +99,22 @@ const workspaceSummary = {
     },
   ],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  updatedAt: '2026-01-01T00:00:00Z',
+  metadata: {
+    revision: 2,
+    createdBy: {
+      kind: 'User',
+      subjectId: '11111111-1111-4111-8111-111111111111',
+      displayName: 'Rules User',
+    },
+    createdAt: '2026-01-01T00:00:00Z',
+    modifiedBy: {
+      kind: 'User',
+      subjectId: '11111111-1111-4111-8111-111111111111',
+      displayName: 'Rules User',
+    },
+    modifiedAt: '2026-01-01T00:00:00Z',
+  },
   actions: {
     canEditDraft: true,
     canCreateVersion: true,
@@ -121,10 +145,11 @@ function requiredDetail() {
         inputs: systemSummary.inputs,
         output: systemSummary.output,
         condition: requiredCondition(),
+        createdAt: '2026-07-10T23:30:07Z',
       },
     ],
-    createdAt: null,
-    updatedAt: null,
+    createdAt: '2026-07-10T23:30:07Z',
+    updatedAt: '2026-07-10T23:30:07Z',
     archivedAt: null,
   };
 }
@@ -679,7 +704,7 @@ describe('RulesPage', () => {
     const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
     const row = within(catalog).getByRole('button', { name: 'Incomplete rule' }).closest('tr');
     expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getAllByText('N/A')).toHaveLength(10);
+    expect(within(row as HTMLElement).getAllByText('N/A')).toHaveLength(5);
     expect(row?.querySelector('[data-status-state]')).toBeNull();
   });
 
@@ -739,8 +764,6 @@ describe('RulesPage', () => {
       ['Active version', 'ActiveVersion'],
       ['Latest version', 'LatestVersion'],
       ['Revision', 'Revision'],
-      ['Created by', 'CreatedBy'],
-      ['Created at', 'CreatedAt'],
       ['Modified by', 'ModifiedBy'],
       ['Modified at', 'ModifiedAt'],
     ] as const;

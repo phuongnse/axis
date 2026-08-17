@@ -76,7 +76,7 @@ internal sealed class WorkspaceInvitationLifecycleWorker(
 
             invitation.Expire(invitation.Revision, now);
             invitation.RecordModification(
-                ActorSnapshot.System("Axis invitation lifecycle"),
+                ActorSnapshot.System(),
                 now);
             await scope.ServiceProvider.GetRequiredService<IIdentityAuditOutbox>().EnqueueAsync(
                 CreateExpiryAudit(invitation, now),
@@ -117,7 +117,7 @@ internal sealed class WorkspaceInvitationLifecycleWorker(
 
             invitation.PurgeTerminalMaterial(invitation.Revision, now);
             invitation.RecordModification(
-                ActorSnapshot.System("Axis invitation lifecycle"),
+                ActorSnapshot.System(),
                 now);
             await SaveIgnoringConcurrentWinner(
                 scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),

@@ -193,8 +193,6 @@ export function RulesPage() {
       ...createResourceMetadataColumns<RuleDefinitionSummary>(
         {
           revision: t('metadata.revision'),
-          createdBy: t('metadata.createdBy'),
-          createdAt: t('metadata.createdAt'),
           modifiedBy: t('metadata.modifiedBy'),
           modifiedAt: t('metadata.modifiedAt'),
         },
@@ -308,15 +306,15 @@ export function RulesPage() {
   );
 }
 
-function ruleSortField(columnId: string | undefined): RuleDefinitionSortField | undefined {
+function ruleSortField(
+  columnId: string | undefined,
+): Exclude<RuleDefinitionSortField, 'CreatedBy' | 'CreatedAt'> | undefined {
   if (columnId === 'rule') return 'Name';
   if (columnId === 'origin') return 'Origin';
   if (columnId === 'status') return 'Status';
   if (columnId === 'activeVersion') return 'ActiveVersion';
   if (columnId === 'latestVersion') return 'LatestVersion';
   if (columnId === 'revision') return 'Revision';
-  if (columnId === 'createdBy') return 'CreatedBy';
-  if (columnId === 'createdAt') return 'CreatedAt';
   if (columnId === 'modifiedBy') return 'ModifiedBy';
   if (columnId === 'modifiedAt') return 'ModifiedAt';
   return undefined;

@@ -49,7 +49,7 @@ public sealed record ActiveWorkspaceHumanProjection(
     Guid UserId,
     string DisplayName,
     string Email,
-    WorkspaceMembershipRole WorkspaceRole = WorkspaceMembershipRole.Member,
-    bool IsProductBuilder = false,
-    int MembershipRevision = 1,
-    ResourceMetadataDto? Metadata = null);
+    WorkspaceMembershipRole WorkspaceRole,
+    bool IsProductBuilder,
+    int MembershipRevision,
+    ResourceMetadataDto Metadata);

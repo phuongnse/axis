@@ -356,7 +356,7 @@ public sealed class SolutionOrchestrator(
                 if (operation.Status == InstallationOperationStatus.Succeeded)
                 {
                     installation.MarkInstalled(clock.GetUtcNow());
-                    installation.RecordModification(ActorSnapshot.System("Axis solution installer"));
+                    installation.RecordModification(ActorSnapshot.System());
                 }
                 stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "succeeded", null, clock.GetUtcNow(), operation: operation);
                 await audit.EnqueueAsync(stepAudit, cancellationToken);
@@ -373,7 +373,7 @@ public sealed class SolutionOrchestrator(
                 SolutionInstallationStep step = operation.Steps.Single(x => x.Status == InstallationStepStatus.Applying);
                 operation.Block(step.Id, epoch, exception.ProblemCode, clock.GetUtcNow());
                 installation.MarkFailed(clock.GetUtcNow());
-                installation.RecordModification(ActorSnapshot.System("Axis solution installer"));
+                installation.RecordModification(ActorSnapshot.System());
                 stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "blocked", exception.ProblemCode, clock.GetUtcNow(), operation: operation);
                 await audit.EnqueueAsync(stepAudit, cancellationToken);
             }
@@ -407,7 +407,7 @@ public sealed class SolutionOrchestrator(
                     operation.BlockBeforeNextMutation("solutions.package.publisher_untrusted", now);
             }
             if (installation.Revision != originalRevision)
-                installation.RecordModification(ActorSnapshot.System("Axis publisher trust monitor"));
+                installation.RecordModification(ActorSnapshot.System());
             SolutionAuditEvent auditEvent = NewAudit("solutions.installation.noncompliant", installation.WorkspaceId, null, installation.Id, null, "revoked", "solutions.package.publisher_untrusted", now);
             auditEventIds.Add(auditEvent.EventId);
             await audit.EnqueueAsync(auditEvent, cancellationToken);
@@ -523,7 +523,7 @@ public sealed class SolutionOrchestrator(
         if (installation.ProvisioningStatus == ProvisioningStatus.Installing)
         {
             installation.MarkFailed(now);
-            installation.RecordModification(ActorSnapshot.System("Axis compatibility monitor"));
+            installation.RecordModification(ActorSnapshot.System());
         }
         operation.BlockBeforeNextMutation("solutions.package.axis_openapi_mismatch", now);
         await PersistAuditAsync(
@@ -557,7 +557,7 @@ public sealed class SolutionOrchestrator(
         if (installation.Revision != originalRevision)
             installation.RecordModification(
                 actor is null
-                    ? ActorSnapshot.System("Axis publisher trust monitor")
+                    ? ActorSnapshot.System()
                     : Actor(actor));
         SolutionAuditEvent auditEvent = NewAudit(
             "solutions.installation.noncompliant",

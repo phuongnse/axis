@@ -31,8 +31,22 @@ public sealed class ListWorkspaceProductBuildersHandlerTests
                 WorkspaceMembershipRole.Administrator));
         memberships.ListActiveForWorkspaceAsync(workspace.Id, Arg.Any<CancellationToken>())
             .Returns([
-                new(actorId, "Administrator", "admin@example.com", WorkspaceMembershipRole.Administrator, false, 1),
-                new(targetId, "Builder", "builder@example.com", WorkspaceMembershipRole.Member, true, 4),
+                new(
+                    actorId,
+                    "Administrator",
+                    "admin@example.com",
+                    WorkspaceMembershipRole.Administrator,
+                    false,
+                    1,
+                    Metadata(1, actorId, "Administrator")),
+                new(
+                    targetId,
+                    "Builder",
+                    "builder@example.com",
+                    WorkspaceMembershipRole.Member,
+                    true,
+                    4,
+                    Metadata(4, targetId, "Builder")),
             ]);
 
         Result<IReadOnlyList<WorkspaceProductBuilderDto>> result =
@@ -49,7 +63,7 @@ public sealed class ListWorkspaceProductBuildersHandlerTests
             false,
             1,
             false,
-            new ResourceMetadataDto(1, null, null, null, null)));
+            Metadata(1, actorId, "Administrator")));
         result.Value.Should().ContainEquivalentOf(new WorkspaceProductBuilderDto(
             targetId,
             "Builder",
@@ -58,6 +72,16 @@ public sealed class ListWorkspaceProductBuildersHandlerTests
             true,
             4,
             true,
-            new ResourceMetadataDto(4, null, null, null, null)));
+            Metadata(4, targetId, "Builder")));
+    }
+
+    private static ResourceMetadataDto Metadata(
+        int revision,
+        Guid actorId,
+        string displayName)
+    {
+        DateTimeOffset timestamp = new(2026, 8, 17, 0, 0, 0, TimeSpan.Zero);
+        ResourceActorDto actor = new(ActorKind.User, actorId, displayName);
+        return new ResourceMetadataDto(revision, actor, timestamp, actor, timestamp);
     }
 }

@@ -192,8 +192,6 @@ export function BusinessObjectsPage() {
       ...createResourceMetadataColumns<BusinessObjectDefinitionListItem>(
         {
           revision: t('metadata.revision'),
-          createdBy: t('metadata.createdBy'),
-          createdAt: t('metadata.createdAt'),
           modifiedBy: t('metadata.modifiedBy'),
           modifiedAt: t('metadata.modifiedAt'),
         },
@@ -319,40 +317,19 @@ function DefinitionStatusBadge({ status }: { status?: 'Unpublished' | 'Published
 }
 
 function businessObjectColumnId(
-  sortBy:
-    | 'Name'
-    | 'Key'
-    | 'Status'
-    | 'Version'
-    | 'Revision'
-    | 'CreatedBy'
-    | 'CreatedAt'
-    | 'ModifiedBy'
-    | 'ModifiedAt',
+  sortBy: 'Name' | 'Key' | 'Status' | 'Version' | 'Revision' | 'ModifiedBy' | 'ModifiedAt',
 ) {
   return `${sortBy[0].toLowerCase()}${sortBy.slice(1)}`;
 }
 
 function businessObjectSortField(
   columnId: string,
-):
-  | 'Name'
-  | 'Key'
-  | 'Status'
-  | 'Version'
-  | 'Revision'
-  | 'CreatedBy'
-  | 'CreatedAt'
-  | 'ModifiedBy'
-  | 'ModifiedAt'
-  | undefined {
+): 'Name' | 'Key' | 'Status' | 'Version' | 'Revision' | 'ModifiedBy' | 'ModifiedAt' | undefined {
   if (columnId === 'name') return 'Name';
   if (columnId === 'key') return 'Key';
   if (columnId === 'status') return 'Status';
   if (columnId === 'version') return 'Version';
   if (columnId === 'revision') return 'Revision';
-  if (columnId === 'createdBy') return 'CreatedBy';
-  if (columnId === 'createdAt') return 'CreatedAt';
   if (columnId === 'modifiedBy') return 'ModifiedBy';
   if (columnId === 'modifiedAt') return 'ModifiedAt';
   return undefined;

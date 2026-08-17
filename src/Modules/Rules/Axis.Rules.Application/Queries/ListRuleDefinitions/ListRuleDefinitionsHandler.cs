@@ -206,13 +206,9 @@ public sealed class ListRuleDefinitionsHandler(
                 ? null
                 : definition.Revision.ToString("D10"),
             RuleDefinitionSortField.CreatedBy => definition.CreatedByActor?.DisplayName,
-            RuleDefinitionSortField.CreatedAt => definition.Origin == DomainOrigin.BuiltIn
-                ? null
-                : definition.CreatedAt.ToUniversalTime().ToString("O"),
+            RuleDefinitionSortField.CreatedAt => definition.CreatedAt.ToUniversalTime().ToString("O"),
             RuleDefinitionSortField.ModifiedBy => definition.UpdatedByActor?.DisplayName,
-            RuleDefinitionSortField.ModifiedAt => definition.Origin == DomainOrigin.BuiltIn
-                ? null
-                : definition.UpdatedAt.ToUniversalTime().ToString("O"),
+            RuleDefinitionSortField.ModifiedAt => definition.UpdatedAt.ToUniversalTime().ToString("O"),
             _ => throw new ArgumentOutOfRangeException(nameof(sortBy)),
         };
 

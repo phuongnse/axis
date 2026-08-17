@@ -103,7 +103,7 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
                 now.Add(Backoff(token.DeliveryAttempts + 1)),
                 null);
             invitation.RecordModification(
-                ActorSnapshot.System("Axis invitation delivery"),
+                ActorSnapshot.System(),
                 now);
             await uow.SaveChangesAsync(ct);
             uow.ClearTracking();
@@ -155,7 +155,7 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
                         now.Add(Backoff(failed.CurrentToken.DeliveryAttempts)),
                         "delivery.transient");
                     failed.RecordModification(
-                        ActorSnapshot.System("Axis invitation delivery"),
+                        ActorSnapshot.System(),
                         now);
                     await SaveIgnoringWinner(uow, ct);
                 }
@@ -177,7 +177,7 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
         DateTime deliveredAt = timeProvider.GetUtcNow().UtcDateTime;
         delivered.MarkDelivered(delivered.Revision);
         delivered.RecordModification(
-            ActorSnapshot.System("Axis invitation delivery"),
+            ActorSnapshot.System(),
             deliveredAt);
         await EnqueueDeliveryAudit(
             services,
@@ -204,7 +204,7 @@ internal sealed class WorkspaceInvitationDeliveryDispatcher(
         DateTime failedAt = timeProvider.GetUtcNow().UtcDateTime;
         invitation.MarkTerminalDeliveryFailure(invitation.Revision, errorCode);
         invitation.RecordModification(
-            ActorSnapshot.System("Axis invitation delivery"),
+            ActorSnapshot.System(),
             failedAt);
         await EnqueueDeliveryAudit(
             services,
