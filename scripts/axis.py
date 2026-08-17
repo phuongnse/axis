@@ -3646,6 +3646,11 @@ def dotnet_projects_for_changed_paths(paths: list[str]) -> tuple[list[str], list
         if (ROOT / architecture_tests).is_file():
             test_projects.add(architecture_tests)
 
+    if "openapi.json" in paths:
+        api_tests = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        if (ROOT / api_tests).is_file():
+            test_projects.add(api_tests)
+
     return sorted(build_projects), sorted(test_projects)
 
 
@@ -3657,6 +3662,17 @@ def dotnet_test_class_filters(
     source_related_projects: set[str] = set()
     full_projects: set[str] = set()
     filters: dict[str, set[str]] = {}
+
+    api_tests = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+    api_source_paths = {
+        path for path in paths if path.startswith("src/Axis.Api/")
+    }
+    if (
+        "openapi.json" in paths
+        and api_tests in selected_projects
+        and api_source_paths <= {"src/Axis.Api/appsettings.json"}
+    ):
+        filters.setdefault(api_tests, set()).add("OpenApiDocumentTests")
 
     for path in paths:
         if path.startswith("src/"):

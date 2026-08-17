@@ -4348,6 +4348,20 @@ class TestReviewVerificationGates(unittest.TestCase):
             {api_tests: ["ProductRoleAssignmentEndpointTests"]},
         )
 
+    def test_generated_api_contract_delta_uses_openapi_owner_test(self) -> None:
+        api_tests = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        architecture_tests = "tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj"
+        paths = ["openapi.json", "src/Axis.Api/appsettings.json"]
+
+        build_projects, test_projects = axis.dotnet_projects_for_changed_paths(paths)
+
+        self.assertEqual(["src/Axis.Api/Axis.Api.csproj"], build_projects)
+        self.assertEqual([api_tests, architecture_tests], test_projects)
+        self.assertEqual(
+            {api_tests: ["OpenApiDocumentTests"]},
+            axis.dotnet_test_class_filters(paths, test_projects),
+        )
+
     def test_prunes_changed_build_projects_already_built_by_selected_root(self) -> None:
         api = "src/Axis.Api/Axis.Api.csproj"
         shared_domain = "src/Shared/Axis.Shared.Domain/Axis.Shared.Domain.csproj"

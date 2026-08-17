@@ -61,6 +61,11 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
             OpenApiSpecVersion.OpenApi3_0,
             TestContext.Current.CancellationToken));
         JsonElement schemas = json.RootElement.GetProperty("components").GetProperty("schemas");
+        schemas.GetProperty("ActorKind").GetProperty("enum")
+            .EnumerateArray()
+            .Select(value => value.GetString())
+            .Should()
+            .Equal("User", "ServiceIdentity", "System", "Anonymous");
         string[] requiredProvenance = ["createdBy", "createdAt", "modifiedBy", "modifiedAt"];
 
         foreach (string schemaName in new[]
