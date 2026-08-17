@@ -22,5 +22,5 @@
 - Blank Personal and organization creator Workspaces, member grant, authoritative refresh, and revocation pass the governed browser journey 3/3.
 - Identity Domain, Application, PostgreSQL Infrastructure, API, Rules, Business Objects, and Architecture suites pass with the current module-neutral contract.
 - OpenAPI and generated clients are synchronized; typed MCP list/grant/revoke tools pass API coverage, protocol, and mutation-safety gates.
-- The reference product release is `0.1.3`; its policy retains runtime Business Object grants only, and its build, package, BFF, and authentic install/application browser journey pass.
+- The reference product keeps stable publication intent at `0.1.0`; committed development snapshot `0.1.0-dev.gb8568d9ded04` retains runtime Business Object grants only, and its package, build, and focused authentic install/application browser journey pass.
 - The clean cutover removed the superseded authoring-action model from production, tests, package policy, documentation, and project dependencies. The absence check is one-time review evidence, not a permanent legacy-name guard.
