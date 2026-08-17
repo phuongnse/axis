@@ -17,6 +17,7 @@ import {
 import { invalidateClientRequestSession } from '@/lib/api';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
 import { axisStyles } from '@/theme.generated';
+import packageMetadata from '../package.json';
 import { AppShell } from '../src/components/shared/AppShell';
 import { ManagedDialog, ManagedDialogBody } from '../src/components/shared/ManagedDialog';
 import {
@@ -310,7 +311,7 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('main')).toHaveTextContent('Frame content');
     const footer = screen.getByRole('contentinfo');
-    expect(footer).toHaveTextContent('Version 0.1.0');
+    expect(footer).toHaveTextContent(`Version ${packageMetadata.version}`);
     expect(footer).toHaveTextContent('Axis Platform');
     expect(footer).toHaveTextContent('2026');
 

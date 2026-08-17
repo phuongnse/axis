@@ -16,6 +16,7 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 10. **Route durable guidance before edit.** The entry domain owner keeps spec, status, and evidence decisions. Other durable guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed handoff before edit.
 11. **Compatibility is explicit.** Derive compatibility from the owning contract and real consumers/data. A clean cutover approved because no supported production consumer/data exists removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, negative assertions, deny-lists, duplicate tests, or routine guidance that keeps retired identifiers or concepts alive. This lifecycle fact never lowers the production quality of the replacement.
 12. **Classify workarounds by contract.** Before taking an alternate path after a failure, name the owning contract, root cause, required owner, execution/trust boundary, invariants, and evidence boundary. If the proposal changes any of them merely to continue instead of repairing the root cause, it is a workaround: stop and re-enter `$axis-design-gate`. Only an explicit owning-contract change plus its own complete evidence can establish a new valid path.
+13. **Separate development from release.** Stable version selection, immutable development snapshot identity, and destructive clean cutover are independent lifecycle decisions. Derive development identity from an immutable source checkpoint without changing stable release intent; change the stable version only at an intentional publication boundary, and never make data deletion an implicit consequence of development, verification, or version selection.
 
 ## Change-driven scope
 
@@ -93,7 +94,7 @@ Delegated skills do not auto-route back, commit, publish, or invoke another work
 
 ## Improvement loop
 
-Apply at review boundaries and to validated feedback:
+Every validated issue, problem, enhancement, or review finding completes this loop before closure; a local patch without classification and proportional proof is not a closed finding. Apply the loop at review boundaries and to validated feedback:
 
 1. **Trigger from evidence.** Use a reproducer, review finding, gate escape, false positive, or stale rule—not a hypothetical.
 2. **Classify by scope.** Decide whether the evidence proves a local defect, reusable decision/invariant, or obsolete rule. A first occurrence may still expose a systemic class.

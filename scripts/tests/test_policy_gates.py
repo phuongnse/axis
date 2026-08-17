@@ -6711,6 +6711,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 "run",
                 return_value=axis.subprocess.CompletedProcess([], 0),
             ) as run,
+            mock.patch.object(axis, "normalize_migration_source_encoding") as normalize,
         ):
             self.assertEqual(
                 0,
@@ -6729,6 +6730,14 @@ class TestAxisCommandWrappers(unittest.TestCase):
             },
             run.call_args.kwargs["env"],
         )
+        normalize.assert_called_once_with(
+            axis.ROOT
+            / "src"
+            / "Modules"
+            / "Identity"
+            / "Axis.Identity.Infrastructure"
+            / "Migrations"
+        )
 
     def test_migration_add_rejects_invalid_name_before_running_dotnet(self) -> None:
         with (
@@ -6745,6 +6754,19 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 )
 
         run.assert_not_called()
+
+    def test_migration_workflow_normalizes_generated_utf8_bom(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            migrations = Path(temporary)
+            generated = migrations / "20260817000000_Initial.cs"
+            generated.write_bytes(b"\xef\xbb\xbfusing System;\n")
+            unchanged = migrations / "Snapshot.cs"
+            unchanged.write_bytes(b"using System;\n")
+
+            axis.normalize_migration_source_encoding(migrations)
+
+            self.assertEqual(b"using System;\n", generated.read_bytes())
+            self.assertEqual(b"using System;\n", unchanged.read_bytes())
 
     def test_frontend_test_maps_paths_and_name_filter(self) -> None:
         calls = self.run_with_fake_process(

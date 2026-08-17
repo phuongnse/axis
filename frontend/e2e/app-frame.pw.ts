@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import packageMetadata from '../package.json';
 import { expectCanonicalTestLanguage } from './canonical-test-language';
 
 const profile = {
@@ -1427,7 +1428,7 @@ test.describe('app frame', () => {
       'flex-start',
     );
     await expect(page.getByRole('main')).toHaveText('');
-    await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
+    await expect(page.getByRole('contentinfo')).toContainText(`Version ${packageMetadata.version}`);
     await expect(page.getByRole('contentinfo')).toContainText('Axis Platform');
     await expect(page.getByRole('contentinfo')).toContainText('2026');
     await expectShellRegionsFitViewport(page);
@@ -1482,7 +1483,7 @@ test.describe('app frame', () => {
       '/business-objects',
     );
     await expect(page.getByRole('main')).toHaveText('');
-    await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
+    await expect(page.getByRole('contentinfo')).toContainText(`Version ${packageMetadata.version}`);
     await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: /Account menu/ }).click();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();

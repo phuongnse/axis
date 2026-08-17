@@ -3317,6 +3317,13 @@ def mcp_command(args: argparse.Namespace) -> int:
     ).returncode
 
 
+def normalize_migration_source_encoding(migrations_dir: Path) -> None:
+    for source in sorted(migrations_dir.glob("*.cs")):
+        content = source.read_bytes()
+        if content.startswith(b"\xef\xbb\xbf"):
+            source.write_bytes(content[3:])
+
+
 def migration_command(args: argparse.Namespace) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
@@ -3378,11 +3385,14 @@ def migration_command(args: argparse.Namespace) -> int:
             "--force",
             "--no-build",
         ])
-    return run(
+    result = run(
         ef_args,
         check=False,
         env={connection_key: DESIGN_TIME_CONNECTION_STRING},
-    ).returncode
+    )
+    if result.returncode == 0:
+        normalize_migration_source_encoding(project.parent / "Migrations")
+    return result.returncode
 
 
 def run_frontend_npm(
