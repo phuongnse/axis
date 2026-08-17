@@ -9,7 +9,7 @@ namespace Axis.Authorization.Infrastructure.Tests.Migrations;
 public sealed class AuthorizationInitialMigrationTests(AuthorizationDatabaseFixture database)
 {
     [Fact]
-    public async Task FreshDatabase_AppliesOneInitialMigrationWithNoModelDrift()
+    public async Task FreshDatabase_WhenMigrated_HasOneInitialMigrationWithoutModelDrift()
     {
         await using AuthorizationDbContext context = database.CreateContext();
 

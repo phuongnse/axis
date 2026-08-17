@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import packageMetadata from '../package.json';
+import packageMetadata from '../package.json' with { type: 'json' };
 import { expectCanonicalTestLanguage } from './canonical-test-language';
 
 const profile = {
@@ -1390,6 +1390,18 @@ test.describe('app frame', () => {
     );
   });
 
+  test('footer renders the manifest version on desktop and mobile', async ({ page }) => {
+    await mockAuthenticatedSession(page);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+
+    const footer = page.getByRole('contentinfo');
+    await expect(footer).toContainText(`Version ${packageMetadata.version}`);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(footer).toContainText(`Version ${packageMetadata.version}`);
+  });
+
   test('AT-002 desktop and mobile frame render without console errors or document overflow', async ({
     page,
   }) => {
@@ -1428,7 +1440,6 @@ test.describe('app frame', () => {
       'flex-start',
     );
     await expect(page.getByRole('main')).toHaveText('');
-    await expect(page.getByRole('contentinfo')).toContainText(`Version ${packageMetadata.version}`);
     await expect(page.getByRole('contentinfo')).toContainText('Axis Platform');
     await expect(page.getByRole('contentinfo')).toContainText('2026');
     await expectShellRegionsFitViewport(page);
@@ -1483,7 +1494,6 @@ test.describe('app frame', () => {
       '/business-objects',
     );
     await expect(page.getByRole('main')).toHaveText('');
-    await expect(page.getByRole('contentinfo')).toContainText(`Version ${packageMetadata.version}`);
     await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: /Account menu/ }).click();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();

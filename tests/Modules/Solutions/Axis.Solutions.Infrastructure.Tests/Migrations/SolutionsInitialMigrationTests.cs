@@ -9,7 +9,7 @@ namespace Axis.Solutions.Infrastructure.Tests.Migrations;
 public sealed class SolutionsInitialMigrationTests(SolutionsDatabaseFixture database)
 {
     [Fact]
-    public async Task FreshDatabase_AppliesOneInitialMigrationWithNoModelDrift()
+    public async Task FreshDatabase_WhenMigrated_HasOneInitialMigrationWithoutModelDrift()
     {
         await using SolutionsDbContext context = database.CreateContext();
 

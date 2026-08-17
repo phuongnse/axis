@@ -9,7 +9,7 @@ namespace Axis.Rules.Infrastructure.Tests.Persistence;
 public sealed class RulesInitialMigrationTests(RulesDatabaseFixture database)
 {
     [Fact]
-    public async Task FreshDatabase_AppliesOneInitialMigrationWithNoModelDrift()
+    public async Task FreshDatabase_WhenMigrated_HasOneInitialMigrationWithoutModelDrift()
     {
         await using RulesDbContext context = database.CreateContext();
 

@@ -4273,6 +4273,29 @@ class TestReviewVerificationGates(unittest.TestCase):
             overlays=(product_overlay,),
         )
 
+    def test_review_boundary_reuses_focused_browser_proof_without_rerunning_it(self) -> None:
+        browser_runner = mock.Mock(return_value=0)
+        output = io.StringIO()
+
+        with (
+            mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/e2e/register.pw.ts"])),
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "check_frontend_dependency_versions", return_value=0),
+            mock.patch.object(axis, "check_frontend_vulnerable_packages", return_value=0),
+            mock.patch.object(axis, "frontend_command", return_value=0),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(
+                0,
+                axis.verify(
+                    axis.argparse.Namespace(reuse_focused_browser_evidence=True)
+                ),
+            )
+
+        browser_runner.assert_not_called()
+        self.assertIn("REUSE frontend e2e", output.getvalue())
+
     def test_runs_related_dotnet_projects_for_source_change(self) -> None:
         calls: list[str] = []
 

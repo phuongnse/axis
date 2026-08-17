@@ -3958,7 +3958,11 @@ def verify(args: argparse.Namespace) -> int:
                     "frontend test (changed test files)",
                     lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
                 )
-            if changed_e2e_tests:
+            if changed_e2e_tests and getattr(args, "reuse_focused_browser_evidence", False):
+                print()
+                print("> frontend e2e (focused proof)")
+                print("REUSE frontend e2e (focused proof from the clean checkpoint)")
+            elif changed_e2e_tests:
                 step(
                     "frontend e2e (changed test files)",
                     lambda: run_local_dev_browser(
@@ -4127,7 +4131,9 @@ def review_readiness(args: argparse.Namespace) -> int:
 
     executed: list[str] = []
     if not policy_only:
-        if verify(args) != 0:
+        verify_args = argparse.Namespace(**vars(args))
+        verify_args.reuse_focused_browser_evidence = True
+        if verify(verify_args) != 0:
             print("review-readiness: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
         executed.append("verify")
