@@ -34,6 +34,14 @@ const builtInRule = (definitionKey: string, name: string, targetTypeKeys: string
   expressionLanguageVersion: 1,
   latestVersion: 1,
   activeVersion: 1,
+  updatedAt: now,
+  metadata: {
+    revision: null,
+    createdBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    createdAt: now,
+    modifiedBy: { kind: 'System', subjectId: null, displayName: 'System' },
+    modifiedAt: now,
+  },
   output: { type: 'Boolean', cardinality: 'Scalar' },
   inputs: [
     {
