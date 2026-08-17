@@ -28,6 +28,7 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, TextIO
@@ -3633,6 +3634,7 @@ def dotnet_test_class_filters(
     test_projects: list[str],
 ) -> dict[str, list[str]]:
     selected_projects = set(test_projects)
+    source_related_projects: set[str] = set()
     full_projects: set[str] = set()
     filters: dict[str, set[str]] = {}
 
@@ -3642,7 +3644,7 @@ def dotnet_test_class_filters(
             if source_project is not None:
                 related_test = related_test_project_for_source_project(source_project)
                 if related_test is not None:
-                    full_projects.add(related_test)
+                    source_related_projects.add(related_test)
             continue
         if not path.startswith("tests/"):
             continue
@@ -3652,6 +3654,10 @@ def dotnet_test_class_filters(
         if path.endswith("Tests.cs"):
             filters.setdefault(project, set()).add(Path(path).stem)
         else:
+            full_projects.add(project)
+
+    for project in source_related_projects:
+        if project not in filters:
             full_projects.add(project)
 
     if any(path.startswith("src/") for path in paths):
@@ -3683,8 +3689,51 @@ def dotnet_format_changed_paths(paths: list[str]) -> int:
     )
 
 
+def direct_dotnet_project_references(project: str) -> set[str]:
+    project_path = ROOT / project
+    try:
+        document = ET.parse(project_path)
+    except (OSError, ET.ParseError):
+        return set()
+
+    references: set[str] = set()
+    for element in document.iter():
+        if element.tag.rsplit("}", 1)[-1] != "ProjectReference":
+            continue
+        include = element.get("Include")
+        if not include:
+            continue
+        reference_path = project_path.parent / Path(include.replace("\\", "/"))
+        try:
+            references.add(reference_path.resolve().relative_to(ROOT.resolve()).as_posix())
+        except ValueError:
+            continue
+    return references
+
+
+def minimal_dotnet_build_projects(projects: list[str]) -> list[str]:
+    selected = set(projects)
+    redundant: set[str] = set()
+
+    for root_project in selected:
+        pending = list(direct_dotnet_project_references(root_project))
+        visited: set[str] = set()
+        while pending:
+            reference = pending.pop()
+            if reference in visited:
+                continue
+            visited.add(reference)
+            if reference in selected:
+                redundant.add(reference)
+            pending.extend(direct_dotnet_project_references(reference))
+
+    return sorted(selected - redundant)
+
+
 def dotnet_build_projects(projects: list[str]) -> int:
-    for project in projects:
+    roots = minimal_dotnet_build_projects(projects)
+    print(f"dotnet-build-changed: {len(roots)} root project(s) cover {len(projects)} changed project(s)")
+    for project in roots:
         result = run([exe("dotnet"), "build", project, "--nologo"], check=False)
         if result.returncode != 0:
             return result.returncode

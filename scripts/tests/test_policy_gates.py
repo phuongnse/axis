@@ -4320,6 +4320,40 @@ class TestReviewVerificationGates(unittest.TestCase):
             {project: ["RuleDefinitionEndpointTests"]},
         )
 
+    def test_source_change_uses_changed_test_classes_as_focused_proof(self) -> None:
+        api_tests = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        architecture_tests = "tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj"
+        paths = [
+            "src/Axis.Api/Endpoints/ProductRoleAssignmentEndpoints.cs",
+            "tests/Api/Axis.Api.Tests/Authorization/ProductRoleAssignmentEndpointTests.cs",
+        ]
+
+        with (
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", paths)),
+            mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "check_test_naming", return_value=0),
+            mock.patch.object(axis, "dotnet_build_projects", return_value=0),
+            mock.patch.object(axis, "dotnet_format_changed_paths", return_value=0),
+            mock.patch.object(axis, "dotnet_test_projects", return_value=0) as dotnet_test_projects,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        dotnet_test_projects.assert_called_once_with(
+            [api_tests, architecture_tests],
+            {api_tests: ["ProductRoleAssignmentEndpointTests"]},
+        )
+
+    def test_prunes_changed_build_projects_already_built_by_selected_root(self) -> None:
+        api = "src/Axis.Api/Axis.Api.csproj"
+        shared_domain = "src/Shared/Axis.Shared.Domain/Axis.Shared.Domain.csproj"
+
+        self.assertEqual(
+            [api],
+            axis.minimal_dotnet_build_projects([shared_domain, api]),
+        )
+
     def test_maps_mcp_source_to_mcp_contract_tests(self) -> None:
         self.assertEqual(
             "tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj",
