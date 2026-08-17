@@ -1,3 +1,5 @@
+using Axis.Shared.Domain.Primitives;
+
 namespace Axis.Solutions.Domain;
 
 public sealed class SolutionVersion
@@ -49,6 +51,19 @@ public sealed class SolutionVersion
     public DateTimeOffset BuiltAt { get; private set; }
     public string SourceUri { get; private set; } = string.Empty;
     public DateTimeOffset PublishedAt { get; private set; }
+    private ActorKind? CreatedByKind { get; set; }
+    private Guid? CreatedBySubjectId { get; set; }
+    private string? CreatedByDisplayName { get; set; }
+    public ActorSnapshot? CreatedBy => Snapshot(CreatedByKind, CreatedBySubjectId, CreatedByDisplayName);
+
+    public void InitializeMetadata(ActorSnapshot actor)
+    {
+        if (!actor.IsValid || CreatedBy is not null)
+            throw new InvalidOperationException("Solution-version publication provenance is invalid.");
+        CreatedByKind = actor.Kind;
+        CreatedBySubjectId = actor.SubjectId;
+        CreatedByDisplayName = actor.DisplayName;
+    }
 
     public static SolutionVersion Create(
         string solutionKey,
@@ -91,4 +106,12 @@ public sealed class SolutionVersion
             sourceUri.AbsoluteUri,
             publishedAt);
     }
+
+    private static ActorSnapshot? Snapshot(
+        ActorKind? kind,
+        Guid? subjectId,
+        string? displayName) =>
+        kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName)
+            ? ActorSnapshot.Create(actorKind, subjectId, displayName)
+            : null;
 }

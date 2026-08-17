@@ -7,4 +7,5 @@ public sealed record ResendWorkspaceInvitationCommand(
     Guid WorkspaceId,
     Guid InvitationId,
     int ExpectedRevision,
-    string CorrelationId) : ICommand<WorkspaceInvitationLifecycleDto>;
+    string CorrelationId,
+    string ActorDisplayName) : ICommand<WorkspaceInvitationLifecycleDto>;

@@ -120,6 +120,7 @@ public sealed class RuleDefinitionTests
             "Amount approval",
             "Requires approval for high-value records.",
             Actor,
+            ActorSnapshot.User(Actor.Id, "Ada Lovelace"),
             Now).IsFailure.Should().BeTrue();
 
     [Fact]
@@ -189,6 +190,7 @@ public sealed class RuleDefinitionTests
         "Amount approval",
         "Requires approval for high-value records.",
         Actor,
+        ActorSnapshot.User(Actor.Id, "Ada Lovelace"),
         Now).Value;
 
     private static void Configure(RuleDefinition definition) =>

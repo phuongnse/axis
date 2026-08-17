@@ -1,4 +1,5 @@
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Identity.Domain.ValueObjects;
 namespace Axis.Identity.Application.Repositories;
 
@@ -49,4 +50,5 @@ public sealed record ActiveWorkspaceHumanProjection(
     string Email,
     WorkspaceMembershipRole WorkspaceRole = WorkspaceMembershipRole.Member,
     bool IsProductBuilder = false,
-    int MembershipRevision = 1);
+    int MembershipRevision = 1,
+    ResourceMetadataDto? Metadata = null);

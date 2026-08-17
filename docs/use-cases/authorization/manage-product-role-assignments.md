@@ -76,6 +76,7 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 - **AC-011** Assignment screens support keyboard and screen-reader operation, clear pending/success/conflict/recovery states, compact layouts, and explicit selection of exact roles without presenting lifecycle roles as product roles.
 - **AC-012** Each `authorization.policy.v1` role supplies product-owned BCP 47 language-tagged presentation entries with NFC-normalized bounded display name and optional description, includes at least `en`, and projects the exact current UI language or `en` fallback; neither the platform nor the client keeps a global/hardcoded role catalog.
 - **AC-013** Product-role assignment administration is exposed through typed MCP tools authorized by the existing human administrator OAuth boundary; no service credential or token is accepted by or exposed through those tools.
+- **AC-014** The product-role assignment collection exposes complete server-owned current-state metadata in the Resource Workspace order: revision, created actor/time, and modified actor/time. Human actor cells show the authenticated administrator's display name; revocation changes modification provenance without changing creation provenance.
 
 ## Acceptance Test Matrix
 
@@ -85,7 +86,7 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 | AT-002 | Application/Infrastructure boundaries | Assignment, equivalent retry, stale revision, and concurrent assign/revoke preserve one canonical active authority outcome with audit read-back | AC-003, AC-004, AC-008, AC-009 | Application test + Infrastructure integration test | Yes |
 | AT-003 | API boundary | Organization `Member`, missing actor/subject activity, unknown subject kind, unknown/stale policy/role, and cross-Workspace target deny without mutation or disclosure | AC-006 | Domain test + API integration test | Yes |
 | AT-004 | API/Application boundaries | Revoked assignments deny the formerly permitted product operation immediately despite stale client state or projected UI affordance | AC-003, AC-010 | API integration test + Application test | Yes |
-| AT-005 | Browser journey | Administrator assigns and revokes exact roles with accessible selection, pending, conflict, and recovery states | AC-004, AC-010, AC-011 | Browser automation | Yes |
+| AT-005 | Browser journey | Administrator assigns and revokes exact roles with accessible selection, pending, conflict, recovery, and complete current-state metadata | AC-004, AC-010, AC-011, AC-014 | UI component test + Browser automation | Yes |
 | AT-006 | Infrastructure boundary | Assignment, revocation, denial, and failure audit outcomes are correlated, append-only, and redacted | AC-009 | Infrastructure integration test | Yes |
 | AT-007 | API/Application boundaries | Invalid BCP 47 tags, missing `en`, non-NFC or over-bound presentation values reject policy installation; current-language projection follows the explicit fallback without platform/client role copy | AC-012 | Application test + API integration test | Yes |
 | AT-008 | API/MCP boundaries | Typed product-role assignment tools use existing human-administrator OAuth and never accept or reveal service credentials or tokens | AC-005, AC-013 | API integration test + MCP contract test | Yes |

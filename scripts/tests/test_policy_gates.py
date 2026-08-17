@@ -3387,7 +3387,7 @@ class TestToolVersionGates(unittest.TestCase):
 
     def test_playwright_chromium_status_reports_missing_browser(self) -> None:
         def fake_run(command: list[str], **_kwargs):
-            return axis.subprocess.CompletedProcess(command, 1, stdout="", stderr="/missing/chromium\n")
+            return axis.subprocess.CompletedProcess(command, 2, stdout="", stderr="/missing/chromium\n")
 
         with (
             mock.patch.object(axis, "run", side_effect=fake_run),
@@ -3398,6 +3398,53 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("/missing/chromium", detail)
         self.assertIn("python scripts/axis.py frontend install-browsers", detail)
+
+    def test_playwright_chromium_status_rejects_installed_browser_missing_native_library(self) -> None:
+        def fake_run(command: list[str], **_kwargs):
+            return axis.subprocess.CompletedProcess(
+                command,
+                1,
+                stdout="/cache/chromium/chrome\n",
+                stderr=(
+                    "/cache/chromium/chrome: error while loading shared libraries: "
+                    "libnspr4.so: cannot open shared object file\n"
+                ),
+            )
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
+        ):
+            ok, detail = axis.playwright_chromium_status({"PATH": "/tmp/node"})
+
+        self.assertFalse(ok)
+        self.assertIn("/cache/chromium/chrome is installed but cannot launch", detail)
+        self.assertIn("missing native library `libnspr4.so`", detail)
+        self.assertIn("python scripts/axis.py local-dev e2e", detail)
+        self.assertIn("does not install with sudo or an OS package manager", detail)
+
+    def test_playwright_chromium_status_requires_a_successful_launch(self) -> None:
+        commands: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            commands.append(command)
+            return axis.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="/cache/chromium/chrome\n",
+                stderr="",
+            )
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
+        ):
+            ok, detail = axis.playwright_chromium_status({"PATH": "/tmp/node"})
+
+        self.assertTrue(ok)
+        self.assertEqual("/cache/chromium/chrome", detail)
+        self.assertIn("chromium.launch", commands[0][-1])
+        self.assertIn("browser.close", commands[0][-1])
 
     def test_local_dev_doctor_does_not_require_host_playwright(self) -> None:
         playwright_status = mock.Mock(return_value=(False, "missing host browser"))
@@ -3434,6 +3481,108 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("local HTTPS certificates", stdout.getvalue())
         self.assertIn("host browser trust", stdout.getvalue())
         self.assertEqual("", stderr.getvalue())
+
+    def test_local_dev_certificate_state_covers_shared_runtime_readiness(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            marker = Path(temp) / "trusted-rootCA.sha1"
+            with (
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    marker,
+                ),
+                mock.patch.object(
+                    axis,
+                    "local_dev_certificates_valid",
+                    side_effect=[True, False, False],
+                ),
+            ):
+                self.assertEqual(
+                    axis.LocalDevCertificateState.OPENSSL_UNAVAILABLE,
+                    axis.local_dev_certificate_state(None),
+                )
+                self.assertEqual(
+                    axis.LocalDevCertificateState.READY,
+                    axis.local_dev_certificate_state("/usr/bin/openssl"),
+                )
+                self.assertEqual(
+                    axis.LocalDevCertificateState.MISSING_OR_INVALID,
+                    axis.local_dev_certificate_state("/usr/bin/openssl"),
+                )
+                marker.write_text("managed\n", encoding="utf-8")
+                self.assertEqual(
+                    axis.LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID,
+                    axis.local_dev_certificate_state("/usr/bin/openssl"),
+                )
+
+    def test_local_dev_certificate_remediation_is_derived_from_state(self) -> None:
+        self.assertIn(
+            "local-dev certs",
+            axis.local_dev_certificate_remediation(
+                axis.LocalDevCertificateState.MISSING_OR_INVALID
+            ),
+        )
+        managed_detail = axis.local_dev_certificate_remediation(
+            axis.LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+        )
+        untrust = "python scripts/axis.py local-dev untrust-certs"
+        renew = "python scripts/axis.py local-dev certs --renew"
+        trust = "python scripts/axis.py local-dev trust-certs"
+        self.assertLess(managed_detail.index(untrust), managed_detail.index(renew))
+        self.assertLess(managed_detail.index(renew), managed_detail.index(trust))
+
+    def test_required_local_dev_certificates_fail_with_state_derived_guidance(self) -> None:
+        with (
+            mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+            mock.patch.object(
+                axis,
+                "local_dev_certificate_state",
+                return_value=axis.LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID,
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.require_local_dev_certificates("local-dev e2e"))
+
+        detail = stderr.getvalue()
+        self.assertIn("local-dev e2e: local HTTPS certificate preflight failed", detail)
+        self.assertIn("python scripts/axis.py local-dev untrust-certs", detail)
+        self.assertIn("python scripts/axis.py local-dev certs --renew", detail)
+        self.assertIn("python scripts/axis.py local-dev trust-certs", detail)
+
+    def test_strict_local_dev_doctor_blocks_invalid_certificate_state(self) -> None:
+        with (
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
+            mock.patch.object(axis, "npm_version_status", return_value=(True, "11.16.0")),
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.12.3")),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
+            mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+            mock.patch.object(
+                axis,
+                "local_dev_certificate_state",
+                return_value=axis.LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID,
+            ),
+            mock.patch.object(
+                axis,
+                "local_dev_host_trust_status",
+                return_value=("WARN", "host browser trust is not configured"),
+            ),
+            mock.patch.object(axis, "_docker_info_ok", return_value=True),
+            mock.patch.object(axis, "_docker_host_ping_ok", return_value=False),
+            mock.patch.object(axis, "_http_ok", return_value=False),
+            mock.patch.object(axis, "_wsl_docker_ok", return_value=False),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(
+                1,
+                axis.doctor(axis.argparse.Namespace(profile="local-dev", strict=True)),
+            )
+
+        self.assertIn("[FAIL] local HTTPS certificates", stdout.getvalue())
+        self.assertIn("local HTTPS certificates", stderr.getvalue())
 
     def test_core_doctor_profile_skips_build_local_dev_and_review_tools(self) -> None:
         with (
@@ -4401,6 +4550,13 @@ class TestLocalDevCli(unittest.TestCase):
         )
         topology_discovery.start()
         self.addCleanup(topology_discovery.stop)
+        certificate_preflight = mock.patch.object(
+            axis,
+            "require_local_dev_certificates",
+            return_value=0,
+        )
+        self.certificate_preflight = certificate_preflight.start()
+        self.addCleanup(certificate_preflight.stop)
 
     def make_overlay(self, name: str = "product.yml") -> Path:
         overlay = self.topology_root / name
@@ -4669,6 +4825,55 @@ class TestLocalDevCli(unittest.TestCase):
             ],
             calls[0][1:],
         )
+
+    def test_https_service_selection_uses_shared_certificate_preflight(self) -> None:
+        for services in ([], ["api"], ["web"], ["e2e"], ["postgres", "api"]):
+            with self.subTest(services=services):
+                self.assertTrue(axis.local_dev_services_require_certificates(services))
+        for services in (["postgres"], ["redis"], ["maildev"], ["otel-lgtm"]):
+            with self.subTest(services=services):
+                self.assertFalse(axis.local_dev_services_require_certificates(services))
+
+    def test_up_preflights_only_when_selected_services_require_https(self) -> None:
+        self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="up", build=False, services=[])
+        )
+        self.certificate_preflight.assert_called_once_with("local-dev up")
+
+        self.certificate_preflight.reset_mock()
+        self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=["postgres"],
+            )
+        )
+        self.certificate_preflight.assert_not_called()
+
+    def test_browser_runner_stops_before_docker_when_certificate_preflight_fails(self) -> None:
+        with (
+            mock.patch.object(axis, "require_local_dev_certificates", return_value=1) as preflight,
+            mock.patch.object(axis, "run") as run,
+        ):
+            self.assertEqual(1, axis.run_local_dev_browser(["e2e/sample.pw.ts"]))
+
+        preflight.assert_called_once_with("local-dev e2e")
+        run.assert_not_called()
+
+    def test_reset_stops_before_destructive_docker_calls_when_certificate_preflight_fails(self) -> None:
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "require_local_dev_certificates", return_value=1),
+            mock.patch.object(axis, "run") as run,
+        ):
+            self.assertEqual(
+                1,
+                axis.local_dev(
+                    axis.argparse.Namespace(local_dev_command="reset-db", yes=True)
+                ),
+            )
+
+        run.assert_not_called()
 
     def test_up_applies_explicit_compose_overlays_in_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -5271,6 +5476,7 @@ class TestLocalDevCli(unittest.TestCase):
             ["e2e", "e2e/local-dev-smoke.pw.ts"],
             calls[2][-2:],
         )
+        self.certificate_preflight.assert_called_once_with("local-dev smoke")
 
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
@@ -5928,6 +6134,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
                 mock.patch.object(axis, "mcp_api_health_ok", side_effect=[False, True]),
                 mock.patch.object(axis, "require_docker_compose", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "require_local_dev_certificates",
+                    return_value=0,
+                ) as certificate_preflight,
                 mock.patch.object(axis, "local_dev_up_args", return_value=["docker", "compose", "up"]),
                 mock.patch.object(axis, "run", side_effect=fake_run),
                 mock.patch.object(axis, "exe", side_effect=lambda name: name),
@@ -5946,6 +6157,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 )
 
         self.assertEqual(["docker", "compose", "up"], calls[0])
+        certificate_preflight.assert_called_once_with("mcp serve")
         self.assertEqual("dotnet", calls[1][0])
         self.assertEqual("", stdout.getvalue())
         self.assertIn("starting the local-dev stack", stderr.getvalue())
@@ -6081,6 +6293,15 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         run.assert_not_called()
         run_npm.assert_not_called()
+
+    def test_setup_preflight_allows_certificate_bootstrap_without_weakening_doctor(self) -> None:
+        with mock.patch.object(axis, "doctor", return_value=0) as doctor:
+            self.assertEqual(0, axis.setup_preflight("local-dev"))
+
+        preflight_args = doctor.call_args.args[0]
+        self.assertEqual("local-dev", preflight_args.profile)
+        self.assertTrue(preflight_args.strict)
+        self.assertTrue(preflight_args.allow_certificate_bootstrap)
 
     def test_dotnet_build_strips_argparse_separator(self) -> None:
         calls = self.run_with_fake_process(

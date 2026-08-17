@@ -207,6 +207,20 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CreatedByActorDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_actor_display_name");
+
+                    b.Property<string>("CreatedByActorKind")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("created_by_actor_kind");
+
+                    b.Property<Guid?>("CreatedByActorSubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_actor_subject_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -269,6 +283,20 @@ namespace Axis.Rules.Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedByActorDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("updated_by_actor_display_name");
+
+                    b.Property<string>("UpdatedByActorKind")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("updated_by_actor_kind");
+
+                    b.Property<Guid?>("UpdatedByActorSubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_actor_subject_id");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")

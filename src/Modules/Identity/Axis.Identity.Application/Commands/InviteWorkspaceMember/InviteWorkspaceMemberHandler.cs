@@ -162,6 +162,7 @@ public sealed class InviteWorkspaceMemberHandler(
             tokenHash,
             envelope,
             DeliveryCorrelation(invitationId, 1));
+        invitation.InitializeMetadata(ActorSnapshot.User(command.InviterUserId, inviter.FullName));
 
         await invitations.AddAsync(invitation, ct);
         await auditOutbox.EnqueueAsync(

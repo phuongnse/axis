@@ -20,8 +20,10 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - Preserves enabled route-owned query and table state while record workflows open, focus, minimize, save, close, or survive authenticated navigation.
 - Uses [docs/foundations/overlays/managed-dialog.md](../overlays/managed-dialog.md) for stable record-workflow identities and lifecycle.
 - Keeps record sections within one record workflow rather than creating a second collection workspace.
-- Keeps header, ready, loading, selected, grouped, and expandable rows on one owner-defined vertical rhythm; cells align content centrally and longer content expands without shifting sibling alignment.
+- Keeps header, ready, loading, selected, grouped, and expandable rows on one owner-defined vertical rhythm; single-line rows vertically center their cells, scalar values remain one line, and only explicitly typed list content expands. When a list actually wraps, the whole row top-aligns so one-line siblings remain level with its first line.
 - Aligns record actions to the same leading content edge as non-interactive cell content; the table owner preserves target size, focus treatment, and truncation without page-action padding shifting the column rhythm.
+- Ends every server-managed resource row with one consistent metadata group: the resource's lifecycle version when applicable, mutable concurrency revision when applicable, `Created by`, `Created at`, `Modified by`, and `Modified at`. These columns are present rather than conditionally omitted; a value that cannot be truthfully reconstructed from historical data renders the shared `N/A` placeholder.
+- Uses server-owned actor provenance. Human mutations show the authenticated user's display name, service mutations show the service identity name, and code-owned operations show an explicit system identity. Stable subject identity remains available to disambiguate duplicate names but is not the primary cell label. Clients never submit or infer actor metadata.
 
 ## Alternate / error flows
 
@@ -31,7 +33,7 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - Browser refresh: the current deep link can launch its one requested window after reload, but the prior session's complete window set and geometry are not restored.
 - Unsaved changes: closing a window requests consumer confirmation without discarding input silently; authenticated route navigation alone does not dismiss the draft.
 - Validation or concurrency conflict: the affected record window remains open, identifies affected controls, and preserves recoverable input without disturbing sibling windows.
-- Small viewport: managed windows use the compact contract while the collection retains one internally scrolling table workspace without document overflow.
+- Small viewport: managed windows use the compact contract while the collection retains one internally scrolling table workspace without document overflow. Regular-width collections fit their full table width; horizontal table scrolling is reserved for compact widths.
 - Complex workflow: a dedicated route is allowed only when comparison, long-running work, or multi-record context cannot be represented accessibly in managed windows.
 
 ## Acceptance Criteria
@@ -47,7 +49,8 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - **AC-009** Window tabs group sections of the same record only and do not introduce a second primary collection workspace.
 - **AC-010** The foundation is product-neutral and does not own feature DTOs, authorization, mutations, localized copy, record validation, or window mechanics.
 - **AC-011** A consumer may use a dedicated record route only when its documented workflow requires multi-record comparison, long-running work, or a layout that cannot remain usable in the managed-window contract.
-- **AC-012** The shared Resource Workspace owner provides one localized page context, optional status, one primary table, app-owned responsive density, aligned record actions, and internal data overflow across registered consumers without absorbing managed-window or feature semantics.
+- **AC-012** The shared Resource Workspace owner provides one localized page context, optional status, one primary table, app-owned responsive density, typed locale-formatted cells, row-level adaptive vertical alignment, aligned record actions, regular-width column fitting, and compact-owned data overflow across registered consumers without absorbing managed-window or feature semantics.
+- **AC-013** Every registered server-managed collection places its complete current-state metadata after domain columns in the canonical order: lifecycle version when applicable, revision when applicable, created actor/time, and modified actor/time. Version and revision use identifier semantics; actors use authenticated server-owned display names; timestamps use localized absolute date-time formatting; and unknowable historical values remain explicit `N/A` rather than fabricated provenance.
 
 ## Acceptance Test Matrix
 
@@ -58,7 +61,7 @@ Provide a consistent enterprise collection workspace in which one primary data t
 | AT-003 | UI component | Loading, unavailable data, validation, unsaved dismissal, concurrency conflict, save, route navigation, and sibling-window changes retain recoverable record state. | AC-004, AC-006, AC-008, AC-009 | UI component test | Yes |
 | AT-004 | Browser journey | Direct URL, refresh, Back/Forward, authenticated navigation, multiple record windows, internal scrolling, stable actions, and desktop/compact layout behave without draft loss, overflow, or console errors. | AC-002, AC-003, AC-004, AC-006, AC-007, AC-008, AC-009 | Browser automation | Yes |
 | AT-005 | Static frontend | Shared collection and managed-window contracts remain product-neutral, localized consumers typecheck, and dedicated routes remain limited to documented workflow needs. | AC-005, AC-010, AC-011 | Frontend CI | Yes |
-| AT-006 | UI component | The complete Resource Workspace owner and five-consumer inventory proves one clean-cutover page/table anatomy, criterion-level standards applicability, responsive internal overflow, aligned record actions, 32/44 CSS-pixel control density, localized 320 CSS-pixel reflow, component state coverage, and project-owner review disposition without absorbing managed-window or feature semantics. | AC-001, AC-004, AC-005, AC-007, AC-010, AC-012 | UI component test + Browser automation | Yes |
+| AT-006 | UI component | The complete Resource Workspace owner and six-consumer inventory proves one clean-cutover page/table anatomy, canonical trailing resource metadata, criterion-level standards applicability, responsive internal overflow, aligned record actions, 32/44 CSS-pixel control density, localized 320 CSS-pixel reflow, component state coverage, and project-owner review disposition without absorbing managed-window or feature semantics. | AC-001, AC-004, AC-005, AC-007, AC-010, AC-012, AC-013 | UI component test + Browser automation | Yes |
 
 ## Out Of Scope
 
@@ -88,9 +91,9 @@ Required UI quality: collection and record-window controls must be keyboard-reac
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** The shared data table provides one primary collection workspace with internal scrolling, toolbar action composition, owner-defined row and record-action alignment, responsive row density, and stable loading geometry. Current collection consumers use URL parameters as one-time launch intents, request stable app-scoped window identities, preserve route-owned collection state, retain independent drafts across authenticated navigation, and guard dirty closure without replacing sibling records.
+> **Implemented:** The shared data table provides one primary collection workspace with internal vertical scrolling, compact-only horizontal scrolling, regular-width column fitting, toolbar action composition, required semantic cell kinds, locale formatting, type-owned horizontal alignment, measured row-level vertical alignment, responsive row density, and stable loading geometry. Current collection consumers use URL parameters as one-time launch intents, request stable app-scoped window identities, preserve route-owned collection state, retain independent drafts across authenticated navigation, and guard dirty closure without replacing sibling records.
 >
-> **Gaps vs spec:** None.
+> **Gaps vs spec:** The canonical trailing metadata group is being implemented across the six registered consumers and remains under project-owner review.
 >
 > **Deferred follow-ups:** Full workspace persistence, profile-backed collection preferences, native pop-outs, and dedicated multi-record workspaces remain out of scope.
 >

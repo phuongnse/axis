@@ -3,7 +3,8 @@ namespace Axis.Rules.Application.Search;
 public sealed record RuleTextSearchDocument(
     string Key,
     string Title,
-    string Content);
+    string Content,
+    string Status = "");
 
 public sealed record RuleTextSearchMatch(
     string Key,

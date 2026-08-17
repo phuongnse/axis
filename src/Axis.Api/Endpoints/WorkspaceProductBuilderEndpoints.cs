@@ -97,7 +97,8 @@ public static class WorkspaceProductBuilderEndpoints
                 userId,
                 enabled,
                 request.ExpectedRevision,
-                CorrelationId(context)),
+                CorrelationId(context),
+                currentUser.DisplayName),
             ct);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }

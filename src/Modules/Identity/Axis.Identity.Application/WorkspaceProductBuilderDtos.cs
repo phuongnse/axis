@@ -1,5 +1,7 @@
 namespace Axis.Identity.Application;
 
+using Axis.Shared.Application;
+
 public sealed record WorkspaceProductBuilderDto(
     Guid UserId,
     string DisplayName,
@@ -7,4 +9,5 @@ public sealed record WorkspaceProductBuilderDto(
     string WorkspaceRole,
     bool IsProductBuilder,
     int MembershipRevision,
-    bool CanChange);
+    bool CanChange,
+    ResourceMetadataDto Metadata);

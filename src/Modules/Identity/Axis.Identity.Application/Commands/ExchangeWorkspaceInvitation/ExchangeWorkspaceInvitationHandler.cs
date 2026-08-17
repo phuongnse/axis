@@ -72,6 +72,10 @@ public sealed class ExchangeWorkspaceInvitationHandler(
             now.Add(policy.HandoffLifetime),
             now,
             invitation.Revision);
+        if (outcome == InvitationExchangeOutcome.Exchanged)
+            invitation.RecordModification(
+                ActorSnapshot.System("Axis invitation token exchange"),
+                now);
 
         Guid auditEventId = Guid.NewGuid();
         await auditOutbox.EnqueueAsync(

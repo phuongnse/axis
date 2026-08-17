@@ -1,6 +1,7 @@
 using System.Globalization;
 using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
+using Axis.Shared.Application;
 
 namespace Axis.Authorization.Application;
 
@@ -17,7 +18,8 @@ public sealed record ProductRoleAssignmentDto(
     Guid PolicyVersionId,
     string RoleKey,
     bool IsActive,
-    int Revision);
+    int Revision,
+    ResourceMetadataDto Metadata);
 
 public sealed record ProductRoleManagementResult(
     bool IsSuccess,
@@ -67,7 +69,13 @@ public sealed class ProductRoleManagementQueryService(
                 value.PolicyVersionId,
                 value.RoleKey,
                 value.IsActive,
-                value.Revision))
+                value.Revision,
+                ResourceMetadataMapping.From(
+                    value.Revision,
+                    value.CreatedBy,
+                    value.CreatedAt,
+                    value.UpdatedBy,
+                    value.UpdatedAt)))
             .OrderBy(value => value.Subject.Kind)
             .ThenBy(value => value.Subject.SubjectId)
             .ThenBy(value => value.RoleKey, StringComparer.Ordinal)

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ruleDefinitionsListQueryOptions } from '@/features/rules';
+import type { CollectionSortDirection, RuleDefinitionSortField } from '@/lib/api-generated';
 import type { MyRouterContext } from '../__root';
 
 export const Route = createFileRoute('/_authenticated/rules')({
@@ -12,6 +13,8 @@ export interface RulesRouteSearch {
   query?: string;
   dialog?: 'create' | 'edit';
   definitionKey?: string;
+  sortBy?: RuleDefinitionSortField;
+  sortDirection?: CollectionSortDirection;
 }
 
 export function loadRulesRoute({ queryClient }: MyRouterContext) {
@@ -27,10 +30,19 @@ function validateRulesSearch(search: Record<string, unknown>): RulesRouteSearch 
     typeof search.definitionKey === 'string' && search.definitionKey
       ? search.definitionKey
       : undefined;
+  const sortBy =
+    search.sortBy === 'Name' || search.sortBy === 'Origin' || search.sortBy === 'Status'
+      ? search.sortBy
+      : undefined;
+  const sortDirection =
+    search.sortDirection === 'Ascending' || search.sortDirection === 'Descending'
+      ? search.sortDirection
+      : undefined;
   return {
     page,
     ...(query ? { query } : {}),
     ...(dialog ? { dialog } : {}),
     ...(definitionKey ? { definitionKey } : {}),
+    ...(sortBy && sortDirection ? { sortBy, sortDirection } : {}),
   };
 }

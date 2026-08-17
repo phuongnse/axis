@@ -136,6 +136,7 @@ public sealed class ProductRoleAssignmentServiceTests
             current.RoleKey,
             "revoke-1",
             "corr-revoke-1",
+            "Axis Admin",
             4);
 
         ProductRoleAssignmentResult result = await context.Service.RevokeAsync(
@@ -248,7 +249,8 @@ public sealed class ProductRoleAssignmentServiceTests
             policyVersionId,
             "Applicant",
             "request-1",
-            "corr-request-1");
+            "corr-request-1",
+            "Axis Admin");
         administrators.IsAdministratorAsync(workspaceId, actor, Arg.Any<CancellationToken>())
             .Returns(administrator);
         activity.IsActiveAsync(workspaceId, target, Arg.Any<CancellationToken>())

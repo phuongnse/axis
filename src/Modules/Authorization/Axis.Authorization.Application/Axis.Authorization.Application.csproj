@@ -3,6 +3,8 @@
     <ProjectReference Include="..\..\Audit\Axis.Audit.Contracts\Axis.Audit.Contracts.csproj" />
     <ProjectReference Include="..\\Axis.Authorization.Contracts\\Axis.Authorization.Contracts.csproj" />
     <ProjectReference Include="..\\Axis.Authorization.Domain\\Axis.Authorization.Domain.csproj" />
+    <ProjectReference Include="..\\..\\..\\Shared\\Axis.Shared.Application\\Axis.Shared.Application.csproj" />
+    <ProjectReference Include="..\\..\\..\\Shared\\Axis.Shared.Domain\\Axis.Shared.Domain.csproj" />
   </ItemGroup>
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
 </Project>

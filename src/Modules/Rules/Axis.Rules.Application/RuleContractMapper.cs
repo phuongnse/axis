@@ -35,6 +35,7 @@ internal static class RuleContractMapper
             definition.Inputs.Select(ToDto).ToArray(),
             ToDto(definition.Output),
             definition.Origin == DomainOrigin.BuiltIn ? null : definition.UpdatedAt,
+            ToMetadata(definition),
             ToActions(definition, canManage),
             definition.Documentation is null ? null : ToDto(definition.Documentation));
 
@@ -56,8 +57,25 @@ internal static class RuleContractMapper
             definition.Origin == DomainOrigin.BuiltIn ? null : definition.CreatedAt,
             definition.Origin == DomainOrigin.BuiltIn ? null : definition.UpdatedAt,
             definition.ArchivedAt,
+            ToMetadata(definition),
             ToActions(definition, canManage),
             definition.Documentation is null ? null : ToDto(definition.Documentation));
+
+    private static RuleResourceMetadataDto ToMetadata(RuleDefinition definition)
+    {
+        bool builtIn = definition.Origin == DomainOrigin.BuiltIn;
+        return new RuleResourceMetadataDto(
+            builtIn ? null : definition.Revision,
+            ToActor(definition.CreatedByActor),
+            builtIn ? null : new DateTimeOffset(DateTime.SpecifyKind(definition.CreatedAt, DateTimeKind.Utc)),
+            ToActor(definition.UpdatedByActor),
+            builtIn ? null : new DateTimeOffset(DateTime.SpecifyKind(definition.UpdatedAt, DateTimeKind.Utc)));
+    }
+
+    private static RuleResourceActorDto? ToActor(ActorSnapshot? actor) =>
+        actor is { } value
+            ? new RuleResourceActorDto(value.Kind.ToString(), value.SubjectId, value.DisplayName)
+            : null;
 
     public static RuleDefinitionVersionDto ToDto(RuleDefinitionVersion version) =>
         new(

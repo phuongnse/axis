@@ -81,6 +81,7 @@ Let a Workspace Product Builder create, validate, test, version, activate, deact
 - **AC-019** Rules owns definitions, versions, activation, authoring language, validation, testing, persistence, and evaluation without importing Object, Workflow, or another consumer's domain types.
 - **AC-020** Rules exposes binding usage without copying target-specific fields into a definition; binding lifecycle is owned by [docs/use-cases/rules/manage-rule-bindings.md](./manage-rule-bindings.md).
 - **AC-021** Definition, version, and activation mutations are atomic and record workspace, revision, actor, and audit timestamps without introducing evaluator nondeterminism.
+- **AC-022** The Rules collection exposes active/latest lifecycle versions plus complete server-owned current-state metadata in the Resource Workspace order: revision, created actor/time, and modified actor/time. Human actor cells show the authenticated user's display name; actor identity is never accepted from the client.
 
 ## Acceptance Test Matrix
 
@@ -91,7 +92,7 @@ Let a Workspace Product Builder create, validate, test, version, activate, deact
 | AT-003 | Application boundary | One language service parses, validates, formats, autocompletes, and explains DSL and visual projections while persisting only the canonical AST | AC-003, AC-004, AC-009, AC-012, AC-013, AC-014 | Application test | Yes |
 | AT-004 | API boundary | Definition lifecycle, language, testing, activation, version history, and usage contracts expose generated frontend parity without consumer fields or localized stored logic | AC-001, AC-004, AC-005, AC-006, AC-008, AC-009, AC-018, AC-020 | API integration test | Yes |
 | AT-005 | Application boundary | Rules has no dependency on consumer modules and built-in/workspace definitions use the same public semantic contract | AC-010, AC-019, AC-020 | Architecture test | Yes |
-| AT-006 | UI component | One Rules grid opens create, read-only, edit, authoring, testing, version, activation, and usage dialogs and preserves collection state with targeted refresh | AC-004, AC-005, AC-009, AC-010, AC-011, AC-015 | UI component test | Yes |
+| AT-006 | UI/API boundaries | One Rules grid opens create, read-only, edit, authoring, testing, version, activation, and usage dialogs, preserves collection state with targeted refresh, and exposes complete sortable current-state metadata with generated contract parity | AC-004, AC-005, AC-009, AC-010, AC-011, AC-015, AC-022 | UI component test + API integration test | Yes |
 | AT-007 | Browser journey | User creates, tests, versions, activates, revises, deactivates, and inspects a rule without leaving the grid, losing state, overflowing, or producing console errors | AC-001, AC-005, AC-006, AC-007, AC-008, AC-011, AC-018 | Browser automation | Yes |
 
 ## Out Of Scope
@@ -104,7 +105,7 @@ Let a Workspace Product Builder create, validate, test, version, activate, deact
 
 | Surface | Required contract |
 |---|---|
-| Rules collection | Render one primary `DataTable` with definition identity, origin, active version, activation state, usage count, and contextual actions. |
+| Rules collection | Render one primary `DataTable` with definition identity, origin, active/latest version, activation state, usage count, contextual actions, and the canonical trailing revision/created/modified metadata group. |
 | Create, view, and edit | Consume [Detail Sections](../../foundations/data-display/detail-sections.md) with General first, Behavior as the primary business section, Usage for published-version relationships, and optional user-relevant system information last. Behavior presents one compact semantic `Inputs -> Logic -> Outputs` sequence with consistent markers, connectors, and alignment. View expressions are static read-only content; explicit authoring help opens the canonical guide where functions and logical operators use one reference interaction. Create and edit use form controls without changing the sequence. |
 | Authoring | Keep every supported authoring projection synchronized through canonical logic; syntax text and visual composition are never separate stored truths. |
 | Test | Open a dialog with typed sample inputs and distinct match, non-match, invalid-input, and evaluation-failure states. |

@@ -79,6 +79,7 @@ internal static class BusinessObjectRecordHandlerTestContext
     public sealed class FakeCurrentSubject : ICurrentSubject
     {
         public IdentitySubjectReference Subject { get; set; } = IdentitySubjectReference.Human(UserId);
+        public string DisplayName { get; set; } = "Ada Lovelace";
     }
 
     public static IProductAuthorizationService AllowedAuthorization(ProductActionScope scope = ProductActionScope.Own)

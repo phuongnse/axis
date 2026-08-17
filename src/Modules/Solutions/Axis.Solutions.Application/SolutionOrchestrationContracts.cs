@@ -67,12 +67,14 @@ public sealed record SolutionActor(
     Guid SubjectId,
     Guid WorkspaceId,
     string CorrelationId,
-    SolutionSubjectKind SubjectKind)
+    SolutionSubjectKind SubjectKind,
+    string DisplayName)
 {
     public void Validate()
     {
         if (SubjectId == Guid.Empty || WorkspaceId == Guid.Empty ||
             !Enum.IsDefined(SubjectKind) || string.IsNullOrWhiteSpace(CorrelationId) ||
+            string.IsNullOrWhiteSpace(DisplayName) ||
             CorrelationId.Trim().Length > AuditEventV1Validator.MaximumCorrelationIdLength)
             throw new SolutionPackageException("solutions.actor.invalid");
     }

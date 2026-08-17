@@ -1,10 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
 import { ApiError } from '@/lib/api';
+import type { MyRouterContext } from '@/routes/__root';
 import { axisStyles } from '@/theme.generated';
 import {
   grantWorkspaceProductBuilder,
@@ -29,9 +38,14 @@ const api = vi.hoisted(() => ({
 vi.mock('../api', () => ({
   workspaceInvitationKeys: { all: ['workspace-invitations'] },
   workspaceProductBuilderKeys: { all: ['workspace-product-builders'] },
-  workspaceInvitationsQueryOptions: (page = 1, pageSize = 20) => ({
-    queryKey: ['workspace-invitations', 'list', page, pageSize],
-    queryFn: () => api.list(page, pageSize),
+  workspaceInvitationsQueryOptions: (
+    page = 1,
+    pageSize = 20,
+    sortBy?: string,
+    sortDirection?: string,
+  ) => ({
+    queryKey: ['workspace-invitations', 'list', page, pageSize, sortBy, sortDirection],
+    queryFn: () => api.list(page, pageSize, sortBy, sortDirection),
   }),
   inviteWorkspaceMember: api.invite,
   resendWorkspaceInvitation: api.resend,
@@ -44,21 +58,55 @@ vi.mock('../api', () => ({
   revokeWorkspaceProductBuilder: api.revokeProductBuilder,
 }));
 
-function renderPage() {
+function renderPage(path = '/memberships') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const rootRoute = createRootRouteWithContext<MyRouterContext>()();
+  const authenticatedRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    id: '_authenticated',
+    component: Outlet,
+  });
+  const membershipsRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: 'memberships',
+    validateSearch: (search: Record<string, unknown>) => {
+      const sortBy =
+        search.sortBy === 'Email' ||
+        search.sortBy === 'Status' ||
+        search.sortBy === 'Role' ||
+        search.sortBy === 'Expires'
+          ? search.sortBy
+          : undefined;
+      const sortDirection =
+        search.sortDirection === 'Ascending' || search.sortDirection === 'Descending'
+          ? search.sortDirection
+          : undefined;
+      return {
+        page: Number(search.page) > 0 ? Number(search.page) : 1,
+        pageSize: [20, 50, 100].includes(Number(search.pageSize)) ? Number(search.pageSize) : 20,
+        ...(sortBy && sortDirection ? { sortBy, sortDirection } : {}),
+      };
+    },
+    component: MembershipManagementPage,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([authenticatedRoute.addChildren([membershipsRoute])]),
+    context: { queryClient },
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(
     <QueryClientProvider client={queryClient}>
       <ManagedWindowProvider renderers={membershipsManagedWindowRenderers}>
         <div className="relative h-dvh w-dvw">
-          <MembershipManagementPage />
+          <RouterProvider router={router} />
           <ManagedWindowHost />
         </div>
       </ManagedWindowProvider>
     </QueryClientProvider>,
   );
-  return queryClient;
+  return { queryClient, router };
 }
 
 describe('MembershipManagementPage', () => {
@@ -89,7 +137,7 @@ describe('MembershipManagementPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('tab', { name: 'Members' }));
+    await user.click(await screen.findByRole('tab', { name: 'Members' }));
     const table = await screen.findByRole('region', {
       name: 'Active Workspace member authoring authority',
     });
@@ -132,7 +180,7 @@ describe('MembershipManagementPage', () => {
       });
     renderPage();
 
-    await user.click(screen.getByRole('tab', { name: 'Members' }));
+    await user.click(await screen.findByRole('tab', { name: 'Members' }));
     const table = await screen.findByRole('region', {
       name: 'Active Workspace member authoring authority',
     });
@@ -164,10 +212,10 @@ describe('MembershipManagementPage', () => {
     });
     renderPage();
 
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
     const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
     const content = document.querySelector<HTMLElement>('[data-slot="resource-workspace-content"]');
-    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
     const invite = await within(table).findByRole('button', { name: 'Invite member' });
 
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
@@ -176,6 +224,10 @@ describe('MembershipManagementPage', () => {
     expect(content).toContainElement(table);
     expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: 'Recipient email: Sort ascending' }),
+    ).toBeVisible();
+    expect(within(table).getByRole('button', { name: 'Delivery: Sort ascending' })).toBeVisible();
     expect(invite).toHaveClass(
       axisStyles.density.minHeight.touchTarget,
       axisStyles.density.minWidth.touchTarget,
@@ -187,9 +239,35 @@ describe('MembershipManagementPage', () => {
     expect(await screen.findByRole('dialog', { name: 'Invite member' })).toBeVisible();
   });
 
+  it('sorts invitation delivery on the server and preserves the URL-backed table state', async () => {
+    const user = userEvent.setup();
+    api.list.mockResolvedValue({
+      items: [pendingInvitation()],
+      page: 1,
+      pageSize: 20,
+      totalCount: 1,
+    });
+    const { router } = renderPage();
+
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    await user.click(within(table).getByRole('button', { name: 'Delivery: Sort ascending' }));
+
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith(1, 20, 'Delivery', 'Ascending'));
+    expect(router.state.location.search).toEqual({
+      page: 1,
+      pageSize: 20,
+      sortBy: 'Delivery',
+      sortDirection: 'Ascending',
+    });
+    expect(within(table).getByRole('columnheader', { name: 'Delivery' })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+  });
+
   it('invites with the accessible form and refreshes the authoritative list', async () => {
     const user = userEvent.setup();
-    const queryClient = renderPage();
+    const { queryClient } = renderPage();
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
 
     const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
@@ -328,7 +406,7 @@ describe('MembershipManagementPage', () => {
     await user.click(screen.getByRole('button', { name: 'Next page' }));
 
     expect(await screen.findByRole('cell', { name: 'member-2@example.com' })).toBeInTheDocument();
-    expect(api.list).toHaveBeenLastCalledWith(2, 20);
+    expect(api.list).toHaveBeenLastCalledWith(2, 20, undefined, undefined);
   });
 });
 

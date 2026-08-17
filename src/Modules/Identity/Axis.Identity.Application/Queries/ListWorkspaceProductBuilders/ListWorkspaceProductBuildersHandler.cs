@@ -1,5 +1,6 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 
@@ -42,7 +43,8 @@ public sealed class ListWorkspaceProductBuildersHandler(
                     member.WorkspaceRole.ToString(),
                     member.IsProductBuilder,
                     member.MembershipRevision,
-                    member.UserId != query.ActorUserId))
+                    member.UserId != query.ActorUserId,
+                    member.Metadata ?? new ResourceMetadataDto(member.MembershipRevision, null, null, null, null)))
                 .ToArray());
     }
 

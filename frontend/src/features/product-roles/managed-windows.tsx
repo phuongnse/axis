@@ -441,7 +441,19 @@ function ProductRoleAssignmentDialog({
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           <Fact label={t('productRoles.subject')} value={subjectName} />
           <Fact label={t('productRoles.kind')} value={assignment.subject?.kind} />
+          {initialPayload.subject?.secondaryLabel ? (
+            <Fact
+              label={t('productRoles.subjectReference')}
+              value={initialPayload.subject.secondaryLabel}
+            />
+          ) : null}
           <Fact label={t('productRoles.role')} value={roleName} />
+          {initialPayload.role?.description ? (
+            <Fact
+              label={t('productRoles.roleDescription')}
+              value={initialPayload.role.description}
+            />
+          ) : null}
           <Fact
             label={t('productRoles.policy')}
             value={initialPayload.role?.policyKey ?? assignment.policyVersionId}

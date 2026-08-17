@@ -1,6 +1,7 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Shared.Application;
 using Microsoft.EntityFrameworkCore;
 namespace Axis.Identity.Infrastructure.Repositories;
 
@@ -54,8 +55,9 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context)
 
     public async Task<IReadOnlyList<ActiveWorkspaceHumanProjection>> ListActiveForWorkspaceAsync(
         Guid workspaceId,
-        CancellationToken ct = default) =>
-        await context.WorkspaceMemberships
+        CancellationToken ct = default)
+    {
+        var values = await context.WorkspaceMemberships
             .AsNoTracking()
             .Where(x => x.WorkspaceId == workspaceId && x.Status == MembershipStatus.Active)
             .Join(
@@ -65,14 +67,19 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context)
                 (membership, user) => new { membership, user })
             .OrderBy(value => value.user.FullName)
             .ThenBy(value => value.user.Id)
-            .Select(value => new ActiveWorkspaceHumanProjection(
-                value.user.Id,
-                value.user.FullName,
-                value.user.Email.Value,
-                value.membership.Role,
-                value.membership.IsProductBuilder,
-                value.membership.Revision))
+            .Select(value => new { value.membership, value.user })
             .ToListAsync(ct);
+
+        return values.Select(value => new ActiveWorkspaceHumanProjection(
+            value.user.Id,
+            value.user.FullName,
+            value.user.Email.Value,
+            value.membership.Role,
+            value.membership.IsProductBuilder,
+            value.membership.Revision,
+            ResourceMetadataMapping.From(value.membership.Revision, value.membership.CreatedBy, value.membership.CreatedAt, value.membership.UpdatedBy, value.membership.UpdatedAt)))
+            .ToArray();
+    }
 
     public Task<bool> HasActivePersonalOwnerWorkspaceAsync(
         Guid userId,

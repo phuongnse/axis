@@ -45,6 +45,9 @@ public sealed class ArchiveRuleDefinitionHandler(
             return archived.ErrorCode == ErrorCodes.Conflict
                 ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(archived.Error)
                 : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(archived.Error);
+        Result provenance = definition.RecordModification(RuleActor.From(currentSubject));
+        if (provenance.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(provenance.Error);
 
         try
         {

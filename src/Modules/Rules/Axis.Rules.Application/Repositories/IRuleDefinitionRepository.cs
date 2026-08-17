@@ -1,4 +1,5 @@
 using Axis.Rules.Domain;
+using Axis.Shared.Application;
 
 namespace Axis.Rules.Application.Repositories;
 
@@ -28,5 +29,7 @@ public interface IRuleDefinitionRepository
         int take,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
+        RuleDefinitionSortField? sortBy = null,
+        CollectionSortDirection? sortDirection = null,
         CancellationToken cancellationToken = default);
 }

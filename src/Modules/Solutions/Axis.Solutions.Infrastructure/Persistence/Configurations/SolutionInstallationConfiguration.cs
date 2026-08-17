@@ -1,4 +1,5 @@
 using Axis.Solutions.Domain;
+using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -18,6 +19,14 @@ internal sealed class SolutionInstallationConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
+        builder.Property<ActorKind?>("CreatedByKind").HasColumnName("created_by_kind").HasConversion<string>().HasMaxLength(32);
+        builder.Property<Guid?>("CreatedBySubjectId").HasColumnName("created_by_subject_id");
+        builder.Property<string?>("CreatedByDisplayName").HasColumnName("created_by_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
+        builder.Property<ActorKind?>("UpdatedByKind").HasColumnName("updated_by_kind").HasConversion<string>().HasMaxLength(32);
+        builder.Property<Guid?>("UpdatedBySubjectId").HasColumnName("updated_by_subject_id");
+        builder.Property<string?>("UpdatedByDisplayName").HasColumnName("updated_by_display_name").HasMaxLength(ActorSnapshot.MaximumDisplayNameLength);
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
         builder.HasIndex(x => new { x.WorkspaceId, x.SolutionKey })
             .IsUnique()
             .HasDatabaseName("ux_solution_installations_workspace_solution");

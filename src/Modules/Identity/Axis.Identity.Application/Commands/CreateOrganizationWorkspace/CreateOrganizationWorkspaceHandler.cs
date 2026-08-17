@@ -84,9 +84,13 @@ public sealed class CreateOrganizationWorkspaceHandler(
                 OrganizationMembershipRole.Owner),
             ct);
         await workspaces.AddAsync(workspace, ct);
-        await workspaceMemberships.AddAsync(
-            WorkspaceMembership.CreateOrganizationCreator(workspace.Id, user.Id),
-            ct);
+        WorkspaceMembership workspaceMembership = WorkspaceMembership.CreateOrganizationCreator(
+            workspace.Id,
+            user.Id);
+        workspaceMembership.InitializeMetadata(
+            ActorSnapshot.User(user.Id, user.FullName),
+            DateTime.UtcNow);
+        await workspaceMemberships.AddAsync(workspaceMembership, ct);
         await idempotency.AddAsync(
             user.Id,
             new CreateOrganizationIdempotencyRecord(

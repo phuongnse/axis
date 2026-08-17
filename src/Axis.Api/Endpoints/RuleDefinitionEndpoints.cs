@@ -213,10 +213,20 @@ public static class RuleDefinitionEndpoints
         [FromQuery] RuleOrigin? origin = null,
         [FromQuery] RuleLifecycleStatus? status = null,
         [FromQuery] string? query = null,
-        [FromQuery] string? language = null)
+        [FromQuery] string? language = null,
+        [FromQuery] RuleDefinitionSortField? sortBy = null,
+        [FromQuery] CollectionSortDirection? sortDirection = null)
     {
         Result<PagedResult<RuleDefinitionSummaryDto>> result = await mediator.Send(
-            new ListRuleDefinitionsQuery(page, pageSize, origin, status, query, language),
+            new ListRuleDefinitionsQuery(
+                page,
+                pageSize,
+                origin,
+                status,
+                query,
+                language,
+                sortBy,
+                sortDirection),
             cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }

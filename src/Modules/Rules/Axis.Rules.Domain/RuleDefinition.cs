@@ -32,6 +32,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public RuleSubjectReference UpdatedBySubject { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    private ActorKind? CreatedByActorKind { get; set; }
+    private Guid? CreatedByActorSubjectId { get; set; }
+    private string? CreatedByActorDisplayName { get; set; }
+    private ActorKind? UpdatedByActorKind { get; set; }
+    private Guid? UpdatedByActorSubjectId { get; set; }
+    private string? UpdatedByActorDisplayName { get; set; }
+    public ActorSnapshot? CreatedByActor => Snapshot(CreatedByActorKind, CreatedByActorSubjectId, CreatedByActorDisplayName);
+    public ActorSnapshot? UpdatedByActor => Snapshot(UpdatedByActorKind, UpdatedByActorSubjectId, UpdatedByActorDisplayName);
     private RuleSubjectKind? ArchivedBySubjectKind { get; set; }
     private Guid? ArchivedBySubjectId { get; set; }
     public RuleSubjectReference? ArchivedBySubject =>
@@ -57,6 +65,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         string description,
         RuleOrigin origin,
         RuleSubjectReference createdBySubject,
+        ActorSnapshot createdByActor,
         DateTime createdAt)
         : base(id)
     {
@@ -72,6 +81,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         UpdatedBySubject = createdBySubject;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+        StampCreated(createdByActor);
     }
 
     public static Result<RuleDefinition> CreateDraft(
@@ -80,6 +90,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         string name,
         string description,
         RuleSubjectReference createdBySubject,
+        ActorSnapshot createdByActor,
         DateTime createdAt)
     {
         if (workspaceId == Guid.Empty)
@@ -87,6 +98,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         if (createdBySubject.Id == Guid.Empty || !Enum.IsDefined(createdBySubject.Kind))
             return Result.Failure<RuleDefinition>("Creating subject is required.");
+        if (!createdByActor.IsValid)
+            return Result.Failure<RuleDefinition>("Creating actor is required.");
 
         Result<RuleDefinitionKey> canonicalKey = RuleDefinitionKey.Create(key.Value);
         if (canonicalKey.IsFailure)
@@ -104,6 +117,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             description.Trim(),
             RuleOrigin.Workspace,
             createdBySubject,
+            createdByActor,
             createdAt);
     }
 
@@ -143,6 +157,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             description.Trim(),
             RuleOrigin.BuiltIn,
             default,
+            ActorSnapshot.System("Axis built-in catalog"),
             default)
         {
             Documentation = documentation,
@@ -156,6 +171,31 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         definition._versions.Add(RuleDefinitionVersion.Create(definition, version, null, default));
         return definition;
     }
+
+    public Result RecordModification(ActorSnapshot actor)
+    {
+        if (!actor.IsValid)
+            return Result.Failure(ErrorCodes.InvalidInput, "Modifying actor is required.");
+        UpdatedByActorKind = actor.Kind;
+        UpdatedByActorSubjectId = actor.SubjectId;
+        UpdatedByActorDisplayName = actor.DisplayName;
+        return Result.Success();
+    }
+
+    private void StampCreated(ActorSnapshot actor)
+    {
+        CreatedByActorKind = actor.Kind;
+        CreatedByActorSubjectId = actor.SubjectId;
+        CreatedByActorDisplayName = actor.DisplayName;
+        UpdatedByActorKind = actor.Kind;
+        UpdatedByActorSubjectId = actor.SubjectId;
+        UpdatedByActorDisplayName = actor.DisplayName;
+    }
+
+    private static ActorSnapshot? Snapshot(ActorKind? kind, Guid? subjectId, string? displayName) =>
+        kind is ActorKind actorKind && !string.IsNullOrWhiteSpace(displayName)
+            ? ActorSnapshot.Create(actorKind, subjectId, displayName)
+            : null;
 
     public Result SaveDraft(
         int expectedRevision,

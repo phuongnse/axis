@@ -37,6 +37,18 @@ public enum SolutionStepStatus
     Failed = 3,
 }
 
+public sealed record SolutionResourceActorDto(
+    string Kind,
+    Guid? SubjectId,
+    string DisplayName);
+
+public sealed record SolutionResourceMetadataDto(
+    long? Revision,
+    SolutionResourceActorDto? CreatedBy,
+    DateTimeOffset? CreatedAt,
+    SolutionResourceActorDto? ModifiedBy,
+    DateTimeOffset? ModifiedAt);
+
 public sealed record SolutionVersionSummaryDto(
     Guid Id,
     string SolutionKey,
@@ -51,7 +63,8 @@ public sealed record SolutionVersionSummaryDto(
     DateTimeOffset BuiltAt,
     Uri SourceUri,
     DateTimeOffset PublishedAt,
-    IReadOnlyList<SolutionComponentPlanDto> Components);
+    IReadOnlyList<SolutionComponentPlanDto> Components,
+    SolutionResourceMetadataDto Metadata);
 
 public sealed record SolutionComponentIdentityDto(string Type, string Key);
 
@@ -77,7 +90,9 @@ public sealed record SolutionInstallationStatusDto(
     SolutionProvisioningStatus ProvisioningStatus,
     SolutionComplianceStatus ComplianceStatus,
     IReadOnlyList<SolutionComponentStatusDto> Components,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Revision,
+    SolutionResourceMetadataDto Metadata);
 
 public sealed record SolutionOperationStatusDto(
     Guid Id,

@@ -981,10 +981,10 @@
       }
     },
     "resource-workspace": {
-      "state": "enforced",
+      "state": "defined",
       "spec": "docs/foundations/data-display/collection-page.md",
       "coverageProfile": "axis-ui-v1",
-      "acceptance": { "status": "accepted" },
+      "acceptance": { "status": "pending" },
       "evidence": {
         "assessment": ["docs/foundations/data-display/resource-workspace.assessment.md"],
         "component": [
@@ -1004,7 +1004,7 @@
           "frontend/e2e/product-delivery-governance.pw.ts"
         ],
         "perceptual": {
-          "status": "accepted",
+          "status": "candidate",
           "artifacts": [
             "frontend/e2e/define-business-object.pw.ts-snapshots/resource-workspace-dark-compact-en-chromium-linux.png",
             "frontend/e2e/define-business-object.pw.ts-snapshots/resource-workspace-dark-desktop-en-chromium-linux.png",
@@ -1105,49 +1105,6 @@
               ],
               "modes": []
             },
-            "standard.human-centred-evaluation": {
-              "acceptance": ["docs/foundations/data-display/collection-page.md#AT-006"],
-              "evidence": ["docs/foundations/data-display/resource-workspace.assessment.md"],
-              "modes": []
-            },
-            "standard.interaction-principles": {
-              "acceptance": [
-                "docs/foundations/data-display/collection-page.md#AT-001",
-                "docs/foundations/data-display/collection-page.md#AT-004",
-                "docs/foundations/data-display/collection-page.md#AT-006"
-              ],
-              "evidence": [
-                "docs/foundations/data-display/resource-workspace.assessment.md",
-                "frontend/e2e/define-business-object.pw.ts",
-                "frontend/e2e/manage-rules.pw.ts",
-                "frontend/tests/data-table.test.tsx",
-                "frontend/tests/resource-workspace.test.tsx"
-              ],
-              "modes": ["keyboard", "pointer"]
-            },
-            "standard.wcag-2-2-aa": {
-              "acceptance": [
-                "docs/foundations/data-display/collection-page.md#AT-001",
-                "docs/foundations/data-display/collection-page.md#AT-004",
-                "docs/foundations/data-display/collection-page.md#AT-006"
-              ],
-              "evidence": [
-                "docs/foundations/data-display/resource-workspace.assessment.md",
-                "frontend/e2e/define-business-object.pw.ts",
-                "frontend/tests/data-table.test.tsx",
-                "frontend/tests/resource-workspace.test.tsx",
-                "frontend/tests/surface-contracts.test.tsx"
-              ],
-              "modes": [
-                "compact",
-                "desktop",
-                "keyboard",
-                "locale",
-                "reduced-motion",
-                "screen-reader",
-                "zoom-reflow"
-              ]
-            },
             "visual.color-tone-contrast": {
               "acceptance": ["docs/foundations/data-display/collection-page.md#AT-006"],
               "evidence": [
@@ -1236,7 +1193,11 @@
               "modes": ["compact", "dark", "desktop", "light", "locale", "zoom-reflow"]
             }
           },
-          "gaps": [],
+          "gaps": [
+            "standard.human-centred-evaluation",
+            "standard.interaction-principles",
+            "standard.wcag-2-2-aa"
+          ],
           "notApplicable": {}
         }
       }
@@ -1246,7 +1207,6 @@
     "account-surface": true,
     "authenticated-frame": true,
     "entry-surface": true,
-    "managed-task-window": true,
-    "resource-workspace": true
+    "managed-task-window": true
   }
 }

@@ -67,6 +67,7 @@ export function createDataTableMessages(
     maximum: t('table.maximum'),
     trueValue: t('table.trueValue'),
     falseValue: t('table.falseValue'),
+    emptyValue: t('table.emptyValue'),
     allValues: t('table.allValues'),
     rowsPerPage: t('table.rowsPerPage'),
     pageStatus: (page, pageCount) => t('table.pageStatus', { page, pageCount }),

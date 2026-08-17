@@ -180,7 +180,8 @@ public sealed class SetWorkspaceProductBuilderHandlerTests
                         targetUserId ?? Target.Id,
                         enabled,
                         expectedRevision ?? _targetMembership.Revision,
-                        "correlation"),
+                        "correlation",
+                        Actor.FullName),
                     CancellationToken.None);
     }
 }

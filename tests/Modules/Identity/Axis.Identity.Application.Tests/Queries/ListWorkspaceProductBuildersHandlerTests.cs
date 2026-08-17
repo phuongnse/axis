@@ -2,6 +2,7 @@ using Axis.Identity.Application.Queries.ListWorkspaceProductBuilders;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -41,8 +42,22 @@ public sealed class ListWorkspaceProductBuildersHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().ContainEquivalentOf(new WorkspaceProductBuilderDto(
-            actorId, "Administrator", "admin@example.com", "Administrator", false, 1, false));
+            actorId,
+            "Administrator",
+            "admin@example.com",
+            "Administrator",
+            false,
+            1,
+            false,
+            new ResourceMetadataDto(1, null, null, null, null)));
         result.Value.Should().ContainEquivalentOf(new WorkspaceProductBuilderDto(
-            targetId, "Builder", "builder@example.com", "Member", true, 4, true));
+            targetId,
+            "Builder",
+            "builder@example.com",
+            "Member",
+            true,
+            4,
+            true,
+            new ResourceMetadataDto(4, null, null, null, null)));
     }
 }

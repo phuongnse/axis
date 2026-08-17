@@ -1,6 +1,8 @@
+using Axis.Rules.Application;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Domain;
 using Axis.Rules.Infrastructure.Persistence;
+using Axis.Shared.Application;
 using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
 
@@ -64,10 +66,12 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
         int take,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
+        RuleDefinitionSortField? sortBy = null,
+        CollectionSortDirection? sortDirection = null,
         CancellationToken cancellationToken = default)
     {
         IQueryable<RuleDefinition> query = Filter(context.RuleDefinitions.AsNoTracking(), workspaceId, status);
-        return await Order(Search(query, searchQuery), searchQuery)
+        return await Order(Search(query, searchQuery), searchQuery, sortBy, sortDirection)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
@@ -115,8 +119,105 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
 
     private static IOrderedQueryable<RuleDefinition> Order(
         IQueryable<RuleDefinition> definitions,
-        string? searchQuery)
+        string? searchQuery,
+        RuleDefinitionSortField? sortBy,
+        CollectionSortDirection? sortDirection)
     {
+        if ((sortBy is null) != (sortDirection is null))
+            throw new ArgumentException("A rule definition sort field and direction must be provided together.");
+
+        if (sortBy == RuleDefinitionSortField.Name)
+        {
+            return sortDirection switch
+            {
+                CollectionSortDirection.Ascending => definitions
+                    .OrderBy(definition => EF.Functions.Collate(definition.Name, "C"))
+                    .ThenBy(definition => definition.Key)
+                    .ThenBy(definition => definition.Id),
+                CollectionSortDirection.Descending => definitions
+                    .OrderByDescending(definition => EF.Functions.Collate(definition.Name, "C"))
+                    .ThenBy(definition => definition.Key)
+                    .ThenBy(definition => definition.Id),
+                _ => throw new ArgumentOutOfRangeException(nameof(sortDirection)),
+            };
+        }
+
+        if (sortBy == RuleDefinitionSortField.Origin)
+        {
+            return definitions
+                .OrderBy(definition => EF.Functions.Collate(definition.Name, "C"))
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id);
+        }
+
+        if (sortBy == RuleDefinitionSortField.Status)
+        {
+            return sortDirection switch
+            {
+                CollectionSortDirection.Ascending => definitions
+                    .OrderBy(definition => definition.ArchivedAt != null
+                        ? "Archived"
+                        : definition.ActiveVersion != null
+                            ? "Active"
+                            : definition.LatestPublishedVersion != null
+                                ? "Inactive"
+                                : "Draft")
+                    .ThenBy(definition => EF.Functions.Collate(definition.Name, "C"))
+                    .ThenBy(definition => definition.Key)
+                    .ThenBy(definition => definition.Id),
+                CollectionSortDirection.Descending => definitions
+                    .OrderByDescending(definition => definition.ArchivedAt != null
+                        ? "Archived"
+                        : definition.ActiveVersion != null
+                            ? "Active"
+                            : definition.LatestPublishedVersion != null
+                                ? "Inactive"
+                                : "Draft")
+                    .ThenBy(definition => EF.Functions.Collate(definition.Name, "C"))
+                    .ThenBy(definition => definition.Key)
+                    .ThenBy(definition => definition.Id),
+                _ => throw new ArgumentOutOfRangeException(nameof(sortDirection)),
+            };
+        }
+
+        if (sortBy == RuleDefinitionSortField.ActiveVersion)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.ActiveVersion == null).ThenBy(definition => definition.ActiveVersion).ThenBy(definition => definition.Id)
+                : definitions.OrderBy(definition => definition.ActiveVersion == null).ThenByDescending(definition => definition.ActiveVersion).ThenBy(definition => definition.Id);
+
+        if (sortBy == RuleDefinitionSortField.LatestVersion)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.LatestPublishedVersion == null).ThenBy(definition => definition.LatestPublishedVersion).ThenBy(definition => definition.Id)
+                : definitions.OrderBy(definition => definition.LatestPublishedVersion == null).ThenByDescending(definition => definition.LatestPublishedVersion).ThenBy(definition => definition.Id);
+
+        if (sortBy == RuleDefinitionSortField.Revision)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.Revision).ThenBy(definition => definition.Id)
+                : definitions.OrderByDescending(definition => definition.Revision).ThenBy(definition => definition.Id);
+
+        if (sortBy == RuleDefinitionSortField.CreatedBy)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => EF.Property<string>(definition, "CreatedByActorDisplayName") == null).ThenBy(definition => EF.Property<string>(definition, "CreatedByActorDisplayName")).ThenBy(definition => definition.Id)
+                : definitions.OrderBy(definition => EF.Property<string>(definition, "CreatedByActorDisplayName") == null).ThenByDescending(definition => EF.Property<string>(definition, "CreatedByActorDisplayName")).ThenBy(definition => definition.Id);
+
+        if (sortBy == RuleDefinitionSortField.CreatedAt)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.CreatedAt).ThenBy(definition => definition.Id)
+                : definitions.OrderByDescending(definition => definition.CreatedAt).ThenBy(definition => definition.Id);
+
+        if (sortBy == RuleDefinitionSortField.ModifiedBy)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => EF.Property<string>(definition, "UpdatedByActorDisplayName") == null).ThenBy(definition => EF.Property<string>(definition, "UpdatedByActorDisplayName")).ThenBy(definition => definition.Id)
+                : definitions.OrderBy(definition => EF.Property<string>(definition, "UpdatedByActorDisplayName") == null).ThenByDescending(definition => EF.Property<string>(definition, "UpdatedByActorDisplayName")).ThenBy(definition => definition.Id);
+
+        if (sortBy == RuleDefinitionSortField.ModifiedAt)
+            return sortDirection == CollectionSortDirection.Ascending
+                ? definitions.OrderBy(definition => definition.UpdatedAt).ThenBy(definition => definition.Id)
+                : definitions.OrderByDescending(definition => definition.UpdatedAt).ThenBy(definition => definition.Id);
+
+        if (sortBy is not null)
+            throw new ArgumentOutOfRangeException(nameof(sortBy));
+
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
             return definitions

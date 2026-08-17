@@ -26,6 +26,15 @@ public sealed record RuleOutputContractDto(
     RuleValueType Type,
     RuleExpressionCardinality Cardinality);
 
+public sealed record RuleResourceActorDto(string Kind, Guid? SubjectId, string DisplayName);
+
+public sealed record RuleResourceMetadataDto(
+    long? Revision,
+    RuleResourceActorDto? CreatedBy,
+    DateTimeOffset? CreatedAt,
+    RuleResourceActorDto? ModifiedBy,
+    DateTimeOffset? ModifiedAt);
+
 public sealed record RuleDefinitionSummaryDto(
     string DefinitionKey,
     string Name,
@@ -39,6 +48,7 @@ public sealed record RuleDefinitionSummaryDto(
     IReadOnlyList<RuleInputDefinitionDto> Inputs,
     RuleOutputContractDto Output,
     DateTime? UpdatedAt,
+    RuleResourceMetadataDto Metadata,
     RuleDefinitionActionsDto Actions,
     RuleReferenceDocumentationDto? Documentation = null);
 
@@ -59,6 +69,7 @@ public sealed record RuleDefinitionDetailDto(
     DateTime? CreatedAt,
     DateTime? UpdatedAt,
     DateTime? ArchivedAt,
+    RuleResourceMetadataDto Metadata,
     RuleDefinitionActionsDto Actions,
     RuleReferenceDocumentationDto? Documentation = null);
 

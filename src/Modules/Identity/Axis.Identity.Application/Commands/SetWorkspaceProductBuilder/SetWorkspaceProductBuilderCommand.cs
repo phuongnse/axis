@@ -9,4 +9,5 @@ public sealed record SetWorkspaceProductBuilderCommand(
     Guid TargetUserId,
     bool Enabled,
     int ExpectedRevision,
-    string CorrelationId) : ICommand<WorkspaceProductBuilderDto>;
+    string CorrelationId,
+    string ActorDisplayName) : ICommand<WorkspaceProductBuilderDto>;

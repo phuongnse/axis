@@ -32,6 +32,8 @@ export type RuleBinding = ApiTypes.RuleBindingDto;
 export type CreateRuleBindingRequest = ApiTypes.CreateRuleBindingRequest;
 export type RuleBindingUsage = ApiTypes.RuleBindingUsageDto;
 export type RuleAuthoringProjection = ApiTypes.RuleAuthoringProjectionDto;
+export type RuleDefinitionSortField = ApiTypes.RuleDefinitionSortField;
+export type CollectionSortDirection = ApiTypes.CollectionSortDirection;
 
 export interface RuleDefinitionFilters {
   page?: number;
@@ -40,6 +42,8 @@ export interface RuleDefinitionFilters {
   status?: RuleLifecycleStatus;
   query?: string;
   language?: string;
+  sortBy?: RuleDefinitionSortField;
+  sortDirection?: CollectionSortDirection;
 }
 
 const defaultFilters = { page: 1, pageSize: 20 } as const;
@@ -107,6 +111,10 @@ export async function listRuleDefinitions(
   if (filters.status) search.set('status', filters.status);
   if (filters.query?.trim()) search.set('query', filters.query.trim());
   if (filters.language) search.set('language', filters.language);
+  if (filters.sortBy && filters.sortDirection) {
+    search.set('sortBy', filters.sortBy);
+    search.set('sortDirection', filters.sortDirection);
+  }
   return fetchApi<RuleDefinitionsPage>(`/rules?${search.toString()}`, { signal });
 }
 

@@ -82,6 +82,12 @@ describe('ServiceIdentitiesPage', () => {
     expect(content).toContainElement(table);
     expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: 'Client identifier: Sort ascending' }),
+    ).toBeVisible();
+    expect(
+      within(table).getByRole('button', { name: 'Signing keys: Sort ascending' }),
+    ).toBeVisible();
     expect(create).toHaveClass(
       axisStyles.density.minHeight.touchTarget,
       axisStyles.density.minWidth.touchTarget,

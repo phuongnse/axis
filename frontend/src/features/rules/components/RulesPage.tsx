@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
   createEmptyFilterExpression,
+  createResourceMetadataColumns,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
@@ -22,6 +23,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ApiError } from '@/lib/api';
 import { referenceContent } from '@/lib/reference-metadata';
 import {
+  type RuleDefinitionSortField,
   type RuleDefinitionSummary,
   ruleDefinitionCollectionActionsQueryOptions,
   ruleDefinitionsListQueryOptions,
@@ -44,6 +46,8 @@ export function RulesPage() {
       pageSize: 20,
       query: debouncedSearch,
       language: i18n.language,
+      sortBy: search.sortBy,
+      sortDirection: search.sortDirection,
     }),
   );
   const collectionActionsQuery = useQuery(ruleDefinitionCollectionActionsQueryOptions());
@@ -55,10 +59,13 @@ export function RulesPage() {
     () => ({
       globalFilter: search.query ?? '',
       filterExpression: createEmptyFilterExpression(),
-      sorting: [],
+      sorting:
+        search.sortBy && search.sortDirection
+          ? [{ id: ruleColumnId(search.sortBy), desc: search.sortDirection === 'Descending' }]
+          : [],
       grouping: [],
     }),
-    [search.query],
+    [search.query, search.sortBy, search.sortDirection],
   );
   const selectedDefinition = definitions.find(
     (definition) => definition.definitionKey === search.definitionKey,
@@ -69,7 +76,10 @@ export function RulesPage() {
     if (search.dialog === 'create') {
       if (collectionActionsQuery.isPending || collectionActionsQuery.isError) return;
       if (canStartCreate) openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
-      void navigate({ replace: true, search: {} });
+      void navigate({
+        replace: true,
+        search: (current) => ({ ...current, dialog: undefined, definitionKey: undefined }),
+      });
       return;
     }
     if (!search.definitionKey || definitionsQuery.isPending) return;
@@ -83,7 +93,10 @@ export function RulesPage() {
         : search.definitionKey,
     );
     if (descriptor) openWindow(descriptor);
-    void navigate({ replace: true, search: {} });
+    void navigate({
+      replace: true,
+      search: (current) => ({ ...current, dialog: undefined, definitionKey: undefined }),
+    });
   }, [
     canStartCreate,
     collectionActionsQuery.isError,
@@ -104,27 +117,27 @@ export function RulesPage() {
         accessorFn: (definition) => localizedRuleName(definition, i18n.language, t),
         size: 330,
         minSize: 280,
-        enableSorting: false,
         enableGrouping: false,
         meta: {
           label: t('rules.ruleColumn'),
+          cell: { kind: 'action' },
         },
-        cell: ({ row }) => (
-          <RuleIdentityCell
-            definition={row.original}
-            onOpen={
-              row.original.definitionKey
-                ? () => {
-                    const descriptor = ruleDefinitionWindowDescriptor(
-                      row.original,
-                      localizedRuleName(row.original, i18n.language, t),
-                    );
-                    if (descriptor) openWindow(descriptor);
-                  }
-                : undefined
-            }
-          />
-        ),
+        cell: ({ row }) => {
+          const name = localizedRuleName(row.original, i18n.language, t);
+          if (!row.original.definitionKey) {
+            return <span className="truncate font-medium text-foreground">{name}</span>;
+          }
+          return (
+            <DataTableRecordAction
+              onClick={() => {
+                const descriptor = ruleDefinitionWindowDescriptor(row.original, name);
+                if (descriptor) openWindow(descriptor);
+              }}
+            >
+              {name}
+            </DataTableRecordAction>
+          );
+        },
       },
       {
         id: 'inputs',
@@ -133,17 +146,15 @@ export function RulesPage() {
         minSize: 200,
         enableSorting: false,
         enableGrouping: false,
-        meta: { label: t('rules.inputs') },
-        cell: ({ row }) => <RuleInputsCell definition={row.original} />,
+        meta: { label: t('rules.inputs'), cell: { kind: 'list' } },
       },
       {
         id: 'origin',
         accessorFn: (definition) => definition.origin,
         size: 130,
         minSize: 120,
-        enableSorting: false,
         enableGrouping: false,
-        meta: { label: t('rules.origin') },
+        meta: { label: t('rules.origin'), cell: { kind: 'status' } },
         cell: ({ row }) => <RuleOriginCell definition={row.original} />,
       },
       {
@@ -151,15 +162,46 @@ export function RulesPage() {
         accessorFn: (definition) => definition.status,
         size: 130,
         minSize: 120,
-        enableSorting: false,
         enableGrouping: false,
-        meta: { label: t('rules.status') },
+        meta: { label: t('rules.status'), cell: { kind: 'status' } },
         cell: ({ row }) => <RuleStatusCell definition={row.original} />,
       },
+      {
+        id: 'activeVersion',
+        accessorKey: 'activeVersion',
+        size: 150,
+        minSize: 140,
+        enableGrouping: false,
+        meta: {
+          label: t('rules.activeVersion'),
+          cell: { kind: 'version' },
+          searchable: false,
+        },
+      },
+      {
+        id: 'latestVersion',
+        accessorKey: 'latestVersion',
+        size: 150,
+        minSize: 140,
+        enableGrouping: false,
+        meta: {
+          label: t('rules.latestVersion'),
+          cell: { kind: 'version' },
+          searchable: false,
+        },
+      },
+      ...createResourceMetadataColumns<RuleDefinitionSummary>({
+        revision: t('metadata.revision'),
+        createdBy: t('metadata.createdBy'),
+        createdAt: t('metadata.createdAt'),
+        modifiedBy: t('metadata.modifiedBy'),
+        modifiedAt: t('metadata.modifiedAt'),
+      }),
     ];
 
     return {
       ariaLabel: t('rules.catalogTitle'),
+      locale: i18n.language,
       source: {
         mode: 'page',
         data: definitions,
@@ -188,12 +230,16 @@ export function RulesPage() {
         `${definition.origin ?? 'Unknown'}:${definition.name ?? definition.definitionKey ?? 'rule'}`,
       queryState: tableQuery,
       onQueryStateChange: (next) => {
+        const sort = next.sorting[0];
+        const sortBy = ruleSortField(sort?.id);
         void navigate({
           replace: true,
           search: (current) => ({
             ...current,
             page: 1,
             query: next.globalFilter.trim() || undefined,
+            sortBy,
+            sortDirection: sortBy ? (sort?.desc ? 'Descending' : 'Ascending') : undefined,
           }),
         });
       },
@@ -259,58 +305,40 @@ export function RulesPage() {
   );
 }
 
-function RuleIdentityCell({
-  definition,
-  onOpen,
-}: {
-  definition: RuleDefinitionSummary;
-  onOpen?: () => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const name = localizedRuleName(definition, i18n.language, t);
-  return (
-    <div className="min-w-0 whitespace-normal">
-      {onOpen ? (
-        <DataTableRecordAction onClick={onOpen}>{name}</DataTableRecordAction>
-      ) : (
-        <p data-slot="rule-table-value" className="font-semibold text-foreground">
-          {name}
-        </p>
-      )}
-      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-        {localizedRuleDescription(definition, i18n.language, t)}
-      </p>
-    </div>
-  );
+function ruleSortField(columnId: string | undefined): RuleDefinitionSortField | undefined {
+  if (columnId === 'rule') return 'Name';
+  if (columnId === 'origin') return 'Origin';
+  if (columnId === 'status') return 'Status';
+  if (columnId === 'activeVersion') return 'ActiveVersion';
+  if (columnId === 'latestVersion') return 'LatestVersion';
+  if (columnId === 'revision') return 'Revision';
+  if (columnId === 'createdBy') return 'CreatedBy';
+  if (columnId === 'createdAt') return 'CreatedAt';
+  if (columnId === 'modifiedBy') return 'ModifiedBy';
+  if (columnId === 'modifiedAt') return 'ModifiedAt';
+  return undefined;
 }
 
-function RuleInputsCell({ definition }: { definition: RuleDefinitionSummary }) {
-  const inputs = definition.inputs ?? [];
-  return inputs.length > 0 ? (
-    <span data-slot="rule-table-value" className="whitespace-normal text-sm text-foreground">
-      {inputs
-        .map((input) => input.label)
-        .filter(Boolean)
-        .join(', ')}
-    </span>
-  ) : (
-    <span data-slot="rule-table-value" className="whitespace-normal text-sm text-foreground">
-      —
-    </span>
-  );
+function ruleColumnId(sortBy: RuleDefinitionSortField): string {
+  if (sortBy === 'Name') return 'rule';
+  return `${sortBy[0].toLowerCase()}${sortBy.slice(1)}`;
 }
 
 function RuleOriginCell({ definition }: { definition: RuleDefinitionSummary }) {
+  const { t } = useTranslation();
   return definition.origin ? (
     <RuleOriginBadge data-slot="rule-table-value" origin={definition.origin} />
   ) : (
-    <span data-slot="rule-table-value">—</span>
+    <span data-slot="rule-table-value">{t('table.emptyValue')}</span>
   );
 }
 
 function RuleStatusCell({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
-  const label = definition.status ? t(`rules.status${definition.status}`) : '—';
+  if (!definition.status) {
+    return <span data-slot="rule-table-value">{t('table.emptyValue')}</span>;
+  }
+  const label = t(`rules.status${definition.status}`);
   const state: StatusBadgeState =
     definition.status === 'Active'
       ? 'positive'
@@ -333,17 +361,5 @@ function localizedRuleName(
     referenceContent(definition.documentation, locale)?.displayName ??
     definition.name ??
     t('rules.unknownRule')
-  );
-}
-
-function localizedRuleDescription(
-  definition: RuleDefinitionSummary,
-  locale: string,
-  t: TFunction,
-): string {
-  return (
-    referenceContent(definition.documentation, locale)?.summary ??
-    definition.description ??
-    t('rules.unknownRuleDescription')
   );
 }

@@ -58,6 +58,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 - **AC-008** Every built-in uses positive assertion polarity: Required matches a present non-blank value; range, precision, length, pattern, format, and selection-count rules match values that satisfy their declared constraints.
 - **AC-009** Required accepts an absent value as evaluable input and returns non-match; absence is not an evaluator failure. Other required runtime inputs remain validation failures when absent.
 - **AC-010** A code-owned built-in version exposes `publishedBySubject: null`; Axis does not fabricate a Human or Service subject for catalog provenance, while Workspace-authored versions require their real publishing subject.
+- **AC-011** A code-owned built-in row uses explicit `System` current-state actor presentation without fabricating a Human or Service subject; unavailable code-package timestamps and concurrency revision remain explicit `N/A` in the same trailing metadata columns used by Workspace Rules.
 
 ## Acceptance Test Matrix
 
@@ -67,7 +68,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 | AT-002 | Application boundary | Exact built-in versions resolve through the shared evaluator; Required returns match for present non-blank, non-match for blank or absent, while malformed input remains an error | AC-002, AC-007, AC-009 | Application test | Yes |
 | AT-003 | API boundary | Catalog/detail responses expose built-in metadata plus the same semantic fields as workspace definitions, including nullable built-in publisher provenance, with generated parity | AC-001, AC-002, AC-006, AC-010 | API integration test | Yes |
 | AT-004 | Application boundary | No consumer module depends on a built-in-specific Rules type or internal implementation | AC-002, AC-007 | Architecture test | Yes |
-| AT-005 | UI component | Catalog and detail use the same renderer; built-in origin only removes mutation actions | AC-002, AC-003, AC-006 | UI component test | Yes |
+| AT-005 | UI component | Catalog and detail use the same renderer; built-in origin only removes mutation actions, and the shared metadata columns distinguish explicit System provenance from unavailable values | AC-002, AC-003, AC-006, AC-011 | UI component test | Yes |
 
 ## Out Of Scope
 

@@ -111,6 +111,7 @@ export const administrationTranslations = {
     'productRoles.revokedDescription': 'The exact product authority was removed immediately.',
     'productRoles.revokedStatus': 'Revoked',
     'productRoles.role': 'Installed product role',
+    'productRoles.roleDescription': 'Role description',
     'productRoles.roleHelp': 'Names and descriptions come from the installed server policy.',
     'productRoles.selectRole': 'Select a product role',
     'productRoles.selectSubject': 'Select a subject',
@@ -118,6 +119,7 @@ export const administrationTranslations = {
     'productRoles.serviceUnavailableDescription':
       'Required policy or audit work is unavailable. Try again later.',
     'productRoles.subject': 'Active subject',
+    'productRoles.subjectReference': 'Subject reference',
     'productRoles.subjectHelp':
       'Human members and service identities remain distinct subject kinds.',
     'productRoles.status': 'Status',
@@ -362,6 +364,7 @@ export const administrationTranslations = {
     'productRoles.revokedDescription': 'Product authority chính xác đã bị xóa ngay.',
     'productRoles.revokedStatus': 'Đã thu hồi',
     'productRoles.role': 'Product role đã cài',
+    'productRoles.roleDescription': 'Mô tả role',
     'productRoles.roleHelp': 'Tên và mô tả do policy đã cài trên server cung cấp.',
     'productRoles.selectRole': 'Chọn product role',
     'productRoles.selectSubject': 'Chọn subject',
@@ -369,6 +372,7 @@ export const administrationTranslations = {
     'productRoles.serviceUnavailableDescription':
       'Policy hoặc audit bắt buộc chưa khả dụng. Thử lại sau.',
     'productRoles.subject': 'Subject đang hoạt động',
+    'productRoles.subjectReference': 'Định danh subject',
     'productRoles.subjectHelp':
       'Human member và service identity vẫn là hai subject kind khác nhau.',
     'productRoles.status': 'Trạng thái',

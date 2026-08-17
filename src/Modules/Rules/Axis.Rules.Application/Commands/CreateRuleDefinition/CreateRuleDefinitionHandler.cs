@@ -45,6 +45,7 @@ public sealed class CreateRuleDefinitionHandler(
             command.Name,
             command.Description,
             RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject),
+            RuleActor.From(currentSubject),
             DateTime.UtcNow);
         if (definition.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(definition.Error);

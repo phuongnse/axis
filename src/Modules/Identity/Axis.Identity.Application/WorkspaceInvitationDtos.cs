@@ -1,4 +1,5 @@
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Application;
 
 namespace Axis.Identity.Application;
 
@@ -10,7 +11,8 @@ public sealed record WorkspaceInvitationLifecycleDto(
     string DeliveryStatus,
     DateTime CreatedAt,
     DateTime ExpiresAt,
-    int Revision);
+    int Revision,
+    ResourceMetadataDto Metadata);
 
 public sealed record WorkspaceInvitationExchangeDto(string Outcome, string? HandoffSecret);
 
@@ -40,5 +42,6 @@ internal static class WorkspaceInvitationDtoMapping
             invitation.CurrentToken.DeliveryStatus.ToString(),
             invitation.CreatedAt,
             invitation.ExpiresAt,
-            invitation.Revision);
+            invitation.Revision,
+            ResourceMetadataMapping.From(invitation.Revision, invitation.CreatedBy, invitation.CreatedAt, invitation.UpdatedBy, invitation.UpdatedAt));
 }

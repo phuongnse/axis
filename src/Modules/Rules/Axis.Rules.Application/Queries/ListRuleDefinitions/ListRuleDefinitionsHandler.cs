@@ -55,6 +55,8 @@ public sealed class ListRuleDefinitionsHandler(
                 CreateSearchDocuments(builtInCandidates, query.Language),
                 includeWorkspace,
                 workspaceStatus,
+                query.SortBy,
+                query.SortDirection,
                 searchSkip,
                 query.PageSize,
                 query.SearchQuery,
@@ -84,6 +86,20 @@ public sealed class ListRuleDefinitionsHandler(
             : 0;
 
         int skip = (query.Page - 1) * query.PageSize;
+        if (query.SortBy is not null || query.SortDirection is not null)
+        {
+            return await ListExplicitlySortedAsync(
+                query,
+                builtInCandidates,
+                includeWorkspace,
+                workspaceStatus,
+                workspaceCount,
+                workspaceId,
+                skip,
+                repository,
+                cancellationToken);
+        }
+
         List<RuleDefinitionSummaryDto> items = builtInDefinitions
             .Skip(skip)
             .Take(query.PageSize)
@@ -99,7 +115,7 @@ public sealed class ListRuleDefinitionsHandler(
                 remaining,
                 workspaceStatus,
                 searchQuery: null,
-                cancellationToken);
+                cancellationToken: cancellationToken);
             items.AddRange(workspaceDefinitions.Select(definition => RuleContractMapper.ToSummaryDto(definition)));
         }
 
@@ -108,6 +124,109 @@ public sealed class ListRuleDefinitionsHandler(
             builtInDefinitions.Count + workspaceCount,
             query.Page,
             query.PageSize);
+    }
+
+    private static async Task<PagedResult<RuleDefinitionSummaryDto>> ListExplicitlySortedAsync(
+        ListRuleDefinitionsQuery query,
+        IReadOnlyList<RuleDefinition> builtInCandidates,
+        bool includeWorkspace,
+        DomainLifecycleStatus? workspaceStatus,
+        int workspaceCount,
+        Guid workspaceId,
+        int skip,
+        IRuleDefinitionRepository repository,
+        CancellationToken cancellationToken)
+    {
+        if (query.SortBy is null || query.SortDirection is null)
+            throw new ArgumentOutOfRangeException(nameof(query.SortBy));
+
+        List<SortableDefinition> candidates = builtInCandidates
+            .Select(definition => new SortableDefinition(
+                RuleContractMapper.ToSummaryDto(definition),
+                DefinitionSortValue(definition, query.Language, query.SortBy.Value),
+                DefinitionSortName(definition, query.Language)))
+            .ToList();
+
+        if (includeWorkspace && workspaceCount > 0)
+        {
+            int workspaceTake = Math.Min(workspaceCount, skip + query.PageSize);
+            IReadOnlyList<RuleDefinition> workspaceDefinitions = await repository.ListForWorkspaceAsync(
+                workspaceId,
+                skip: 0,
+                take: workspaceTake,
+                status: workspaceStatus,
+                searchQuery: null,
+                sortBy: query.SortBy,
+                sortDirection: query.SortDirection,
+                cancellationToken: cancellationToken);
+            candidates.AddRange(workspaceDefinitions.Select(definition => new SortableDefinition(
+                RuleContractMapper.ToSummaryDto(definition),
+                DefinitionSortValue(definition, query.Language, query.SortBy.Value),
+                definition.Name)));
+        }
+
+        IOrderedEnumerable<SortableDefinition> ordered = query.SortDirection switch
+        {
+            CollectionSortDirection.Ascending => candidates
+                .OrderBy(candidate => candidate.SortValue is null)
+                .ThenBy(candidate => candidate.SortValue, StringComparer.Ordinal),
+            CollectionSortDirection.Descending => candidates
+                .OrderBy(candidate => candidate.SortValue is null)
+                .ThenByDescending(candidate => candidate.SortValue, StringComparer.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(query.SortDirection)),
+        };
+        RuleDefinitionSummaryDto[] items = ordered
+            .ThenBy(candidate => candidate.Name, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.Definition.DefinitionKey, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.Definition.Origin)
+            .Skip(skip)
+            .Take(query.PageSize)
+            .Select(candidate => candidate.Definition)
+            .ToArray();
+
+        return new PagedResult<RuleDefinitionSummaryDto>(
+            items,
+            builtInCandidates.Count + workspaceCount,
+            query.Page,
+            query.PageSize);
+    }
+
+    private static string? DefinitionSortValue(
+        RuleDefinition definition,
+        string? language,
+        RuleDefinitionSortField sortBy) =>
+        sortBy switch
+        {
+            RuleDefinitionSortField.Name => DefinitionSortName(definition, language),
+            RuleDefinitionSortField.Origin => definition.Origin.ToString(),
+            RuleDefinitionSortField.Status => definition.Status.ToString(),
+            RuleDefinitionSortField.ActiveVersion => definition.ActiveVersion?.ToString("D10"),
+            RuleDefinitionSortField.LatestVersion => definition.LatestPublishedVersion?.ToString("D10"),
+            RuleDefinitionSortField.Revision => definition.Origin == DomainOrigin.BuiltIn
+                ? null
+                : definition.Revision.ToString("D10"),
+            RuleDefinitionSortField.CreatedBy => definition.CreatedByActor?.DisplayName,
+            RuleDefinitionSortField.CreatedAt => definition.Origin == DomainOrigin.BuiltIn
+                ? null
+                : definition.CreatedAt.ToUniversalTime().ToString("O"),
+            RuleDefinitionSortField.ModifiedBy => definition.UpdatedByActor?.DisplayName,
+            RuleDefinitionSortField.ModifiedAt => definition.Origin == DomainOrigin.BuiltIn
+                ? null
+                : definition.UpdatedAt.ToUniversalTime().ToString("O"),
+            _ => throw new ArgumentOutOfRangeException(nameof(sortBy)),
+        };
+
+    private static string DefinitionSortName(RuleDefinition definition, string? language)
+    {
+        if (definition.Origin != DomainOrigin.BuiltIn || definition.Documentation is null)
+            return definition.Name;
+
+        string locale = language?.StartsWith("vi", StringComparison.OrdinalIgnoreCase) == true
+            ? "vi"
+            : "en";
+        return definition.Documentation.Locales.TryGetValue(locale, out RuleReferenceContent? content)
+            ? content.DisplayName
+            : definition.Name;
     }
 
     private static IReadOnlyList<RuleTextSearchDocument> CreateSearchDocuments(
@@ -129,7 +248,8 @@ public sealed class ListRuleDefinitionsHandler(
                 return new RuleTextSearchDocument(
                     definition.Key.Value,
                     content.DisplayName,
-                    $"{content.Summary} {content.Usage} {definition.Key.Value}");
+                    $"{content.Summary} {content.Usage} {definition.Key.Value}",
+                    definition.Status.ToString());
             })
             .ToArray();
     }
@@ -174,4 +294,9 @@ public sealed class ListRuleDefinitionsHandler(
 
         return definitions;
     }
+
+    private sealed record SortableDefinition(
+        RuleDefinitionSummaryDto Definition,
+        string? SortValue,
+        string Name);
 }

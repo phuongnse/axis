@@ -1,3 +1,4 @@
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 
@@ -7,7 +8,9 @@ public sealed record ListWorkspaceInvitationsQuery(
     Guid ActorUserId,
     Guid WorkspaceId,
     int Page,
-    int PageSize) : IQuery<Result<WorkspaceInvitationPageDto>>;
+    int PageSize,
+    WorkspaceInvitationSortField? SortBy = null,
+    CollectionSortDirection? SortDirection = null) : IQuery<Result<WorkspaceInvitationPageDto>>;
 
 public sealed record WorkspaceInvitationPageDto(
     IReadOnlyList<WorkspaceInvitationLifecycleDto> Items,

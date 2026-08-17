@@ -63,17 +63,17 @@ public static class ServiceIdentityEndpoints
 
     private static async Task<IResult> Create(
         [FromBody] CreateRequest request, CurrentUser user, HttpContext context, ISender sender, CancellationToken ct) =>
-        (await sender.Send(new CreateServiceIdentityCommand(user.UserId, user.WorkspaceId, request.ClientId, Correlation(context)), ct)).ToProblemOrOk();
+        (await sender.Send(new CreateServiceIdentityCommand(user.UserId, user.WorkspaceId, request.ClientId, Correlation(context), user.DisplayName), ct)).ToProblemOrOk();
     private static async Task<IResult> Get(Guid serviceIdentityId, CurrentUser user, ISender sender, CancellationToken ct) =>
         (await sender.Send(new GetServiceIdentityQuery(user.UserId, user.WorkspaceId, serviceIdentityId), ct)).ToProblemOrOk();
     private static async Task<IResult> List(CurrentUser user, ISender sender, CancellationToken ct) =>
         (await sender.Send(new ListServiceIdentitiesQuery(user.UserId, user.WorkspaceId), ct)).ToProblemOrOk();
     private static async Task<IResult> AddKey(Guid serviceIdentityId, [FromBody] KeyRequest request, CurrentUser user, HttpContext context, ISender sender, CancellationToken ct) =>
-        (await sender.Send(new AddServiceIdentityKeyCommand(user.UserId, user.WorkspaceId, serviceIdentityId, request.ExpectedRevision, request.PublicJwk, Correlation(context)), ct)).ToProblemOrOk();
+        (await sender.Send(new AddServiceIdentityKeyCommand(user.UserId, user.WorkspaceId, serviceIdentityId, request.ExpectedRevision, request.PublicJwk, Correlation(context), user.DisplayName), ct)).ToProblemOrOk();
     private static async Task<IResult> RevokeKey(Guid serviceIdentityId, Guid keyId, [FromBody] RevisionRequest request, CurrentUser user, HttpContext context, ISender sender, CancellationToken ct) =>
-        (await sender.Send(new RevokeServiceIdentityKeyCommand(user.UserId, user.WorkspaceId, serviceIdentityId, keyId, request.ExpectedRevision, Correlation(context)), ct)).ToProblemOrOk();
+        (await sender.Send(new RevokeServiceIdentityKeyCommand(user.UserId, user.WorkspaceId, serviceIdentityId, keyId, request.ExpectedRevision, Correlation(context), user.DisplayName), ct)).ToProblemOrOk();
     private static async Task<IResult> Revoke(Guid serviceIdentityId, [FromBody] RevisionRequest request, CurrentUser user, HttpContext context, ISender sender, CancellationToken ct) =>
-        (await sender.Send(new RevokeServiceIdentityCommand(user.UserId, user.WorkspaceId, serviceIdentityId, request.ExpectedRevision, Correlation(context)), ct)).ToProblemOrOk();
+        (await sender.Send(new RevokeServiceIdentityCommand(user.UserId, user.WorkspaceId, serviceIdentityId, request.ExpectedRevision, Correlation(context), user.DisplayName), ct)).ToProblemOrOk();
     private static string Correlation(HttpContext context) => context.TraceIdentifier;
     public sealed record CreateRequest(string ClientId);
     public sealed record KeyRequest(int ExpectedRevision, string PublicJwk);

@@ -5,6 +5,7 @@ using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
 using Axis.Shared.Application.Identity;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 using ContractOperandKind = Axis.Rules.Contracts.RuleOperandKind;
@@ -26,6 +27,7 @@ internal sealed class RuleDefinitionHandlerTestContext
         CurrentUser.UserId.Returns(UserId);
         CurrentUser.workspaceId.Returns(WorkspaceId);
         CurrentSubject.Subject.Returns(SubjectReference.Human(UserId));
+        CurrentSubject.DisplayName.Returns("Ada Lovelace");
         Authorization.AuthorizeAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<SubjectReference>(),
@@ -50,6 +52,7 @@ internal sealed class RuleDefinitionHandlerTestContext
             "Credit threshold",
             "Flags high credit values.",
             RuleSubjectReference.Human(UserId),
+            ActorSnapshot.User(UserId, "Ada Lovelace"),
             DateTime.UtcNow).Value;
 
         if (configured)

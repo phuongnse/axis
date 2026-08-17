@@ -77,6 +77,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 - **AC-012** Management UI exposes lifecycle state and recoverable errors accessibly, prevents duplicate submission while pending, supports keyboard key-management actions, and remains usable on compact layouts without secret-bearing fields.
 - **AC-013** Key revocation retains immutable `kid` and RFC 7638 public-JWK-thumbprint tombstones; neither a revoked `kid` nor its public key material under a renamed `kid` can be added or authenticate again.
 - **AC-014** Service-identity lifecycle administration is exposed through typed MCP tools authorized by the existing human administrator OAuth boundary; no service credential or token is accepted by or exposed through those tools.
+- **AC-015** The service-identity collection exposes complete server-owned current-state metadata in the Resource Workspace order: revision, created actor/time, and modified actor/time. Human actor cells show the authenticated administrator's display name and never expose or accept credential material.
 
 ## Acceptance Test Matrix
 
@@ -87,7 +88,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 | AT-003 | API boundary | Active personal `Owner` and organization `Administrator` authority succeeds, while organization `Member`, inactive membership, malformed/private/non-ES256 JWK, duplicate `kid`, and cross-Workspace access deny without unintended mutation or disclosure | AC-005, AC-006, AC-011 | Domain test + API integration test | Yes |
 | AT-004 | API/Application boundaries | Revoked key or identity, including its intrinsic grant, immediately removes service authority and cannot be reactivated by retry or concurrency | AC-004, AC-008 | API integration test + Application test | Yes |
 | AT-005 | Infrastructure boundary | Lifecycle successes, denials, and failures are redacted, correlated, append-only, and readable without credentials or key material | AC-009, AC-010 | Infrastructure integration test | Yes |
-| AT-006 | Browser journey | Administrator manages keys and revocation with accessible pending, success, conflict, and recovery states | AC-003, AC-012 | Browser automation | Yes |
+| AT-006 | Browser journey | Administrator manages keys and revocation with accessible pending, success, conflict, and recovery states while the collection presents complete current-state metadata | AC-003, AC-012, AC-015 | UI component test + Browser automation | Yes |
 | AT-007 | Application/Infrastructure boundaries | Attempts to reuse a revoked `kid` or revoked public-key thumbprint under another `kid` fail, while overlap with a distinct active key remains valid | AC-002, AC-006, AC-013 | Application test + Infrastructure integration test | Yes |
 | AT-008 | API/MCP boundaries | Typed service-identity lifecycle tools use existing human-administrator OAuth and never accept or reveal service credentials or tokens | AC-005, AC-010, AC-014 | API integration test + MCP contract test | Yes |
 
@@ -101,7 +102,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 
 | Surface | Required contract |
 |---|---|
-| Service identity collection | Identify the current Workspace, service identities, non-secret key/lifecycle state, and actions allowed by server-reported authority. |
+| Service identity collection | Identify the current Workspace, service identities, non-secret key/lifecycle state, actions allowed by server-reported authority, and the canonical trailing revision/created/modified metadata group. |
 | Create identity | Explain the one-Workspace boundary, provide the client identifier only after success, accept public JWK material only, and keep private material out of the interface. |
 | Key rotation and revoke | Show existing non-secret key identity and status, support overlap before revocation, require explicit irreversible confirmation, and show immediate recovery guidance. |
 

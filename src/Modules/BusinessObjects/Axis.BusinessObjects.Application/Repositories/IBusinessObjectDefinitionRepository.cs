@@ -1,5 +1,6 @@
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Shared.Application;
 
 namespace Axis.BusinessObjects.Application.Repositories;
 
@@ -29,5 +30,7 @@ public interface IBusinessObjectDefinitionRepository
         int pageSize,
         string? searchQuery = null,
         bool publishedOnly = false,
+        BusinessObjectDefinitionSortField? sortBy = null,
+        CollectionSortDirection? sortDirection = null,
         CancellationToken ct = default);
 }

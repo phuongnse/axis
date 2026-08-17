@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date
+from enum import Enum
 import hashlib
 import importlib
 import importlib.util
@@ -138,6 +139,7 @@ LOCAL_DEV_SERVICE_SHELL: dict[str, str] = {
     "e2e": "bash",
 }
 LOCAL_DEV_DEFAULT_SHELL = "sh"
+LOCAL_DEV_HTTPS_SERVICES = frozenset({"api", "web", "e2e"})
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -163,6 +165,13 @@ from axis_frontend_policy import (  # noqa: E402
 
 class CheckError(RuntimeError):
     """Raised when a command fails."""
+
+
+class LocalDevCertificateState(Enum):
+    READY = "ready"
+    OPENSSL_UNAVAILABLE = "openssl-unavailable"
+    MISSING_OR_INVALID = "missing-or-invalid"
+    MANAGED_TRUST_MARKER_INVALID = "managed-trust-marker-invalid"
 
 
 def configure_cli_text_streams() -> None:
@@ -2983,11 +2992,13 @@ def playwright_chromium_status(env: dict[str, str] | None = None) -> tuple[bool,
                 "import { chromium } from '@playwright/test';"
                 "import { existsSync } from 'node:fs';"
                 "const path = chromium.executablePath();"
+                "console.log(path);"
                 "if (!existsSync(path)) {"
                 "  console.error(path);"
-                "  process.exit(1);"
+                "  process.exit(2);"
                 "}"
-                "console.log(path);"
+                "const browser = await chromium.launch({ headless: true });"
+                "await browser.close();"
             ),
         ],
         cwd=FRONTEND_DIR,
@@ -2996,10 +3007,35 @@ def playwright_chromium_status(env: dict[str, str] | None = None) -> tuple[bool,
         env=env,
         timeout=PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS,
     )
-    detail = (probe.stdout or probe.stderr or "").strip().splitlines()
-    browser_path = detail[-1] if detail else "Playwright Chromium executable not found"
+    stdout_lines = (probe.stdout or "").strip().splitlines()
+    stderr = (probe.stderr or "").strip()
+    browser_path = (
+        stdout_lines[-1]
+        if stdout_lines
+        else stderr.splitlines()[-1]
+        if stderr
+        else "Playwright Chromium executable not found"
+    )
     if probe.returncode == 0:
         return True, browser_path
+    if probe.returncode != 2:
+        missing_library = re.search(
+            r"error while loading shared libraries: ([^:\s]+)",
+            stderr,
+        )
+        reason = (
+            f"missing native library `{missing_library.group(1)}`"
+            if missing_library
+            else "the installed browser process exited before becoming ready"
+        )
+        return (
+            False,
+            f"{browser_path} is installed but cannot launch ({reason}); required Axis browser "
+            "evidence runs through `python scripts/axis.py local-dev e2e -- <playwright-args>` "
+            "in the Compose-managed browser runtime; explicit host-browser debugging requires "
+            "Playwright's publisher-documented native OS prerequisites, which Axis does not "
+            "install with sudo or an OS package manager",
+        )
     return (
         False,
         f"{browser_path}; run `python scripts/axis.py frontend install-browsers`",
@@ -3015,7 +3051,7 @@ def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
     if not ok:
         print(f"playwright-browsers: FAIL - {detail}", file=sys.stderr)
         return 1
-    print(f"playwright-browsers: OK (chromium: {detail})")
+    print(f"playwright-browsers: OK (host Chromium launched: {detail})")
     return 0
 
 
@@ -4080,6 +4116,8 @@ def ensure_mcp_api_ready(health_url: str, root_ca: Path) -> bool:
 
     if require_docker_compose("mcp serve") != 0:
         return False
+    if require_local_dev_certificates("mcp serve") != 0:
+        return False
 
     print(
         "mcp serve: Axis API is not healthy; starting the local-dev stack",
@@ -4317,6 +4355,11 @@ def local_dev_up_args(
     return local_dev_compose_args(*args, overlays=overlays)
 
 
+def local_dev_services_require_certificates(services: Iterable[str]) -> bool:
+    selected = set(services)
+    return not selected or not selected.isdisjoint(LOCAL_DEV_HTTPS_SERVICES)
+
+
 def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     command = exec_command[1:] if exec_command[:1] == ["--"] else exec_command
     if command:
@@ -4388,7 +4431,11 @@ def run_local_dev_browser(
     service: str = "e2e",
     build_services: Iterable[str] = (),
     snapshot_output: Path | None = None,
+    command_label: str = "local-dev e2e",
 ) -> int:
+    certificate_rc = require_local_dev_certificates(command_label)
+    if certificate_rc != 0:
+        return certificate_rc
     overlays = tuple(overlays)
     runtime_services = list(build_services)
     if runtime_services:
@@ -4433,6 +4480,7 @@ def local_dev_smoke(
         ["e2e/local-dev-smoke.pw.ts"],
         overlays=overlays,
         service="e2e",
+        command_label="local-dev smoke",
     )
 
 
@@ -4561,6 +4609,49 @@ def local_dev_certificates_valid(openssl: str) -> bool:
     return True
 
 
+def local_dev_certificate_state(openssl: str | None) -> LocalDevCertificateState:
+    if openssl is None:
+        return LocalDevCertificateState.OPENSSL_UNAVAILABLE
+    if local_dev_certificates_valid(openssl):
+        return LocalDevCertificateState.READY
+    if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
+        return LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+    return LocalDevCertificateState.MISSING_OR_INVALID
+
+
+def local_dev_certificate_remediation(state: LocalDevCertificateState) -> str:
+    if state is LocalDevCertificateState.READY:
+        return "valid local CA and localhost certificate"
+    if state is LocalDevCertificateState.OPENSSL_UNAVAILABLE:
+        return (
+            "OpenSSL is required to validate local HTTPS certificates; install OpenSSL on "
+            "PATH or Git for Windows, then run `python scripts/axis.py local-dev certs`"
+        )
+    if state is LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID:
+        return (
+            "local HTTPS certificate material is missing or invalid while an Axis-managed trust "
+            "marker is present; reconcile it with `python scripts/axis.py local-dev untrust-certs`, "
+            "`python scripts/axis.py local-dev certs --renew`, then "
+            "`python scripts/axis.py local-dev trust-certs`"
+        )
+    return (
+        "local HTTPS certificate material is missing or invalid; run "
+        "`python scripts/axis.py local-dev certs`"
+    )
+
+
+def require_local_dev_certificates(label: str) -> int:
+    state = local_dev_certificate_state(find_openssl())
+    if state is LocalDevCertificateState.READY:
+        return 0
+    print(
+        f"{label}: local HTTPS certificate preflight failed: "
+        f"{local_dev_certificate_remediation(state)}",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def local_dev_cert_host() -> str:
     system = platform.system().lower()
     if os.name == "nt" or system == "windows":
@@ -4576,6 +4667,13 @@ def local_dev_cert_host() -> str:
 def local_dev_host_trust_status() -> tuple[str, str]:
     trust_command = "`python scripts/axis.py local-dev trust-certs`"
     if not LOCAL_ROOT_CA_CER.is_file():
+        if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
+            return (
+                "WARN",
+                local_dev_certificate_remediation(
+                    LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+                ),
+            )
         return "WARN", "local root CA is missing; run `python scripts/axis.py local-dev certs`"
 
     host = local_dev_cert_host()
@@ -4777,8 +4875,10 @@ def local_dev_certs(args: argparse.Namespace | None = None) -> int:
 
     if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
         print(
-            "local-dev certs: the current root CA was trusted by Axis; run "
-            "`python scripts/axis.py local-dev untrust-certs` before replacing it",
+            "local-dev certs: "
+            + local_dev_certificate_remediation(
+                LocalDevCertificateState.MANAGED_TRUST_MARKER_INVALID
+            ),
             file=sys.stderr,
         )
         return 1
@@ -4883,6 +4983,10 @@ def local_dev(args: argparse.Namespace) -> int:
         )
 
     if command == "up":
+        if local_dev_services_require_certificates(args.services):
+            certificate_rc = require_local_dev_certificates("local-dev up")
+            if certificate_rc != 0:
+                return certificate_rc
         result = run(
             local_dev_up_args(*args.services, build=args.build, overlays=overlays),
             check=False,
@@ -4915,6 +5019,10 @@ def local_dev(args: argparse.Namespace) -> int:
         return result.returncode
 
     if command in {"start", "stop", "restart"}:
+        if command != "stop" and local_dev_services_require_certificates(args.services):
+            certificate_rc = require_local_dev_certificates(f"local-dev {command}")
+            if certificate_rc != 0:
+                return certificate_rc
         return run(
             local_dev_compose_args(command, *args.services, overlays=overlays),
             check=False,
@@ -4924,6 +5032,10 @@ def local_dev(args: argparse.Namespace) -> int:
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
+        if local_dev_services_require_certificates(args.services):
+            certificate_rc = require_local_dev_certificates("local-dev recreate")
+            if certificate_rc != 0:
+                return certificate_rc
         result = run(
             local_dev_up_args(
                 *args.services,
@@ -5045,6 +5157,9 @@ def local_dev(args: argparse.Namespace) -> int:
             ).returncode
 
     if command == "reset-db":
+        certificate_rc = require_local_dev_certificates("local-dev reset-db")
+        if certificate_rc != 0:
+            return certificate_rc
         if not explicit_confirmation(
             args,
             command="local-dev reset-db",
@@ -5066,6 +5181,9 @@ def local_dev(args: argparse.Namespace) -> int:
         return up.returncode
 
     if command == "reset-all":
+        certificate_rc = require_local_dev_certificates("local-dev reset-all")
+        if certificate_rc != 0:
+            return certificate_rc
         if not explicit_confirmation(
             args,
             command="local-dev reset-all",
@@ -5264,7 +5382,13 @@ def setup_external_preflight(profile: str) -> int:
 
 
 def setup_preflight(profile: str) -> int:
-    rc = doctor(argparse.Namespace(profile=profile, strict=True))
+    rc = doctor(
+        argparse.Namespace(
+            profile=profile,
+            strict=True,
+            allow_certificate_bootstrap=True,
+        )
+    )
     if rc != 0:
         if profile == "review" and not setup_tool_ready("lychee"):
             print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
@@ -5414,6 +5538,7 @@ def doctor(args: argparse.Namespace) -> int:
     if profile not in axis_setup.DOCTOR_PROFILES:
         raise CheckError(f"Unknown doctor profile: {profile}")
     groups = set(axis_setup.DOCTOR_PROFILES[: axis_setup.DOCTOR_PROFILES.index(profile) + 1])
+    allow_certificate_bootstrap = getattr(args, "allow_certificate_bootstrap", False)
     rows: list[tuple[str, str, str]] = []
 
     def record(status: str, label: str, detail: str) -> None:
@@ -5454,18 +5579,23 @@ def doctor(args: argparse.Namespace) -> int:
         openssl = find_openssl()
         if openssl:
             record("OK", "openssl", openssl)
-            certificates_valid = local_dev_certificates_valid(openssl)
+            certificate_state = local_dev_certificate_state(openssl)
+            certificate_status = (
+                "OK"
+                if certificate_state is LocalDevCertificateState.READY
+                else "WARN"
+                if allow_certificate_bootstrap
+                else "FAIL"
+            )
             record(
-                "OK" if certificates_valid else "WARN",
+                certificate_status,
                 "local HTTPS certificates",
-                "valid local CA and localhost certificate"
-                if certificates_valid
-                else "missing or invalid; run `python scripts/axis.py local-dev certs`",
+                local_dev_certificate_remediation(certificate_state),
             )
             trust_status, trust_detail = local_dev_host_trust_status()
             record(trust_status, "host browser trust", trust_detail)
         else:
-            record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
+            record("FAIL", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
 
         docker_status, docker_detail = _command_version("docker", "--version")
         if docker_status == "FAIL":
@@ -5604,7 +5734,10 @@ def build_parser(
     setup_parser.add_argument(
         "--browsers",
         action="store_true",
-        help="Install host Playwright Chromium for explicit host-browser debugging",
+        help=(
+            "Install the host Playwright Chromium binary for explicit debugging; "
+            "native OS prerequisites remain external"
+        ),
     )
     setup_parser.add_argument(
         "--plan-only",
@@ -5755,7 +5888,13 @@ def build_parser(
         help="Apply compatible npm audit fixes to package-lock.json without force or install scripts",
     )
     frontend_sync_lock.set_defaults(func=frontend_command)
-    frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
+    frontend_sub.add_parser(
+        "install-browsers",
+        help=(
+            "Install the optional host Playwright Chromium binary; "
+            "native OS prerequisites remain external"
+        ),
+    ).set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
     frontend_format = frontend_sub.add_parser(
         "format",
@@ -5903,7 +6042,10 @@ def build_parser(
         "frontend-dependency-versions",
         help="Require exact versions for direct npm dependencies",
     ).set_defaults(func=check_frontend_dependency_versions)
-    check_sub.add_parser("playwright-browsers", help="Check Playwright Chromium availability").set_defaults(func=check_playwright_browsers)
+    check_sub.add_parser(
+        "playwright-browsers",
+        help="Launch-probe the optional host Playwright Chromium runtime",
+    ).set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages", help="Audit NuGet dependencies for vulnerabilities").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser(
         "frontend-vulnerable-packages",

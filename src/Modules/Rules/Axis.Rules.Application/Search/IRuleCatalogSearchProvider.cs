@@ -1,4 +1,5 @@
 using Axis.Rules.Domain;
+using Axis.Shared.Application;
 
 namespace Axis.Rules.Application.Search;
 
@@ -17,6 +18,8 @@ public interface IRuleCatalogSearchProvider
         IReadOnlyList<RuleTextSearchDocument> systemDocuments,
         bool includeWorkspace,
         RuleLifecycleStatus? workspaceStatus,
+        RuleDefinitionSortField? sortBy,
+        CollectionSortDirection? sortDirection,
         int skip,
         int take,
         string query,

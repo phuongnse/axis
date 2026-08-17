@@ -16,14 +16,21 @@ Provide a reusable, typed data-table foundation that lets product features defin
 
 ## Guarantees
 
-- Accepts a typed data source, stable row identity, localized messages, and semantic column definitions.
+- Accepts a typed data source, stable row identity, locale, localized messages, and semantic column definitions.
+- Requires every column to declare one cell kind: `text`, `identifier`, `version`, `revision`, `actor`, `number`, `date`, `dateTime`, `boolean`, `status`, `list`, or `action`.
+- Treats lifecycle versions and concurrency revisions as identifiers rather than quantities: they remain start-aligned, use stable `v…` and `r…` display notation where the value is numeric, and sort by their underlying server-owned value rather than their rendered label.
+- Formats default-rendered numbers, dates, date-times, booleans, and empty values centrally; missing or invalid values use the canonical compact `N/A` placeholder, numeric columns use end alignment and tabular figures, identifiers use the shared identifier treatment, scalar content stays on one line, and only explicit list cells wrap.
 - Provides configured discovery, query-state, data-mode, and toolbar behavior without feature-local table interaction systems.
 - Keeps loading, error, empty, no-result, and pagination states inside a stable table region.
+- Fits preferred column proportions into the available width on regular viewports; compact viewports alone retain table-owned horizontal overflow. Single-line rows vertically center their cells, while a row switches every cell to top alignment only when measured content actually wraps so sibling values remain aligned with the first text line.
 
 ## Alternate / error flows
 
 - Client dataset: filter, sort, grouping, aggregation, expansion, and numbered paging operate over the complete in-memory dataset; product free-text search remains server owned.
 - Server page: the table emits structured query state and renders backend-owned rows, row count, and page state without applying local operations to a partial dataset.
+- Server-page sorting: each enabled column maps to a server-owned total order that is applied before paging; clearing explicit sorting restores the endpoint's default order or search relevance.
+- Sortable scalar column: displayed text, number, date/time, or enum values are sortable by default. Enum values use their canonical server representation as the primary order, with deterministic server-owned tie-breakers.
+- Semantically unsortable column: a consumer leaves sorting disabled only for action columns, constant values, or composite/list values without an explicitly documented comparison key. Missing backend support for an otherwise sortable scalar is an implementation gap, not a UX exception.
 - Infinite dataset: the table progressively requests cursor pages near the scroll boundary and virtualizes loaded rows when configured.
 - Hierarchical dataset: rows expose child rows or an expanded detail renderer without changing the consumer's column contract.
 - Hidden column: its generated filter field is removed and any active condition is cleared so an invisible criterion cannot remain active.
@@ -34,8 +41,8 @@ Provide a reusable, typed data-table foundation that lets product features defin
 ## Acceptance Criteria
 
 *Definition and rendering*
-- **AC-001** A consumer can render a table from one typed definition containing its data source, row identity, localized messages, and semantic column metadata.
-- **AC-002** Columns support custom cell and aggregate rendering, visibility, order, sizing, and pinning without feature-local visual overrides.
+- **AC-001** A consumer can render a table from one typed definition containing its data source, row identity, locale, localized messages, and required semantic column metadata.
+- **AC-002** Columns receive a type-correct shared default renderer and support custom cell and aggregate rendering, visibility, order, sizing, and pinning without feature-local alignment or containment overrides.
 - **AC-003** The table owns loading, error, empty, no-result, and retry presentation inside a constrained scroll region with a stable header.
 
 *Discovery and query state*
@@ -55,18 +62,19 @@ Provide a reusable, typed data-table foundation that lets product features defin
 
 *Quality*
 - **AC-013** Table controls use localized consumer copy, keyboard interaction, labels, and visible focus states.
-- **AC-014** The table fits supported desktop and mobile widths without document-level overflow, aligns body cells to the row start, and keeps header, body, and footer regions visually coherent.
+- **AC-014** The table proportionally fits columns without horizontal overflow at supported regular widths, confines necessary horizontal overflow to compact widths, vertically centers single-line rows, top-aligns every cell when any content in that row wraps, and keeps single-line siblings aligned to the wrapped content's first line.
 - **AC-015** The foundation API does not require a particular client data or navigation library, product API contract, or feature-specific data type.
+- **AC-018** Default cell rendering is locale-aware and type-safe: finite quantities are end-aligned with tabular figures; versions, revisions, and identifiers remain start-aligned with stable identifier treatment; date-only values preserve their calendar date; date-times use the declared locale; booleans use localized shared copy; actors expose their display name; empty/invalid values use the canonical `N/A` placeholder; scalar values truncate to one line; and list values alone may wrap. Custom renderers retain the declared kind's alignment and containment.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | UI component | Typed columns render semantic cells, stable headers, visibility, sorting, consumer-defined toolbar actions, and constrained empty/error/loading states. | AC-001, AC-002, AC-003, AC-007, AC-013, AC-016 | UI component test | Yes |
+| AT-001 | UI component | Typed columns render locale-formatted semantic cells, type-owned horizontal alignment and containment, adaptive single-line/multiline row alignment, viewport-aware column fitting, stable headers, visibility, sorting, consumer-defined toolbar actions, and constrained empty/error/loading states. | AC-001, AC-002, AC-003, AC-007, AC-013, AC-014, AC-016, AC-018 | UI component test | Yes |
 | AT-002 | UI component | Controlled search emits server intent without matching rows locally, while the typed filter builder derives from visible columns, supports nested groups and type-specific operators/editors, clears hidden-field conditions, validates incomplete input, and resets correctly. | AC-004, AC-005, AC-006, AC-017 | UI component test | Yes |
 | AT-003 | UI component | Client numbered paging and manual page callbacks preserve correct whole-dataset ownership. | AC-008, AC-009, AC-015 | UI component test | Yes |
 | AT-004 | UI component | Infinite loading, grouping, expansion, aggregation, selection, and bulk action extension points operate through controlled table state. | AC-010, AC-011, AC-012, AC-015 | UI component test | Yes |
-| AT-005 | UI component | Rules catalog consumes the shared definition and exposes server-owned search, paging, and row actions without partial client matching. | AC-001, AC-004, AC-009 | UI component test | Yes |
+| AT-005 | UI component | Rules catalog consumes the shared definition and exposes URL-backed server search, whole-dataset sorting, paging, and row actions without partial client processing. | AC-001, AC-004, AC-007, AC-009 | UI component test | Yes |
 | AT-006 | Browser journey | Rules table keeps its header and toolbar stable, confines scrolling, and fits desktop and mobile without document overflow or console errors. | AC-003, AC-013, AC-014 | Browser automation | Yes |
 | AT-007 | Static frontend | Shared and consuming code typechecks, lints, and keeps localized copy valid. | AC-013, AC-015 | Frontend CI | Yes |
 
@@ -84,8 +92,8 @@ Provide a reusable, typed data-table foundation that lets product features defin
 | Surface | Required contract |
 |---|---|
 | Table toolbar | Show configured global search, typed visible-column filter builder, active-filter reset, grouping controls, column controls, and consumer-defined domain actions without layout shift. |
-| Header | Show localized labels, accessible sort state, resize affordances when enabled, and pinned columns when configured. |
-| Body | Render row-start-aligned semantic cells, grouped or hierarchical rows, selection, and detail content inside the owned scroll viewport. |
+| Header | Show localized labels, accessible sort state, type-owned alignment, resize affordances when enabled, and pinned columns when configured. |
+| Body | Render semantic cells with centralized locale formatting and containment; vertically center a row while all cells remain one line, then top-align the whole row to the first content line when any typed value wraps. Keep grouped or hierarchical rows, selection, and detail content inside the owned scroll viewport. |
 | Footer | Show numbered paging, loaded/total progress, or infinite loading state according to the selected data mode. |
 | Non-data states | Preserve the table region while showing localized loading, error, empty, or no-result content and an available retry action. |
 
@@ -99,7 +107,7 @@ Required UI quality: controls must be keyboard-reachable, visible copy must come
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** The typed data-table foundation owns client, manual-page, and infinite data modes; a nested typed filter builder; sorting; numbered paging; grouping; expansion; selection; virtualization; stable table scrolling; and consumer-defined toolbar actions.
+> **Implemented:** The typed data-table foundation owns client, manual-page, and infinite data modes; required semantic cell kinds and locale formatting; type-owned horizontal alignment and containment; measured row-level vertical alignment; regular-width column fitting with compact-only horizontal overflow; a nested typed filter builder; sorting; numbered paging; grouping; expansion; selection; virtualization; stable table scrolling; and consumer-defined toolbar actions.
 >
 > **Gaps vs spec:** None. Generic client mode still supports structured filtering over a complete in-memory dataset, but free-text matching is always emitted as controlled server intent.
 >
@@ -107,4 +115,4 @@ Required UI quality: controls must be keyboard-reachable, visible copy must come
 >
 > **Verification:** Acceptance proof is tracked in [docs/foundations/data-display/data-table.evidence.md](./data-table.evidence.md).
 >
-> **Decisions:** One typed definition packages data and semantic column metadata; raw data reflection is rejected. Client, manual-page, and infinite modes are explicit. Manual modes keep whole-dataset processing on the server. Filter fields follow visible columns, use a product-neutral serializable expression, and clear hidden-field conditions. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.
+> **Decisions:** One typed definition packages data, locale, and required semantic column metadata; raw data reflection is rejected. The shared renderer owns scalar formatting, the canonical `N/A` placeholder for missing or invalid values, horizontal alignment, measured row-level vertical alignment, viewport-aware sizing, and containment, while product meanings such as translated enum/status labels remain consumer-owned custom rendering. `number` is reserved for quantities and measures. `version` and `revision` are identifiers even when persisted as integers; numeric versions render with `v` notation and revisions with `r` notation without localized grouping or end alignment. Actor cells render the server-owned display name and keep stable actor identity out of the primary visual label. Scalar cells are one line by default; only an explicit `list` kind wraps. A row remains vertically centered while every cell is one line; if any cell actually wraps, the entire row top-aligns and one-line siblings share its first-line edge. Preferred column sizes act as proportions at regular widths, while compact widths preserve them and own horizontal scrolling. Client, manual-page, and infinite modes are explicit. Manual modes keep whole-dataset processing on the server, including every enabled sort before paging; clearing sort returns to the server default or relevance order. Displayed scalar text, number, version, revision, actor, date/time, and enum columns are sortable by default; enums use canonical server values plus deterministic tie-breakers. Sorting stays disabled only for actions, constants, and composite/list values without a documented comparison key. Missing backend support is an implementation gap rather than a consumer-specific UX exception. Filter fields follow visible columns, use a product-neutral serializable expression, and clear hidden-field conditions. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.

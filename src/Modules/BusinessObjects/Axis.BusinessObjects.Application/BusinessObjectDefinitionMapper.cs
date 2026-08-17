@@ -1,4 +1,5 @@
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.Shared.Application;
 
 namespace Axis.BusinessObjects.Application;
 
@@ -22,6 +23,7 @@ internal static class BusinessObjectDefinitionMapper
             definition.LatestPublishedVersionNumber,
             definition.CreatedAt,
             definition.UpdatedAt,
+            ToMetadata(definition),
             definition.Fields.OrderBy(field => field.Order).Select(ToFieldDto).ToArray(),
             latestVersion is null ? null : ToVersionDto(latestVersion),
             new BusinessObjectDefinitionActionsDto(
@@ -37,7 +39,19 @@ internal static class BusinessObjectDefinitionMapper
             definition.Status,
             definition.Revision,
             definition.LatestPublishedVersionNumber,
-            definition.UpdatedAt);
+            definition.UpdatedAt,
+            ToMetadata(definition));
+
+    private static ResourceMetadataDto ToMetadata(BusinessObjectDefinition definition) =>
+        new(
+            definition.Revision,
+            definition.CreatedBy is { } createdBy ? ResourceActorDto.From(createdBy) : null,
+            AsOffset(definition.CreatedAt),
+            definition.UpdatedBy is { } updatedBy ? ResourceActorDto.From(updatedBy) : null,
+            AsOffset(definition.UpdatedAt));
+
+    private static DateTimeOffset AsOffset(DateTime value) =>
+        new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
 
     public static BusinessObjectDefinitionVersionDto ToVersionDto(BusinessObjectDefinitionVersion version) =>
         new(

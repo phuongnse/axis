@@ -31,7 +31,15 @@ import {
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 import {
   persistentItemHighlight,
@@ -80,12 +88,19 @@ import {
   filterData,
   pruneFilterExpression,
 } from './filtering';
+import { createDataTableValueFormatter, type DataTableValueFormatter } from './formatting';
 import { dataTableCheckboxHitArea, dataTableTargetGeometry } from './geometry';
-import type { DataTableDefinition, DataTableMessages, DataTableQueryState } from './types';
+import type {
+  DataTableCellDefinition,
+  DataTableDefinition,
+  DataTableMessages,
+  DataTableQueryState,
+} from './types';
 
 const selectionColumnId = '__selection';
 const defaultPageSizeOptions = [10, 20, 50, 100] as const;
 const loadingRowIds = ['one', 'two', 'three', 'four', 'five', 'six'] as const;
+const compactTableViewportWidth = 768;
 
 export function DataTable<TData>({ definition }: { definition: DataTableDefinition<TData> }) {
   const { source, messages } = definition;
@@ -118,8 +133,13 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
       source.mode === 'client' && source.pagination ? (source.pagination.pageSize ?? 20) : 20,
   }));
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const showInitialLoading = usePendingVisibility(Boolean(definition.loading));
   const initialLoading = !definition.error && (Boolean(definition.loading) || showInitialLoading);
+  const valueFormatter = useMemo(
+    () => createDataTableValueFormatter(definition.locale, messages),
+    [definition.locale, messages],
+  );
 
   const updateQuery = useCallback(
     (next: DataTableQueryState) => {
@@ -143,7 +163,20 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
   );
 
   const columns = useMemo<ColumnDef<TData, unknown>[]>(() => {
-    const configured = [...definition.columns];
+    const configured = definition.columns.map<ColumnDef<TData, unknown>>((column) =>
+      column.cell
+        ? column
+        : {
+            ...column,
+            cell: ({ getValue }) => (
+              <DataTableFormattedValue
+                value={getValue()}
+                definition={column.meta.cell}
+                formatter={valueFormatter}
+              />
+            ),
+          },
+    );
     if (!definition.enableRowSelection) return configured;
     return [
       {
@@ -157,7 +190,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
         enableGlobalFilter: false,
         enableGrouping: false,
         enablePinning: true,
-        meta: { label: messages.selectRow, searchable: false },
+        meta: { label: messages.selectRow, cell: { kind: 'action' }, searchable: false },
         header: ({ table }) => (
           <Checkbox
             aria-label={messages.selectAllRows}
@@ -179,7 +212,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
       },
       ...configured,
     ];
-  }, [definition.columns, definition.enableRowSelection, messages]);
+  }, [definition.columns, definition.enableRowSelection, messages, valueFormatter]);
   const data = useMemo(
     () =>
       source.mode === 'client'
@@ -276,11 +309,23 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
     if (source.mode === 'infinite') fetchMoreIfNeeded();
   }, [fetchMoreIfNeeded, source.mode]);
 
+  useLayoutEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const updateWidth = () => setViewportWidth(viewport.clientWidth);
+    updateWidth();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
   const selectedRows = table.getSelectedRowModel().flatRows;
   const hasRows = rows.length > 0;
   const renderVirtualRows = virtualized && hasRows && !initialLoading && !definition.error;
   const hasQuery = Boolean(query.globalFilter) || countFilterConditions(query.filterExpression) > 0;
   const visibleColumnCount = Math.max(table.getVisibleLeafColumns().length, 1);
+  const columnLayout = createColumnLayout(table.getVisibleLeafColumns(), viewportWidth);
 
   return (
     <section
@@ -326,17 +371,18 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
         ref={scrollRef}
         onScroll={fetchMoreIfNeeded}
         data-slot="data-table-viewport"
+        data-horizontal-overflow={columnLayout.allowsHorizontalOverflow ? 'compact' : 'fitted'}
         className="relative min-h-0 flex-1 overflow-auto overscroll-contain"
       >
         <Table
           containerClassName="overflow-visible"
           className={cn('table-fixed', virtualized && 'grid')}
-          style={{ width: table.getTotalSize(), minWidth: '100%' }}
+          style={{ width: columnLayout.tableWidth, minWidth: '100%' }}
         >
           {!virtualized ? (
             <colgroup>
               {table.getVisibleLeafColumns().map((column) => (
-                <col key={column.id} style={{ width: column.getSize() }} />
+                <col key={column.id} style={{ width: columnLayout.width(column) }} />
               ))}
             </colgroup>
           ) : null}
@@ -349,17 +395,30 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
+                    data-align={isEndAligned(header.column) ? 'end' : 'start'}
+                    aria-sort={
+                      header.column.getIsSorted() === 'asc'
+                        ? 'ascending'
+                        : header.column.getIsSorted() === 'desc'
+                          ? 'descending'
+                          : undefined
+                    }
                     style={{
-                      width: header.getSize(),
-                      ...pinnedColumnStyle(header.column),
+                      width: columnLayout.width(header.column),
+                      ...pinnedColumnStyle(header.column, columnLayout),
                     }}
                     className={cn(
-                      'relative bg-card first:pl-3',
+                      'relative overflow-hidden bg-card first:pl-3',
+                      isEndAligned(header.column) && 'text-right',
                       virtualized && 'flex shrink-0 items-center',
                     )}
                   >
                     {header.isPlaceholder ? null : (
-                      <DataTableColumnHeader column={header.column} messages={messages}>
+                      <DataTableColumnHeader
+                        column={header.column}
+                        messages={messages}
+                        align={isEndAligned(header.column) ? 'end' : 'start'}
+                      >
                         {header.column.columnDef.meta?.label ??
                           flexRender(header.column.columnDef.header, header.getContext())}
                       </DataTableColumnHeader>
@@ -392,6 +451,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
             {initialLoading ? (
               <LoadingRows
                 columns={table.getVisibleLeafColumns()}
+                columnLayout={columnLayout}
                 messages={messages}
                 visible={showInitialLoading}
                 virtualized={virtualized}
@@ -399,7 +459,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
             ) : definition.error ? (
               <StateRow
                 columnCount={visibleColumnCount}
-                tableWidth={table.getTotalSize()}
+                tableWidth={columnLayout.tableWidth}
                 virtualized={virtualized}
               >
                 <Empty role="alert">
@@ -434,7 +494,9 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                       key={row.id}
                       row={row}
                       messages={messages}
+                      valueFormatter={valueFormatter}
                       renderDetail={definition.renderDetail}
+                      columnLayout={columnLayout}
                       virtual={{ start: virtualRow.start, measure: rowVirtualizer.measureElement }}
                     />
                   );
@@ -445,14 +507,16 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                     key={row.id}
                     row={row}
                     messages={messages}
+                    valueFormatter={valueFormatter}
                     renderDetail={definition.renderDetail}
+                    columnLayout={columnLayout}
                   />
                 ))
               )
             ) : (
               <StateRow
                 columnCount={visibleColumnCount}
-                tableWidth={table.getTotalSize()}
+                tableWidth={columnLayout.tableWidth}
                 virtualized={virtualized}
               >
                 <Empty>
@@ -482,22 +546,33 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
 function DataTableColumnHeader<TData>({
   column,
   messages,
+  align,
   children,
 }: {
   column: Column<TData, unknown>;
   messages: DataTableMessages;
+  align: 'start' | 'end';
   children: React.ReactNode;
 }) {
   const sorted = column.getIsSorted();
   const configurable = column.getCanHide() || column.getCanPin();
   return (
-    <div className="flex min-w-0 items-center gap-1">
+    <div
+      className={cn(
+        'group relative flex w-full min-w-0 items-center overflow-hidden',
+        align === 'end' && 'justify-end',
+      )}
+    >
       {column.getCanSort() ? (
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className={cn(dataTableTargetGeometry, '-ml-2 justify-start px-2')}
+          className={cn(
+            dataTableTargetGeometry,
+            '-ml-2 flex-1 gap-1 overflow-hidden px-2',
+            align === 'end' ? 'ml-auto justify-end' : 'justify-start',
+          )}
           aria-label={`${column.columnDef.meta?.label ?? column.id}: ${
             sorted === 'asc'
               ? messages.sortDescending
@@ -525,7 +600,10 @@ function DataTableColumnHeader<TData>({
           )}
         </Button>
       ) : (
-        <span data-slot="data-table-column-label" className="truncate">
+        <span
+          data-slot="data-table-column-label"
+          className={cn('min-w-0 flex-1 truncate', align === 'end' && 'ml-auto')}
+        >
           {children}
         </span>
       )}
@@ -537,7 +615,10 @@ function DataTableColumnHeader<TData>({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                className={dataTableTargetGeometry}
+                className={cn(
+                  dataTableTargetGeometry,
+                  'pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 bg-card opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100',
+                )}
                 aria-label={`${column.columnDef.meta?.label ?? column.id}: ${messages.columns}`}
               />
             }
@@ -597,24 +678,60 @@ function DataTableColumnHeader<TData>({
 function DataRow<TData>({
   row,
   messages,
+  valueFormatter,
   renderDetail,
+  columnLayout,
   virtual,
 }: {
   row: Row<TData>;
   messages: DataTableMessages;
+  valueFormatter: DataTableValueFormatter;
   renderDetail?: (row: Row<TData>) => React.ReactNode;
+  columnLayout: DataTableColumnLayout<TData>;
   virtual?: { start: number; measure: (element: Element | null) => void };
 }) {
   const visibleCells = row.getVisibleCells();
+  const rowRef = useRef<HTMLTableRowElement | null>(null);
+  const [multiline, setMultiline] = useState(false);
+  const setRowRef = useCallback(
+    (element: HTMLTableRowElement | null) => {
+      rowRef.current = element;
+      virtual?.measure(element);
+    },
+    [virtual],
+  );
+  useLayoutEffect(() => {
+    const element = rowRef.current;
+    if (!element) return;
+    const updateLayout = () => {
+      const next = [
+        ...element.querySelectorAll<HTMLElement>('[data-slot="data-table-cell-content"]'),
+      ].some(hasMultipleTextLines);
+      setMultiline((current) => (current === next ? current : next));
+    };
+    updateLayout();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateLayout);
+    observer.observe(element);
+    const mutationObserver =
+      typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(updateLayout);
+    mutationObserver?.observe(element, { childList: true, characterData: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, []);
   const detail =
     row.getIsExpanded() && renderDetail && !row.getIsGrouped() ? renderDetail(row) : null;
   return (
     <Fragment>
       <TableRow
-        ref={virtual ? virtual.measure : undefined}
+        ref={setRowRef}
         data-index={virtual ? row.index : undefined}
+        data-row-layout={multiline ? 'multiline' : 'single-line'}
         className={cn(
           'bg-card',
+          multiline && '[&_[data-slot=data-table-record-action]]:items-start',
           transientItemHighlight,
           row.getIsSelected() && persistentItemHighlight,
           virtual && 'absolute flex w-full',
@@ -628,22 +745,43 @@ function DataRow<TData>({
           const canExpand =
             index === (visibleCells[0]?.column.id === selectionColumnId ? 1 : 0) &&
             row.getCanExpand();
+          const cellDefinition = cell.column.columnDef.meta?.cell ?? { kind: 'text' as const };
+          const endAligned = cellDefinition.kind === 'number';
+          const renderer = aggregated
+            ? (cell.column.columnDef.aggregatedCell ?? cell.column.columnDef.cell)
+            : cell.column.columnDef.cell;
+          const renderedValue = renderer ? (
+            flexRender(renderer, cell.getContext())
+          ) : (
+            <DataTableFormattedValue
+              value={cell.getValue()}
+              definition={cellDefinition}
+              formatter={valueFormatter}
+            />
+          );
           return (
             <TableCell
               key={cell.id}
+              data-align={endAligned ? 'end' : 'start'}
+              data-cell-kind={cellDefinition.kind}
               style={{
-                width: cell.column.getSize(),
-                ...pinnedColumnStyle(cell.column),
+                width: columnLayout.width(cell.column),
+                ...pinnedColumnStyle(cell.column, columnLayout),
               }}
               className={cn(
-                'bg-inherit py-1 align-middle first:pl-3',
-                virtual && 'flex shrink-0 items-center',
+                'overflow-hidden bg-inherit py-1 first:pl-3',
+                multiline ? 'align-top' : 'align-middle',
+                endAligned && 'text-right tabular-nums',
+                virtual && 'flex shrink-0',
+                virtual && (multiline ? 'items-start' : 'items-center'),
               )}
             >
               <div
                 data-slot="data-table-cell-content"
                 className={cn(
-                  'flex min-w-0 items-center',
+                  'flex min-w-0 overflow-hidden',
+                  multiline ? 'items-start' : 'items-center',
+                  endAligned && 'w-full justify-end text-right',
                   axisStyles.spacing.gap.inline,
                   axisStyles.density.minHeight.touchTarget,
                   axisStyles.density.minHeight.compactControlAtSmall,
@@ -664,16 +802,13 @@ function DataRow<TData>({
                 ) : null}
                 {grouped ? (
                   <>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    {renderedValue}
                     <span className="text-xs text-muted-foreground">({row.subRows.length})</span>
                   </>
                 ) : aggregated ? (
-                  flexRender(
-                    cell.column.columnDef.aggregatedCell ?? cell.column.columnDef.cell,
-                    cell.getContext(),
-                  )
+                  renderedValue
                 ) : isAggregateCell ? null : (
-                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                  renderedValue
                 )}
               </div>
             </TableCell>
@@ -689,6 +824,36 @@ function DataRow<TData>({
   );
 }
 
+function DataTableFormattedValue({
+  value,
+  definition,
+  formatter,
+}: {
+  value: unknown;
+  definition: DataTableCellDefinition;
+  formatter: DataTableValueFormatter;
+}) {
+  return (
+    <span
+      data-slot="data-table-value"
+      className={cn(
+        'min-w-0 max-w-full',
+        definition.kind === 'list' ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap',
+        (definition.kind === 'identifier' ||
+          definition.kind === 'version' ||
+          definition.kind === 'revision') &&
+          'font-mono text-xs',
+        (definition.kind === 'number' ||
+          definition.kind === 'date' ||
+          definition.kind === 'dateTime') &&
+          'tabular-nums',
+      )}
+    >
+      {formatter.format(value, definition)}
+    </span>
+  );
+}
+
 function StateRow({
   columnCount,
   tableWidth,
@@ -696,7 +861,7 @@ function StateRow({
   children,
 }: {
   columnCount: number;
-  tableWidth: number;
+  tableWidth: number | string;
   virtualized: boolean;
   children: React.ReactNode;
 }) {
@@ -715,11 +880,13 @@ function StateRow({
 
 function LoadingRows<TData>({
   columns,
+  columnLayout,
   messages,
   visible,
   virtualized,
 }: {
   columns: readonly Column<TData, unknown>[];
+  columnLayout: DataTableColumnLayout<TData>;
   messages: DataTableMessages;
   visible: boolean;
   virtualized: boolean;
@@ -734,15 +901,18 @@ function LoadingRows<TData>({
           {columns.map((columnDefinition, column) => (
             <TableCell
               key={`loading-${rowId}-${columnDefinition.id}`}
+              data-align={isEndAligned(columnDefinition) ? 'end' : 'start'}
               className={cn(
                 'py-1 align-middle first:pl-3',
+                isEndAligned(columnDefinition) && 'text-right',
                 virtualized && 'flex shrink-0 items-center',
               )}
-              style={virtualized ? { width: columnDefinition.getSize() } : undefined}
+              style={virtualized ? { width: columnLayout.width(columnDefinition) } : undefined}
             >
               <div
                 className={cn(
                   'flex min-w-0 items-center',
+                  isEndAligned(columnDefinition) && 'justify-end',
                   axisStyles.density.minHeight.touchTarget,
                   axisStyles.density.minHeight.compactControlAtSmall,
                 )}
@@ -758,6 +928,96 @@ function LoadingRows<TData>({
       ))}
     </>
   );
+}
+
+function isEndAligned<TData>(column: Column<TData, unknown>): boolean {
+  return column.columnDef.meta?.cell.kind === 'number';
+}
+
+interface DataTableColumnLayout<TData> {
+  tableWidth: number | string;
+  allowsHorizontalOverflow: boolean;
+  width: (column: Column<TData, unknown>) => number;
+  left: (column: Column<TData, unknown>) => number | undefined;
+  right: (column: Column<TData, unknown>) => number | undefined;
+}
+
+function createColumnLayout<TData>(
+  columns: readonly Column<TData, unknown>[],
+  viewportWidth: number,
+): DataTableColumnLayout<TData> {
+  const preferredWidth = columns.reduce((total, column) => total + column.getSize(), 0);
+  const allowsHorizontalOverflow = viewportWidth > 0 && viewportWidth < compactTableViewportWidth;
+  const fitToViewport = viewportWidth > 0 && !allowsHorizontalOverflow;
+  const widths = new Map<string, number>();
+
+  if (!fitToViewport) {
+    for (const column of columns) widths.set(column.id, column.getSize());
+  } else {
+    const fixedColumns = columns.filter(isFixedWidthColumn);
+    const flexibleColumns = columns.filter((column) => !isFixedWidthColumn(column));
+    const fixedWidth = fixedColumns.reduce((total, column) => total + column.getSize(), 0);
+    const flexibleBudget = Math.max(viewportWidth - fixedWidth, 0);
+    const flexiblePreferredWidth = flexibleColumns.reduce(
+      (total, column) => total + column.getSize(),
+      0,
+    );
+    for (const column of fixedColumns) widths.set(column.id, column.getSize());
+    for (const column of flexibleColumns) {
+      widths.set(
+        column.id,
+        flexiblePreferredWidth > 0
+          ? (flexibleBudget * column.getSize()) / flexiblePreferredWidth
+          : 0,
+      );
+    }
+  }
+
+  const leftOffsets = new Map<string, number>();
+  let left = 0;
+  for (const column of columns.filter((column) => column.getIsPinned() === 'left')) {
+    leftOffsets.set(column.id, left);
+    left += widths.get(column.id) ?? column.getSize();
+  }
+  const rightOffsets = new Map<string, number>();
+  let right = 0;
+  for (const column of columns.filter((column) => column.getIsPinned() === 'right').reverse()) {
+    rightOffsets.set(column.id, right);
+    right += widths.get(column.id) ?? column.getSize();
+  }
+
+  return {
+    tableWidth: fitToViewport ? '100%' : Math.max(preferredWidth, viewportWidth),
+    allowsHorizontalOverflow,
+    width: (column) => widths.get(column.id) ?? column.getSize(),
+    left: (column) => leftOffsets.get(column.id),
+    right: (column) => rightOffsets.get(column.id),
+  };
+}
+
+function isFixedWidthColumn<TData>(column: Column<TData, unknown>): boolean {
+  const { minSize, maxSize } = column.columnDef;
+  return minSize !== undefined && maxSize !== undefined && minSize === maxSize;
+}
+
+function hasMultipleTextLines(element: HTMLElement): boolean {
+  const candidates = [element, ...element.querySelectorAll<HTMLElement>('*')].filter(
+    (candidate) => candidate.childElementCount === 0,
+  );
+  const lineTops: number[] = [];
+  for (const candidate of candidates) {
+    if (!candidate.textContent?.trim() || candidate.closest('.sr-only,[aria-hidden="true"]')) {
+      continue;
+    }
+    for (const rect of Array.from(candidate.getClientRects())) {
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      if (!lineTops.some((top) => Math.abs(top - rect.top) < 2)) lineTops.push(rect.top);
+      if (lineTops.length > 1) return true;
+    }
+    const lineHeight = Number.parseFloat(getComputedStyle(candidate).lineHeight);
+    if (Number.isFinite(lineHeight) && candidate.scrollHeight > lineHeight * 1.5) return true;
+  }
+  return false;
 }
 
 function DataTableFooter<TData>({
@@ -914,13 +1174,16 @@ function pageWindow(pageIndex: number, pageCount: number): number[] {
   return Array.from({ length: count }, (_, index) => start + index);
 }
 
-function pinnedColumnStyle<TData>(column: Column<TData, unknown>): React.CSSProperties {
+function pinnedColumnStyle<TData>(
+  column: Column<TData, unknown>,
+  layout: DataTableColumnLayout<TData>,
+): React.CSSProperties {
   const pinned = column.getIsPinned();
   if (!pinned) return {};
   return {
     position: 'sticky',
-    left: pinned === 'left' ? column.getStart('left') : undefined,
-    right: pinned === 'right' ? column.getAfter('right') : undefined,
+    left: pinned === 'left' ? layout.left(column) : undefined,
+    right: pinned === 'right' ? layout.right(column) : undefined,
     zIndex: 10,
     boxShadow:
       pinned === 'left' && column.getIsLastColumn('left')

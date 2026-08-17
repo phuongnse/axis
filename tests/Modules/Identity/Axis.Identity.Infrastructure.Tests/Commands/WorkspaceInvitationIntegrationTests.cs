@@ -13,6 +13,7 @@ using Axis.Identity.Infrastructure.Persistence.Entities;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Identity.Infrastructure.Tests.Fixtures;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -811,7 +812,8 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 workspaceId,
                 invitationId,
                 1,
-                "revoke-race"),
+                "revoke-race",
+                "Workspace Admin"),
             TestContext.Current.CancellationToken);
     }
 
@@ -1088,8 +1090,10 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             Guid workspaceId,
             int offset,
             int limit,
+            WorkspaceInvitationSortField? sortBy = null,
+            CollectionSortDirection? sortDirection = null,
             CancellationToken ct = default) =>
-            inner.ListForWorkspaceAsync(workspaceId, offset, limit, ct);
+            inner.ListForWorkspaceAsync(workspaceId, offset, limit, sortBy, sortDirection, ct);
 
         public Task<int> CountForWorkspaceAsync(Guid workspaceId, CancellationToken ct = default) =>
             inner.CountForWorkspaceAsync(workspaceId, ct);
@@ -1161,8 +1165,10 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             Guid workspaceId,
             int offset,
             int limit,
+            WorkspaceInvitationSortField? sortBy = null,
+            CollectionSortDirection? sortDirection = null,
             CancellationToken ct = default) =>
-            inner.ListForWorkspaceAsync(workspaceId, offset, limit, ct);
+            inner.ListForWorkspaceAsync(workspaceId, offset, limit, sortBy, sortDirection, ct);
 
         public Task<int> CountForWorkspaceAsync(Guid workspaceId, CancellationToken ct = default) =>
             inner.CountForWorkspaceAsync(workspaceId, ct);

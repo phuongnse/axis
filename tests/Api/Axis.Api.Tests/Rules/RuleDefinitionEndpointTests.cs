@@ -558,6 +558,61 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task ListRuleDefinitions_WhenNameSortIsExplicit_SortsLocalizedWholeCatalogBeforePaging()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules?page=1&pageSize=6&language=vi&sortBy=Name&sortDirection=Ascending",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        body.GetProperty("items").EnumerateArray()
+            .Select(definition => definition.GetProperty("definitionKey").GetString())
+            .Should().Equal(
+                RuleDefinitionKeys.Required,
+                RuleDefinitionKeys.DateRange,
+                RuleDefinitionKeys.DateTimeRange,
+                RuleDefinitionKeys.NumericRange,
+                RuleDefinitionKeys.TextPattern,
+                RuleDefinitionKeys.ChoiceSelectionCount);
+    }
+
+    [Theory]
+    [InlineData("Origin")]
+    [InlineData("Status")]
+    public async Task ListRuleDefinitions_WhenScalarEnumSortIsExplicit_AcceptsThePublicContract(
+        string sortBy)
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules?page=1&pageSize=20&sortBy={sortBy}&sortDirection=Ascending",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Theory]
+    [InlineData("sortBy=Name")]
+    [InlineData("sortDirection=Ascending")]
+    [InlineData("sortBy=999&sortDirection=Ascending")]
+    public async Task ListRuleDefinitions_WhenSortParametersAreIncompleteOrInvalid_ReturnsBadRequest(string sortQuery)
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules?page=1&pageSize=20&{sortQuery}",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task WorkspaceRule_WhenAccessedFromAnotherWorkspace_ReturnsNotFoundWithoutMutation()
     {
         string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());

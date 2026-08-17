@@ -77,6 +77,7 @@ Product Builder persistence, creator bootstrap, membership lifecycle interaction
 - **AC-013** Grant, revocation, denial, and failure outcomes are correlated, redacted, and fail closed when required audit work cannot be confirmed.
 - **AC-014** The management UI is keyboard and screen-reader operable, names the current Workspace and target member, distinguishes lifecycle role from Product Builder, and exposes pending, success, conflict, denial, and recovery states.
 - **AC-015** Identity Product Builder persistence, application contracts, API projections, and authority decisions contain no module, route, resource-type, or action registry; adding or removing an authoring adapter requires no Identity data migration.
+- **AC-016** Membership administration exposes each active human membership's complete server-owned current-state metadata in the Resource Workspace order: revision, created actor/time, and modified actor/time. Actor cells show the authenticated user's display name; membership and Product Builder mutations preserve one truthful provenance trail.
 
 ## Acceptance Test Matrix
 
@@ -89,7 +90,7 @@ Product Builder persistence, creator bootstrap, membership lifecycle interaction
 | AT-005 | API/Application boundaries | A non-builder with exact published-definition product authority can read published Business Object runtime metadata but cannot read unpublished state or author | AC-004, AC-012 | API integration test + Application test | Yes |
 | AT-006 | Application boundary | Suspend/reactivate/remove, self-change, service, inactive, stale, concurrent, and foreign targets preserve fail-closed authority invariants | AC-008, AC-009, AC-010 | Domain test + Application test | Yes |
 | AT-007 | Infrastructure boundary | Grant, revoke, denial, and failure audit outcomes are durable, correlated, append-only, and redacted | AC-013 | Infrastructure integration test | Yes |
-| AT-008 | UI component | Membership administration projects independent role and Product Builder state with accessible grant/revoke, pending, conflict, and recovery behavior | AC-005, AC-006, AC-014 | UI component test | Yes |
+| AT-008 | UI/API boundaries | Membership administration projects independent role and Product Builder state with accessible grant/revoke, pending, conflict, recovery, and complete current-state metadata behavior | AC-005, AC-006, AC-014, AC-016 | UI component test + API integration test | Yes |
 | AT-009 | Browser journey | Authenticated blank Personal and organization creator Workspaces show Rules and Business Objects; a granted member gains and a revoked member loses both authoring surfaces after authoritative refresh | AC-001, AC-002, AC-003, AC-005, AC-011, AC-014 | Browser automation | Yes |
 | AT-010 | Architecture boundary | Identity Product Builder code and storage contain no dependency on current authoring modules or their routes/actions; current modules depend only on the generic Identity contract | AC-003, AC-015 | Architecture test | Yes |
 

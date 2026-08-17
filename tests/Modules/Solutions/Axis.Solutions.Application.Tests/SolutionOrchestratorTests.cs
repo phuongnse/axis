@@ -19,7 +19,7 @@ public sealed class SolutionOrchestratorTests
         Audit audit = new();
         UnitOfWork unitOfWork = new();
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-preflight", SolutionSubjectKind.Human);
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-preflight", SolutionSubjectKind.Human, "Axis Admin");
         Adapter adapter = new("authorization.policy.v1", fail: true);
         SolutionOrchestrator orchestrator = new(
             new SolutionPackageVerifier(keys),
@@ -60,7 +60,7 @@ public sealed class SolutionOrchestratorTests
         Audit audit = new();
         UnitOfWork unitOfWork = new();
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-race", SolutionSubjectKind.Human);
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-race", SolutionSubjectKind.Human, "Axis Admin");
         byte[] envelope = CreateSignedEnvelope(key, digest);
         Guid canonicalVersionId = Guid.Empty;
         unitOfWork.OnNextSave = () =>
@@ -120,7 +120,7 @@ public sealed class SolutionOrchestratorTests
         Audit audit = new();
         UnitOfWork unitOfWork = new();
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-conflict", SolutionSubjectKind.Human);
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-conflict", SolutionSubjectKind.Human, "Axis Admin");
         byte[] requestedEnvelope = CreateSignedEnvelope(key, digest);
         byte[] canonicalEnvelope = CreateSignedEnvelope(key, digest, "other-build");
         string canonicalPackageSha256 = Convert.ToHexString(SHA256.HashData(canonicalEnvelope)).ToLowerInvariant();
@@ -629,7 +629,8 @@ public sealed class SolutionOrchestratorTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "test-correlation",
-            SolutionSubjectKind.Human);
+            SolutionSubjectKind.Human,
+            "Axis Admin");
         public SolutionOrchestrator Orchestrator { get; }
         public InstallSolutionRequest Request { get; }
         public Harness(

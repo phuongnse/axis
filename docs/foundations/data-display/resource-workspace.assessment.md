@@ -6,7 +6,7 @@
 
 This is the criterion-level technical assessment for the complete `resource-workspace` review unit. The evaluated page/process includes the shared `ResourceWorkspace` page anatomy, its one primary `DataTable`, and all six registered consumers: Business Objects, Memberships, Product Roles, Rules, Service Identities, and Solution Delivery. It covers page orientation, collection status, search/filter/group/column controls where enabled, row and bulk selection where enabled, sort, paging, loading, empty, error/retry, ready, denied-action, toolbar-owned commands, and collection-preserving record-launch states.
 
-The assessment does not absorb managed-task-window anatomy, record-editor content, feature authorization, API or persistence correctness, product validation, route-specific copy, or product-wide certification. Managed windows remain closed in the visual matrix. The shared row-rhythm and semantic status-state replacement reopens Resource Workspace acceptance; Solution Delivery remains a registered consumer and supplies its own product-state evidence.
+The assessment does not absorb managed-task-window anatomy, record-editor content, feature authorization, API or persistence correctness, product validation, route-specific copy, or product-wide certification. Managed windows remain closed in the visual matrix. The required semantic cell-kind, locale-formatting, adaptive row alignment, viewport-aware sizing, and containment contract reopens Resource Workspace acceptance; Solution Delivery remains a registered consumer and supplies its own product-state evidence.
 
 Normative and informative references:
 
@@ -25,16 +25,16 @@ Normative and informative references:
 | Appearance | Light and dark; deterministic reduced-motion media; rest, hover, keyboard-focus, disabled, current-page, selection, status, and retry states |
 | Content | Canonical EN plus VI; Business Objects as the maximal visual representative; twenty rows, long localized description/control text, and WCAG text-spacing overrides |
 | Input/semantics | Pointer and keyboard journeys; one `h1`; named collection region; native table/header/cell semantics; labels, current page, selected rows, busy/status feedback, and named controls |
-| Visual | Five accepted captures: light/dark × desktop/compact plus VI at the 320 CSS-pixel text-spacing/reflow boundary |
+| Visual | Five current candidate captures: light/dark × desktop/compact plus VI at the 320 CSS-pixel text-spacing/reflow boundary |
 | Deterministic checks | Typed owner/id contract; six-consumer real-symbol registry; component state evidence; browser surface markers, accessibility-tree snapshot, focus treatment, 32/44 CSS-pixel geometry, internal/document overflow, theme, locale, reduced motion, and exact screenshot comparison; clean-cutover sweep |
 
-Automation supports but does not make the perceptual or standards-review decision. Business Objects is representative because it exercises the complete page header, description, search, column control, primary action, maximal column set, status badges, paging, and both internal scroll axes. Focused component evidence covers owner options and states not visible in one ready-state capture, while the six consumer suites establish product adoption without treating feature semantics as surface-owned.
+Automation supports but does not make the perceptual or standards-review decision. Business Objects is representative because it exercises the complete page header, description, search, column control, primary action, maximal column set, status badges, paging, regular-width column fitting, and compact horizontal overflow. Focused component evidence covers owner options and states not visible in one ready-state capture, while the six consumer suites establish product adoption without treating feature semantics as surface-owned.
 
 Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1280 CSS pixels at 400%, and separately applies the specified letter, word, and line spacing. The page retains viewport ownership while the table viewport alone owns overflow. Compact hit targets are at least 44 CSS pixels and desktop controls at least 32 CSS pixels; the column-resize drag handle retains its separate 24 CSS-pixel minimum-target contract and is not represented as a toolbar action.
 
 ## WCAG 2.2 A/AA applicability
 
-`Technical pass` means no failure was found within the declared page/process and current representative matrix. `N/A` means the scoped page/process contains no content or operation to which the criterion applies. These accepted findings apply only to this declared review unit and are not a product-wide certification claim.
+`Technical pass` means no failure was found within the declared page/process and current representative matrix. `N/A` means the scoped page/process contains no content or operation to which the criterion applies. These current technical findings apply only to this declared review unit, remain subject to project-owner review, and are not a product-wide certification claim.
 
 | Criterion | Result | Scoped evidence or rationale |
 |---|---|---|
@@ -56,7 +56,7 @@ Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1
 | 1.4.5 Images of Text | Technical pass | No image of text. |
 | 1.4.10 Reflow | Technical pass | At 320 CSS pixels, the page has no horizontal document overflow; the table exposes its own horizontal and vertical scrolling as required by the data relationship. |
 | 1.4.11 Non-text Contrast | Technical pass | Control, table, current-page, status, selection, and focus boundaries use canonical semantic theme pairs and are rendered in both themes. |
-| 1.4.12 Text Spacing | Technical pass | The VI matrix applies the WCAG letter/word/line spacing values, then rechecks document overflow, internal table scrolling, target geometry, focus, and the accepted capture. |
+| 1.4.12 Text Spacing | Technical pass | The VI matrix applies the WCAG letter/word/line spacing values, then rechecks document overflow, internal table scrolling, target geometry, focus, and the current candidate capture. |
 | 1.4.13 Content on Hover or Focus | Technical pass | Toolbar menus remain dismissible and do not make essential information hover-only; the representative hover treatment is reduced-motion safe. |
 | 2.1.1 Keyboard | Technical pass | Search, table sort/actions, selection, paging, retry, and consumer actions use native or accessible controls; browser and component evidence operate them by keyboard. |
 | 2.1.2 No Keyboard Trap | Technical pass | The collection itself creates no trap; toolbar popups use standard dismissible behavior. Managed windows are outside this review unit. |
@@ -106,19 +106,19 @@ These are current technical findings for the declared Resource Workspace review 
 | Learnability | All six consumers reuse one page/table grammar, semantic state mapping, density system, and paging/query placement. |
 | Controllability | Query and paging changes require direct operation; record launch is explicit; retry is local; table state remains available when a separate managed workflow opens. |
 | Use-error robustness | Loading and failure states preserve page context; retry remains local; selection/query state is explicit; feature workflows retain validation, authorization, conflict, and dirty-close policy. |
-| User engagement | Calm page hierarchy, one dominant collection, restrained borders/elevation, semantic state use, centrally aligned row content, and stable internal scrolling keep attention on the data task; the accepted matrix records the current perceptual judgment. |
+| User engagement | Calm page hierarchy, one dominant collection, restrained borders/elevation, semantic state use, vertically centered one-line rows, first-line-aligned expanding list rows, regular-width fitting, and stable compact overflow keep attention on the data task; the candidate matrix awaits the project owner's perceptual judgment. |
 
-The human-centred lifecycle evidence evaluates one coherent shared boundary and exercises adverse width, locale, text spacing, theme, motion, row volume, query, paging, loading, empty, error, denial, and recovery conditions. Technical evidence and project-owner review are complete for this review unit.
+The human-centred lifecycle evidence evaluates one coherent shared boundary and exercises adverse width, locale, text spacing, theme, motion, row volume, query, paging, loading, empty, error, denial, and recovery conditions. Technical evidence is current; project-owner review of the replacement candidate remains pending for this review unit.
 
 ## Ownership and retirement
 
 - `ResourceWorkspace` is the only shared collection-page owner and requires one of the six finite `resource-workspace` ids.
-- `DataTable` is the only shared primary collection table owner. Its toolbar, query builder, table viewport, centrally aligned row states, stable loading geometry, and footer share centralized app-owned density, spacing, and checkbox hit-area mappings.
+- `DataTable` is the only shared primary collection table owner. Its required cell-kind and locale contract compiler-binds all consumers to centralized default formatting, empty-value copy, numeric end alignment, identifier treatment, scalar containment, list wrapping, measured row-level vertical alignment, regular-width fitting, compact horizontal overflow, stable loading geometry, density, spacing, and checkbox hit-area mappings.
 - `BusinessObjectsPage`, `MembershipManagementPage`, `ProductRoleAssignmentsPage`, `RulesPage`, `ServiceIdentitiesPage`, and `SolutionsPage` are the six active consumers; the real-symbol registry compiler-binds each implementation and id to the owner.
 - Consumers retain API, authorization, localized copy, record workflow, validation, mutation, and recovery semantics. `ResourceWorkspace` and `DataTable` own only the shared page/collection presentation contract.
 - `ManagedWindowManager` and its windows remain a separate review unit even when launched from a collection. No managed window is open in Resource Workspace perceptual evidence.
-- The supported path contains no parallel collection-page wrapper, feature-owned primary table, action-column fallback, compatibility alias, or legacy composition. The retirement sweep is `rg -n "ResourceWorkspace|resource-workspace|<DataTable|data-slot=\"resource-workspace\"" frontend/src frontend/tests frontend/e2e` and must be reviewed with the typed registry evidence.
+- The supported path contains no parallel collection-page wrapper, feature-owned primary table, action-column fallback, feature-local scalar date/number formatter, compatibility alias, multi-line scalar identity cell, or legacy composition. The retirement sweep is `rg -n "ResourceWorkspace|resource-workspace|<DataTable|Intl\\.(DateTime|Number)Format|secondaryLabel|line-clamp" frontend/src frontend/tests frontend/e2e` and must be reviewed with the typed registry evidence.
 
 ## Review disposition
 
-Technical assessment: **accepted for the declared Resource Workspace**. Human-facing lifecycle roll-up: **Complete**. All eighteen current profile requirements are acceptance-traced with accepted perceptual evidence, criterion-level standards assessment, typed consumer ownership, rendered owner markers, and current retirement proof.
+Technical assessment: **current for the declared Resource Workspace candidate**. Human-facing lifecycle roll-up: **Awaiting review**. Fifteen current profile requirements are acceptance-traced with current technical and candidate perceptual evidence; the three review-dependent standards requirements remain gaps until the project owner accepts or requests changes to the rendered result.

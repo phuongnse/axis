@@ -1,3 +1,4 @@
+using Axis.Rules.Application;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Domain;
@@ -5,6 +6,7 @@ using Axis.Rules.Infrastructure.Persistence;
 using Axis.Rules.Infrastructure.Repositories;
 using Axis.Rules.Infrastructure.Tests.Fixtures;
 using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -131,6 +133,54 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
     }
 
     [Fact]
+    public async Task ListForWorkspaceAsync_WhenNameSortIsExplicit_SortsBeforePaging()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        RuleDefinition alpha = ConfiguredDraft(workspaceId, UniqueKey("alpha"), "Alpha rule");
+        RuleDefinition zulu = ConfiguredDraft(workspaceId, UniqueKey("zulu"), "Zulu rule");
+        await _repository.AddAsync(alpha, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(zulu, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<RuleDefinition> result = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            skip: 0,
+            take: 1,
+            sortBy: RuleDefinitionSortField.Name,
+            sortDirection: CollectionSortDirection.Descending,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Should().ContainSingle().Which.Id.Should().Be(zulu.Id);
+    }
+
+    [Fact]
+    public async Task ListForWorkspaceAsync_WhenStatusSortIsExplicit_SortsBeforePaging()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        RuleDefinition draft = ConfiguredDraft(workspaceId, UniqueKey("draft_status"), "Draft rule");
+        RuleDefinition active = ConfiguredDraft(workspaceId, UniqueKey("active_status"), "Active rule");
+        CreateVersion(active);
+        active.ActivateVersion(
+            active.Revision,
+            1,
+            RuleSubjectReference.Human(Guid.NewGuid()),
+            DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        await _repository.AddAsync(draft, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(active, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<RuleDefinition> result = await _repository.ListForWorkspaceAsync(
+            workspaceId,
+            skip: 0,
+            take: 1,
+            sortBy: RuleDefinitionSortField.Status,
+            sortDirection: CollectionSortDirection.Ascending,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Should().ContainSingle().Which.Id.Should().Be(active.Id);
+    }
+
+    [Fact]
     public async Task SaveChangesAsync_WhenDraftIsRevised_PreservesPersistedImmutableVersion()
     {
         Guid workspaceId = Guid.NewGuid();
@@ -181,6 +231,7 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             name,
             $"Search document for {name}.",
             RuleSubjectReference.Human(Guid.NewGuid()),
+            ActorSnapshot.User(Guid.NewGuid(), "Ada Lovelace"),
             DateTime.UtcNow).Value;
         definition.SaveDraft(
             definition.Revision,

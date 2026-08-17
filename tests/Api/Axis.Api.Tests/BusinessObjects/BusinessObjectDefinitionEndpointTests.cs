@@ -32,6 +32,29 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
     }
 
     [Fact]
+    public async Task ListDefinitions_WhenSortPairIsSpecified_OrdersTheWholeDataset()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        string suffix = Guid.NewGuid().ToString("N");
+        Guid alphaId = await CreateUnpublishedAsync(accessToken, $"Alpha {suffix}");
+        Guid zuluId = await CreateUnpublishedAsync(accessToken, $"Zulu {suffix}");
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/business-object-definitions?page=1&pageSize=100&sortBy=Name&sortDirection=Descending",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        body.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .Where(id => id == alphaId || id == zuluId)
+            .Should().Equal(zuluId, alphaId);
+    }
+
+    [Fact]
     public async Task DefinitionAuthoring_WhenNonBuilder_ReturnsForbidden()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
@@ -161,6 +184,11 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         created.GetProperty("status").GetString().Should().Be(nameof(BusinessObjectDefinitionStatus.Unpublished));
         created.GetProperty("objectKey").GetString().Should().Be(objectKey);
         created.GetProperty("revision").GetInt32().Should().Be(1);
+        JsonElement createdMetadata = created.GetProperty("metadata");
+        createdMetadata.GetProperty("createdBy").GetProperty("displayName").GetString()
+            .Should().Be("Alice Smith");
+        createdMetadata.GetProperty("modifiedBy").GetProperty("displayName").GetString()
+            .Should().Be("Alice Smith");
 
         Guid requiredBindingId = await CreateRuleBindingAsync(
             accessToken,
@@ -248,6 +276,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         saved.GetProperty("objectKey").GetString().Should().Be(objectKey);
         saved.GetProperty("revision").GetInt32().Should().Be(2);
+        saved.GetProperty("metadata").GetProperty("modifiedBy").GetProperty("displayName").GetString()
+            .Should().Be("Alice Smith");
         saved.GetProperty("fields").GetArrayLength().Should().Be(2);
         JsonElement savedNameField = saved.GetProperty("fields")[0];
         savedNameField.GetProperty("fieldType").GetString().Should().Be("Text");

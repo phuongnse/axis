@@ -63,6 +63,20 @@ export interface DataTableFilterCondition {
   value: DataTableFilterValue;
 }
 
+export type DataTableCellDefinition =
+  | { kind: 'text' }
+  | { kind: 'identifier' }
+  | { kind: 'version' }
+  | { kind: 'revision' }
+  | { kind: 'actor' }
+  | { kind: 'number'; format?: Intl.NumberFormatOptions }
+  | { kind: 'date'; format?: Intl.DateTimeFormatOptions }
+  | { kind: 'dateTime'; format?: Intl.DateTimeFormatOptions }
+  | { kind: 'boolean' }
+  | { kind: 'status' }
+  | { kind: 'list' }
+  | { kind: 'action' };
+
 export interface DataTableFilterGroup {
   id: string;
   combinator: 'and' | 'or';
@@ -71,6 +85,7 @@ export interface DataTableFilterGroup {
 
 export interface DataTableColumnMeta<TData> {
   label: string;
+  cell: DataTableCellDefinition;
   filter?: DataTableFilterDefinition<TData>;
   searchable?: boolean;
   searchValue?: (row: TData) => unknown;
@@ -80,7 +95,9 @@ declare module '@tanstack/react-table' {
   interface ColumnMeta<TData, TValue> extends DataTableColumnMeta<TData> {}
 }
 
-export type DataTableColumnDef<TData> = ColumnDef<TData, unknown>;
+export type DataTableColumnDef<TData> = ColumnDef<TData, unknown> & {
+  meta: DataTableColumnMeta<TData>;
+};
 
 export interface DataTableQueryState {
   globalFilter: string;
@@ -183,6 +200,7 @@ export interface DataTableMessages {
   maximum: string;
   trueValue: string;
   falseValue: string;
+  emptyValue: string;
   allValues: string;
   rowsPerPage: string;
   pageStatus: (page: number, pageCount: number) => string;
@@ -203,6 +221,7 @@ export interface DataTableMessages {
 
 export interface DataTableDefinition<TData> {
   ariaLabel: string;
+  locale: string;
   source: DataTableSource<TData>;
   columns: readonly DataTableColumnDef<TData>[];
   messages: DataTableMessages;

@@ -74,6 +74,7 @@ public static class ProductRoleAssignmentEndpoints
                 request.RoleKey ?? string.Empty,
                 idempotencyKey ?? string.Empty,
                 CorrelationId(context),
+                currentUser.DisplayName,
                 request.ExpectedRevision),
             cancellationToken);
 
@@ -100,6 +101,7 @@ public static class ProductRoleAssignmentEndpoints
                 request.RoleKey ?? string.Empty,
                 idempotencyKey ?? string.Empty,
                 CorrelationId(context),
+                currentUser.DisplayName,
                 request.ExpectedRevision),
             cancellationToken);
 

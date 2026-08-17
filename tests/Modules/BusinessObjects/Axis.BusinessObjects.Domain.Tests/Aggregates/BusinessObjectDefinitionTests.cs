@@ -34,6 +34,7 @@ public sealed class BusinessObjectDefinitionTests
             WorkspaceId,
             new string('n', 257),
             BusinessObjectDefinitionKey.Create("customer").Value,
+            ActorSnapshot.User(Guid.NewGuid(), "Ada Lovelace"),
             Now);
 
         result.IsFailure.Should().BeTrue();
@@ -508,6 +509,7 @@ public sealed class BusinessObjectDefinitionTests
             WorkspaceId,
             "Customer",
             BusinessObjectDefinitionKey.Create("customer").Value,
+            ActorSnapshot.User(Guid.NewGuid(), "Ada Lovelace"),
             Now);
 
         result.IsSuccess.Should().BeTrue();

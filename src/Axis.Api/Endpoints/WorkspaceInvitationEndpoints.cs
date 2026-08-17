@@ -6,6 +6,7 @@ using Axis.Identity.Application.Commands.InviteWorkspaceMember;
 using Axis.Identity.Application.Commands.ResendWorkspaceInvitation;
 using Axis.Identity.Application.Commands.RevokeWorkspaceInvitation;
 using Axis.Identity.Application.Queries.ListWorkspaceInvitations;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -90,6 +91,8 @@ public static class WorkspaceInvitationEndpoints
     private static async Task<IResult> List(
         [FromQuery] int page,
         [FromQuery] int pageSize,
+        [FromQuery] WorkspaceInvitationSortField? sortBy,
+        [FromQuery] CollectionSortDirection? sortDirection,
         CurrentUser currentUser,
         ISender mediator,
         CancellationToken ct)
@@ -101,7 +104,9 @@ public static class WorkspaceInvitationEndpoints
                 currentUser.UserId,
                 currentUser.WorkspaceId,
                 effectivePage,
-                effectivePageSize),
+                effectivePageSize,
+                sortBy,
+                sortDirection),
             ct);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
@@ -120,7 +125,8 @@ public static class WorkspaceInvitationEndpoints
                 currentUser.WorkspaceId,
                 invitationId,
                 request.ExpectedRevision,
-                CorrelationId(context)),
+                CorrelationId(context),
+                currentUser.DisplayName),
             ct);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
@@ -139,7 +145,8 @@ public static class WorkspaceInvitationEndpoints
                 currentUser.WorkspaceId,
                 invitationId,
                 request.ExpectedRevision,
-                CorrelationId(context)),
+                CorrelationId(context),
+                currentUser.DisplayName),
             ct);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }

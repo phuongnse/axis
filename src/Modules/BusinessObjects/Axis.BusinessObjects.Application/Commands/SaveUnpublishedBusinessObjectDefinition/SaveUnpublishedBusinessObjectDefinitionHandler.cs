@@ -57,6 +57,9 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
             DateTime.UtcNow);
         if (saved.IsFailure)
             return MapDomainFailure(saved);
+        Result provenance = definition.RecordModification(BusinessObjectActor.From(currentSubject));
+        if (provenance.IsFailure)
+            return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(provenance.Error);
 
         try
         {

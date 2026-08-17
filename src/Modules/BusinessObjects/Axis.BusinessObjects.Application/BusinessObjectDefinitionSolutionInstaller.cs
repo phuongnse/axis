@@ -55,6 +55,7 @@ public sealed class BusinessObjectDefinitionSolutionInstaller(
                 workspaceId,
                 component.Name,
                 ObjectKey,
+                ActorSnapshot.System("Axis solution installer"),
                 now);
             if (created.IsFailure ||
                 created.Value.SaveUnpublished(
@@ -354,14 +355,19 @@ public sealed class BusinessObjectDefinitionSolutionInstaller(
     private static Result Stamp(
         BusinessObjectDefinition definition,
         string componentKey,
-        BusinessObjectDefinitionInstallationReceipt receipt) =>
-        definition.AdvanceInstallationReceipt(
+        BusinessObjectDefinitionInstallationReceipt receipt)
+    {
+        Result advanced = definition.AdvanceInstallationReceipt(
             receipt.SolutionVersionId,
             componentKey,
             receipt.ComponentHash,
             receipt.OperationId,
             receipt.StepId,
             receipt.LeaseEpoch);
+        return advanced.IsFailure
+            ? advanced
+            : definition.RecordModification(ActorSnapshot.System("Axis solution installer"));
+    }
 
     private static bool ValidReceipt(BusinessObjectDefinitionInstallationReceipt? receipt) =>
         receipt is not null && receipt.SolutionVersionId != Guid.Empty &&
