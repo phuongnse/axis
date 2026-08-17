@@ -1,6 +1,7 @@
 using Axis.Identity.Domain.Aggregates;
-using Axis.Shared.Application;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application;
+
 namespace Axis.Identity.Application.Repositories;
 
 public interface IWorkspaceMembershipRepository

@@ -1,5 +1,5 @@
-using Axis.Solutions.Domain;
 using Axis.Shared.Domain.Primitives;
+using Axis.Solutions.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

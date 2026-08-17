@@ -1,5 +1,5 @@
-using FluentValidation;
 using Axis.Shared.Application;
+using FluentValidation;
 
 namespace Axis.BusinessObjects.Application.Queries.ListBusinessObjectDefinitions;
 

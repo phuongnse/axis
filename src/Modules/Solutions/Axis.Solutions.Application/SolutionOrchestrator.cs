@@ -1,7 +1,7 @@
 using Axis.Audit.Contracts;
+using Axis.Shared.Domain.Primitives;
 using Axis.Solutions.Contracts;
 using Axis.Solutions.Domain;
-using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Solutions.Application;
 

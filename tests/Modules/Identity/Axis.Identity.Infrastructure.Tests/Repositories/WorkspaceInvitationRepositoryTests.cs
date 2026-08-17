@@ -21,7 +21,16 @@ public sealed class WorkspaceInvitationRepositoryTests(IdentityDatabaseFixture d
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync() => await _context.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        WorkspaceInvitation[] invitations = _context.ChangeTracker
+            .Entries<WorkspaceInvitation>()
+            .Select(entry => entry.Entity)
+            .ToArray();
+        _context.WorkspaceInvitations.RemoveRange(invitations);
+        await _context.SaveChangesAsync(CancellationToken.None);
+        await _context.DisposeAsync();
+    }
 
     [Theory]
     [InlineData(WorkspaceInvitationSortField.Email, false)]
