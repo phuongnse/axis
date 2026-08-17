@@ -6,6 +6,7 @@ using Axis.Api.Tests.Helpers;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,6 +29,9 @@ public sealed class WorkspaceProductBuilderEndpointTests(ApiTestFixture fixture)
             administrator.WorkspaceId,
             target.Id,
             WorkspaceMembershipRole.Member);
+        targetMembership.InitializeMetadata(
+            ActorSnapshot.User(administrator.UserId, "Workspace Administrator"),
+            DateTime.UtcNow);
         using (IServiceScope scope = fixture.CreateScope())
         {
             IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -49,6 +53,13 @@ public sealed class WorkspaceProductBuilderEndpointTests(ApiTestFixture fixture)
         targetRow.GetProperty("workspaceRole").GetString().Should().Be("Member");
         targetRow.GetProperty("isProductBuilder").GetBoolean().Should().BeFalse();
         targetRow.GetProperty("canChange").GetBoolean().Should().BeTrue();
+        JsonElement targetCreatedBy = targetRow
+            .GetProperty("metadata")
+            .GetProperty("createdBy");
+        targetCreatedBy.GetProperty("kind").GetString().Should().Be("User");
+        targetCreatedBy.GetProperty("subjectId").GetGuid().Should().Be(administrator.UserId);
+        targetCreatedBy.GetProperty("displayName").GetString()
+            .Should().Be("Workspace Administrator");
 
         HttpResponseMessage granted = await fixture.PostBrowserJsonAsync(
             $"/api/workspace-product-builders/{target.Id}/grant",
