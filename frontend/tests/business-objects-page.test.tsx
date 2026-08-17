@@ -1215,6 +1215,7 @@ function pageWith(detail: ReturnType<typeof definitionDetail>) {
         revision: detail.revision,
         latestPublishedVersionNumber: null,
         updatedAt: detail.updatedAt,
+        metadata: definitionMetadata(detail.revision),
       },
     ],
     totalCount: 1,
@@ -1240,6 +1241,7 @@ function definitionDetail({
     latestPublishedVersionNumber: null,
     createdAt: now,
     updatedAt: now,
+    metadata: definitionMetadata(revision),
     actions: { canSave: true, canPublish: true },
     fields: fields ?? [
       {
@@ -1262,5 +1264,20 @@ function definitionDetail({
       },
     ],
     latestPublishedVersion: null,
+  };
+}
+
+function definitionMetadata(revision: number) {
+  const actor = {
+    kind: 'User',
+    subjectId: '11111111-1111-4111-8111-111111111111',
+    displayName: 'Business Objects User',
+  };
+  return {
+    revision,
+    createdBy: actor,
+    createdAt: now,
+    modifiedBy: actor,
+    modifiedAt: now,
   };
 }
