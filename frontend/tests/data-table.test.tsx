@@ -290,6 +290,62 @@ describe('DataTable', () => {
         desktop.unmount();
       }
 
+      viewportWidth = 768;
+      const compressedMinimums = [280, 200, 170, 180];
+      const compressedColumns: DataTableColumnDef<Item>[] = [
+        {
+          id: 'rule',
+          accessorKey: 'name',
+          size: 330,
+          minSize: compressedMinimums[0],
+          meta: { label: 'Rule', cell: { kind: 'text' } },
+        },
+        {
+          id: 'inputs',
+          accessorKey: 'department',
+          size: 220,
+          minSize: compressedMinimums[1],
+          meta: { label: 'Inputs', cell: { kind: 'list' } },
+        },
+        {
+          id: 'createdBy',
+          accessorKey: 'status',
+          size: 190,
+          minSize: compressedMinimums[2],
+          meta: { label: 'Created by', cell: { kind: 'actor' } },
+        },
+        {
+          id: 'createdAt',
+          accessorKey: 'occurredAt',
+          size: 190,
+          minSize: compressedMinimums[3],
+          meta: { label: 'Created at', cell: { kind: 'dateTime' } },
+        },
+      ];
+      const compressed = render(
+        <DataTable definition={clientDefinition({ columns: compressedColumns })} />,
+      );
+      const compressedViewport = compressed.container.querySelector<HTMLElement>(
+        '[data-slot="data-table-viewport"]',
+      );
+      const compressedWidths = [...(compressedViewport?.querySelectorAll('col') ?? [])].map(
+        (column) => Number.parseFloat((column as HTMLElement).style.width),
+      );
+      const compressedMinimumTotal = compressedMinimums.reduce((total, width) => total + width, 0);
+      expect(compressedViewport).toHaveAttribute('data-horizontal-overflow', 'fitted');
+      expect(compressedWidths).toHaveLength(compressedMinimums.length);
+      compressedWidths.forEach((width, index) => {
+        expect(width).toBeCloseTo(
+          (viewportWidth * compressedMinimums[index]) / compressedMinimumTotal,
+          4,
+        );
+      });
+      expect(compressedWidths.reduce((total, width) => total + width, 0)).toBeCloseTo(
+        viewportWidth,
+        4,
+      );
+      compressed.unmount();
+
       viewportWidth = 390;
       const compact = render(<DataTable definition={clientDefinition()} />);
       const compactViewport = compact.container.querySelector<HTMLElement>(
