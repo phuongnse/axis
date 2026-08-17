@@ -3515,13 +3515,7 @@ DOTNET_SOLUTION_LEVEL_RE = re.compile(
     r"^(Directory[.].*|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)"
 )
 FRONTEND_TEST_SUITE_LEVEL_PATHS = {
-    "frontend/package-lock.json",
-    "frontend/package.json",
     "frontend/src/test/setup.ts",
-    "frontend/tsconfig.app.json",
-    "frontend/tsconfig.json",
-    "frontend/tsconfig.node.json",
-    "frontend/tsconfig.type-tests.json",
     "frontend/vite.config.ts",
     "frontend/vitest.config.ts",
 }

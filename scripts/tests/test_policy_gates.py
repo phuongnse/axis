@@ -3701,13 +3701,16 @@ class TestVerifyGate(unittest.TestCase):
         for patched in (text_encoding, toolchain, versions, audit, frontend, scripts_standard, policy_tests):
             patched.assert_not_called()
 
-    def test_package_manifest_change_runs_frontend_vulnerability_gate(self) -> None:
+    def test_package_manifest_change_runs_dependency_gates_without_unit_suite(self) -> None:
         calls: list[str] = []
         with (
             mock.patch.object(
                 axis,
                 "verify_scope_paths",
-                return_value=("working tree", ["frontend/package-lock.json"]),
+                return_value=(
+                    "working tree",
+                    ["frontend/package.json", "frontend/package-lock.json"],
+                ),
             ),
             mock.patch.object(axis, "run_text_encoding_check", return_value=0),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
@@ -3730,7 +3733,7 @@ class TestVerifyGate(unittest.TestCase):
         ):
             self.assertEqual(0, axis.verify(object()))
 
-        self.assertEqual(["toolchain", "versions", "audit", "ci", "test"], calls)
+        self.assertEqual(["toolchain", "versions", "audit", "ci"], calls)
 
     def test_risk_acceptance_manifest_change_runs_frontend_vulnerability_gate(self) -> None:
         calls: list[str] = []
