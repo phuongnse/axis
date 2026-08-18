@@ -7876,6 +7876,38 @@ class TestInstallHooks(unittest.TestCase):
         self.assertIn("refusing to overwrite existing core.hooksPath", stderr.getvalue())
         self.assertEqual([["git", "config", "--get", "core.hooksPath"]], calls)
 
+    def test_refuses_an_explicitly_empty_core_hooks_path_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            target = temp_root / ".git" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertFalse(target.exists())
+            self.assertIn("empty core.hooksPath", stderr.getvalue())
+
     def test_refuses_inherited_repo_hooks_path_that_resolves_to_tracked_source(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             temp_root = Path(temp)
@@ -7947,6 +7979,54 @@ class TestInstallHooks(unittest.TestCase):
             calls,
         )
         self.assertIn("inherited core.hooksPath", stderr.getvalue())
+
+    def test_restores_local_hooks_path_when_post_unset_validation_detects_a_race(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+            local_hooks_configured = True
+
+            def fake_run(args: list[str], **_kwargs):
+                nonlocal local_hooks_configured
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    value = "scripts/hooks\n" if local_hooks_configured else "raced/hooks\n"
+                    return axis.subprocess.CompletedProcess(args, 0, stdout=value, stderr="")
+                if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="scripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--show-scope", "--get-all", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="local\tscripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--local", "--unset-all", "core.hooksPath"]:
+                    local_hooks_configured = False
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+                if args[1:] == ["config", "--local", "core.hooksPath", "scripts/hooks"]:
+                    local_hooks_configured = True
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertTrue(local_hooks_configured)
+            self.assertIn("original local value was restored", stderr.getvalue())
 
     def test_derives_hook_target_only_from_the_common_git_directory(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:

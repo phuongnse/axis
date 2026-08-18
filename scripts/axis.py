@@ -4603,7 +4603,14 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
 
     hooks_value = current_hooks.stdout.strip() if current_hooks.returncode == 0 else ""
     migration_local_value: str | None = None
-    if hooks_value:
+    if current_hooks.returncode == 0 and not hooks_value:
+        print(
+            "install-hooks: refusing explicitly configured empty core.hooksPath; "
+            "clear it in its owning Git config scope first",
+            file=sys.stderr,
+        )
+        return 1
+    if current_hooks.returncode == 0:
         repo_hooks_path = (ROOT / "scripts" / "hooks").resolve()
         hooks_path = Path(hooks_value)
         resolved_hooks_path = hooks_path if hooks_path.is_absolute() else (ROOT / hooks_path)
