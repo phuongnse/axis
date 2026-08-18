@@ -4602,6 +4602,7 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
         return current_hooks.returncode
 
     hooks_value = current_hooks.stdout.strip() if current_hooks.returncode == 0 else ""
+    migration_local_value: str | None = None
     if hooks_value:
         repo_hooks_path = (ROOT / "scripts" / "hooks").resolve()
         hooks_path = Path(hooks_value)
@@ -4648,34 +4649,46 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
             )
             return 1
 
-        unset_result = run(
-            [exe("git"), "config", "--local", "--unset-all", "core.hooksPath"],
-            check=False,
-        )
-        if unset_result.returncode not in (0, 5):
-            return unset_result.returncode
-
-        remaining_hooks = run(
-            [exe("git"), "config", "--get", "core.hooksPath"],
+        scoped_hooks = run(
+            [exe("git"), "config", "--show-scope", "--get-all", "core.hooksPath"],
             capture=True,
             check=False,
         )
-        if remaining_hooks.returncode not in (0, 1, 5):
-            return remaining_hooks.returncode
-        remaining_value = (
-            remaining_hooks.stdout.strip() if remaining_hooks.returncode == 0 else ""
-        )
-        if remaining_value:
+        if scoped_hooks.returncode not in (0, 1, 5):
+            return scoped_hooks.returncode
+        scoped_records: list[tuple[str, str]] = []
+        for line in scoped_hooks.stdout.splitlines():
+            scope, separator, value = line.partition("\t")
+            if not separator or not scope or not value:
+                print(
+                    "install-hooks: cannot parse scoped core.hooksPath configuration",
+                    file=sys.stderr,
+                )
+                return 1
+            scoped_records.append((scope, value))
+        inherited_records = [
+            (scope, value) for scope, value in scoped_records if scope != "local"
+        ]
+        local_records = [value for scope, value in scoped_records if scope == "local"]
+        if inherited_records:
+            inherited_summary = ", ".join(
+                f"{scope}={value}" for scope, value in inherited_records
+            )
             print(
-                "install-hooks: refusing inherited core.hooksPath revealed after local migration "
-                f"({remaining_value}); clear it in its owning Git config scope first",
+                "install-hooks: refusing inherited core.hooksPath before local migration "
+                f"({inherited_summary}); clear it in its owning Git config scope first",
                 file=sys.stderr,
             )
             return 1
+        if local_records != [local_value]:
+            print(
+                "install-hooks: refusing ambiguous local core.hooksPath values; "
+                "keep exactly one verified repository-local value",
+                file=sys.stderr,
+            )
+            return 1
+        migration_local_value = local_value
 
-    hook_path_result = run([exe("git"), "rev-parse", "--git-path", "hooks/pre-push"], capture=True, check=False)
-    if hook_path_result.returncode != 0:
-        return hook_path_result.returncode
     common_dir_result = run(
         [exe("git"), "rev-parse", "--git-common-dir"],
         capture=True,
@@ -4685,13 +4698,11 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
         return common_dir_result.returncode
 
     source = ROOT / "scripts" / "hooks" / "pre-push"
-    target = Path(hook_path_result.stdout.strip())
-    if not target.is_absolute():
-        target = ROOT / target
     common_dir = Path(common_dir_result.stdout.strip())
     if not common_dir.is_absolute():
         common_dir = ROOT / common_dir
     allowed_hooks_dir = (common_dir / "hooks").resolve()
+    target = allowed_hooks_dir / "pre-push"
     resolved_source = source.resolve()
     resolved_target = target.resolve()
     if resolved_target == resolved_source or resolved_target.parent != allowed_hooks_dir:
@@ -4752,6 +4763,46 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
     atomic_replace(target, source_content, mode=hook_mode)
     marker_content = f"{hashlib.sha256(source_content).hexdigest()}\n".encode()
     atomic_replace(marker, marker_content)
+
+    if migration_local_value is not None:
+        unset_result = run(
+            [exe("git"), "config", "--local", "--unset-all", "core.hooksPath"],
+            check=False,
+        )
+        if unset_result.returncode not in (0, 5):
+            return unset_result.returncode
+        remaining_hooks = run(
+            [exe("git"), "config", "--get", "core.hooksPath"],
+            capture=True,
+            check=False,
+        )
+        remaining_value = (
+            remaining_hooks.stdout.strip() if remaining_hooks.returncode == 0 else ""
+        )
+        if remaining_hooks.returncode not in (0, 1, 5) or remaining_value:
+            restore_result = run(
+                [
+                    exe("git"),
+                    "config",
+                    "--local",
+                    "core.hooksPath",
+                    migration_local_value,
+                ],
+                check=False,
+            )
+            if restore_result.returncode != 0:
+                print(
+                    "install-hooks: FAIL - could not restore local core.hooksPath after "
+                    "post-migration validation failed",
+                    file=sys.stderr,
+                )
+                return restore_result.returncode
+            print(
+                "install-hooks: refusing inherited core.hooksPath revealed during migration; "
+                "the original local value was restored",
+                file=sys.stderr,
+            )
+            return 1
 
     print(f"Installed: {target} (pre-push runs python scripts/axis.py pre-push).")
     return 0
