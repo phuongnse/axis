@@ -33,6 +33,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, TextIO
 
+import axis_host_https
+import axis_pr_policy
+
 sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +46,8 @@ VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
 LOCAL_DEV_WAIT_TIMEOUT_SECONDS = 300
+LOCAL_DEV_HOST_SMOKE_TIMEOUT_SECONDS = 15
+LOCAL_DEV_WEB_URL = "https://localhost:3000/"
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
@@ -321,14 +326,17 @@ def git(args: list[str], *, capture: bool = True, check: bool = True) -> str:
     return result.stdout if result.stdout is not None else ""
 
 
-BRANCH_PATTERN = re.compile(r"^(feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
-RENOVATE_BRANCH_PATTERN = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
+BRANCH_PATTERN = axis_pr_policy.BRANCH_RE
+RENOVATE_BRANCH_PATTERN = axis_pr_policy.RENOVATE_BRANCH_RE
 
 
 def git_checkpoint(args: argparse.Namespace) -> int:
     branch = args.branch
     if not BRANCH_PATTERN.fullmatch(branch):
         raise CheckError(f"git checkpoint: invalid branch name: {branch}")
+    subject_issues = axis_pr_policy.validate_commit_subject(args.subject)
+    if subject_issues:
+        raise CheckError(f"git checkpoint: {'; '.join(subject_issues)}")
 
     all_changes = args.all_changes
     if all_changes:
@@ -413,6 +421,68 @@ def diff_range() -> str:
             return f"{result.stdout.strip()}...HEAD"
     tried = ", ".join(attempted)
     raise CheckError(f"diff_range: cannot determine diff base (tried {tried}); set BASE_REF or fetch the base branch")
+
+
+def resolve_publish_branch(explicit: str | None = None) -> str:
+    if explicit is not None:
+        return explicit
+    for variable in ("PR_HEAD_REF", "GITHUB_HEAD_REF"):
+        if branch := os.environ.get(variable, "").strip():
+            return branch
+    return git(["branch", "--show-current"]).strip()
+
+
+def publish_commit_subjects(range_spec: str) -> list[tuple[str, str]]:
+    result = run(
+        [exe("git"), "log", "--format=%H%x00%s", range_spec],
+        cwd=ROOT,
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise CheckError(
+            f"publish metadata: cannot inspect commit range {range_spec}: "
+            f"{detail or f'git exited {result.returncode}'}"
+        )
+
+    commits: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        commit, separator, subject = line.partition("\0")
+        if not separator:
+            raise CheckError("publish metadata: git returned an invalid commit record")
+        commits.append((commit, subject))
+    return commits
+
+
+def check_publish_metadata(args: argparse.Namespace | None = None) -> int:
+    explicit_branch = getattr(args, "branch", None)
+    explicit_range = getattr(args, "range_spec", None)
+    try:
+        branch = resolve_publish_branch(explicit_branch)
+        range_spec = explicit_range or diff_range()
+        commits = publish_commit_subjects(range_spec)
+    except CheckError as exc:
+        print(f"check-publish-metadata FAIL:\n  - {exc}", file=sys.stderr)
+        return 1
+
+    issues = axis_pr_policy.validate_branch(branch)
+    for commit, subject in commits:
+        issues.extend(
+            f"Commit {commit[:12]}: {issue}"
+            for issue in axis_pr_policy.validate_commit_subject(subject)
+        )
+
+    if issues:
+        print("check-publish-metadata FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+
+    print(
+        f"check-publish-metadata: OK ({branch}, {len(commits)} commit(s), {range_spec})"
+    )
+    return 0
 
 
 def git_lines(args: list[str], *, label: str) -> list[str]:
@@ -917,6 +987,99 @@ def check_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
             print(f"  - {issue}", file=sys.stderr)
         return 1
     print("check-vulnerable-packages: OK")
+    return 0
+
+
+def dotnet_dependency_lock_issues(*, root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    props_path = root / "Directory.Packages.props"
+    try:
+        props_root = ET.parse(props_path).getroot()
+    except (OSError, ET.ParseError) as exc:
+        issues.append(f"cannot read {props_path.relative_to(root)}: {exc}")
+    else:
+        lock_opt_in = props_root.find(".//RestorePackagesWithLockFile")
+        if lock_opt_in is None or (lock_opt_in.text or "").strip().lower() != "true":
+            issues.append(
+                "Directory.Packages.props must set RestorePackagesWithLockFile to true"
+            )
+
+    projects = sorted(
+        project
+        for source_root in (root / "src", root / "tests")
+        if source_root.is_dir()
+        for project in source_root.rglob("*.csproj")
+        if not {"bin", "obj"} & set(project.parts)
+    )
+    expected_solution_projects = {
+        project.relative_to(root).as_posix() for project in projects
+    }
+    solution_path = root / "Axis.sln"
+    solution_projects: set[str] = set()
+    solution_project_pattern = re.compile(
+        r'^Project\("[^"]+"\) = "[^"]+", "([^"]+[.]csproj)", "[^"]+"$'
+    )
+    try:
+        solution_lines = solution_path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError as exc:
+        issues.append(f"cannot read Axis.sln: {exc}")
+    else:
+        for line in solution_lines:
+            match = solution_project_pattern.match(line)
+            if match is None:
+                if '.csproj"' in line.lower():
+                    issues.append(f"Axis.sln contains an invalid project entry: {line}")
+                continue
+            relative_project = match.group(1).replace("\\", "/")
+            if relative_project in solution_projects:
+                issues.append(f"Axis.sln contains duplicate project {relative_project}")
+            solution_projects.add(relative_project)
+        for relative_project in sorted(expected_solution_projects - solution_projects):
+            issues.append(f"Axis.sln is missing project {relative_project}")
+        for relative_project in sorted(solution_projects - expected_solution_projects):
+            issues.append(f"Axis.sln references unexpected project {relative_project}")
+
+    for project in projects:
+        lock_path = project.with_name("packages.lock.json")
+        relative_lock = lock_path.relative_to(root)
+        try:
+            lock_document = json.loads(lock_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            issues.append(f"{relative_lock}: missing NuGet lock file for {project.relative_to(root)}")
+            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append(f"{relative_lock}: invalid NuGet lock file: {exc}")
+            continue
+        if not isinstance(lock_document, dict):
+            issues.append(f"{relative_lock}: lock document must be an object")
+            continue
+        if not isinstance(lock_document.get("version"), int):
+            issues.append(f"{relative_lock}: version must be an integer")
+        dependencies = lock_document.get("dependencies")
+        if not isinstance(dependencies, dict):
+            issues.append(f"{relative_lock}: dependencies must be an object")
+
+    for lock_path in sorted(
+        lock
+        for source_root in (root / "src", root / "tests")
+        if source_root.is_dir()
+        for lock in source_root.rglob("packages.lock.json")
+        if not {"bin", "obj"} & set(lock.parts)
+    ):
+        if not any(lock_path.parent.glob("*.csproj")):
+            issues.append(
+                f"{lock_path.relative_to(root)}: lock file has no sibling .csproj owner"
+            )
+    return issues
+
+
+def check_dotnet_dependency_locks(_args: argparse.Namespace | None = None) -> int:
+    issues = dotnet_dependency_lock_issues()
+    if issues:
+        for issue in issues:
+            print(f"check-dotnet-dependency-locks: FAIL - {issue}", file=sys.stderr)
+        return 1
+    print("check-dotnet-dependency-locks: OK")
     return 0
 
 
@@ -3502,7 +3665,7 @@ def frontend_command(args: argparse.Namespace) -> int:
 
         original = snapshot()
         result = run_frontend_npm(["run", "gen:api-types"])
-        if result.returncode != 0 or not args.check:
+        if not args.check:
             return result.returncode
         generated = snapshot()
         if generated != original:
@@ -3512,6 +3675,9 @@ def frontend_command(args: argparse.Namespace) -> int:
                 target = generated_path / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)
+        if result.returncode != 0:
+            return result.returncode
+        if generated != original:
             print(
                 "frontend gen-api-types: frontend/src/lib/api-generated is stale - "
                 "run `python scripts/axis.py frontend gen-api-types` and commit the result",
@@ -3844,7 +4010,11 @@ def verify(args: argparse.Namespace) -> int:
     dotnet_test_naming = any(path.startswith("tests/") and path.endswith(".cs") for path in paths)
     dotnet_test_project_classification = any(path.startswith("tests/") and path.endswith(".csproj") for path in paths)
     dotnet_package_scan = any(
-        path == "Directory.Packages.props" or (path.endswith(".csproj") and path.startswith(("src/", "tests/")))
+        path == "Directory.Packages.props"
+        or (
+            path.startswith(("src/", "tests/"))
+            and (path.endswith(".csproj") or path.endswith("/packages.lock.json"))
+        )
         for path in paths
     )
     build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
@@ -3881,6 +4051,7 @@ def verify(args: argparse.Namespace) -> int:
         for path in paths
     )
     scripts_changed = any(path.startswith("scripts/") for path in paths)
+    workflow_changed = any(path.startswith(".github/workflows/") for path in paths)
     theme_changed = any(axis_theme.is_theme_path(path) for path in paths)
     text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
     api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
@@ -3925,6 +4096,7 @@ def verify(args: argparse.Namespace) -> int:
                     else:
                         step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
             if dotnet_package_scan:
+                step(".NET dependency locks", lambda: check_dotnet_dependency_locks())
                 step(".NET vulnerable packages", lambda: check_vulnerable_packages())
 
     if frontend:
@@ -3979,6 +4151,7 @@ def verify(args: argparse.Namespace) -> int:
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
+    if scripts_changed or workflow_changed:
         step("policy gate tests", lambda: check_policy_tests())
 
     if renovate_config:
@@ -4047,7 +4220,11 @@ def review_readiness_policy_gates(
     doc_drift_range: str | None = None,
 ) -> list[tuple[str, callable[[], int]]]:
     gates: list[tuple[str, callable[[], int]]] = []
-    if any(path.startswith("scripts/") for path in paths) and not policy_tests_covered:
+    policy_surface_changed = any(
+        path.startswith("scripts/") or path.startswith(".github/workflows/")
+        for path in paths
+    )
+    if policy_surface_changed and not policy_tests_covered:
         gates.append(("policy gate tests", check_policy_tests))
     if ".github/renovate.json5" in paths:
         gates.append(("Renovate config", lambda: check_renovate_config(None)))
@@ -4123,6 +4300,10 @@ def review_readiness(args: argparse.Namespace) -> int:
         )
         return 1
 
+    if not policy_only and check_publish_metadata() != 0:
+        print("review-readiness: FAIL - publish metadata is not ready", file=sys.stderr)
+        return 1
+
     try:
         _scope, paths = verify_scope_paths(since)
     except CheckError as exc:
@@ -4138,10 +4319,13 @@ def review_readiness(args: argparse.Namespace) -> int:
             return 1
         executed.append("verify")
 
-    scripts_changed = any(path.startswith("scripts/") for path in paths)
+    policy_surface_changed = any(
+        path.startswith("scripts/") or path.startswith(".github/workflows/")
+        for path in paths
+    )
     policy_rc, policy_gates = run_review_readiness_policy(
         paths,
-        policy_tests_covered=not policy_only and scripts_changed,
+        policy_tests_covered=not policy_only and policy_surface_changed,
         doc_drift_covered=set() if policy_only else review_readiness_doc_drift_coverage(paths),
         doc_drift_range=f"{since}..HEAD" if since else None,
     )
@@ -4201,6 +4385,13 @@ def pre_push(args: argparse.Namespace) -> int:
     print(
         "  Run `python scripts/axis.py review-readiness --full-branch` for the first review or "
         "`--since <checkpoint>` for a follow-up."
+    )
+
+    step(
+        "publish metadata",
+        lambda: check_publish_metadata(
+            argparse.Namespace(branch=None, range_spec=range_spec)
+        ),
     )
 
     if dotnet:
@@ -4320,9 +4511,56 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
     if not target.is_absolute():
         target = ROOT / target
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, target)
-    if os.name != "nt":
-        target.chmod(target.stat().st_mode | 0o111)
+    marker = target.with_name(f"{target.name}.axis-managed.sha256")
+    source_content = source.read_bytes()
+    if (
+        target.is_symlink()
+        or (target.exists() and not target.is_file())
+        or marker.is_symlink()
+        or (marker.exists() and not marker.is_file())
+    ):
+        print(
+            f"install-hooks: refusing to overwrite unmanaged hook target {target}",
+            file=sys.stderr,
+        )
+        return 1
+    if target.is_file():
+        existing_content = target.read_bytes()
+        existing_digest = hashlib.sha256(existing_content).hexdigest()
+        marker_digest = ""
+        if marker.is_file() and not marker.is_symlink():
+            marker_digest = marker.read_text(encoding="utf-8").strip().lower()
+        managed = existing_content == source_content or marker_digest == existing_digest
+        if not managed:
+            print(
+                "install-hooks: refusing to overwrite unmanaged hook "
+                f"{target}; move or remove it explicitly, then rerun install-hooks",
+                file=sys.stderr,
+            )
+            return 1
+
+    def atomic_replace(destination: Path, content: bytes, *, mode: int | None = None) -> None:
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent,
+                prefix=f".axis-{destination.name}-",
+                delete=False,
+            ) as temporary:
+                temporary.write(content)
+                temporary_path = Path(temporary.name)
+            if mode is not None:
+                temporary_path.chmod(mode)
+            os.replace(temporary_path, destination)
+            temporary_path = None
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+
+    hook_mode = None if os.name == "nt" else (source.stat().st_mode & 0o777) | 0o111
+    atomic_replace(target, source_content, mode=hook_mode)
+    marker_content = f"{hashlib.sha256(source_content).hexdigest()}\n".encode()
+    atomic_replace(marker, marker_content)
 
     print(f"Installed: {target} (pre-push runs python scripts/axis.py pre-push).")
     return 0
@@ -4818,6 +5056,31 @@ def local_dev_certificates_valid(openssl: str) -> bool:
             if result.returncode != 0 or any(marker not in result.stdout for marker in required_markers):
                 return False
 
+    required_leaf_extensions = (
+        ("basicConstraints", ("X509v3 Basic Constraints", "CA:FALSE")),
+        ("keyUsage", ("X509v3 Key Usage", "Digital Signature", "Key Encipherment")),
+        (
+            "extendedKeyUsage",
+            ("X509v3 Extended Key Usage", "TLS Web Server Authentication"),
+        ),
+    )
+    for extension, required_markers in required_leaf_extensions:
+        result = run(
+            [
+                openssl,
+                "x509",
+                "-in",
+                str(LOCALHOST_CERT),
+                "-ext",
+                extension,
+                "-noout",
+            ],
+            check=False,
+            capture=True,
+        )
+        if result.returncode != 0 or any(marker not in result.stdout for marker in required_markers):
+            return False
+
     root_fingerprints: list[str] = []
     for certificate_path, format_args in (
         (LOCAL_ROOT_CA_PEM, []),
@@ -5005,6 +5268,13 @@ def confirm_local_ca_store_change(
     return sys.stdin.readline().strip().lower() in {"y", "yes"}
 
 
+def emit_captured_process_output(result: subprocess.CompletedProcess[str]) -> None:
+    if result.stdout and result.stdout.strip():
+        print(result.stdout.rstrip())
+    if result.stderr and result.stderr.strip():
+        print(result.stderr.rstrip(), file=sys.stderr)
+
+
 def local_dev_trust_certs(args: argparse.Namespace) -> int:
     if not LOCAL_ROOT_CA_CER.is_file():
         print("local-dev trust-certs: root CA is missing; run `python scripts/axis.py local-dev certs`", file=sys.stderr)
@@ -5037,7 +5307,11 @@ def local_dev_trust_certs(args: argparse.Namespace) -> int:
             if converted.returncode != 0 or not converted.stdout.strip():
                 return converted.returncode or 1
             certificate_path = converted.stdout.strip()
-        result = run([certutil, "-f", "-user", "-addstore", "Root", certificate_path], check=False)
+        result = run(
+            [certutil, "-f", "-user", "-addstore", "Root", certificate_path],
+            check=False,
+            capture=True,
+        )
     else:
         security = shutil.which("security")
         if security is None:
@@ -5047,13 +5321,19 @@ def local_dev_trust_certs(args: argparse.Namespace) -> int:
         result = run(
             [security, "add-trusted-cert", "-r", "trustRoot", "-k", str(keychain), str(LOCAL_ROOT_CA_CER)],
             check=False,
+            capture=True,
         )
+    emit_captured_process_output(result)
     if result.returncode == 0:
         LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.write_text(
             f"{local_dev_ca_fingerprint('sha1')}\n",
             encoding="utf-8",
         )
         print("local-dev trust-certs: trusted Axis root CA for the current user")
+        print(
+            "local-dev trust-certs: when the stack is running, verify host HTTPS with "
+            "`python scripts/axis.py local-dev host-smoke`; restart browsers opened before trust"
+        )
     return result.returncode
 
 
@@ -5085,18 +5365,89 @@ def local_dev_untrust_certs(args: argparse.Namespace) -> int:
         if certutil is None:
             print("local-dev untrust-certs: Windows certutil was not found", file=sys.stderr)
             return 1
-        result = run([certutil, "-user", "-delstore", "Root", fingerprint], check=False)
+        result = run(
+            [certutil, "-user", "-delstore", "Root", fingerprint],
+            check=False,
+            capture=True,
+        )
     else:
         security = shutil.which("security")
         if security is None:
             print("local-dev untrust-certs: macOS security tool was not found", file=sys.stderr)
             return 1
         keychain = Path.home() / "Library" / "Keychains" / "login.keychain-db"
-        result = run([security, "delete-certificate", "-Z", fingerprint, str(keychain)], check=False)
+        result = run(
+            [security, "delete-certificate", "-Z", fingerprint, str(keychain)],
+            check=False,
+            capture=True,
+        )
+    emit_captured_process_output(result)
     if result.returncode == 0:
         LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.unlink(missing_ok=True)
         print("local-dev untrust-certs: removed Axis root CA from the current user's trust store")
     return result.returncode
+
+
+def local_dev_host_smoke(_args: argparse.Namespace | None = None) -> int:
+    certificate_rc = require_local_dev_certificates("local-dev host-smoke")
+    if certificate_rc != 0:
+        return certificate_rc
+
+    try:
+        probe = axis_host_https.resolve_host_https_probe(
+            local_dev_cert_host(),
+            url=LOCAL_DEV_WEB_URL,
+            timeout_seconds=LOCAL_DEV_HOST_SMOKE_TIMEOUT_SECONDS,
+            executable_lookup=shutil.which,
+            python_executable=sys.executable,
+        )
+    except axis_host_https.HostHttpsProbeUnavailable as exc:
+        print(
+            f"local-dev host-smoke: FAIL - {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    result = run_optional(
+        list(probe.command),
+        timeout=LOCAL_DEV_HOST_SMOKE_TIMEOUT_SECONDS + 5,
+    )
+    if result is None:
+        print(
+            f"local-dev host-smoke: FAIL - the {probe.boundary} HTTPS client could not be executed",
+            file=sys.stderr,
+        )
+        return 1
+    if result.returncode != 0:
+        raw_detail = (result.stderr or result.stdout or "").strip()
+        detail = re.sub(r"\s+", " ", raw_detail)[:1000]
+        trust_status, trust_detail = local_dev_host_trust_status()
+        remediation = f"; {trust_detail}" if trust_status != "OK" else ""
+        print(
+            "local-dev host-smoke: FAIL - "
+            f"{detail or f'host HTTPS client exited with {result.returncode}'}{remediation}",
+            file=sys.stderr,
+        )
+        return 1
+
+    status_codes = [
+        int(line.strip())
+        for line in (result.stdout or "").splitlines()
+        if re.fullmatch(r"[0-9]{3}", line.strip())
+    ]
+    if not status_codes or not 200 <= status_codes[-1] < 300:
+        observed = status_codes[-1] if status_codes else "no HTTP status"
+        print(
+            f"local-dev host-smoke: FAIL - {LOCAL_DEV_WEB_URL} returned {observed}",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(
+        f"local-dev host-smoke: OK ({LOCAL_DEV_WEB_URL} returned HTTP "
+        f"{status_codes[-1]} through {probe.boundary})"
+    )
+    return 0
 
 
 def local_dev_certs(args: argparse.Namespace | None = None) -> int:
@@ -5213,7 +5564,8 @@ def local_dev_certs(args: argparse.Namespace | None = None) -> int:
 
 def local_dev(args: argparse.Namespace) -> int:
     overlay_values = getattr(args, "compose_overlays", [])
-    if args.local_dev_command in {"certs", "trust-certs", "untrust-certs"} and overlay_values:
+    host_only_commands = {"certs", "trust-certs", "untrust-certs", "host-smoke"}
+    if args.local_dev_command in host_only_commands and overlay_values:
         raise CheckError(
             f"local-dev --compose-overlay is not valid for {args.local_dev_command}"
         )
@@ -5223,6 +5575,8 @@ def local_dev(args: argparse.Namespace) -> int:
         return local_dev_trust_certs(args)
     if args.local_dev_command == "untrust-certs":
         return local_dev_untrust_certs(args)
+    if args.local_dev_command == "host-smoke":
+        return local_dev_host_smoke(args)
 
     overlays = resolve_local_dev_compose_overlays(overlay_values)
     command = args.local_dev_command
@@ -5264,6 +5618,11 @@ def local_dev(args: argparse.Namespace) -> int:
             print("maildev: http://localhost:1080")
             trust_status, trust_detail = local_dev_host_trust_status()
             print(f"[{trust_status}] host browser trust: {trust_detail}")
+            if trust_status == "OK":
+                print(
+                    "host HTTPS verification: "
+                    "`python scripts/axis.py local-dev host-smoke`"
+                )
         return 0
 
     if command == "down":
@@ -5620,28 +5979,47 @@ def gh_cli_status() -> tuple[bool, str]:
 def setup_external_preflight(profile: str) -> int:
     if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
         return 1
+    issues: list[str] = []
     if profile in {"local-dev", "review"}:
         if find_openssl() is None:
-            print(
-                "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
-                "Axis will not install an OS package automatically",
-                file=sys.stderr,
+            issues.append(
+                "OpenSSL is required for local HTTPS certificates; "
+                "Axis will not install an OS package automatically"
             )
-            return 1
         if not _docker_info_ok():
             session_hint = _docker_group_session_hint()
-            detail = session_hint or (
-                "Docker Engine is not reachable in this shell; "
-                "Axis will not install or start an OS service automatically"
+            issues.append(
+                session_hint
+                or (
+                    "Docker Engine is not reachable in this shell; "
+                    "Axis will not install or start an OS service automatically"
+                )
             )
-            print(
-                f"setup: FAIL - {detail}",
-                file=sys.stderr,
+        if not _docker_compose_ok():
+            issues.append(
+                "Docker Compose v2 is not available in this shell; "
+                "Axis will not install an OS package automatically"
             )
-            return 1
-        if require_docker_compose("setup") != 0:
-            return 1
-    return 0
+    for issue in issues:
+        print(f"setup: FAIL - {issue}", file=sys.stderr)
+    return 1 if issues else 0
+
+
+def setup_native_prerequisite_preflight(
+    missing_managed_tools: Iterable[str],
+    *,
+    platform_spec: axis_setup.SetupPlatform,
+) -> int:
+    issues: list[str] = []
+    if "dotnet" in set(missing_managed_tools):
+        dotnet_issue = axis_setup.dotnet_native_prerequisite_preflight(
+            platform_spec=platform_spec
+        )
+        if dotnet_issue:
+            issues.append(dotnet_issue)
+    for issue in issues:
+        print(f"setup: FAIL - {issue}", file=sys.stderr)
+    return 1 if issues else 0
 
 
 def setup_preflight(profile: str) -> int:
@@ -5708,9 +6086,13 @@ def setup(args: argparse.Namespace) -> int:
             print(f"setup: FAIL - {exc}", file=sys.stderr)
             return 1
 
-    rc = setup_external_preflight(profile)
-    if rc != 0:
-        return rc
+    native_rc = setup_native_prerequisite_preflight(
+        missing,
+        platform_spec=platform_spec,
+    )
+    external_rc = setup_external_preflight(profile)
+    if native_rc != 0 or external_rc != 0:
+        return 1
 
     if install_user_tools:
         try:
@@ -5786,9 +6168,15 @@ def setup(args: argparse.Namespace) -> int:
             return rc
 
     print("setup: OK")
-    if profile in {"local-dev", "review"} and not trust_local_ca:
+    if profile in {"local-dev", "review"}:
+        print("setup: next: `python scripts/axis.py local-dev up`")
         trust_status, trust_detail = local_dev_host_trust_status()
-        if trust_status != "OK":
+        if trust_status == "OK":
+            print(
+                "setup: after the stack is ready, verify host HTTPS with "
+                "`python scripts/axis.py local-dev host-smoke`"
+            )
+        else:
             print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
     if profile == "review":
         if setup_tool_ready("gh"):
@@ -6219,6 +6607,10 @@ def build_parser(
     local_untrust = local_dev_sub.add_parser("untrust-certs", help="Remove the local root CA from the current host user store")
     local_untrust.add_argument("--yes", action="store_true", help="Skip the Axis confirmation; the host OS may still prompt")
     local_untrust.set_defaults(func=local_dev)
+    local_dev_sub.add_parser(
+        "host-smoke",
+        help="Verify live web HTTPS through the current host user's trust stack",
+    ).set_defaults(func=local_dev)
     local_up = local_dev_sub.add_parser("up", help="Create and start local services")
     local_up.add_argument("--build", action="store_true")
     local_up.add_argument("services", nargs="*")
@@ -6315,6 +6707,10 @@ def build_parser(
     check_sub.add_parser("test-project-classification", help="Validate test project classifications").set_defaults(func=check_test_project_classification)
     check_sub.add_parser("docker", help="Check Docker availability for integration tests").set_defaults(func=check_docker)
     check_sub.add_parser("dotnet-sdk", help="Check the required .NET SDK version").set_defaults(func=check_dotnet_sdk)
+    check_sub.add_parser(
+        "dotnet-dependency-locks",
+        help="Validate the committed NuGet lock graph",
+    ).set_defaults(func=check_dotnet_dependency_locks)
     check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser(
         "frontend-dependency-versions",
@@ -6361,6 +6757,13 @@ def build_parser(
     pr_parser.add_argument("--body-file", type=Path)
     pr_parser.add_argument("--branch")
     pr_parser.set_defaults(func=check_pr)
+    publish_parser = check_sub.add_parser(
+        "publish-metadata",
+        help="Validate the current branch and publishable commit subjects",
+    )
+    publish_parser.add_argument("--branch")
+    publish_parser.add_argument("--range", dest="range_spec")
+    publish_parser.set_defaults(func=check_publish_metadata)
 
     test = sub.add_parser("test", help="Run repository test profiles")
     test_sub = test.add_subparsers(dest="test_command", required=True)

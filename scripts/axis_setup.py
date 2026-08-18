@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes.util
 import hashlib
 import json
 import os
@@ -103,6 +104,44 @@ def dotnet_native_prerequisite_hint(
         f"the .NET host is missing ICU; {action}, then rerun setup; "
         "Axis will not run sudo or an OS package manager"
     )
+
+
+def dotnet_native_prerequisite_preflight(
+    *,
+    platform_spec: SetupPlatform | None = None,
+    os_release_text: str | None = None,
+    library_lookup: Callable[[str], str | None] | None = None,
+) -> str | None:
+    """Return actionable guidance when Linux cannot discover the ICU runtime.
+
+    This probe intentionally checks only a prerequisite whose absence can be
+    established through the platform dynamic loader before a portable .NET SDK
+    is downloaded. The installed .NET host remains the authority for version or
+    compatibility failures that cannot be proven this early.
+    """
+
+    try:
+        current_platform = platform_spec or detect_platform()
+    except SetupError:
+        return None
+    if current_platform.os != "linux":
+        return None
+
+    lookup = library_lookup or ctypes.util.find_library
+    try:
+        if lookup("icuuc"):
+            return None
+    except (OSError, TypeError, ValueError):
+        return None
+
+    hint = dotnet_native_prerequisite_hint(
+        "Couldn't find a valid ICU package installed on the system.",
+        platform_spec=current_platform,
+        os_release_text=os_release_text,
+    )
+    if hint is None:
+        return None
+    return f"{hint}; resolve this host prerequisite before downloading the managed .NET SDK"
 
 
 def detect_platform(
@@ -452,6 +491,7 @@ def setup_plan(
     if profile in {"local-dev", "review"}:
         steps.append("diagnose Docker Engine, Compose, and OpenSSL without changing OS services")
     if install_user_tools:
+        steps.append("diagnose known managed-runtime native prerequisites before downloads")
         labels: list[str] = []
         external: list[str] = []
         for tool in managed_tools:

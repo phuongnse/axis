@@ -34,7 +34,7 @@ The runtime, framework, persistence provider, and framework-integrated libraries
 
 - The frontend toolchain is one coherent baseline: exact Node in `frontend/.nvmrc` and `frontend/Dockerfile.dev`, its bundled exact npm in `frontend/package.json`, and the portable Node pin in `scripts/axis_setup.py`.
 - Direct frontend dependencies and overrides use exact versions in `frontend/package.json`; `package-lock.json` locks the full resolved graph and `python scripts/axis.py frontend install` is the only supported install path.
-- .NET package versions remain centralized and exact in `Directory.Packages.props`. GitHub Actions remain digest-pinned.
+- .NET package versions remain centralized and exact in `Directory.Packages.props`; each project commits its generated `packages.lock.json`, and CI restores the full graph in locked mode. GitHub Actions remain digest-pinned.
 - Independently versioned product BFFs pin their .NET SDK, direct NuGet packages, container bases, and full restore graph in their own repository; the Axis reference product is the required proving consumer of this supported combination.
 - Framework-integrated packages use the asset compiled for Axis's target framework and share its runtime/provider major unless the vendor's published support matrix explicitly owns another combination and an integration test exercises the affected abstraction.
 - Renovate is the only automated version proposer. It opens weekly dependency and lockfile updates, requires Dependency Dashboard approval before creating a major-update PR, and raises vulnerability fixes without waiting for approval or the normal schedule. It never bypasses CI or human merge review.
@@ -45,6 +45,7 @@ The runtime, framework, persistence provider, and framework-integrated libraries
 
 - .NET SDK: `global.json`
 - Backend packages: `Directory.Packages.props`
+- Backend resolved graphs: sibling `packages.lock.json` files for every `src/**` and `tests/**` project
 - Frontend direct packages: `frontend/package.json`
 - Frontend resolved graph: `frontend/package-lock.json`
 - Local container images: `docker-compose.yml`

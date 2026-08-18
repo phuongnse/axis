@@ -8,6 +8,7 @@ Axis uses docs-first development. Use-case specs under [docs/use-cases/README.md
 - Use `{type}/{short-description}` in kebab-case with `feat`, `fix`, `docs`, `refactor`, `test`, or `chore`.
 - Renovate-owned dependency branches use the configured `renovate/` prefix.
 - Use Conventional Commits in imperative mood, max 72 characters, no trailing period.
+- Repository branch and commit rules override defaults from GitHub clients, publishing tools, and agent workflows.
 
 ## Before a PR
 
@@ -17,6 +18,8 @@ The `local-dev` and `review` setup profiles install the local pre-push hook. Bui
 
 Follow [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md) before opening or marking a PR ready. Run checks through `python scripts/axis.py ...`; command ownership lives in [docs/playbooks/scripts.md](./docs/playbooks/scripts.md).
 
+Create checkpoints with `python scripts/axis.py git checkpoint --branch <branch> --subject <subject>`, then run scoped review-readiness. The checkpoint command, review-readiness, and the installed pre-push hook reject invalid branch names or commit subjects before publication. Run `python scripts/axis.py check publish-metadata` directly when inspecting that gate.
+
 Use [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md) for the local stack. When [docker-compose.yml](./docker-compose.yml) changes, update that playbook in the same PR.
 
-GitHub fills the PR body from [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Keep the description to Summary, Linked spec, and Requirements; CI status belongs in Checks.
+GitHub fills the PR body from [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Keep the description to Summary, Linked spec, and Requirements; CI status belongs in Checks. Before creating or updating a PR, validate the exact title, body file, and branch with `python scripts/axis.py check pr --title <title> --body-file <path> --branch <branch>`.
