@@ -19,4 +19,4 @@ python scripts/axis.py setup --profile local-dev --install-user-tools
 python scripts/axis.py local-dev up
 ```
 
-Add `--plan-only` to inspect the platform-specific work without changing anything, or `--trust-local-ca` to opt into the current-user host trust store (`--yes` skips the Axis prompt; Windows may still warn). Use the host URLs printed after the stack becomes ready. For supported platforms, Docker-in-WSL, HTTPS setup, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).
+Add `--plan-only` to inspect the platform-specific work without changing anything. When host-browser access is required, add `--trust-local-ca` to opt into current-user host trust, then run `python scripts/axis.py local-dev host-smoke` after the stack is ready. For supported-platform trust boundaries, Docker-in-WSL, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).

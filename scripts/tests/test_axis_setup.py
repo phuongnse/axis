@@ -102,6 +102,62 @@ class TestSetupPlatform(unittest.TestCase):
 
         self.assertIsNone(hint)
 
+    def test_dotnet_native_preflight_treats_failed_icu_discovery_as_inconclusive(self) -> None:
+        preflight = getattr(axis_setup, "dotnet_native_prerequisite_preflight", None)
+        self.assertTrue(callable(preflight))
+
+        hint = preflight(
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
+            library_lookup=lambda _name: None,
+        )
+
+        self.assertIsNone(hint)
+
+    def test_dotnet_native_preflight_reports_only_authoritative_icu_absence(self) -> None:
+        preflight = getattr(axis_setup, "dotnet_native_prerequisite_preflight", None)
+        self.assertTrue(callable(preflight))
+
+        hint = preflight(
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
+            library_lookup=lambda _name: axis_setup.NativeLibraryStatus.MISSING,
+        )
+
+        self.assertIn("sudo apt install libicu78", hint)
+        self.assertIn("before downloading", hint)
+
+    def test_dotnet_native_preflight_accepts_a_discoverable_icu_runtime(self) -> None:
+        preflight = getattr(axis_setup, "dotnet_native_prerequisite_preflight", None)
+        self.assertTrue(callable(preflight))
+
+        hint = preflight(
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
+            library_lookup=lambda name: "libicuuc.so.78" if name == "icuuc" else None,
+        )
+
+        self.assertIsNone(hint)
+
+    def test_dotnet_native_preflight_does_not_apply_linux_rules_to_other_hosts(self) -> None:
+        preflight = getattr(axis_setup, "dotnet_native_prerequisite_preflight", None)
+        self.assertTrue(callable(preflight))
+
+        def unexpected_lookup(_name: str) -> str | None:
+            raise AssertionError("non-Linux hosts must not run the Linux dynamic-loader probe")
+
+        for host in (
+            axis_setup.SetupPlatform("windows", "x64"),
+            axis_setup.SetupPlatform("darwin", "arm64"),
+        ):
+            with self.subTest(host=host):
+                self.assertIsNone(
+                    preflight(
+                        platform_spec=host,
+                        library_lookup=unexpected_lookup,
+                    )
+                )
+
 
 class TestManagedToolPaths(unittest.TestCase):
     def test_uses_platform_native_user_data_roots(self) -> None:

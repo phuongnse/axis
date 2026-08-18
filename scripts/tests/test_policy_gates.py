@@ -181,6 +181,20 @@ class TestPrGuard(unittest.TestCase):
             with self.subTest(branch=branch):
                 self.assertTrue(check_pr.validate_branch(branch))
 
+    def test_accepts_publishable_conventional_subjects(self) -> None:
+        for subject in ("fix: harden publishing", "feat(identity)!: remove legacy login"):
+            with self.subTest(subject=subject):
+                self.assertEqual([], check_pr.validate_commit_subject(subject))
+
+    def test_rejects_unpublishable_commit_subjects(self) -> None:
+        for subject in (
+            "Harden publishing",
+            "fix: end with punctuation.",
+            f"fix: {'x' * 68}",
+        ):
+            with self.subTest(subject=subject):
+                self.assertTrue(check_pr.validate_commit_subject(subject))
+
     def test_rejects_pending_requirement_on_human_branch(self) -> None:
         body = """## Summary
 This summary is long enough.
@@ -3939,6 +3953,7 @@ class TestReviewVerificationGates(unittest.TestCase):
     def test_runs_verify_and_shared_policy_profile(self) -> None:
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0) as publish_metadata,
             mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/src/App.tsx"])),
             mock.patch.object(axis, "verify", return_value=0) as verify,
             mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["doc drift"])) as policy,
@@ -3949,6 +3964,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             )
 
         self.assertEqual(0, result)
+        publish_metadata.assert_called_once_with()
         verify.assert_called_once()
         policy.assert_called_once_with(
             ["frontend/src/App.tsx"],
@@ -3956,6 +3972,25 @@ class TestReviewVerificationGates(unittest.TestCase):
             doc_drift_covered=set(),
             doc_drift_range=None,
         )
+
+    def test_rejects_unpublishable_metadata_before_expensive_verification(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "check_publish_metadata", return_value=1) as publish_metadata,
+            mock.patch.object(axis, "verify_scope_paths") as verify_scope_paths,
+            mock.patch.object(axis, "verify") as verify,
+            mock.patch.object(axis, "run_review_readiness_policy") as policy,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = axis.review_readiness(
+                axis.argparse.Namespace(since=None, full_branch=True, policy_only=False)
+            )
+
+        self.assertEqual(1, result)
+        publish_metadata.assert_called_once_with()
+        verify_scope_paths.assert_not_called()
+        verify.assert_not_called()
+        policy.assert_not_called()
 
     def test_policy_only_uses_same_profile_without_verify(self) -> None:
         with (
@@ -4092,6 +4127,105 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertIsNone(delegated.since)
         self.assertTrue(delegated.full_branch)
         self.assertFalse(delegated.policy_only)
+
+    def test_pre_push_quick_gate_validates_publish_metadata(self) -> None:
+        with (
+            mock.patch.dict(axis.os.environ, {}, clear=True),
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0) as publish_metadata,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.pre_push(object())
+
+        self.assertEqual(0, result)
+        publish_metadata.assert_called_once()
+        args = publish_metadata.call_args.args[0]
+        self.assertIsNone(args.branch)
+        self.assertEqual("base...HEAD", args.range_spec)
+
+    def test_pre_push_hook_rejects_invalid_remote_branch_instead_of_current_branch(self) -> None:
+        update = (
+            f"refs/heads/fix/local {'a' * 40} "
+            f"refs/heads/automation/invalid {'0' * 40}\n"
+        )
+        with (
+            mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(axis, "diff_range", return_value="current-base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = axis.pre_push(axis.argparse.Namespace(updates_from_stdin=True))
+
+        self.assertEqual(1, result)
+        self.assertIn("automation/invalid", stderr.getvalue())
+
+    def test_pre_push_hook_checks_the_pushed_sha_and_remote_branch(self) -> None:
+        pushed_sha = "a" * 40
+        update = (
+            f"refs/heads/fix/local {pushed_sha} "
+            f"refs/heads/fix/remote-target {'b' * 40}\n"
+        )
+        with (
+            mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(
+                axis,
+                "publish_range_for_commit",
+                return_value=f"base...{pushed_sha}",
+                create=True,
+            ) as publish_range,
+            mock.patch.object(
+                axis,
+                "changed_paths_for_publish_ranges",
+                return_value=["frontend/src/App.tsx"],
+                create=True,
+            ),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0) as publish_metadata,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.pre_push(axis.argparse.Namespace(updates_from_stdin=True))
+
+        self.assertEqual(0, result)
+        publish_range.assert_called_once_with(pushed_sha)
+        publish_args = publish_metadata.call_args.args[0]
+        self.assertEqual("fix/remote-target", publish_args.branch)
+        self.assertEqual(f"base...{pushed_sha}", publish_args.range_spec)
+
+    def test_pre_push_hook_ignores_tag_updates_and_branch_deletions(self) -> None:
+        updates = (
+            f"refs/tags/v1 {'a' * 40} refs/tags/v1 {'0' * 40}\n"
+            f"(delete) {'0' * 40} refs/heads/fix/old {'b' * 40}\n"
+        )
+
+        self.assertEqual([], axis.parse_pre_push_branch_updates(updates))
+
+    def test_pre_push_full_refuses_a_pushed_sha_other_than_checked_out_head(self) -> None:
+        pushed_sha = "a" * 40
+        update = (
+            f"refs/heads/fix/local {pushed_sha} "
+            f"refs/heads/fix/remote-target {'b' * 40}\n"
+        )
+        with (
+            mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}, clear=True),
+            mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(
+                axis,
+                "publish_range_for_commit",
+                return_value=f"base...{pushed_sha}",
+            ),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0),
+            mock.patch.object(axis, "git", return_value=f"{'c' * 40}\n"),
+            mock.patch.object(axis, "review_readiness") as review_readiness,
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = axis.pre_push(axis.argparse.Namespace(updates_from_stdin=True))
+
+        self.assertEqual(1, result)
+        self.assertIn("checked-out HEAD", stderr.getvalue())
+        review_readiness.assert_not_called()
 
     def test_runs_script_checks_for_script_changes(self) -> None:
         calls: list[str] = []
@@ -4677,6 +4811,12 @@ class TestScriptsStandardGate(unittest.TestCase):
             {"scripts/hooks/pre-push": "#!/usr/bin/env bash\npython scripts/axis.py pre-push\n"}
         )
         self.assertIn("scripts/hooks/pre-push: pre-push hook must be a Python entrypoint", issues)
+
+    def test_pre_push_hook_forwards_git_update_records_to_axis(self) -> None:
+        hook = (ROOT / "scripts" / "hooks" / "pre-push").read_text(encoding="utf-8")
+
+        self.assertIn('"pre-push"', hook)
+        self.assertIn('"--updates-from-stdin"', hook)
 
     def test_rejects_executable_pre_push_hook_source(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
@@ -5662,6 +5802,70 @@ class TestLocalDevCli(unittest.TestCase):
         )
         self.certificate_preflight.assert_called_once_with("local-dev smoke")
 
+    def test_host_smoke_executes_the_resolved_cross_platform_probe(self) -> None:
+        host_smoke = getattr(axis, "local_dev_host_smoke", None)
+        self.assertTrue(callable(host_smoke))
+        calls: list[list[str]] = []
+
+        def fake_run_optional(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="200\n", stderr="")
+
+        with (
+            mock.patch.object(
+                axis.axis_host_https,
+                "resolve_host_https_probe",
+                return_value=axis.axis_host_https.HostHttpsProbe(
+                    command=("host-https-client", "--verify"),
+                    boundary="test host trust",
+                ),
+            ),
+            mock.patch.object(axis, "run_optional", side_effect=fake_run_optional),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, host_smoke(axis.argparse.Namespace()))
+
+        self.assertEqual([["host-https-client", "--verify"]], calls)
+        self.assertIn("HTTP 200", stdout.getvalue())
+        self.assertIn("test host trust", stdout.getvalue())
+
+    def test_host_smoke_failure_reports_static_trust_remediation(self) -> None:
+        host_smoke = getattr(axis, "local_dev_host_smoke", None)
+        self.assertTrue(callable(host_smoke))
+        with (
+            mock.patch.object(
+                axis.axis_host_https,
+                "resolve_host_https_probe",
+                return_value=axis.axis_host_https.HostHttpsProbe(
+                    command=("host-https-client", "--verify"),
+                    boundary="test host trust",
+                ),
+            ),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    [],
+                    1,
+                    stdout="",
+                    stderr="certificate verify failed",
+                ),
+            ),
+            mock.patch.object(
+                axis,
+                "local_dev_host_trust_status",
+                return_value=(
+                    "WARN",
+                    "host browser trust is not configured; run `python scripts/axis.py local-dev trust-certs`",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, host_smoke(axis.argparse.Namespace()))
+
+        self.assertIn("certificate verify failed", stderr.getvalue())
+        self.assertIn("trust-certs", stderr.getvalue())
+
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(local_dev_command="shell", service="web", exec_command=[])
@@ -5834,7 +6038,197 @@ class TestLocalDevShellArgv(unittest.TestCase):
 
 
 class TestGitWorkflows(unittest.TestCase):
-    def test_secret_scan_pins_runtime_and_keeps_full_verified_scan(self) -> None:
+
+    def test_checkpoint_rejects_non_conventional_subject_before_git_mutation(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths") as working_tree_paths,
+            mock.patch.object(axis, "git_lines") as git_lines,
+            mock.patch.object(axis, "git") as git,
+        ):
+            with self.assertRaisesRegex(axis.CheckError, "Conventional Commit"):
+                axis.git_checkpoint(
+                    axis.argparse.Namespace(
+                        branch="fix/publish-gate",
+                        subject="Harden publishing",
+                        body=None,
+                        all_changes=False,
+                    )
+                )
+
+        working_tree_paths.assert_not_called()
+        git_lines.assert_not_called()
+        git.assert_not_called()
+
+    def test_publish_metadata_rejects_non_conventional_commit_in_range(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "publish_commit_subjects",
+                return_value=[("0123456789ab", "Harden publishing")],
+                create=True,
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = axis.check_publish_metadata(
+                axis.argparse.Namespace(
+                    branch="fix/publish-gate",
+                    range_spec="base..HEAD",
+                )
+            )
+
+        self.assertEqual(1, result)
+        self.assertIn("0123456789ab", stderr.getvalue())
+        self.assertIn("Conventional Commit", stderr.getvalue())
+
+    def test_publish_metadata_accepts_project_branch_and_commit_range(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "publish_commit_subjects",
+                return_value=[("0123456789ab", "fix: harden publishing")],
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.check_publish_metadata(
+                axis.argparse.Namespace(
+                    branch="fix/publish-gate",
+                    range_spec="base..HEAD",
+                )
+            )
+
+        self.assertEqual(0, result)
+
+    def test_cli_routes_publish_metadata_with_explicit_range(self) -> None:
+        with (
+            mock.patch.object(axis, "check_publish_metadata", return_value=0) as publish_metadata,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.main(
+                [
+                    "check",
+                    "publish-metadata",
+                    "--branch",
+                    "fix/publish-gate",
+                    "--range",
+                    "base..HEAD",
+                ]
+            )
+
+        self.assertEqual(0, result)
+        args = publish_metadata.call_args.args[0]
+        self.assertEqual("fix/publish-gate", args.branch)
+        self.assertEqual("base..HEAD", args.range_spec)
+
+    def test_repository_tracks_a_lock_file_for_every_dotnet_project(self) -> None:
+        self.assertEqual([], axis.dotnet_dependency_lock_issues())
+
+    def test_dotnet_lock_checker_rejects_missing_opt_in_and_project_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            project = root / "src" / "Example" / "Example.csproj"
+            project.parent.mkdir(parents=True)
+            project.write_text("<Project />\n", encoding="utf-8")
+            (root / "Directory.Packages.props").write_text(
+                "<Project><PropertyGroup /></Project>\n",
+                encoding="utf-8",
+            )
+
+            issues = axis.dotnet_dependency_lock_issues(root=root)
+
+        self.assertTrue(any("RestorePackagesWithLockFile" in issue for issue in issues))
+        self.assertTrue(any("packages.lock.json" in issue for issue in issues))
+
+    def test_dotnet_lock_checker_rejects_malformed_and_orphan_locks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            project = root / "src" / "Example" / "Example.csproj"
+            project.parent.mkdir(parents=True)
+            project.write_text("<Project />\n", encoding="utf-8")
+            project.with_name("packages.lock.json").write_text("not json\n", encoding="utf-8")
+            orphan = root / "tests" / "Orphan" / "packages.lock.json"
+            orphan.parent.mkdir(parents=True)
+            orphan.write_text('{"version": 2, "dependencies": {}}\n', encoding="utf-8")
+            (root / "Directory.Packages.props").write_text(
+                "<Project><PropertyGroup>"
+                "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>"
+                "</PropertyGroup></Project>\n",
+                encoding="utf-8",
+            )
+
+            issues = axis.dotnet_dependency_lock_issues(root=root)
+
+        self.assertTrue(any("invalid NuGet lock file" in issue for issue in issues))
+        self.assertTrue(any("no sibling .csproj owner" in issue for issue in issues))
+
+    def test_dotnet_lock_checker_rejects_solution_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            project = root / "src" / "Example" / "Example.csproj"
+            project.parent.mkdir(parents=True)
+            project.write_text("<Project />\n", encoding="utf-8")
+            project.with_name("packages.lock.json").write_text(
+                '{"version": 2, "dependencies": {}}\n',
+                encoding="utf-8",
+            )
+            (root / "Directory.Packages.props").write_text(
+                "<Project><PropertyGroup>"
+                "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>"
+                "</PropertyGroup></Project>\n",
+                encoding="utf-8",
+            )
+            (root / "Axis.sln").write_text(
+                'Project("{TYPE}") = "Unexpected", '
+                '"src\\Unexpected\\Unexpected.csproj", "{PROJECT}"\n',
+                encoding="utf-8",
+            )
+
+            issues = axis.dotnet_dependency_lock_issues(root=root)
+
+        self.assertIn("Axis.sln is missing project src/Example/Example.csproj", issues)
+        self.assertIn(
+            "Axis.sln references unexpected project src/Unexpected/Unexpected.csproj",
+            issues,
+        )
+
+    def test_ci_uses_global_json_and_locked_nuget_graph(self) -> None:
+        for relative in (
+            ".github/workflows/build-and-test.yml",
+            ".github/workflows/dependency-security.yml",
+        ):
+            with self.subTest(workflow=relative):
+                workflow = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn("global-json-file: global.json", workflow)
+                self.assertIn("cache-dependency-path: '**/packages.lock.json'", workflow)
+                self.assertIn("python scripts/axis.py dotnet restore -- --locked-mode", workflow)
+
+    def test_ci_runs_backend_and_frontend_jobs_for_script_changes(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(
+            encoding="utf-8"
+        )
+        filters = workflow.split("          filters: |\n", maxsplit=1)[1].split(
+            "\n\n  dotnet:", maxsplit=1
+        )[0]
+        backend, frontend = filters.split("            frontend:\n", maxsplit=1)
+
+        self.assertIn("- 'scripts/**'", backend)
+        self.assertIn("- 'scripts/**'", frontend)
+
+    def test_ci_pr_guard_validates_branch_pr_and_commit_metadata(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(
+            encoding="utf-8"
+        )
+        pr_job = workflow.split("  pr:\n", maxsplit=1)[1].split("\n  detect:\n", maxsplit=1)[0]
+
+        self.assertIn("fetch-depth: 0", pr_job)
+        self.assertIn("python scripts/axis.py check pr", pr_job)
+        self.assertIn(
+            'python scripts/axis.py check publish-metadata --range "$PR_BASE_SHA..$PR_HEAD_SHA"',
+            pr_job,
+        )
+        self.assertIn("PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}", pr_job)
+        self.assertIn("PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}", pr_job)
+
+    def test_secret_scan_pins_runtime_and_reports_every_result_class(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(encoding="utf-8")
         secret_scan = workflow.split("  secret-scan:\n", maxsplit=1)[1]
 
@@ -5846,7 +6240,10 @@ class TestGitWorkflows(unittest.TestCase):
         self.assertIn("head: ${{ github.event.pull_request.head.sha }}", secret_scan)
         self.assertIn("version: 3.95.3", secret_scan)
         extra_args = next(line.strip() for line in secret_scan.splitlines() if "extra_args:" in line)
-        self.assertEqual("extra_args: --only-verified", extra_args)
+        self.assertEqual(
+            "extra_args: --results=verified,unknown,unverified --fail-on-scan-errors",
+            extra_args,
+        )
 
     def test_sync_fast_forwards_existing_branch(self) -> None:
         calls: list[list[str]] = []
@@ -6926,6 +7323,31 @@ class TestAxisCommandWrappers(unittest.TestCase):
             self.assertEqual(1, rc)
             self.assertEqual("current", generated.read_text(encoding="utf-8"))
 
+    def test_frontend_gen_api_types_check_restores_files_when_generator_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            frontend = Path(temp)
+            generated = frontend / "src" / "lib" / "api-generated" / "types.gen.ts"
+            generated.parent.mkdir(parents=True)
+            generated.write_text("current", encoding="utf-8")
+
+            def generate(_args: list[str]) -> subprocess.CompletedProcess[str]:
+                generated.write_text("partial", encoding="utf-8")
+                (generated.parent / "partial.gen.ts").write_text("partial", encoding="utf-8")
+                return subprocess.CompletedProcess([], 7)
+
+            with (
+                mock.patch.object(axis, "FRONTEND_DIR", frontend),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(axis, "run_frontend_npm", side_effect=generate),
+            ):
+                rc = axis.frontend_command(
+                    axis.argparse.Namespace(frontend_command="gen-api-types", check=True)
+                )
+
+            self.assertEqual(7, rc)
+            self.assertEqual("current", generated.read_text(encoding="utf-8"))
+            self.assertFalse((generated.parent / "partial.gen.ts").exists())
+
     def test_frontend_command_runs_npm_with_resolved_frontend_env(self) -> None:
         calls: list[dict[str, dict[str, str] | None]] = []
         frontend_env = {"PATH": "/tmp/nvm-node-bin:/usr/bin"}
@@ -6993,7 +7415,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 self.assertEqual(0, axis.local_dev_certs())
 
             self.assertTrue((cert_dir / "localhost.ext").is_file())
-            self.assertIn("subjectAltName=@alt_names", (cert_dir / "localhost.ext").read_text(encoding="utf-8"))
+            leaf_extensions = (cert_dir / "localhost.ext").read_text(encoding="utf-8")
+            self.assertIn("basicConstraints=CA:FALSE", leaf_extensions)
+            self.assertIn("keyUsage=digitalSignature,keyEncipherment", leaf_extensions)
+            self.assertIn("extendedKeyUsage=serverAuth", leaf_extensions)
+            self.assertIn("subjectAltName=@alt_names", leaf_extensions)
             chmod.assert_any_call(cert_dir, 0o700)
             chmod.assert_any_call(cert_dir / "rootCA-key.pem", 0o600)
             chmod.assert_any_call(cert_dir / "localhost-key.pem", 0o600)
@@ -7005,6 +7431,55 @@ class TestAxisCommandWrappers(unittest.TestCase):
             )
             self.assertIn("basicConstraints=critical,CA:TRUE", root_ca_command)
             self.assertIn("keyUsage=critical,keyCertSign,cRLSign", root_ca_command)
+
+    def test_local_dev_certificate_reuse_requires_server_leaf_extensions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            cert_dir = Path(temp)
+            paths = {
+                "LOCAL_ROOT_CA_KEY": cert_dir / "rootCA-key.pem",
+                "LOCAL_ROOT_CA_PEM": cert_dir / "rootCA.pem",
+                "LOCAL_ROOT_CA_CER": cert_dir / "rootCA.cer",
+                "LOCALHOST_KEY": cert_dir / "localhost-key.pem",
+                "LOCALHOST_CERT": cert_dir / "localhost.pem",
+            }
+            for path in paths.values():
+                path.write_text("certificate material\n", encoding="utf-8")
+
+            valid_server_usage = True
+
+            def fake_run(command: list[str], **_kwargs):
+                if "-ext" in command:
+                    extension = command[command.index("-ext") + 1]
+                    is_leaf = str(paths["LOCALHOST_CERT"]) in command
+                    if is_leaf and extension == "basicConstraints":
+                        stdout = "X509v3 Basic Constraints:\n    CA:FALSE\n"
+                    elif is_leaf and extension == "keyUsage":
+                        stdout = "X509v3 Key Usage:\n    Digital Signature, Key Encipherment\n"
+                    elif is_leaf and extension == "extendedKeyUsage":
+                        usage = "TLS Web Server Authentication" if valid_server_usage else "Code Signing"
+                        stdout = f"X509v3 Extended Key Usage:\n    {usage}\n"
+                    elif extension == "basicConstraints":
+                        stdout = "X509v3 Basic Constraints: critical\n    CA:TRUE\n"
+                    else:
+                        stdout = "X509v3 Key Usage: critical\n    Certificate Sign, CRL Sign\n"
+                    return axis.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+                if "-fingerprint" in command:
+                    return axis.subprocess.CompletedProcess(
+                        command,
+                        0,
+                        stdout="sha256 Fingerprint=ROOT\n",
+                        stderr="",
+                    )
+                return axis.subprocess.CompletedProcess(command, 0, stdout="public-key\n", stderr="")
+
+            with contextlib.ExitStack() as stack:
+                for name, path in paths.items():
+                    stack.enter_context(mock.patch.object(axis, name, path))
+                stack.enter_context(mock.patch.object(axis, "run", side_effect=fake_run))
+
+                self.assertTrue(axis.local_dev_certificates_valid("openssl"))
+                valid_server_usage = False
+                self.assertFalse(axis.local_dev_certificates_valid("openssl"))
 
     def test_local_dev_certs_reuses_current_and_regenerates_legacy_material(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -7032,7 +7507,14 @@ class TestAxisCommandWrappers(unittest.TestCase):
             def fake_run(command: list[str], **_kwargs):
                 calls.append(command)
                 if "-ext" in command:
-                    if "basicConstraints" in command:
+                    is_leaf = str(paths["LOCALHOST_CERT"]) in command
+                    if is_leaf and "basicConstraints" in command:
+                        stdout = "X509v3 Basic Constraints:\n    CA:FALSE\n"
+                    elif is_leaf and "extendedKeyUsage" in command:
+                        stdout = "X509v3 Extended Key Usage:\n    TLS Web Server Authentication\n"
+                    elif is_leaf:
+                        stdout = "X509v3 Key Usage:\n    Digital Signature, Key Encipherment\n"
+                    elif "basicConstraints" in command:
                         stdout = "X509v3 Basic Constraints: critical\n    CA:TRUE\n"
                     elif legacy_key_usage or (legacy_der_key_usage and "-inform" in command):
                         stdout = "X509v3 Key Usage: critical\n    Certificate Sign\n"
@@ -7175,9 +7657,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
             root_ca.write_bytes(b"axis-root-ca")
             trusted_marker = Path(temp) / "trusted-rootCA.sha1"
             calls: list[list[str]] = []
+            call_options: list[dict[str, object]] = []
 
-            def fake_run(command: list[str], **_kwargs):
+            def fake_run(command: list[str], **kwargs):
                 calls.append(command)
+                call_options.append(kwargs)
                 stdout = "C:\\axis\\rootCA.cer\n" if command[0] == "wslpath" else ""
                 return axis.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
@@ -7201,6 +7685,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 ["certutil.exe", "-f", "-user", "-addstore", "Root", "C:\\axis\\rootCA.cer"],
                 calls[1],
             )
+            self.assertTrue(call_options[1].get("capture"))
             self.assertTrue(trusted_marker.is_file())
             self.assertEqual(
                 f"{hashlib.sha1(b'axis-root-ca').hexdigest().upper()}\n",
@@ -7349,13 +7834,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
         with (
             mock.patch.object(axis, "local_dev_certs", return_value=0) as certs,
             mock.patch.object(axis, "local_dev_trust_certs", return_value=0) as trust,
+            mock.patch.object(axis, "local_dev_host_smoke", return_value=0, create=True) as host_smoke,
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(0, axis.main(["local-dev", "certs", "--renew"]))
             self.assertEqual(0, axis.main(["local-dev", "trust-certs", "--yes"]))
+            self.assertEqual(0, axis.main(["local-dev", "host-smoke"]))
 
         self.assertTrue(certs.call_args.args[0].renew)
         self.assertTrue(trust.call_args.args[0].yes)
+        host_smoke.assert_called_once()
 
 
 class TestInstallHooks(unittest.TestCase):
@@ -7388,6 +7876,194 @@ class TestInstallHooks(unittest.TestCase):
         self.assertIn("refusing to overwrite existing core.hooksPath", stderr.getvalue())
         self.assertEqual([["git", "config", "--get", "core.hooksPath"]], calls)
 
+    def test_refuses_an_explicitly_empty_core_hooks_path_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            target = temp_root / ".git" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertFalse(target.exists())
+            self.assertIn("empty core.hooksPath", stderr.getvalue())
+
+    def test_refuses_inherited_repo_hooks_path_that_resolves_to_tracked_source(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="scripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertEqual("axis hook\n", source.read_text(encoding="utf-8"))
+            self.assertFalse(source.with_name("pre-push.axis-managed.sha256").exists())
+            self.assertIn("inherited core.hooksPath", stderr.getvalue())
+
+    def test_refuses_local_migration_when_an_inherited_hooks_path_exists_without_mutation(self) -> None:
+        local_hooks_configured = True
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            nonlocal local_hooks_configured
+            calls.append(args)
+            if args[1:] == ["config", "--get", "core.hooksPath"]:
+                value = "scripts/hooks\n" if local_hooks_configured else "global/hooks\n"
+                return axis.subprocess.CompletedProcess(args, 0, stdout=value, stderr="")
+            if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                return axis.subprocess.CompletedProcess(
+                    args, 0, stdout="scripts/hooks\n", stderr=""
+                )
+            if args[1:] == ["config", "--show-scope", "--get-all", "core.hooksPath"]:
+                return axis.subprocess.CompletedProcess(
+                    args,
+                    0,
+                    stdout="global\tglobal/hooks\nlocal\tscripts/hooks\n",
+                    stderr="",
+                )
+            if args[1:] == ["config", "--local", "--unset-all", "core.hooksPath"]:
+                local_hooks_configured = False
+                return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {args}")
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.install_hooks())
+
+        self.assertTrue(local_hooks_configured)
+        self.assertNotIn(
+            ["git", "config", "--local", "--unset-all", "core.hooksPath"],
+            calls,
+        )
+        self.assertIn("inherited core.hooksPath", stderr.getvalue())
+
+    def test_restores_local_hooks_path_when_post_unset_validation_detects_a_race(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+            local_hooks_configured = True
+
+            def fake_run(args: list[str], **_kwargs):
+                nonlocal local_hooks_configured
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    value = "scripts/hooks\n" if local_hooks_configured else "raced/hooks\n"
+                    return axis.subprocess.CompletedProcess(args, 0, stdout=value, stderr="")
+                if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="scripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--show-scope", "--get-all", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="local\tscripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--local", "--unset-all", "core.hooksPath"]:
+                    local_hooks_configured = False
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+                if args[1:] == ["config", "--local", "core.hooksPath", "scripts/hooks"]:
+                    local_hooks_configured = True
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertTrue(local_hooks_configured)
+            self.assertIn("original local value was restored", stderr.getvalue())
+
+    def test_derives_hook_target_only_from_the_common_git_directory(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            outside = temp_root / "outside" / "pre-push"
+            target = temp_root / ".git" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] in (
+                    ["config", "--get", "core.hooksPath"],
+                    ["config", "--local", "--get", "core.hooksPath"],
+                ):
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertFalse(outside.exists())
+            self.assertEqual("axis hook\n", target.read_text(encoding="utf-8"))
+
     def test_replaces_repo_core_hooks_path_with_git_hook_copy(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             temp_root = Path(temp)
@@ -7397,15 +8073,34 @@ class TestInstallHooks(unittest.TestCase):
             source.write_text("#!/usr/bin/env python3\nprint('pre-push')\n", encoding="utf-8")
 
             calls: list[list[str]] = []
+            local_hooks_configured = True
 
             def fake_run(args: list[str], **_kwargs):
+                nonlocal local_hooks_configured
                 calls.append(args)
                 if args[1:] == ["config", "--get", "core.hooksPath"]:
-                    return axis.subprocess.CompletedProcess(args, 0, stdout="scripts/hooks\n", stderr="")
-                if args[1:] == ["config", "--unset-all", "core.hooksPath"]:
+                    if local_hooks_configured:
+                        return axis.subprocess.CompletedProcess(
+                            args, 0, stdout="scripts/hooks\n", stderr=""
+                        )
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="scripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--show-scope", "--get-all", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="local\tscripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--local", "--unset-all", "core.hooksPath"]:
+                    local_hooks_configured = False
                     return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
                 if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
                     return axis.subprocess.CompletedProcess(args, 0, stdout=f"{target}\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
                 raise AssertionError(f"unexpected command: {args}")
 
             original_root = axis.ROOT
@@ -7421,9 +8116,53 @@ class TestInstallHooks(unittest.TestCase):
                 axis.ROOT = original_root
 
             self.assertEqual(source.read_text(encoding="utf-8"), target.read_text(encoding="utf-8"))
+            marker = target.with_name("pre-push.axis-managed.sha256")
+            self.assertEqual(
+                f"{hashlib.sha256(source.read_bytes()).hexdigest()}\n",
+                marker.read_text(encoding="utf-8"),
+            )
             if axis.os.name != "nt":
                 self.assertNotEqual(0, target.stat().st_mode & 0o111)
-            self.assertIn(["git", "config", "--unset-all", "core.hooksPath"], calls)
+            self.assertIn(
+                ["git", "config", "--local", "--unset-all", "core.hooksPath"],
+                calls,
+            )
+
+    def test_refuses_to_overwrite_an_unmanaged_default_pre_push_hook(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            target = temp_root / ".git" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            target.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+            target.write_text("personal hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout=f"{target}\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertEqual("personal hook\n", target.read_text(encoding="utf-8"))
+            self.assertIn("refusing to overwrite unmanaged hook", stderr.getvalue())
 
 
 class TestRepoSkillsGate(unittest.TestCase):

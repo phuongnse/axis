@@ -18,7 +18,15 @@ def main() -> int:
         text=True,
     )
     root = Path(result.stdout.strip())
-    os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])
+    os.execv(
+        sys.executable,
+        [
+            sys.executable,
+            str(root / "scripts" / "axis.py"),
+            "pre-push",
+            "--updates-from-stdin",
+        ],
+    )
     return 1
 
 

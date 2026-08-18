@@ -15,25 +15,26 @@ import subprocess
 import sys
 from pathlib import Path
 
+from axis_pr_policy import (
+    BRANCH_RE,
+    PR_TITLE_EXAMPLE,
+    RENOVATE_BRANCH_RE,
+    validate_branch,
+    validate_commit_subject,
+    validate_pr_title,
+)
+
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<label>.+)$", re.MULTILINE)
 CHECKLIST_STATUS_RE = re.compile(r"\[status:\s*(?P<status>[a-z-]+)\]\s*$", re.IGNORECASE)
 CHECKLIST_REASON_RE = re.compile(r"\[reason:\s*(?P<reason>[^\]]*\S[^\]]*)\]", re.IGNORECASE)
 CHECKLIST_STATUSES = {"satisfied", "not-applicable", "pending"}
-PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: \S.*$")
-BRANCH_RE = re.compile(r"^(?:feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
-RENOVATE_BRANCH_RE = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
-
 REQUIRED_SECTIONS = (
     "Summary",
     "Linked spec",
     "Requirements & rules followed",
 )
-
-PR_TITLE_EXAMPLE = "feat(identity): implement standalone user registration"
-BRANCH_EXAMPLE = "feat/short-description"
-
 
 def strip_comments(text: str) -> str:
     return COMMENT_RE.sub("", text)
@@ -57,29 +58,7 @@ def section_text(parts: dict[str, str], name: str) -> str:
 
 
 def validate_title(title: str) -> list[str]:
-    title = title.strip()
-    if not title:
-        return [f"PR title is empty; use Conventional Commit style, e.g. `{PR_TITLE_EXAMPLE}`"]
-    if not PR_TITLE_RE.match(title):
-        return [
-            "PR title must use Conventional Commit style: "
-            "`type(scope): subject` or `type: subject`, "
-            f"e.g. `{PR_TITLE_EXAMPLE}`",
-        ]
-    return []
-
-
-def validate_branch(branch: str) -> list[str]:
-    branch = branch.strip()
-    if not branch:
-        return ["PR branch is unavailable; run from a named branch or pass `--branch`"]
-    if BRANCH_RE.fullmatch(branch) or RENOVATE_BRANCH_RE.fullmatch(branch):
-        return []
-    return [
-        "PR branch must follow CONTRIBUTING.md: "
-        "`{type}/{short-description}` in kebab-case, "
-        f"e.g. `{BRANCH_EXAMPLE}`"
-    ]
+    return validate_pr_title(title)
 
 
 def validate_body(body: str, *, allow_pending: bool = False) -> list[str]:

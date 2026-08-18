@@ -75,6 +75,7 @@
       "matchFileNames": [
         "Directory.Packages.props",
         "**/*.csproj",
+        "**/packages.lock.json",
         "dotnet-tools.json"
       ],
       "groupName": ".NET packages",
