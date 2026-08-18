@@ -32,6 +32,15 @@ def setup_args(**overrides: object) -> argparse.Namespace:
 
 
 class TestPortableSetupCli(unittest.TestCase):
+    def setUp(self) -> None:
+        native_prerequisite = mock.patch.object(
+            axis.axis_setup,
+            "dotnet_native_prerequisite_preflight",
+            return_value=None,
+        )
+        native_prerequisite.start()
+        self.addCleanup(native_prerequisite.stop)
+
     def test_build_profile_rejects_local_ca_trust(self) -> None:
         with (
             mock.patch.object(axis.axis_setup, "detect_platform") as detect_platform,
@@ -283,13 +292,50 @@ class TestPortableSetupCli(unittest.TestCase):
                 return_value="Docker group membership is configured but missing from this shell; start a new login shell",
                 create=True,
             ),
-            mock.patch.object(axis, "require_docker_compose") as compose,
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
             self.assertEqual(1, axis.setup_external_preflight("local-dev"))
 
-        compose.assert_not_called()
         self.assertIn("new login shell", stderr.getvalue())
+
+    def test_external_preflight_reports_all_local_dev_host_blockers_together(self) -> None:
+        with (
+            mock.patch.object(axis, "doctor", return_value=0),
+            mock.patch.object(axis, "find_openssl", return_value=None),
+            mock.patch.object(axis, "_docker_info_ok", return_value=False),
+            mock.patch.object(axis, "_docker_group_session_hint", return_value=None),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=False),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.setup_external_preflight("local-dev"))
+
+        output = stderr.getvalue()
+        self.assertIn("OpenSSL", output)
+        self.assertIn("Docker Engine", output)
+        self.assertIn("Docker Compose v2", output)
+
+    def test_native_preflight_stops_before_confirmation_and_download(self) -> None:
+        preflight = getattr(axis, "setup_native_prerequisite_preflight", None)
+        self.assertTrue(callable(preflight))
+        with (
+            mock.patch.object(
+                axis.axis_setup,
+                "dotnet_native_prerequisite_preflight",
+                return_value="the .NET host is missing ICU; install the verified runtime package",
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(
+                1,
+                preflight(
+                    ("dotnet", "node"),
+                    platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+                ),
+            )
+
+        self.assertIn("setup: FAIL", stderr.getvalue())
+        self.assertIn("missing ICU", stderr.getvalue())
 
     def test_docker_group_hint_distinguishes_configured_from_active_membership(self) -> None:
         handler = getattr(axis, "_docker_group_session_hint", None)
@@ -457,6 +503,11 @@ class TestPortableSetupCli(unittest.TestCase):
             mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
             mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", return_value=False),
+            mock.patch.object(
+                axis,
+                "setup_native_prerequisite_preflight",
+                side_effect=lambda _missing, **_kwargs: events.append("native") or 0,
+            ),
             mock.patch.object(axis, "setup_external_preflight", side_effect=lambda _profile: events.append("external") or 0),
             mock.patch.object(axis.axis_setup, "confirm_install"),
             mock.patch.object(axis.axis_setup, "install_tool", side_effect=lambda tool, **_kwargs: events.append(f"install:{tool}") or Path("/managed") / tool),
@@ -466,9 +517,26 @@ class TestPortableSetupCli(unittest.TestCase):
         ):
             self.assertEqual(1, axis.setup(setup_args(install_user_tools=True, yes=True)))
 
-        self.assertEqual("external", events[0])
+        self.assertEqual(["native", "external"], events[:2])
         self.assertLess(events.index("external"), events.index("install:dotnet"))
         self.assertLess(events.index("install:node"), events.index("full"))
+
+    def test_native_preflight_failure_stops_before_confirmation_and_download(self) -> None:
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
+            mock.patch.object(axis, "setup_tool_ready", return_value=False),
+            mock.patch.object(axis, "setup_native_prerequisite_preflight", return_value=1),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
+            mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
+            mock.patch.object(axis.axis_setup, "install_tool") as install_tool,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(1, axis.setup(setup_args(install_user_tools=True, yes=True)))
+
+        confirm.assert_not_called()
+        install_tool.assert_not_called()
 
     def test_external_preflight_failure_stops_before_confirmation_and_download(self) -> None:
         with (

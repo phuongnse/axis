@@ -174,6 +174,11 @@ public sealed class ProductPolicyInstallerPersistenceTests(AuthorizationDatabase
             IsActive = true,
             Revision = 1,
             CreatedAt = DateTimeOffset.Parse("2026-08-07T00:00:00Z"),
+            UpdatedAt = DateTimeOffset.Parse("2026-08-07T00:00:00Z"),
+            CreatedByKind = "System",
+            CreatedByDisplayName = "System",
+            UpdatedByKind = "System",
+            UpdatedByDisplayName = "System",
         }, TestContext.Current.CancellationToken);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 

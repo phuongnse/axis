@@ -58,6 +58,7 @@ jobs:
             backend:
               - 'src/**'
               - 'tests/**'
+              - 'scripts/**'
               - 'Directory.Packages.props'
               - 'Directory.Build.props'
               - 'Axis.sln'
@@ -70,6 +71,7 @@ jobs:
               - '.github/workflows/build-and-test.yml'
             frontend:
               - 'frontend/**'
+              - 'scripts/**'
               - '.editorconfig'
               # api-types.ts is generated from openapi.json; any change to the
               # contract must run the "API types in sync" guard below, even
@@ -92,21 +94,22 @@ jobs:
         with:
           persist-credentials: false
 
-      # setup-dotnet's built-in cache hashes every csproj + packages.lock.json
-      # (when present) and restores ~/.nuget/packages keyed on the hash.
+      # global.json owns SDK selection; committed lock files own the cache key.
       - name: Setup .NET
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          # Version owner: docs/TECH_STACK.md (.NET 8.x); global.json selects it.
-          dotnet-version: 8.0.x
+          global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/*.csproj'
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Verify Docker is available (required by Testcontainers)
         run: python scripts/axis.py check docker
 
+      - name: Validate NuGet lock graph
+        run: python scripts/axis.py check dotnet-dependency-locks
+
       - name: Restore dependencies
-        run: python scripts/axis.py dotnet restore
+        run: python scripts/axis.py dotnet restore -- --locked-mode
 
       - name: Vulnerable packages
         run: python scripts/axis.py check vulnerable-packages
@@ -236,14 +239,8 @@ jobs:
           args: --config ./lychee.toml './**/*.md'
           fail: true
 
-  # Secret scanning via TruffleHog. Free, open-source, no license required
-  # for any account type (gitleaks-action v2 broke this — its breaking
-  # update added a paid GITLEAKS_LICENSE requirement for repository and personal
-  # accounts alike, see https://github.com/gitleaks/gitleaks-action#-announcement).
-  #
-  # `--only-verified` cuts down false positives by querying the alleged
-  # service for token validity before reporting. Scans the full diff
-  # between PR base and HEAD (fetch-depth: 0 needed for that comparison).
+  # Secret scanning reports verified, unverified, and verification-error
+  # findings across the full PR diff and fails when the scanner itself errors.
   # NOTE: keep the job `name:` tool-agnostic ("Secret scanning"). The
   # required-check setting in branch protection references this exact
   # string — if we ever swap TruffleHog for another scanner (as we just
@@ -266,4 +263,4 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           version: 3.95.3
-          extra_args: --only-verified
+          extra_args: --results=verified,unknown,unverified --fail-on-scan-errors

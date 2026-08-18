@@ -21,12 +21,15 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: 8.0.x
+          global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/*.csproj'
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Validate NuGet lock graph
+        run: python scripts/axis.py check dotnet-dependency-locks
 
       - name: Restore .NET dependencies
-        run: python scripts/axis.py dotnet restore
+        run: python scripts/axis.py dotnet restore -- --locked-mode
 
       - name: Audit .NET dependencies
         run: python scripts/axis.py check vulnerable-packages
