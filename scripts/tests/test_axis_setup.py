@@ -102,7 +102,7 @@ class TestSetupPlatform(unittest.TestCase):
 
         self.assertIsNone(hint)
 
-    def test_dotnet_native_preflight_reports_missing_icu_before_download(self) -> None:
+    def test_dotnet_native_preflight_treats_failed_icu_discovery_as_inconclusive(self) -> None:
         preflight = getattr(axis_setup, "dotnet_native_prerequisite_preflight", None)
         self.assertTrue(callable(preflight))
 
@@ -110,6 +110,18 @@ class TestSetupPlatform(unittest.TestCase):
             platform_spec=axis_setup.SetupPlatform("linux", "x64"),
             os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
             library_lookup=lambda _name: None,
+        )
+
+        self.assertIsNone(hint)
+
+    def test_dotnet_native_preflight_reports_only_authoritative_icu_absence(self) -> None:
+        preflight = getattr(axis_setup, "dotnet_native_prerequisite_preflight", None)
+        self.assertTrue(callable(preflight))
+
+        hint = preflight(
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
+            library_lookup=lambda _name: axis_setup.NativeLibraryStatus.MISSING,
         )
 
         self.assertIn("sudo apt install libicu78", hint)

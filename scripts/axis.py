@@ -328,6 +328,8 @@ def git(args: list[str], *, capture: bool = True, check: bool = True) -> str:
 
 BRANCH_PATTERN = axis_pr_policy.BRANCH_RE
 RENOVATE_BRANCH_PATTERN = axis_pr_policy.RENOVATE_BRANCH_RE
+GIT_OBJECT_RE = re.compile(r"^[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?$")
+NULL_GIT_OBJECT_RE = re.compile(r"^0{40}(?:0{24})?$")
 
 
 def git_checkpoint(args: argparse.Namespace) -> int:
@@ -423,6 +425,71 @@ def diff_range() -> str:
     raise CheckError(f"diff_range: cannot determine diff base (tried {tried}); set BASE_REF or fetch the base branch")
 
 
+def publish_range_for_commit(commit: str) -> str:
+    if GIT_OBJECT_RE.fullmatch(commit) is None or NULL_GIT_OBJECT_RE.fullmatch(commit):
+        raise CheckError(f"publish metadata: invalid pushed commit id: {commit}")
+    base = os.environ.get("BASE_BRANCH", "main")
+    candidates = [os.environ.get("BASE_REF"), f"origin/{base}", base]
+    attempted: list[str] = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        attempted.append(candidate)
+        if not ref_exists(candidate):
+            continue
+        result = run(
+            [exe("git"), "merge-base", candidate, commit],
+            capture=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return f"{result.stdout.strip()}...{commit}"
+    tried = ", ".join(attempted)
+    raise CheckError(
+        "publish metadata: cannot determine the pushed commit base "
+        f"(tried {tried}); fetch the base branch or set BASE_REF"
+    )
+
+
+def parse_pre_push_branch_updates(text: str) -> list[tuple[str, str]]:
+    updates: list[tuple[str, str]] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        fields = line.split()
+        if len(fields) != 4:
+            raise CheckError(
+                f"pre-push: invalid Git update record on stdin line {line_number}"
+            )
+        _local_ref, local_sha, remote_ref, remote_sha = fields
+        if GIT_OBJECT_RE.fullmatch(local_sha) is None or GIT_OBJECT_RE.fullmatch(remote_sha) is None:
+            raise CheckError(
+                f"pre-push: invalid Git object id on stdin line {line_number}"
+            )
+        if NULL_GIT_OBJECT_RE.fullmatch(local_sha):
+            continue
+        if not remote_ref.startswith("refs/heads/"):
+            continue
+        branch = remote_ref.removeprefix("refs/heads/")
+        branch_issues = axis_pr_policy.validate_branch(branch)
+        if branch_issues:
+            raise CheckError(f"pre-push: {branch}: {'; '.join(branch_issues)}")
+        updates.append((branch, local_sha.lower()))
+    return updates
+
+
+def changed_paths_for_publish_ranges(range_specs: Iterable[str]) -> list[str]:
+    paths: list[str] = []
+    for range_spec in range_specs:
+        paths.extend(
+            git_lines(
+                ["diff", "--name-only", range_spec],
+                label=f"pre-push changed paths {range_spec}",
+            )
+        )
+    return unique_paths(paths)
+
+
 def resolve_publish_branch(explicit: str | None = None) -> str:
     if explicit is not None:
         return explicit
@@ -460,13 +527,24 @@ def check_publish_metadata(args: argparse.Namespace | None = None) -> int:
     explicit_range = getattr(args, "range_spec", None)
     try:
         branch = resolve_publish_branch(explicit_branch)
+    except CheckError as exc:
+        print(f"check-publish-metadata FAIL:\n  - {exc}", file=sys.stderr)
+        return 1
+
+    issues = axis_pr_policy.validate_branch(branch)
+    if issues:
+        print("check-publish-metadata FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+
+    try:
         range_spec = explicit_range or diff_range()
         commits = publish_commit_subjects(range_spec)
     except CheckError as exc:
         print(f"check-publish-metadata FAIL:\n  - {exc}", file=sys.stderr)
         return 1
 
-    issues = axis_pr_policy.validate_branch(branch)
     for commit, subject in commits:
         issues.extend(
             f"Commit {commit[:12]}: {issue}"
@@ -4343,13 +4421,61 @@ def review_readiness(args: argparse.Namespace) -> int:
 
 
 def pre_push(args: argparse.Namespace) -> int:
+    updates_from_stdin = bool(getattr(args, "updates_from_stdin", False))
+    if updates_from_stdin:
+        try:
+            branch_updates = parse_pre_push_branch_updates(sys.stdin.read())
+            publish_targets = [
+                (branch, publish_range_for_commit(commit))
+                for branch, commit in branch_updates
+            ]
+            if not publish_targets:
+                print("pre-push: PASS (no branch updates)")
+                return 0
+        except CheckError as exc:
+            print(f"pre-push: FAIL - {exc}", file=sys.stderr)
+            return 1
+    else:
+        branch_updates = []
+        publish_targets = []
+
+    def check_publish_targets() -> int:
+        failed_targets = 0
+        for branch, target_range in publish_targets:
+            failed_targets += check_publish_metadata(
+                argparse.Namespace(branch=branch, range_spec=target_range)
+            ) != 0
+        return 1 if failed_targets else 0
+
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
+        if updates_from_stdin:
+            if check_publish_targets() != 0:
+                print("pre-push: FAIL - publish metadata is not ready", file=sys.stderr)
+                return 1
+            try:
+                head = git(["rev-parse", "HEAD"]).strip().lower()
+            except CheckError as exc:
+                print(f"pre-push: FAIL - {exc}", file=sys.stderr)
+                return 1
+            if any(commit != head for _branch, commit in branch_updates):
+                print(
+                    "pre-push: FAIL - AXIS_PRE_PUSH_FULL can verify only branch updates at "
+                    "the checked-out HEAD; unset it for the pushed-ref quick gate",
+                    file=sys.stderr,
+                )
+                return 1
         print("pre-push: AXIS_PRE_PUSH_FULL is set; running full-branch review-readiness.")
         return review_readiness(argparse.Namespace(since=None, full_branch=True, policy_only=False))
 
-    range_spec = diff_range()
-    paths = changed_paths(range_spec)
+    if updates_from_stdin:
+        paths = changed_paths_for_publish_ranges(
+            target_range for _branch, target_range in publish_targets
+        )
+    else:
+        range_spec = diff_range()
+        publish_targets = [(None, range_spec)]
+        paths = changed_paths(range_spec)
     dotnet = not paths or any(
         re.search(
             r"^(src/|tests/|Directory[.]|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)",
@@ -4387,12 +4513,7 @@ def pre_push(args: argparse.Namespace) -> int:
         "`--since <checkpoint>` for a follow-up."
     )
 
-    step(
-        "publish metadata",
-        lambda: check_publish_metadata(
-            argparse.Namespace(branch=None, range_spec=range_spec)
-        ),
-    )
+    step("publish metadata", check_publish_targets)
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -4498,18 +4619,88 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
             )
             return 1
 
-        unset_result = run([exe("git"), "config", "--unset-all", "core.hooksPath"], check=False)
+        local_hooks = run(
+            [exe("git"), "config", "--local", "--get", "core.hooksPath"],
+            capture=True,
+            check=False,
+        )
+        if local_hooks.returncode not in (0, 1, 5):
+            return local_hooks.returncode
+        local_value = local_hooks.stdout.strip() if local_hooks.returncode == 0 else ""
+        if not local_value:
+            print(
+                "install-hooks: refusing inherited core.hooksPath "
+                f"({hooks_value}); clear it in its owning Git config scope first",
+                file=sys.stderr,
+            )
+            return 1
+        local_path = Path(local_value)
+        resolved_local_path = local_path if local_path.is_absolute() else (ROOT / local_path)
+        normalized_local_value = local_value.replace("\\", "/").rstrip("/")
+        if not (
+            normalized_local_value in {"scripts/hooks", "./scripts/hooks"}
+            or resolved_local_path.resolve() == repo_hooks_path
+        ):
+            print(
+                "install-hooks: refusing to migrate an unverified local core.hooksPath "
+                f"({local_value})",
+                file=sys.stderr,
+            )
+            return 1
+
+        unset_result = run(
+            [exe("git"), "config", "--local", "--unset-all", "core.hooksPath"],
+            check=False,
+        )
         if unset_result.returncode not in (0, 5):
             return unset_result.returncode
+
+        remaining_hooks = run(
+            [exe("git"), "config", "--get", "core.hooksPath"],
+            capture=True,
+            check=False,
+        )
+        if remaining_hooks.returncode not in (0, 1, 5):
+            return remaining_hooks.returncode
+        remaining_value = (
+            remaining_hooks.stdout.strip() if remaining_hooks.returncode == 0 else ""
+        )
+        if remaining_value:
+            print(
+                "install-hooks: refusing inherited core.hooksPath revealed after local migration "
+                f"({remaining_value}); clear it in its owning Git config scope first",
+                file=sys.stderr,
+            )
+            return 1
 
     hook_path_result = run([exe("git"), "rev-parse", "--git-path", "hooks/pre-push"], capture=True, check=False)
     if hook_path_result.returncode != 0:
         return hook_path_result.returncode
+    common_dir_result = run(
+        [exe("git"), "rev-parse", "--git-common-dir"],
+        capture=True,
+        check=False,
+    )
+    if common_dir_result.returncode != 0:
+        return common_dir_result.returncode
 
     source = ROOT / "scripts" / "hooks" / "pre-push"
     target = Path(hook_path_result.stdout.strip())
     if not target.is_absolute():
         target = ROOT / target
+    common_dir = Path(common_dir_result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = ROOT / common_dir
+    allowed_hooks_dir = (common_dir / "hooks").resolve()
+    resolved_source = source.resolve()
+    resolved_target = target.resolve()
+    if resolved_target == resolved_source or resolved_target.parent != allowed_hooks_dir:
+        print(
+            "install-hooks: refusing hook target outside the repository Git hooks directory "
+            f"({target})",
+            file=sys.stderr,
+        )
+        return 1
     target.parent.mkdir(parents=True, exist_ok=True)
     marker = target.with_name(f"{target.name}.axis-managed.sha256")
     source_content = source.read_bytes()
@@ -6421,7 +6612,13 @@ def build_parser(
     doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required tools in the selected profile are unavailable")
     doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks", help="Install the repository-managed pre-push hook").set_defaults(func=install_hooks)
-    sub.add_parser("pre-push", help="Run the pre-push policy profile").set_defaults(func=pre_push)
+    pre_push_parser = sub.add_parser("pre-push", help="Run the pre-push policy profile")
+    pre_push_parser.add_argument(
+        "--updates-from-stdin",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    pre_push_parser.set_defaults(func=pre_push)
     git_parser = sub.add_parser("git", help="Run finite repository Git workflows")
     git_sub = git_parser.add_subparsers(dest="git_command", required=True)
     git_sync_parser = git_sub.add_parser(

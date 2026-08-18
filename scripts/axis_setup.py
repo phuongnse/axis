@@ -16,6 +16,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, TextIO
 
@@ -38,6 +39,14 @@ USER_AGENT = "Axis setup"
 
 class SetupError(RuntimeError):
     """Raised when portable setup cannot continue safely."""
+
+
+class NativeLibraryStatus(Enum):
+    """Authoritativeness-aware native-library probe result."""
+
+    AVAILABLE = "available"
+    MISSING = "missing"
+    UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True)
@@ -110,14 +119,13 @@ def dotnet_native_prerequisite_preflight(
     *,
     platform_spec: SetupPlatform | None = None,
     os_release_text: str | None = None,
-    library_lookup: Callable[[str], str | None] | None = None,
+    library_lookup: Callable[[str], str | NativeLibraryStatus | None] | None = None,
 ) -> str | None:
-    """Return actionable guidance when Linux cannot discover the ICU runtime.
+    """Return guidance only when a Linux probe proves the ICU runtime is absent.
 
-    This probe intentionally checks only a prerequisite whose absence can be
-    established through the platform dynamic loader before a portable .NET SDK
-    is downloaded. The installed .NET host remains the authority for version or
-    compatibility failures that cannot be proven this early.
+    ``ctypes.util.find_library`` returning ``None`` is inconclusive because its
+    discovery helpers may themselves be unavailable. The installed .NET host
+    remains authoritative unless a stronger probe explicitly returns MISSING.
     """
 
     try:
@@ -129,9 +137,10 @@ def dotnet_native_prerequisite_preflight(
 
     lookup = library_lookup or ctypes.util.find_library
     try:
-        if lookup("icuuc"):
-            return None
+        result = lookup("icuuc")
     except (OSError, TypeError, ValueError):
+        return None
+    if result is not NativeLibraryStatus.MISSING:
         return None
 
     hint = dotnet_native_prerequisite_hint(

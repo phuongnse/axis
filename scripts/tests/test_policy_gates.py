@@ -4144,6 +4144,89 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertIsNone(args.branch)
         self.assertEqual("base...HEAD", args.range_spec)
 
+    def test_pre_push_hook_rejects_invalid_remote_branch_instead_of_current_branch(self) -> None:
+        update = (
+            f"refs/heads/fix/local {'a' * 40} "
+            f"refs/heads/automation/invalid {'0' * 40}\n"
+        )
+        with (
+            mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(axis, "diff_range", return_value="current-base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = axis.pre_push(axis.argparse.Namespace(updates_from_stdin=True))
+
+        self.assertEqual(1, result)
+        self.assertIn("automation/invalid", stderr.getvalue())
+
+    def test_pre_push_hook_checks_the_pushed_sha_and_remote_branch(self) -> None:
+        pushed_sha = "a" * 40
+        update = (
+            f"refs/heads/fix/local {pushed_sha} "
+            f"refs/heads/fix/remote-target {'b' * 40}\n"
+        )
+        with (
+            mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(
+                axis,
+                "publish_range_for_commit",
+                return_value=f"base...{pushed_sha}",
+                create=True,
+            ) as publish_range,
+            mock.patch.object(
+                axis,
+                "changed_paths_for_publish_ranges",
+                return_value=["frontend/src/App.tsx"],
+                create=True,
+            ),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0) as publish_metadata,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.pre_push(axis.argparse.Namespace(updates_from_stdin=True))
+
+        self.assertEqual(0, result)
+        publish_range.assert_called_once_with(pushed_sha)
+        publish_args = publish_metadata.call_args.args[0]
+        self.assertEqual("fix/remote-target", publish_args.branch)
+        self.assertEqual(f"base...{pushed_sha}", publish_args.range_spec)
+
+    def test_pre_push_hook_ignores_tag_updates_and_branch_deletions(self) -> None:
+        updates = (
+            f"refs/tags/v1 {'a' * 40} refs/tags/v1 {'0' * 40}\n"
+            f"(delete) {'0' * 40} refs/heads/fix/old {'b' * 40}\n"
+        )
+
+        self.assertEqual([], axis.parse_pre_push_branch_updates(updates))
+
+    def test_pre_push_full_refuses_a_pushed_sha_other_than_checked_out_head(self) -> None:
+        pushed_sha = "a" * 40
+        update = (
+            f"refs/heads/fix/local {pushed_sha} "
+            f"refs/heads/fix/remote-target {'b' * 40}\n"
+        )
+        with (
+            mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}, clear=True),
+            mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(
+                axis,
+                "publish_range_for_commit",
+                return_value=f"base...{pushed_sha}",
+            ),
+            mock.patch.object(axis, "check_publish_metadata", return_value=0),
+            mock.patch.object(axis, "git", return_value=f"{'c' * 40}\n"),
+            mock.patch.object(axis, "review_readiness") as review_readiness,
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = axis.pre_push(axis.argparse.Namespace(updates_from_stdin=True))
+
+        self.assertEqual(1, result)
+        self.assertIn("checked-out HEAD", stderr.getvalue())
+        review_readiness.assert_not_called()
+
     def test_runs_script_checks_for_script_changes(self) -> None:
         calls: list[str] = []
 
@@ -4728,6 +4811,12 @@ class TestScriptsStandardGate(unittest.TestCase):
             {"scripts/hooks/pre-push": "#!/usr/bin/env bash\npython scripts/axis.py pre-push\n"}
         )
         self.assertIn("scripts/hooks/pre-push: pre-push hook must be a Python entrypoint", issues)
+
+    def test_pre_push_hook_forwards_git_update_records_to_axis(self) -> None:
+        hook = (ROOT / "scripts" / "hooks" / "pre-push").read_text(encoding="utf-8")
+
+        self.assertIn('"pre-push"', hook)
+        self.assertIn('"--updates-from-stdin"', hook)
 
     def test_rejects_executable_pre_push_hook_source(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
@@ -7787,6 +7876,75 @@ class TestInstallHooks(unittest.TestCase):
         self.assertIn("refusing to overwrite existing core.hooksPath", stderr.getvalue())
         self.assertEqual([["git", "config", "--get", "core.hooksPath"]], calls)
 
+    def test_refuses_inherited_repo_hooks_path_that_resolves_to_tracked_source(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="scripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertEqual("axis hook\n", source.read_text(encoding="utf-8"))
+            self.assertFalse(source.with_name("pre-push.axis-managed.sha256").exists())
+            self.assertIn("inherited core.hooksPath", stderr.getvalue())
+
+    def test_refuses_hook_target_outside_default_git_hooks_directory(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            outside = temp_root / "outside" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("axis hook\n", encoding="utf-8")
+
+            def fake_run(args: list[str], **_kwargs):
+                if args[1:] in (
+                    ["config", "--get", "core.hooksPath"],
+                    ["config", "--local", "--get", "core.hooksPath"],
+                ):
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout=f"{outside}\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    self.assertEqual(1, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertFalse(outside.exists())
+            self.assertIn("outside the repository Git hooks directory", stderr.getvalue())
+
     def test_replaces_repo_core_hooks_path_with_git_hook_copy(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             temp_root = Path(temp)
@@ -7796,15 +7954,30 @@ class TestInstallHooks(unittest.TestCase):
             source.write_text("#!/usr/bin/env python3\nprint('pre-push')\n", encoding="utf-8")
 
             calls: list[list[str]] = []
+            local_hooks_configured = True
 
             def fake_run(args: list[str], **_kwargs):
+                nonlocal local_hooks_configured
                 calls.append(args)
                 if args[1:] == ["config", "--get", "core.hooksPath"]:
-                    return axis.subprocess.CompletedProcess(args, 0, stdout="scripts/hooks\n", stderr="")
-                if args[1:] == ["config", "--unset-all", "core.hooksPath"]:
+                    if local_hooks_configured:
+                        return axis.subprocess.CompletedProcess(
+                            args, 0, stdout="scripts/hooks\n", stderr=""
+                        )
+                    return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+                if args[1:] == ["config", "--local", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout="scripts/hooks\n", stderr=""
+                    )
+                if args[1:] == ["config", "--local", "--unset-all", "core.hooksPath"]:
+                    local_hooks_configured = False
                     return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
                 if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
                     return axis.subprocess.CompletedProcess(args, 0, stdout=f"{target}\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
                 raise AssertionError(f"unexpected command: {args}")
 
             original_root = axis.ROOT
@@ -7827,7 +8000,10 @@ class TestInstallHooks(unittest.TestCase):
             )
             if axis.os.name != "nt":
                 self.assertNotEqual(0, target.stat().st_mode & 0o111)
-            self.assertIn(["git", "config", "--unset-all", "core.hooksPath"], calls)
+            self.assertIn(
+                ["git", "config", "--local", "--unset-all", "core.hooksPath"],
+                calls,
+            )
 
     def test_refuses_to_overwrite_an_unmanaged_default_pre_push_hook(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
@@ -7844,6 +8020,10 @@ class TestInstallHooks(unittest.TestCase):
                     return axis.subprocess.CompletedProcess(args, 1, stdout="", stderr="")
                 if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
                     return axis.subprocess.CompletedProcess(args, 0, stdout=f"{target}\n", stderr="")
+                if args[1:] == ["rev-parse", "--git-common-dir"]:
+                    return axis.subprocess.CompletedProcess(
+                        args, 0, stdout=f"{temp_root / '.git'}\n", stderr=""
+                    )
                 raise AssertionError(f"unexpected command: {args}")
 
             original_root = axis.ROOT
