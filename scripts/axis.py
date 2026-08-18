@@ -1738,514 +1738,6 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
-REPO_SKILLS_DIR = ".agents/skills"
-REPO_SKILL_WORKFLOWS = "workflows.toml"
-FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
-SKILL_MAX_LINES = 80
-SKILL_REPO_REF_RE = re.compile(
-    r"`(?P<target>(?:AGENTS\.md|\.agents/skills/[A-Za-z0-9._/#-]+|\.github/[A-Za-z0-9._/#-]+|"
-    r"docs/[A-Za-z0-9._/#-]+|scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|"
-    r"frontend/[A-Za-z0-9._/#-]+))`"
-)
-SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
-SKILL_REQUIRED_HEADINGS = ("## Goal", "## Hard gates", "## Inputs", "## Workflow", "## Output")
-SKILL_ALIAS_RE = re.compile(r"(?<![A-Za-z0-9_-])\$(?P<name>axis-[a-z0-9-]+)(?![A-Za-z0-9_-])")
-SKILL_REQUIRES_RE = re.compile(r"[*][*]Requires[*][*]")
-SKILL_CATALOG_LINK_RE = re.compile(r"\]\(\./(?P<name>axis-[a-z0-9-]+)/SKILL[.]md(?:#[^)]+)?\)")
-
-
-def simple_yaml_value(text: str, key: str) -> str:
-    match = re.search(rf"(?m)^\s*{re.escape(key)}:\s*(?P<value>.+?)\s*$", text)
-    if match is None:
-        return ""
-    value = match.group("value").strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    return value
-
-
-def check_project_orchestration() -> int:
-    result = run(
-        [sys.executable, str(ROOT / ".codex" / "check.py")],
-        check=False,
-        capture=True,
-    )
-    if result.returncode != 0:
-        print(result.stderr or result.stdout, file=sys.stderr)
-    return result.returncode
-
-
-def is_project_orchestration_path(path: str) -> bool:
-    return path == ".gitignore" or path.startswith(".codex/")
-
-
-def markdown_anchor_slug(text: str) -> str:
-    text = re.sub(r"`([^`]*)`", r"\1", text.strip().lower())
-    text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"\s+", "-", text)
-    return text.strip("-")
-
-
-def markdown_anchor_slugs(path: Path) -> set[str]:
-    slugs: set[str] = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^(?P<marks>#{1,6})\s+(?P<title>.+?)\s*#*\s*$", line)
-        if match is not None:
-            slugs.add(markdown_anchor_slug(match.group("title")))
-    return slugs
-
-
-def skill_reference_target(target: str, *, skill_dir: Path, root: Path) -> tuple[Path, str] | None:
-    target = urllib.parse.unquote(target.strip())
-    if not target or target.startswith(("#", "http://", "https://", "mailto:")):
-        return None
-    if any(token in target for token in ("{", "}", "*")):
-        return None
-
-    path_part = target.split("#", 1)[0].split("?", 1)[0]
-    if not path_part:
-        return None
-
-    normalized = path_part.replace("\\", "/")
-    repo_prefixes = ("AGENTS.md", f"{REPO_SKILLS_DIR}/", ".github/", "docs/", "scripts/", "tests/", "frontend/")
-    if normalized.startswith(repo_prefixes):
-        return root / normalized, target
-    return (skill_dir / normalized).resolve(), target
-
-
-def repo_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
-    issues: list[str] = []
-    seen: set[str] = set()
-    skill_dir = skill_md.parent
-    candidates = [match.group("target") for match in SKILL_REPO_REF_RE.finditer(text)]
-    candidates.extend(match.group("target") for match in SKILL_MD_LINK_RE.finditer(text))
-
-    for target in candidates:
-        resolved = skill_reference_target(target, skill_dir=skill_dir, root=root)
-        if resolved is None:
-            continue
-        path, display = resolved
-        key = f"{path}#{display}"
-        if key in seen:
-            continue
-        seen.add(key)
-
-        path_without_anchor = Path(str(path).split("#", 1)[0])
-        if not path_without_anchor.exists():
-            issues.append(
-                f"{rel_from(skill_md, root)}: referenced path `{display.split('#', 1)[0]}` does not exist"
-            )
-            continue
-
-        if "#" in display and path_without_anchor.suffix.lower() == ".md":
-            anchor = display.split("#", 1)[1]
-            if anchor and anchor not in markdown_anchor_slugs(path_without_anchor):
-                issues.append(f"{rel_from(skill_md, root)}: referenced anchor `{display}` does not exist")
-
-    return issues
-
-
-def repo_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
-    issues: list[str] = []
-    fence_lang: str | None = None
-    for idx, line in enumerate(text.splitlines(), 1):
-        fence_match = re.match(r"^```([A-Za-z0-9_-]*)", line.strip())
-        if fence_match:
-            fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
-            continue
-
-        if fence_lang in {"bash", "sh", "shell", "console"}:
-            message = raw_doc_command_message(line)
-            if message is not None:
-                issues.append(
-                    f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{line.strip()}` - {message}"
-                )
-
-        for fragment in re.findall(r"`([^`]+)`", line):
-            message = raw_doc_command_message(fragment)
-            if message is not None:
-                issues.append(f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{fragment}` - {message}")
-    return issues
-
-
-def repo_skill_catalog_issues(skills_root: Path, skill_names: set[str], *, root: Path) -> list[str]:
-    catalog_path = skills_root / "README.md"
-    if not catalog_path.is_file():
-        return [f"{rel_from(catalog_path, root)}: responsibility catalog is missing"]
-
-    counts: dict[str, int] = {}
-    for match in SKILL_CATALOG_LINK_RE.finditer(catalog_path.read_text(encoding="utf-8")):
-        name = match.group("name")
-        counts[name] = counts.get(name, 0) + 1
-
-    issues: list[str] = []
-    for name in sorted(skill_names):
-        count = counts.get(name, 0)
-        if count == 0:
-            issues.append(f"{rel_from(catalog_path, root)}: missing responsibility entry for `{name}`")
-        elif count > 1:
-            issues.append(f"{rel_from(catalog_path, root)}: `{name}` must have exactly one responsibility entry")
-    for name in sorted(set(counts) - skill_names):
-        issues.append(f"{rel_from(catalog_path, root)}: catalog references unknown skill `{name}`")
-    return issues
-
-
-def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root: Path) -> list[str]:
-    path = skills_root / REPO_SKILL_WORKFLOWS
-    normalized = rel_from(path, root)
-    if not path.is_file():
-        return [f"{normalized}: cross-skill workflow contract is missing"]
-
-    try:
-        contract = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return [f"{normalized}: cannot load workflow contract: {exc}"]
-
-    issues: list[str] = []
-    allowed_root_keys = {"version", "semantic_roles", "workflows"}
-    unknown_root_keys = sorted(set(contract) - allowed_root_keys)
-    if unknown_root_keys:
-        issues.append(f"{normalized}: unknown root keys {unknown_root_keys}")
-    if contract.get("version") != 1:
-        issues.append(f"{normalized}: `version` must be 1")
-
-    semantic_roles = contract.get("semantic_roles", {})
-    if not isinstance(semantic_roles, dict) or any(
-        not isinstance(role, str) or not isinstance(agent, str)
-        for role, agent in semantic_roles.items()
-    ):
-        issues.append(f"{normalized}: `semantic_roles` must map role IDs to project agent IDs")
-        semantic_roles = {}
-    else:
-        for role, agent in semantic_roles.items():
-            if SKILL_NAME_RE.fullmatch(role) is None:
-                issues.append(f"{normalized}: semantic role `{role}` must use kebab-case")
-            if not (root / ".codex" / "agents" / f"{agent}.toml").is_file():
-                issues.append(f"{normalized}: semantic role `{role}` references unknown agent `{agent}`")
-
-    workflows = contract.get("workflows")
-    if not isinstance(workflows, dict) or not workflows:
-        issues.append(f"{normalized}: `workflows` must contain at least one workflow table")
-        return issues
-
-    used_roles: set[str] = set()
-    allowed_workflow_keys = {"initial", "terminal_states", "states", "transitions"}
-    allowed_transition_keys = {"id", "from", "to", "owner", "evidence"}
-    for workflow_name, workflow in workflows.items():
-        label = f"{normalized}: workflow `{workflow_name}`"
-        if SKILL_NAME_RE.fullmatch(workflow_name) is None:
-            issues.append(f"{label} ID must use kebab-case")
-        if not isinstance(workflow, dict):
-            issues.append(f"{label} must be a table")
-            continue
-
-        unknown_keys = sorted(set(workflow) - allowed_workflow_keys)
-        if unknown_keys:
-            issues.append(f"{label} has unknown keys {unknown_keys}")
-        states = workflow.get("states")
-        if not isinstance(states, list) or not states or any(not isinstance(state, str) for state in states):
-            issues.append(f"{label} `states` must be a non-empty string array")
-            continue
-        if len(states) != len(set(states)):
-            issues.append(f"{label} states must be unique")
-        state_set = set(states)
-        for state in states:
-            if SKILL_NAME_RE.fullmatch(state) is None:
-                issues.append(f"{label} state `{state}` must use kebab-case")
-
-        initial = workflow.get("initial")
-        if initial not in state_set:
-            issues.append(f"{label} initial state `{initial}` is not declared")
-        terminal_states = workflow.get("terminal_states")
-        if (
-            not isinstance(terminal_states, list)
-            or not terminal_states
-            or any(not isinstance(state, str) for state in terminal_states)
-        ):
-            issues.append(f"{label} `terminal_states` must be a non-empty array")
-            terminal_states = []
-        for state in terminal_states:
-            if state not in state_set:
-                issues.append(f"{label} terminal state `{state}` is not declared")
-
-        transitions = workflow.get("transitions")
-        if not isinstance(transitions, list) or not transitions:
-            issues.append(f"{label} `transitions` must be a non-empty table array")
-            continue
-
-        transition_ids: set[str] = set()
-        transition_contracts: dict[str, tuple[str, str, str, str]] = {}
-        edges: set[tuple[str, str]] = set()
-        adjacency: dict[str, set[str]] = {state: set() for state in states}
-        for index, transition in enumerate(transitions, 1):
-            transition_label = f"{label} transition {index}"
-            if not isinstance(transition, dict):
-                issues.append(f"{transition_label} must be a table")
-                continue
-            unknown_keys = sorted(set(transition) - allowed_transition_keys)
-            if unknown_keys:
-                issues.append(f"{transition_label} has unknown keys {unknown_keys}")
-            missing_keys = sorted(allowed_transition_keys - set(transition))
-            if missing_keys:
-                issues.append(f"{transition_label} is missing keys {missing_keys}")
-                continue
-
-            transition_id = transition["id"]
-            source = transition["from"]
-            target = transition["to"]
-            owner = transition["owner"]
-            evidence = transition["evidence"]
-            if not all(isinstance(value, str) and value for value in (transition_id, source, target, owner, evidence)):
-                issues.append(f"{transition_label} fields must be non-empty strings")
-                continue
-            if SKILL_NAME_RE.fullmatch(transition_id) is None:
-                issues.append(f"{transition_label} ID `{transition_id}` must use kebab-case")
-            if transition_id in transition_ids:
-                issues.append(f"{label} transition ID `{transition_id}` is duplicated")
-            transition_ids.add(transition_id)
-            transition_contracts[transition_id] = (source, target, owner, evidence)
-            if source not in state_set or target not in state_set:
-                issues.append(f"{transition_label} references an undeclared state `{source} -> {target}`")
-            else:
-                edge = (source, target)
-                if edge in edges:
-                    issues.append(f"{label} transition `{source} -> {target}` has multiple owners")
-                edges.add(edge)
-                adjacency[source].add(target)
-
-            owner_kind, separator, owner_id = owner.partition(":")
-            if separator != ":" or owner_kind not in {"skill", "role"} or not owner_id:
-                issues.append(f"{transition_label} owner must be `skill:<id>` or `role:<id>`")
-            elif owner_kind == "skill" and owner_id not in skill_names:
-                issues.append(f"{transition_label} references unknown skill owner `{owner_id}`")
-            elif owner_kind == "role":
-                used_roles.add(owner_id)
-                if owner_id not in semantic_roles:
-                    issues.append(f"{transition_label} references unknown semantic role `{owner_id}`")
-
-        if workflow_name == "review":
-            required_review_transitions = {
-                "create-checkpoint": (
-                    "focused-proof",
-                    "checkpoint",
-                    "skill:axis-pull-request",
-                    "focused-proof-and-clean-immutable-checkpoint",
-                ),
-                "verify-readiness": (
-                    "checkpoint",
-                    "readiness-verified",
-                    "skill:axis-review-readiness",
-                    "ready-verdict-for-exact-checkpoint-and-comparison-base",
-                ),
-                "approve-review": (
-                    "readiness-verified",
-                    "review-approved",
-                    "role:independent-reviewer",
-                    "completed-review-pass",
-                ),
-                "request-changes": (
-                    "readiness-verified",
-                    "changes-requested",
-                    "role:independent-reviewer",
-                    "completed-review-findings",
-                ),
-                "resolve-findings": (
-                    "changes-requested",
-                    "focused-proof",
-                    "skill:axis-review-feedback",
-                    "classified-findings-and-focused-proof",
-                ),
-                "publish": (
-                    "review-approved",
-                    "published",
-                    "skill:axis-pull-request",
-                    "validated-remote-state",
-                ),
-            }
-            if initial != "focused-proof":
-                issues.append(f"{label} must begin at `focused-proof`")
-            for transition_id, expected in required_review_transitions.items():
-                if transition_contracts.get(transition_id) != expected:
-                    source, target, owner, evidence = expected
-                    issues.append(
-                        f"{label} must route `{transition_id}` from `{source}` to `{target}` "
-                        f"with owner `{owner}` and evidence `{evidence}`"
-                    )
-
-        if initial in state_set:
-            reachable = {initial}
-            pending = [initial]
-            while pending:
-                source = pending.pop()
-                for target in adjacency[source] - reachable:
-                    reachable.add(target)
-                    pending.append(target)
-            for state in sorted(state_set - reachable):
-                issues.append(f"{label} state `{state}` is unreachable from `{initial}`")
-
-        declared_terminals = state_set.intersection(terminal_states)
-        if declared_terminals:
-            reverse_adjacency: dict[str, set[str]] = {state: set() for state in states}
-            for source, targets in adjacency.items():
-                for target in targets:
-                    reverse_adjacency[target].add(source)
-            can_reach_terminal = set(declared_terminals)
-            pending = list(declared_terminals)
-            while pending:
-                target = pending.pop()
-                for source in reverse_adjacency[target] - can_reach_terminal:
-                    can_reach_terminal.add(source)
-                    pending.append(source)
-            for state in sorted(state_set - can_reach_terminal):
-                issues.append(f"{label} state `{state}` cannot reach a terminal state")
-
-    for role in sorted(set(semantic_roles) - used_roles):
-        issues.append(f"{normalized}: semantic role `{role}` is not used by any transition")
-    return issues
-
-
-def repo_skill_required_cycle_issues(records: list[tuple[Path, str]]) -> list[str]:
-    skill_names = {path.parent.name for path, _text in records}
-    graph: dict[str, set[str]] = {name: set() for name in skill_names}
-    for skill_md, text in records:
-        source = skill_md.parent.name
-        for line in text.splitlines():
-            if SKILL_REQUIRES_RE.search(line) is None:
-                continue
-            graph[source].update(
-                match.group("name")
-                for match in SKILL_ALIAS_RE.finditer(line)
-                if match.group("name") in skill_names
-            )
-
-    issues: list[str] = []
-    visited: set[str] = set()
-    visiting: list[str] = []
-    reported: set[frozenset[str]] = set()
-
-    def visit(name: str) -> None:
-        if name in visiting:
-            cycle = visiting[visiting.index(name) :] + [name]
-            key = frozenset(cycle)
-            if key not in reported:
-                reported.add(key)
-                issues.append(
-                    f"{REPO_SKILLS_DIR}: recursive **Requires** handoff: {' -> '.join(cycle)}; "
-                    "make one edge a delegate/return or reuse current prerequisite evidence"
-                )
-            return
-        if name in visited:
-            return
-        visiting.append(name)
-        for target in sorted(graph[name]):
-            visit(target)
-        visiting.pop()
-        visited.add(name)
-
-    for name in sorted(graph):
-        visit(name)
-    return issues
-
-
-def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
-    if not skills_root.exists():
-        return issues
-
-    skill_dirs = sorted(path for path in skills_root.iterdir() if path.is_dir())
-    skill_names = {path.name for path in skill_dirs}
-    records: list[tuple[Path, str]] = []
-
-    for skill_dir in skill_dirs:
-        skill_path = rel_from(skill_dir, root)
-
-        skill_name = skill_dir.name
-        if SKILL_NAME_RE.fullmatch(skill_name) is None:
-            issues.append(f"{skill_path}: skill folder name must be lowercase letters, digits, and hyphens")
-
-        legacy_adapter = skill_dir / "agents"
-        if legacy_adapter.is_dir():
-            issues.append(
-                f"{skill_path}: remove legacy agents/ vendor metadata; "
-                f"repo skills use {REPO_SKILLS_DIR}/<name>/SKILL.md only"
-            )
-
-        skill_md = skill_dir / "SKILL.md"
-        if not skill_md.is_file():
-            issues.append(f"{skill_path}: missing SKILL.md")
-            continue
-
-        text = skill_md.read_text(encoding="utf-8")
-        records.append((skill_md, text))
-        if "TODO" in text or "[TODO" in text:
-            issues.append(f"{rel_from(skill_md, root)}: remove template TODO text before committing")
-        line_count = len(text.splitlines())
-        if line_count > SKILL_MAX_LINES:
-            issues.append(
-                f"{rel_from(skill_md, root)}: keep SKILL.md concise ({line_count} lines > {SKILL_MAX_LINES})"
-            )
-        issues.extend(repo_skill_raw_command_issues(skill_md, text, root=root))
-
-        frontmatter = FRONTMATTER_RE.match(text)
-        if frontmatter is None:
-            issues.append(f"{rel_from(skill_md, root)}: missing YAML frontmatter delimited by ---")
-            continue
-
-        header = frontmatter.group("header")
-        header_keys = set(re.findall(r"(?m)^([A-Za-z0-9_-]+):", header))
-        unsupported_keys = sorted(header_keys - {"name", "description"})
-        if unsupported_keys:
-            issues.append(
-                f"{rel_from(skill_md, root)}: frontmatter supports only `name` and `description`; "
-                f"remove {unsupported_keys}"
-            )
-        declared_name = simple_yaml_value(header, "name")
-        description = simple_yaml_value(header, "description")
-        if declared_name != skill_name:
-            issues.append(
-                f"{rel_from(skill_md, root)}: frontmatter name must match folder name "
-                f"({skill_name})"
-            )
-        if not description:
-            issues.append(f"{rel_from(skill_md, root)}: frontmatter description is required")
-
-        body = text[frontmatter.end() :]
-        if re.search(r"(?m)^#\s+\S", body) is None:
-            issues.append(f"{rel_from(skill_md, root)}: body must contain a Markdown H1")
-        for heading in SKILL_REQUIRED_HEADINGS:
-            if re.search(rf"(?m)^{re.escape(heading)}\s*$", body) is None:
-                issues.append(
-                    f"{rel_from(skill_md, root)}: missing required section `{heading}`"
-                )
-        if "../reference.md" not in text:
-            issues.append(f"{rel_from(skill_md, root)}: must link the universal `../reference.md` contract")
-        for alias in sorted({match.group("name") for match in SKILL_ALIAS_RE.finditer(text)}):
-            if alias not in skill_names:
-                issues.append(f"{rel_from(skill_md, root)}: unknown skill alias `${alias}`")
-        issues.extend(repo_skill_reference_issues(skill_md, text, root=root))
-
-    issues.extend(repo_skill_catalog_issues(skills_root, skill_names, root=root))
-    issues.extend(repo_skill_workflow_issues(skills_root, skill_names, root=root))
-    issues.extend(repo_skill_required_cycle_issues(records))
-    return issues
-
-
-def check_repo_skills(_args: argparse.Namespace | None = None) -> int:
-    issues = repo_skill_issues()
-    if issues:
-        print("check-repo-skills FAIL:", file=sys.stderr)
-        for issue in issues:
-            print(f"  - {issue}", file=sys.stderr)
-        return 1
-    if check_project_orchestration() != 0:
-        return 1
-    print("check-repo-skills: OK")
-    return 0
-
-
 def check_policy_tests(args: argparse.Namespace | None = None) -> int:
     tests = getattr(args, "tests", None) or []
     command = [sys.executable, "-m", "unittest"]
@@ -2468,7 +1960,7 @@ RAW_DOC_COMMAND_PATTERNS = [
 def is_command_doc(path: str) -> bool:
     return (
         path in DOC_COMMAND_DOC_PATHS
-        or (path.startswith(("docs/", ".agents/skills/")) and path.endswith(".md"))
+        or (path.startswith("docs/") and path.endswith(".md"))
         or (path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml")))
     )
 
@@ -2801,8 +2293,6 @@ def doc_drift_checker_names(paths: list[str]) -> set[str]:
         names.add("check-text-encoding")
     if any(path.startswith("scripts/") for path in paths):
         names.add("check-scripts-standard")
-    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
-        names.add("check-repo-skills")
     if any(path.startswith(("src/", "tests/")) and path.endswith(".cs") for path in paths):
         names.add("check-ef-domain-mapping")
     if any(is_frontend_path(path) for path in paths):
@@ -2909,7 +2399,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             lambda _=None: run_text_encoding_check(text_paths, label="check-text-encoding-changed"),
         ),
         ("check-scripts-standard", check_scripts_standard),
-        ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-ui-baseline", check_ui_baseline),
@@ -4124,10 +3613,6 @@ def verify(args: argparse.Namespace) -> int:
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
     foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
-    skills = any(
-        path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path)
-        for path in paths
-    )
     scripts_changed = any(path.startswith("scripts/") for path in paths)
     workflow_changed = any(path.startswith(".github/workflows/") for path in paths)
     theme_changed = any(axis_theme.is_theme_path(path) for path in paths)
@@ -4138,7 +3623,8 @@ def verify(args: argparse.Namespace) -> int:
     print(
         "verify plan: "
         f"dotnet={dotnet} frontend={frontend} docs={docs} scripts={scripts_changed} "
-        f"skills={skills} markdown-links={markdown_links} renovate-config={renovate_config}"
+        f"markdown-links={markdown_links} "
+        f"renovate-config={renovate_config}"
     )
 
     if not paths:
@@ -4235,9 +3721,6 @@ def verify(args: argparse.Namespace) -> int:
     if renovate_config:
         step("Renovate config", lambda: check_renovate_config(None))
 
-    if skills:
-        step("Repo skills", lambda: check_repo_skills())
-
     if docs:
         step("doc navigation", lambda: check_doc_navigation())
         step("doc size budgets", lambda: check_doc_size_budgets())
@@ -4271,7 +3754,7 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
-def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
+def review_checks_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
     if any((ROOT / path).is_file() and should_check_text_encoding(path) for path in paths):
         covered.add("check-text-encoding")
@@ -4279,8 +3762,6 @@ def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
         covered.add("check-theme")
     if any(path.startswith("scripts/") for path in paths):
         covered.add("check-scripts-standard")
-    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
-        covered.add("check-repo-skills")
     if any(is_docs_path(path) for path in paths):
         covered.update({"check-doc-navigation", "check-doc-size-budgets", "check-doc-code-fences.py"})
     if any(path.startswith("docs/use-cases/") for path in paths):
@@ -4290,7 +3771,7 @@ def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
     return covered
 
 
-def review_readiness_policy_gates(
+def review_checks_policy_gates(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -4322,7 +3803,7 @@ def review_readiness_policy_gates(
     return gates
 
 
-def run_review_readiness_policy(
+def run_review_checks_policy(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -4331,14 +3812,14 @@ def run_review_readiness_policy(
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
-    for name, checker in review_readiness_policy_gates(
+    for name, checker in review_checks_policy_gates(
         paths,
         policy_tests_covered=policy_tests_covered,
         doc_drift_covered=doc_drift_covered,
         doc_drift_range=doc_drift_range,
     ):
         print()
-        print(f"> review-readiness: {name}")
+        print(f"> review-checks: {name}")
         executed.append(name)
         try:
             rc = checker()
@@ -4346,41 +3827,16 @@ def run_review_readiness_policy(
             print(exc, file=sys.stderr)
             rc = 1
         if rc == 0:
-            print(f"OK review-readiness: {name}")
+            print(f"OK review-checks: {name}")
         else:
-            print(f"FAIL review-readiness: {name}")
+            print(f"FAIL review-checks: {name}")
             failed.append(name)
     return (0 if not failed else 1), executed
 
 
-def review_readiness(args: argparse.Namespace) -> int:
+def review_checks(args: argparse.Namespace) -> int:
     since = getattr(args, "since", None)
-    full_branch = bool(getattr(args, "full_branch", False))
     policy_only = bool(getattr(args, "policy_only", False))
-    if since and full_branch:
-        print(
-            "review-readiness: FAIL - select only one scope: --since <checkpoint> or --full-branch",
-            file=sys.stderr,
-        )
-        return 1
-    if not policy_only and not since and not full_branch:
-        print(
-            "review-readiness: FAIL - select an explicit scope: --since <checkpoint> for a follow-up "
-            "delta or --full-branch for the complete publishable branch",
-            file=sys.stderr,
-        )
-        return 1
-
-    if working_tree_paths():
-        print(
-            "review-readiness: FAIL - create an intentional checkpoint commit before review-boundary verification",
-            file=sys.stderr,
-        )
-        return 1
-
-    if not policy_only and check_publish_metadata() != 0:
-        print("review-readiness: FAIL - publish metadata is not ready", file=sys.stderr)
-        return 1
 
     try:
         _scope, paths = verify_scope_paths(since)
@@ -4393,7 +3849,7 @@ def review_readiness(args: argparse.Namespace) -> int:
         verify_args = argparse.Namespace(**vars(args))
         verify_args.reuse_focused_browser_evidence = True
         if verify(verify_args) != 0:
-            print("review-readiness: FAIL - changed-path verification failed", file=sys.stderr)
+            print("review-checks: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
         executed.append("verify")
 
@@ -4401,22 +3857,22 @@ def review_readiness(args: argparse.Namespace) -> int:
         path.startswith("scripts/") or path.startswith(".github/workflows/")
         for path in paths
     )
-    policy_rc, policy_gates = run_review_readiness_policy(
+    policy_rc, policy_gates = run_review_checks_policy(
         paths,
         policy_tests_covered=not policy_only and policy_surface_changed,
-        doc_drift_covered=set() if policy_only else review_readiness_doc_drift_coverage(paths),
+        doc_drift_covered=set() if policy_only else review_checks_doc_drift_coverage(paths),
         doc_drift_range=f"{since}..HEAD" if since else None,
     )
     executed.extend(policy_gates)
     if policy_rc != 0:
-        print("review-readiness: FAIL - policy profile failed", file=sys.stderr)
+        print("review-checks: FAIL - policy profile failed", file=sys.stderr)
         return 1
 
     if policy_only:
-        print("review-readiness: PASS (policy profile)")
+        print("review-checks: PASS (policy profile)")
         return 0
 
-    print(f"review-readiness: PASS ({', '.join(executed)})")
+    print(f"review-checks: PASS ({', '.join(executed)})")
     return 0
 
 
@@ -4465,8 +3921,8 @@ def pre_push(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
                 return 1
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full-branch review-readiness.")
-        return review_readiness(argparse.Namespace(since=None, full_branch=True, policy_only=False))
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running Axis review checks.")
+        return review_checks(argparse.Namespace(since=None, policy_only=False))
 
     if updates_from_stdin:
         paths = changed_paths_for_publish_ranges(
@@ -4484,10 +3940,6 @@ def pre_push(args: argparse.Namespace) -> int:
         for p in paths
     )
     docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
-    skills = not paths or any(
-        p.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(p)
-        for p in paths
-    )
     scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     renovate_config = not paths or ".github/renovate.json5" in paths
     failed: list[str] = []
@@ -4509,8 +3961,8 @@ def pre_push(args: argparse.Namespace) -> int:
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
     print(
-        "  Run `python scripts/axis.py review-readiness --full-branch` for the first review or "
-        "`--since <checkpoint>` for a follow-up."
+        "  The engineering-process review profile runs full Axis checks; use "
+        "`review-checks --since <checkpoint>` only for a focused follow-up."
     )
 
     step("publish metadata", check_publish_targets)
@@ -4522,9 +3974,6 @@ def pre_push(args: argparse.Namespace) -> int:
     if docs:
         step("doc navigation", lambda: check_doc_navigation())
         step("doc size budgets", lambda: check_doc_size_budgets())
-
-    if skills:
-        step("Repo skills", lambda: check_repo_skills())
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
@@ -6707,22 +6156,17 @@ def build_parser(
         help="Skip the pre-push hook only when explicitly authorized",
     )
     git_push_parser.set_defaults(func=git_push_checkpoint)
-    review_readiness_parser = sub.add_parser(
-        "review-readiness",
-        help="Verify a clean checkpoint before independent review",
+    review_checks_parser = sub.add_parser(
+        "review-checks",
+        help="Run Axis checks selected for the shared review profile",
     )
-    review_readiness_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
-    review_readiness_parser.add_argument(
-        "--full-branch",
-        action="store_true",
-        help="Explicitly verify the complete publishable branch diff",
-    )
-    review_readiness_parser.add_argument(
+    review_checks_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    review_checks_parser.add_argument(
         "--policy-only",
         action="store_true",
         help="Run only the deterministic policy profile shared with CI",
     )
-    review_readiness_parser.set_defaults(func=review_readiness)
+    review_checks_parser.set_defaults(func=review_checks)
     verify_parser = sub.add_parser("verify", help="Run checks selected from changed paths")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
     verify_parser.add_argument(
@@ -6956,7 +6400,6 @@ def build_parser(
     check_sub.add_parser("mcp-tool-safety", help="Check MCP mutation gating behavior").set_defaults(func=check_mcp_tool_safety)
     check_sub.add_parser("text-encoding", help="Check repository text encoding and line endings").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard", help="Check repository script ownership conventions").set_defaults(func=check_scripts_standard)
-    check_sub.add_parser("repo-skills", help="Validate repository skill contracts").set_defaults(func=check_repo_skills)
     check_sub.add_parser("renovate-config", help="Validate the Renovate configuration").set_defaults(func=check_renovate_config)
     check_sub.add_parser("test-naming", help="Validate test naming conventions").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification", help="Validate test project classifications").set_defaults(func=check_test_project_classification)

@@ -2,12 +2,16 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md`](../../.agents/skills/README.md) and [`.agents/skills/reference.md`](../../.agents/skills/reference.md)); enforcement status lives in [docs/ENFORCEMENT.md](../ENFORCEMENT.md); command behavior lives in [docs/playbooks/scripts.md](./scripts.md).
+Review checklist only. Workflow lives in the managed `run-change` and capability
+skills pinned by `.process/process.lock`; enforcement status lives in
+[docs/ENFORCEMENT.md](../ENFORCEMENT.md), and command behavior lives in
+[docs/playbooks/scripts.md](./scripts.md).
 
 ## Before Code
 
-- Use `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
-- Select the entry owner from [`.agents/skills/README.md`](../../.agents/skills/README.md) and preserve current prerequisite evidence across typed handoffs.
+- Use `$assess-design` for non-trivial work; high-risk surfaces need sign-off.
+- Select the applicable managed capability skill and preserve current prerequisite
+  evidence across ownership handoffs.
 - Confirm the routing checkpoint covers current independently ownable work units; re-evaluate unexecuted units after decisions resolve ambiguity or change their scope, ownership, or verification boundary.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
@@ -19,7 +23,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 
 ## Acceptance Coverage
 
-Use [`.agents/skills/axis-use-case-spec/reference.md`](../../.agents/skills/axis-use-case-spec/reference.md) for AC/AT schema. Review that validation, edge, authorization, isolation, dependency-failure, screen, accessibility, and interaction expectations are covered when in scope.
+Use [`docs/playbooks/acceptance-authoring.md`](./acceptance-authoring.md) for AC/AT schema. Review that validation, edge, authorization, isolation, dependency-failure, screen, accessibility, and interaction expectations are covered when in scope.
 
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
@@ -33,7 +37,8 @@ For a high-risk security or privacy protocol, confirm the current threat model n
 
 ## Review Verification
 
-During development, run the smallest check that proves the edit. Before independent review, use `$axis-review-readiness`.
+During development, run the smallest check that proves the edit. Before independent
+review, use `processctl change verify` for every required profile.
 
 Only claim a full local suite when full `python scripts/axis.py dotnet test` ran, including integration/API tests. CI remains authoritative before merge.
 
@@ -48,13 +53,15 @@ For a clean cutover, review the post-edit `rg` sweep for retired routes, fields,
 | Behavior/spec/status | Owning use case |
 | Stack/library/manifests | [docs/TECH_STACK.md](../TECH_STACK.md) and owning manifests |
 | Repeated rule class | Focused playbook or [docs/ENFORCEMENT.md](../ENFORCEMENT.md) |
-| Mermaid or committed visual artifact | `$axis-doc-hygiene` and the owning spec |
+| Mermaid or committed visual artifact | `$maintain-docs` and the owning spec |
 
 Pure refactor/style/test-only changes can report docs as not triggered.
 
 ## Retrospective Review
 
-Use `$axis-review-readiness` and apply [`.agents/skills/reference.md § Improvement loop`](../../.agents/skills/reference.md#improvement-loop). Record one outcome instead of adding retrospective prose.
+Use the shared `verify-change`, `review-change`, and `finish-change` gates and apply
+the managed `evolve-process` classification and regression loop.
+Record one outcome instead of adding retrospective prose.
 
 ## Layer Status
 

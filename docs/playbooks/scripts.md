@@ -2,7 +2,9 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
-[scripts/axis.py](../../scripts/axis.py) owns repo maintenance commands. Use `$axis-script-scope` when deciding what to run.
+[scripts/axis.py](../../scripts/axis.py) owns Axis build, generation, local-development,
+and product-policy commands. The shared process owns lifecycle and evidence routing;
+use `$run-project-command` when deciding what to run.
 
 ## Tool Versions
 
@@ -32,11 +34,13 @@
 
 ## Pre-PR review checkpoint
 
-`$axis-pull-request` owns trigger decisions, checkpoint commits, independent review, feedback loops, and publication. This playbook owns verification command behavior:
+The shared engineering-process lifecycle owns checkpoint-bound verification,
+independent review, and finding loops. `$publish-change` owns only authorized
+publication. This playbook owns Axis verification command behavior:
 
 - The enforced sequence is focused proof, clean immutable checkpoint with repository-valid branch and commit metadata, readiness bound to the exact checkpoint/comparison base, then independent review. Readiness and review never run concurrently.
 - First review covers the committed publishable branch diff; follow-up review covers only the new immutable checkpoint delta when earlier evidence remains valid.
-- Follow-up verification uses `python scripts/axis.py review-readiness --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
+- Follow-up verification uses `python scripts/axis.py review-checks --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
 - Reviewer unavailability or unresolved valid findings blocks publication unless the user explicitly approves the exact skip or deferral.
 
 ## Command Boundaries
@@ -59,19 +63,19 @@
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
 - The shared runner normalizes `TMPDIR`, `TEMP`, and `TMP` to one existing writable directory before every governed subprocess; inherited cross-OS paths are never passed through.
 - Use `python scripts/axis.py local-dev smoke` for the fixed local-stack smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for diff-triggered browser evidence. Intentional visual-baseline writes add `--snapshot-output e2e/<test>.pw.ts-snapshots` before the Playwright arguments and `--update-snapshots` inside them; the wrapper validates and persists only that test-owned directory. Omit E2E arguments only for CI or a cross-cutting diff that invalidates every browser surface. All paths reconcile the local stack and run Playwright in the same Compose-managed browser environment.
-- Use `python scripts/axis.py mcp serve` as the single local MCP entrypoint; it reuses a healthy stack or starts `local-dev up`, builds the bridge with diagnostics on stderr, and then keeps stdout protocol-only. The wrapper defaults to read access; the repository Codex registration opts into write during active development, while each mutation still requires task-level approval. Pass `--no-build` only when the bridge output is already current. See [docs/playbooks/mcp.md](./mcp.md).
+- Use `python scripts/axis.py mcp serve` as the single local MCP entrypoint; it reuses a healthy stack or starts `local-dev up`, builds the bridge with diagnostics on stderr, and then keeps stdout protocol-only. The wrapper defaults to read access; a client may select write access only for an explicitly authorized mutation task. Pass `--no-build` only when the bridge output is already current. See [docs/playbooks/mcp.md](./mcp.md).
 - Use `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` when an API operation, MCP tool, auth boundary, or mutation policy changes. These are the maintained MCP parity and safety checks.
 - `local-dev shell` is an unrestricted diagnostic escape hatch, not a finite workflow or evidence route. Volume-destructive local-dev commands require explicit `--yes`.
-- Use `python scripts/axis.py review-readiness --full-branch` on a clean checkpoint commit for the first review of the complete publishable branch, or `python scripts/axis.py review-readiness --since <reviewed-checkpoint>` for an immutable follow-up delta. Local review readiness requires one explicit scope so an omitted base cannot trigger an accidental branch-wide verification run. Either route first validates the current branch and every commit subject in the complete publishable branch, then runs changed-path verification plus the deterministic policy profile shared with CI; CI may continue to use `--policy-only` without a local execution scope.
+- The engineering-process `review` profile runs `python scripts/axis.py review-checks` against the current branch diff. Use `--since <reviewed-checkpoint>` only for a focused immutable follow-up delta. `review-checks` owns Axis verification and the deterministic policy profile shared with CI; processctl owns clean-checkpoint binding, evidence freshness, and independent-review readiness. Publication metadata remains a separate project gate.
 - Pass current verification evidence to delegated reviewers. The primary owns routine checks; reviewers do not repeat passing suites and run only the smallest reproducer for a finding or evidence gap.
-- Treat `python scripts/axis.py verify` as the changed-path verification engine behind review-readiness, not as complete PR-readiness evidence by itself.
+- Treat `python scripts/axis.py verify` as the changed-path verification engine behind review-checks, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
 - Frontend source verification uses the maintained dependency graph to run related tests plus any changed unit-test files. Only shared test setup or test-runtime configuration triggers the full frontend unit suite; dependency manifests and TypeScript project changes remain on their dependency, type, lint, and build gates. Browser evidence remains acceptance- and diff-triggered.
 - A changed .NET test class without source, project, or shared-fixture changes runs that class only. When changed source has changed test classes, those classes are the focused proof; source without focused proof and shared test infrastructure fall back to the affected test project.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; the installed hook passes Git's exact update records so the first quick gate validates every pushed branch name and pushed commit range rather than the checked-out branch alone. Direct invocation falls back to the current branch. It is not a substitute for the pre-PR review checkpoint on published PR branches.
 - Use `python scripts/axis.py check publish-metadata` to validate the current branch plus every commit subject from its merge base. CI passes the exact PR base/head range to the same command.
 - Use `python scripts/axis.py check pr --title <title> --body-file <path> --branch <branch>` to validate the exact current or CI pull-request title/body/branch before creating or updating it.
-- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run full-branch `review-readiness`; ordinary pre-push remains a quick gate.
+- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run the complete Axis review profile; ordinary pre-push remains a quick gate.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 
 ## Script Rules

@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use `$axis-api-contract` for REST/OpenAPI/API type changes.
+Use `$change-api` for REST/OpenAPI/API type changes.
 
 ## Query & N+1 patterns
 

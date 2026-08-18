@@ -18,7 +18,13 @@ The `local-dev` and `review` setup profiles install the local pre-push hook. Bui
 
 Follow [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md) before opening or marking a PR ready. Run checks through `python scripts/axis.py ...`; command ownership lives in [docs/playbooks/scripts.md](./docs/playbooks/scripts.md).
 
-Create checkpoints with `python scripts/axis.py git checkpoint --branch <branch> --subject <subject>`, then run scoped review-readiness. The checkpoint command, review-readiness, and the installed pre-push hook reject invalid branch names or commit subjects before publication. Run `python scripts/axis.py check publish-metadata` directly when inspecting that gate.
+Create checkpoints with `python scripts/axis.py git checkpoint --branch <branch>
+--subject <subject>`, then run the required profiles through `processctl change
+verify`. The Axis `review` profile invokes scoped review-checks; processctl binds
+that result to the immutable checkpoint before independent review. The checkpoint
+command, review profile, and installed pre-push hook reject invalid branch names or
+commit subjects before publication. Run `python scripts/axis.py check
+publish-metadata` directly when inspecting that gate.
 
 Use [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md) for the local stack. When [docker-compose.yml](./docker-compose.yml) changes, update that playbook in the same PR.
 

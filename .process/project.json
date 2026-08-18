@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "project": "axis",
+  "lifecycle": {
+    "requiredProfiles": [
+      "development",
+      "review"
+    ]
+  },
+  "profiles": {
+    "development": [
+      {
+        "id": "changed-path-verification",
+        "run": [
+          "python",
+          "scripts/axis.py",
+          "verify"
+        ],
+        "timeoutSeconds": 3600
+      }
+    ],
+    "review": [
+      {
+        "id": "review-checks",
+        "run": [
+          "python",
+          "scripts/axis.py",
+          "review-checks"
+        ],
+        "timeoutSeconds": 7200
+      }
+    ]
+  }
+}
