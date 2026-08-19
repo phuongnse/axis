@@ -22,8 +22,9 @@ Create checkpoints with `python scripts/axis.py git checkpoint --branch <branch>
 --subject <subject>`, then run the required profiles through `processctl change
 verify`. The Axis `review` profile invokes scoped review-checks; processctl binds
 that result to the immutable checkpoint before independent review. The checkpoint
-command, review profile, and installed pre-push hook reject invalid branch names or
-commit subjects before publication. Run `python scripts/axis.py check
+command and installed pre-push publication gate reject invalid branch names or
+commit subjects before publication; the review profile remains source-verification
+only. Run `python scripts/axis.py check
 publish-metadata` directly when inspecting that gate.
 
 Use [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md) for the local stack. When [docker-compose.yml](./docker-compose.yml) changes, update that playbook in the same PR.
