@@ -18,7 +18,7 @@ Run on any supported host:
 python -m venv .process-venv
 # Activate .process-venv using the native command for your shell.
 python -m pip install --require-hashes -r requirements/process.txt
-processctl setup --project-root . --profile development --apply --allow network --allow user-files
+processctl setup --project-root . --profile development --apply --allow network --allow user-files --allow project-files
 python scripts/axis.py local-dev certs
 python scripts/axis.py install-hooks
 python scripts/axis.py local-dev up
