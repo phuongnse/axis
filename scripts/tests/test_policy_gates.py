@@ -3364,6 +3364,52 @@ class TestMarkdownLinkGate(unittest.TestCase):
         self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
 
 class TestVerifyGate(unittest.TestCase):
+    def test_process_profiles_bind_browser_docker_and_setup_mutation_contracts(self) -> None:
+        project = json.loads(axis.PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
+        development_command = project["profiles"]["development"][0]["run"]
+        self.assertEqual(["python", "scripts/axis.py", "verify"], development_command)
+        self.assertIn("docker-engine", project["environment"]["profiles"]["development"])
+        self.assertIn("docker-engine", project["environment"]["profiles"]["review"])
+        setup = {
+            action["id"]: action
+            for action in project["environment"]["setupActions"]
+        }
+        self.assertEqual(
+            ["network", "project-files", "user-files"],
+            setup["install-project-dependencies"]["mutations"],
+        )
+
+    def test_frontend_dependency_state_requires_installed_package_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            frontend = Path(directory)
+            package = {
+                "version": "1.2.3",
+                "resolved": "https://registry.example.invalid/pkg-1.2.3.tgz",
+                "integrity": "sha512-test",
+            }
+            lock = {"packages": {"": {}, "node_modules/pkg": package}}
+            node_modules = frontend / "node_modules"
+            package_dir = node_modules / "pkg"
+            package_dir.mkdir(parents=True)
+            (frontend / "package-lock.json").write_text(
+                json.dumps(lock), encoding="utf-8"
+            )
+            (node_modules / ".package-lock.json").write_text(
+                json.dumps(lock), encoding="utf-8"
+            )
+            (package_dir / "package.json").write_text(
+                json.dumps({"name": "pkg", "version": "1.2.3"}),
+                encoding="utf-8",
+            )
+            with mock.patch.object(axis, "FRONTEND_DIR", frontend):
+                self.assertEqual([], axis.frontend_dependency_state_issues())
+                (package_dir / "package.json").unlink()
+                package_dir.rmdir()
+                self.assertIn(
+                    "frontend dependency contents are missing: node_modules/pkg",
+                    axis.frontend_dependency_state_issues(),
+                )
+
     def test_plan_only_prints_selected_steps_without_running_checks(self) -> None:
         with (
             mock.patch.object(
@@ -4025,29 +4071,6 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["e2e/register.pw.ts"],
             overlays=(product_overlay,),
         )
-
-    def test_review_boundary_reuses_focused_browser_proof_without_rerunning_it(self) -> None:
-        browser_runner = mock.Mock(return_value=0)
-        output = io.StringIO()
-
-        with (
-            mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/e2e/register.pw.ts"])),
-            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-            mock.patch.object(axis, "check_frontend_dependency_versions", return_value=0),
-            mock.patch.object(axis, "check_frontend_vulnerable_packages", return_value=0),
-            mock.patch.object(axis, "frontend_command", return_value=0),
-            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
-            contextlib.redirect_stdout(output),
-        ):
-            self.assertEqual(
-                0,
-                axis.verify(
-                    axis.argparse.Namespace(reuse_focused_browser_evidence=True)
-                ),
-            )
-
-        browser_runner.assert_not_called()
-        self.assertIn("REUSE frontend e2e", output.getvalue())
 
     def test_runs_related_dotnet_projects_for_source_change(self) -> None:
         calls: list[str] = []

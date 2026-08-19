@@ -14,8 +14,7 @@
         "run": [
           "python",
           "scripts/axis.py",
-          "verify",
-          "--reuse-focused-browser-evidence"
+          "verify"
         ],
         "timeoutSeconds": 3600
       }
@@ -38,6 +37,7 @@
     "foregroundOnly": true,
     "profiles": {
       "development": [
+        "docker-engine",
         "dotnet-sdk",
         "git-runtime",
         "lychee-cli",
@@ -52,6 +52,7 @@
         "python-runtime"
       ],
       "review": [
+        "docker-engine",
         "dotnet-sdk",
         "git-runtime",
         "lychee-cli",
@@ -62,6 +63,21 @@
       ]
     },
     "requirements": [
+      {
+        "id": "docker-engine",
+        "description": "Reachable Docker Engine required by selected integration, API, infrastructure, and browser tests",
+        "probe": {
+          "run": [
+            "python",
+            "scripts/axis.py",
+            "check",
+            "docker"
+          ],
+          "timeoutSeconds": 30,
+          "readOnly": true
+        },
+        "remediation": "Install and start Docker Engine with a reachable daemon, then rerun doctor."
+      },
       {
         "id": "dotnet-sdk",
         "description": "Exact .NET SDK selected by the Axis toolchain contract",
@@ -170,7 +186,7 @@
           "timeoutSeconds": 30,
           "readOnly": true
         },
-        "remediation": "Run processctl setup for the selected profile with network and project-files approval.",
+        "remediation": "Run processctl setup for the selected profile with network, project-files, and user-files approval.",
         "setupAction": "install-project-dependencies"
       },
       {
@@ -562,7 +578,8 @@
         "timeoutSeconds": 1800,
         "mutations": [
           "network",
-          "project-files"
+          "project-files",
+          "user-files"
         ],
         "requires": [
           "install-dotnet",

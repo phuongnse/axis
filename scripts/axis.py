@@ -21,6 +21,7 @@ import re
 import shlex
 import shutil
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable, TextIO
 
 import axis_host_https
@@ -45,6 +46,7 @@ REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
+MAX_FRONTEND_PACKAGE_MANIFEST_BYTES = 256_000
 LOCAL_DEV_WAIT_TIMEOUT_SECONDS = 300
 LOCAL_DEV_HOST_SMOKE_TIMEOUT_SECONDS = 15
 LOCAL_DEV_WEB_URL = "https://localhost:3000/"
@@ -1248,6 +1250,46 @@ def frontend_dependency_state_issues() -> list[str]:
         installed_metadata = installed_packages.get(location)
         if not isinstance(installed_metadata, dict):
             issues.append(f"frontend dependency is not installed: {location}")
+            continue
+        relative = PurePosixPath(location)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.as_posix() != location
+        ):
+            issues.append(f"frontend dependency has an invalid install path: {location}")
+            continue
+        package_path = FRONTEND_DIR.joinpath(*relative.parts)
+        manifest_path = package_path / "package.json"
+        try:
+            package_stat = package_path.lstat()
+            manifest_stat = manifest_path.lstat()
+            if stat.S_ISLNK(package_stat.st_mode) or not stat.S_ISDIR(
+                package_stat.st_mode
+            ):
+                issues.append(f"frontend dependency directory is missing: {location}")
+                continue
+            if stat.S_ISLNK(manifest_stat.st_mode) or not stat.S_ISREG(
+                manifest_stat.st_mode
+            ):
+                issues.append(f"frontend dependency manifest is missing: {location}")
+                continue
+            if manifest_stat.st_size > MAX_FRONTEND_PACKAGE_MANIFEST_BYTES:
+                issues.append(
+                    f"frontend dependency manifest is too large: {location}/package.json"
+                )
+                continue
+            package_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            issues.append(f"frontend dependency contents are missing: {location}")
+            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append(f"cannot read frontend dependency manifest for {location}: {exc}")
+            continue
+        if not isinstance(package_manifest, dict) or package_manifest.get(
+            "version"
+        ) != metadata.get("version"):
+            issues.append(f"frontend dependency manifest version differs: {location}")
             continue
         for field in ("version", "resolved", "integrity"):
             expected = metadata.get(field)
@@ -3764,11 +3806,7 @@ def verify(args: argparse.Namespace) -> int:
                     "frontend test (changed test files)",
                     lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
                 )
-            if changed_e2e_tests and getattr(args, "reuse_focused_browser_evidence", False):
-                print()
-                print("> frontend e2e (focused proof)")
-                print("REUSE frontend e2e (focused proof from the clean checkpoint)")
-            elif changed_e2e_tests:
+            if changed_e2e_tests:
                 step(
                     "frontend e2e (changed test files)",
                     lambda: run_local_dev_browser(
@@ -3918,7 +3956,6 @@ def review_checks(args: argparse.Namespace) -> int:
     executed: list[str] = []
     if not policy_only and not supplemental:
         verify_args = argparse.Namespace(**vars(args))
-        verify_args.reuse_focused_browser_evidence = True
         if verify(verify_args) != 0:
             print("review-checks: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
@@ -5677,14 +5714,6 @@ def build_parser(
         "--plan-only",
         action="store_true",
         help="Print the changed-path verification plan without running commands",
-    )
-    verify_parser.add_argument(
-        "--reuse-focused-browser-evidence",
-        action="store_true",
-        help=(
-            "Keep browser and detached local-development orchestration outside this finite "
-            "command; required E2E evidence remains separately owned"
-        ),
     )
     verify_parser.set_defaults(func=verify)
 
