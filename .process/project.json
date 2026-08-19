@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "project": "axis",
   "lifecycle": {
     "requiredProfiles": [
@@ -14,7 +14,8 @@
         "run": [
           "python",
           "scripts/axis.py",
-          "verify"
+          "verify",
+          "--reuse-focused-browser-evidence"
         ],
         "timeoutSeconds": 3600
       }
@@ -25,9 +26,548 @@
         "run": [
           "python",
           "scripts/axis.py",
-          "review-checks"
+          "review-checks",
+          "--supplemental"
         ],
         "timeoutSeconds": 7200
+      }
+    ]
+  },
+  "environment": {
+    "defaultProfile": "development",
+    "foregroundOnly": true,
+    "profiles": {
+      "development": [
+        "dotnet-sdk",
+        "git-runtime",
+        "lychee-cli",
+        "node-runtime",
+        "npm-cli",
+        "project-dependencies",
+        "python-runtime"
+      ],
+      "publication": [
+        "gh-cli",
+        "git-runtime",
+        "python-runtime"
+      ],
+      "review": [
+        "dotnet-sdk",
+        "git-runtime",
+        "lychee-cli",
+        "node-runtime",
+        "npm-cli",
+        "project-dependencies",
+        "python-runtime"
+      ]
+    },
+    "requirements": [
+      {
+        "id": "dotnet-sdk",
+        "description": "Exact .NET SDK selected by the Axis toolchain contract",
+        "probe": {
+          "run": [
+            "dotnet",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "stdout",
+          "outputRegex": "^10\\.0\\.302$"
+        },
+        "remediation": "Run processctl setup for the selected profile with network and user-files approval.",
+        "setupAction": "install-dotnet"
+      },
+      {
+        "id": "gh-cli",
+        "description": "Exact GitHub CLI used by publication workflows",
+        "probe": {
+          "run": [
+            "gh",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "stdout",
+          "outputRegex": "^gh version 2\\.96\\.0(?: |$)"
+        },
+        "remediation": "Run processctl setup for the publication profile with network and user-files approval.",
+        "setupAction": "install-gh"
+      },
+      {
+        "id": "git-runtime",
+        "description": "Git command-line client required for lifecycle checkpoints and source provenance",
+        "probe": {
+          "run": [
+            "git",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "stdout",
+          "outputRegex": "^git version 2\\.[0-9]+\\.[0-9]+"
+        },
+        "remediation": "Install a supported Git 2.x command-line client, then rerun doctor."
+      },
+      {
+        "id": "lychee-cli",
+        "description": "Exact Lychee release used by the offline Markdown link contract",
+        "probe": {
+          "run": [
+            "lychee",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "stdout",
+          "outputRegex": "^lychee 0\\.23\\.0$"
+        },
+        "remediation": "Run processctl setup for the selected profile with network and user-files approval; macOS x64 and Windows arm64 require an externally installed exact release.",
+        "setupAction": "install-lychee"
+      },
+      {
+        "id": "node-runtime",
+        "description": "Exact Node.js runtime selected by frontend/.nvmrc",
+        "probe": {
+          "run": [
+            "node",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "stdout",
+          "outputRegex": "^v24\\.18\\.0$"
+        },
+        "remediation": "Run processctl setup for the selected profile with network and user-files approval.",
+        "setupAction": "install-node"
+      },
+      {
+        "id": "npm-cli",
+        "description": "Exact npm CLI bound to the verified Node.js runtime",
+        "probe": {
+          "run": [
+            "npm",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "stdout",
+          "outputRegex": "^11\\.16\\.0$"
+        },
+        "remediation": "Run processctl setup for the selected profile with network and user-files approval.",
+        "setupAction": "install-node"
+      },
+      {
+        "id": "project-dependencies",
+        "description": "Locked NuGet and npm dependency graphs are restored for the current repository inputs",
+        "probe": {
+          "run": [
+            "python",
+            "scripts/axis.py",
+            "check",
+            "dependency-state"
+          ],
+          "timeoutSeconds": 30,
+          "readOnly": true
+        },
+        "remediation": "Run processctl setup for the selected profile with network and project-files approval.",
+        "setupAction": "install-project-dependencies"
+      },
+      {
+        "id": "python-runtime",
+        "description": "CPython runtime used by the Axis repository command owner",
+        "probe": {
+          "run": [
+            "python",
+            "--version"
+          ],
+          "timeoutSeconds": 15,
+          "readOnly": true,
+          "outputStream": "combined",
+          "outputRegex": "^Python 3\\.(?:11|12|13|14)\\."
+        },
+        "remediation": "Install a supported Python 3.11-3.14 runtime before running processctl."
+      }
+    ],
+    "managedTools": [
+      {
+        "id": "dotnet",
+        "version": "10.0.302",
+        "artifacts": [
+          {
+            "platform": "linux-glibc-arm64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-linux-arm64.tar.gz",
+            "checksum": "sha512:9e409c14e00686d661c78fa4dd9ad0e4dcf695c328bd5ff777d05b4a9c34b42cf89b12573b92e9fb2f565dbe12016b4835f77c7d9a42b55a7494df21634cd5d6",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 400000000,
+            "maxExtractedBytes": 1600000000,
+            "maxFiles": 100000,
+            "commands": {
+              "dotnet": "dotnet"
+            }
+          },
+          {
+            "platform": "linux-glibc-x64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-linux-x64.tar.gz",
+            "checksum": "sha512:10069bec8783596484a610332f090d562802a41b9b40e3327a5a5688b572e10c296ae300f940d40461f23c157ed1b0843c2f8e6b3f20d8d8d9d83432d8143bac",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 400000000,
+            "maxExtractedBytes": 1600000000,
+            "maxFiles": 100000,
+            "commands": {
+              "dotnet": "dotnet"
+            }
+          },
+          {
+            "platform": "macos-arm64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-osx-arm64.tar.gz",
+            "checksum": "sha512:b2286dec9177e8b5543ff2fe95c84db358b87ec2a36a0d34a29033d70279940fd1134af56c4299648f8950db2d6ce35237698cf2818d9abc670c2c1664c92ac0",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 400000000,
+            "maxExtractedBytes": 1600000000,
+            "maxFiles": 100000,
+            "commands": {
+              "dotnet": "dotnet"
+            }
+          },
+          {
+            "platform": "macos-x64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-osx-x64.tar.gz",
+            "checksum": "sha512:48d5861dc0d6c9c782c6d163d6b334ecac2ebd65a1ae59e9ce5b93dd080a31d7ecfc4e4d47e0e35b201ce63661218d641e154022266294a3a8b84593a019cfbc",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 400000000,
+            "maxExtractedBytes": 1600000000,
+            "maxFiles": 100000,
+            "commands": {
+              "dotnet": "dotnet"
+            }
+          },
+          {
+            "platform": "windows-arm64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-win-arm64.zip",
+            "checksum": "sha512:241abb2b345cff1b32d87a9e29da5e9d52f899f691e7b34661274477564c4717054c489814a9fd7a5526fc9e0d8174a0d951a4a845556eee53add526f71917e7",
+            "archiveFormat": "zip",
+            "stripComponents": 0,
+            "maxDownloadBytes": 400000000,
+            "maxExtractedBytes": 1600000000,
+            "maxFiles": 100000,
+            "commands": {
+              "dotnet": "dotnet.exe"
+            }
+          },
+          {
+            "platform": "windows-x64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-win-x64.zip",
+            "checksum": "sha512:7d170ed75fa9af34c00646621d92011dbd71943952e2787cd15df9be78e6452b55dadef34d7eff77b802e6af4959e071a55855ac649afeac70901c3a2a258716",
+            "archiveFormat": "zip",
+            "stripComponents": 0,
+            "maxDownloadBytes": 400000000,
+            "maxExtractedBytes": 1600000000,
+            "maxFiles": 100000,
+            "commands": {
+              "dotnet": "dotnet.exe"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gh",
+        "version": "2.96.0",
+        "artifacts": [
+          {
+            "platform": "linux-glibc-arm64",
+            "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_arm64.tar.gz",
+            "checksum": "sha256:06f86ec7103d41993b76cd78072f43595c34aaa56506d971d9860e67140bf909",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "gh": "bin/gh"
+            }
+          },
+          {
+            "platform": "linux-glibc-x64",
+            "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_amd64.tar.gz",
+            "checksum": "sha256:83d5c2ccad5498f58bf6368acb1ab32588cf43ab3a4b1c301bf36328b1c8bd60",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "gh": "bin/gh"
+            }
+          },
+          {
+            "platform": "macos-arm64",
+            "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_arm64.zip",
+            "checksum": "sha256:f23a0c37d963aacc3bed703ccbd59b41c5ca22101fab7f00eb2b7cad23aba463",
+            "archiveFormat": "zip",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "gh": "bin/gh"
+            }
+          },
+          {
+            "platform": "macos-x64",
+            "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_amd64.zip",
+            "checksum": "sha256:4bd449df9ad639391bc62b8032546f0fe9edcd8526e06682a4f88abd8c5d163c",
+            "archiveFormat": "zip",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "gh": "bin/gh"
+            }
+          },
+          {
+            "platform": "windows-arm64",
+            "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_arm64.zip",
+            "checksum": "sha256:c517e0b32c98a4ba90ac95af8d12cc3ac55781ab4ab72f9a91ce3de0541d2b09",
+            "archiveFormat": "zip",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "gh": "bin/gh.exe"
+            }
+          },
+          {
+            "platform": "windows-x64",
+            "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_amd64.zip",
+            "checksum": "sha256:c2d6acc935cd2f00e2144d7e036d5cd82e6b6bd5594e8c75aa75ef2a4ed6aac3",
+            "archiveFormat": "zip",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "gh": "bin/gh.exe"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lychee",
+        "version": "0.23.0",
+        "artifacts": [
+          {
+            "platform": "linux-glibc-arm64",
+            "url": "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.23.0/lychee-aarch64-unknown-linux-gnu.tar.gz",
+            "checksum": "sha256:97eb93b02a7d78a752fc33e5b0983439ccaadbf3db952b68a0a4401acd92e6e0",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 50000000,
+            "maxExtractedBytes": 100000000,
+            "maxFiles": 1000,
+            "commands": {
+              "lychee": "lychee"
+            }
+          },
+          {
+            "platform": "linux-glibc-x64",
+            "url": "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.23.0/lychee-x86_64-unknown-linux-gnu.tar.gz",
+            "checksum": "sha256:1fcb6ccf10d04c22b8c5873c5b9cb7be32ee7423e12169d6f1a79a6f1962ef81",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 50000000,
+            "maxExtractedBytes": 100000000,
+            "maxFiles": 1000,
+            "commands": {
+              "lychee": "lychee"
+            }
+          },
+          {
+            "platform": "macos-arm64",
+            "url": "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.23.0/lychee-arm64-macos.tar.gz",
+            "checksum": "sha256:1953bb425486e1b887757201e54e8fdf866c9cada6c270d8f6ed21ffbed4145a",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 0,
+            "maxDownloadBytes": 50000000,
+            "maxExtractedBytes": 100000000,
+            "maxFiles": 1000,
+            "commands": {
+              "lychee": "lychee"
+            }
+          },
+          {
+            "platform": "windows-x64",
+            "url": "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.23.0/lychee-x86_64-windows.exe",
+            "checksum": "sha256:0fda7ff0a60c0250939fc25361c2d4e6e7853c31c996733fdd5a1dd760bcb824",
+            "archiveFormat": "file",
+            "stripComponents": 0,
+            "maxDownloadBytes": 50000000,
+            "maxExtractedBytes": 50000000,
+            "maxFiles": 1,
+            "commands": {
+              "lychee": "lychee.exe"
+            }
+          }
+        ]
+      },
+      {
+        "id": "node",
+        "version": "24.18.0",
+        "artifacts": [
+          {
+            "platform": "linux-glibc-arm64",
+            "url": "https://nodejs.org/download/release/v24.18.0/node-v24.18.0-linux-arm64.tar.gz",
+            "checksum": "sha256:6b4484c2190274175df9aa8f28e2d758a819cb1c1fe6ab481e2f95b463ab8508",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "node": "bin/node",
+              "npm": {
+                "executable": "bin/node",
+                "script": "lib/node_modules/npm/bin/npm-cli.js"
+              }
+            }
+          },
+          {
+            "platform": "linux-glibc-x64",
+            "url": "https://nodejs.org/download/release/v24.18.0/node-v24.18.0-linux-x64.tar.gz",
+            "checksum": "sha256:783130984963db7ba9cbd01089eaf2c2efb055c7c1693c943174b967b3050cb8",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "node": "bin/node",
+              "npm": {
+                "executable": "bin/node",
+                "script": "lib/node_modules/npm/bin/npm-cli.js"
+              }
+            }
+          },
+          {
+            "platform": "macos-arm64",
+            "url": "https://nodejs.org/download/release/v24.18.0/node-v24.18.0-darwin-arm64.tar.gz",
+            "checksum": "sha256:e1a97e14c99c803e96c7339403282ea05a499c32f8d83defe9ef5ec66f979ed1",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "node": "bin/node",
+              "npm": {
+                "executable": "bin/node",
+                "script": "lib/node_modules/npm/bin/npm-cli.js"
+              }
+            }
+          },
+          {
+            "platform": "macos-x64",
+            "url": "https://nodejs.org/download/release/v24.18.0/node-v24.18.0-darwin-x64.tar.gz",
+            "checksum": "sha256:dfd0dbd3e721503434df7b7205e719f61b3a3a31b2bcf9729b8b91fea240f080",
+            "archiveFormat": "tar.gz",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "node": "bin/node",
+              "npm": {
+                "executable": "bin/node",
+                "script": "lib/node_modules/npm/bin/npm-cli.js"
+              }
+            }
+          },
+          {
+            "platform": "windows-arm64",
+            "url": "https://nodejs.org/download/release/v24.18.0/node-v24.18.0-win-arm64.zip",
+            "checksum": "sha256:f274669adb93b1fd0fbf8f21fd078609e9dcc84333d4f2718d2dde3f9a161a01",
+            "archiveFormat": "zip",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "node": "node.exe",
+              "npm": {
+                "executable": "node.exe",
+                "script": "node_modules/npm/bin/npm-cli.js"
+              }
+            }
+          },
+          {
+            "platform": "windows-x64",
+            "url": "https://nodejs.org/download/release/v24.18.0/node-v24.18.0-win-x64.zip",
+            "checksum": "sha256:0ae68406b42d7725661da979b1403ec9926da205c6770827f33aac9d8f26e821",
+            "archiveFormat": "zip",
+            "stripComponents": 1,
+            "maxDownloadBytes": 100000000,
+            "maxExtractedBytes": 300000000,
+            "maxFiles": 10000,
+            "commands": {
+              "node": "node.exe",
+              "npm": {
+                "executable": "node.exe",
+                "script": "node_modules/npm/bin/npm-cli.js"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "setupActions": [
+      {
+        "id": "install-dotnet",
+        "kind": "managed-tool",
+        "tool": "dotnet",
+        "timeoutSeconds": 900
+      },
+      {
+        "id": "install-gh",
+        "kind": "managed-tool",
+        "tool": "gh",
+        "timeoutSeconds": 300
+      },
+      {
+        "id": "install-lychee",
+        "kind": "managed-tool",
+        "tool": "lychee",
+        "timeoutSeconds": 300
+      },
+      {
+        "id": "install-node",
+        "kind": "managed-tool",
+        "tool": "node",
+        "timeoutSeconds": 600
+      },
+      {
+        "id": "install-project-dependencies",
+        "kind": "command",
+        "run": [
+          "python",
+          "scripts/axis.py",
+          "dependencies",
+          "install"
+        ],
+        "timeoutSeconds": 1800,
+        "mutations": [
+          "network",
+          "project-files"
+        ],
+        "requires": [
+          "install-dotnet",
+          "install-node"
+        ]
       }
     ]
   }

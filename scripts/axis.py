@@ -54,6 +54,7 @@ GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
 RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
+PROCESS_PROJECT_PATH = ROOT / ".process" / "project.json"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
@@ -151,7 +152,6 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import axis_repo  # noqa: E402
-import axis_setup  # noqa: E402
 import axis_theme  # noqa: E402
 import doc_drift_domains  # noqa: E402
 from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
@@ -171,6 +171,32 @@ from axis_frontend_policy import (  # noqa: E402
 
 class CheckError(RuntimeError):
     """Raised when a command fails."""
+
+
+def managed_tool_version(tool: str) -> str:
+    """Read the exact tool version from the process-owned environment contract."""
+
+    try:
+        document = json.loads(PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
+        tools = document["environment"]["managedTools"]
+    except (KeyError, OSError, TypeError, json.JSONDecodeError) as exc:
+        raise CheckError(
+            f"cannot read managed tool versions from {path_label(PROCESS_PROJECT_PATH)}: {exc}"
+        ) from exc
+    for entry in tools:
+        if isinstance(entry, dict) and entry.get("id") == tool:
+            version = entry.get("version")
+            if isinstance(version, str) and version:
+                return version
+    raise CheckError(f"managed tool `{tool}` is missing from {path_label(PROCESS_PROJECT_PATH)}")
+
+
+def managed_tool_install_hint(profile: str) -> str:
+    return (
+        "run `processctl setup --project-root . "
+        f"--profile {profile}` to inspect the plan, then rerun with `--apply` and "
+        "the requested mutation approvals"
+    )
 
 
 class LocalDevCertificateState(Enum):
@@ -225,12 +251,6 @@ def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
         found = shutil.which(name, path=path)
         if found:
             return found
-    try:
-        managed = axis_setup.managed_executable(name)
-    except axis_setup.SetupError:
-        managed = None
-    if managed is not None and managed.is_file():
-        return str(managed)
     if os.name == "nt" and not name.endswith(".exe"):
         cmd = shutil.which(f"{name}.cmd", path=path)
         if cmd:
@@ -245,18 +265,6 @@ def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
         return True
     path = env_path(env)
     return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
-
-
-def managed_command_env(args: list[str]) -> dict[str, str]:
-    if not args:
-        return {}
-    try:
-        managed_dotnet = axis_setup.managed_executable("dotnet")
-    except axis_setup.SetupError:
-        return {}
-    if Path(args[0]).resolve(strict=False) != managed_dotnet.resolve(strict=False):
-        return {}
-    return {"DOTNET_ROOT": str(managed_dotnet.parent)}
 
 
 def command_temp_dir(env: dict[str, str]) -> str:
@@ -280,7 +288,6 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
     merged_env["PYTHONDONTWRITEBYTECODE"] = "1"
-    merged_env.update(managed_command_env(args))
     if env:
         merged_env.update(env)
     temp_dir = command_temp_dir(merged_env)
@@ -948,7 +955,17 @@ def test_unit(args: argparse.Namespace) -> int:
     for project in projects:
         print()
         print(f"> dotnet test {project}")
-        result = run([exe("dotnet"), "test", project, "--nologo", *args.dotnet_args], check=False)
+        result = run(
+            [
+                exe("dotnet"),
+                "test",
+                project,
+                "--nologo",
+                "--disable-build-servers",
+                *args.dotnet_args,
+            ],
+            check=False,
+        )
         if result.returncode != 0:
             return result.returncode
     return 0
@@ -1161,6 +1178,111 @@ def check_dotnet_dependency_locks(_args: argparse.Namespace | None = None) -> in
     return 0
 
 
+def dotnet_dependency_state_issues() -> list[str]:
+    issues: list[str] = []
+    projects = sorted(
+        {
+            *repo_files("src/**/*.csproj"),
+            *repo_files("tests/**/*.csproj"),
+        }
+    )
+    for project in projects:
+        project_path = ROOT / project
+        lock_path = project_path.with_name("packages.lock.json")
+        assets_path = project_path.parent / "obj" / "project.assets.json"
+        try:
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            assets = json.loads(assets_path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            missing = Path(exc.filename or "unknown")
+            issues.append(f"{path_label(missing)} is missing")
+            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append(f"cannot read dependency state for {project}: {exc}")
+            continue
+
+        expected: set[str] = set()
+        dependencies = lock.get("dependencies", {})
+        if isinstance(dependencies, dict):
+            for target in dependencies.values():
+                if not isinstance(target, dict):
+                    continue
+                for package, metadata in target.items():
+                    if not isinstance(metadata, dict) or metadata.get("type") == "Project":
+                        continue
+                    version = metadata.get("resolved")
+                    if isinstance(version, str):
+                        expected.add(f"{package}/{version}".casefold())
+        libraries = assets.get("libraries", {})
+        actual = {str(package).casefold() for package in libraries} if isinstance(libraries, dict) else set()
+        missing_packages = sorted(expected - actual)
+        if missing_packages:
+            issues.append(
+                f"{path_label(assets_path)} is stale; missing locked packages: "
+                + ", ".join(missing_packages[:5])
+            )
+    return issues
+
+
+def frontend_dependency_state_issues() -> list[str]:
+    lock_path = FRONTEND_DIR / "package-lock.json"
+    installed_path = FRONTEND_DIR / "node_modules" / ".package-lock.json"
+    try:
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        installed = json.loads(installed_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        return [f"{path_label(Path(exc.filename or 'unknown'))} is missing"]
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"cannot read frontend dependency state: {exc}"]
+
+    expected_packages = lock.get("packages", {})
+    installed_packages = installed.get("packages", {})
+    if not isinstance(expected_packages, dict) or not isinstance(installed_packages, dict):
+        return ["frontend dependency lock state must contain package maps"]
+    issues: list[str] = []
+    for location, metadata in sorted(expected_packages.items()):
+        if not location.startswith("node_modules/") or not isinstance(metadata, dict):
+            continue
+        if metadata.get("optional"):
+            continue
+        installed_metadata = installed_packages.get(location)
+        if not isinstance(installed_metadata, dict):
+            issues.append(f"frontend dependency is not installed: {location}")
+            continue
+        for field in ("version", "resolved", "integrity"):
+            expected = metadata.get(field)
+            if expected is not None and installed_metadata.get(field) != expected:
+                issues.append(f"frontend dependency state differs for {location}.{field}")
+                break
+    return issues
+
+
+def check_dependency_state(_args: argparse.Namespace | None = None) -> int:
+    issues = [*dotnet_dependency_state_issues(), *frontend_dependency_state_issues()]
+    if issues:
+        for issue in issues:
+            print(f"check-dependency-state: FAIL - {issue}", file=sys.stderr)
+        return 1
+    print("check-dependency-state: OK (locked NuGet and npm graphs are restored)")
+    return 0
+
+
+def install_project_dependencies(_args: argparse.Namespace | None = None) -> int:
+    dotnet = run(
+        [
+            exe("dotnet"),
+            "restore",
+            "Axis.sln",
+            "--locked-mode",
+            "--disable-build-servers",
+        ],
+        check=False,
+    )
+    if dotnet.returncode != 0:
+        return dotnet.returncode
+    return run_frontend_npm(["ci"]).returncode
+
+
 EXACT_NPM_VERSION_RE = re.compile(
     r"^(?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z.-]+)?(?:[+][0-9A-Za-z.-]+)?$"
@@ -1193,9 +1315,10 @@ def check_frontend_dependency_versions(_args: argparse.Namespace | None = None) 
         node_version = ""
     if EXACT_NPM_VERSION_RE.fullmatch(node_version) is None:
         issues.append(f"{path_label(NVMRC_PATH)} must pin one exact Node version")
-    elif node_version != axis_setup.NODE_VERSION:
+    elif node_version != managed_tool_version("node"):
         issues.append(
-            f"{path_label(NVMRC_PATH)} pins {node_version}, but portable setup pins {axis_setup.NODE_VERSION}"
+            f"{path_label(NVMRC_PATH)} pins {node_version}, but the process manifest pins "
+            f"{managed_tool_version('node')}"
         )
 
     dockerfile_path = ROOT / "frontend" / "Dockerfile.dev"
@@ -1762,6 +1885,7 @@ def run_mcp_test(filter_expression: str | None, label: str) -> int:
         str(MCP_TEST_PROJECT),
         "--nologo",
         "--no-restore",
+        "--disable-build-servers",
     ]
     if filter_expression:
         command.extend(["--filter", filter_expression])
@@ -1953,8 +2077,8 @@ RAW_DOC_COMMAND_PATTERNS = [
         "use `python scripts/axis.py ...`",
     ),
     (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
-    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
-    (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
+    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `processctl doctor --project-root . --profile review`"),
+    (re.compile(r"^cargo\s+install\s+lychee\b"), "use the checksum-verified `processctl setup` managed-tool action"),
 ]
 
 def is_command_doc(path: str) -> bool:
@@ -2471,50 +2595,6 @@ def _path_with_prefix(bin_dir: Path) -> str:
     return os.pathsep.join([entry, *parts]) if parts else entry
 
 
-def _version_sort_key(version_text: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in re.findall(r"\d+", version_text))
-
-
-def _npm_exists_in_bin_dir(bin_dir: Path) -> bool:
-    return any((bin_dir / name).is_file() for name in ("npm", "npm.cmd", "npm.exe"))
-
-
-def _node_exists_in_bin_dir(bin_dir: Path) -> bool:
-    return (bin_dir / "node").is_file() or (bin_dir / "node.exe").is_file()
-
-
-def _home_dir() -> Path | None:
-    try:
-        return Path.home()
-    except RuntimeError:
-        return None
-
-
-def _nvm_unix_roots() -> list[Path]:
-    roots: list[Path] = []
-    nvm_dir = os.environ.get("NVM_DIR")
-    if nvm_dir:
-        roots.append(Path(nvm_dir) / "versions" / "node")
-    home = _home_dir()
-    if home is not None:
-        roots.append(home / ".nvm" / "versions" / "node")
-    return roots
-
-
-def _nvm_windows_roots() -> list[Path]:
-    if os.name != "nt":
-        return []
-    roots: list[Path] = []
-    for env_name in ("NVM_HOME", "NVM_DIR"):
-        value = os.environ.get(env_name)
-        if value:
-            roots.append(Path(value))
-    appdata = os.environ.get("APPDATA")
-    if appdata:
-        roots.append(Path(appdata) / "nvm")
-    return roots
-
-
 def _windows_git_usr_bin_dirs() -> list[Path]:
     dirs: list[Path] = []
     for env_name in ("ProgramFiles", "ProgramFiles(x86)"):
@@ -2541,88 +2621,16 @@ def find_openssl() -> str | None:
     return None
 
 
-def _node_version_label(bin_dir: Path) -> str:
-    if bin_dir.name == "bin" and bin_dir.parent.name.startswith("v"):
-        return bin_dir.parent.name
-    return bin_dir.name
-
-
-def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
-    seen: set[Path] = set()
-    candidates: list[Path] = []
-
-    def add(bin_dir: Path) -> None:
-        resolved = bin_dir.resolve()
-        if resolved in seen or not _node_exists_in_bin_dir(resolved) or not _npm_exists_in_bin_dir(resolved):
-            return
-        seen.add(resolved)
-        candidates.append(resolved)
-
-    try:
-        add(axis_setup.managed_bin_dir("node"))
-    except axis_setup.SetupError:
-        pass
-
-    path_node = shutil.which("node")
-    path_npm = shutil.which("npm") or shutil.which("npm.cmd")
-    if path_node and path_npm and Path(path_node).parent.resolve() == Path(path_npm).parent.resolve():
-        add(Path(path_node).parent)
-
-    for root in _nvm_unix_roots():
-        if not root.is_dir():
-            continue
-        for version_dir in root.iterdir():
-            if version_dir.is_dir() and version_major(version_dir.name) == expected_major:
-                add(version_dir / "bin")
-
-    for root in _nvm_windows_roots():
-        if not root.is_dir():
-            continue
-        for version_dir in root.iterdir():
-            if version_dir.is_dir() and version_major(version_dir.name) == expected_major:
-                add(version_dir)
-
-    nvm_symlink = os.environ.get("NVM_SYMLINK")
-    if nvm_symlink:
-        add(Path(nvm_symlink))
-
-    home = _home_dir()
-    if home is not None:
-        add(home / ".volta" / "bin")
-
-    return sorted(candidates, key=lambda path: _version_sort_key(_node_version_label(path)), reverse=True)
-
-
-def _nvm_node_bin_dirs(expected_major: str) -> list[Path]:
-    return _node_toolchain_bin_dirs(expected_major)
-
-
 def frontend_toolchain_env() -> dict[str, str]:
     expected_ok, expected_or_error = required_node_version()
     if not expected_ok:
         return {}
 
     expected = expected_or_error
-    expected_major = version_major(expected)
-    if expected_major is None:
-        return {}
     node_ok, node_version, node_resolved = command_version_line("node", "--version")
-    npm_ok, _npm_version, npm_resolved = command_version_line("npm", "--version")
-    if (
-        node_ok
-        and npm_ok
-        and node_version.removeprefix("v") == expected
-        and Path(node_resolved).parent.resolve() == Path(npm_resolved).parent.resolve()
-    ):
+    npm_ok, _npm_detail = npm_version_status({})
+    if node_ok and npm_ok and node_version.removeprefix("v") == expected:
         return {"PATH": _path_with_prefix(Path(node_resolved).parent)}
-
-    for bin_dir in _nvm_node_bin_dirs(expected_major):
-        env = {"PATH": _path_with_prefix(bin_dir)}
-        node_ok, node_version, _node_resolved = command_version_line("node", "--version", env=env)
-        npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version", env=env)
-        if node_ok and npm_ok and node_version.removeprefix("v") == expected:
-            return env
-
     return {}
 
 
@@ -2657,22 +2665,22 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
             f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
         )
-    portable_major = version_major(axis_setup.DOTNET_SDK_VERSION)
+    process_dotnet_version = managed_tool_version("dotnet")
+    portable_major = version_major(process_dotnet_version)
     if portable_major != source_major_or_error:
         return (
             False,
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x, "
-            f"but portable setup pins {axis_setup.DOTNET_SDK_VERSION} in scripts/axis_setup.py",
+            f"but {path_label(PROCESS_PROJECT_PATH)} pins {process_dotnet_version}",
         )
 
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
-        prerequisite = axis_setup.dotnet_native_prerequisite_hint(version_line)
-        next_action = prerequisite or managed_tool_install_hint("build")
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {next_action}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; "
+            f"{managed_tool_install_hint('development')}",
         )
 
     major = version_major(version_line)
@@ -2681,7 +2689,8 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
             f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {managed_tool_install_hint('build')}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; "
+            f"{managed_tool_install_hint('development')}",
         )
     return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
 
@@ -2707,7 +2716,7 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         return (
             False,
             f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}; "
-            f"{managed_tool_install_hint('build')}",
+            f"{managed_tool_install_hint('development')}",
         )
 
     actual = version_line.removeprefix("v")
@@ -2715,9 +2724,37 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         return (
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
-            f"expected Node {expected} from {rel(NVMRC_PATH)}; {managed_tool_install_hint('build')}",
+            f"expected Node {expected} from {rel(NVMRC_PATH)}; "
+            f"{managed_tool_install_hint('development')}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {rel(NVMRC_PATH)}"
+
+
+def npm_cli_command(*, env: dict[str, str] | None = None) -> list[str]:
+    """Resolve npm through its native Node runtime without a batch shell."""
+
+    path = env_path(env)
+    node = shutil.which("node", path=path)
+    if node is None:
+        raise CheckError("node not found in PATH")
+    node_path = Path(node).resolve(strict=False)
+    candidates = (
+        node_path.parent / "node_modules" / "npm" / "bin" / "npm-cli.js",
+        node_path.parent.parent / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return [str(node_path), str(candidate)]
+
+    npm = shutil.which("npm", path=path)
+    if npm is not None:
+        npm_path = Path(npm)
+        resolved = npm_path.resolve(strict=False)
+        if resolved.is_file() and resolved.suffix.lower() == ".js":
+            return [str(node_path), str(resolved)]
+        if os.name != "nt":
+            return [str(npm_path)]
+    raise CheckError("npm CLI script is not paired with the active Node runtime")
 
 
 def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
@@ -2731,18 +2768,32 @@ def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
     if match is None:
         return False, f"{path_label(package_path)} packageManager must pin one exact npm version"
     expected = match.group(1)
-    ok, version_line, resolved = command_version_line("npm", "--version", env=env)
-    if not ok:
+    try:
+        command = npm_cli_command(env=env)
+    except CheckError as exc:
         return (
             False,
-            f"{version_line}; npm {expected} is required per {path_label(package_path)}; "
-            f"{managed_tool_install_hint('build')}",
+            f"{exc}; npm {expected} is required per {path_label(package_path)}; "
+            f"{managed_tool_install_hint('development')}",
         )
+    result = run_optional(
+        [*command, "--version"],
+        env=env,
+        timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+    )
+    resolved = " ".join(command)
+    if result is None or result.returncode != 0:
+        detail = "npm CLI did not execute" if result is None else (
+            result.stderr or result.stdout or f"npm exited with {result.returncode}"
+        ).strip()
+        return False, f"{detail}; {managed_tool_install_hint('development')}"
+    lines = (result.stdout or result.stderr or "").strip().splitlines()
+    version_line = lines[0] if lines else ""
     if version_line != expected:
         return (
             False,
             f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}; "
-            f"{managed_tool_install_hint('build')}",
+            f"{managed_tool_install_hint('development')}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {path_label(package_path)}"
 
@@ -2852,7 +2903,7 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
 
     first_line = (result.stdout or result.stderr or "").strip().splitlines()
     version_line = first_line[0] if first_line else ""
-    expected = f"lychee {axis_setup.LYCHEE_VERSION}"
+    expected = f"lychee {managed_tool_version('lychee')}"
     if version_line != expected:
         return (
             False,
@@ -2888,7 +2939,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
-            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required, "
+            f"check-markdown-links: Lychee {managed_tool_version('lychee')} is required, "
             f"but it is unavailable; {managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
@@ -2896,7 +2947,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     version_ok, version_detail = lychee_version_status(lychee)
     if not version_ok:
         print(
-            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required; {version_detail}. "
+            f"check-markdown-links: Lychee {managed_tool_version('lychee')} is required; {version_detail}. "
             f"{managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
@@ -2948,14 +2999,20 @@ def dotnet_command(args: argparse.Namespace) -> int:
             target = dotnet_args.pop(0)
             if dotnet_args and dotnet_args[0] == "--":
                 dotnet_args = dotnet_args[1:]
-        return run([exe("dotnet"), "build", target, "--nologo", *dotnet_args], check=False).returncode
+        return run(
+            [exe("dotnet"), "build", target, "--nologo", "--disable-build-servers", *dotnet_args],
+            check=False,
+        ).returncode
     if command == "test":
         target = "Axis.sln"
         if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
             target = dotnet_args.pop(0)
             if dotnet_args and dotnet_args[0] == "--":
                 dotnet_args = dotnet_args[1:]
-        return run([exe("dotnet"), "test", target, "--nologo", *dotnet_args], check=False).returncode
+        return run(
+            [exe("dotnet"), "test", target, "--nologo", "--disable-build-servers", *dotnet_args],
+            check=False,
+        ).returncode
     if command == "format":
         target = "Axis.sln"
         if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
@@ -2966,7 +3023,11 @@ def dotnet_command(args: argparse.Namespace) -> int:
         if args.check:
             format_args.append("--verify-no-changes")
         format_args.extend(dotnet_args)
-        return run([exe("dotnet"), *format_args], check=False).returncode
+        return run(
+            [exe("dotnet"), *format_args],
+            check=False,
+            env={"MSBUILDDISABLENODEREUSE": "1"},
+        ).returncode
     if command == "run-api":
         return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
     raise CheckError(f"Unknown dotnet command: {command}")
@@ -3135,7 +3196,7 @@ def run_frontend_npm(
     env = frontend_toolchain_env()
     if env_overrides:
         env.update(env_overrides)
-    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, capture=capture, check=False)
+    return run([*npm_cli_command(env=env), *npm_args], cwd=cwd, env=env, capture=capture, check=False)
 
 
 def passthrough_args(raw_args: list[str]) -> list[str]:
@@ -3513,7 +3574,10 @@ def dotnet_build_projects(projects: list[str]) -> int:
     roots = minimal_dotnet_build_projects(projects)
     print(f"dotnet-build-changed: {len(roots)} root project(s) cover {len(projects)} changed project(s)")
     for project in roots:
-        result = run([exe("dotnet"), "build", project, "--nologo"], check=False)
+        result = run(
+            [exe("dotnet"), "build", project, "--nologo", "--disable-build-servers"],
+            check=False,
+        )
         if result.returncode != 0:
             return result.returncode
     return 0
@@ -3524,7 +3588,13 @@ def dotnet_test_projects(
     class_filters: dict[str, list[str]] | None = None,
 ) -> int:
     for project in projects:
-        command = [exe("dotnet"), "test", project, "--nologo"]
+        command = [
+            exe("dotnet"),
+            "test",
+            project,
+            "--nologo",
+            "--disable-build-servers",
+        ]
         project_filters = (class_filters or {}).get(project, [])
         if project_filters:
             command.extend([
@@ -3837,6 +3907,7 @@ def run_review_checks_policy(
 def review_checks(args: argparse.Namespace) -> int:
     since = getattr(args, "since", None)
     policy_only = bool(getattr(args, "policy_only", False))
+    supplemental = bool(getattr(args, "supplemental", False))
 
     try:
         _scope, paths = verify_scope_paths(since)
@@ -3845,7 +3916,7 @@ def review_checks(args: argparse.Namespace) -> int:
         return 1
 
     executed: list[str] = []
-    if not policy_only:
+    if not policy_only and not supplemental:
         verify_args = argparse.Namespace(**vars(args))
         verify_args.reuse_focused_browser_evidence = True
         if verify(verify_args) != 0:
@@ -3859,7 +3930,7 @@ def review_checks(args: argparse.Namespace) -> int:
     )
     policy_rc, policy_gates = run_review_checks_policy(
         paths,
-        policy_tests_covered=not policy_only and policy_surface_changed,
+        policy_tests_covered=supplemental or (not policy_only and policy_surface_changed),
         doc_drift_covered=set() if policy_only else review_checks_doc_drift_coverage(paths),
         doc_drift_range=f"{since}..HEAD" if since else None,
     )
@@ -3870,6 +3941,9 @@ def review_checks(args: argparse.Namespace) -> int:
 
     if policy_only:
         print("review-checks: PASS (policy profile)")
+        return 0
+    if supplemental:
+        print("review-checks: PASS (supplemental review profile)")
         return 0
 
     print(f"review-checks: PASS ({', '.join(executed)})")
@@ -4262,34 +4336,6 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
 
     print(f"Installed: {target} (pre-push runs python scripts/axis.py pre-push).")
     return 0
-
-
-def _command_version(name: str, *version_args: str, env: dict[str, str] | None = None) -> tuple[str, str]:
-    ok, version, resolved = command_version_line(name, *version_args, env=env)
-    if not ok:
-        return "FAIL", version
-    return "OK", f"{version} ({resolved})"
-
-
-def python_launcher_status() -> tuple[str, str]:
-    ok, version, resolved = command_version_line("python", "--version")
-    if not ok:
-        return "FAIL", version
-    if version_major(version) != "3":
-        return "FAIL", f"found `{version}` at {resolved}; expected Python 3"
-
-    probe = run_optional(
-        [
-            resolved,
-            "-c",
-            "import inspect, tarfile; raise SystemExit(0 if hasattr(tarfile, 'data_filter') and "
-            "'filter' in inspect.signature(tarfile.TarFile.extractall).parameters else 1)",
-        ],
-        timeout=VERSION_PROBE_TIMEOUT_SECONDS,
-    )
-    if probe is None or probe.returncode != 0:
-        return "FAIL", f"{version} ({resolved}); missing required tar data extraction filter"
-    return "OK", f"{version} ({resolved})"
 
 
 def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
@@ -5533,512 +5579,6 @@ def local_dev(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown local-dev command: {command}")
 
 
-def _wsl_docker_ok() -> bool:
-    if os.name != "nt" or shutil.which("wsl.exe") is None:
-        return False
-    result = run_optional(
-        ["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"],
-        timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
-    )
-    return result is not None and result.returncode == 0
-
-
-def _docker_group_session_hint(
-    *,
-    socket_group_id: int | None = None,
-    configured_group_ids: set[int] | None = None,
-    active_group_ids: set[int] | None = None,
-) -> str | None:
-    if socket_group_id is None or configured_group_ids is None or active_group_ids is None:
-        if os.name == "nt":
-            return None
-        socket_path = Path("/var/run/docker.sock")
-        try:
-            import grp
-            import pwd
-
-            socket_group_id = socket_path.stat().st_gid
-            user = pwd.getpwuid(os.getuid())
-            configured_group_ids = {user.pw_gid}
-            configured_group_ids.update(
-                group.gr_gid for group in grp.getgrall() if user.pw_name in group.gr_mem
-            )
-            active_group_ids = {os.getgid(), *os.getgroups()}
-        except (ImportError, KeyError, OSError):
-            return None
-
-    if socket_group_id in configured_group_ids and socket_group_id not in active_group_ids:
-        return (
-            "Docker group membership is configured but missing from this shell; "
-            "start a new login shell or restart WSL, then rerun the command"
-        )
-    return None
-
-
-def path_node_toolchain_ready() -> bool:
-    node = shutil.which("node")
-    npm = shutil.which("npm") or shutil.which("npm.cmd")
-    if node is None or npm is None:
-        return False
-    if Path(node).parent.resolve() != Path(npm).parent.resolve():
-        return False
-
-    expected_node_ok, expected_node = required_node_version()
-    if not expected_node_ok:
-        return False
-    try:
-        package = json.loads((FRONTEND_DIR / "package.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
-    package_manager = package.get("packageManager")
-    npm_match = re.fullmatch(
-        r"npm@((?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*))",
-        package_manager or "",
-    )
-    if npm_match is None:
-        return False
-
-    node_result = run_optional([node, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
-    npm_result = run_optional([npm, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
-    if node_result is None or npm_result is None:
-        return False
-    if node_result.returncode != 0 or npm_result.returncode != 0:
-        return False
-    return (
-        (node_result.stdout or "").strip().removeprefix("v") == expected_node
-        and (npm_result.stdout or "").strip() == npm_match.group(1)
-    )
-
-
-def path_dotnet_sdk_ready() -> bool:
-    source_ok, source_major_or_error = global_json_sdk_major()
-    if not source_ok or source_major_or_error != REQUIRED_DOTNET_SDK_MAJOR:
-        return False
-    if version_major(axis_setup.DOTNET_SDK_VERSION) != source_major_or_error:
-        return False
-
-    dotnet = shutil.which("dotnet")
-    if dotnet is None:
-        return False
-    result = run_optional([dotnet, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
-    return (
-        result is not None
-        and result.returncode == 0
-        and version_major(result.stdout or result.stderr or "") == source_major_or_error
-    )
-
-
-def setup_tool_ready(tool: str) -> bool:
-    if tool == "dotnet":
-        return dotnet_sdk_status()[0]
-    if tool == "node":
-        env = frontend_toolchain_env()
-        if not env:
-            return False
-        node_ok = node_version_status(env)[0]
-        npm_ok = npm_version_status(env)[0]
-        return node_ok and npm_ok
-    if tool == "lychee":
-        resolved = find_lychee()
-        return resolved is not None and lychee_version_status(resolved)[0]
-    if tool == "gh":
-        return gh_cli_status()[0]
-    raise CheckError(f"Unknown setup-managed tool: {tool}")
-
-
-def managed_tool_install_hint(profile: str) -> str:
-    return (
-        "run `python scripts/axis.py setup "
-        f"--profile {profile} --install-user-tools` to let Axis install the managed toolchain"
-    )
-
-
-def gh_cli_status() -> tuple[bool, str]:
-    ok, version_line, resolved = command_version_line("gh", "--version")
-    if not ok:
-        return False, f"{version_line}; {managed_tool_install_hint('review')}"
-    match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
-    if match is None:
-        return (
-            False,
-            f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
-            f"{managed_tool_install_hint('review')}",
-        )
-    version = match.group(1)
-    if _version_sort_key(version) < _version_sort_key(axis_setup.GH_VERSION):
-        return (
-            False,
-            f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
-            f"{managed_tool_install_hint('review')}",
-        )
-    return True, f"{version_line} ({resolved}); expected >= {axis_setup.GH_VERSION}"
-
-
-def setup_external_preflight(profile: str) -> int:
-    if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
-        return 1
-    issues: list[str] = []
-    if profile in {"local-dev", "review"}:
-        if find_openssl() is None:
-            issues.append(
-                "OpenSSL is required for local HTTPS certificates; "
-                "Axis will not install an OS package automatically"
-            )
-        if not _docker_info_ok():
-            session_hint = _docker_group_session_hint()
-            issues.append(
-                session_hint
-                or (
-                    "Docker Engine is not reachable in this shell; "
-                    "Axis will not install or start an OS service automatically"
-                )
-            )
-        if not _docker_compose_ok():
-            issues.append(
-                "Docker Compose v2 is not available in this shell; "
-                "Axis will not install an OS package automatically"
-            )
-    for issue in issues:
-        print(f"setup: FAIL - {issue}", file=sys.stderr)
-    return 1 if issues else 0
-
-
-def setup_native_prerequisite_preflight(
-    missing_managed_tools: Iterable[str],
-    *,
-    platform_spec: axis_setup.SetupPlatform,
-) -> int:
-    issues: list[str] = []
-    if "dotnet" in set(missing_managed_tools):
-        dotnet_issue = axis_setup.dotnet_native_prerequisite_preflight(
-            platform_spec=platform_spec
-        )
-        if dotnet_issue:
-            issues.append(dotnet_issue)
-    for issue in issues:
-        print(f"setup: FAIL - {issue}", file=sys.stderr)
-    return 1 if issues else 0
-
-
-def setup_preflight(profile: str) -> int:
-    rc = doctor(
-        argparse.Namespace(
-            profile=profile,
-            strict=True,
-            allow_certificate_bootstrap=True,
-        )
-    )
-    if rc != 0:
-        if profile == "review" and not setup_tool_ready("lychee"):
-            print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
-        return rc
-    return 0
-
-
-def setup(args: argparse.Namespace) -> int:
-    profile = getattr(args, "profile", "build")
-    browsers = getattr(args, "browsers", False)
-    install_user_tools = getattr(args, "install_user_tools", False)
-    plan_only = getattr(args, "plan_only", False)
-    trust_local_ca = getattr(args, "trust_local_ca", False)
-    if trust_local_ca and profile not in {"local-dev", "review"}:
-        print("setup: FAIL - --trust-local-ca requires --profile local-dev or review", file=sys.stderr)
-        return 1
-    try:
-        platform_spec = axis_setup.detect_platform()
-        plan = axis_setup.setup_plan(
-            profile=profile,
-            install_user_tools=install_user_tools,
-            browsers=browsers,
-            trust_local_ca=trust_local_ca,
-            platform_spec=platform_spec,
-        )
-    except axis_setup.SetupError as exc:
-        print(f"setup: FAIL - {exc}", file=sys.stderr)
-        return 1
-
-    print(f"axis setup (profile={profile}, platform={platform_spec.label})", flush=True)
-    if plan_only:
-        for index, label in enumerate(plan, 1):
-            print(f"{index}. {label}")
-        print("setup plan: no checks, downloads, or repository mutations were performed")
-        if profile in {"local-dev", "review"} and not trust_local_ca:
-            print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
-        return 0
-
-    expose_dotnet_command = install_user_tools and not path_dotnet_sdk_ready()
-    expose_node_commands = install_user_tools and not path_node_toolchain_ready()
-    missing: tuple[str, ...] = ()
-    if install_user_tools:
-        managed_tools = axis_setup.managed_tools_for_profile(profile)
-        missing = tuple(tool for tool in managed_tools if not setup_tool_ready(tool))
-        try:
-            for tool in missing:
-                try:
-                    axis_setup.asset_name(tool, platform_spec)
-                except axis_setup.SetupError as exc:
-                    raise axis_setup.SetupError(
-                        f"no verified portable artifact is available for missing `{tool}`: {exc}"
-                    ) from exc
-        except axis_setup.SetupError as exc:
-            print(f"setup: FAIL - {exc}", file=sys.stderr)
-            return 1
-
-    native_rc = setup_native_prerequisite_preflight(
-        missing,
-        platform_spec=platform_spec,
-    )
-    external_rc = setup_external_preflight(profile)
-    if native_rc != 0 or external_rc != 0:
-        return 1
-
-    if install_user_tools:
-        try:
-            exposed_commands: list[Path] = []
-            axis_setup.confirm_install(
-                missing,
-                assume_yes=getattr(args, "yes", False),
-                stdin=sys.stdin,
-            )
-            for tool in missing:
-                print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
-                installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
-                print(f"  installed: {installed}")
-            if expose_dotnet_command:
-                exposed = axis_setup.expose_managed_command("dotnet", platform_spec=platform_spec)
-                exposed_commands.append(exposed)
-                print(f"  exposed: {exposed}")
-            if expose_node_commands:
-                for exposed in axis_setup.expose_managed_commands(
-                    ("node", "npm"),
-                    platform_spec=platform_spec,
-                ):
-                    exposed_commands.append(exposed)
-                    print(f"  exposed: {exposed}")
-            if profile == "review" and ("gh" in missing or shutil.which("gh") is None):
-                exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
-                exposed_commands.append(exposed)
-                print(f"  exposed: {exposed}")
-            active_dirs = {
-                os.path.normcase(os.path.abspath(entry))
-                for entry in os.environ.get("PATH", "").split(os.pathsep)
-                if entry
-            }
-            for command_dir in sorted({path.parent for path in exposed_commands}):
-                if os.path.normcase(os.path.abspath(command_dir)) not in active_dirs:
-                    print(
-                        f"setup: user command directory `{command_dir}` is not active in this shell; "
-                        "add it to PATH and start a new shell"
-                    )
-        except (OSError, axis_setup.SetupError) as exc:
-            print(f"setup: FAIL - {exc}", file=sys.stderr)
-            return 1
-
-    rc = setup_preflight(profile)
-    if rc != 0:
-        return rc
-
-    steps: list[tuple[str, callable[[], int]]] = [
-        (
-            "restore .NET dependencies",
-            lambda: run([exe("dotnet"), "restore", "Axis.sln"], check=False).returncode,
-        ),
-        ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
-    ]
-    if browsers:
-        steps.append(
-            (
-                "install Playwright Chromium",
-                lambda: run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode,
-            )
-        )
-    if profile in {"local-dev", "review"}:
-        steps.append(("generate local HTTPS certificates", lambda: local_dev_certs(args)))
-        if trust_local_ca:
-            steps.append(("trust local HTTPS root CA", lambda: local_dev_trust_certs(args)))
-        steps.append(("install repository pre-push hook", lambda: install_hooks(args)))
-
-    for label, action in steps:
-        print(f"> {label}", flush=True)
-        rc = action()
-        if rc != 0:
-            print(f"setup: FAIL - {label}", file=sys.stderr)
-            return rc
-
-    print("setup: OK")
-    if profile in {"local-dev", "review"}:
-        print("setup: next: `python scripts/axis.py local-dev up`")
-        trust_status, trust_detail = local_dev_host_trust_status()
-        if trust_status == "OK":
-            print(
-                "setup: after the stack is ready, verify host HTTPS with "
-                "`python scripts/axis.py local-dev host-smoke`"
-            )
-        else:
-            print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
-    if profile == "review":
-        if setup_tool_ready("gh"):
-            print("review authentication remains interactive: run `gh auth status`")
-    return 0
-
-
-def doctor(args: argparse.Namespace) -> int:
-    profile = getattr(args, "profile", "local-dev")
-    if profile not in axis_setup.DOCTOR_PROFILES:
-        raise CheckError(f"Unknown doctor profile: {profile}")
-    groups = set(axis_setup.DOCTOR_PROFILES[: axis_setup.DOCTOR_PROFILES.index(profile) + 1])
-    allow_certificate_bootstrap = getattr(args, "allow_certificate_bootstrap", False)
-    rows: list[tuple[str, str, str]] = []
-
-    def record(status: str, label: str, detail: str) -> None:
-        rows.append((status, label, detail))
-
-    record("OK", "repo", str(ROOT))
-    record("OK", "os", f"{platform.system()} {platform.release()} ({platform.machine()})")
-    record("OK", "python", f"{platform.python_version()} ({sys.executable})")
-
-    python_status, python_detail = python_launcher_status()
-    record(python_status, "python launcher", python_detail)
-
-    git_status, git_detail = _command_version("git", "--version")
-    record(git_status, "git", git_detail)
-
-    frontend_env: dict[str, str] | None = None
-    node_ok = False
-    if "build" in groups:
-        dotnet_ok, dotnet_detail = dotnet_sdk_status()
-        record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
-
-        frontend_env = frontend_toolchain_env()
-        node_ok, node_detail = node_version_status(frontend_env)
-        record("OK" if node_ok else "FAIL", "node", node_detail)
-        npm_ok, npm_detail = npm_version_status(frontend_env)
-        record("OK" if npm_ok else "FAIL", "npm", npm_detail)
-
-        if os.name == "nt":
-            npm_cmd = shutil.which("npm.cmd")
-            npm_ps1 = shutil.which("npm.ps1")
-            if npm_cmd:
-                detail = f"native npm shim available ({npm_cmd})"
-                if npm_ps1:
-                    detail += f"; alternate npm launcher also detected ({npm_ps1})"
-                record("OK", "npm adapter", detail)
-
-    if "local-dev" in groups:
-        openssl = find_openssl()
-        if openssl:
-            record("OK", "openssl", openssl)
-            certificate_state = local_dev_certificate_state(openssl)
-            certificate_status = (
-                "OK"
-                if certificate_state is LocalDevCertificateState.READY
-                else "WARN"
-                if allow_certificate_bootstrap
-                else "FAIL"
-            )
-            record(
-                certificate_status,
-                "local HTTPS certificates",
-                local_dev_certificate_remediation(certificate_state),
-            )
-            trust_status, trust_detail = local_dev_host_trust_status()
-            record(trust_status, "host browser trust", trust_detail)
-        else:
-            record("FAIL", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
-
-        docker_status, docker_detail = _command_version("docker", "--version")
-        if docker_status == "FAIL":
-            record(
-                "WARN",
-                "docker cli",
-                f"{docker_detail}; install Docker Engine and Compose in the active environment",
-            )
-        else:
-            record(docker_status, "docker cli", docker_detail)
-
-        docker_current = _docker_info_ok()
-        docker_host = os.environ.get("DOCKER_HOST")
-        docker_host_ping = _docker_host_ping_ok(docker_host)
-        tcp_docker = _http_ok("http://127.0.0.1:2375/_ping") or _http_ok("http://localhost:2375/_ping")
-        wsl_docker = _wsl_docker_ok()
-
-        if docker_current:
-            record("OK", "docker endpoint", "docker info works in this shell")
-        elif docker_host and docker_host_ping:
-            record("OK", "docker endpoint", f"DOCKER_HOST={docker_host} responds; Testcontainers can use it")
-        elif docker_host:
-            record("FAIL", "docker endpoint", f"DOCKER_HOST={docker_host} is set, but the daemon did not respond")
-        elif tcp_docker:
-            record(
-                "WARN",
-                "docker endpoint",
-                "an exported Docker endpoint responds; set DOCKER_HOST for the current session",
-            )
-        elif wsl_docker:
-            record(
-                "WARN",
-                "docker endpoint",
-                "Docker works from another detected execution context; run the canonical command there",
-            )
-        else:
-            session_hint = _docker_group_session_hint()
-            record(
-                "FAIL",
-                "docker endpoint",
-                session_hint or "docker info failed; no reachable Docker endpoint detected",
-            )
-
-        if _docker_compose_ok():
-            record("OK", "docker compose", "docker compose version works")
-        elif wsl_docker:
-            record("WARN", "docker compose", "Docker Compose is available from another execution context")
-        else:
-            record("FAIL", "docker compose", "Docker Compose v2 not available from this execution context")
-
-    if "review" in groups:
-        lychee = find_lychee()
-        if lychee is None:
-            try:
-                platform_spec = axis_setup.detect_platform()
-                axis_setup.asset_name("lychee", platform_spec)
-                lychee_action = managed_tool_install_hint("review")
-            except axis_setup.SetupError as exc:
-                lychee_action = str(exc)
-            record("FAIL", "lychee", f"Lychee {axis_setup.LYCHEE_VERSION} is required; {lychee_action}")
-        else:
-            lychee_ok, lychee_detail = lychee_version_status(lychee)
-            record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
-
-        gh_ok, gh_detail = gh_cli_status()
-        record("OK" if gh_ok else "WARN", "github cli (optional)", gh_detail)
-
-    print(f"axis doctor (profile={profile})")
-    for status, label, detail in rows:
-        print(f"[{status:<4}] {label}: {detail}")
-
-    failures = [label for status, label, _detail in rows if status == "FAIL"]
-    if failures and getattr(args, "strict", False):
-        print(f"doctor: FAIL - {len(failures)} blocking issue(s): {', '.join(failures)}", file=sys.stderr)
-        return 1
-
-    if failures:
-        print("doctor: completed with blocking findings; rerun with --strict to fail on them")
-    else:
-        print("doctor: OK")
-    return 0
-
-
-def check_pr(args: argparse.Namespace) -> int:
-    module_args: list[str] = []
-    if args.title is not None:
-        module_args.extend(["--title", args.title])
-    if args.body_file is not None:
-        module_args.extend(["--body-file", str(args.body_file)])
-    if args.branch is not None:
-        module_args.extend(["--branch", args.branch])
-    return module_main("check-pr.py", module_args)
-
-
 def check_renovate_config(_args: argparse.Namespace | None = None) -> int:
     if not RENOVATE_CONFIG_PATH.is_file():
         print("check-renovate-config FAIL: missing .github/renovate.json5", file=sys.stderr)
@@ -6073,51 +5613,6 @@ def build_parser(
     parser = parser_class(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    setup_parser = sub.add_parser("setup", help="Prepare a portable repository development profile")
-    setup_parser.add_argument(
-        "--profile",
-        choices=axis_setup.SETUP_PROFILES,
-        default="build",
-        help="Cumulative setup profile (default: build)",
-    )
-    setup_parser.add_argument(
-        "--browsers",
-        action="store_true",
-        help=(
-            "Install the host Playwright Chromium binary for explicit debugging; "
-            "native OS prerequisites remain external"
-        ),
-    )
-    setup_parser.add_argument(
-        "--plan-only",
-        action="store_true",
-        help="Print the platform-specific setup plan without checks, downloads, or mutations",
-    )
-    setup_parser.add_argument(
-        "--install-user-tools",
-        action="store_true",
-        help="Install missing pinned tools into the current user's Axis data directory",
-    )
-    setup_parser.add_argument(
-        "--yes",
-        action="store_true",
-        help="Skip Axis confirmation for opted-in user-local downloads and trust-store changes",
-    )
-    setup_parser.add_argument(
-        "--trust-local-ca",
-        action="store_true",
-        help="Trust the generated local root CA in the current user's host trust store",
-    )
-    setup_parser.set_defaults(func=setup)
-    doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")
-    doctor_parser.add_argument(
-        "--profile",
-        choices=axis_setup.DOCTOR_PROFILES,
-        default="local-dev",
-        help="Tool group to diagnose (default: local-dev)",
-    )
-    doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required tools in the selected profile are unavailable")
-    doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks", help="Install the repository-managed pre-push hook").set_defaults(func=install_hooks)
     pre_push_parser = sub.add_parser("pre-push", help="Run the pre-push policy profile")
     pre_push_parser.add_argument(
@@ -6161,10 +5656,19 @@ def build_parser(
         help="Run Axis checks selected for the shared review profile",
     )
     review_checks_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
-    review_checks_parser.add_argument(
+    review_checks_mode = review_checks_parser.add_mutually_exclusive_group()
+    review_checks_mode.add_argument(
         "--policy-only",
         action="store_true",
         help="Run only the deterministic policy profile shared with CI",
+    )
+    review_checks_mode.add_argument(
+        "--supplemental",
+        action="store_true",
+        help=(
+            "Run only review gates not already selected by the required development "
+            "profile"
+        ),
     )
     review_checks_parser.set_defaults(func=review_checks)
     verify_parser = sub.add_parser("verify", help="Run checks selected from changed paths")
@@ -6174,7 +5678,28 @@ def build_parser(
         action="store_true",
         help="Print the changed-path verification plan without running commands",
     )
+    verify_parser.add_argument(
+        "--reuse-focused-browser-evidence",
+        action="store_true",
+        help=(
+            "Keep browser and detached local-development orchestration outside this finite "
+            "command; required E2E evidence remains separately owned"
+        ),
+    )
     verify_parser.set_defaults(func=verify)
+
+    dependencies_parser = sub.add_parser(
+        "dependencies",
+        help="Run project-native locked dependency operations for processctl setup",
+    )
+    dependencies_sub = dependencies_parser.add_subparsers(
+        dest="dependencies_command",
+        required=True,
+    )
+    dependencies_sub.add_parser(
+        "install",
+        help="Restore locked NuGet and npm dependency graphs",
+    ).set_defaults(func=install_project_dependencies)
 
     dotnet_parser = sub.add_parser("dotnet", help="Run repository-standard .NET commands")
     dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
@@ -6409,6 +5934,10 @@ def build_parser(
         "dotnet-dependency-locks",
         help="Validate the committed NuGet lock graph",
     ).set_defaults(func=check_dotnet_dependency_locks)
+    check_sub.add_parser(
+        "dependency-state",
+        help="Check that locked NuGet and npm graphs are restored for current inputs",
+    ).set_defaults(func=check_dependency_state)
     check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser(
         "frontend-dependency-versions",
@@ -6450,11 +5979,6 @@ def build_parser(
     check_sub.add_parser("foundation-docs", help="Validate foundation documentation contracts").set_defaults(
         func=lambda _args: run_module_check("check-foundation-docs.py", [])
     )
-    pr_parser = check_sub.add_parser("pr", help="Validate pull-request metadata and branch naming")
-    pr_parser.add_argument("--title")
-    pr_parser.add_argument("--body-file", type=Path)
-    pr_parser.add_argument("--branch")
-    pr_parser.set_defaults(func=check_pr)
     publish_parser = check_sub.add_parser(
         "publish-metadata",
         help="Validate the current branch and publishable commit subjects",

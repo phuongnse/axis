@@ -5,16 +5,16 @@ Axis uses docs-first development. Use-case specs under [docs/use-cases/README.md
 ## Branches and commits
 
 - Branch from `main`; do not push directly to `main`.
-- Use `{type}/{short-description}` in kebab-case with `feat`, `fix`, `docs`, `refactor`, `test`, or `chore`.
-- Renovate-owned dependency branches use the configured `renovate/` prefix.
+- Use `{type}/{short-description}` in kebab-case with `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`, `ci`, or `perf`.
+- Renovate-owned dependency branches use the configured `automation/renovate/` prefix.
 - Use Conventional Commits in imperative mood, max 72 characters, no trailing period.
 - Repository branch and commit rules override defaults from GitHub clients, publishing tools, and agent workflows.
 
 ## Before a PR
 
-For first-time setup, run `python scripts/axis.py setup --profile build --install-user-tools`. Use `--profile local-dev` when the browser, local HTTPS certificates, and pre-push hook are needed; see [docs/playbooks/scripts.md](./docs/playbooks/scripts.md) for launcher variants, plan-only mode, and installation boundaries.
+For first-time setup, create and activate `.process-venv` with Python 3.14, install `requirements/process.txt` with `python -m pip install --require-hashes`, then run `processctl setup --project-root . --profile development --apply --allow network --allow user-files`. See [docs/playbooks/scripts.md](./docs/playbooks/scripts.md) for the process boundary and installation policy.
 
-The `local-dev` and `review` setup profiles install the local pre-push hook. Build-only contributors can run `python scripts/axis.py install-hooks` separately.
+Local HTTPS material and the repository pre-push hook remain Axis-owned. Run `python scripts/axis.py local-dev certs` and `python scripts/axis.py install-hooks`; current-user certificate trust is a separate explicit `python scripts/axis.py local-dev trust-certs` action.
 
 Follow [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md) before opening or marking a PR ready. Run checks through `python scripts/axis.py ...`; command ownership lives in [docs/playbooks/scripts.md](./docs/playbooks/scripts.md).
 
@@ -29,4 +29,4 @@ publish-metadata` directly when inspecting that gate.
 
 Use [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md) for the local stack. When [docker-compose.yml](./docker-compose.yml) changes, update that playbook in the same PR.
 
-GitHub fills the PR body from [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Keep the description to Summary, Linked spec, and Requirements; CI status belongs in Checks. Before creating or updating a PR, validate the exact title, body file, and branch with `python scripts/axis.py check pr --title <title> --body-file <path> --branch <branch>`.
+GitHub fills the PR body from the process-managed [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Preserve its managed markers and required sections; CI status belongs in Checks. Before creating or updating a PR, validate the exact title, body file, branch, and state with `processctl publication validate-pr --title <title> --branch <branch> --state <draft-or-ready> --body-file <path>`.

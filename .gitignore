@@ -53,3 +53,4 @@ Thumbs.db
 .aider*
 __pycache__/
 /.process/runs/
+/.process-venv/
