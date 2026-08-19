@@ -3364,12 +3364,48 @@ class TestMarkdownLinkGate(unittest.TestCase):
         self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
 
 class TestVerifyGate(unittest.TestCase):
+    def test_docker_readiness_requires_engine_and_compose(self) -> None:
+        with (
+            mock.patch.object(axis, "_docker_info_ok", return_value=True),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, axis.check_docker())
+
+        self.assertIn("docker info and docker compose version work", stdout.getvalue())
+
+    def test_docker_readiness_rejects_engine_without_compose(self) -> None:
+        with (
+            mock.patch.object(axis, "_docker_info_ok", return_value=True),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=False),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_docker())
+
+        self.assertIn("Docker Compose v2 is unavailable", stderr.getvalue())
+
+    def test_docker_readiness_rejects_compose_without_engine(self) -> None:
+        with (
+            mock.patch.object(axis, "_docker_info_ok", return_value=False),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_docker())
+
+        self.assertIn("no reachable Docker endpoint detected", stderr.getvalue())
+
     def test_process_profiles_bind_browser_docker_and_setup_mutation_contracts(self) -> None:
         project = json.loads(axis.PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
         development_command = project["profiles"]["development"][0]["run"]
         self.assertEqual(["python", "scripts/axis.py", "verify"], development_command)
         self.assertIn("docker-engine", project["environment"]["profiles"]["development"])
         self.assertIn("docker-engine", project["environment"]["profiles"]["review"])
+        docker_requirement = next(
+            requirement
+            for requirement in project["environment"]["requirements"]
+            if requirement["id"] == "docker-engine"
+        )
+        self.assertIn("Docker Compose v2", docker_requirement["description"])
         setup = {
             action["id"]: action
             for action in project["environment"]["setupActions"]

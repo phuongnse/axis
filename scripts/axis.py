@@ -3359,10 +3359,17 @@ def frontend_command(args: argparse.Namespace) -> int:
 
 
 def check_docker(_args: argparse.Namespace | None = None) -> int:
-    if _docker_info_ok():
-        print("check-docker: OK (docker info works)")
+    engine_ok = _docker_info_ok()
+    compose_ok = _docker_compose_ok()
+    if engine_ok and compose_ok:
+        print("check-docker: OK (docker info and docker compose version work)")
         return 0
-    print("check-docker: FAIL - docker info failed; no reachable Docker endpoint detected", file=sys.stderr)
+    failures = []
+    if not engine_ok:
+        failures.append("docker info failed; no reachable Docker endpoint detected")
+    if not compose_ok:
+        failures.append("docker compose version failed; Docker Compose v2 is unavailable")
+    print(f"check-docker: FAIL - {'; '.join(failures)}", file=sys.stderr)
     return 1
 
 
