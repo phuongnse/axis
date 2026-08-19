@@ -6959,11 +6959,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
         with (
             mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
             mock.patch.object(axis, "frontend_toolchain_env", return_value=frontend_env),
-            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
+            mock.patch.object(
+                axis,
+                "npm_cli_command",
+                return_value=["node", "npm-cli.js"],
+            ) as npm_cli_command,
             mock.patch.object(axis, "run", side_effect=fake_run),
         ):
             self.assertEqual(0, axis.frontend_command(axis.argparse.Namespace(frontend_command="ci")))
 
+        npm_cli_command.assert_called_once_with(env=frontend_env)
         self.assertEqual(frontend_env, calls[0]["env"])
 
     def test_generate_ui_baseline_uses_deterministic_python_generator(self) -> None:
