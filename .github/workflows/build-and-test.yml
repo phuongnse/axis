@@ -14,6 +14,12 @@ permissions:
   pull-requests: read   # dorny/paths-filter calls pulls.listFiles to detect changed paths
 
 jobs:
+  independent-review:
+    name: independent-review
+    permissions:
+      contents: read
+    uses: phuongnse/renovate-ops/.github/workflows/independent-review.yml@48a644b081ea9d098796432750f892e2e3f44614
+
   pr:
     name: PR guard
     runs-on: ubuntu-latest
