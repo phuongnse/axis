@@ -89,7 +89,7 @@
           "timeoutSeconds": 15,
           "readOnly": true,
           "outputStream": "stdout",
-          "outputRegex": "^10\\.0\\.302$"
+          "outputRegex": "^10\\.0\\.302\\r?$"
         },
         "remediation": "Run processctl setup for the selected profile with network and user-files approval.",
         "setupAction": "install-dotnet"
@@ -152,7 +152,7 @@
           "timeoutSeconds": 15,
           "readOnly": true,
           "outputStream": "stdout",
-          "outputRegex": "^v24\\.18\\.0$"
+          "outputRegex": "^v24\\.18\\.0\\r?$"
         },
         "remediation": "Run processctl setup for the selected profile with network and user-files approval.",
         "setupAction": "install-node"
