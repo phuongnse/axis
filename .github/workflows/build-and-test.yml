@@ -30,6 +30,13 @@ jobs:
       - name: Install published process runtime
         run: python -m pip install --require-hashes -r requirements/process.txt
 
+      - name: Validate complete process adoption candidate
+        if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
+        run: >-
+          processctl adoption check
+          --project-root .
+          --requirements-lock requirements/process.txt
+
       - name: Read PR body from the trusted event payload
         run: jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/pr-body.md"
 
@@ -76,6 +83,13 @@ jobs:
 
       - name: Install published process runtime
         run: python -m pip install --require-hashes -r requirements/process.txt
+
+      - name: Validate complete process adoption candidate
+        if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
+        run: >-
+          processctl adoption check
+          --project-root .
+          --requirements-lock requirements/process.txt
 
       - name: Restore project-owned locked dependencies
         run: python scripts/axis.py dependencies install

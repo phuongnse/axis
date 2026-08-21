@@ -2436,6 +2436,72 @@ def main() -> int:
 
 
 class TestRenovateConfigGate(unittest.TestCase):
+    def test_process_updates_materialize_one_complete_non_automerge_candidate(self) -> None:
+        config = json.loads(
+            (axis.ROOT / ".github" / "renovate.json5").read_text(encoding="utf-8")
+        )
+
+        self.assertFalse(config["automerge"])
+        self.assertTrue(config["draftPR"])
+        self.assertIn("pip-compile", config["enabledManagers"])
+        self.assertFalse(config["pip_requirements"]["enabled"])
+        self.assertEqual(
+            ["/^requirements\\/process\\.txt$/"],
+            config["pip-compile"]["managerFilePatterns"],
+        )
+        task = config["postUpgradeTasks"]
+        self.assertEqual("branch", task["executionMode"])
+        self.assertEqual(
+            [
+                "python .process/adopt-process.py --project-root . "
+                "--requirements-lock requirements/process.txt"
+            ],
+            task["commands"],
+        )
+        self.assertTrue(
+            {
+                ".agents/skills/**",
+                ".github/PULL_REQUEST_TEMPLATE.md",
+                ".process/adopt-process.py",
+                ".process/adopt-process-windows-job.py",
+                ".process/adoption-migrations/**",
+                ".process/process.lock",
+                ".process/project.json",
+                "requirements/process.in",
+                "requirements/process.txt",
+            }.issubset(task["fileFilters"])
+        )
+        rule = next(
+            item
+            for item in config["packageRules"]
+            if item.get("matchPackageNames") == ["engineering-process"]
+        )
+        self.assertFalse(rule["automerge"])
+        self.assertEqual(["at any time"], rule["schedule"])
+        self.assertEqual(100, rule["prPriority"])
+        self.assertEqual(
+            ["requirements/process.in", "requirements/process.txt"],
+            rule["matchFileNames"],
+        )
+
+        process_input = (axis.ROOT / "requirements" / "process.in").read_text(
+            encoding="utf-8"
+        )
+        process_lock = (axis.ROOT / "requirements" / "process.txt").read_text(
+            encoding="utf-8"
+        )
+        self.assertRegex(
+            process_input,
+            r"(?m)^engineering-process==[0-9]+\.[0-9]+\.[0-9]+$",
+        )
+        self.assertIn("pip-compile ", process_lock)
+        self.assertIn("--generate-hashes", process_lock)
+        workflow = (
+            axis.ROOT / ".github" / "workflows" / "build-and-test.yml"
+        ).read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
+        self.assertIn("automation/renovate/engineering-process", workflow)
+
     def test_uses_project_frontend_runtime_for_validator(self) -> None:
         completed = axis.subprocess.CompletedProcess([], 0, stdout="", stderr="")
         with (

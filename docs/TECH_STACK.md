@@ -54,6 +54,8 @@ The runtime, framework, persistence provider, and framework-integrated libraries
 - Dependency automation: `.github/renovate.json5`
 - Scheduled dependency audit: `.github/workflows/dependency-security.yml`
 - Reference-product BFF runtime and packages: the independently versioned reference-product repository
-- Engineering-process package graph: `requirements/process.txt`
+- Engineering-process direct public pin: `requirements/process.in`
+- Engineering-process compiled package graph and hashes: `requirements/process.txt`
 - Portable environment and finite profiles: `.process/project.json`
 - Process distribution resources: `.process/process.lock`
+- Process adoption materialization: `.process/adopt-process.py` and the installed target distribution

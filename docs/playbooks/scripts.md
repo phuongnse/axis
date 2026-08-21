@@ -11,7 +11,7 @@ use `$run-project-command` when deciding what to run.
 | Tool | Required source | Used by |
 |---|---|---|
 | Python | Python 3.14 with `venv` and `pip` for the locked process bootstrap; the Axis domain launcher accepts the range declared in [.process/project.json](../../.process/project.json) | process runtime and repository maintenance |
-| Engineering process | Exact public graph and hashes in [requirements/process.txt](../../requirements/process.txt); distribution resources in [.process/process.lock](../../.process/process.lock) | lifecycle, portable environment, verification, publication metadata |
+| Engineering process | Direct public pin in [requirements/process.in](../../requirements/process.in), complete graph and hashes in [requirements/process.txt](../../requirements/process.txt), and distribution resources in [.process/process.lock](../../.process/process.lock) | lifecycle, portable environment, verification, publication metadata |
 | .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable artifact contract in [.process/project.json](../../.process/project.json) | build, tests, format, package scan, API contracts |
 | MCP SDK | Exact `ModelContextProtocol` pin in [Directory.Packages.props](../../Directory.Packages.props) | local `Axis.Mcp` stdio bridge and focused MCP contract tests |
 | Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable Node/npm contract in [.process/project.json](../../.process/project.json) | frontend commands and API types |
@@ -32,6 +32,9 @@ use `$run-project-command` when deciding what to run.
 - GitHub CLI authentication remains interactive and outside setup. The `publication` profile verifies its executable contract but never authenticates on the user's behalf.
 - Use the exact Axis `check` subcommand for one machine-readable product prerequisite or policy gate. Environment and distribution integrity stay owned by `processctl doctor`.
 - During policy-script development, use repeatable `python scripts/axis.py check policy-tests --test <dotted-test-name>` selectors for only the touched regression cases. Omit `--test` only when the full policy suite is triggered at the review boundary or in CI.
+
+Automatic process dependency updates and their merge boundary are owned by
+[process-adoption.md](./process-adoption.md).
 
 ## Pre-PR review checkpoint
 
