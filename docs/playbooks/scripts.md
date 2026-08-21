@@ -2,41 +2,49 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
-[scripts/axis.py](../../scripts/axis.py) owns repo maintenance commands. Use `$axis-script-scope` when deciding what to run.
+[scripts/axis.py](../../scripts/axis.py) owns Axis build, generation, local-development,
+and product-policy commands. The shared process owns lifecycle and evidence routing;
+use `$run-project-command` when deciding what to run.
 
 ## Tool Versions
 
 | Tool | Required source | Used by |
 |---|---|---|
-| Python | Current patched Python 3 exposed as `python`; Ubuntu/WSL provides the launcher through `python-is-python3` | repository maintenance |
-| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | build, tests, format, package scan, API contracts |
+| Python | Python 3.14 with `venv` and `pip` for the locked process bootstrap; the Axis domain launcher accepts the range declared in [.process/project.json](../../.process/project.json) | process runtime and repository maintenance |
+| Engineering process | Direct public pin in [requirements/process.in](../../requirements/process.in), complete graph and hashes in [requirements/process.txt](../../requirements/process.txt), and distribution resources in [.process/process.lock](../../.process/process.lock) | lifecycle, portable environment, verification, publication metadata |
+| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable artifact contract in [.process/project.json](../../.process/project.json) | build, tests, format, package scan, API contracts |
 | MCP SDK | Exact `ModelContextProtocol` pin in [Directory.Packages.props](../../Directory.Packages.props) | local `Axis.Mcp` stdio bridge and focused MCP contract tests |
-| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | frontend commands and API types |
+| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable Node/npm contract in [.process/project.json](../../.process/project.json) | frontend commands and API types |
 | Playwright browser runtime | [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e) and [frontend/package.json](../../frontend/package.json) | Containerized `local-dev smoke` and `local-dev e2e` workflows |
-| Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
-| GitHub CLI | portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | optional publication adapter |
+| Lychee | Portable artifact contract in [.process/project.json](../../.process/project.json) | Markdown link checks |
+| GitHub CLI | Portable artifact contract in [.process/project.json](../../.process/project.json) | optional publication adapter |
 | Renovate validator | Exact version in [scripts/axis.py](../../scripts/axis.py) | Dependency automation config |
 
 ## Bootstrap and diagnosis
 
-- Python from [Tool Versions](#tool-versions), including the standard-library tar data extraction filter, and Git are external prerequisites. Run `python scripts/axis.py setup --profile build`; select `local-dev` or `review` for cumulative preparation.
-- Add `--install-user-tools` to install a missing pinned .NET SDK and Node.js. When PATH `dotnet` is missing or does not satisfy the required SDK major, setup exposes the verified managed `dotnet` through the native user command directory; its launcher sets `DOTNET_ROOT` to that managed SDK. When the PATH-resolved Node/npm pair does not satisfy the exact repository pins, setup similarly exposes the verified managed `node` and `npm` after validating both targets; the review profile likewise exposes the managed GitHub CLI. Setup never replaces an unmanaged command or edits `PATH`, and it reports when the command directory is not active in the current shell. Downloads require interactive confirmation or `--yes`, use HTTPS, verify the publisher's SHA-256/SHA-512 digest, and land under the native user data directory. `AXIS_TOOLS_DIR` overrides that location.
-- Portable executables still rely on publisher-documented host libraries. Before authorized downloads, setup reports every proven local-dev host blocker together. Linux native-library discovery is tri-state: a positive result is accepted, authoritative absence may fail early, and inconclusive discovery defers to the installed .NET host. Diagnostics print an exact host action only for a verified OS/version, never set runtime fallbacks, and never install OS packages silently.
-- Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. Add `--browsers` only when explicit host-browser debugging needs a user-local Chromium binary; standard Axis browser workflows use the containerized runtime. The browser installer does not provision native OS libraries. `python scripts/axis.py check playwright-browsers` launch-probes that optional host runtime and reports native-prerequisite failures; a downloaded executable alone is not considered ready.
-- `local-dev` and `review` also create or reuse local HTTPS certificates and install the repository pre-push hook. Hook installation migrates only a verified repository-local legacy `core.hooksPath`, rechecks inherited configuration, writes only inside the repository Git hooks directory, updates only a digest-owned Axis copy, and refuses unmanaged targets; resolve the reported config scope or hook explicitly before retrying. `--trust-local-ca` explicitly opts into a confirmed current-user host trust-store change; when omitted, setup reports host trust and the browser-readiness follow-up. Setup never changes system-wide trust or invokes `sudo`. These profiles require Docker Engine, Compose, and OpenSSL in the active shell before dependency mutations.
-- Portable setup validates the current OS/architecture and reports unavailable verified artifacts in `--plan-only`; unsupported tool/platform combinations remain external prerequisites. Setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration.
-- GitHub CLI authentication remains interactive and outside setup.
-- Doctor profiles are cumulative: `core`, `build`, `local-dev`, and `review`. The default is `local-dev`; review-only tools such as Lychee are checked by `review`.
-- Use the exact `check` subcommand for one machine-readable prerequisite or policy gate. Host Playwright readiness is deliberately absent from cumulative doctor profiles because required browser evidence runs in Compose; use the explicit `playwright-browsers` check only for opted-in host debugging.
+- Python 3.14 with `venv`/`pip` and Git are external bootstrap prerequisites. Create and activate `.process-venv`, then install the exact public graph with `python -m pip install --require-hashes -r requirements/process.txt`. The repository never requires a global Python package install.
+- Use `processctl doctor --project-root . --profile development` or `--profile review` for read-only diagnosis. Use `processctl setup --project-root . --profile <profile>` to inspect the exact plan; add `--apply --allow network --allow user-files --allow project-files` only when authorizing the declared downloads and project-dependency restore.
+- The environment contract in `.process/project.json` is data, not per-platform shell branching. `processctl` selects the matching OS/architecture artifact, verifies its publisher checksum before extraction, resolves an explicit native executable, and injects the verified environment only into the governed command. Windows npm uses `node.exe` plus `npm-cli.js`; batch shims and shell execution are outside the contract.
+- Managed setup currently covers .NET, Node/npm, Lychee, and GitHub CLI where the manifest has a verified publisher artifact. A requirement with no matching artifact remains an external prerequisite and fails with explicit remediation. Portable executables still rely on publisher-documented host libraries; setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration.
+- The declared project-dependency action restores NuGet in locked mode and installs the npm lock graph. `python scripts/axis.py check dependency-state` diagnoses that graph without mutation.
+- Local HTTPS certificates, optional current-user trust, Docker availability, and repository hooks are product concerns, not portable process concerns. Use `python scripts/axis.py local-dev certs`, the separately authorized `python scripts/axis.py local-dev trust-certs`, and `python scripts/axis.py install-hooks`. Hook installation migrates only a verified repository-local legacy `core.hooksPath`, writes only inside the repository Git hooks directory, and refuses unmanaged targets.
+- Standard browser evidence uses the Compose-managed Playwright runtime. `python scripts/axis.py check playwright-browsers` only launch-probes an independently provisioned host browser for explicit host debugging.
+- GitHub CLI authentication remains interactive and outside setup. The `publication` profile verifies its executable contract but never authenticates on the user's behalf.
+- Use the exact Axis `check` subcommand for one machine-readable product prerequisite or policy gate. Environment and distribution integrity stay owned by `processctl doctor`.
 - During policy-script development, use repeatable `python scripts/axis.py check policy-tests --test <dotted-test-name>` selectors for only the touched regression cases. Omit `--test` only when the full policy suite is triggered at the review boundary or in CI.
+
+Automatic process dependency updates and their merge boundary are owned by
+[process-adoption.md](./process-adoption.md).
 
 ## Pre-PR review checkpoint
 
-`$axis-pull-request` owns trigger decisions, checkpoint commits, independent review, feedback loops, and publication. This playbook owns verification command behavior:
+The shared engineering-process lifecycle owns checkpoint-bound verification,
+independent review, and finding loops. `$publish-change` owns only authorized
+publication. This playbook owns Axis verification command behavior:
 
 - The enforced sequence is focused proof, clean immutable checkpoint with repository-valid branch and commit metadata, readiness bound to the exact checkpoint/comparison base, then independent review. Readiness and review never run concurrently.
 - First review covers the committed publishable branch diff; follow-up review covers only the new immutable checkpoint delta when earlier evidence remains valid.
-- Follow-up verification uses `python scripts/axis.py review-readiness --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
+- Follow-up verification uses `python scripts/axis.py review-checks --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
 - Reviewer unavailability or unresolved valid findings blocks publication unless the user explicitly approves the exact skip or deferral.
 
 ## Command Boundaries
@@ -59,25 +67,25 @@
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
 - The shared runner normalizes `TMPDIR`, `TEMP`, and `TMP` to one existing writable directory before every governed subprocess; inherited cross-OS paths are never passed through.
 - Use `python scripts/axis.py local-dev smoke` for the fixed local-stack smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for diff-triggered browser evidence. Intentional visual-baseline writes add `--snapshot-output e2e/<test>.pw.ts-snapshots` before the Playwright arguments and `--update-snapshots` inside them; the wrapper validates and persists only that test-owned directory. Omit E2E arguments only for CI or a cross-cutting diff that invalidates every browser surface. All paths reconcile the local stack and run Playwright in the same Compose-managed browser environment.
-- Use `python scripts/axis.py mcp serve` as the single local MCP entrypoint; it reuses a healthy stack or starts `local-dev up`, builds the bridge with diagnostics on stderr, and then keeps stdout protocol-only. The wrapper defaults to read access; the repository Codex registration opts into write during active development, while each mutation still requires task-level approval. Pass `--no-build` only when the bridge output is already current. See [docs/playbooks/mcp.md](./mcp.md).
+- Use `python scripts/axis.py mcp serve` as the single local MCP entrypoint; it reuses a healthy stack or starts `local-dev up`, builds the bridge with diagnostics on stderr, and then keeps stdout protocol-only. The wrapper defaults to read access; a client may select write access only for an explicitly authorized mutation task. Pass `--no-build` only when the bridge output is already current. See [docs/playbooks/mcp.md](./mcp.md).
 - Use `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` when an API operation, MCP tool, auth boundary, or mutation policy changes. These are the maintained MCP parity and safety checks.
 - `local-dev shell` is an unrestricted diagnostic escape hatch, not a finite workflow or evidence route. Volume-destructive local-dev commands require explicit `--yes`.
-- Use `python scripts/axis.py review-readiness --full-branch` on a clean checkpoint commit for the first review of the complete publishable branch, or `python scripts/axis.py review-readiness --since <reviewed-checkpoint>` for an immutable follow-up delta. Local review readiness requires one explicit scope so an omitted base cannot trigger an accidental branch-wide verification run. Either route first validates the current branch and every commit subject in the complete publishable branch, then runs changed-path verification plus the deterministic policy profile shared with CI; CI may continue to use `--policy-only` without a local execution scope.
+- The engineering-process `development` profile runs Axis's changed-path impact graph once. Its required `review` companion runs `python scripts/axis.py review-checks --supplemental`, which evaluates only policy and doc-drift gates not already covered by that development run. Standalone `python scripts/axis.py review-checks` still composes both layers; use `--since <reviewed-checkpoint>` only for a focused immutable follow-up delta. CI's independent policy job uses `--policy-only`. `processctl` owns clean-checkpoint binding, evidence freshness, and independent-review readiness. Publication metadata remains a separate project gate.
 - Pass current verification evidence to delegated reviewers. The primary owns routine checks; reviewers do not repeat passing suites and run only the smallest reproducer for a finding or evidence gap.
-- Treat `python scripts/axis.py verify` as the changed-path verification engine behind review-readiness, not as complete PR-readiness evidence by itself.
+- Treat `python scripts/axis.py verify` as the changed-path verification engine behind review-checks, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
 - Frontend source verification uses the maintained dependency graph to run related tests plus any changed unit-test files. Only shared test setup or test-runtime configuration triggers the full frontend unit suite; dependency manifests and TypeScript project changes remain on their dependency, type, lint, and build gates. Browser evidence remains acceptance- and diff-triggered.
 - A changed .NET test class without source, project, or shared-fixture changes runs that class only. When changed source has changed test classes, those classes are the focused proof; source without focused proof and shared test infrastructure fall back to the affected test project.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; the installed hook passes Git's exact update records so the first quick gate validates every pushed branch name and pushed commit range rather than the checked-out branch alone. Direct invocation falls back to the current branch. It is not a substitute for the pre-PR review checkpoint on published PR branches.
-- Use `python scripts/axis.py check publish-metadata` to validate the current branch plus every commit subject from its merge base. CI passes the exact PR base/head range to the same command.
-- Use `python scripts/axis.py check pr --title <title> --body-file <path> --branch <branch>` to validate the exact current or CI pull-request title/body/branch before creating or updating it.
-- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run full-branch `review-readiness`; ordinary pre-push remains a quick gate.
+- Use `python scripts/axis.py check publish-metadata` as the stronger local checkpoint and pre-push gate for the current branch plus every commit subject from its merge base.
+- Use `processctl publication validate-pr --title <title> --branch <branch> --state <draft-or-ready> --body-file <path>` to validate the exact current or CI pull-request title/body/branch/state before creating or updating it. CI also binds commit metadata to the exact base/head range with `processctl publication validate-range`.
+- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run the complete Axis review profile; ordinary pre-push remains a quick gate.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 
 ## Script Rules
 
 - Keep repo maintenance scripts in Python.
-- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), portable setup ownership in [scripts/axis_setup.py](../../scripts/axis_setup.py), and coherent policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
+- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), portable environment ownership in [.process/project.json](../../.process/project.json), and coherent product-policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation atomically writes the executable copy and its ownership digest under `.git/hooks` without replacing an unmanaged hook.
 - Deterministic guards must parse explicit structure, configuration, graphs, source symbols, or executable behavior. Do not infer semantic compliance from prose keywords, fragments, or wording.
@@ -86,6 +94,6 @@
 - Command tests prove supported subcommands and current behavior.
 - Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
 - Diff-aware checks include PR range plus staged, unstaged, and untracked files.
-- `python scripts/axis.py check frontend-dependency-versions` requires exact direct npm versions and overrides, and keeps the Node/npm source, portable setup, and dev image on one exact baseline. Regenerate `package-lock.json` from that manifest through `python scripts/axis.py frontend sync-lock`; use `python scripts/axis.py frontend sync-lock --audit-fix` for compatible lock-only audit remediation without force or install scripts, then install the locked graph through `python scripts/axis.py frontend install`.
+- `python scripts/axis.py check frontend-dependency-versions` requires exact direct npm versions and overrides, and keeps the Node/npm source, portable process contract, and dev image on one exact baseline. Regenerate `package-lock.json` from that manifest through `python scripts/axis.py frontend sync-lock`; use `python scripts/axis.py frontend sync-lock --audit-fix` for compatible lock-only audit remediation without force or install scripts, then install the locked graph through `python scripts/axis.py frontend install`.
 - The frontend vulnerability gate evaluates the full npm audit JSON. High and critical findings always fail; every lower-severity advisory needs a current exact acceptance of at most 30 days in [frontend/dependency-risk-acceptances.json](../../frontend/dependency-risk-acceptances.json). New, changed, expired, overlong, and stale acceptances fail the same gate.
 - Changed-path verification runs both frontend dependency gates for every frontend diff, matching pull-request CI. [.github/workflows/dependency-security.yml](../../.github/workflows/dependency-security.yml) audits the locked npm and NuGet graphs daily on the default branch.

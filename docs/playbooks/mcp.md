@@ -22,7 +22,7 @@ python scripts/axis.py mcp serve
 
 The wrapper checks the local root CA, reuses a healthy `local-dev` stack or starts it when necessary, builds `Axis.Mcp` with diagnostics redirected to stderr, and then hands stdin/stdout to the stdio bridge. The MCP protocol owns stdout; no detached or background bridge is supported. On first use, the bridge opens the Axis authorization URL in a browser and uses OAuth Authorization Code + PKCE with client `axis_mcp` and the fixed loopback callback `http://127.0.0.1:48123/callback`.
 
-The bridge defaults to `read` access. The repository Codex registration explicitly selects `write` during active development so its live registry supports approved mutation tasks without registration churn; registration never authorizes an agent to mutate product state without task-level approval:
+The bridge defaults to `read` access. A client selects `write` only for an explicitly approved mutation task; exposing a write-capable registry never authorizes a caller to mutate product state by itself:
 
 ```text
 python scripts/axis.py mcp serve --access read
@@ -74,7 +74,7 @@ Use MCP for product state and product operations:
 
 1. Read current user/workspace, service identities, product-role state, solution versions/installations, definitions, records, rules, bindings, authoring metadata, simulations, and evaluations through MCP.
 2. For a source change, use the MCP product tools to inspect and exercise the running API; use `scripts/axis.py` and the repository skills for source edits, builds, migrations, tests, and documentation.
-3. The repository Codex registration exposes write tools during active development; invoke one only when the task explicitly includes the relevant mutation, and pass the latest server revision. Other clients select `--access write` only for the same authorized scope. Lifecycle archive and binding deletion are destructive operations; use the business-object prepare/confirm flow only where that API workflow requires it.
+3. A client exposes write tools only for the authorized scope; invoke one only when the task explicitly includes the relevant mutation, and pass the latest server revision. Lifecycle archive and binding deletion are destructive operations; use the business-object prepare/confirm flow only where that API workflow requires it.
 4. For a business-object workflow, create a Draft record from the published object, save values with the latest revision, submit it, and treat a non-match as an expected recoverable Draft rather than a transport failure.
 5. Re-read the affected resource and report the API response/problem code.
 
@@ -82,7 +82,7 @@ Use MCP for product state and product operations:
 
 When an API operation changes, the same slice must update the OpenAPI contract, `AxisMcpOperationCatalog`, the typed tool/request shape, focused tests, and this playbook when the workflow changes. Do not add a generic proxy to avoid updating parity. The committed OpenAPI is the generated-coverage source of truth; when endpoint operation IDs change, regenerate it before running the coverage gate.
 
-Use the MCP owner skill [`.agents/skills/axis-mcp-integration/SKILL.md`](../../.agents/skills/axis-mcp-integration/SKILL.md) and run:
+Use the MCP owner skill [`.agents/skills/integrate-mcp/SKILL.md`](../../.agents/skills/integrate-mcp/SKILL.md) and run:
 
 ```text
 python scripts/axis.py check mcp-api-coverage

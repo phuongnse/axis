@@ -29,17 +29,37 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Keep product behavior tied to owning use-case acceptance criteria.
 - Keep architecture and stack changes aligned with [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) and [docs/TECH_STACK.md](./docs/TECH_STACK.md).
 - Keep tests behavior-focused and proportional to risk.
-- Repeatable workflows live in [`.agents/skills/`](./.agents/skills/README.md).
-- Before non-trivial work, read the matching `SKILL.md` and [`.agents/skills/reference.md`](./.agents/skills/reference.md), then follow numbered steps in order.
-- After selecting the workflow owner, proactively delegate eligible independently ownable work units under [`.agents/skills/reference.md` § Agent routing](./.agents/skills/reference.md#agent-routing) before execution and whenever a routing re-evaluation trigger occurs; model choice never changes skill ownership or gates.
-- `$axis-*` aliases in docs map to `.agents/skills/<name>/SKILL.md`. Do not skip workflow gates or defer them into PR follow-ups unless the user explicitly approved that deferral.
-- When a required action is outside the repository or user-controlled (for example authentication, consent, client reload/restart, host prerequisites, permissions, approval, or a destructive operation), stop at that boundary, preserve the exact evidence, and ask the user for the action or decision. Do not silently bypass the boundary with disabled security, injected credentials, direct database changes, killed app-managed processes, ad hoc proxies, or indirect evidence. Follow the [blocker and completion protocol](./.agents/skills/reference.md#blocker-and-completion-protocol).
+- The pinned engineering-process lifecycle owns specification, planning,
+  implementation, verification, independent review, finding loops, and completion.
+  Axis product and architecture contracts add domain policy; they do not replace
+  lifecycle gates.
+- Before non-trivial work, start from `run-change`, read the current phase and affected
+  managed capability skills, then read only the owning Axis contracts and source.
+- Optional work delegation never changes lifecycle ownership. Independent review
+  still requires a separate attested read-only actor and context.
+- When a required action is outside the repository or user-controlled (for example authentication, consent, client reload/restart, host prerequisites, permissions, approval, or a destructive operation), stop at that boundary, preserve the exact evidence, and ask the user for the action or decision. Do not silently bypass the boundary with disabled security, injected credentials, direct database changes, killed app-managed processes, ad hoc proxies, or indirect evidence. Follow the [blocker protocol](./.agents/skills/run-change/references/execution.md#blocker-protocol).
 - Before claiming a slice complete, map its acceptance criteria to current source, test, and runtime evidence. Missing, stale, indirect, or blocked evidence stays `not run` or `blocked`; it is not converted into a pass. MCP runtime work additionally requires the supported client registry and authenticated operation/read-back boundary described in [the MCP playbook](./docs/playbooks/mcp.md#runtime-lifecycle-and-blocker-protocol).
-
-## External Skills
-
-Axis repository skills own the development lifecycle. External skills may supplement reasoning and diagnostics, but must not create parallel specs, plans, review gates, verification commands, or Git/PR workflows. When an external skill overlaps a `$axis-*` owner, the Axis owner takes precedence.
 
 ## Verification
 
-Select development and review verification under [`.agents/skills/reference.md` § Change-driven scope](./.agents/skills/reference.md#change-driven-scope); before review, apply [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).
+Select development and review evidence through `.process/project.json` and
+`run-project-command`; before review, apply
+[docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).
+
+<!-- engineering-process:start -->
+## Engineering process
+
+Use the portable skills pinned by `.process/process.lock` for every non-trivial
+change. Enter through `run-change` and use `processctl change ...` for specification,
+planning, implementation registration, checkpoint verification, independent review,
+finding resolution, and completion.
+
+The project owns product decisions, domain contracts, exact verification commands,
+and publication authority. The process distribution owns lifecycle semantics and
+managed skills. Do not edit managed skills in this repository; update the pinned
+distribution and synchronize them instead.
+
+Independent review requires an attested read-only actor and context that did not
+implement the current cycle. No particular agent host is required. Missing or stale
+evidence, self-review, and publication without separate authorization are blocking.
+<!-- engineering-process:end -->

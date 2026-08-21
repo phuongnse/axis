@@ -18,6 +18,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Validate locked process dependency graph
+        run: |
+          python -m pip install --require-hashes -r requirements/process.txt
+          python -m pip check
+
       - name: Setup .NET
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:

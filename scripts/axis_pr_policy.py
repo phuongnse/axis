@@ -10,9 +10,12 @@ CONVENTIONAL_SUBJECT_RE = re.compile(
     r"^[a-z]+(?:\([a-z0-9-]+\))?!?: \S(?:.*\S)?$"
 )
 BRANCH_RE = re.compile(
-    r"^(?:feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$"
+    r"^(?:feat|fix|docs|refactor|test|chore|build|ci|perf)/"
+    r"[a-z0-9]+(?:-[a-z0-9]+)*$"
 )
-RENOVATE_BRANCH_RE = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
+RENOVATE_BRANCH_RE = re.compile(
+    r"^automation/renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$"
+)
 
 PR_TITLE_EXAMPLE = "feat(identity): implement standalone user registration"
 COMMIT_SUBJECT_EXAMPLE = "fix: reject invalid publication metadata"
@@ -70,6 +73,7 @@ def validate_branch(branch: str) -> list[str]:
         return []
     return [
         "PR branch must follow CONTRIBUTING.md: "
-        "`{type}/{short-description}` in kebab-case, "
+        "`{type}/{short-description}` in kebab-case or "
+        "`automation/{owner}/{description}`, "
         f"e.g. `{BRANCH_EXAMPLE}`"
     ]

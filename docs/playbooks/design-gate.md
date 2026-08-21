@@ -4,7 +4,7 @@
 
 The Design Gate is required pre-code evidence for non-trivial changes. Produce the per-change dossier in the active task, pass it through typed owner handoffs, and retain it until the change closes. Promote only current durable decisions and rationale to owner docs; keep task progress and review context in checkpoint commits or the pull request. Do not create committed or ignored per-change dossier files. This is the sole committed Design Gate playbook, not a machine-enforced CI gate.
 
-For repeatable execution, read [`.agents/skills/axis-design-gate/SKILL.md`](../../.agents/skills/axis-design-gate/SKILL.md) (`$axis-design-gate`).
+For repeatable execution, read [`.agents/skills/assess-design/SKILL.md`](../../.agents/skills/assess-design/SKILL.md) (`$assess-design`).
 
 ---
 
@@ -38,7 +38,7 @@ Every non-trivial dossier covers:
 
    In both cases list retired identifiers and the post-edit `rg` sweep. For a clean cutover, also name the exact positive invariant over the current finite registry, package, dependency graph, or contract that rejects every extra entry without storing retired identifiers; if no finite owner exists, record why the transient sweep is the only structurally valid proof. A dossier is incomplete if it substitutes a committed retired-name denylist, regression fixture, or compatibility test for that current-owner proof. Do not add compatibility “just in case.” Otherwise write `N/A because no supported surface is retired`.
 5. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
-6. **Verification plan** — list exact development checks and review-readiness checks. Do not call review-only artifacts gates.
+6. **Verification plan** — list exact development checks and review-checks checks. Do not call review-only artifacts gates.
 7. **UI review unit** — for constitution, profile, theme, surface-owner, or visible-consumer work, name exactly one foundation, owner, or consumer; choose the largest coherent boundary with one owner, contract, invalidation set, and review decision, normally the whole foundation/surface or a complete consumer. Do not fragment one owner into typography, spacing, individual regions, or other implementation details unless ownership, acceptance, verification, or safe rollback is genuinely independent; record that rationale when splitting. Name the candidate review boundary, applicable profile requirements and current gaps, invalidation triggers, and the conditions that stop and reopen the unit. Otherwise write `N/A because the change does not affect visible UI or its conformance system`.
 
 For project-owner communication, collapse the manifest's independent lifecycle, acceptance, and perceptual controls into one review-unit roll-up: `In progress`, `Awaiting review`, or `Complete`. Requested changes return the same unit to `In progress`. Raw machine states remain audit detail and must not be presented as three separate decisions for the reviewer.
@@ -49,7 +49,9 @@ Skip a row only with an explicit `N/A because ...`.
 
 ## Surface Routing
 
-[`.agents/skills/README.md`](../../.agents/skills/README.md) owns intent-to-skill routing. After the dossier, delegate to the selected surface owner and retain the Design Gate evidence; do not restart the gate when that evidence remains current.
+The managed capability skills pinned by `.process/process.lock` own reusable routing.
+After the dossier, continue with the selected product or technical owner and retain
+the Design Gate evidence; do not restart the gate while that evidence remains current.
 
 ---
 

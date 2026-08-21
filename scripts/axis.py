@@ -21,6 +21,7 @@ import re
 import shlex
 import shutil
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable, TextIO
 
 import axis_host_https
@@ -45,6 +46,7 @@ REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
+MAX_FRONTEND_PACKAGE_MANIFEST_BYTES = 256_000
 LOCAL_DEV_WAIT_TIMEOUT_SECONDS = 300
 LOCAL_DEV_HOST_SMOKE_TIMEOUT_SECONDS = 15
 LOCAL_DEV_WEB_URL = "https://localhost:3000/"
@@ -54,6 +56,7 @@ GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
 RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
+PROCESS_PROJECT_PATH = ROOT / ".process" / "project.json"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
@@ -151,7 +154,6 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import axis_repo  # noqa: E402
-import axis_setup  # noqa: E402
 import axis_theme  # noqa: E402
 import doc_drift_domains  # noqa: E402
 from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
@@ -171,6 +173,32 @@ from axis_frontend_policy import (  # noqa: E402
 
 class CheckError(RuntimeError):
     """Raised when a command fails."""
+
+
+def managed_tool_version(tool: str) -> str:
+    """Read the exact tool version from the process-owned environment contract."""
+
+    try:
+        document = json.loads(PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
+        tools = document["environment"]["managedTools"]
+    except (KeyError, OSError, TypeError, json.JSONDecodeError) as exc:
+        raise CheckError(
+            f"cannot read managed tool versions from {path_label(PROCESS_PROJECT_PATH)}: {exc}"
+        ) from exc
+    for entry in tools:
+        if isinstance(entry, dict) and entry.get("id") == tool:
+            version = entry.get("version")
+            if isinstance(version, str) and version:
+                return version
+    raise CheckError(f"managed tool `{tool}` is missing from {path_label(PROCESS_PROJECT_PATH)}")
+
+
+def managed_tool_install_hint(profile: str) -> str:
+    return (
+        "run `processctl setup --project-root . "
+        f"--profile {profile}` to inspect the plan, then rerun with `--apply` and "
+        "the requested mutation approvals"
+    )
 
 
 class LocalDevCertificateState(Enum):
@@ -225,12 +253,6 @@ def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
         found = shutil.which(name, path=path)
         if found:
             return found
-    try:
-        managed = axis_setup.managed_executable(name)
-    except axis_setup.SetupError:
-        managed = None
-    if managed is not None and managed.is_file():
-        return str(managed)
     if os.name == "nt" and not name.endswith(".exe"):
         cmd = shutil.which(f"{name}.cmd", path=path)
         if cmd:
@@ -245,18 +267,6 @@ def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
         return True
     path = env_path(env)
     return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
-
-
-def managed_command_env(args: list[str]) -> dict[str, str]:
-    if not args:
-        return {}
-    try:
-        managed_dotnet = axis_setup.managed_executable("dotnet")
-    except axis_setup.SetupError:
-        return {}
-    if Path(args[0]).resolve(strict=False) != managed_dotnet.resolve(strict=False):
-        return {}
-    return {"DOTNET_ROOT": str(managed_dotnet.parent)}
 
 
 def command_temp_dir(env: dict[str, str]) -> str:
@@ -280,7 +290,6 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
     merged_env["PYTHONDONTWRITEBYTECODE"] = "1"
-    merged_env.update(managed_command_env(args))
     if env:
         merged_env.update(env)
     temp_dir = command_temp_dir(merged_env)
@@ -948,7 +957,17 @@ def test_unit(args: argparse.Namespace) -> int:
     for project in projects:
         print()
         print(f"> dotnet test {project}")
-        result = run([exe("dotnet"), "test", project, "--nologo", *args.dotnet_args], check=False)
+        result = run(
+            [
+                exe("dotnet"),
+                "test",
+                project,
+                "--nologo",
+                "--disable-build-servers",
+                *args.dotnet_args,
+            ],
+            check=False,
+        )
         if result.returncode != 0:
             return result.returncode
     return 0
@@ -1161,6 +1180,151 @@ def check_dotnet_dependency_locks(_args: argparse.Namespace | None = None) -> in
     return 0
 
 
+def dotnet_dependency_state_issues() -> list[str]:
+    issues: list[str] = []
+    projects = sorted(
+        {
+            *repo_files("src/**/*.csproj"),
+            *repo_files("tests/**/*.csproj"),
+        }
+    )
+    for project in projects:
+        project_path = ROOT / project
+        lock_path = project_path.with_name("packages.lock.json")
+        assets_path = project_path.parent / "obj" / "project.assets.json"
+        try:
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            assets = json.loads(assets_path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            missing = Path(exc.filename or "unknown")
+            issues.append(f"{path_label(missing)} is missing")
+            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append(f"cannot read dependency state for {project}: {exc}")
+            continue
+
+        expected: set[str] = set()
+        dependencies = lock.get("dependencies", {})
+        if isinstance(dependencies, dict):
+            for target in dependencies.values():
+                if not isinstance(target, dict):
+                    continue
+                for package, metadata in target.items():
+                    if not isinstance(metadata, dict) or metadata.get("type") == "Project":
+                        continue
+                    version = metadata.get("resolved")
+                    if isinstance(version, str):
+                        expected.add(f"{package}/{version}".casefold())
+        libraries = assets.get("libraries", {})
+        actual = {str(package).casefold() for package in libraries} if isinstance(libraries, dict) else set()
+        missing_packages = sorted(expected - actual)
+        if missing_packages:
+            issues.append(
+                f"{path_label(assets_path)} is stale; missing locked packages: "
+                + ", ".join(missing_packages[:5])
+            )
+    return issues
+
+
+def frontend_dependency_state_issues() -> list[str]:
+    lock_path = FRONTEND_DIR / "package-lock.json"
+    installed_path = FRONTEND_DIR / "node_modules" / ".package-lock.json"
+    try:
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        installed = json.loads(installed_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        return [f"{path_label(Path(exc.filename or 'unknown'))} is missing"]
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"cannot read frontend dependency state: {exc}"]
+
+    expected_packages = lock.get("packages", {})
+    installed_packages = installed.get("packages", {})
+    if not isinstance(expected_packages, dict) or not isinstance(installed_packages, dict):
+        return ["frontend dependency lock state must contain package maps"]
+    issues: list[str] = []
+    for location, metadata in sorted(expected_packages.items()):
+        if not location.startswith("node_modules/") or not isinstance(metadata, dict):
+            continue
+        if metadata.get("optional"):
+            continue
+        installed_metadata = installed_packages.get(location)
+        if not isinstance(installed_metadata, dict):
+            issues.append(f"frontend dependency is not installed: {location}")
+            continue
+        relative = PurePosixPath(location)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.as_posix() != location
+        ):
+            issues.append(f"frontend dependency has an invalid install path: {location}")
+            continue
+        package_path = FRONTEND_DIR.joinpath(*relative.parts)
+        manifest_path = package_path / "package.json"
+        try:
+            package_stat = package_path.lstat()
+            manifest_stat = manifest_path.lstat()
+            if stat.S_ISLNK(package_stat.st_mode) or not stat.S_ISDIR(
+                package_stat.st_mode
+            ):
+                issues.append(f"frontend dependency directory is missing: {location}")
+                continue
+            if stat.S_ISLNK(manifest_stat.st_mode) or not stat.S_ISREG(
+                manifest_stat.st_mode
+            ):
+                issues.append(f"frontend dependency manifest is missing: {location}")
+                continue
+            if manifest_stat.st_size > MAX_FRONTEND_PACKAGE_MANIFEST_BYTES:
+                issues.append(
+                    f"frontend dependency manifest is too large: {location}/package.json"
+                )
+                continue
+            package_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            issues.append(f"frontend dependency contents are missing: {location}")
+            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append(f"cannot read frontend dependency manifest for {location}: {exc}")
+            continue
+        if not isinstance(package_manifest, dict) or package_manifest.get(
+            "version"
+        ) != metadata.get("version"):
+            issues.append(f"frontend dependency manifest version differs: {location}")
+            continue
+        for field in ("version", "resolved", "integrity"):
+            expected = metadata.get(field)
+            if expected is not None and installed_metadata.get(field) != expected:
+                issues.append(f"frontend dependency state differs for {location}.{field}")
+                break
+    return issues
+
+
+def check_dependency_state(_args: argparse.Namespace | None = None) -> int:
+    issues = [*dotnet_dependency_state_issues(), *frontend_dependency_state_issues()]
+    if issues:
+        for issue in issues:
+            print(f"check-dependency-state: FAIL - {issue}", file=sys.stderr)
+        return 1
+    print("check-dependency-state: OK (locked NuGet and npm graphs are restored)")
+    return 0
+
+
+def install_project_dependencies(_args: argparse.Namespace | None = None) -> int:
+    dotnet = run(
+        [
+            exe("dotnet"),
+            "restore",
+            "Axis.sln",
+            "--locked-mode",
+            "--disable-build-servers",
+        ],
+        check=False,
+    )
+    if dotnet.returncode != 0:
+        return dotnet.returncode
+    return run_frontend_npm(["ci"]).returncode
+
+
 EXACT_NPM_VERSION_RE = re.compile(
     r"^(?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z.-]+)?(?:[+][0-9A-Za-z.-]+)?$"
@@ -1193,9 +1357,10 @@ def check_frontend_dependency_versions(_args: argparse.Namespace | None = None) 
         node_version = ""
     if EXACT_NPM_VERSION_RE.fullmatch(node_version) is None:
         issues.append(f"{path_label(NVMRC_PATH)} must pin one exact Node version")
-    elif node_version != axis_setup.NODE_VERSION:
+    elif node_version != managed_tool_version("node"):
         issues.append(
-            f"{path_label(NVMRC_PATH)} pins {node_version}, but portable setup pins {axis_setup.NODE_VERSION}"
+            f"{path_label(NVMRC_PATH)} pins {node_version}, but the process manifest pins "
+            f"{managed_tool_version('node')}"
         )
 
     dockerfile_path = ROOT / "frontend" / "Dockerfile.dev"
@@ -1738,514 +1903,6 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
-REPO_SKILLS_DIR = ".agents/skills"
-REPO_SKILL_WORKFLOWS = "workflows.toml"
-FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
-SKILL_MAX_LINES = 80
-SKILL_REPO_REF_RE = re.compile(
-    r"`(?P<target>(?:AGENTS\.md|\.agents/skills/[A-Za-z0-9._/#-]+|\.github/[A-Za-z0-9._/#-]+|"
-    r"docs/[A-Za-z0-9._/#-]+|scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|"
-    r"frontend/[A-Za-z0-9._/#-]+))`"
-)
-SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
-SKILL_REQUIRED_HEADINGS = ("## Goal", "## Hard gates", "## Inputs", "## Workflow", "## Output")
-SKILL_ALIAS_RE = re.compile(r"(?<![A-Za-z0-9_-])\$(?P<name>axis-[a-z0-9-]+)(?![A-Za-z0-9_-])")
-SKILL_REQUIRES_RE = re.compile(r"[*][*]Requires[*][*]")
-SKILL_CATALOG_LINK_RE = re.compile(r"\]\(\./(?P<name>axis-[a-z0-9-]+)/SKILL[.]md(?:#[^)]+)?\)")
-
-
-def simple_yaml_value(text: str, key: str) -> str:
-    match = re.search(rf"(?m)^\s*{re.escape(key)}:\s*(?P<value>.+?)\s*$", text)
-    if match is None:
-        return ""
-    value = match.group("value").strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    return value
-
-
-def check_project_orchestration() -> int:
-    result = run(
-        [sys.executable, str(ROOT / ".codex" / "check.py")],
-        check=False,
-        capture=True,
-    )
-    if result.returncode != 0:
-        print(result.stderr or result.stdout, file=sys.stderr)
-    return result.returncode
-
-
-def is_project_orchestration_path(path: str) -> bool:
-    return path == ".gitignore" or path.startswith(".codex/")
-
-
-def markdown_anchor_slug(text: str) -> str:
-    text = re.sub(r"`([^`]*)`", r"\1", text.strip().lower())
-    text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"\s+", "-", text)
-    return text.strip("-")
-
-
-def markdown_anchor_slugs(path: Path) -> set[str]:
-    slugs: set[str] = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^(?P<marks>#{1,6})\s+(?P<title>.+?)\s*#*\s*$", line)
-        if match is not None:
-            slugs.add(markdown_anchor_slug(match.group("title")))
-    return slugs
-
-
-def skill_reference_target(target: str, *, skill_dir: Path, root: Path) -> tuple[Path, str] | None:
-    target = urllib.parse.unquote(target.strip())
-    if not target or target.startswith(("#", "http://", "https://", "mailto:")):
-        return None
-    if any(token in target for token in ("{", "}", "*")):
-        return None
-
-    path_part = target.split("#", 1)[0].split("?", 1)[0]
-    if not path_part:
-        return None
-
-    normalized = path_part.replace("\\", "/")
-    repo_prefixes = ("AGENTS.md", f"{REPO_SKILLS_DIR}/", ".github/", "docs/", "scripts/", "tests/", "frontend/")
-    if normalized.startswith(repo_prefixes):
-        return root / normalized, target
-    return (skill_dir / normalized).resolve(), target
-
-
-def repo_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
-    issues: list[str] = []
-    seen: set[str] = set()
-    skill_dir = skill_md.parent
-    candidates = [match.group("target") for match in SKILL_REPO_REF_RE.finditer(text)]
-    candidates.extend(match.group("target") for match in SKILL_MD_LINK_RE.finditer(text))
-
-    for target in candidates:
-        resolved = skill_reference_target(target, skill_dir=skill_dir, root=root)
-        if resolved is None:
-            continue
-        path, display = resolved
-        key = f"{path}#{display}"
-        if key in seen:
-            continue
-        seen.add(key)
-
-        path_without_anchor = Path(str(path).split("#", 1)[0])
-        if not path_without_anchor.exists():
-            issues.append(
-                f"{rel_from(skill_md, root)}: referenced path `{display.split('#', 1)[0]}` does not exist"
-            )
-            continue
-
-        if "#" in display and path_without_anchor.suffix.lower() == ".md":
-            anchor = display.split("#", 1)[1]
-            if anchor and anchor not in markdown_anchor_slugs(path_without_anchor):
-                issues.append(f"{rel_from(skill_md, root)}: referenced anchor `{display}` does not exist")
-
-    return issues
-
-
-def repo_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
-    issues: list[str] = []
-    fence_lang: str | None = None
-    for idx, line in enumerate(text.splitlines(), 1):
-        fence_match = re.match(r"^```([A-Za-z0-9_-]*)", line.strip())
-        if fence_match:
-            fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
-            continue
-
-        if fence_lang in {"bash", "sh", "shell", "console"}:
-            message = raw_doc_command_message(line)
-            if message is not None:
-                issues.append(
-                    f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{line.strip()}` - {message}"
-                )
-
-        for fragment in re.findall(r"`([^`]+)`", line):
-            message = raw_doc_command_message(fragment)
-            if message is not None:
-                issues.append(f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{fragment}` - {message}")
-    return issues
-
-
-def repo_skill_catalog_issues(skills_root: Path, skill_names: set[str], *, root: Path) -> list[str]:
-    catalog_path = skills_root / "README.md"
-    if not catalog_path.is_file():
-        return [f"{rel_from(catalog_path, root)}: responsibility catalog is missing"]
-
-    counts: dict[str, int] = {}
-    for match in SKILL_CATALOG_LINK_RE.finditer(catalog_path.read_text(encoding="utf-8")):
-        name = match.group("name")
-        counts[name] = counts.get(name, 0) + 1
-
-    issues: list[str] = []
-    for name in sorted(skill_names):
-        count = counts.get(name, 0)
-        if count == 0:
-            issues.append(f"{rel_from(catalog_path, root)}: missing responsibility entry for `{name}`")
-        elif count > 1:
-            issues.append(f"{rel_from(catalog_path, root)}: `{name}` must have exactly one responsibility entry")
-    for name in sorted(set(counts) - skill_names):
-        issues.append(f"{rel_from(catalog_path, root)}: catalog references unknown skill `{name}`")
-    return issues
-
-
-def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root: Path) -> list[str]:
-    path = skills_root / REPO_SKILL_WORKFLOWS
-    normalized = rel_from(path, root)
-    if not path.is_file():
-        return [f"{normalized}: cross-skill workflow contract is missing"]
-
-    try:
-        contract = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return [f"{normalized}: cannot load workflow contract: {exc}"]
-
-    issues: list[str] = []
-    allowed_root_keys = {"version", "semantic_roles", "workflows"}
-    unknown_root_keys = sorted(set(contract) - allowed_root_keys)
-    if unknown_root_keys:
-        issues.append(f"{normalized}: unknown root keys {unknown_root_keys}")
-    if contract.get("version") != 1:
-        issues.append(f"{normalized}: `version` must be 1")
-
-    semantic_roles = contract.get("semantic_roles", {})
-    if not isinstance(semantic_roles, dict) or any(
-        not isinstance(role, str) or not isinstance(agent, str)
-        for role, agent in semantic_roles.items()
-    ):
-        issues.append(f"{normalized}: `semantic_roles` must map role IDs to project agent IDs")
-        semantic_roles = {}
-    else:
-        for role, agent in semantic_roles.items():
-            if SKILL_NAME_RE.fullmatch(role) is None:
-                issues.append(f"{normalized}: semantic role `{role}` must use kebab-case")
-            if not (root / ".codex" / "agents" / f"{agent}.toml").is_file():
-                issues.append(f"{normalized}: semantic role `{role}` references unknown agent `{agent}`")
-
-    workflows = contract.get("workflows")
-    if not isinstance(workflows, dict) or not workflows:
-        issues.append(f"{normalized}: `workflows` must contain at least one workflow table")
-        return issues
-
-    used_roles: set[str] = set()
-    allowed_workflow_keys = {"initial", "terminal_states", "states", "transitions"}
-    allowed_transition_keys = {"id", "from", "to", "owner", "evidence"}
-    for workflow_name, workflow in workflows.items():
-        label = f"{normalized}: workflow `{workflow_name}`"
-        if SKILL_NAME_RE.fullmatch(workflow_name) is None:
-            issues.append(f"{label} ID must use kebab-case")
-        if not isinstance(workflow, dict):
-            issues.append(f"{label} must be a table")
-            continue
-
-        unknown_keys = sorted(set(workflow) - allowed_workflow_keys)
-        if unknown_keys:
-            issues.append(f"{label} has unknown keys {unknown_keys}")
-        states = workflow.get("states")
-        if not isinstance(states, list) or not states or any(not isinstance(state, str) for state in states):
-            issues.append(f"{label} `states` must be a non-empty string array")
-            continue
-        if len(states) != len(set(states)):
-            issues.append(f"{label} states must be unique")
-        state_set = set(states)
-        for state in states:
-            if SKILL_NAME_RE.fullmatch(state) is None:
-                issues.append(f"{label} state `{state}` must use kebab-case")
-
-        initial = workflow.get("initial")
-        if initial not in state_set:
-            issues.append(f"{label} initial state `{initial}` is not declared")
-        terminal_states = workflow.get("terminal_states")
-        if (
-            not isinstance(terminal_states, list)
-            or not terminal_states
-            or any(not isinstance(state, str) for state in terminal_states)
-        ):
-            issues.append(f"{label} `terminal_states` must be a non-empty array")
-            terminal_states = []
-        for state in terminal_states:
-            if state not in state_set:
-                issues.append(f"{label} terminal state `{state}` is not declared")
-
-        transitions = workflow.get("transitions")
-        if not isinstance(transitions, list) or not transitions:
-            issues.append(f"{label} `transitions` must be a non-empty table array")
-            continue
-
-        transition_ids: set[str] = set()
-        transition_contracts: dict[str, tuple[str, str, str, str]] = {}
-        edges: set[tuple[str, str]] = set()
-        adjacency: dict[str, set[str]] = {state: set() for state in states}
-        for index, transition in enumerate(transitions, 1):
-            transition_label = f"{label} transition {index}"
-            if not isinstance(transition, dict):
-                issues.append(f"{transition_label} must be a table")
-                continue
-            unknown_keys = sorted(set(transition) - allowed_transition_keys)
-            if unknown_keys:
-                issues.append(f"{transition_label} has unknown keys {unknown_keys}")
-            missing_keys = sorted(allowed_transition_keys - set(transition))
-            if missing_keys:
-                issues.append(f"{transition_label} is missing keys {missing_keys}")
-                continue
-
-            transition_id = transition["id"]
-            source = transition["from"]
-            target = transition["to"]
-            owner = transition["owner"]
-            evidence = transition["evidence"]
-            if not all(isinstance(value, str) and value for value in (transition_id, source, target, owner, evidence)):
-                issues.append(f"{transition_label} fields must be non-empty strings")
-                continue
-            if SKILL_NAME_RE.fullmatch(transition_id) is None:
-                issues.append(f"{transition_label} ID `{transition_id}` must use kebab-case")
-            if transition_id in transition_ids:
-                issues.append(f"{label} transition ID `{transition_id}` is duplicated")
-            transition_ids.add(transition_id)
-            transition_contracts[transition_id] = (source, target, owner, evidence)
-            if source not in state_set or target not in state_set:
-                issues.append(f"{transition_label} references an undeclared state `{source} -> {target}`")
-            else:
-                edge = (source, target)
-                if edge in edges:
-                    issues.append(f"{label} transition `{source} -> {target}` has multiple owners")
-                edges.add(edge)
-                adjacency[source].add(target)
-
-            owner_kind, separator, owner_id = owner.partition(":")
-            if separator != ":" or owner_kind not in {"skill", "role"} or not owner_id:
-                issues.append(f"{transition_label} owner must be `skill:<id>` or `role:<id>`")
-            elif owner_kind == "skill" and owner_id not in skill_names:
-                issues.append(f"{transition_label} references unknown skill owner `{owner_id}`")
-            elif owner_kind == "role":
-                used_roles.add(owner_id)
-                if owner_id not in semantic_roles:
-                    issues.append(f"{transition_label} references unknown semantic role `{owner_id}`")
-
-        if workflow_name == "review":
-            required_review_transitions = {
-                "create-checkpoint": (
-                    "focused-proof",
-                    "checkpoint",
-                    "skill:axis-pull-request",
-                    "focused-proof-and-clean-immutable-checkpoint",
-                ),
-                "verify-readiness": (
-                    "checkpoint",
-                    "readiness-verified",
-                    "skill:axis-review-readiness",
-                    "ready-verdict-for-exact-checkpoint-and-comparison-base",
-                ),
-                "approve-review": (
-                    "readiness-verified",
-                    "review-approved",
-                    "role:independent-reviewer",
-                    "completed-review-pass",
-                ),
-                "request-changes": (
-                    "readiness-verified",
-                    "changes-requested",
-                    "role:independent-reviewer",
-                    "completed-review-findings",
-                ),
-                "resolve-findings": (
-                    "changes-requested",
-                    "focused-proof",
-                    "skill:axis-review-feedback",
-                    "classified-findings-and-focused-proof",
-                ),
-                "publish": (
-                    "review-approved",
-                    "published",
-                    "skill:axis-pull-request",
-                    "validated-remote-state",
-                ),
-            }
-            if initial != "focused-proof":
-                issues.append(f"{label} must begin at `focused-proof`")
-            for transition_id, expected in required_review_transitions.items():
-                if transition_contracts.get(transition_id) != expected:
-                    source, target, owner, evidence = expected
-                    issues.append(
-                        f"{label} must route `{transition_id}` from `{source}` to `{target}` "
-                        f"with owner `{owner}` and evidence `{evidence}`"
-                    )
-
-        if initial in state_set:
-            reachable = {initial}
-            pending = [initial]
-            while pending:
-                source = pending.pop()
-                for target in adjacency[source] - reachable:
-                    reachable.add(target)
-                    pending.append(target)
-            for state in sorted(state_set - reachable):
-                issues.append(f"{label} state `{state}` is unreachable from `{initial}`")
-
-        declared_terminals = state_set.intersection(terminal_states)
-        if declared_terminals:
-            reverse_adjacency: dict[str, set[str]] = {state: set() for state in states}
-            for source, targets in adjacency.items():
-                for target in targets:
-                    reverse_adjacency[target].add(source)
-            can_reach_terminal = set(declared_terminals)
-            pending = list(declared_terminals)
-            while pending:
-                target = pending.pop()
-                for source in reverse_adjacency[target] - can_reach_terminal:
-                    can_reach_terminal.add(source)
-                    pending.append(source)
-            for state in sorted(state_set - can_reach_terminal):
-                issues.append(f"{label} state `{state}` cannot reach a terminal state")
-
-    for role in sorted(set(semantic_roles) - used_roles):
-        issues.append(f"{normalized}: semantic role `{role}` is not used by any transition")
-    return issues
-
-
-def repo_skill_required_cycle_issues(records: list[tuple[Path, str]]) -> list[str]:
-    skill_names = {path.parent.name for path, _text in records}
-    graph: dict[str, set[str]] = {name: set() for name in skill_names}
-    for skill_md, text in records:
-        source = skill_md.parent.name
-        for line in text.splitlines():
-            if SKILL_REQUIRES_RE.search(line) is None:
-                continue
-            graph[source].update(
-                match.group("name")
-                for match in SKILL_ALIAS_RE.finditer(line)
-                if match.group("name") in skill_names
-            )
-
-    issues: list[str] = []
-    visited: set[str] = set()
-    visiting: list[str] = []
-    reported: set[frozenset[str]] = set()
-
-    def visit(name: str) -> None:
-        if name in visiting:
-            cycle = visiting[visiting.index(name) :] + [name]
-            key = frozenset(cycle)
-            if key not in reported:
-                reported.add(key)
-                issues.append(
-                    f"{REPO_SKILLS_DIR}: recursive **Requires** handoff: {' -> '.join(cycle)}; "
-                    "make one edge a delegate/return or reuse current prerequisite evidence"
-                )
-            return
-        if name in visited:
-            return
-        visiting.append(name)
-        for target in sorted(graph[name]):
-            visit(target)
-        visiting.pop()
-        visited.add(name)
-
-    for name in sorted(graph):
-        visit(name)
-    return issues
-
-
-def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
-    if not skills_root.exists():
-        return issues
-
-    skill_dirs = sorted(path for path in skills_root.iterdir() if path.is_dir())
-    skill_names = {path.name for path in skill_dirs}
-    records: list[tuple[Path, str]] = []
-
-    for skill_dir in skill_dirs:
-        skill_path = rel_from(skill_dir, root)
-
-        skill_name = skill_dir.name
-        if SKILL_NAME_RE.fullmatch(skill_name) is None:
-            issues.append(f"{skill_path}: skill folder name must be lowercase letters, digits, and hyphens")
-
-        legacy_adapter = skill_dir / "agents"
-        if legacy_adapter.is_dir():
-            issues.append(
-                f"{skill_path}: remove legacy agents/ vendor metadata; "
-                f"repo skills use {REPO_SKILLS_DIR}/<name>/SKILL.md only"
-            )
-
-        skill_md = skill_dir / "SKILL.md"
-        if not skill_md.is_file():
-            issues.append(f"{skill_path}: missing SKILL.md")
-            continue
-
-        text = skill_md.read_text(encoding="utf-8")
-        records.append((skill_md, text))
-        if "TODO" in text or "[TODO" in text:
-            issues.append(f"{rel_from(skill_md, root)}: remove template TODO text before committing")
-        line_count = len(text.splitlines())
-        if line_count > SKILL_MAX_LINES:
-            issues.append(
-                f"{rel_from(skill_md, root)}: keep SKILL.md concise ({line_count} lines > {SKILL_MAX_LINES})"
-            )
-        issues.extend(repo_skill_raw_command_issues(skill_md, text, root=root))
-
-        frontmatter = FRONTMATTER_RE.match(text)
-        if frontmatter is None:
-            issues.append(f"{rel_from(skill_md, root)}: missing YAML frontmatter delimited by ---")
-            continue
-
-        header = frontmatter.group("header")
-        header_keys = set(re.findall(r"(?m)^([A-Za-z0-9_-]+):", header))
-        unsupported_keys = sorted(header_keys - {"name", "description"})
-        if unsupported_keys:
-            issues.append(
-                f"{rel_from(skill_md, root)}: frontmatter supports only `name` and `description`; "
-                f"remove {unsupported_keys}"
-            )
-        declared_name = simple_yaml_value(header, "name")
-        description = simple_yaml_value(header, "description")
-        if declared_name != skill_name:
-            issues.append(
-                f"{rel_from(skill_md, root)}: frontmatter name must match folder name "
-                f"({skill_name})"
-            )
-        if not description:
-            issues.append(f"{rel_from(skill_md, root)}: frontmatter description is required")
-
-        body = text[frontmatter.end() :]
-        if re.search(r"(?m)^#\s+\S", body) is None:
-            issues.append(f"{rel_from(skill_md, root)}: body must contain a Markdown H1")
-        for heading in SKILL_REQUIRED_HEADINGS:
-            if re.search(rf"(?m)^{re.escape(heading)}\s*$", body) is None:
-                issues.append(
-                    f"{rel_from(skill_md, root)}: missing required section `{heading}`"
-                )
-        if "../reference.md" not in text:
-            issues.append(f"{rel_from(skill_md, root)}: must link the universal `../reference.md` contract")
-        for alias in sorted({match.group("name") for match in SKILL_ALIAS_RE.finditer(text)}):
-            if alias not in skill_names:
-                issues.append(f"{rel_from(skill_md, root)}: unknown skill alias `${alias}`")
-        issues.extend(repo_skill_reference_issues(skill_md, text, root=root))
-
-    issues.extend(repo_skill_catalog_issues(skills_root, skill_names, root=root))
-    issues.extend(repo_skill_workflow_issues(skills_root, skill_names, root=root))
-    issues.extend(repo_skill_required_cycle_issues(records))
-    return issues
-
-
-def check_repo_skills(_args: argparse.Namespace | None = None) -> int:
-    issues = repo_skill_issues()
-    if issues:
-        print("check-repo-skills FAIL:", file=sys.stderr)
-        for issue in issues:
-            print(f"  - {issue}", file=sys.stderr)
-        return 1
-    if check_project_orchestration() != 0:
-        return 1
-    print("check-repo-skills: OK")
-    return 0
-
-
 def check_policy_tests(args: argparse.Namespace | None = None) -> int:
     tests = getattr(args, "tests", None) or []
     command = [sys.executable, "-m", "unittest"]
@@ -2270,6 +1927,7 @@ def run_mcp_test(filter_expression: str | None, label: str) -> int:
         str(MCP_TEST_PROJECT),
         "--nologo",
         "--no-restore",
+        "--disable-build-servers",
     ]
     if filter_expression:
         command.extend(["--filter", filter_expression])
@@ -2461,14 +2119,14 @@ RAW_DOC_COMMAND_PATTERNS = [
         "use `python scripts/axis.py ...`",
     ),
     (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
-    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
-    (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
+    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `processctl doctor --project-root . --profile review`"),
+    (re.compile(r"^cargo\s+install\s+lychee\b"), "use the checksum-verified `processctl setup` managed-tool action"),
 ]
 
 def is_command_doc(path: str) -> bool:
     return (
         path in DOC_COMMAND_DOC_PATHS
-        or (path.startswith(("docs/", ".agents/skills/")) and path.endswith(".md"))
+        or (path.startswith("docs/") and path.endswith(".md"))
         or (path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml")))
     )
 
@@ -2801,8 +2459,6 @@ def doc_drift_checker_names(paths: list[str]) -> set[str]:
         names.add("check-text-encoding")
     if any(path.startswith("scripts/") for path in paths):
         names.add("check-scripts-standard")
-    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
-        names.add("check-repo-skills")
     if any(path.startswith(("src/", "tests/")) and path.endswith(".cs") for path in paths):
         names.add("check-ef-domain-mapping")
     if any(is_frontend_path(path) for path in paths):
@@ -2909,7 +2565,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             lambda _=None: run_text_encoding_check(text_paths, label="check-text-encoding-changed"),
         ),
         ("check-scripts-standard", check_scripts_standard),
-        ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-ui-baseline", check_ui_baseline),
@@ -2982,50 +2637,6 @@ def _path_with_prefix(bin_dir: Path) -> str:
     return os.pathsep.join([entry, *parts]) if parts else entry
 
 
-def _version_sort_key(version_text: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in re.findall(r"\d+", version_text))
-
-
-def _npm_exists_in_bin_dir(bin_dir: Path) -> bool:
-    return any((bin_dir / name).is_file() for name in ("npm", "npm.cmd", "npm.exe"))
-
-
-def _node_exists_in_bin_dir(bin_dir: Path) -> bool:
-    return (bin_dir / "node").is_file() or (bin_dir / "node.exe").is_file()
-
-
-def _home_dir() -> Path | None:
-    try:
-        return Path.home()
-    except RuntimeError:
-        return None
-
-
-def _nvm_unix_roots() -> list[Path]:
-    roots: list[Path] = []
-    nvm_dir = os.environ.get("NVM_DIR")
-    if nvm_dir:
-        roots.append(Path(nvm_dir) / "versions" / "node")
-    home = _home_dir()
-    if home is not None:
-        roots.append(home / ".nvm" / "versions" / "node")
-    return roots
-
-
-def _nvm_windows_roots() -> list[Path]:
-    if os.name != "nt":
-        return []
-    roots: list[Path] = []
-    for env_name in ("NVM_HOME", "NVM_DIR"):
-        value = os.environ.get(env_name)
-        if value:
-            roots.append(Path(value))
-    appdata = os.environ.get("APPDATA")
-    if appdata:
-        roots.append(Path(appdata) / "nvm")
-    return roots
-
-
 def _windows_git_usr_bin_dirs() -> list[Path]:
     dirs: list[Path] = []
     for env_name in ("ProgramFiles", "ProgramFiles(x86)"):
@@ -3052,88 +2663,16 @@ def find_openssl() -> str | None:
     return None
 
 
-def _node_version_label(bin_dir: Path) -> str:
-    if bin_dir.name == "bin" and bin_dir.parent.name.startswith("v"):
-        return bin_dir.parent.name
-    return bin_dir.name
-
-
-def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
-    seen: set[Path] = set()
-    candidates: list[Path] = []
-
-    def add(bin_dir: Path) -> None:
-        resolved = bin_dir.resolve()
-        if resolved in seen or not _node_exists_in_bin_dir(resolved) or not _npm_exists_in_bin_dir(resolved):
-            return
-        seen.add(resolved)
-        candidates.append(resolved)
-
-    try:
-        add(axis_setup.managed_bin_dir("node"))
-    except axis_setup.SetupError:
-        pass
-
-    path_node = shutil.which("node")
-    path_npm = shutil.which("npm") or shutil.which("npm.cmd")
-    if path_node and path_npm and Path(path_node).parent.resolve() == Path(path_npm).parent.resolve():
-        add(Path(path_node).parent)
-
-    for root in _nvm_unix_roots():
-        if not root.is_dir():
-            continue
-        for version_dir in root.iterdir():
-            if version_dir.is_dir() and version_major(version_dir.name) == expected_major:
-                add(version_dir / "bin")
-
-    for root in _nvm_windows_roots():
-        if not root.is_dir():
-            continue
-        for version_dir in root.iterdir():
-            if version_dir.is_dir() and version_major(version_dir.name) == expected_major:
-                add(version_dir)
-
-    nvm_symlink = os.environ.get("NVM_SYMLINK")
-    if nvm_symlink:
-        add(Path(nvm_symlink))
-
-    home = _home_dir()
-    if home is not None:
-        add(home / ".volta" / "bin")
-
-    return sorted(candidates, key=lambda path: _version_sort_key(_node_version_label(path)), reverse=True)
-
-
-def _nvm_node_bin_dirs(expected_major: str) -> list[Path]:
-    return _node_toolchain_bin_dirs(expected_major)
-
-
 def frontend_toolchain_env() -> dict[str, str]:
     expected_ok, expected_or_error = required_node_version()
     if not expected_ok:
         return {}
 
     expected = expected_or_error
-    expected_major = version_major(expected)
-    if expected_major is None:
-        return {}
     node_ok, node_version, node_resolved = command_version_line("node", "--version")
-    npm_ok, _npm_version, npm_resolved = command_version_line("npm", "--version")
-    if (
-        node_ok
-        and npm_ok
-        and node_version.removeprefix("v") == expected
-        and Path(node_resolved).parent.resolve() == Path(npm_resolved).parent.resolve()
-    ):
+    npm_ok, _npm_detail = npm_version_status({})
+    if node_ok and npm_ok and node_version.removeprefix("v") == expected:
         return {"PATH": _path_with_prefix(Path(node_resolved).parent)}
-
-    for bin_dir in _nvm_node_bin_dirs(expected_major):
-        env = {"PATH": _path_with_prefix(bin_dir)}
-        node_ok, node_version, _node_resolved = command_version_line("node", "--version", env=env)
-        npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version", env=env)
-        if node_ok and npm_ok and node_version.removeprefix("v") == expected:
-            return env
-
     return {}
 
 
@@ -3168,22 +2707,22 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
             f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
         )
-    portable_major = version_major(axis_setup.DOTNET_SDK_VERSION)
+    process_dotnet_version = managed_tool_version("dotnet")
+    portable_major = version_major(process_dotnet_version)
     if portable_major != source_major_or_error:
         return (
             False,
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x, "
-            f"but portable setup pins {axis_setup.DOTNET_SDK_VERSION} in scripts/axis_setup.py",
+            f"but {path_label(PROCESS_PROJECT_PATH)} pins {process_dotnet_version}",
         )
 
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
-        prerequisite = axis_setup.dotnet_native_prerequisite_hint(version_line)
-        next_action = prerequisite or managed_tool_install_hint("build")
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {next_action}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; "
+            f"{managed_tool_install_hint('development')}",
         )
 
     major = version_major(version_line)
@@ -3192,7 +2731,8 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
             f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {managed_tool_install_hint('build')}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; "
+            f"{managed_tool_install_hint('development')}",
         )
     return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
 
@@ -3218,7 +2758,7 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         return (
             False,
             f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}; "
-            f"{managed_tool_install_hint('build')}",
+            f"{managed_tool_install_hint('development')}",
         )
 
     actual = version_line.removeprefix("v")
@@ -3226,9 +2766,37 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         return (
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
-            f"expected Node {expected} from {rel(NVMRC_PATH)}; {managed_tool_install_hint('build')}",
+            f"expected Node {expected} from {rel(NVMRC_PATH)}; "
+            f"{managed_tool_install_hint('development')}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {rel(NVMRC_PATH)}"
+
+
+def npm_cli_command(*, env: dict[str, str] | None = None) -> list[str]:
+    """Resolve npm through its native Node runtime without a batch shell."""
+
+    path = env_path(env)
+    node = shutil.which("node", path=path)
+    if node is None:
+        raise CheckError("node not found in PATH")
+    node_path = Path(node).resolve(strict=False)
+    candidates = (
+        node_path.parent / "node_modules" / "npm" / "bin" / "npm-cli.js",
+        node_path.parent.parent / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return [str(node_path), str(candidate)]
+
+    npm = shutil.which("npm", path=path)
+    if npm is not None:
+        npm_path = Path(npm)
+        resolved = npm_path.resolve(strict=False)
+        if resolved.is_file() and resolved.suffix.lower() == ".js":
+            return [str(node_path), str(resolved)]
+        if os.name != "nt":
+            return [str(npm_path)]
+    raise CheckError("npm CLI script is not paired with the active Node runtime")
 
 
 def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
@@ -3242,18 +2810,32 @@ def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
     if match is None:
         return False, f"{path_label(package_path)} packageManager must pin one exact npm version"
     expected = match.group(1)
-    ok, version_line, resolved = command_version_line("npm", "--version", env=env)
-    if not ok:
+    try:
+        command = npm_cli_command(env=env)
+    except CheckError as exc:
         return (
             False,
-            f"{version_line}; npm {expected} is required per {path_label(package_path)}; "
-            f"{managed_tool_install_hint('build')}",
+            f"{exc}; npm {expected} is required per {path_label(package_path)}; "
+            f"{managed_tool_install_hint('development')}",
         )
+    result = run_optional(
+        [*command, "--version"],
+        env=env,
+        timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+    )
+    resolved = " ".join(command)
+    if result is None or result.returncode != 0:
+        detail = "npm CLI did not execute" if result is None else (
+            result.stderr or result.stdout or f"npm exited with {result.returncode}"
+        ).strip()
+        return False, f"{detail}; {managed_tool_install_hint('development')}"
+    lines = (result.stdout or result.stderr or "").strip().splitlines()
+    version_line = lines[0] if lines else ""
     if version_line != expected:
         return (
             False,
             f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}; "
-            f"{managed_tool_install_hint('build')}",
+            f"{managed_tool_install_hint('development')}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {path_label(package_path)}"
 
@@ -3363,7 +2945,7 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
 
     first_line = (result.stdout or result.stderr or "").strip().splitlines()
     version_line = first_line[0] if first_line else ""
-    expected = f"lychee {axis_setup.LYCHEE_VERSION}"
+    expected = f"lychee {managed_tool_version('lychee')}"
     if version_line != expected:
         return (
             False,
@@ -3399,7 +2981,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
-            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required, "
+            f"check-markdown-links: Lychee {managed_tool_version('lychee')} is required, "
             f"but it is unavailable; {managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
@@ -3407,7 +2989,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     version_ok, version_detail = lychee_version_status(lychee)
     if not version_ok:
         print(
-            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required; {version_detail}. "
+            f"check-markdown-links: Lychee {managed_tool_version('lychee')} is required; {version_detail}. "
             f"{managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
@@ -3459,14 +3041,20 @@ def dotnet_command(args: argparse.Namespace) -> int:
             target = dotnet_args.pop(0)
             if dotnet_args and dotnet_args[0] == "--":
                 dotnet_args = dotnet_args[1:]
-        return run([exe("dotnet"), "build", target, "--nologo", *dotnet_args], check=False).returncode
+        return run(
+            [exe("dotnet"), "build", target, "--nologo", "--disable-build-servers", *dotnet_args],
+            check=False,
+        ).returncode
     if command == "test":
         target = "Axis.sln"
         if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
             target = dotnet_args.pop(0)
             if dotnet_args and dotnet_args[0] == "--":
                 dotnet_args = dotnet_args[1:]
-        return run([exe("dotnet"), "test", target, "--nologo", *dotnet_args], check=False).returncode
+        return run(
+            [exe("dotnet"), "test", target, "--nologo", "--disable-build-servers", *dotnet_args],
+            check=False,
+        ).returncode
     if command == "format":
         target = "Axis.sln"
         if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
@@ -3477,7 +3065,11 @@ def dotnet_command(args: argparse.Namespace) -> int:
         if args.check:
             format_args.append("--verify-no-changes")
         format_args.extend(dotnet_args)
-        return run([exe("dotnet"), *format_args], check=False).returncode
+        return run(
+            [exe("dotnet"), *format_args],
+            check=False,
+            env={"MSBUILDDISABLENODEREUSE": "1"},
+        ).returncode
     if command == "run-api":
         return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
     raise CheckError(f"Unknown dotnet command: {command}")
@@ -3646,7 +3238,7 @@ def run_frontend_npm(
     env = frontend_toolchain_env()
     if env_overrides:
         env.update(env_overrides)
-    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, capture=capture, check=False)
+    return run([*npm_cli_command(env=env), *npm_args], cwd=cwd, env=env, capture=capture, check=False)
 
 
 def passthrough_args(raw_args: list[str]) -> list[str]:
@@ -3767,10 +3359,17 @@ def frontend_command(args: argparse.Namespace) -> int:
 
 
 def check_docker(_args: argparse.Namespace | None = None) -> int:
-    if _docker_info_ok():
-        print("check-docker: OK (docker info works)")
+    engine_ok = _docker_info_ok()
+    compose_ok = _docker_compose_ok()
+    if engine_ok and compose_ok:
+        print("check-docker: OK (docker info and docker compose version work)")
         return 0
-    print("check-docker: FAIL - docker info failed; no reachable Docker endpoint detected", file=sys.stderr)
+    failures = []
+    if not engine_ok:
+        failures.append("docker info failed; no reachable Docker endpoint detected")
+    if not compose_ok:
+        failures.append("docker compose version failed; Docker Compose v2 is unavailable")
+    print(f"check-docker: FAIL - {'; '.join(failures)}", file=sys.stderr)
     return 1
 
 
@@ -4024,7 +3623,10 @@ def dotnet_build_projects(projects: list[str]) -> int:
     roots = minimal_dotnet_build_projects(projects)
     print(f"dotnet-build-changed: {len(roots)} root project(s) cover {len(projects)} changed project(s)")
     for project in roots:
-        result = run([exe("dotnet"), "build", project, "--nologo"], check=False)
+        result = run(
+            [exe("dotnet"), "build", project, "--nologo", "--disable-build-servers"],
+            check=False,
+        )
         if result.returncode != 0:
             return result.returncode
     return 0
@@ -4035,7 +3637,13 @@ def dotnet_test_projects(
     class_filters: dict[str, list[str]] | None = None,
 ) -> int:
     for project in projects:
-        command = [exe("dotnet"), "test", project, "--nologo"]
+        command = [
+            exe("dotnet"),
+            "test",
+            project,
+            "--nologo",
+            "--disable-build-servers",
+        ]
         project_filters = (class_filters or {}).get(project, [])
         if project_filters:
             command.extend([
@@ -4124,10 +3732,6 @@ def verify(args: argparse.Namespace) -> int:
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
     foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
-    skills = any(
-        path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path)
-        for path in paths
-    )
     scripts_changed = any(path.startswith("scripts/") for path in paths)
     workflow_changed = any(path.startswith(".github/workflows/") for path in paths)
     theme_changed = any(axis_theme.is_theme_path(path) for path in paths)
@@ -4138,7 +3742,8 @@ def verify(args: argparse.Namespace) -> int:
     print(
         "verify plan: "
         f"dotnet={dotnet} frontend={frontend} docs={docs} scripts={scripts_changed} "
-        f"skills={skills} markdown-links={markdown_links} renovate-config={renovate_config}"
+        f"markdown-links={markdown_links} "
+        f"renovate-config={renovate_config}"
     )
 
     if not paths:
@@ -4208,11 +3813,7 @@ def verify(args: argparse.Namespace) -> int:
                     "frontend test (changed test files)",
                     lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
                 )
-            if changed_e2e_tests and getattr(args, "reuse_focused_browser_evidence", False):
-                print()
-                print("> frontend e2e (focused proof)")
-                print("REUSE frontend e2e (focused proof from the clean checkpoint)")
-            elif changed_e2e_tests:
+            if changed_e2e_tests:
                 step(
                     "frontend e2e (changed test files)",
                     lambda: run_local_dev_browser(
@@ -4234,9 +3835,6 @@ def verify(args: argparse.Namespace) -> int:
 
     if renovate_config:
         step("Renovate config", lambda: check_renovate_config(None))
-
-    if skills:
-        step("Repo skills", lambda: check_repo_skills())
 
     if docs:
         step("doc navigation", lambda: check_doc_navigation())
@@ -4271,7 +3869,7 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
-def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
+def review_checks_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
     if any((ROOT / path).is_file() and should_check_text_encoding(path) for path in paths):
         covered.add("check-text-encoding")
@@ -4279,8 +3877,6 @@ def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
         covered.add("check-theme")
     if any(path.startswith("scripts/") for path in paths):
         covered.add("check-scripts-standard")
-    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
-        covered.add("check-repo-skills")
     if any(is_docs_path(path) for path in paths):
         covered.update({"check-doc-navigation", "check-doc-size-budgets", "check-doc-code-fences.py"})
     if any(path.startswith("docs/use-cases/") for path in paths):
@@ -4290,7 +3886,7 @@ def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
     return covered
 
 
-def review_readiness_policy_gates(
+def review_checks_policy_gates(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -4322,7 +3918,7 @@ def review_readiness_policy_gates(
     return gates
 
 
-def run_review_readiness_policy(
+def run_review_checks_policy(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -4331,14 +3927,14 @@ def run_review_readiness_policy(
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
-    for name, checker in review_readiness_policy_gates(
+    for name, checker in review_checks_policy_gates(
         paths,
         policy_tests_covered=policy_tests_covered,
         doc_drift_covered=doc_drift_covered,
         doc_drift_range=doc_drift_range,
     ):
         print()
-        print(f"> review-readiness: {name}")
+        print(f"> review-checks: {name}")
         executed.append(name)
         try:
             rc = checker()
@@ -4346,41 +3942,17 @@ def run_review_readiness_policy(
             print(exc, file=sys.stderr)
             rc = 1
         if rc == 0:
-            print(f"OK review-readiness: {name}")
+            print(f"OK review-checks: {name}")
         else:
-            print(f"FAIL review-readiness: {name}")
+            print(f"FAIL review-checks: {name}")
             failed.append(name)
     return (0 if not failed else 1), executed
 
 
-def review_readiness(args: argparse.Namespace) -> int:
+def review_checks(args: argparse.Namespace) -> int:
     since = getattr(args, "since", None)
-    full_branch = bool(getattr(args, "full_branch", False))
     policy_only = bool(getattr(args, "policy_only", False))
-    if since and full_branch:
-        print(
-            "review-readiness: FAIL - select only one scope: --since <checkpoint> or --full-branch",
-            file=sys.stderr,
-        )
-        return 1
-    if not policy_only and not since and not full_branch:
-        print(
-            "review-readiness: FAIL - select an explicit scope: --since <checkpoint> for a follow-up "
-            "delta or --full-branch for the complete publishable branch",
-            file=sys.stderr,
-        )
-        return 1
-
-    if working_tree_paths():
-        print(
-            "review-readiness: FAIL - create an intentional checkpoint commit before review-boundary verification",
-            file=sys.stderr,
-        )
-        return 1
-
-    if not policy_only and check_publish_metadata() != 0:
-        print("review-readiness: FAIL - publish metadata is not ready", file=sys.stderr)
-        return 1
+    supplemental = bool(getattr(args, "supplemental", False))
 
     try:
         _scope, paths = verify_scope_paths(since)
@@ -4389,11 +3961,10 @@ def review_readiness(args: argparse.Namespace) -> int:
         return 1
 
     executed: list[str] = []
-    if not policy_only:
+    if not policy_only and not supplemental:
         verify_args = argparse.Namespace(**vars(args))
-        verify_args.reuse_focused_browser_evidence = True
         if verify(verify_args) != 0:
-            print("review-readiness: FAIL - changed-path verification failed", file=sys.stderr)
+            print("review-checks: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
         executed.append("verify")
 
@@ -4401,22 +3972,25 @@ def review_readiness(args: argparse.Namespace) -> int:
         path.startswith("scripts/") or path.startswith(".github/workflows/")
         for path in paths
     )
-    policy_rc, policy_gates = run_review_readiness_policy(
+    policy_rc, policy_gates = run_review_checks_policy(
         paths,
-        policy_tests_covered=not policy_only and policy_surface_changed,
-        doc_drift_covered=set() if policy_only else review_readiness_doc_drift_coverage(paths),
+        policy_tests_covered=supplemental or (not policy_only and policy_surface_changed),
+        doc_drift_covered=set() if policy_only else review_checks_doc_drift_coverage(paths),
         doc_drift_range=f"{since}..HEAD" if since else None,
     )
     executed.extend(policy_gates)
     if policy_rc != 0:
-        print("review-readiness: FAIL - policy profile failed", file=sys.stderr)
+        print("review-checks: FAIL - policy profile failed", file=sys.stderr)
         return 1
 
     if policy_only:
-        print("review-readiness: PASS (policy profile)")
+        print("review-checks: PASS (policy profile)")
+        return 0
+    if supplemental:
+        print("review-checks: PASS (supplemental review profile)")
         return 0
 
-    print(f"review-readiness: PASS ({', '.join(executed)})")
+    print(f"review-checks: PASS ({', '.join(executed)})")
     return 0
 
 
@@ -4465,8 +4039,8 @@ def pre_push(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
                 return 1
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full-branch review-readiness.")
-        return review_readiness(argparse.Namespace(since=None, full_branch=True, policy_only=False))
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running Axis review checks.")
+        return review_checks(argparse.Namespace(since=None, policy_only=False))
 
     if updates_from_stdin:
         paths = changed_paths_for_publish_ranges(
@@ -4484,10 +4058,6 @@ def pre_push(args: argparse.Namespace) -> int:
         for p in paths
     )
     docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
-    skills = not paths or any(
-        p.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(p)
-        for p in paths
-    )
     scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     renovate_config = not paths or ".github/renovate.json5" in paths
     failed: list[str] = []
@@ -4509,8 +4079,8 @@ def pre_push(args: argparse.Namespace) -> int:
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
     print(
-        "  Run `python scripts/axis.py review-readiness --full-branch` for the first review or "
-        "`--since <checkpoint>` for a follow-up."
+        "  The engineering-process review profile runs full Axis checks; use "
+        "`review-checks --since <checkpoint>` only for a focused follow-up."
     )
 
     step("publish metadata", check_publish_targets)
@@ -4522,9 +4092,6 @@ def pre_push(args: argparse.Namespace) -> int:
     if docs:
         step("doc navigation", lambda: check_doc_navigation())
         step("doc size budgets", lambda: check_doc_size_budgets())
-
-    if skills:
-        step("Repo skills", lambda: check_repo_skills())
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
@@ -4813,34 +4380,6 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
 
     print(f"Installed: {target} (pre-push runs python scripts/axis.py pre-push).")
     return 0
-
-
-def _command_version(name: str, *version_args: str, env: dict[str, str] | None = None) -> tuple[str, str]:
-    ok, version, resolved = command_version_line(name, *version_args, env=env)
-    if not ok:
-        return "FAIL", version
-    return "OK", f"{version} ({resolved})"
-
-
-def python_launcher_status() -> tuple[str, str]:
-    ok, version, resolved = command_version_line("python", "--version")
-    if not ok:
-        return "FAIL", version
-    if version_major(version) != "3":
-        return "FAIL", f"found `{version}` at {resolved}; expected Python 3"
-
-    probe = run_optional(
-        [
-            resolved,
-            "-c",
-            "import inspect, tarfile; raise SystemExit(0 if hasattr(tarfile, 'data_filter') and "
-            "'filter' in inspect.signature(tarfile.TarFile.extractall).parameters else 1)",
-        ],
-        timeout=VERSION_PROBE_TIMEOUT_SECONDS,
-    )
-    if probe is None or probe.returncode != 0:
-        return "FAIL", f"{version} ({resolved}); missing required tar data extraction filter"
-    return "OK", f"{version} ({resolved})"
 
 
 def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
@@ -6084,512 +5623,6 @@ def local_dev(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown local-dev command: {command}")
 
 
-def _wsl_docker_ok() -> bool:
-    if os.name != "nt" or shutil.which("wsl.exe") is None:
-        return False
-    result = run_optional(
-        ["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"],
-        timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
-    )
-    return result is not None and result.returncode == 0
-
-
-def _docker_group_session_hint(
-    *,
-    socket_group_id: int | None = None,
-    configured_group_ids: set[int] | None = None,
-    active_group_ids: set[int] | None = None,
-) -> str | None:
-    if socket_group_id is None or configured_group_ids is None or active_group_ids is None:
-        if os.name == "nt":
-            return None
-        socket_path = Path("/var/run/docker.sock")
-        try:
-            import grp
-            import pwd
-
-            socket_group_id = socket_path.stat().st_gid
-            user = pwd.getpwuid(os.getuid())
-            configured_group_ids = {user.pw_gid}
-            configured_group_ids.update(
-                group.gr_gid for group in grp.getgrall() if user.pw_name in group.gr_mem
-            )
-            active_group_ids = {os.getgid(), *os.getgroups()}
-        except (ImportError, KeyError, OSError):
-            return None
-
-    if socket_group_id in configured_group_ids and socket_group_id not in active_group_ids:
-        return (
-            "Docker group membership is configured but missing from this shell; "
-            "start a new login shell or restart WSL, then rerun the command"
-        )
-    return None
-
-
-def path_node_toolchain_ready() -> bool:
-    node = shutil.which("node")
-    npm = shutil.which("npm") or shutil.which("npm.cmd")
-    if node is None or npm is None:
-        return False
-    if Path(node).parent.resolve() != Path(npm).parent.resolve():
-        return False
-
-    expected_node_ok, expected_node = required_node_version()
-    if not expected_node_ok:
-        return False
-    try:
-        package = json.loads((FRONTEND_DIR / "package.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
-    package_manager = package.get("packageManager")
-    npm_match = re.fullmatch(
-        r"npm@((?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*))",
-        package_manager or "",
-    )
-    if npm_match is None:
-        return False
-
-    node_result = run_optional([node, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
-    npm_result = run_optional([npm, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
-    if node_result is None or npm_result is None:
-        return False
-    if node_result.returncode != 0 or npm_result.returncode != 0:
-        return False
-    return (
-        (node_result.stdout or "").strip().removeprefix("v") == expected_node
-        and (npm_result.stdout or "").strip() == npm_match.group(1)
-    )
-
-
-def path_dotnet_sdk_ready() -> bool:
-    source_ok, source_major_or_error = global_json_sdk_major()
-    if not source_ok or source_major_or_error != REQUIRED_DOTNET_SDK_MAJOR:
-        return False
-    if version_major(axis_setup.DOTNET_SDK_VERSION) != source_major_or_error:
-        return False
-
-    dotnet = shutil.which("dotnet")
-    if dotnet is None:
-        return False
-    result = run_optional([dotnet, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
-    return (
-        result is not None
-        and result.returncode == 0
-        and version_major(result.stdout or result.stderr or "") == source_major_or_error
-    )
-
-
-def setup_tool_ready(tool: str) -> bool:
-    if tool == "dotnet":
-        return dotnet_sdk_status()[0]
-    if tool == "node":
-        env = frontend_toolchain_env()
-        if not env:
-            return False
-        node_ok = node_version_status(env)[0]
-        npm_ok = npm_version_status(env)[0]
-        return node_ok and npm_ok
-    if tool == "lychee":
-        resolved = find_lychee()
-        return resolved is not None and lychee_version_status(resolved)[0]
-    if tool == "gh":
-        return gh_cli_status()[0]
-    raise CheckError(f"Unknown setup-managed tool: {tool}")
-
-
-def managed_tool_install_hint(profile: str) -> str:
-    return (
-        "run `python scripts/axis.py setup "
-        f"--profile {profile} --install-user-tools` to let Axis install the managed toolchain"
-    )
-
-
-def gh_cli_status() -> tuple[bool, str]:
-    ok, version_line, resolved = command_version_line("gh", "--version")
-    if not ok:
-        return False, f"{version_line}; {managed_tool_install_hint('review')}"
-    match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
-    if match is None:
-        return (
-            False,
-            f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
-            f"{managed_tool_install_hint('review')}",
-        )
-    version = match.group(1)
-    if _version_sort_key(version) < _version_sort_key(axis_setup.GH_VERSION):
-        return (
-            False,
-            f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
-            f"{managed_tool_install_hint('review')}",
-        )
-    return True, f"{version_line} ({resolved}); expected >= {axis_setup.GH_VERSION}"
-
-
-def setup_external_preflight(profile: str) -> int:
-    if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
-        return 1
-    issues: list[str] = []
-    if profile in {"local-dev", "review"}:
-        if find_openssl() is None:
-            issues.append(
-                "OpenSSL is required for local HTTPS certificates; "
-                "Axis will not install an OS package automatically"
-            )
-        if not _docker_info_ok():
-            session_hint = _docker_group_session_hint()
-            issues.append(
-                session_hint
-                or (
-                    "Docker Engine is not reachable in this shell; "
-                    "Axis will not install or start an OS service automatically"
-                )
-            )
-        if not _docker_compose_ok():
-            issues.append(
-                "Docker Compose v2 is not available in this shell; "
-                "Axis will not install an OS package automatically"
-            )
-    for issue in issues:
-        print(f"setup: FAIL - {issue}", file=sys.stderr)
-    return 1 if issues else 0
-
-
-def setup_native_prerequisite_preflight(
-    missing_managed_tools: Iterable[str],
-    *,
-    platform_spec: axis_setup.SetupPlatform,
-) -> int:
-    issues: list[str] = []
-    if "dotnet" in set(missing_managed_tools):
-        dotnet_issue = axis_setup.dotnet_native_prerequisite_preflight(
-            platform_spec=platform_spec
-        )
-        if dotnet_issue:
-            issues.append(dotnet_issue)
-    for issue in issues:
-        print(f"setup: FAIL - {issue}", file=sys.stderr)
-    return 1 if issues else 0
-
-
-def setup_preflight(profile: str) -> int:
-    rc = doctor(
-        argparse.Namespace(
-            profile=profile,
-            strict=True,
-            allow_certificate_bootstrap=True,
-        )
-    )
-    if rc != 0:
-        if profile == "review" and not setup_tool_ready("lychee"):
-            print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
-        return rc
-    return 0
-
-
-def setup(args: argparse.Namespace) -> int:
-    profile = getattr(args, "profile", "build")
-    browsers = getattr(args, "browsers", False)
-    install_user_tools = getattr(args, "install_user_tools", False)
-    plan_only = getattr(args, "plan_only", False)
-    trust_local_ca = getattr(args, "trust_local_ca", False)
-    if trust_local_ca and profile not in {"local-dev", "review"}:
-        print("setup: FAIL - --trust-local-ca requires --profile local-dev or review", file=sys.stderr)
-        return 1
-    try:
-        platform_spec = axis_setup.detect_platform()
-        plan = axis_setup.setup_plan(
-            profile=profile,
-            install_user_tools=install_user_tools,
-            browsers=browsers,
-            trust_local_ca=trust_local_ca,
-            platform_spec=platform_spec,
-        )
-    except axis_setup.SetupError as exc:
-        print(f"setup: FAIL - {exc}", file=sys.stderr)
-        return 1
-
-    print(f"axis setup (profile={profile}, platform={platform_spec.label})", flush=True)
-    if plan_only:
-        for index, label in enumerate(plan, 1):
-            print(f"{index}. {label}")
-        print("setup plan: no checks, downloads, or repository mutations were performed")
-        if profile in {"local-dev", "review"} and not trust_local_ca:
-            print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
-        return 0
-
-    expose_dotnet_command = install_user_tools and not path_dotnet_sdk_ready()
-    expose_node_commands = install_user_tools and not path_node_toolchain_ready()
-    missing: tuple[str, ...] = ()
-    if install_user_tools:
-        managed_tools = axis_setup.managed_tools_for_profile(profile)
-        missing = tuple(tool for tool in managed_tools if not setup_tool_ready(tool))
-        try:
-            for tool in missing:
-                try:
-                    axis_setup.asset_name(tool, platform_spec)
-                except axis_setup.SetupError as exc:
-                    raise axis_setup.SetupError(
-                        f"no verified portable artifact is available for missing `{tool}`: {exc}"
-                    ) from exc
-        except axis_setup.SetupError as exc:
-            print(f"setup: FAIL - {exc}", file=sys.stderr)
-            return 1
-
-    native_rc = setup_native_prerequisite_preflight(
-        missing,
-        platform_spec=platform_spec,
-    )
-    external_rc = setup_external_preflight(profile)
-    if native_rc != 0 or external_rc != 0:
-        return 1
-
-    if install_user_tools:
-        try:
-            exposed_commands: list[Path] = []
-            axis_setup.confirm_install(
-                missing,
-                assume_yes=getattr(args, "yes", False),
-                stdin=sys.stdin,
-            )
-            for tool in missing:
-                print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
-                installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
-                print(f"  installed: {installed}")
-            if expose_dotnet_command:
-                exposed = axis_setup.expose_managed_command("dotnet", platform_spec=platform_spec)
-                exposed_commands.append(exposed)
-                print(f"  exposed: {exposed}")
-            if expose_node_commands:
-                for exposed in axis_setup.expose_managed_commands(
-                    ("node", "npm"),
-                    platform_spec=platform_spec,
-                ):
-                    exposed_commands.append(exposed)
-                    print(f"  exposed: {exposed}")
-            if profile == "review" and ("gh" in missing or shutil.which("gh") is None):
-                exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
-                exposed_commands.append(exposed)
-                print(f"  exposed: {exposed}")
-            active_dirs = {
-                os.path.normcase(os.path.abspath(entry))
-                for entry in os.environ.get("PATH", "").split(os.pathsep)
-                if entry
-            }
-            for command_dir in sorted({path.parent for path in exposed_commands}):
-                if os.path.normcase(os.path.abspath(command_dir)) not in active_dirs:
-                    print(
-                        f"setup: user command directory `{command_dir}` is not active in this shell; "
-                        "add it to PATH and start a new shell"
-                    )
-        except (OSError, axis_setup.SetupError) as exc:
-            print(f"setup: FAIL - {exc}", file=sys.stderr)
-            return 1
-
-    rc = setup_preflight(profile)
-    if rc != 0:
-        return rc
-
-    steps: list[tuple[str, callable[[], int]]] = [
-        (
-            "restore .NET dependencies",
-            lambda: run([exe("dotnet"), "restore", "Axis.sln"], check=False).returncode,
-        ),
-        ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
-    ]
-    if browsers:
-        steps.append(
-            (
-                "install Playwright Chromium",
-                lambda: run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode,
-            )
-        )
-    if profile in {"local-dev", "review"}:
-        steps.append(("generate local HTTPS certificates", lambda: local_dev_certs(args)))
-        if trust_local_ca:
-            steps.append(("trust local HTTPS root CA", lambda: local_dev_trust_certs(args)))
-        steps.append(("install repository pre-push hook", lambda: install_hooks(args)))
-
-    for label, action in steps:
-        print(f"> {label}", flush=True)
-        rc = action()
-        if rc != 0:
-            print(f"setup: FAIL - {label}", file=sys.stderr)
-            return rc
-
-    print("setup: OK")
-    if profile in {"local-dev", "review"}:
-        print("setup: next: `python scripts/axis.py local-dev up`")
-        trust_status, trust_detail = local_dev_host_trust_status()
-        if trust_status == "OK":
-            print(
-                "setup: after the stack is ready, verify host HTTPS with "
-                "`python scripts/axis.py local-dev host-smoke`"
-            )
-        else:
-            print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
-    if profile == "review":
-        if setup_tool_ready("gh"):
-            print("review authentication remains interactive: run `gh auth status`")
-    return 0
-
-
-def doctor(args: argparse.Namespace) -> int:
-    profile = getattr(args, "profile", "local-dev")
-    if profile not in axis_setup.DOCTOR_PROFILES:
-        raise CheckError(f"Unknown doctor profile: {profile}")
-    groups = set(axis_setup.DOCTOR_PROFILES[: axis_setup.DOCTOR_PROFILES.index(profile) + 1])
-    allow_certificate_bootstrap = getattr(args, "allow_certificate_bootstrap", False)
-    rows: list[tuple[str, str, str]] = []
-
-    def record(status: str, label: str, detail: str) -> None:
-        rows.append((status, label, detail))
-
-    record("OK", "repo", str(ROOT))
-    record("OK", "os", f"{platform.system()} {platform.release()} ({platform.machine()})")
-    record("OK", "python", f"{platform.python_version()} ({sys.executable})")
-
-    python_status, python_detail = python_launcher_status()
-    record(python_status, "python launcher", python_detail)
-
-    git_status, git_detail = _command_version("git", "--version")
-    record(git_status, "git", git_detail)
-
-    frontend_env: dict[str, str] | None = None
-    node_ok = False
-    if "build" in groups:
-        dotnet_ok, dotnet_detail = dotnet_sdk_status()
-        record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
-
-        frontend_env = frontend_toolchain_env()
-        node_ok, node_detail = node_version_status(frontend_env)
-        record("OK" if node_ok else "FAIL", "node", node_detail)
-        npm_ok, npm_detail = npm_version_status(frontend_env)
-        record("OK" if npm_ok else "FAIL", "npm", npm_detail)
-
-        if os.name == "nt":
-            npm_cmd = shutil.which("npm.cmd")
-            npm_ps1 = shutil.which("npm.ps1")
-            if npm_cmd:
-                detail = f"native npm shim available ({npm_cmd})"
-                if npm_ps1:
-                    detail += f"; alternate npm launcher also detected ({npm_ps1})"
-                record("OK", "npm adapter", detail)
-
-    if "local-dev" in groups:
-        openssl = find_openssl()
-        if openssl:
-            record("OK", "openssl", openssl)
-            certificate_state = local_dev_certificate_state(openssl)
-            certificate_status = (
-                "OK"
-                if certificate_state is LocalDevCertificateState.READY
-                else "WARN"
-                if allow_certificate_bootstrap
-                else "FAIL"
-            )
-            record(
-                certificate_status,
-                "local HTTPS certificates",
-                local_dev_certificate_remediation(certificate_state),
-            )
-            trust_status, trust_detail = local_dev_host_trust_status()
-            record(trust_status, "host browser trust", trust_detail)
-        else:
-            record("FAIL", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
-
-        docker_status, docker_detail = _command_version("docker", "--version")
-        if docker_status == "FAIL":
-            record(
-                "WARN",
-                "docker cli",
-                f"{docker_detail}; install Docker Engine and Compose in the active environment",
-            )
-        else:
-            record(docker_status, "docker cli", docker_detail)
-
-        docker_current = _docker_info_ok()
-        docker_host = os.environ.get("DOCKER_HOST")
-        docker_host_ping = _docker_host_ping_ok(docker_host)
-        tcp_docker = _http_ok("http://127.0.0.1:2375/_ping") or _http_ok("http://localhost:2375/_ping")
-        wsl_docker = _wsl_docker_ok()
-
-        if docker_current:
-            record("OK", "docker endpoint", "docker info works in this shell")
-        elif docker_host and docker_host_ping:
-            record("OK", "docker endpoint", f"DOCKER_HOST={docker_host} responds; Testcontainers can use it")
-        elif docker_host:
-            record("FAIL", "docker endpoint", f"DOCKER_HOST={docker_host} is set, but the daemon did not respond")
-        elif tcp_docker:
-            record(
-                "WARN",
-                "docker endpoint",
-                "an exported Docker endpoint responds; set DOCKER_HOST for the current session",
-            )
-        elif wsl_docker:
-            record(
-                "WARN",
-                "docker endpoint",
-                "Docker works from another detected execution context; run the canonical command there",
-            )
-        else:
-            session_hint = _docker_group_session_hint()
-            record(
-                "FAIL",
-                "docker endpoint",
-                session_hint or "docker info failed; no reachable Docker endpoint detected",
-            )
-
-        if _docker_compose_ok():
-            record("OK", "docker compose", "docker compose version works")
-        elif wsl_docker:
-            record("WARN", "docker compose", "Docker Compose is available from another execution context")
-        else:
-            record("FAIL", "docker compose", "Docker Compose v2 not available from this execution context")
-
-    if "review" in groups:
-        lychee = find_lychee()
-        if lychee is None:
-            try:
-                platform_spec = axis_setup.detect_platform()
-                axis_setup.asset_name("lychee", platform_spec)
-                lychee_action = managed_tool_install_hint("review")
-            except axis_setup.SetupError as exc:
-                lychee_action = str(exc)
-            record("FAIL", "lychee", f"Lychee {axis_setup.LYCHEE_VERSION} is required; {lychee_action}")
-        else:
-            lychee_ok, lychee_detail = lychee_version_status(lychee)
-            record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
-
-        gh_ok, gh_detail = gh_cli_status()
-        record("OK" if gh_ok else "WARN", "github cli (optional)", gh_detail)
-
-    print(f"axis doctor (profile={profile})")
-    for status, label, detail in rows:
-        print(f"[{status:<4}] {label}: {detail}")
-
-    failures = [label for status, label, _detail in rows if status == "FAIL"]
-    if failures and getattr(args, "strict", False):
-        print(f"doctor: FAIL - {len(failures)} blocking issue(s): {', '.join(failures)}", file=sys.stderr)
-        return 1
-
-    if failures:
-        print("doctor: completed with blocking findings; rerun with --strict to fail on them")
-    else:
-        print("doctor: OK")
-    return 0
-
-
-def check_pr(args: argparse.Namespace) -> int:
-    module_args: list[str] = []
-    if args.title is not None:
-        module_args.extend(["--title", args.title])
-    if args.body_file is not None:
-        module_args.extend(["--body-file", str(args.body_file)])
-    if args.branch is not None:
-        module_args.extend(["--branch", args.branch])
-    return module_main("check-pr.py", module_args)
-
-
 def check_renovate_config(_args: argparse.Namespace | None = None) -> int:
     if not RENOVATE_CONFIG_PATH.is_file():
         print("check-renovate-config FAIL: missing .github/renovate.json5", file=sys.stderr)
@@ -6624,51 +5657,6 @@ def build_parser(
     parser = parser_class(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    setup_parser = sub.add_parser("setup", help="Prepare a portable repository development profile")
-    setup_parser.add_argument(
-        "--profile",
-        choices=axis_setup.SETUP_PROFILES,
-        default="build",
-        help="Cumulative setup profile (default: build)",
-    )
-    setup_parser.add_argument(
-        "--browsers",
-        action="store_true",
-        help=(
-            "Install the host Playwright Chromium binary for explicit debugging; "
-            "native OS prerequisites remain external"
-        ),
-    )
-    setup_parser.add_argument(
-        "--plan-only",
-        action="store_true",
-        help="Print the platform-specific setup plan without checks, downloads, or mutations",
-    )
-    setup_parser.add_argument(
-        "--install-user-tools",
-        action="store_true",
-        help="Install missing pinned tools into the current user's Axis data directory",
-    )
-    setup_parser.add_argument(
-        "--yes",
-        action="store_true",
-        help="Skip Axis confirmation for opted-in user-local downloads and trust-store changes",
-    )
-    setup_parser.add_argument(
-        "--trust-local-ca",
-        action="store_true",
-        help="Trust the generated local root CA in the current user's host trust store",
-    )
-    setup_parser.set_defaults(func=setup)
-    doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")
-    doctor_parser.add_argument(
-        "--profile",
-        choices=axis_setup.DOCTOR_PROFILES,
-        default="local-dev",
-        help="Tool group to diagnose (default: local-dev)",
-    )
-    doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required tools in the selected profile are unavailable")
-    doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks", help="Install the repository-managed pre-push hook").set_defaults(func=install_hooks)
     pre_push_parser = sub.add_parser("pre-push", help="Run the pre-push policy profile")
     pre_push_parser.add_argument(
@@ -6707,22 +5695,26 @@ def build_parser(
         help="Skip the pre-push hook only when explicitly authorized",
     )
     git_push_parser.set_defaults(func=git_push_checkpoint)
-    review_readiness_parser = sub.add_parser(
-        "review-readiness",
-        help="Verify a clean checkpoint before independent review",
+    review_checks_parser = sub.add_parser(
+        "review-checks",
+        help="Run Axis checks selected for the shared review profile",
     )
-    review_readiness_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
-    review_readiness_parser.add_argument(
-        "--full-branch",
-        action="store_true",
-        help="Explicitly verify the complete publishable branch diff",
-    )
-    review_readiness_parser.add_argument(
+    review_checks_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    review_checks_mode = review_checks_parser.add_mutually_exclusive_group()
+    review_checks_mode.add_argument(
         "--policy-only",
         action="store_true",
         help="Run only the deterministic policy profile shared with CI",
     )
-    review_readiness_parser.set_defaults(func=review_readiness)
+    review_checks_mode.add_argument(
+        "--supplemental",
+        action="store_true",
+        help=(
+            "Run only review gates not already selected by the required development "
+            "profile"
+        ),
+    )
+    review_checks_parser.set_defaults(func=review_checks)
     verify_parser = sub.add_parser("verify", help="Run checks selected from changed paths")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
     verify_parser.add_argument(
@@ -6731,6 +5723,19 @@ def build_parser(
         help="Print the changed-path verification plan without running commands",
     )
     verify_parser.set_defaults(func=verify)
+
+    dependencies_parser = sub.add_parser(
+        "dependencies",
+        help="Run project-native locked dependency operations for processctl setup",
+    )
+    dependencies_sub = dependencies_parser.add_subparsers(
+        dest="dependencies_command",
+        required=True,
+    )
+    dependencies_sub.add_parser(
+        "install",
+        help="Restore locked NuGet and npm dependency graphs",
+    ).set_defaults(func=install_project_dependencies)
 
     dotnet_parser = sub.add_parser("dotnet", help="Run repository-standard .NET commands")
     dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
@@ -6956,7 +5961,6 @@ def build_parser(
     check_sub.add_parser("mcp-tool-safety", help="Check MCP mutation gating behavior").set_defaults(func=check_mcp_tool_safety)
     check_sub.add_parser("text-encoding", help="Check repository text encoding and line endings").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard", help="Check repository script ownership conventions").set_defaults(func=check_scripts_standard)
-    check_sub.add_parser("repo-skills", help="Validate repository skill contracts").set_defaults(func=check_repo_skills)
     check_sub.add_parser("renovate-config", help="Validate the Renovate configuration").set_defaults(func=check_renovate_config)
     check_sub.add_parser("test-naming", help="Validate test naming conventions").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification", help="Validate test project classifications").set_defaults(func=check_test_project_classification)
@@ -6966,6 +5970,10 @@ def build_parser(
         "dotnet-dependency-locks",
         help="Validate the committed NuGet lock graph",
     ).set_defaults(func=check_dotnet_dependency_locks)
+    check_sub.add_parser(
+        "dependency-state",
+        help="Check that locked NuGet and npm graphs are restored for current inputs",
+    ).set_defaults(func=check_dependency_state)
     check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser(
         "frontend-dependency-versions",
@@ -7007,11 +6015,6 @@ def build_parser(
     check_sub.add_parser("foundation-docs", help="Validate foundation documentation contracts").set_defaults(
         func=lambda _args: run_module_check("check-foundation-docs.py", [])
     )
-    pr_parser = check_sub.add_parser("pr", help="Validate pull-request metadata and branch naming")
-    pr_parser.add_argument("--title")
-    pr_parser.add_argument("--body-file", type=Path)
-    pr_parser.add_argument("--branch")
-    pr_parser.set_defaults(func=check_pr)
     publish_parser = check_sub.add_parser(
         "publish-metadata",
         help="Validate the current branch and publishable commit subjects",
