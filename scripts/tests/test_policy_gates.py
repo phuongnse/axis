@@ -5804,7 +5804,56 @@ class TestLocalDevShellArgv(unittest.TestCase):
         self.assertEqual(["bash"], axis.local_dev_shell_argv("web", ["--", "bash"]))
 
 
+class TestPublicationAuthorityAdapter(unittest.TestCase):
+    def test_delegates_grammar_to_processctl_json_boundary(self) -> None:
+        completed = axis.subprocess.CompletedProcess(
+            [],
+            1,
+            stdout=json.dumps(
+                {
+                    "status": "failed",
+                    "issues": ["invalid publication branch"],
+                }
+            ),
+            stderr="",
+        )
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", return_value=completed) as run,
+        ):
+            issues, document = axis.publication_validation(
+                "validate-branch", ["--branch", "invalid"]
+            )
+
+        self.assertEqual(["invalid publication branch"], issues)
+        self.assertEqual("failed", document["status"])
+        self.assertEqual(
+            [
+                "processctl",
+                "publication",
+                "validate-branch",
+                "--branch",
+                "invalid",
+                "--json",
+            ],
+            run.call_args.args[0],
+        )
+        self.assertFalse(run.call_args.kwargs["check"])
+
+
 class TestGitWorkflows(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        branch = mock.patch.object(axis, "publication_branch_issues", return_value=[])
+        publication = mock.patch.object(
+            axis,
+            "publication_validation",
+            return_value=([], {"commits": []}),
+        )
+        branch.start()
+        publication.start()
+        self.addCleanup(publication.stop)
+        self.addCleanup(branch.stop)
 
     def test_checkpoint_rejects_non_conventional_subject_before_git_mutation(self) -> None:
         with (
