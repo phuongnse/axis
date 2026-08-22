@@ -5987,6 +5987,15 @@ class TestGitWorkflows(unittest.TestCase):
         )
         self.assertIn("PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}", pr_job)
         self.assertIn("PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}", pr_job)
+        self.assertIn("if: runner.os == 'Linux'", pr_job)
+        self.assertIn("Validate process distribution sync", pr_job)
+        self.assertIn("Validate Linux process environment", pr_job)
+        self.assertIn("Run Linux finite process profiles", pr_job)
+        self.assertIn("if: runner.os == 'Windows'", pr_job)
+        self.assertIn(
+            "python -m unittest scripts.tests.test_install_process_runtime",
+            pr_job,
+        )
         dependency_security = (
             ROOT / ".github" / "workflows" / "dependency-security.yml"
         ).read_text(encoding="utf-8")

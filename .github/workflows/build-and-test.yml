@@ -108,18 +108,30 @@ jobs:
         run: python scripts/axis.py dependencies install
 
       - name: Install missing managed review tools
+        if: runner.os == 'Linux'
         run: processctl setup --project-root . --profile review --apply --allow network --allow user-files
 
-      - name: Validate process distribution and environment
+      - name: Validate process distribution sync
+        run: processctl sync --project-root . --check
+
+      # Docker-backed full profiles are Linux-owned. The Windows matrix proves the
+      # exact lock, adoption materialization, managed sync, and installer behavior
+      # without pretending the hosted Windows image provides a Docker endpoint.
+      - name: Validate Linux process environment
+        if: runner.os == 'Linux'
         run: |
-          processctl sync --project-root . --check
           processctl doctor --project-root . --profile development
           processctl doctor --project-root . --profile review
 
-      - name: Run finite process profiles
+      - name: Run Linux finite process profiles
+        if: runner.os == 'Linux'
         run: |
           processctl verify --project-root . --profile development
           processctl verify --project-root . --profile review
+
+      - name: Verify Windows process installer portability
+        if: runner.os == 'Windows'
+        run: python -m unittest scripts.tests.test_install_process_runtime
 
   # Detects which scopes the PR actually touches so the heavy jobs below
   # can skip themselves on PRs that don't affect them. Job-level `if:`
