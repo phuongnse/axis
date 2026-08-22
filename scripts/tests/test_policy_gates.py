@@ -2475,14 +2475,23 @@ class TestRenovateConfigGate(unittest.TestCase):
         rule = next(
             item
             for item in config["packageRules"]
-            if item.get("matchPackageNames") == ["engineering-process"]
+            if "engineering-process" in item.get("matchPackageNames", [])
         )
         self.assertFalse(rule["automerge"])
         self.assertEqual(["at any time"], rule["schedule"])
         self.assertEqual(100, rule["prPriority"])
         self.assertEqual(
-            ["requirements/process.in", "requirements/process.txt"],
+            [
+                ".github/workflows/build-and-test.yml",
+                ".github/workflows/dependency-security.yml",
+                "requirements/process.in",
+                "requirements/process.txt",
+            ],
             rule["matchFileNames"],
+        )
+        self.assertEqual(
+            ["engineering-process", "phuongnse/engineering-process"],
+            rule["matchPackageNames"],
         )
 
         process_input = (axis.ROOT / "requirements" / "process.in").read_text(
@@ -3923,6 +3932,11 @@ class TestReviewVerificationGates(unittest.TestCase):
         )
         with (
             mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(
+                axis,
+                "publication_branch_issues",
+                return_value=["invalid automation branch"],
+            ),
             mock.patch.object(axis, "diff_range", return_value="current-base...HEAD"),
             mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
             mock.patch.object(axis, "check_publish_metadata", return_value=0),
@@ -3942,6 +3956,7 @@ class TestReviewVerificationGates(unittest.TestCase):
         )
         with (
             mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(axis, "publication_branch_issues", return_value=[]),
             mock.patch.object(
                 axis,
                 "publish_range_for_commit",
@@ -3982,6 +3997,7 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}, clear=True),
             mock.patch.object(axis.sys, "stdin", io.StringIO(update)),
+            mock.patch.object(axis, "publication_branch_issues", return_value=[]),
             mock.patch.object(
                 axis,
                 "publish_range_for_commit",
@@ -5792,6 +5808,12 @@ class TestGitWorkflows(unittest.TestCase):
 
     def test_checkpoint_rejects_non_conventional_subject_before_git_mutation(self) -> None:
         with (
+            mock.patch.object(axis, "publication_branch_issues", return_value=[]),
+            mock.patch.object(
+                axis,
+                "publication_validation",
+                return_value=(["Commit subject must use Conventional Commit style"], {}),
+            ),
             mock.patch.object(axis, "working_tree_paths") as working_tree_paths,
             mock.patch.object(axis, "git_lines") as git_lines,
             mock.patch.object(axis, "git") as git,
@@ -5814,9 +5836,14 @@ class TestGitWorkflows(unittest.TestCase):
         with (
             mock.patch.object(
                 axis,
-                "publish_commit_subjects",
-                return_value=[("0123456789ab", "Harden publishing")],
-                create=True,
+                "publication_validation",
+                return_value=(
+                    [
+                        "Commit 0123456789ab: Commit subject must use "
+                        "Conventional Commit style"
+                    ],
+                    {"commits": ["0123456789ab"]},
+                ),
             ),
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
@@ -5835,8 +5862,8 @@ class TestGitWorkflows(unittest.TestCase):
         with (
             mock.patch.object(
                 axis,
-                "publish_commit_subjects",
-                return_value=[("0123456789ab", "fix: harden publishing")],
+                "publication_validation",
+                return_value=([], {"commits": ["0123456789ab"]}),
             ),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -5971,10 +5998,8 @@ class TestGitWorkflows(unittest.TestCase):
         pr_job = workflow.split("  pr:\n", maxsplit=1)[1].split("\n  detect:\n", maxsplit=1)[0]
 
         self.assertIn("fetch-depth: 0", pr_job)
-        self.assertEqual(
-            2,
-            pr_job.count("python scripts/install_process_runtime.py"),
-        )
+        self.assertEqual(2, pr_job.count("uses: phuongnse/engineering-process@"))
+        self.assertNotIn("scripts/install_process_runtime.py", pr_job)
         self.assertNotIn(
             "python -m pip install --require-hashes -r requirements/process.txt",
             pr_job,
@@ -5991,17 +6016,12 @@ class TestGitWorkflows(unittest.TestCase):
         self.assertIn("Validate process distribution sync", pr_job)
         self.assertIn("Validate Linux process environment", pr_job)
         self.assertIn("Run Linux finite process profiles", pr_job)
-        self.assertIn("if: runner.os == 'Windows'", pr_job)
-        self.assertIn(
-            "python -m unittest scripts.tests.test_install_process_runtime",
-            pr_job,
-        )
+        self.assertIn("shared action behavior", pr_job)
         dependency_security = (
             ROOT / ".github" / "workflows" / "dependency-security.yml"
         ).read_text(encoding="utf-8")
-        self.assertIn(
-            "python scripts/install_process_runtime.py", dependency_security
-        )
+        self.assertIn("uses: phuongnse/engineering-process@", dependency_security)
+        self.assertNotIn("scripts/install_process_runtime.py", dependency_security)
         self.assertNotIn(
             "python -m pip install --require-hashes -r requirements/process.txt",
             dependency_security,

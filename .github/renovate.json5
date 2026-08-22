@@ -65,6 +65,8 @@
       ".agents/.gitattributes",
       ".agents/skills/**",
       ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/workflows/build-and-test.yml",
+      ".github/workflows/dependency-security.yml",
       ".process/adopt-process.py",
       ".process/adopt-process-windows-job.py",
       ".process/adoption-migrations/**",
@@ -82,11 +84,14 @@
     {
       "description": "Generate a complete engineering-process authority adoption PR.",
       "matchFileNames": [
+        ".github/workflows/build-and-test.yml",
+        ".github/workflows/dependency-security.yml",
         "requirements/process.in",
         "requirements/process.txt"
       ],
       "matchPackageNames": [
-        "engineering-process"
+        "engineering-process",
+        "phuongnse/engineering-process"
       ],
       "enabled": true,
       "automerge": false,
