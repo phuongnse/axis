@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date, timedelta
 from unittest import mock
 from pathlib import Path
 
@@ -2576,9 +2577,11 @@ class TestVulnerablePackageGate(unittest.TestCase):
     def write_frontend_risk_acceptance(
         root: Path,
         *,
-        accepted_on: str = "2026-07-22",
-        expires_on: str = "2026-08-21",
+        accepted_on: str | None = None,
+        expires_on: str | None = None,
     ) -> None:
+        accepted_on = accepted_on or (date.today() - timedelta(days=15)).isoformat()
+        expires_on = expires_on or (date.today() + timedelta(days=15)).isoformat()
         path = root / "frontend" / "dependency-risk-acceptances.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -2973,7 +2976,11 @@ class TestVulnerablePackageGate(unittest.TestCase):
     def test_frontend_gate_rejects_acceptance_longer_than_thirty_days(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            self.write_frontend_risk_acceptance(root, expires_on="2026-08-22")
+            self.write_frontend_risk_acceptance(
+                root,
+                accepted_on=(date.today() - timedelta(days=31)).isoformat(),
+                expires_on=date.today().isoformat(),
+            )
             with (
                 mock.patch.object(axis, "ROOT", root),
                 mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
@@ -5964,7 +5971,14 @@ class TestGitWorkflows(unittest.TestCase):
         pr_job = workflow.split("  pr:\n", maxsplit=1)[1].split("\n  detect:\n", maxsplit=1)[0]
 
         self.assertIn("fetch-depth: 0", pr_job)
-        self.assertIn("python -m pip install --require-hashes -r requirements/process.txt", pr_job)
+        self.assertEqual(
+            2,
+            pr_job.count("python scripts/install_process_runtime.py"),
+        )
+        self.assertNotIn(
+            "python -m pip install --require-hashes -r requirements/process.txt",
+            pr_job,
+        )
         self.assertIn("processctl publication validate-pr", pr_job)
         self.assertIn('jq -r \'.pull_request.body // ""\' "$GITHUB_EVENT_PATH"', pr_job)
         self.assertIn(
@@ -5973,6 +5987,25 @@ class TestGitWorkflows(unittest.TestCase):
         )
         self.assertIn("PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}", pr_job)
         self.assertIn("PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}", pr_job)
+        self.assertIn("if: runner.os == 'Linux'", pr_job)
+        self.assertIn("Validate process distribution sync", pr_job)
+        self.assertIn("Validate Linux process environment", pr_job)
+        self.assertIn("Run Linux finite process profiles", pr_job)
+        self.assertIn("if: runner.os == 'Windows'", pr_job)
+        self.assertIn(
+            "python -m unittest scripts.tests.test_install_process_runtime",
+            pr_job,
+        )
+        dependency_security = (
+            ROOT / ".github" / "workflows" / "dependency-security.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "python scripts/install_process_runtime.py", dependency_security
+        )
+        self.assertNotIn(
+            "python -m pip install --require-hashes -r requirements/process.txt",
+            dependency_security,
+        )
 
     def test_secret_scan_pins_runtime_and_reports_every_result_class(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(encoding="utf-8")
