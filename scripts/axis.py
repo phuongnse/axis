@@ -35,7 +35,6 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable, TextIO
 
 import axis_host_https
-import axis_pr_policy
 
 sys.dont_write_bytecode = True
 
@@ -335,17 +334,59 @@ def git(args: list[str], *, capture: bool = True, check: bool = True) -> str:
     return result.stdout if result.stdout is not None else ""
 
 
-BRANCH_PATTERN = axis_pr_policy.BRANCH_RE
-RENOVATE_BRANCH_PATTERN = axis_pr_policy.RENOVATE_BRANCH_RE
 GIT_OBJECT_RE = re.compile(r"^[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?$")
 NULL_GIT_OBJECT_RE = re.compile(r"^0{40}(?:0{24})?$")
 
 
+def publication_validation(
+    command: str, arguments: list[str]
+) -> tuple[list[str], dict[str, object]]:
+    try:
+        result = run(
+            [exe("processctl"), "publication", command, *arguments, "--json"],
+            cwd=ROOT,
+            capture=True,
+            check=False,
+            timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+        )
+    except OSError as error:
+        return [f"processctl publication {command} is unavailable: {error}"], {}
+    try:
+        document = json.loads(result.stdout)
+    except (TypeError, json.JSONDecodeError):
+        document = {}
+    raw_issues = document.get("issues") if isinstance(document, dict) else None
+    issues = (
+        [issue for issue in raw_issues if isinstance(issue, str)]
+        if isinstance(raw_issues, list)
+        else []
+    )
+    if result.returncode != 0 and not issues:
+        detail = (result.stderr or result.stdout or "").strip()
+        issues.append(
+            f"processctl publication {command} failed with exit code "
+            f"{result.returncode}: {detail or 'no diagnostic output'}"
+        )
+    return issues, document if isinstance(document, dict) else {}
+
+
+def publication_branch_issues(branch: str, *, manual_only: bool = False) -> list[str]:
+    issues, _document = publication_validation(
+        "validate-branch", ["--branch", branch]
+    )
+    if manual_only and branch.startswith("automation/"):
+        issues.append("manual Git mutation commands do not accept automation branches")
+    return issues
+
+
 def git_checkpoint(args: argparse.Namespace) -> int:
     branch = args.branch
-    if not BRANCH_PATTERN.fullmatch(branch):
-        raise CheckError(f"git checkpoint: invalid branch name: {branch}")
-    subject_issues = axis_pr_policy.validate_commit_subject(args.subject)
+    branch_issues = publication_branch_issues(branch, manual_only=True)
+    if branch_issues:
+        raise CheckError(f"git checkpoint: {'; '.join(branch_issues)}")
+    subject_issues, _document = publication_validation(
+        "validate-commit", ["--subject", args.subject]
+    )
     if subject_issues:
         raise CheckError(f"git checkpoint: {'; '.join(subject_issues)}")
 
@@ -379,8 +420,9 @@ def git_checkpoint(args: argparse.Namespace) -> int:
 
 def git_push_checkpoint(args: argparse.Namespace) -> int:
     branch = args.branch
-    if not BRANCH_PATTERN.fullmatch(branch):
-        raise CheckError(f"git push-checkpoint: invalid branch name: {branch}")
+    branch_issues = publication_branch_issues(branch, manual_only=True)
+    if branch_issues:
+        raise CheckError(f"git push-checkpoint: {'; '.join(branch_issues)}")
 
     current_branch = git(["branch", "--show-current"]).strip()
     if current_branch != branch:
@@ -480,7 +522,7 @@ def parse_pre_push_branch_updates(text: str) -> list[tuple[str, str]]:
         if not remote_ref.startswith("refs/heads/"):
             continue
         branch = remote_ref.removeprefix("refs/heads/")
-        branch_issues = axis_pr_policy.validate_branch(branch)
+        branch_issues = publication_branch_issues(branch)
         if branch_issues:
             raise CheckError(f"pre-push: {branch}: {'; '.join(branch_issues)}")
         updates.append((branch, local_sha.lower()))
@@ -508,29 +550,6 @@ def resolve_publish_branch(explicit: str | None = None) -> str:
     return git(["branch", "--show-current"]).strip()
 
 
-def publish_commit_subjects(range_spec: str) -> list[tuple[str, str]]:
-    result = run(
-        [exe("git"), "log", "--format=%H%x00%s", range_spec],
-        cwd=ROOT,
-        capture=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(
-            f"publish metadata: cannot inspect commit range {range_spec}: "
-            f"{detail or f'git exited {result.returncode}'}"
-        )
-
-    commits: list[tuple[str, str]] = []
-    for line in result.stdout.splitlines():
-        commit, separator, subject = line.partition("\0")
-        if not separator:
-            raise CheckError("publish metadata: git returned an invalid commit record")
-        commits.append((commit, subject))
-    return commits
-
-
 def check_publish_metadata(args: argparse.Namespace | None = None) -> int:
     explicit_branch = getattr(args, "branch", None)
     explicit_range = getattr(args, "range_spec", None)
@@ -540,25 +559,22 @@ def check_publish_metadata(args: argparse.Namespace | None = None) -> int:
         print(f"check-publish-metadata FAIL:\n  - {exc}", file=sys.stderr)
         return 1
 
-    issues = axis_pr_policy.validate_branch(branch)
-    if issues:
-        print("check-publish-metadata FAIL:", file=sys.stderr)
-        for issue in issues:
-            print(f"  - {issue}", file=sys.stderr)
-        return 1
-
     try:
         range_spec = explicit_range or diff_range()
-        commits = publish_commit_subjects(range_spec)
     except CheckError as exc:
         print(f"check-publish-metadata FAIL:\n  - {exc}", file=sys.stderr)
         return 1
-
-    for commit, subject in commits:
-        issues.extend(
-            f"Commit {commit[:12]}: {issue}"
-            for issue in axis_pr_policy.validate_commit_subject(subject)
-        )
+    issues, document = publication_validation(
+        "validate-range",
+        [
+            "--project-root",
+            str(ROOT),
+            "--branch",
+            branch,
+            "--range",
+            range_spec,
+        ],
+    )
 
     if issues:
         print("check-publish-metadata FAIL:", file=sys.stderr)
@@ -567,7 +583,8 @@ def check_publish_metadata(args: argparse.Namespace | None = None) -> int:
         return 1
 
     print(
-        f"check-publish-metadata: OK ({branch}, {len(commits)} commit(s), {range_spec})"
+        f"check-publish-metadata: OK "
+        f"({branch}, {len(document.get('commits', []))} commit(s), {range_spec})"
     )
     return 0
 
@@ -604,12 +621,9 @@ def working_tree_paths() -> list[str]:
 
 def git_sync(args: argparse.Namespace) -> int:
     branch = args.branch
-    if (
-        branch != "main"
-        and not BRANCH_PATTERN.fullmatch(branch)
-        and not RENOVATE_BRANCH_PATTERN.fullmatch(branch)
-    ):
-        raise CheckError(f"git sync: invalid branch name: {branch}")
+    branch_issues = [] if branch == "main" else publication_branch_issues(branch)
+    if branch_issues:
+        raise CheckError(f"git sync: {'; '.join(branch_issues)}")
 
     current_branch = git(["branch", "--show-current"]).strip()
     if not current_branch:
