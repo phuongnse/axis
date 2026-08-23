@@ -41,7 +41,7 @@ jobs:
           requirements-lock: requirements/process.txt
 
       - name: Validate complete process adoption candidate
-        if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
+        if: startsWith(github.head_ref, 'automation/process/engineering-process')
         run: >-
           processctl adoption check
           --project-root .
@@ -98,7 +98,7 @@ jobs:
           requirements-lock: requirements/process.txt
 
       - name: Validate complete process adoption candidate
-        if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
+        if: startsWith(github.head_ref, 'automation/process/engineering-process')
         run: >-
           processctl adoption check
           --project-root .

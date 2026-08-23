@@ -25,11 +25,11 @@ python scripts/axis.py local-dev up
 ```
 
 `requirements/process.in` owns the direct public process pin and
-`requirements/process.txt` owns its complete pip-compile hash graph. Renovate creates
-complete process-adoption drafts by running the managed `.process/adopt-process.py`
-command before it opens the PR. Merge of a verified adoption PR applies the new
-process; there is no command to run after merge. Operational details and the required
-Renovate host allowlist are in
+`requirements/process.txt` owns its complete pip-compile hash graph. The configured
+consumer lifecycle host prepares and reviews a complete unpublished adoption
+checkpoint with the managed `.process/adopt-process.py` command, then pushes and
+creates the PR only after lifecycle completion. Human merge of that exact PR applies
+the new process; there is no command to run after merge. Operational details are in
 [docs/playbooks/process-adoption.md](./docs/playbooks/process-adoption.md).
 
 Run `processctl setup --project-root . --profile development` without `--apply` to inspect the platform-neutral setup plan. When host-browser access is required, opt into current-user trust with `python scripts/axis.py local-dev trust-certs`, then run `python scripts/axis.py local-dev host-smoke` after the stack is ready. For supported-platform trust boundaries, Docker-in-WSL, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).

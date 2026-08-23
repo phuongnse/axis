@@ -4,10 +4,11 @@
 
 Recurring rule classes and their enforcement status.
 
-The `automation/renovate/engineering-process-authority` branch is bot-owned. Humans
-and agents do not push cleanup or conflict-resolution commits to it. This initial
-process ownership cutover is reviewed on a normal `refactor/*` branch; after that
-merge, every authority update is generated and updated only by Renovate.
+Engineering-process authority candidates are owned by the consumer lifecycle host,
+not Renovate. The host keeps the candidate unpublished through complete verification,
+fresh independent review, finding resolution, and `change finish`; only then may
+automation push its `automation/*` branch and create the PR. The configured human
+owner alone merges it.
 
 ## Status
 

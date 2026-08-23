@@ -2437,11 +2437,12 @@ def main() -> int:
 
 
 class TestRenovateConfigGate(unittest.TestCase):
-    def test_process_updates_materialize_one_complete_non_automerge_candidate(self) -> None:
+    def test_process_updates_are_reserved_for_the_lifecycle_host(self) -> None:
         config = json.loads(
             (axis.ROOT / ".github" / "renovate.json5").read_text(encoding="utf-8")
         )
 
+        self.assertTrue(config["enabled"])
         self.assertFalse(config["automerge"])
         self.assertTrue(config["draftPR"])
         self.assertIn("pip-compile", config["enabledManagers"])
@@ -2477,6 +2478,7 @@ class TestRenovateConfigGate(unittest.TestCase):
             for item in config["packageRules"]
             if "engineering-process" in item.get("matchPackageNames", [])
         )
+        self.assertFalse(rule["enabled"])
         self.assertFalse(rule["automerge"])
         self.assertEqual(["at any time"], rule["schedule"])
         self.assertEqual(100, rule["prPriority"])
@@ -2510,7 +2512,8 @@ class TestRenovateConfigGate(unittest.TestCase):
             axis.ROOT / ".github" / "workflows" / "build-and-test.yml"
         ).read_text(encoding="utf-8")
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
-        self.assertIn("automation/renovate/engineering-process", workflow)
+        self.assertIn("automation/process/engineering-process", workflow)
+        self.assertNotIn("automation/renovate/engineering-process", workflow)
 
     def test_uses_project_frontend_runtime_for_validator(self) -> None:
         completed = axis.subprocess.CompletedProcess([], 0, stdout="", stderr="")
