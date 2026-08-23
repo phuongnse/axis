@@ -56,6 +56,7 @@ The runtime, framework, persistence provider, and framework-integrated libraries
 - Reference-product BFF runtime and packages: the independently versioned reference-product repository
 - Engineering-process direct public pin: `requirements/process.in`
 - Engineering-process compiled package graph and hashes: `requirements/process.txt`
+- Engineering-process CI bootstrap action: full governed release commit in `.github/workflows/build-and-test.yml` and `.github/workflows/dependency-security.yml`
 - Portable environment and finite profiles: `.process/project.json`
 - Process distribution resources: `.process/process.lock`
 - Process adoption materialization: `.process/adopt-process.py` and the installed target distribution

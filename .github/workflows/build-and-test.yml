@@ -35,10 +35,10 @@ jobs:
           python-version: '3.14'
 
       - name: Install published process runtime
-        run: >-
-          python scripts/install_process_runtime.py
-          --project-root .
-          --requirements-lock requirements/process.txt
+        uses: phuongnse/engineering-process@b963597418226da02b31dbbdc3a09c23d1a6f9c8 # v0.3.0
+        with:
+          project-root: .
+          requirements-lock: requirements/process.txt
 
       - name: Validate complete process adoption candidate
         if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
@@ -92,10 +92,10 @@ jobs:
           cache-dependency-path: '**/packages.lock.json'
 
       - name: Install published process runtime
-        run: >-
-          python scripts/install_process_runtime.py
-          --project-root .
-          --requirements-lock requirements/process.txt
+        uses: phuongnse/engineering-process@b963597418226da02b31dbbdc3a09c23d1a6f9c8 # v0.3.0
+        with:
+          project-root: .
+          requirements-lock: requirements/process.txt
 
       - name: Validate complete process adoption candidate
         if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
@@ -115,7 +115,7 @@ jobs:
         run: processctl sync --project-root . --check
 
       # Docker-backed full profiles are Linux-owned. The Windows matrix proves the
-      # exact lock, adoption materialization, managed sync, and installer behavior
+      # exact lock, adoption materialization, managed sync, and shared action behavior
       # without pretending the hosted Windows image provides a Docker endpoint.
       - name: Validate Linux process environment
         if: runner.os == 'Linux'
@@ -128,10 +128,6 @@ jobs:
         run: |
           processctl verify --project-root . --profile development
           processctl verify --project-root . --profile review
-
-      - name: Verify Windows process installer portability
-        if: runner.os == 'Windows'
-        run: python -m unittest scripts.tests.test_install_process_runtime
 
   # Detects which scopes the PR actually touches so the heavy jobs below
   # can skip themselves on PRs that don't affect them. Job-level `if:`
