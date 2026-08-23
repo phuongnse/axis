@@ -28,7 +28,7 @@ Axis is an open-source enterprise application platform engineered under the prod
 | [docs/playbooks/testing.md](./playbooks/testing.md) | Backend and frontend test conventions. |
 | [docs/playbooks/docs-style.md](./playbooks/docs-style.md) | Documentation ownership and size rules. |
 | [docs/playbooks/scripts.md](./playbooks/scripts.md) | Axis CLI and repo script standards. |
-| [docs/playbooks/process-adoption.md](./playbooks/process-adoption.md) | Renovate process pin, complete adoption PR, and merge boundary. |
+| [docs/playbooks/process-adoption.md](./playbooks/process-adoption.md) | Lifecycle-host process pin, pre-publication review, complete adoption PR, and merge boundary. |
 | [docs/playbooks/local-dev.md](./playbooks/local-dev.md) | Local stack commands and ports. |
 | [docs/playbooks/mcp.md](./playbooks/mcp.md) | Local MCP bridge boundary, auth, tools, and verification. |
 
