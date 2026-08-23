@@ -83,7 +83,7 @@
   },
   "packageRules": [
     {
-      "description": "Generate a complete engineering-process authority adoption PR.",
+      "description": "Reserve engineering-process adoption for the pre-publication lifecycle host.",
       "matchFileNames": [
         ".github/workflows/build-and-test.yml",
         ".github/workflows/dependency-security.yml",
@@ -94,7 +94,7 @@
         "engineering-process",
         "phuongnse/engineering-process"
       ],
-      "enabled": true,
+      "enabled": false,
       "automerge": false,
       "groupName": "engineering-process authority",
       "groupSlug": "engineering-process-authority",
