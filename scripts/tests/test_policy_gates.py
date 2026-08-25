@@ -2437,6 +2437,25 @@ def main() -> int:
 
 
 class TestRenovateConfigGate(unittest.TestCase):
+    POLICY_JOB = (
+        "  policy-verification:\n"
+        "    name: policy-verification\n"
+        "    permissions:\n"
+        "      contents: read\n"
+        "      pull-requests: read\n"
+        "    uses: phuongnse/renovate-ops/.github/workflows/"
+        "policy-verification.yml@2152dab51edd6c84163a71b48f50e6ad042eb331\n"
+    )
+
+    @classmethod
+    def has_exact_policy_job(cls, workflow: str) -> bool:
+        marker = "  policy-verification:\n"
+        next_job = "\n  pr:\n"
+        if marker not in workflow or next_job not in workflow:
+            return False
+        policy_job = marker + workflow.split(marker, 1)[1].split(next_job, 1)[0]
+        return policy_job == cls.POLICY_JOB
+
     def test_process_updates_are_reserved_for_the_lifecycle_host(self) -> None:
         config = json.loads(
             (axis.ROOT / ".github" / "renovate.json5").read_text(encoding="utf-8")
@@ -2493,16 +2512,37 @@ class TestRenovateConfigGate(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
         self.assertIn("automation/process/engineering-process", workflow)
         self.assertNotIn("automation/renovate/engineering-process", workflow)
-        self.assertIn(
-            "policy-verification.yml@2152dab51edd6c84163a71b48f50e6ad042eb331",
-            workflow,
-        )
-        self.assertIn(
-            "policy-verification:\n    name: policy-verification\n"
-            "    permissions:\n      contents: read\n      pull-requests: read",
-            workflow,
-        )
+        self.assertTrue(self.has_exact_policy_job(workflow))
         self.assertNotIn("independent-review.yml", workflow)
+
+    def test_policy_job_rejects_trust_root_and_permission_mutations(self) -> None:
+        workflow = (
+            axis.ROOT / ".github" / "workflows" / "build-and-test.yml"
+        ).read_text(encoding="utf-8")
+        mutations = {
+            "untrusted-owner": workflow.replace(
+                "phuongnse/renovate-ops/", "attacker/renovate-ops/", 1
+            ),
+            "changed-revision": workflow.replace(
+                "2152dab51edd6c84163a71b48f50e6ad042eb331",
+                "2152dab51edd6c84163a71b48f50e6ad042eb330",
+                1,
+            ),
+            "write-permissions": workflow.replace(
+                "contents: read\n      pull-requests: read",
+                "contents: write\n      pull-requests: write",
+                1,
+            ),
+            "extra-permission": workflow.replace(
+                "pull-requests: read\n    uses:",
+                "pull-requests: read\n      issues: write\n    uses:",
+                1,
+            ),
+        }
+        self.assertTrue(self.has_exact_policy_job(workflow))
+        for name, mutation in mutations.items():
+            with self.subTest(name=name):
+                self.assertFalse(self.has_exact_policy_job(mutation))
 
     def test_uses_project_frontend_runtime_for_validator(self) -> None:
         completed = axis.subprocess.CompletedProcess([], 0, stdout="", stderr="")
