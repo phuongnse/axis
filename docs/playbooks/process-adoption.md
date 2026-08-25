@@ -16,8 +16,8 @@ this repository and no consumer depends on a sibling checkout.
   and accepted hashes.
 - `.process/process.lock` owns the adopted distribution digest and selected skills.
 - `.github/renovate.json5` owns explicit consumer discovery intent, normal dependency
-  polling, the disabled process-authority rule, the bounded output allowlist, and
-  `automerge: false`.
+  polling, the disabled process-authority rule, the absence of post-upgrade execution,
+  and `automerge: false`.
 - `.process/adopt-process.py` is the managed bootstrap runner. It installs only the
   hash-locked target distribution in an isolated environment; that installed target
   owns `processctl adoption apply`.

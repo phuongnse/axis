@@ -2493,7 +2493,15 @@ class TestRenovateConfigGate(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
         self.assertIn("automation/process/engineering-process", workflow)
         self.assertNotIn("automation/renovate/engineering-process", workflow)
-        self.assertIn("policy-verification.yml@2152dab51edd6c", workflow)
+        self.assertIn(
+            "policy-verification.yml@2152dab51edd6c84163a71b48f50e6ad042eb331",
+            workflow,
+        )
+        self.assertIn(
+            "policy-verification:\n    name: policy-verification\n"
+            "    permissions:\n      contents: read\n      pull-requests: read",
+            workflow,
+        )
         self.assertNotIn("independent-review.yml", workflow)
 
     def test_uses_project_frontend_runtime_for_validator(self) -> None:
