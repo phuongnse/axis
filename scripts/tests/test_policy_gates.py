@@ -2451,28 +2451,7 @@ class TestRenovateConfigGate(unittest.TestCase):
             ["/^requirements\\/process\\.txt$/"],
             config["pip-compile"]["managerFilePatterns"],
         )
-        task = config["postUpgradeTasks"]
-        self.assertEqual("branch", task["executionMode"])
-        self.assertEqual(
-            [
-                "python .process/adopt-process.py --project-root . "
-                "--requirements-lock requirements/process.txt"
-            ],
-            task["commands"],
-        )
-        self.assertTrue(
-            {
-                ".agents/skills/**",
-                ".github/PULL_REQUEST_TEMPLATE.md",
-                ".process/adopt-process.py",
-                ".process/adopt-process-windows-job.py",
-                ".process/adoption-migrations/**",
-                ".process/process.lock",
-                ".process/project.json",
-                "requirements/process.in",
-                "requirements/process.txt",
-            }.issubset(task["fileFilters"])
-        )
+        self.assertNotIn("postUpgradeTasks", config)
         rule = next(
             item
             for item in config["packageRules"]
@@ -2514,6 +2493,8 @@ class TestRenovateConfigGate(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
         self.assertIn("automation/process/engineering-process", workflow)
         self.assertNotIn("automation/renovate/engineering-process", workflow)
+        self.assertIn("policy-verification.yml@2152dab51edd6c", workflow)
+        self.assertNotIn("independent-review.yml", workflow)
 
     def test_uses_project_frontend_runtime_for_validator(self) -> None:
         completed = axis.subprocess.CompletedProcess([], 0, stdout="", stderr="")
