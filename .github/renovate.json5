@@ -57,30 +57,6 @@
     "vulnerabilityFixStrategy": "lowest"
   },
   "prBodyTemplate": "<!-- engineering-process:pr-description:start -->\n## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Contract and scope\n\nDependency automation follows the exact version owners in docs/TECH_STACK.md.\n\n## Impact and risk\n\nThe proposed locked dependency delta requires CI and human compatibility review.\n\n## Verification\n\nProcess profiles and dependency audits run after this draft opens.\n\n## Independent review\n\nA human reviewer must approve the verified immutable checkpoint before merge.\n\n## Requirements and rules followed\n\n- [ ] **Scope and contract** — accepted scope is implemented without unapproved expansion. [status: pending]\n- [ ] **Verification evidence** — required current profiles pass on the published checkpoint. [status: pending]\n- [ ] **Independent review** — a separate reviewer approved the published checkpoint with no open required finding. [status: pending]\n<!-- engineering-process:pr-description:end -->\n\n## Project-specific requirements\n\n- [ ] **Project-specific: Documentation and status** — owning documentation and enforcement status are current when behavior, status, or workflow changes. [status: pending]\n- [x] **Project-specific: UI system** — [reason: dependency automation does not change an accepted UI surface until a separately reviewed implementation does so] [status: not-applicable]\n- [x] **Project-specific: Placeholder sweep** — generated Renovate text contains no implementation placeholder. [status: satisfied]\n",
-  "postUpgradeTasks": {
-    "commands": [
-      "python .process/adopt-process.py --project-root . --requirements-lock requirements/process.txt"
-    ],
-    "executionMode": "branch",
-    "fileFilters": [
-      ".agents/.gitattributes",
-      ".agents/skills/**",
-      ".github/PULL_REQUEST_TEMPLATE.md",
-      ".github/workflows/build-and-test.yml",
-      ".github/workflows/dependency-security.yml",
-      ".process/adopt-process.py",
-      ".process/adopt-process-windows-job.py",
-      ".process/adoption-migrations/**",
-      ".process/process.lock",
-      ".process/project.json",
-      "AGENTS.md",
-      "requirements/process.in",
-      "requirements/process.txt"
-    ],
-    "installTools": {
-      "python": {}
-    }
-  },
   "packageRules": [
     {
       "description": "Reserve engineering-process adoption for the pre-publication lifecycle host.",
