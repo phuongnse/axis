@@ -2444,7 +2444,7 @@ class TestRenovateConfigGate(unittest.TestCase):
         "      contents: read\n"
         "      pull-requests: read\n"
         "    uses: phuongnse/renovate-ops/.github/workflows/"
-        "policy-verification.yml@2152dab51edd6c84163a71b48f50e6ad042eb331\n"
+        "policy-verification.yml@1e3d0d333b62ec92c94ea5c355bbb0cd73024b78\n"
     )
 
     @classmethod
@@ -2524,8 +2524,8 @@ class TestRenovateConfigGate(unittest.TestCase):
                 "phuongnse/renovate-ops/", "attacker/renovate-ops/", 1
             ),
             "changed-revision": workflow.replace(
-                "2152dab51edd6c84163a71b48f50e6ad042eb331",
-                "2152dab51edd6c84163a71b48f50e6ad042eb330",
+                "1e3d0d333b62ec92c94ea5c355bbb0cd73024b78",
+                "1e3d0d333b62ec92c94ea5c355bbb0cd73024b79",
                 1,
             ),
             "write-permissions": workflow.replace(
