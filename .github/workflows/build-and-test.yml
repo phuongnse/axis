@@ -36,13 +36,17 @@ jobs:
           python-version: '3.14'
 
       - name: Install published process runtime
-        uses: phuongnse/engineering-process@cb2563e5a90a644af5be596d9418bb13f065aa12 # v0.4.0
-        with:
-          project-root: .
-          requirements-lock: requirements/process.txt
+        run: >-
+          python -m pip install
+          --isolated
+          --disable-pip-version-check
+          --no-input
+          --require-hashes
+          --only-binary :all:
+          -r requirements/process.txt
 
       - name: Validate complete process adoption candidate
-        if: startsWith(github.head_ref, 'automation/process/engineering-process')
+        if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
         run: >-
           processctl adoption check
           --project-root .
@@ -93,13 +97,17 @@ jobs:
           cache-dependency-path: '**/packages.lock.json'
 
       - name: Install published process runtime
-        uses: phuongnse/engineering-process@cb2563e5a90a644af5be596d9418bb13f065aa12 # v0.4.0
-        with:
-          project-root: .
-          requirements-lock: requirements/process.txt
+        run: >-
+          python -m pip install
+          --isolated
+          --disable-pip-version-check
+          --no-input
+          --require-hashes
+          --only-binary :all:
+          -r requirements/process.txt
 
       - name: Validate complete process adoption candidate
-        if: startsWith(github.head_ref, 'automation/process/engineering-process')
+        if: startsWith(github.head_ref, 'automation/renovate/engineering-process')
         run: >-
           processctl adoption check
           --project-root .
@@ -113,10 +121,10 @@ jobs:
         run: processctl setup --project-root . --profile review --apply --allow network --allow user-files
 
       - name: Validate process distribution sync
-        run: processctl sync --project-root . --check
+        run: processctl adoption check --project-root . --requirements-lock requirements/process.txt
 
       # Docker-backed full profiles are Linux-owned. The Windows matrix proves the
-      # exact lock, adoption materialization, managed sync, and shared action behavior
+      # exact lock, adoption materialization, managed sync, and direct runtime installation
       # without pretending the hosted Windows image provides a Docker endpoint.
       - name: Validate Linux process environment
         if: runner.os == 'Linux'

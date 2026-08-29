@@ -4,7 +4,7 @@
 
 The Design Gate is required pre-code evidence for non-trivial changes. Produce the per-change dossier in the active task, pass it through typed owner handoffs, and retain it until the change closes. Promote only current durable decisions and rationale to owner docs; keep task progress and review context in checkpoint commits or the pull request. Do not create committed or ignored per-change dossier files. This is the sole committed Design Gate playbook, not a machine-enforced CI gate.
 
-For repeatable execution, read [`.agents/skills/assess-design/SKILL.md`](../../.agents/skills/assess-design/SKILL.md) (`$assess-design`).
+This Axis-owned playbook is the repeatable design gate used before `start-change`.
 
 ---
 

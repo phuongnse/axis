@@ -2456,7 +2456,7 @@ class TestRenovateConfigGate(unittest.TestCase):
         policy_job = marker + workflow.split(marker, 1)[1].split(next_job, 1)[0]
         return policy_job == cls.POLICY_JOB
 
-    def test_process_updates_are_reserved_for_the_lifecycle_host(self) -> None:
+    def test_process_updates_are_materialized_by_the_managed_runner(self) -> None:
         config = json.loads(
             (axis.ROOT / ".github" / "renovate.json5").read_text(encoding="utf-8")
         )
@@ -2476,22 +2476,31 @@ class TestRenovateConfigGate(unittest.TestCase):
             for item in config["packageRules"]
             if "engineering-process" in item.get("matchPackageNames", [])
         )
-        self.assertFalse(rule["enabled"])
+        self.assertTrue(rule["enabled"])
         self.assertFalse(rule["automerge"])
         self.assertEqual(["at any time"], rule["schedule"])
         self.assertEqual(100, rule["prPriority"])
         self.assertEqual(
             [
-                ".github/workflows/build-and-test.yml",
-                ".github/workflows/dependency-security.yml",
                 "requirements/process.in",
                 "requirements/process.txt",
             ],
             rule["matchFileNames"],
         )
         self.assertEqual(
-            ["engineering-process", "phuongnse/engineering-process"],
+            ["engineering-process"],
             rule["matchPackageNames"],
+        )
+        self.assertEqual(
+            [
+                "python .process/adopt-process.py --project-root . "
+                "--requirements-lock requirements/process.txt"
+            ],
+            rule["postUpgradeTasks"]["commands"],
+        )
+        self.assertEqual("update", rule["postUpgradeTasks"]["executionMode"])
+        self.assertIn(
+            ".agents/skills/**", rule["postUpgradeTasks"]["fileFilters"]
         )
 
         process_input = (axis.ROOT / "requirements" / "process.in").read_text(
@@ -2510,8 +2519,7 @@ class TestRenovateConfigGate(unittest.TestCase):
             axis.ROOT / ".github" / "workflows" / "build-and-test.yml"
         ).read_text(encoding="utf-8")
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
-        self.assertIn("automation/process/engineering-process", workflow)
-        self.assertNotIn("automation/renovate/engineering-process", workflow)
+        self.assertIn("automation/renovate/engineering-process", workflow)
         self.assertTrue(self.has_exact_policy_job(workflow))
         self.assertNotIn("independent-review.yml", workflow)
 
@@ -3854,7 +3862,7 @@ class TestReviewVerificationGates(unittest.TestCase):
     def test_review_checks_reuses_verify_coverage_in_doc_drift(self) -> None:
         paths = [
             "scripts/axis.py",
-            ".agents/skills/run-project-command/SKILL.md",
+            "docs/playbooks/scripts.md",
             "docs/use-cases/example.md",
             "docs/foundations/example.md",
         ]
@@ -6079,12 +6087,9 @@ class TestGitWorkflows(unittest.TestCase):
         pr_job = workflow.split("  pr:\n", maxsplit=1)[1].split("\n  detect:\n", maxsplit=1)[0]
 
         self.assertIn("fetch-depth: 0", pr_job)
-        self.assertEqual(2, pr_job.count("uses: phuongnse/engineering-process@"))
+        self.assertEqual(2, pr_job.count("python -m pip install"))
+        self.assertEqual(2, pr_job.count("--require-hashes"))
         self.assertNotIn("scripts/install_process_runtime.py", pr_job)
-        self.assertNotIn(
-            "python -m pip install --require-hashes -r requirements/process.txt",
-            pr_job,
-        )
         self.assertIn("processctl publication validate-pr", pr_job)
         self.assertIn('jq -r \'.pull_request.body // ""\' "$GITHUB_EVENT_PATH"', pr_job)
         self.assertIn(
@@ -6097,16 +6102,13 @@ class TestGitWorkflows(unittest.TestCase):
         self.assertIn("Validate process distribution sync", pr_job)
         self.assertIn("Validate Linux process environment", pr_job)
         self.assertIn("Run Linux finite process profiles", pr_job)
-        self.assertIn("shared action behavior", pr_job)
+        self.assertIn("direct runtime installation", pr_job)
         dependency_security = (
             ROOT / ".github" / "workflows" / "dependency-security.yml"
         ).read_text(encoding="utf-8")
-        self.assertIn("uses: phuongnse/engineering-process@", dependency_security)
+        self.assertIn("python -m pip install", dependency_security)
+        self.assertIn("--require-hashes", dependency_security)
         self.assertNotIn("scripts/install_process_runtime.py", dependency_security)
-        self.assertNotIn(
-            "python -m pip install --require-hashes -r requirements/process.txt",
-            dependency_security,
-        )
 
     def test_secret_scan_pins_runtime_and_reports_every_result_class(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(encoding="utf-8")
