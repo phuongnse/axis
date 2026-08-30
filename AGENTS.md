@@ -33,17 +33,17 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
   implementation, verification, independent review, finding loops, and completion.
   Axis product and architecture contracts add domain policy; they do not replace
   lifecycle gates.
-- Before non-trivial work, start from `run-change`, read the current phase and affected
-  managed capability skills, then read only the owning Axis contracts and source.
+- Before non-trivial work, start from `run-change`, read the current phase skill, then
+  read only the owning Axis playbooks, contracts, and source.
 - Optional work delegation never changes lifecycle ownership. Independent review
   still requires a separate attested read-only actor and context.
-- When a required action is outside the repository or user-controlled (for example authentication, consent, client reload/restart, host prerequisites, permissions, approval, or a destructive operation), stop at that boundary, preserve the exact evidence, and ask the user for the action or decision. Do not silently bypass the boundary with disabled security, injected credentials, direct database changes, killed app-managed processes, ad hoc proxies, or indirect evidence. Follow the [blocker protocol](./.agents/skills/run-change/references/execution.md#blocker-protocol).
+- When a required action is outside the repository or user-controlled (for example authentication, consent, client reload/restart, host prerequisites, permissions, approval, or a destructive operation), stop at that boundary, preserve the exact evidence, and ask the user for the action or decision. Do not silently bypass the boundary with disabled security, injected credentials, direct database changes, killed app-managed processes, ad hoc proxies, or indirect evidence.
 - Before claiming a slice complete, map its acceptance criteria to current source, test, and runtime evidence. Missing, stale, indirect, or blocked evidence stays `not run` or `blocked`; it is not converted into a pass. MCP runtime work additionally requires the supported client registry and authenticated operation/read-back boundary described in [the MCP playbook](./docs/playbooks/mcp.md#runtime-lifecycle-and-blocker-protocol).
 
 ## Verification
 
 Select development and review evidence through `.process/project.json` and
-`run-project-command`; before review, apply
+`verify-change`; before review, apply
 [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).
 
 <!-- engineering-process:start -->

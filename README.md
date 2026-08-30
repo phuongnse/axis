@@ -18,7 +18,7 @@ Run on any supported host:
 python -m venv .process-venv
 # Activate .process-venv using the native command for your shell.
 python -m pip install --require-hashes -r requirements/process.txt
-processctl setup --project-root . --profile development --apply --allow network --allow user-files --allow project-files
+processctl setup --project-root . --profile development --apply
 python scripts/axis.py local-dev certs
 python scripts/axis.py install-hooks
 python scripts/axis.py local-dev up
@@ -32,4 +32,4 @@ creates the PR only after lifecycle completion. Human merge of that exact PR app
 the new process; there is no command to run after merge. Operational details are in
 [docs/playbooks/process-adoption.md](./docs/playbooks/process-adoption.md).
 
-Run `processctl setup --project-root . --profile development` without `--apply` to inspect the platform-neutral setup plan. When host-browser access is required, opt into current-user trust with `python scripts/axis.py local-dev trust-certs`, then run `python scripts/axis.py local-dev host-smoke` after the stack is ready. For supported-platform trust boundaries, Docker-in-WSL, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).
+Run `processctl setup --project-root . --profile development` without `--apply` to inspect the consumer-owned dependency command. When host-browser access is required, opt into current-user trust with `python scripts/axis.py local-dev trust-certs`, then run `python scripts/axis.py local-dev host-smoke` after the stack is ready. For supported-platform trust boundaries, Docker-in-WSL, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).

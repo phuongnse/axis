@@ -29,11 +29,11 @@ The runtime, framework, persistence provider, and framework-integrated libraries
 | Testing | xUnit v3, Testcontainers, architecture tests, Vitest, Testing Library, Playwright. |
 | Local runtime | Docker Compose with PostgreSQL, Redis, Maildev, API, SPA, and optional observability/e2e profiles. |
 | Dependency automation | Renovate. |
-| Engineering process | Public `engineering-process` Python distribution and portable `processctl` lifecycle/environment contract. |
+| Engineering process | Public `engineering-process` Python distribution with portable lifecycle, verification, and managed adoption. |
 
 ## Dependency Version Policy
 
-- The frontend toolchain is one coherent baseline: exact Node in `frontend/.nvmrc` and `frontend/Dockerfile.dev`, its bundled exact npm in `frontend/package.json`, and the portable Node/npm contract in `.process/project.json`.
+- The frontend toolchain is one coherent baseline: exact Node in `frontend/.nvmrc` and `frontend/Dockerfile.dev`, with its bundled exact npm in `frontend/package.json`.
 - Direct frontend dependencies and overrides use exact versions in `frontend/package.json`; `package-lock.json` locks the full resolved graph and `python scripts/axis.py frontend install` is the only supported install path.
 - .NET package versions remain centralized and exact in `Directory.Packages.props`; each project commits its generated `packages.lock.json`, and CI restores the full graph in locked mode. GitHub Actions remain digest-pinned.
 - Independently versioned product BFFs pin their .NET SDK, direct NuGet packages, container bases, and full restore graph in their own repository; the Axis reference product is the required proving consumer of this supported combination.
@@ -56,7 +56,7 @@ The runtime, framework, persistence provider, and framework-integrated libraries
 - Reference-product BFF runtime and packages: the independently versioned reference-product repository
 - Engineering-process direct public pin: `requirements/process.in`
 - Engineering-process compiled package graph and hashes: `requirements/process.txt`
-- Engineering-process CI bootstrap action: full governed release commit in `.github/workflows/build-and-test.yml` and `.github/workflows/dependency-security.yml`
-- Portable environment and finite profiles: `.process/project.json`
+- Engineering-process CI bootstrap: direct `--require-hashes` installation from `requirements/process.txt` after setup-python
+- Finite verification profiles and consumer-owned setup command: `.process/project.json`
 - Process distribution resources: `.process/process.lock`
 - Process adoption materialization: `.process/adopt-process.py` and the installed target distribution

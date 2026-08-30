@@ -82,7 +82,7 @@ Use MCP for product state and product operations:
 
 When an API operation changes, the same slice must update the OpenAPI contract, `AxisMcpOperationCatalog`, the typed tool/request shape, focused tests, and this playbook when the workflow changes. Do not add a generic proxy to avoid updating parity. The committed OpenAPI is the generated-coverage source of truth; when endpoint operation IDs change, regenerate it before running the coverage gate.
 
-Use the MCP owner skill [`.agents/skills/integrate-mcp/SKILL.md`](../../.agents/skills/integrate-mcp/SKILL.md) and run:
+Use this MCP owner playbook with the normal phase skills, then run:
 
 ```text
 python scripts/axis.py check mcp-api-coverage

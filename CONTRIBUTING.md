@@ -12,7 +12,7 @@ Axis uses docs-first development. Use-case specs under [docs/use-cases/README.md
 
 ## Before a PR
 
-For first-time setup, create and activate `.process-venv` with Python 3.14, install `requirements/process.txt` with `python -m pip install --require-hashes`, then run `processctl setup --project-root . --profile development --apply --allow network --allow user-files --allow project-files`. See [docs/playbooks/scripts.md](./docs/playbooks/scripts.md) for the process boundary and installation policy.
+For first-time setup, create and activate `.process-venv` with Python 3.14, install `requirements/process.txt` with `python -m pip install --require-hashes`, then run `processctl setup --project-root . --profile development --apply`. See [docs/playbooks/scripts.md](./docs/playbooks/scripts.md) for the process boundary and installation policy.
 
 Local HTTPS material and the repository pre-push hook remain Axis-owned. Run `python scripts/axis.py local-dev certs` and `python scripts/axis.py install-hooks`; current-user certificate trust is a separate explicit `python scripts/axis.py local-dev trust-certs` action.
 

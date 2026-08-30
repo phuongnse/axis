@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use `$change-api` for REST/OpenAPI/API type changes.
+Use this Axis-owned playbook for REST/OpenAPI/API type changes.
 
 ## Query & N+1 patterns
 

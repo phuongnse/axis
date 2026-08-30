@@ -2,16 +2,16 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Review checklist only. Workflow lives in the managed `run-change` and capability
-skills pinned by `.process/process.lock`; enforcement status lives in
+Review checklist only. Workflow lives in the managed `run-change` phase skills;
+Axis capability guidance lives in its playbooks and contracts. Enforcement status lives in
 [docs/ENFORCEMENT.md](../ENFORCEMENT.md), and command behavior lives in
 [docs/playbooks/scripts.md](./scripts.md).
 
 ## Before Code
 
-- Use `$assess-design` for non-trivial work; high-risk surfaces need sign-off.
-- Select the applicable managed capability skill and preserve current prerequisite
-  evidence across ownership handoffs.
+- Use [design-gate.md](./design-gate.md) for non-trivial work; high-risk surfaces need sign-off.
+- Select the applicable Axis owner playbook and preserve current prerequisite evidence
+  across ownership handoffs.
 - Confirm the routing checkpoint covers current independently ownable work units; re-evaluate unexecuted units after decisions resolve ambiguity or change their scope, ownership, or verification boundary.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
@@ -53,14 +53,14 @@ For a clean cutover, review the post-edit `rg` sweep for retired routes, fields,
 | Behavior/spec/status | Owning use case |
 | Stack/library/manifests | [docs/TECH_STACK.md](../TECH_STACK.md) and owning manifests |
 | Repeated rule class | Focused playbook or [docs/ENFORCEMENT.md](../ENFORCEMENT.md) |
-| Mermaid or committed visual artifact | `$maintain-docs` and the owning spec |
+| Mermaid or committed visual artifact | [docs-style.md](./docs-style.md) and the owning spec |
 
 Pure refactor/style/test-only changes can report docs as not triggered.
 
 ## Retrospective Review
 
-Use the shared `verify-change`, `review-change`, and `finish-change` gates and apply
-the managed `evolve-process` classification and regression loop.
+Use the shared `verify-change`, `review-change`, and `finish-change` gates. Open a
+normal process change backed by consumer evidence when the shared process itself is at fault.
 Record one outcome instead of adding retrospective prose.
 
 ## Layer Status

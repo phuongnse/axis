@@ -4,29 +4,27 @@
 
 [scripts/axis.py](../../scripts/axis.py) owns Axis build, generation, local-development,
 and product-policy commands. The shared process owns lifecycle and evidence routing;
-use `$run-project-command` when deciding what to run.
+use `verify-change` with `.process/project.json` when deciding what to run.
 
 ## Tool Versions
 
 | Tool | Required source | Used by |
 |---|---|---|
-| Python | Python 3.14 with `venv` and `pip` for the locked process bootstrap; the Axis domain launcher accepts the range declared in [.process/project.json](../../.process/project.json) | process runtime and repository maintenance |
-| Engineering process | Direct public pin in [requirements/process.in](../../requirements/process.in), complete graph and hashes in [requirements/process.txt](../../requirements/process.txt), distribution resources in [.process/process.lock](../../.process/process.lock), and full governed release commit for the CI bootstrap action | lifecycle, portable environment, verification, publication metadata |
-| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable artifact contract in [.process/project.json](../../.process/project.json) | build, tests, format, package scan, API contracts |
+| Python | Python 3.14 with `venv` and `pip` for the locked process bootstrap | process runtime and repository maintenance |
+| Engineering process | Direct public pin in [requirements/process.in](../../requirements/process.in), complete graph and hashes in [requirements/process.txt](../../requirements/process.txt), and distribution resources in [.process/process.lock](../../.process/process.lock) | lifecycle, verification, and managed adoption |
+| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md) | build, tests, format, package scan, API contracts |
 | MCP SDK | Exact `ModelContextProtocol` pin in [Directory.Packages.props](../../Directory.Packages.props) | local `Axis.Mcp` stdio bridge and focused MCP contract tests |
-| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable Node/npm contract in [.process/project.json](../../.process/project.json) | frontend commands and API types |
+| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc) and bundled npm in [frontend/package.json](../../frontend/package.json) | frontend commands and API types |
 | Playwright browser runtime | [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e) and [frontend/package.json](../../frontend/package.json) | Containerized `local-dev smoke` and `local-dev e2e` workflows |
-| Lychee | Portable artifact contract in [.process/project.json](../../.process/project.json) | Markdown link checks |
-| GitHub CLI | Portable artifact contract in [.process/project.json](../../.process/project.json) | optional publication adapter |
+| Lychee | Exact CI action version in the documentation job | Markdown link checks |
+| GitHub CLI | External prerequisite supplied by the operator or CI image | optional publication adapter |
 | Renovate validator | Exact version in [scripts/axis.py](../../scripts/axis.py) | Dependency automation config |
 
 ## Bootstrap and diagnosis
 
 - Python 3.14 with `venv`/`pip` and Git are external bootstrap prerequisites. Create and activate `.process-venv`, then install the exact public graph with `python -m pip install --require-hashes -r requirements/process.txt`. The repository never requires a global Python package install.
-- GitHub CI uses the producer-owned `phuongnse/engineering-process` action pinned by full release commit. Axis owns only its lock and workflow invocation; installer, registry retry, and descendant-containment implementations do not live under `scripts/`.
-- Use `processctl doctor --project-root . --profile development` or `--profile review` for read-only diagnosis. Use `processctl setup --project-root . --profile <profile>` to inspect the exact plan; add `--apply --allow network --allow user-files --allow project-files` only when authorizing the declared downloads and project-dependency restore.
-- The environment contract in `.process/project.json` is data, not per-platform shell branching. `processctl` selects the matching OS/architecture artifact, verifies its publisher checksum before extraction, resolves an explicit native executable, and injects the verified environment only into the governed command. Windows npm uses `node.exe` plus `npm-cli.js`; batch shims and shell execution are outside the contract.
-- Managed setup currently covers .NET, Node/npm, Lychee, and GitHub CLI where the manifest has a verified publisher artifact. A requirement with no matching artifact remains an external prerequisite and fails with explicit remediation. Portable executables still rely on publisher-documented host libraries; setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration.
+- GitHub CI installs the exact hash-locked process graph directly after setting up Python; Axis does not copy an installer implementation under `scripts/`.
+- Use `processctl doctor --project-root . --profile development` or `--profile review` to validate process adoption and profile selection. `processctl setup --project-root . --profile <profile> --apply` runs only the consumer-owned project-dependency command declared in `.process/project.json`; host runtimes remain external or CI-owned prerequisites.
 - The declared project-dependency action restores NuGet in locked mode and installs the npm lock graph. `python scripts/axis.py check dependency-state` diagnoses that graph without mutation.
 - Local HTTPS certificates, optional current-user trust, Docker availability, and repository hooks are product concerns, not portable process concerns. Use `python scripts/axis.py local-dev certs`, the separately authorized `python scripts/axis.py local-dev trust-certs`, and `python scripts/axis.py install-hooks`. Hook installation migrates only a verified repository-local legacy `core.hooksPath`, writes only inside the repository Git hooks directory, and refuses unmanaged targets.
 - Standard browser evidence uses the Compose-managed Playwright runtime. `python scripts/axis.py check playwright-browsers` only launch-probes an independently provisioned host browser for explicit host debugging.
@@ -40,8 +38,8 @@ Automatic process dependency updates and their merge boundary are owned by
 ## Pre-PR review checkpoint
 
 The shared engineering-process lifecycle owns checkpoint-bound verification,
-independent review, and finding loops. `$publish-change` owns only authorized
-publication. This playbook owns Axis verification command behavior:
+independent review, and finding loops. Axis owns publication commands and policy.
+This playbook owns Axis verification command behavior:
 
 - The enforced sequence is focused proof, clean immutable checkpoint with repository-valid branch and commit metadata, readiness bound to the exact checkpoint/comparison base, then independent review. Readiness and review never run concurrently.
 - First review covers the committed publishable branch diff; follow-up review covers only the new immutable checkpoint delta when earlier evidence remains valid.
@@ -86,7 +84,7 @@ publication. This playbook owns Axis verification command behavior:
 ## Script Rules
 
 - Keep repo maintenance scripts in Python.
-- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), portable environment ownership in [.process/project.json](../../.process/project.json), and coherent product-policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
+- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), finite profile ownership in [.process/project.json](../../.process/project.json), and coherent product-policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation atomically writes the executable copy and its ownership digest under `.git/hooks` without replacing an unmanaged hook.
 - Deterministic guards must parse explicit structure, configuration, graphs, source symbols, or executable behavior. Do not infer semantic compliance from prose keywords, fragments, or wording.
