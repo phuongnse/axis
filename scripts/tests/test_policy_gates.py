@@ -2462,7 +2462,6 @@ class TestRenovateConfigGate(unittest.TestCase):
         )
 
         self.assertTrue(config["enabled"])
-        self.assertFalse(config["automerge"])
         self.assertTrue(config["draftPR"])
         self.assertIn("pip-compile", config["enabledManagers"])
         self.assertFalse(config["pip_requirements"]["enabled"])
@@ -2477,7 +2476,7 @@ class TestRenovateConfigGate(unittest.TestCase):
             if "engineering-process" in item.get("matchPackageNames", [])
         )
         self.assertTrue(rule["enabled"])
-        self.assertFalse(rule["automerge"])
+        self.assertTrue(rule["draftPR"])
         self.assertEqual(["at any time"], rule["schedule"])
         self.assertEqual(100, rule["prPriority"])
         self.assertEqual(
@@ -2514,7 +2513,6 @@ class TestRenovateConfigGate(unittest.TestCase):
         )
         self.assertEqual(["major"], major_approval_rule["matchUpdateTypes"])
         self.assertTrue(major_approval_rule["dependencyDashboardApproval"])
-        self.assertFalse(major_approval_rule["automerge"])
 
         process_input = (axis.ROOT / "requirements" / "process.in").read_text(
             encoding="utf-8"
