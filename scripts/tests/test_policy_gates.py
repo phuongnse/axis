@@ -2502,6 +2502,19 @@ class TestRenovateConfigGate(unittest.TestCase):
         self.assertIn(
             ".agents/skills/**", rule["postUpgradeTasks"]["fileFilters"]
         )
+        major_approval_rule = next(
+            item
+            for item in config["packageRules"]
+            if "major" in item.get("matchUpdateTypes", [])
+            and item.get("dependencyDashboardApproval") is True
+        )
+        self.assertEqual(
+            ["!engineering-process"],
+            major_approval_rule["matchPackageNames"],
+        )
+        self.assertEqual(["major"], major_approval_rule["matchUpdateTypes"])
+        self.assertTrue(major_approval_rule["dependencyDashboardApproval"])
+        self.assertFalse(major_approval_rule["automerge"])
 
         process_input = (axis.ROOT / "requirements" / "process.in").read_text(
             encoding="utf-8"
