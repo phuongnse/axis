@@ -182,6 +182,9 @@
     },
     {
       "description": "Require dashboard approval before proposing separate major updates.",
+      "matchPackageNames": [
+        "!engineering-process"
+      ],
       "matchUpdateTypes": [
         "major"
       ],
