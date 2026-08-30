@@ -29,7 +29,7 @@ After the stack is ready, `python scripts/axis.py local-dev host-smoke` verifies
 
 If Docker Engine is native to WSL or reachable through another execution context, correct the active shell environment instead of changing tests. Docker diagnostics distinguish an unreachable daemon from Docker group membership that requires a new login shell or WSL restart.
 
-Axis domain commands resolve native executables from the active environment. Process-governed setup and verification receive checksum-verified managed Node/npm paths from `processctl`; Windows npm is invoked through the native `node.exe` plus `npm-cli.js`, never a shell batch shim. OpenSSL for certificates resolves from PATH or Git for Windows. Neither process setup nor Axis commands invoke an OS package manager, `sudo`, Docker Desktop, or service configuration.
+Axis domain commands resolve native executables from the active environment and validate Node/npm against `frontend/.nvmrc` plus `frontend/package.json`; Windows npm is invoked through the native `node.exe` plus `npm-cli.js`, never a shell batch shim. OpenSSL for certificates resolves from PATH or Git for Windows. Neither process setup nor Axis commands invoke an OS package manager, `sudo`, Docker Desktop, or service configuration.
 
 ## Stack
 
