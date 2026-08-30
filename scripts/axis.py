@@ -41,6 +41,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "10"
+REQUIRED_LYCHEE_VERSION = "0.23.0"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
@@ -174,30 +175,8 @@ class CheckError(RuntimeError):
     """Raised when a command fails."""
 
 
-def managed_tool_version(tool: str) -> str:
-    """Read the exact tool version from the process-owned environment contract."""
-
-    try:
-        document = json.loads(PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
-        tools = document["environment"]["managedTools"]
-    except (KeyError, OSError, TypeError, json.JSONDecodeError) as exc:
-        raise CheckError(
-            f"cannot read managed tool versions from {path_label(PROCESS_PROJECT_PATH)}: {exc}"
-        ) from exc
-    for entry in tools:
-        if isinstance(entry, dict) and entry.get("id") == tool:
-            version = entry.get("version")
-            if isinstance(version, str) and version:
-                return version
-    raise CheckError(f"managed tool `{tool}` is missing from {path_label(PROCESS_PROJECT_PATH)}")
-
-
-def managed_tool_install_hint(profile: str) -> str:
-    return (
-        "run `processctl setup --project-root . "
-        f"--profile {profile}` to inspect the plan, then rerun with `--apply` and "
-        "the requested mutation approvals"
-    )
+def host_tool_install_hint(source: str) -> str:
+    return f"install the version pinned by {source} and expose its native executable on PATH"
 
 
 class LocalDevCertificateState(Enum):
@@ -1371,11 +1350,6 @@ def check_frontend_dependency_versions(_args: argparse.Namespace | None = None) 
         node_version = ""
     if EXACT_NPM_VERSION_RE.fullmatch(node_version) is None:
         issues.append(f"{path_label(NVMRC_PATH)} must pin one exact Node version")
-    elif node_version != managed_tool_version("node"):
-        issues.append(
-            f"{path_label(NVMRC_PATH)} pins {node_version}, but the process manifest pins "
-            f"{managed_tool_version('node')}"
-        )
 
     dockerfile_path = ROOT / "frontend" / "Dockerfile.dev"
     try:
@@ -2134,7 +2108,7 @@ RAW_DOC_COMMAND_PATTERNS = [
     ),
     (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
     (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `processctl doctor --project-root . --profile review`"),
-    (re.compile(r"^cargo\s+install\s+lychee\b"), "use the checksum-verified `processctl setup` managed-tool action"),
+    (re.compile(r"^cargo\s+install\s+lychee\b"), "use the exact CI-pinned Lychee version through the Axis wrapper"),
 ]
 
 def is_command_doc(path: str) -> bool:
@@ -2721,22 +2695,13 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
             f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
         )
-    process_dotnet_version = managed_tool_version("dotnet")
-    portable_major = version_major(process_dotnet_version)
-    if portable_major != source_major_or_error:
-        return (
-            False,
-            f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x, "
-            f"but {path_label(PROCESS_PROJECT_PATH)} pins {process_dotnet_version}",
-        )
-
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
             f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; "
-            f"{managed_tool_install_hint('development')}",
+            f"{host_tool_install_hint(path_label(GLOBAL_JSON_PATH))}",
         )
 
     major = version_major(version_line)
@@ -2746,7 +2711,7 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             f"found `{version_line or 'unknown'}` at {resolved}; "
             f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
             f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; "
-            f"{managed_tool_install_hint('development')}",
+            f"{host_tool_install_hint(path_label(GLOBAL_JSON_PATH))}",
         )
     return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
 
@@ -2772,7 +2737,7 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         return (
             False,
             f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}; "
-            f"{managed_tool_install_hint('development')}",
+            f"{host_tool_install_hint(rel(NVMRC_PATH))}",
         )
 
     actual = version_line.removeprefix("v")
@@ -2781,7 +2746,7 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
             f"expected Node {expected} from {rel(NVMRC_PATH)}; "
-            f"{managed_tool_install_hint('development')}",
+            f"{host_tool_install_hint(rel(NVMRC_PATH))}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {rel(NVMRC_PATH)}"
 
@@ -2830,7 +2795,7 @@ def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         return (
             False,
             f"{exc}; npm {expected} is required per {path_label(package_path)}; "
-            f"{managed_tool_install_hint('development')}",
+            f"{host_tool_install_hint(path_label(package_path))}",
         )
     result = run_optional(
         [*command, "--version"],
@@ -2842,14 +2807,14 @@ def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
         detail = "npm CLI did not execute" if result is None else (
             result.stderr or result.stdout or f"npm exited with {result.returncode}"
         ).strip()
-        return False, f"{detail}; {managed_tool_install_hint('development')}"
+        return False, f"{detail}; {host_tool_install_hint(path_label(package_path))}"
     lines = (result.stdout or result.stderr or "").strip().splitlines()
     version_line = lines[0] if lines else ""
     if version_line != expected:
         return (
             False,
             f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}; "
-            f"{managed_tool_install_hint('development')}",
+            f"{host_tool_install_hint(path_label(package_path))}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {path_label(package_path)}"
 
@@ -2959,7 +2924,7 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
 
     first_line = (result.stdout or result.stderr or "").strip().splitlines()
     version_line = first_line[0] if first_line else ""
-    expected = f"lychee {managed_tool_version('lychee')}"
+    expected = f"lychee {REQUIRED_LYCHEE_VERSION}"
     if version_line != expected:
         return (
             False,
@@ -2995,16 +2960,16 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
-            f"check-markdown-links: Lychee {managed_tool_version('lychee')} is required, "
-            f"but it is unavailable; {managed_tool_install_hint('review')}.",
+            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required, "
+            f"but it is unavailable; {host_tool_install_hint('.github/workflows/build-and-test.yml')}.",
             file=sys.stderr,
         )
         return 1
     version_ok, version_detail = lychee_version_status(lychee)
     if not version_ok:
         print(
-            f"check-markdown-links: Lychee {managed_tool_version('lychee')} is required; {version_detail}. "
-            f"{managed_tool_install_hint('review')}.",
+            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required; {version_detail}. "
+            f"{host_tool_install_hint('.github/workflows/build-and-test.yml')}.",
             file=sys.stderr,
         )
         return 1
@@ -3439,10 +3404,6 @@ def frontend_test_related_inputs(paths: list[str]) -> list[str]:
     return sorted(set(frontend_related_source_paths(paths) + changed_unit_tests))
 
 
-def is_markdown_link_path(path: str) -> bool:
-    return path.endswith(".md") or path in {"lychee.toml", ".github/workflows/build-and-test.yml"}
-
-
 def is_docs_path(path: str) -> bool:
     return path.startswith("docs/") or path in {
         "AGENTS.md",
@@ -3740,9 +3701,6 @@ def verify(args: argparse.Namespace) -> int:
         if path.startswith("frontend/e2e/") and path.endswith((".ts", ".tsx"))
     ]
 
-    markdown_paths = [path for path in paths if path.endswith(".md") and (ROOT / path).is_file()]
-    markdown_links_global = any(path in {"lychee.toml", ".github/workflows/build-and-test.yml"} for path in paths)
-    markdown_links = any(is_markdown_link_path(path) for path in paths)
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
     foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
@@ -3756,7 +3714,6 @@ def verify(args: argparse.Namespace) -> int:
     print(
         "verify plan: "
         f"dotnet={dotnet} frontend={frontend} docs={docs} scripts={scripts_changed} "
-        f"markdown-links={markdown_links} "
         f"renovate-config={renovate_config}"
     )
 
@@ -3858,12 +3815,6 @@ def verify(args: argparse.Namespace) -> int:
             step("use-case docs", lambda: run_module_check("check-use-case-docs.py", []))
         if foundation_docs:
             step("foundation docs", lambda: run_module_check("check-foundation-docs.py", []))
-
-    if markdown_links and (markdown_paths or markdown_links_global):
-        step(
-            "markdown links (changed files)",
-            lambda: check_markdown_links_for_paths(None if markdown_links_global else markdown_paths),
-        )
 
     if api_surface_drift:
         print()

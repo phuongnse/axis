@@ -2816,7 +2816,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
             root = Path(temp)
             frontend = root / "frontend"
             frontend.mkdir()
-            node_version = axis.managed_tool_version("node")
+            node_version = axis.NVMRC_PATH.read_text(encoding="utf-8").strip()
             (frontend / ".nvmrc").write_text(f"{node_version}\n", encoding="utf-8")
             (frontend / "Dockerfile.dev").write_text(
                 f"FROM node:{node_version}-alpine\n",
@@ -2844,7 +2844,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
             root = Path(temp)
             frontend = root / "frontend"
             frontend.mkdir()
-            node_version = axis.managed_tool_version("node")
+            node_version = axis.NVMRC_PATH.read_text(encoding="utf-8").strip()
             (frontend / ".nvmrc").write_text(f"{node_version}\n", encoding="utf-8")
             (frontend / "Dockerfile.dev").write_text(
                 f"FROM node:{node_version}-alpine\n",
@@ -3183,17 +3183,6 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("selects .NET SDK 9.x", detail)
         self.assertIn("expected 10.x", detail)
 
-    def test_dotnet_sdk_rejects_portable_setup_major_drift_before_runtime_probe(self) -> None:
-        with (
-            mock.patch.object(axis, "managed_tool_version", return_value="9.0.100"),
-            mock.patch.object(axis, "command_version_line") as command_version,
-        ):
-            ok, detail = axis.dotnet_sdk_status()
-
-        self.assertFalse(ok)
-        self.assertIn(".process/project.json pins 9.0.100", detail)
-        command_version.assert_not_called()
-
     def test_dotnet_sdk_rejects_wrong_major(self) -> None:
         with mock.patch.object(
             axis,
@@ -3205,9 +3194,10 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("expected .NET SDK 10.x", detail)
         self.assertIn("docs/TECH_STACK.md", detail)
-        self.assertIn("processctl setup", detail)
+        self.assertIn("global.json", detail)
+        self.assertIn("native executable on PATH", detail)
 
-    def test_dotnet_sdk_missing_runtime_points_to_axis_managed_setup(self) -> None:
+    def test_dotnet_sdk_missing_runtime_points_to_consumer_owned_source(self) -> None:
         with mock.patch.object(
             axis,
             "command_version_line",
@@ -3216,7 +3206,8 @@ class TestToolVersionGates(unittest.TestCase):
             ok, detail = axis.dotnet_sdk_status()
 
         self.assertFalse(ok)
-        self.assertIn("processctl setup", detail)
+        self.assertIn("global.json", detail)
+        self.assertIn("native executable on PATH", detail)
 
     def test_frontend_toolchain_rejects_wrong_node_patch(self) -> None:
         with (
@@ -3234,7 +3225,7 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("expected Node 24.18.0", stderr.getvalue())
         self.assertIn("frontend/.nvmrc", stderr.getvalue())
 
-    def test_missing_node_points_to_axis_managed_setup(self) -> None:
+    def test_missing_node_points_to_consumer_owned_source(self) -> None:
         with (
             mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
             mock.patch.object(
@@ -3246,9 +3237,10 @@ class TestToolVersionGates(unittest.TestCase):
             ok, detail = axis.node_version_status({})
 
         self.assertFalse(ok)
-        self.assertIn("processctl setup", detail)
+        self.assertIn("frontend/.nvmrc", detail)
+        self.assertIn("native executable on PATH", detail)
 
-    def test_wrong_npm_points_to_axis_managed_setup(self) -> None:
+    def test_wrong_npm_points_to_consumer_owned_source(self) -> None:
         completed = axis.subprocess.CompletedProcess(
             ["node", "npm-cli.js", "--version"],
             0,
@@ -3262,7 +3254,8 @@ class TestToolVersionGates(unittest.TestCase):
             ok, detail = axis.npm_version_status({})
 
         self.assertFalse(ok)
-        self.assertIn("processctl setup", detail)
+        self.assertIn("frontend/package.json", detail)
+        self.assertIn("native executable on PATH", detail)
 
     def test_npm_cli_uses_native_node_and_script_without_batch_shim(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3283,7 +3276,7 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertNotIn(".cmd", " ".join(command).lower())
         self.assertNotIn(".bat", " ".join(command).lower())
 
-    def test_missing_lychee_points_to_axis_managed_setup(self) -> None:
+    def test_missing_lychee_points_to_consumer_owned_source(self) -> None:
         with (
             mock.patch.object(axis, "find_lychee", return_value=None),
             contextlib.redirect_stderr(io.StringIO()) as stderr,
@@ -3291,7 +3284,8 @@ class TestToolVersionGates(unittest.TestCase):
             rc = axis.check_markdown_links_for_paths([])
 
         self.assertEqual(1, rc)
-        self.assertIn("processctl setup", stderr.getvalue())
+        self.assertIn(".github/workflows/build-and-test.yml", stderr.getvalue())
+        self.assertIn("native executable on PATH", stderr.getvalue())
 
     def test_find_openssl_uses_git_for_windows_usr_bin(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3467,6 +3461,10 @@ class TestMarkdownLinkGate(unittest.TestCase):
             self.assertEqual(0, axis.check_markdown_links())
 
         self.assertEqual([["/usr/bin/lychee", "--config", "./lychee.toml", "./**/*.md"]], calls)
+        workflow = (axis.ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(f"lycheeVersion: v{axis.REQUIRED_LYCHEE_VERSION}", workflow)
 
     def test_fails_when_lychee_version_is_wrong(self) -> None:
         with (
@@ -3529,26 +3527,22 @@ class TestVerifyGate(unittest.TestCase):
 
         self.assertIn("no reachable Docker endpoint detected", stderr.getvalue())
 
-    def test_process_profiles_bind_browser_docker_and_setup_mutation_contracts(self) -> None:
+    def test_process_profiles_bind_consumer_owned_commands(self) -> None:
         project = json.loads(axis.PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(5, project["schemaVersion"])
+        self.assertEqual(["development", "review"], project["lifecycle"]["requiredProfiles"])
         development_command = project["profiles"]["development"][0]["run"]
         self.assertEqual(["python", "scripts/axis.py", "verify"], development_command)
-        self.assertIn("docker-engine", project["environment"]["profiles"]["development"])
-        self.assertIn("docker-engine", project["environment"]["profiles"]["review"])
-        docker_requirement = next(
-            requirement
-            for requirement in project["environment"]["requirements"]
-            if requirement["id"] == "docker-engine"
-        )
-        self.assertIn("Docker Compose v2", docker_requirement["description"])
-        setup = {
-            action["id"]: action
-            for action in project["environment"]["setupActions"]
-        }
         self.assertEqual(
-            ["network", "project-files", "user-files"],
-            setup["install-project-dependencies"]["mutations"],
+            ["python", "scripts/axis.py", "review-checks", "--supplemental"],
+            project["profiles"]["review"][0]["run"],
         )
+        setup = {action["id"]: action for action in project["setup"]}
+        self.assertEqual(
+            ["python", "scripts/axis.py", "dependencies", "install"],
+            setup["install-project-dependencies"]["run"],
+        )
+        self.assertNotIn("environment", project)
 
     def test_frontend_dependency_state_requires_installed_package_contents(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -3715,7 +3709,7 @@ class TestVerifyGate(unittest.TestCase):
 
         self.assertEqual(["toolchain", "versions", "audit", "ci", "test"], calls)
 
-    def test_runs_markdown_links_for_markdown_changes(self) -> None:
+    def test_routes_portable_doc_checks_without_duplicating_ci_link_job(self) -> None:
         calls: list[str] = []
 
         with (
@@ -3726,7 +3720,7 @@ class TestVerifyGate(unittest.TestCase):
             mock.patch.object(
                 axis,
                 "check_markdown_links_for_paths",
-                side_effect=lambda paths: calls.append(f"markdown-links:{','.join(paths or [])}") or 0,
+                side_effect=AssertionError("link checks belong to the dedicated CI job"),
             ),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -3737,7 +3731,6 @@ class TestVerifyGate(unittest.TestCase):
                 "doc-navigation",
                 "doc-size-budgets",
                 "check-doc-code-fences.py",
-                "markdown-links:docs/README.md",
             ],
             calls,
         )
