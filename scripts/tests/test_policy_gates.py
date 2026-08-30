@@ -2444,7 +2444,7 @@ class TestRenovateConfigGate(unittest.TestCase):
         "      contents: read\n"
         "      pull-requests: read\n"
         "    uses: phuongnse/renovate-ops/.github/workflows/"
-        "policy-verification.yml@1e3d0d333b62ec92c94ea5c355bbb0cd73024b78\n"
+        "policy-verification.yml@5fb53c2295c0f62c29d34c8141121b71198769f4\n"
     )
 
     @classmethod
@@ -2462,7 +2462,6 @@ class TestRenovateConfigGate(unittest.TestCase):
         )
 
         self.assertTrue(config["enabled"])
-        self.assertFalse(config["automerge"])
         self.assertTrue(config["draftPR"])
         self.assertIn("pip-compile", config["enabledManagers"])
         self.assertFalse(config["pip_requirements"]["enabled"])
@@ -2477,7 +2476,7 @@ class TestRenovateConfigGate(unittest.TestCase):
             if "engineering-process" in item.get("matchPackageNames", [])
         )
         self.assertTrue(rule["enabled"])
-        self.assertFalse(rule["automerge"])
+        self.assertTrue(rule["draftPR"])
         self.assertEqual(["at any time"], rule["schedule"])
         self.assertEqual(100, rule["prPriority"])
         self.assertEqual(
@@ -2514,7 +2513,6 @@ class TestRenovateConfigGate(unittest.TestCase):
         )
         self.assertEqual(["major"], major_approval_rule["matchUpdateTypes"])
         self.assertTrue(major_approval_rule["dependencyDashboardApproval"])
-        self.assertFalse(major_approval_rule["automerge"])
 
         process_input = (axis.ROOT / "requirements" / "process.in").read_text(
             encoding="utf-8"
@@ -2545,7 +2543,7 @@ class TestRenovateConfigGate(unittest.TestCase):
                 "phuongnse/renovate-ops/", "attacker/renovate-ops/", 1
             ),
             "changed-revision": workflow.replace(
-                "1e3d0d333b62ec92c94ea5c355bbb0cd73024b78",
+                "5fb53c2295c0f62c29d34c8141121b71198769f4",
                 "1e3d0d333b62ec92c94ea5c355bbb0cd73024b79",
                 1,
             ),

@@ -3,8 +3,8 @@
 > **Navigation**: [docs/README.md](../README.md) ·
 > [docs/TECH_STACK.md](../TECH_STACK.md) · [AGENTS.md](../../AGENTS.md)
 
-Axis adopts public engineering-process releases through an ordinary, non-automerge
-Renovate pull request.
+Axis adopts public engineering-process releases through an ordinary draft Renovate
+pull request.
 
 ## Owners
 
@@ -30,5 +30,4 @@ no diff.
 The PR then runs normal development, review, security, and policy-verification checks.
 A package-only update, stale managed file, failed profile, or self-review remains
 blocking. The configured human owner alone merges the independently reviewed exact
-checkpoint; merge activates the new process. No post-merge command or automerge is
-permitted.
+checkpoint; that merge activates the new process without a post-merge command.
