@@ -2,7 +2,8 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Docs are scanned, not read. Use `$maintain-docs` for docs edits; keep workflow in skills and deterministic checks in scripts.
+Docs are scanned, not read. Use this playbook for docs edits; keep shared lifecycle
+workflow in phase skills and deterministic Axis checks in scripts.
 
 ## Ownership
 
@@ -42,9 +43,10 @@ Do not add reference-owner sections or bottom reference lists for repo docs.
 
 Use-case specs own one primary actor goal and observable product behavior. Keep Purpose, Primary actor, optional Supporting actors, Preconditions, Trigger, Success guarantee, Minimal guarantee, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional Screen flow, optional Diagrams, and implementation status. Link shared invariants and technical realization to their single owner.
 
-Use `$specify-use-case` for spec shape, `$implement-use-case` for status, and `$maintain-docs` for diagrams or committed visual artifacts.
+Use [acceptance-authoring.md](./acceptance-authoring.md) for spec shape, the owning
+use-case for status, and this playbook for diagrams or committed visual artifacts.
 
-Foundation specs use Purpose, Consumers, Activation, Guarantees, alternate/error behavior, ACs, Acceptance Test Matrix, Out Of Scope, optional Screen flow/Diagrams, and implementation status. They remain product-neutral and keep framework/provider details outside acceptance behavior; use `$build-frontend-foundation` for app shell or shared SPA foundation contracts.
+Foundation specs use Purpose, Consumers, Activation, Guarantees, alternate/error behavior, ACs, Acceptance Test Matrix, Out Of Scope, optional Screen flow/Diagrams, and implementation status. They remain product-neutral and keep framework/provider details outside acceptance behavior; use [frontend.md](./frontend.md) for app shell or shared SPA foundation contracts.
 
 Use-case and foundation docs marked complete keep exact proof in the sibling `{slug}.evidence.md` file. Spec files keep `Acceptance Test Matrix` high-level; sidecars keep `Acceptance Evidence` rows with committed proof paths and Axis wrapper commands. A row may list comma-separated AT IDs only when the proof paths and commands are identical.
 

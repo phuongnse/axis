@@ -2,7 +2,8 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use `$build-frontend` for SPA feature work. Use `$build-frontend-foundation` for app shell or shared SPA foundation work owned by [docs/foundations/README.md](../foundations/README.md).
+Use this Axis-owned playbook for SPA work. App shell and shared SPA foundations remain
+owned by [docs/foundations/README.md](../foundations/README.md).
 
 ## UX-first product UI
 
@@ -60,7 +61,7 @@ The manifest keeps lifecycle, review acceptance, and perceptual evidence separat
 
 Choose semantic meaning before a component. Product UI uses an accessible reviewed primitive when one maps that meaning; native fallback behavior requires an accepted platform need. Selected values and options use the same display-label source, icons support rather than replace accessible names, and fixed controls retain stable geometry.
 
-Treat component visuals as mappings of the constitution, not independent conventions. Feature code uses defaults and documented props; it does not locally alter visual treatment through style overrides, selectors, or wrapper styling. If no semantic role fits, return to `$govern-ui` before implementation instead of creating a component-local rule.
+Treat component visuals as mappings of the constitution, not independent conventions. Feature code uses defaults and documented props; it does not locally alter visual treatment through style overrides, selectors, or wrapper styling. If no semantic role fits, return to the Axis Design Gate before implementation instead of creating a component-local rule.
 
 Use these ownership layers:
 
@@ -77,7 +78,7 @@ The [Axis UI Constitution](../foundations/visual-system/axis-visual-system.md#in
 
 [docs/playbooks/client-experience.md](./client-experience.md#semantic-component-selection) owns semantic feedback, state-label, metadata, relationship, and action selection. Feature code consumes those meanings and never imports raw provider components to create another vocabulary.
 
-Use `$govern-ui` for constitution/theme decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance when they introduce no customization; constitution, semantic-value, provider, primitive-exception, or cross-feature convention changes require the Design Gate and applicable sign-off.
+Use this playbook and the Design Gate for constitution/theme decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance when they introduce no customization; constitution, semantic-value, provider, primitive-exception, or cross-feature convention changes require the Design Gate and applicable sign-off.
 
 ## Styling
 

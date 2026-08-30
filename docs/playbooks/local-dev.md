@@ -9,9 +9,9 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 - Python and Git from [scripts.md § Tool Versions](./scripts.md#tool-versions).
 - Docker Engine with Compose reachable from the shell running tests. Native Docker Engine inside WSL is supported; Docker Desktop is not required.
 - OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
-- .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed as checksum-verified managed tools by `processctl`.
+- .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), installed as host prerequisites or by pinned CI setup actions.
 
-For first-time preparation, create and activate `.process-venv` with Python 3.14, install `requirements/process.txt` with `python -m pip install --require-hashes`, and run `processctl doctor --project-root . --profile development`. If requirements are missing, inspect `processctl setup --project-root . --profile development`, then apply the declared plan with `processctl setup --project-root . --profile development --apply --allow network --allow user-files --allow project-files`. That setup installs verified managed tools and restores locked project dependencies. Generate local certificates with `python scripts/axis.py local-dev certs` and install the pre-push hook with `python scripts/axis.py install-hooks`. Current-user trust remains a separate explicit `python scripts/axis.py local-dev trust-certs` action; Windows may still show its native security warning.
+For first-time preparation, install the exact .NET and Node prerequisites, create and activate `.process-venv` with Python 3.14, install `requirements/process.txt` with `python -m pip install --require-hashes`, and run `processctl doctor --project-root . --profile development`. Apply `processctl setup --project-root . --profile development --apply` to restore only the consumer-owned locked project dependencies. Generate local certificates with `python scripts/axis.py local-dev certs` and install the pre-push hook with `python scripts/axis.py install-hooks`. Current-user trust remains a separate explicit `python scripts/axis.py local-dev trust-certs` action; Windows may still show its native security warning.
 
 ## HTTPS
 

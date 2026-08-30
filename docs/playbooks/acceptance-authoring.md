@@ -2,7 +2,8 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
-Use with the shared `specify-use-case` skill when writing or refreshing use-case acceptance criteria and the Acceptance Test Matrix.
+Use this Axis-owned playbook when writing or refreshing use-case acceptance criteria
+and the Acceptance Test Matrix, then register the result through `start-change`.
 
 ## Actor goal and narrative
 
