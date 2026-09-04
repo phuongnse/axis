@@ -2532,6 +2532,7 @@ class TestRenovateConfigGate(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
         self.assertIn("automation/renovate/engineering-process", workflow)
         self.assertTrue(self.has_exact_policy_job(workflow))
+        self.assertIn("    name: Build and test (.NET)\n", workflow)
         self.assertNotIn("independent-review.yml", workflow)
 
     def test_policy_job_rejects_trust_root_and_permission_mutations(self) -> None:

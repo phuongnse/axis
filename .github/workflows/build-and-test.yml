@@ -193,7 +193,7 @@ jobs:
               - '.github/workflows/build-and-test.yml'
 
   dotnet:
-    name: .NET — Build and Test
+    name: Build and test (.NET)
     needs: detect
     if: needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
