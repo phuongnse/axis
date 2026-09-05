@@ -1,27 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "helpers:pinGitHubActionDigests"
-  ],
-  "enabled": true,
-  "dependencyDashboard": true,
-  "configMigration": true,
-  "timezone": "Asia/Ho_Chi_Minh",
-  "schedule": [
-    "before 5am on monday"
-  ],
-  "labels": [
-    "dependencies"
-  ],
   "branchPrefix": "automation/renovate/",
-  "draftPR": true,
-  "semanticCommits": "enabled",
-  "semanticCommitType": "chore",
-  "semanticCommitScope": "deps",
   "commitMessageLowerCase": "never",
-  "prConcurrentLimit": 5,
-  "prHourlyLimit": 2,
+  "configMigration": true,
+  "constraints": {
+    "python": "==3.14"
+  },
+  "dependencyDashboard": true,
+  "draftPR": true,
+  "enabled": true,
   "enabledManagers": [
     "docker-compose",
     "dockerfile",
@@ -30,35 +17,28 @@
     "nuget",
     "pip-compile"
   ],
-  "rangeStrategy": "pin",
-  "constraints": {
-    "python": "==3.14"
-  },
-  "pip-compile": {
-    "managerFilePatterns": [
-      "/^requirements\\/process\\.txt$/"
-    ]
-  },
-  "pip_requirements": {
-    "enabled": false
-  },
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "github>phuongnse/engineering-process//templates/renovate#71bb94acb18aab41c97120f66e3cbd7c2fcee468"
+  ],
+  "labels": [
+    "dependencies"
+  ],
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": [
       "before 5am on monday"
     ]
   },
-  "vulnerabilityAlerts": {
-    "enabled": true,
-    "labels": [
-      "security"
-    ],
-    "vulnerabilityFixStrategy": "lowest"
-  },
-  "prBodyTemplate": "<!-- engineering-process:pr-description:start -->\n## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Contract and scope\n\nDependency automation follows the exact version owners in docs/TECH_STACK.md.\n\n## Impact and risk\n\nThe proposed locked dependency delta requires CI and human compatibility review.\n\n## Verification\n\nProcess profiles and dependency audits run after this draft opens.\n\n## Independent review\n\nA human reviewer must approve the verified immutable checkpoint before merge.\n\n## Requirements and rules followed\n\n- [ ] **Scope and contract** — accepted scope is implemented without unapproved expansion. [status: pending]\n- [ ] **Verification evidence** — required current profiles pass on the published checkpoint. [status: pending]\n- [ ] **Independent review** — a separate reviewer approved the published checkpoint with no open required finding. [status: pending]\n<!-- engineering-process:pr-description:end -->\n\n## Project-specific requirements\n\n- [ ] **Project-specific: Documentation and status** — owning documentation and enforcement status are current when behavior, status, or workflow changes. [status: pending]\n- [x] **Project-specific: UI system** — [reason: dependency automation does not change an accepted UI surface until a separately reviewed implementation does so] [status: not-applicable]\n- [x] **Project-specific: Placeholder sweep** — generated Renovate text contains no implementation placeholder. [status: satisfied]\n",
   "packageRules": [
     {
+      "commitMessageTopic": "engineering-process",
       "description": "Adopt each published engineering-process release as a complete managed pull request.",
+      "draftPR": true,
+      "enabled": true,
+      "groupName": "engineering-process",
+      "groupSlug": "engineering-process",
       "matchFileNames": [
         "requirements/process.in",
         "requirements/process.txt"
@@ -66,19 +46,11 @@
       "matchPackageNames": [
         "engineering-process"
       ],
-      "enabled": true,
-      "draftPR": true,
-      "groupName": "engineering-process",
-      "groupSlug": "engineering-process",
-      "schedule": [
-        "at any time"
-      ],
-      "prPriority": 100,
-      "commitMessageTopic": "engineering-process",
       "postUpgradeTasks": {
         "commands": [
           "python .process/adopt-process.py --project-root . --requirements-lock requirements/process.txt"
         ],
+        "executionMode": "update",
         "fileFilters": [
           ".agents/skills/**",
           ".github/PULL_REQUEST_TEMPLATE.md",
@@ -90,105 +62,133 @@
           ".process/project.json",
           "AGENTS.md"
         ],
-        "executionMode": "update",
         "installTools": {
           "python": {}
         }
-      }
+      },
+      "prPriority": 100,
+      "schedule": [
+        "at any time"
+      ]
     },
     {
       "description": "Do not automate .NET SDK baseline changes.",
+      "enabled": false,
       "matchFileNames": [
         "global.json"
-      ],
-      "enabled": false
+      ]
     },
     {
       "description": "Keep the Node image aligned with the explicitly approved Node and bundled npm baseline.",
+      "enabled": false,
       "matchFileNames": [
         "frontend/Dockerfile.dev"
-      ],
-      "enabled": false
+      ]
     },
     {
       "description": "Do not update bundled npm independently from the Node baseline.",
-      "matchManagers": [
-        "npm"
-      ],
+      "enabled": false,
       "matchDepTypes": [
         "packageManager"
       ],
-      "enabled": false
+      "matchManagers": [
+        "npm"
+      ]
     },
     {
+      "commitMessageTopic": ".NET packages",
       "description": "Group .NET package updates.",
-      "matchManagers": [
-        "nuget"
-      ],
+      "groupName": ".NET packages",
+      "groupSlug": "dotnet-packages",
       "matchFileNames": [
         "Directory.Packages.props",
         "**/*.csproj",
         "**/packages.lock.json",
         "dotnet-tools.json"
       ],
-      "groupName": ".NET packages",
-      "groupSlug": "dotnet-packages",
-      "commitMessageTopic": ".NET packages"
+      "matchManagers": [
+        "nuget"
+      ]
     },
     {
+      "commitMessageTopic": "frontend runtime dependencies",
       "description": "Group frontend runtime dependency updates.",
-      "matchManagers": [
-        "npm"
-      ],
+      "groupName": "frontend runtime dependencies",
+      "groupSlug": "frontend-runtime",
       "matchDepTypes": [
         "dependencies"
       ],
-      "groupName": "frontend runtime dependencies",
-      "groupSlug": "frontend-runtime",
-      "commitMessageTopic": "frontend runtime dependencies"
-    },
-    {
-      "description": "Group frontend tooling dependency updates.",
       "matchManagers": [
         "npm"
-      ],
+      ]
+    },
+    {
+      "commitMessageTopic": "frontend tooling dependencies",
+      "description": "Group frontend tooling dependency updates.",
+      "groupName": "frontend tooling dependencies",
+      "groupSlug": "frontend-tooling",
       "matchDepTypes": [
         "devDependencies"
       ],
-      "groupName": "frontend tooling dependencies",
-      "groupSlug": "frontend-tooling",
-      "commitMessageTopic": "frontend tooling dependencies"
+      "matchManagers": [
+        "npm"
+      ]
     },
     {
+      "commitMessageTopic": "GitHub Actions dependencies",
       "description": "Group GitHub Actions updates and preserve SHA pinning.",
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
       "matchManagers": [
         "github-actions"
       ],
-      "groupName": "GitHub Actions",
-      "groupSlug": "github-actions",
-      "semanticCommitType": "ci",
-      "commitMessageTopic": "GitHub Actions dependencies"
+      "semanticCommitType": "ci"
     },
     {
+      "commitMessageTopic": "container images",
       "description": "Group container image updates.",
+      "groupName": "container images",
+      "groupSlug": "container-images",
       "matchManagers": [
         "docker-compose",
         "dockerfile"
-      ],
-      "groupName": "container images",
-      "groupSlug": "container-images",
-      "commitMessageTopic": "container images"
+      ]
     },
     {
+      "dependencyDashboardApproval": true,
       "description": "Require dashboard approval before proposing separate major updates.",
+      "groupName": null,
       "matchPackageNames": [
         "!engineering-process"
       ],
       "matchUpdateTypes": [
         "major"
-      ],
-      "groupName": null,
-      "dependencyDashboardApproval": true
+      ]
     }
-  ]
+  ],
+  "pip-compile": {
+    "managerFilePatterns": [
+      "/^requirements\\/process\\.txt$/"
+    ]
+  },
+  "pip_requirements": {
+    "enabled": false
+  },
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "pin",
+  "schedule": [
+    "before 5am on monday"
+  ],
+  "semanticCommitScope": "deps",
+  "semanticCommitType": "chore",
+  "semanticCommits": "enabled",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security"
+    ],
+    "vulnerabilityFixStrategy": "lowest"
+  }
 }
