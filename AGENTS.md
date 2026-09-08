@@ -33,7 +33,7 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
   implementation, verification, independent review, finding loops, and completion.
   Axis product and architecture contracts add domain policy; they do not replace
   lifecycle gates.
-- Before non-trivial work, start from `run-change`, read the current phase skill, then
+- Before non-trivial work, start from `deliver-change`, read the current phase skill, then
   read only the owning Axis playbooks, contracts, and source.
 - Optional work delegation never changes lifecycle ownership. Independent review
   still requires a separate attested read-only actor and context.
@@ -43,13 +43,13 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 ## Verification
 
 Select development and review evidence through `.process/project.json` and
-`verify-change`; before review, apply
+`change-verify`; before review, apply
 [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).
 
 <!-- engineering-process:start -->
 ## Engineering process
 
-For non-trivial delivery work, enter through the managed run-change skill and follow
+For non-trivial delivery work, enter through the managed deliver-change skill and follow
 the processctl lifecycle: start, plan, implement, verify, independent review, finish.
 
 This repository owns product decisions, domain rules, exact argument-array commands,
