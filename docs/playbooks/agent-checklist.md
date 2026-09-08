@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Review checklist only. Workflow lives in the managed `run-change` phase skills;
+Review checklist only. Workflow lives in the managed `deliver-change` phase skills;
 Axis capability guidance lives in its playbooks and contracts. Enforcement status lives in
 [docs/ENFORCEMENT.md](../ENFORCEMENT.md), and command behavior lives in
 [docs/playbooks/scripts.md](./scripts.md).
@@ -59,7 +59,7 @@ Pure refactor/style/test-only changes can report docs as not triggered.
 
 ## Retrospective Review
 
-Use the shared `verify-change`, `review-change`, and `finish-change` gates. Open a
+Use the shared `change-verify`, `change-review`, and `change-complete` gates. Open a
 normal process change backed by consumer evidence when the shared process itself is at fault.
 Record one outcome instead of adding retrospective prose.
 

@@ -4,7 +4,7 @@
 
 [scripts/axis.py](../../scripts/axis.py) owns Axis build, generation, local-development,
 and product-policy commands. The shared process owns lifecycle and evidence routing;
-use `verify-change` with `.process/project.json` when deciding what to run.
+use `change-verify` with `.process/project.json` when deciding what to run.
 
 ## Tool Versions
 

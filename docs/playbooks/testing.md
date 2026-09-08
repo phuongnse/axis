@@ -3,8 +3,8 @@
 > **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
 Use the smallest test that proves the edit while developing. Use the shared
-`verify-change` lifecycle; the Axis `review` profile supplies the immutable
-review-boundary checks before `review-change` assigns an independent reviewer.
+`change-verify` lifecycle; the Axis `review` profile supplies the immutable
+review-boundary checks before `change-review` assigns an independent reviewer.
 
 ## Shared
 
