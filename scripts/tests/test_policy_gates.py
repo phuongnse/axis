@@ -2439,12 +2439,12 @@ def main() -> int:
 class TestRenovateConfigGate(unittest.TestCase):
     POLICY_JOB = (
         "  policy-verification:\n"
-        "    name: policy-verification\n"
+        "    name: Policy verification\n"
         "    permissions:\n"
         "      contents: read\n"
         "      pull-requests: read\n"
         "    uses: phuongnse/renovate-ops/.github/workflows/"
-        "policy-verification.yml@5fb53c2295c0f62c29d34c8141121b71198769f4\n"
+        "policy-verification.yml@38d952b8c94604df10fadc48b6c830a144ea1137\n"
     )
 
     @classmethod
@@ -2532,6 +2532,7 @@ class TestRenovateConfigGate(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("processctl adoption check"), 2)
         self.assertIn("automation/renovate/engineering-process", workflow)
         self.assertTrue(self.has_exact_policy_job(workflow))
+        self.assertIn("    name: Build and test (.NET)\n", workflow)
         self.assertNotIn("independent-review.yml", workflow)
 
     def test_policy_job_rejects_trust_root_and_permission_mutations(self) -> None:
@@ -2543,7 +2544,7 @@ class TestRenovateConfigGate(unittest.TestCase):
                 "phuongnse/renovate-ops/", "attacker/renovate-ops/", 1
             ),
             "changed-revision": workflow.replace(
-                "5fb53c2295c0f62c29d34c8141121b71198769f4",
+                "38d952b8c94604df10fadc48b6c830a144ea1137",
                 "1e3d0d333b62ec92c94ea5c355bbb0cd73024b79",
                 1,
             ),
