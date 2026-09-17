@@ -128,9 +128,7 @@ jobs:
       # without pretending the hosted Windows image provides a Docker endpoint.
       - name: Validate Linux process environment
         if: runner.os == 'Linux'
-        run: |
-          processctl doctor --project-root . --profile development
-          processctl doctor --project-root . --profile review
+        run: processctl doctor --project-root .
 
       - name: Run Linux finite process profiles
         if: runner.os == 'Linux'

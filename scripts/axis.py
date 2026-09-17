@@ -2107,7 +2107,7 @@ RAW_DOC_COMMAND_PATTERNS = [
         "use `python scripts/axis.py ...`",
     ),
     (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
-    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `processctl doctor --project-root . --profile review`"),
+    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `processctl doctor --project-root .`"),
     (re.compile(r"^cargo\s+install\s+lychee\b"), "use the exact CI-pinned Lychee version through the Axis wrapper"),
 ]
 
