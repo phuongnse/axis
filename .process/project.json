@@ -31,7 +31,7 @@
     ]
   },
   "project": "axis",
-  "schemaVersion": 5,
+  "schemaVersion": 1,
   "setup": [
     {
       "id": "install-project-dependencies",
