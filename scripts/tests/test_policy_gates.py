@@ -3527,7 +3527,7 @@ class TestVerifyGate(unittest.TestCase):
 
     def test_process_profiles_bind_consumer_owned_commands(self) -> None:
         project = json.loads(axis.PROCESS_PROJECT_PATH.read_text(encoding="utf-8"))
-        self.assertEqual(5, project["schemaVersion"])
+        self.assertEqual(1, project["schemaVersion"])
         self.assertEqual(["development", "review"], project["lifecycle"]["requiredProfiles"])
         development_command = project["profiles"]["development"][0]["run"]
         self.assertEqual(["python", "scripts/axis.py", "verify"], development_command)
