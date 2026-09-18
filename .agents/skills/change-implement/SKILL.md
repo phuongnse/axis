@@ -5,6 +5,14 @@ description: Implement the accepted plan or resolve blocking review findings whe
 
 # Implement a change
 
+## Route card
+
+**State:** `planned` or `changes-requested`. **Do:** register every mutating actor,
+implement only the accepted plan, and add behavioral regressions for the reported
+failure mode. **Evidence:** in-scope diff, implementation participants, and focused
+checks; no implicit contract expansion. **Next:** `change verify` on a committed,
+unchanged candidate.
+
 Register the implementation identity before editing:
 
     processctl change implement --change-id ID --actor ACTOR --context CONTEXT
@@ -18,6 +26,11 @@ Address the structural root cause identified in the plan rather than applying
 local symptom-patching workarounds. Do not approximate open-world meaning with
 heuristic token lists, special-case branches for callers, or error masking; decouple
 unmanaged ambient state from authority boundaries.
+Keep the implementation inside the plan's literal affected-path boundaries. Do not
+make an unplanned path appear covered by widening a directory merely to satisfy the
+runtime scope check; if the mechanism requires a different boundary, stop and ask the
+owner to supersede the contract or plan. Re-read the causal chain before editing and
+make the changed boundary capable of falsifying the reported faulty behavior.
 For a deterministic defect, add focused regression evidence that distinguishes the
 reported faulty behavior from the correction. When a known-faulty state is safely
 available, demonstrate that distinction; no proof of test-authoring or execution
@@ -33,6 +46,14 @@ knowledge repairs, using inspected behavior, accepted requirements, and recorded
 decisions. Replaced material is updated, removed, or visibly marked historical or
 superseded when retaining it is useful. Explain enough for the intended reader and
 accepted work, in a logical order, with references that clarify relevant relationships.
+
+Apply the documentation decision while implementing the behavior, not as a final
+status line. Update the consumer-owned source that a future reader will use,
+preserve the consumer's document organization, and add a focused page only when
+an existing source cannot carry the information. If a template, standard, or
+other output is derived, fix its source and regenerate the output; do not hand
+patch one copy. A change with no reader impact needs no documentation artifact,
+but the plan's reasoning must remain true after implementation.
 
 If review requested changes,
 resolve every blocking finding in the next cycle without renaming or dropping it.
@@ -57,3 +78,21 @@ gaps merely because they are listed.
 When evidence exposes a contract gap, stop and ask the project owner to supersede the
 contract. Do not make review prose into new scope. When implementation is ready,
 route to **change-verify**.
+
+If the active run must move to another sequential workspace, commit the candidate and
+export the explicit handoff package. The package carries the schema-validated run and
+checkpoint binding; it does not carry uncommitted source or waive a fresh review:
+
+    processctl change handoff export --change-id ID --output HANDOFF_PATH
+
+The receiving workspace imports that package and resumes the phase reported by
+`change status`. Keep actor/context ownership and the current implementation cycle;
+do not create a second run with a copied or renamed change id.
+
+When the lifecycle has a `plan-scope` blocker, the current run is terminal for this
+contract: stop editing and stop retrying. Report the uncovered paths, whether the
+accepted outcome is unchanged, and the exact owner action. An owner-approved
+superseding contract may continue the compatible work through `change start` →
+`change plan` → `change implement`; use the recorded prior run relation and preserve
+all inherited candidate paths. A new outcome is not an implementation-boundary
+repair and requires a fresh accepted decision.

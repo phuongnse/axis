@@ -5,6 +5,15 @@ description: Complete an approved change when routed by deliver-change, only whi
 
 # Complete a change
 
+## Route card
+
+**State:** `approved`. **Do:** recheck the exact reviewed checkpoint and let
+`change finish` write the one receipt; keep release, merge, adoption, and deployment
+with the consumer owner. **Evidence:** required profiles, approved independent
+review, current publication boundary, incident-intake result, and receipt. **Next:**
+owner-controlled publication/adoption, or a new implementation cycle if the candidate
+changes.
+
 Confirm the lifecycle is approved, every required profile passed, every blocking
 finding is closed, every non-blocking finding has its required disposition, and the
 repository still matches the reviewed snapshot.
@@ -15,17 +24,28 @@ Run:
 
     processctl change finish --change-id ID --actor ACTOR --context CONTEXT
 
-The existing `change finish` CLI operation writes one bounded completion receipt and
-marks the run completed.
+The existing `change finish` CLI operation writes one bounded completion receipt,
+records the durable lifecycle result, marks completion, and removes only the
+change-owned `.process/runs/ID` runtime. Readers use the receipt after that cleanup;
+they do not require the deleted run files.
+
+Cleanup is deliberately retryable. If deletion or the final receipt write is
+interrupted, inspect `change status`: a `pending` or `failed` cleanup routes back to
+the same `change finish` command. Do not recreate implementation or review evidence
+to repair cleanup. `change storage` reports receipt count/bytes against the
+consumer-owned retention bounds; purge only an explicitly selected clean receipt:
+
+    processctl change storage --json
+    processctl change purge --change-id ID --confirm
 
 For an opted-in project, `change finish` first runs the existing read-only publication
 validators against the current branch, HEAD commit subject, and the recorded
 `comparisonBaseCommit` through the exact current HEAD. It records the validated
-branch, subject, and pinned range in a version 2 receipt only after the repository
-and branch remain unchanged. Version 1 receipts remain supported. A failed preflight leaves
-the approved run incomplete.
+branch, subject, and pinned range in the single current version-1 receipt only after
+the repository and branch remain unchanged. A failed preflight leaves the approved
+run incomplete.
 
-Before writing the receipt, `change finish` executes the automated incident intake preflight: it inspects lifecycle history and verification evidence for closed-taxonomy incidents, deduplicates by stable title key, and records created, reused, suppressed, or failed process improvement intake events without blocking consumer completion.
+Before writing the receipt, `change finish` executes the automated incident intake preflight: it inspects lifecycle history and verification evidence for the closed taxonomy, records the complete stable-key decision, and performs tracker I/O only under the consumer's process-change policy. Search/writer failures, suppression, reuse, and creation are recorded as bounded intake events; a recorded result is not retried and intake never blocks consumer completion.
 
 This source preflight does not validate a provider pull-request body or make a pull
 request ready. The consumer's required CI must run the same branch, head-commit,
@@ -35,7 +55,7 @@ merge, publication, deployment, and release authority remain consumer-owned.
 Before marking a PR ready, render its body from the selected standard and actual
 completion evidence. Run the consumer's publication preflight, including the current
 branch, exact head subject, pinned base-to-head range, and ready-state body. For a
-consumer using the packaged compatibility checks, all four commands must pass:
+consumer using the packaged publication checks, all four commands must pass:
 
     processctl publication validate-branch --branch BRANCH
     processctl publication validate-commit --subject HEAD_SUBJECT
@@ -45,6 +65,15 @@ consumer using the packaged compatibility checks, all four commands must pass:
 Use actual current PR metadata and the selected consumer root. Keep the PR draft
 when a check fails, and repeat the same checks in required CI/branch protection.
 Custom publication policy uses consumer-owned commands at the same boundary.
+
+For the first complete PR, prepare the one body/title/branch/base/head candidate
+before calling the provider, then validate that same candidate before `gh pr create`
+or the equivalent API. For the packaged standard, the normal sequence is
+`artifact prepare-pr-data`, render the selected body, the four publication validators
+above, and only then provider creation. An existing PR is edited only when the
+current title/body actually differs; metadata repair is not a CI-refresh workaround.
+Keep a draft when evidence or metadata is incomplete. A successful publication
+check, auto-merge request, or merge request is not itself a merge result.
 
 Completion does not itself grant merge, deployment, or release authority; those
 remain project-owned operations. Never report completion from prose alone.
@@ -79,3 +108,9 @@ gaps after completion. Carry the owner and stable record URL for every accepted-
 or tracked-follow-up disposition into the durable handoff. Finish never edits
 readiness, upgrades a pack version, promotes a capability, or turns `building` into a
 production claim; those are reviewed consumer-owned source changes.
+
+Completion consumes only the current run's contract, plan, fresh verification, and
+approved review. A superseding run's prior relation is historical provenance; it does
+not make the prior run's evidence, approval, findings, or receipt valid for the new
+candidate. The prior blocked run remains visible and is not rewritten or marked
+complete by finishing its replacement.

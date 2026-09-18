@@ -5,6 +5,14 @@ description: Plan the registered change and its verification boundary when deliv
 
 # Plan a change
 
+## Route card
+
+**State:** `specified`. **Do:** inspect the accepted boundary and register one plan
+whose work items name literal affected paths, causal mechanism, risks, and invariant
+evidence. **Evidence:** the unchanged contract digest, current source behavior, and
+plan digest. **Next:** `change implement`; unresolved product choices remain with the
+owner.
+
 Read the registered contract and inspect the affected code. Describe one coherent
 approach, bounded work items with owned paths, and concrete risks with mitigations.
 The plan must bind the exact contract digest and must not add behavior that the
@@ -25,11 +33,38 @@ boundaries. Decouple volatile external state from core decision logic rather tha
 attempting to filter it. Keep reasoning proportional; retaining a clear existing
 structure is a valid choice.
 
+For every material criterion or risk, make the chain reviewable: observed behavior or
+failure mode, violated contract or invariant, actual mechanism that can produce it,
+smallest sufficient changed boundary, and objective evidence that would distinguish
+the faulty state from the correction. `workItems[].affectedPaths` are literal
+repository-relative file or directory boundaries for the candidate diff. Declare only
+the paths needed by the accepted work; the lifecycle checks that every new candidate
+path is inside one of these boundaries before final verification and review. That
+machine check proves scope declaration only. It does not prove that the boundary is
+minimal, that the mechanism is the true cause, or that an evidence choice is
+semantically adequate; those remain independent-review judgments.
+
 Identify project knowledge this change would make misleading, incomplete, or obsolete,
 and concrete information gaps obstructing the accepted work. Plan only the necessary
 updates or additions in consumer-owned sources. Any proposed cleanup names the
 obstacle, smallest useful repair, and expected benefit; unrelated gaps remain
 non-blocking proposals.
+
+Make the documentation decision reviewable in the existing work items. Name the
+affected reader, the durable fact or action that changes, the authoritative source,
+and any generated or published output that must follow it. If no documentation
+changes are needed, state the reader consequence that makes that decision safe.
+Do not turn this into a required checklist or infer impact from filenames,
+keywords, page count, or an agent's assertion. When guidance is generated,
+plan the source correction and output verification together; when guidance is
+consumer-owned, preserve its existing structure and format.
+
+For a contract that supersedes a plan-scope-blocked run, inspect the linked prior run
+and the complete diff from its recorded comparison base. Add only the implementation
+boundaries needed for the already accepted outcome; the new literal boundaries must
+cover inherited source changes as well as the new contract/plan control inputs. Do not
+carry prior verification, review, approval, findings, or correction-budget state into
+the plan, and do not select a new comparison base that hides inherited work.
 
 Explain a material or non-obvious evidence strategy in the existing `approach`, tied
 to accepted behavior, contract boundaries, and concrete risks. Derive expectations
@@ -44,24 +79,25 @@ When planning a process adoption change, keep the project's baseline
 `requiredProfiles` in the contract; do not attempt to omit them. Classify the
 adoption boundary in the `approach`:
 1. guidance-only/managed-skill update: plan adoption integrity checks (`processctl adoption check`, hash lock, doctor) and publication metadata;
-2. process runtime, dependency, or schema migration: plan adoption integrity plus verification of affected runtime boundaries;
+2. process runtime, dependency, or schema contract break: plan adoption integrity, direct rejection of superseded inputs, consumer recovery, and verification of affected runtime boundaries;
 3. mixed adoption with consumer product source or policy edits: plan full normal consumer-required verification profiles;
 4. incomplete or unknown impact: plan the complete baseline verification path without waiver.
 Where prior passing profile evidence is valid and consumer source is unchanged, plan
 continuation verification via `processctl change verify --remaining`.
 
-When a consumer adopts the impact-selection capability, plan its versioned
+When a consumer adopts the impact-selection capability, plan its current version-1
 `impactProfiles` policy as consumer-owned evidence. Map every candidate path to one
 or more independently executable units, use a global unit only when its declared
 paths include the explicit universal `**` pattern and dependency reach is
 intentionally cross-cutting, and define the agent action for an
-unresolved path. A schema-version 2 `finalProfiles` opt-in must name only required
-profiles and include an explicit global unit for each; the consumer owns the claim
-that the selected units are independent and complete. Do not infer final coverage
-from filenames or commands. Unresolved feedback or final assurance impact must block
-the corresponding path; an explicit full-profile refresh remains available but is
-not an automatic fallback. Consumers without the opt-in keep the normal required
-profiles as their final assurance boundary.
+    unresolved path. An optional `finalProfiles` declaration in the same current policy
+    must name only required profiles and include an explicit global unit for each; the
+    consumer owns the claim that the selected units are independent and complete. Do
+    not infer final coverage from filenames or commands. Unresolved feedback or final
+    assurance impact must block the corresponding path; an explicit full-profile
+    refresh remains available as a deliberate command, never as a fallback. Consumers
+    without the declaration keep the normal required profiles as their final assurance
+    boundary.
 
 Read **production-engineering** and add one `productionEngineering` assessment for
 each canonical invariant in its defined order. Decide applicability from the stated

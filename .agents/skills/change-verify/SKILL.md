@@ -5,6 +5,32 @@ description: Run the project-owned verification profiles on one unchanged reposi
 
 # Verify a change
 
+## Route card
+
+**State:** `implementing` (or a recorded execution blocker). **Do:** inspect `change
+status` and `change explain`, then execute only the accepted required profiles that
+are not validly reusable; use the exact consumer commands and fail closed on scope,
+mutation, timeout, or unknown identity. **Evidence:** passed reports bound to one
+checkpoint and input identity. **Next:** independent review; profiles are not rerun
+by review or finish.
+
+Begin with:
+
+    processctl change status --change-id ID --json
+
+The status projection is the reader-facing summary. `evidence.requirements` is the
+current decision for each profile; `recordedVerification` only describes what was
+stored previously. A stored `passed` value is not reusable evidence until the current
+selection marks that profile `satisfied`. The projection also shows the candidate
+checkpoint, contract/plan digests, review state including active blocking findings,
+readiness summary, safe diagnostic reference, and one next action. The legacy
+`verification` field retains stored report statuses; `currentVerification` and
+`evidence` carry the current selection states. `diagnostics` adds only the validated
+failed check identity, failure class, bounded execution facts, and fixed selective
+reproduction command. It is read-only and does not refresh, reuse, or advance
+lifecycle state. Commands in `nextAction` include all required handoff flags; any
+caller-selected actor, context, plan, or report path is shown as an explicit input.
+
 Read the registered acceptance criteria and .process/project.json. When publication
 is required, commit the complete candidate on a valid publication branch before final
 verification. The lifecycle rejects uncommitted candidate changes or an invalid or
@@ -16,6 +42,16 @@ An explicit profile request is an unconditional refresh:
 
     processctl change verify --change-id ID --profile PROFILE
 
+For a long-running command, add `--progress` to the explicit, `--remaining`, or
+`--affected` verification request. The opt-in status stream is written to stderr at a
+bounded cadence and reports only the profile/check position, elapsed time, declared
+timeout, last successful runner observation, runner responsiveness, and captured byte
+count. It must report internal progress as `unknown` when the consumer command exposes
+no trusted progress signal; output growth is not treated as proof of test progress.
+It never invents percentages, current test names, remaining time, or a passing result.
+The stream is operational context, not lifecycle evidence, review approval, or merge
+eligibility, and the normal JSON result on stdout remains unchanged.
+
 For a continuation request, inspect the decision first and then execute only
 unsatisfied required profiles:
 
@@ -24,11 +60,43 @@ unsatisfied required profiles:
 
 `--remaining` reuses only a complete passed whole-profile report whose candidate,
 accepted contract and plan, consumer project policy, process authority, runtime and
-bounded child environment all match. It records reuse as a lifecycle event without
-pretending that a command ran again. Missing or legacy input identity is unknown and
+  bounded child environment all match. It records reuse as a lifecycle event without
+  pretending that a command ran again. Missing input identity is unknown and
 runs again. Optional configured profiles not selected by the accepted contract are
 reported as inapplicable; a required profile missing from the current policy is
 blocked. This path never deduplicates check positions or equal check IDs.
+
+Verification may be resumed in another workspace through the explicit handoff
+package. Export only after the candidate is committed, import only into the matching
+checkout, and then rerun `change status`/`change explain`; the package does not make
+old evidence fresh when candidate, policy, process authority, runtime, or dependency
+inputs differ.
+
+A failed full-profile report is not evidence for any required profile. The same run
+retains its failed check, one-based position, exit result, timeout/output/stream and
+cleanup indicators, bounded stream counts/hashes, safe reproduction arguments, report
+digest, recorded time, and candidate checkpoint. `change explain` exposes these facts
+through a typed reference with a `current`, `stale`, or `unavailable` label; read its
+relative run path for the schema-owned descriptor. It never includes raw stdout,
+stderr, traceback, secrets, or a guessed test failure; if the consumer command has no
+safe structured failure report, that limit is explicit. Historical or partial reports
+are not treated as the current candidate.
+
+When a failed report still matches the exact candidate and input identity,
+`--remaining` blocks instead of retrying the same operation. Change the relevant
+consumer input, candidate, authority, or dependency through its owner-controlled route,
+or deliberately request the explicit full-profile refresh. A later pass proves only
+that later execution passed; it does not by itself explain or prove the earlier
+failure was fixed. A selective check/module/command run remains diagnostic and never
+becomes required evidence.
+
+`change status` exposes bounded run measurements: `remainingBlockedAttempts` counts
+non-progress remaining requests, `failedProfileRefreshes` counts explicit full-profile
+refreshes after a failed report, `remainingInvalidationExecutions` counts remaining
+work launched after a failed report became stale, and `profileExecutions`/`checkLaunches`
+count the actual lifecycle work needed by the run. These counters are scenario
+evidence, not a latency target or a new telemetry system, and selective diagnostics
+outside the lifecycle do not become required evidence.
 
 The stage reuse map is deliberately narrow:
 
@@ -53,20 +121,20 @@ policy:
     processctl change explain --change-id ID --impact
     processctl change verify --change-id ID --affected --affected-profile development
 
-The policy lives in the consumer project configuration as `impactProfiles`. Version 1
-declares independently executable units, exact argument-array commands, and normalized
-path patterns for feedback. A version 2 policy may additionally name required
-`finalProfiles`; those profiles explicitly assert that their selected units are
-complete final assurance, and each must contain an explicit `scope: "global"` unit
-whose paths include the universal `**` pattern for cross-cutting reach. A unit with
+The policy lives in the consumer project configuration as one current version-1
+`impactProfiles` definition. It declares independently executable units, exact
+argument-array commands, and normalized path patterns for feedback. It may additionally
+name required `finalProfiles`; those profiles explicitly assert that their selected
+units are complete final assurance, and each must contain an explicit `scope: "global"`
+unit whose paths include the universal `**` pattern for cross-cutting reach. A unit with
 `scope: "global"` is a deliberate global rule only when that universal pattern is
 declared; narrower patterns never cover unrelated paths. The process computes paths
 from the pinned
 comparison base through the current candidate and selects every matching unit in
 declared order.
 
-For a version 1 policy, affected execution remains feedback-only. For an opted-in
-version 2 final profile, `change verify --remaining` executes the resolved units as
+Affected execution remains feedback-only. When the current policy declares a final
+profile, `change verify --remaining` executes the resolved units as
 `impact-assurance` evidence, records the selection identity in the lifecycle report
 and receipt, and lets review/finish consume that evidence. An unresolved final
 selection blocks remaining verification; it never silently falls back to a partial
@@ -85,15 +153,18 @@ satisfy required profiles proportionally. First verify adoption integrity
 (`processctl adoption check`, hash lock, doctor). When consumer product sources are
 unchanged and prior passing profile reports match the current candidate and environment,
 `--remaining` reuses valid reports without rerunning unaffected checks, and executes
-any unsatisfied profiles. Impact feedback, final impact assurance and whole-profile
+any unsatisfied profiles. The current impact policy, final impact assurance, and whole-profile
 reuse are separate mechanisms: an unresolved feedback selection blocks affected
-execution, an unresolved final opt-in blocks remaining verification, while an owner
+execution, an unresolved final selection blocks remaining verification, and an owner
 or release workflow may intentionally request the explicit full profile.
 
 Commands are exact argument arrays with timeouts. Do not substitute a different tool
-or narrower check when a required command fails. A command failure, timeout, output
-or stream failure, failed descendant cleanup, or tracked repository mutation is a
-failure and leaves the change in implementing. Successfully cleaned post-exit
+or narrower check when a required command fails. A non-zero exit is a command failure;
+timeout, output limit, stream, cleanup, spawn, and other inability-to-produce-report
+conditions are execution failures. The report or lifecycle blocker identifies which
+condition occurred and the missing consumer action. A command failure report leaves
+the change implementing but blocks same-input remaining work; a spawn failure records
+the same bounded stop without raw process detail. Successfully cleaned post-exit
 descendants remain recorded without replacing the foreground command result.
 
 In a fresh session, use the consumer's declared bootstrap and the supported runtime
@@ -118,10 +189,20 @@ Overrides must remain in snapshot-covered consumer files. These checks validate 
 declared format or generated bytes, not the truth of arbitrary prose or lifecycle
 approval. Entirely custom formats use consumer-owned template and validator commands.
 
+For documentation work, verify the reader-facing claim at the right boundary:
+follow the linked entry point, resolve internal links, inspect the rendered or
+generated result, and run an example when the consumer provides one. Use
+automation only for properties it can observe; link or format success does not
+prove that the explanation is accurate or useful. When a source/derived pair is
+changed, verify the source-to-output relation and keep adopted-release output
+separate from next-distribution output. The full required profiles remain the
+assurance boundary; a documentation check does not create a new profile or
+replace independent review.
+
 The contract must already include conditional profiles required by affected enforced
 capabilities. `--remaining` may select only the accepted contract's requiredProfiles;
 it does not infer reuse from branch names, labels, filenames, commands or diagnostics.
-The separate `--affected` path uses only the explicit versioned `impactProfiles`
+The separate `--affected` path uses only the explicit current `impactProfiles`
 policy; it does not guess missing coverage from filenames. do not run every planned
 production gate for an unrelated change, and do not treat a passing baseline profile
 as evidence for a planned capability whose gap remains open. A readiness promotion
@@ -129,3 +210,16 @@ is valid only when all evidence named by that capability passes on this same sna
 
 When all required profiles pass on the same snapshot, the lifecycle becomes verified;
 route to **change-review**.
+
+For a publication-enabled consumer, treat source or PR metadata as a separate
+evidence boundary. A code candidate change must produce fresh code evidence; a
+title/body-only PR edit may reuse code evidence only while the exact head and all
+code inputs remain unchanged, and must run the consumer's publication check against
+the current base/head/title/body. For this consumer, retained code evidence is an
+immutable versioned artifact linked by the provider to a successful `ci.yml`
+workflow run; its exact artifact protocol name plus provider run metadata binds the
+base/head/branch/matrix record. A skipped,
+missing, expired, cancelled, failed, stale or out-of-order provider record is not a
+pass. If the event wiring cannot show which current candidate and metadata a check
+evaluated, leave the PR blocked and report that unknown rather than refreshing an
+unrelated heavy profile.
