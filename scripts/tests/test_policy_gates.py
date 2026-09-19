@@ -2477,6 +2477,7 @@ class TestRenovateConfigGate(unittest.TestCase):
         )
         self.assertTrue(rule["enabled"])
         self.assertTrue(rule["draftPR"])
+        self.assertEqual("always", rule["recreateWhen"])
         self.assertEqual(["at any time"], rule["schedule"])
         self.assertEqual(100, rule["prPriority"])
         self.assertEqual(
