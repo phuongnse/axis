@@ -1,0 +1,30 @@
+name: Axis requirement clarification
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+  issues:
+    types: [edited, closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: GitHub issue number
+        type: string
+        required: true
+      pipeline:
+        description: Configured project pipeline
+        type: string
+        required: true
+        default: discovery
+permissions: {}
+jobs:
+  discuss:
+    if: github.event_name == 'workflow_dispatch' || !github.event.issue.pull_request
+    uses: phuongnse/nexkit/.github/workflows/clarify.yml@5fb140cd480e49088da0815b6551bebc01038a42
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    with:
+      kit_repository: phuongnse/nexkit
+      kit_ref: '5fb140cd480e49088da0815b6551bebc01038a42'
+      pipeline: discovery

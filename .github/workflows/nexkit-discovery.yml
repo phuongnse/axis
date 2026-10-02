@@ -1,0 +1,63 @@
+name: Axis platform discovery
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+  issues:
+    types: [edited, closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: GitHub issue number
+        required: true
+        type: string
+      pipeline:
+        description: Configured project pipeline
+        required: true
+        type: string
+        default: discovery
+permissions: {}
+concurrency:
+  group: nexkit-work
+  queue: max
+jobs:
+  prepare:
+    if: github.event_name == 'workflow_dispatch' || !github.event.issue.pull_request
+    uses: phuongnse/nexkit/.github/workflows/prepare-work.yml@5fb140cd480e49088da0815b6551bebc01038a42
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+      actions: read
+    with:
+      kit_repository: phuongnse/nexkit
+      kit_ref: '5fb140cd480e49088da0815b6551bebc01038a42'
+      pipeline: discovery
+      work_type: tasks
+  analyze:
+    needs: prepare
+    if: needs.prepare.outputs.ready == 'true'
+    uses: phuongnse/nexkit/.github/workflows/agent-invocation.yml@5fb140cd480e49088da0815b6551bebc01038a42
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+      actions: read
+    with:
+      kit_repository: phuongnse/nexkit
+      kit_ref: '5fb140cd480e49088da0815b6551bebc01038a42'
+      context_artifact_id: ${{ needs.prepare.outputs.context_artifact_id }}
+      invocation: analyze
+  finish:
+    needs: [prepare, analyze]
+    if: always() && needs.prepare.outputs.ready == 'true'
+    uses: phuongnse/nexkit/.github/workflows/finish-tasks.yml@5fb140cd480e49088da0815b6551bebc01038a42
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+      actions: write
+    with:
+      kit_repository: phuongnse/nexkit
+      kit_ref: '5fb140cd480e49088da0815b6551bebc01038a42'
+      context_artifact_id: ${{ needs.prepare.outputs.context_artifact_id }}
+      jobs_succeeded: ${{ needs.analyze.result == 'success' && needs.analyze.outputs.status == 'done' }}

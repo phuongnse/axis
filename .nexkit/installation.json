@@ -1,0 +1,30 @@
+{
+  "bundle_files": [
+    ".github/workflows/nexkit-clarify.yml",
+    ".github/workflows/nexkit-discovery.yml",
+    ".github/workflows/nexkit-intake.yml",
+    ".github/workflows/nexkit-runner-probe.yml",
+    ".nexkit/controls/platform-discovery.md"
+  ],
+  "files": {
+    ".agents/skills/nexkit-deliver/SKILL.md": "d7092e2ac5446513c27537b37146b70544a9e1bef34d3b27cb28ff149995d770",
+    ".agents/skills/nexkit-howto/SKILL.md": "4a3129e75f85cc7f06e254b600f5057111a5f61572b34a87cbfc50e0cee68bcf",
+    ".agents/skills/nexkit-init/SKILL.md": "73f0fa38eeaaa9dd442ce204a011306c0accc9669ae7318f8b410b80d8b1be58",
+    ".agents/skills/nexkit-knowledge/SKILL.md": "41c85a5ab1a7a86d89d360ef0dd5878fdd40fc4a610c0043fb842d0c5eb44979",
+    ".agents/skills/nexkit-release/SKILL.md": "18eb81bbaa3332911ff534250d1c20a5c2affcebdba37b035c1c074414855061",
+    ".agents/skills/nexkit-request/SKILL.md": "032becd0a36495044ca6a7784fe6aecbe9a45db9beedd6e2bc7e68bf21a29ef2",
+    ".agents/skills/nexkit-review/SKILL.md": "75640fe5054e4238a8a06f247e4ba21a099fb626444a0d179fd5f75b7ab40283",
+    ".agents/skills/nexkit-status/SKILL.md": "91f803a924aec14040f9a09d6a0abaef9678d38adf2bd9ca3667e96e2bccfb25",
+    ".agents/skills/nexkit-task/SKILL.md": "221a660adfce8b397563b3bb9add5c86efbf6204df6590d11c70d84633d0bdaa",
+    ".github/workflows/nexkit-clarify.yml": "60f666858a48d66693955902b4ff77c5d791884d0646a59686cb43ef71c79b1c",
+    ".github/workflows/nexkit-discovery.yml": "2f0d3d9e72531a706a6636c3f1f3b9340c74779bbf90f58818fc6760ed282629",
+    ".github/workflows/nexkit-intake.yml": "9615da232a1a0c3a04359ef7a39757ee6c4c6a44293403f1251cee80ff65dafb",
+    ".github/workflows/nexkit-runner-probe.yml": "72c0c350298c9b7dc0f8a667f5c4ac46c3cfeaf3738958c08c427662e1d24f8a",
+    ".nexkit/controls/platform-discovery.md": "01194b6d032c46e92a92d16798dc02eaca49f57fb2e9ee0d316c9543d9c935ce"
+  },
+  "hosts": [
+    "codex"
+  ],
+  "project": "37d33c887c2d117399efc69c8291903590a6229d89d12f224f843b101252ad84",
+  "version": "1.0.0"
+}

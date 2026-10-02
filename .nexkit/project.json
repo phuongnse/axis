@@ -1,0 +1,111 @@
+{
+  "default_branch": "main",
+  "defaults": {
+    "application": "absent",
+    "clarification": {
+      "agent_minutes": 10,
+      "max_calls": 3
+    },
+    "decisions": [
+      "Build a modern enterprise application platform for user-defined data structures and business processes.",
+      "Architecture, technology choices and the first implementation scope remain open.",
+      "Use the dedicated VPS runner with this consumer's independent ChatGPT subscription login.",
+      "Use gpt-6.1-sol and max reasoning for every configured agent invocation.",
+      "Require authorized collaborator specification approval before read-only discovery.",
+      "Retain the accepted bounded usage: three ten-minute clarification calls; two fifteen-minute analysis calls across at most two attempts within forty-five minutes.",
+      "Use the supplied NexKit runtime and reusable workflows without consumer compatibility patches.",
+      "Configure application delivery only after architecture and real application tests and end-to-end checks are established."
+    ],
+    "engine": {
+      "auth": "chatgpt",
+      "install": {
+        "version": "0.160.0"
+      },
+      "name": "codex"
+    },
+    "environment": {
+      "agent_runner": [
+        "self-hosted",
+        "linux",
+        "x64",
+        "axis-runner"
+      ],
+      "runner": "ubuntu-24.04",
+      "setup": []
+    },
+    "knowledge": [
+      "README.md",
+      "docs/product-brief.md",
+      "docs/runner-operations.md"
+    ],
+    "limits": {
+      "agent_calls": 2,
+      "attempts": 2,
+      "command_seconds": 120,
+      "minutes": 45
+    },
+    "models": {
+      "implement": "gpt-6.1-sol"
+    },
+    "reasoning_effort": {
+      "implement": "max"
+    },
+    "release": {
+      "enabled": false
+    }
+  },
+  "files": {
+    ".github/workflows/nexkit-clarify.yml": {
+      "managed": true,
+      "sha256": "60f666858a48d66693955902b4ff77c5d791884d0646a59686cb43ef71c79b1c"
+    },
+    ".github/workflows/nexkit-discovery.yml": {
+      "managed": true,
+      "sha256": "2f0d3d9e72531a706a6636c3f1f3b9340c74779bbf90f58818fc6760ed282629"
+    },
+    ".github/workflows/nexkit-intake.yml": {
+      "managed": true,
+      "sha256": "9615da232a1a0c3a04359ef7a39757ee6c4c6a44293403f1251cee80ff65dafb"
+    },
+    ".github/workflows/nexkit-runner-probe.yml": {
+      "managed": true,
+      "sha256": "72c0c350298c9b7dc0f8a667f5c4ac46c3cfeaf3738958c08c427662e1d24f8a"
+    },
+    ".nexkit/controls/platform-discovery.md": {
+      "managed": true,
+      "sha256": "01194b6d032c46e92a92d16798dc02eaca49f57fb2e9ee0d316c9543d9c935ce"
+    }
+  },
+  "kit": {
+    "ref": "5fb140cd480e49088da0815b6551bebc01038a42",
+    "repository": "phuongnse/nexkit",
+    "version": "1.0.0"
+  },
+  "pipelines": {
+    "discovery": {
+      "agent_workflows": [
+        ".github/workflows/nexkit-clarify.yml",
+        ".github/workflows/nexkit-discovery.yml",
+        ".github/workflows/nexkit-runner-probe.yml"
+      ],
+      "entrypoints": {
+        "clarify": ".github/workflows/nexkit-clarify.yml",
+        "intake": ".github/workflows/nexkit-intake.yml",
+        "tasks": ".github/workflows/nexkit-discovery.yml"
+      },
+      "invocations": {
+        "analyze": {
+          "contract": "task",
+          "minutes": 15,
+          "model": "gpt-6.1-sol",
+          "reasoning_effort": "max",
+          "required": true,
+          "task": ".nexkit/controls/platform-discovery.md"
+        }
+      },
+      "settings": {}
+    }
+  },
+  "repository": "phuongnse/axis",
+  "schema": 1
+}
