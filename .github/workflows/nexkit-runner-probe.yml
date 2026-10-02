@@ -2,6 +2,8 @@
 # Copy as .github/workflows/nexkit-runner-probe.yml and accept it in setup.
 name: NexKit runner admission probe
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 permissions: {}
 jobs:

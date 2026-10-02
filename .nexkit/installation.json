@@ -19,12 +19,12 @@
     ".github/workflows/nexkit-clarify.yml": "60f666858a48d66693955902b4ff77c5d791884d0646a59686cb43ef71c79b1c",
     ".github/workflows/nexkit-discovery.yml": "2f0d3d9e72531a706a6636c3f1f3b9340c74779bbf90f58818fc6760ed282629",
     ".github/workflows/nexkit-intake.yml": "9615da232a1a0c3a04359ef7a39757ee6c4c6a44293403f1251cee80ff65dafb",
-    ".github/workflows/nexkit-runner-probe.yml": "72c0c350298c9b7dc0f8a667f5c4ac46c3cfeaf3738958c08c427662e1d24f8a",
+    ".github/workflows/nexkit-runner-probe.yml": "f5a0894b6c04b14407b4ea60b4c62676149ec0d0d0e92f5550450fd0d30c55ea",
     ".nexkit/controls/platform-discovery.md": "01194b6d032c46e92a92d16798dc02eaca49f57fb2e9ee0d316c9543d9c935ce"
   },
   "hosts": [
     "codex"
   ],
-  "project": "37d33c887c2d117399efc69c8291903590a6229d89d12f224f843b101252ad84",
+  "project": "436913c1effac84fbb930f925b018c3c08584c997a217c35750e97254c06ba6d",
   "version": "1.0.0"
 }

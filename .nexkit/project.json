@@ -69,7 +69,7 @@
     },
     ".github/workflows/nexkit-runner-probe.yml": {
       "managed": true,
-      "sha256": "72c0c350298c9b7dc0f8a667f5c4ac46c3cfeaf3738958c08c427662e1d24f8a"
+      "sha256": "f5a0894b6c04b14407b4ea60b4c62676149ec0d0d0e92f5550450fd0d30c55ea"
     },
     ".nexkit/controls/platform-discovery.md": {
       "managed": true,
