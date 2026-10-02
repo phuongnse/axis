@@ -21,14 +21,14 @@ permissions: {}
 jobs:
   receive:
     if: github.event_name == 'workflow_dispatch' || (!github.event.issue.pull_request && startsWith(github.event.comment.body, '/nexkit start'))
-    uses: phuongnse/nexkit/.github/workflows/intake.yml@5fb140cd480e49088da0815b6551bebc01038a42
+    uses: phuongnse/nexkit/.github/workflows/intake.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd
     permissions:
       contents: read
       issues: write
       actions: write
     with:
       kit_repository: phuongnse/nexkit
-      kit_ref: '5fb140cd480e49088da0815b6551bebc01038a42'
+      kit_ref: '12135708fa35d7471a4127b9a8aaf4c19d834ebd'
       # Comments select their pipeline in the controller. Dispatches carry the
       # CLI's explicit selection. Both must use an accepted intake entrypoint.
       pipeline: ${{ inputs.pipeline || '' }}
