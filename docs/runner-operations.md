@@ -8,6 +8,23 @@ The project selects Codex 0.160.0, GPT-6.1 Sol (`gpt-6.1-sol`) and Max reasoning
 (`max`). The local Codex configuration preserves the same model and effort.
 Authentication uses the independent ChatGPT login in the dedicated runner.
 
+## Select a toolkit release
+
+Use a local NexKit CLI from 1.1.0 or later to preview and apply an exact
+published release:
+
+```sh
+nexkit use --version 1.1.0 --dry-run
+nexkit use --version 1.1.0
+nexkit doctor --online --checks
+```
+
+Release selection verifies the published assets and refreshes the immutable
+kit pin, reusable-workflow references, accepted hashes and project skills.
+Review the permission changes and commit these files together through a pull
+request. Local Codex plugin updates and provisioned runner maintenance are
+separate steps; review runtime changes before deciding whether to reprovision.
+
 ## Provision and maintain
 
 Use the supplied NexKit image, runtime action and reusable workflows. Workflow

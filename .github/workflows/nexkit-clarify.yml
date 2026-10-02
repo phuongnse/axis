@@ -19,12 +19,12 @@ permissions: {}
 jobs:
   discuss:
     if: github.event_name == 'workflow_dispatch' || !github.event.issue.pull_request
-    uses: phuongnse/nexkit/.github/workflows/clarify.yml@5fb140cd480e49088da0815b6551bebc01038a42
+    uses: phuongnse/nexkit/.github/workflows/clarify.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd
     permissions:
       contents: write
       issues: write
       actions: read
     with:
       kit_repository: phuongnse/nexkit
-      kit_ref: '5fb140cd480e49088da0815b6551bebc01038a42'
+      kit_ref: '12135708fa35d7471a4127b9a8aaf4c19d834ebd'
       pipeline: discovery

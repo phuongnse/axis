@@ -57,15 +57,15 @@
   "files": {
     ".github/workflows/nexkit-clarify.yml": {
       "managed": true,
-      "sha256": "60f666858a48d66693955902b4ff77c5d791884d0646a59686cb43ef71c79b1c"
+      "sha256": "5e2b1b2dda45c5971259ca21d543fa134dbe647d3cc4907bb59b483b2b9a5b5a"
     },
     ".github/workflows/nexkit-discovery.yml": {
       "managed": true,
-      "sha256": "2f0d3d9e72531a706a6636c3f1f3b9340c74779bbf90f58818fc6760ed282629"
+      "sha256": "af7784e488144d63daa3e966a702728a857523306a6f9fa6395b4d3de1a5c254"
     },
     ".github/workflows/nexkit-intake.yml": {
       "managed": true,
-      "sha256": "9615da232a1a0c3a04359ef7a39757ee6c4c6a44293403f1251cee80ff65dafb"
+      "sha256": "7a180bbb6d881bad1309ba044fda940039fc78ba91a753d0e82b129a76facbb7"
     },
     ".github/workflows/nexkit-runner-probe.yml": {
       "managed": true,
@@ -77,9 +77,9 @@
     }
   },
   "kit": {
-    "ref": "5fb140cd480e49088da0815b6551bebc01038a42",
+    "ref": "12135708fa35d7471a4127b9a8aaf4c19d834ebd",
     "repository": "phuongnse/nexkit",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "pipelines": {
     "discovery": {
