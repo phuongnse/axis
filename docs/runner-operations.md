@@ -41,8 +41,13 @@ python3 "$NEXKIT_SOURCE/scripts/manage_runner.py" status \
   --config .nexkit/project.json --pipeline discovery
 ```
 
-The binding uses the project label `axis-runner`. Provisioning records its
-immutable image and policy directory. Reprovisioning requires deliberate cleanup
+The binding uses the project label `axis-runner`. Every agent-bearing pipeline
+declares the same explicit caller allowlist for this shared consumer runner:
+discovery clarification, discovery analysis, the administrative probe, delivery
+clarification and composed delivery. Hosted check, relay, continuation and release
+callers are excluded. Configuration changes alone do not refresh the host binding;
+accept the exact workflow list and maintain the binding through runner provisioning.
+Provisioning records its immutable image and policy directory. Reprovisioning requires deliberate cleanup
 of the stopped old container, while preserving this consumer's private login.
 Never copy credentials into another consumer or run concurrent session refreshers.
 
@@ -72,6 +77,7 @@ responses. Verify live model access separately with a small clarification reques
 A specification needs an authorized collaborator's approval before discovery.
 Doctor does not prove model access or completion of the native task workflow.
 
-There is no application implementation yet. Agree architecture and meaningful
-application tests and end-to-end checks before configuring application delivery.
+There is no application implementation yet. Application delivery and release
+have installed workflows but remain blocked before reservation. Agree architecture
+and meaningful application tests and end-to-end checks before enabling them.
 Infrastructure checks do not establish application behavior.

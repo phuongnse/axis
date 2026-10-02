@@ -1,0 +1,69 @@
+# Pipeline verification only; this job does not establish application behavior.
+name: "Axis pipeline validation"
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".nexkit/**"
+      - "AGENTS.md"
+      - "README.md"
+      - "docs/**"
+  push:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/**"
+      - ".nexkit/**"
+      - "AGENTS.md"
+      - "README.md"
+      - "docs/**"
+  workflow_dispatch: {}
+permissions: {}
+jobs:
+  validate:
+    name: "Axis pipeline validation"
+    runs-on: "ubuntu-24.04"
+    timeout-minutes: 10
+    permissions:
+      contents: "read"
+    defaults:
+      run:
+        working-directory: "axis"
+    steps:
+      -
+        uses: "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"
+        with:
+          path: "axis"
+          persist-credentials: false
+      -
+        uses: "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"
+        with:
+          repository: "phuongnse/nexkit"
+          ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+          path: "kit"
+          persist-credentials: false
+      -
+        name: "Install the pipeline parser"
+        run: "python3 -m pip install 'PyYAML==6.0.1'"
+      -
+        name: "Validate accepted controls, artifact dependencies and approval wiring"
+        run: "python3 .nexkit/controls/check-pipeline.py --kit ../kit"
+      -
+        name: "Exercise rejected pipeline configurations"
+        run: "python3 .nexkit/controls/test-pipeline.py --kit ../kit"
+      -
+        name: "Validate native Actions YAML"
+        shell: "bash"
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/actionlint.tar.gz"
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          archive = Path(os.environ['RUNNER_TEMP']) / 'actionlint.tar.gz'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
+          PY
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -ignore 'unexpected key "queue" for "concurrency" section' .github/workflows/*.yml

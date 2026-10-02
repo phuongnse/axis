@@ -1,0 +1,43 @@
+# Accepted Axis caller; NexKit source is pinned to an immutable release commit.
+name: "Axis approved release"
+on:
+  issue_comment:
+    types:
+      - "created"
+      - "edited"
+      - "deleted"
+  issues:
+    types:
+      - "edited"
+      - "closed"
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "GitHub issue number"
+        type: "string"
+        required: true
+      pipeline:
+        description: "Configured Axis pipeline"
+        type: "string"
+        required: true
+        default: "release"
+permissions: {}
+jobs:
+  readiness:
+    if: "github.event_name == 'workflow_dispatch' || (!github.event.issue.pull_request && contains(github.event.issue.body, '<!-- nexkit:pipeline:release -->'))"
+    uses: "./.github/workflows/nexkit-application-readiness.yml"
+    permissions:
+      contents: "read"
+    with:
+      pipeline: "release"
+  release:
+    needs: "readiness"
+    uses: "phuongnse/nexkit/.github/workflows/release.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      actions: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      pipeline: "release"

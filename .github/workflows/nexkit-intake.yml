@@ -1,4 +1,4 @@
-# Connection example only. Replace the zero SHA and select this file during setup.
+# Accepted Axis intake for requirements and release candidates.
 name: Axis request intake
 on:
   issue_comment:
@@ -8,7 +8,7 @@ on:
       operation:
         type: choice
         required: true
-        options: [request, start, spec]
+        options: [request, start, spec, release]
       payload:
         description: JSON produced by the NexKit CLI
         type: string
