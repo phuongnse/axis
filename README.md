@@ -10,7 +10,10 @@ before product or architecture work.
 ## NexKit
 
 The `discovery` pipeline supports requirement clarification and approved read-only
-investigation. Application delivery and release are not configured.
+investigation. The `delivery` and `release` workflows are installed with application
+work blocked until architecture, real test/E2E commands and release outputs are
+established. Read the [pipeline guide](docs/pipeline.md) for the full flow and
+activation requirements.
 
 Agents use **GPT-6.1 Sol** (`gpt-6.1-sol`) with **Max** reasoning (`max`), through
 this project's dedicated ChatGPT subscription runner on the VPS.

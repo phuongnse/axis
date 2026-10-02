@@ -1,0 +1,20 @@
+# Accepted Axis caller; NexKit source is pinned to an immutable release commit.
+name: "Axis PR review events"
+on:
+  pull_request_review:
+    types:
+      - "submitted"
+      - "edited"
+      - "dismissed"
+permissions: {}
+jobs:
+  notify:
+    uses: "phuongnse/nexkit/.github/workflows/review-events.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "read"
+      issues: "read"
+      pull-requests: "read"
+      actions: "write"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"

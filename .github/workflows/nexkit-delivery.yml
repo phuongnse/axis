@@ -1,0 +1,229 @@
+# Accepted Axis caller; NexKit source is pinned to an immutable release commit.
+name: "Axis application delivery"
+on:
+  issue_comment:
+    types:
+      - "created"
+      - "edited"
+      - "deleted"
+  issues:
+    types:
+      - "edited"
+      - "closed"
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "GitHub issue number"
+        type: "string"
+        required: true
+      pipeline:
+        description: "Configured Axis pipeline"
+        type: "string"
+        required: true
+        default: "delivery"
+permissions: {}
+concurrency:
+  group: "nexkit-work"
+  queue: "max"
+jobs:
+  readiness:
+    if: "github.event_name == 'workflow_dispatch' || (!github.event.issue.pull_request && contains(github.event.issue.body, '<!-- nexkit:pipeline:delivery -->'))"
+    uses: "./.github/workflows/nexkit-application-readiness.yml"
+    permissions:
+      contents: "read"
+    with:
+      pipeline: "delivery"
+  prepare:
+    needs: "readiness"
+    uses: "phuongnse/nexkit/.github/workflows/prepare-work.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "read"
+      actions: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      pipeline: "delivery"
+      work_type: "delivery"
+  plan:
+    needs: "prepare"
+    if: "needs.prepare.outputs.ready == 'true'"
+    uses: "phuongnse/nexkit/.github/workflows/agent-invocation.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "read"
+      actions: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      context_artifact_id: "${{ needs.prepare.outputs.context_artifact_id }}"
+      invocation: "plan"
+  implement:
+    needs:
+      - "prepare"
+      - "plan"
+    if: "needs.plan.outputs.status == 'done'"
+    uses: "phuongnse/nexkit/.github/workflows/agent-invocation.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "read"
+      actions: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      context_artifact_id: "${{ needs.prepare.outputs.context_artifact_id }}"
+      invocation: "implement"
+      input_artifact_ids: "${{ needs.plan.outputs.report_artifact_id }}"
+  publish:
+    needs: "implement"
+    if: "needs.implement.outputs.status == 'done'"
+    uses: "phuongnse/nexkit/.github/workflows/publish-candidate.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "write"
+      checks: "write"
+      actions: "write"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      context_artifact_id: "${{ needs.implement.outputs.context_artifact_id }}"
+      report_artifact_id: "${{ needs.implement.outputs.report_artifact_id }}"
+  build:
+    needs: "publish"
+    uses: "phuongnse/nexkit/.github/workflows/candidate-check.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "read"
+      issues: "read"
+      pull-requests: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      candidate_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      check: "build"
+  lint:
+    needs: "publish"
+    uses: "phuongnse/nexkit/.github/workflows/candidate-check.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "read"
+      issues: "read"
+      pull-requests: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      candidate_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      check: "lint"
+  unit:
+    needs: "publish"
+    uses: "phuongnse/nexkit/.github/workflows/candidate-check.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "read"
+      issues: "read"
+      pull-requests: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      candidate_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      check: "unit"
+  integration:
+    needs: "publish"
+    uses: "phuongnse/nexkit/.github/workflows/candidate-check.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "read"
+      issues: "read"
+      pull-requests: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      candidate_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      check: "integration"
+  e2e:
+    needs: "publish"
+    uses: "phuongnse/nexkit/.github/workflows/candidate-check.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "read"
+      issues: "read"
+      pull-requests: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      candidate_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      check: "e2e"
+  review:
+    needs:
+      - "publish"
+      - "build"
+      - "lint"
+      - "unit"
+      - "integration"
+      - "e2e"
+    if: "always() && needs.publish.result == 'success' && needs.build.outputs.report_artifact_id != '' && needs.lint.outputs.report_artifact_id != '' && needs.unit.outputs.report_artifact_id != '' && needs.integration.outputs.report_artifact_id != '' && needs.e2e.outputs.report_artifact_id != ''"
+    uses: "phuongnse/nexkit/.github/workflows/agent-invocation.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "read"
+      actions: "read"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      context_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      invocation: "review"
+      check_artifact_ids: "${{ needs.build.outputs.report_artifact_id }},${{ needs.lint.outputs.report_artifact_id }},${{ needs.unit.outputs.report_artifact_id }},${{ needs.integration.outputs.report_artifact_id }},${{ needs.e2e.outputs.report_artifact_id }}"
+  pr-review:
+    needs:
+      - "publish"
+      - "build"
+      - "lint"
+      - "unit"
+      - "integration"
+      - "e2e"
+      - "review"
+    if: "needs.review.outputs.status == 'done' && needs.build.outputs.passed == 'true' && needs.lint.outputs.passed == 'true' && needs.unit.outputs.passed == 'true' && needs.integration.outputs.passed == 'true' && needs.e2e.outputs.passed == 'true'"
+    uses: "phuongnse/nexkit/.github/workflows/request-approval.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "write"
+      checks: "write"
+      actions: "write"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      context_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      gate: "pr-review"
+      check_artifact_ids: "${{ needs.build.outputs.report_artifact_id }},${{ needs.lint.outputs.report_artifact_id }},${{ needs.unit.outputs.report_artifact_id }},${{ needs.integration.outputs.report_artifact_id }},${{ needs.e2e.outputs.report_artifact_id }}"
+      review_artifact_id: "${{ needs.review.outputs.report_artifact_id }}"
+  finish:
+    needs:
+      - "readiness"
+      - "prepare"
+      - "plan"
+      - "implement"
+      - "publish"
+      - "build"
+      - "lint"
+      - "unit"
+      - "integration"
+      - "e2e"
+      - "review"
+      - "pr-review"
+    if: "always() && needs.prepare.outputs.ready == 'true'"
+    uses: "phuongnse/nexkit/.github/workflows/finish-work.yml@12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+    permissions:
+      contents: "write"
+      issues: "write"
+      pull-requests: "write"
+      checks: "write"
+      actions: "write"
+    with:
+      kit_repository: "phuongnse/nexkit"
+      kit_ref: "12135708fa35d7471a4127b9a8aaf4c19d834ebd"
+      context_artifact_id: "${{ needs.prepare.outputs.context_artifact_id }}"
+      candidate_artifact_id: "${{ needs.publish.outputs.candidate_artifact_id }}"
+      check_artifact_ids: "${{ needs.build.outputs.report_artifact_id }},${{ needs.lint.outputs.report_artifact_id }},${{ needs.unit.outputs.report_artifact_id }},${{ needs.integration.outputs.report_artifact_id }},${{ needs.e2e.outputs.report_artifact_id }}"
+      review_artifact_id: "${{ needs.review.outputs.report_artifact_id }}"
+      jobs_succeeded: "${{ needs.plan.result == 'success' && needs.plan.outputs.status == 'done' && needs.implement.result == 'success' && needs.implement.outputs.status == 'done' && needs.publish.result == 'success' && needs.build.result == 'success' && needs.build.outputs.passed == 'true' && needs.lint.result == 'success' && needs.lint.outputs.passed == 'true' && needs.unit.result == 'success' && needs.unit.outputs.passed == 'true' && needs.integration.result == 'success' && needs.integration.outputs.passed == 'true' && needs.e2e.result == 'success' && needs.e2e.outputs.passed == 'true' && needs.review.result == 'success' && needs.review.outputs.status == 'done' && needs['pr-review'].result == 'success' && needs['pr-review'].outputs.ready == 'true' }}"

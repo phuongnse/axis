@@ -1,10 +1,24 @@
 {
   "bundle_files": [
+    ".github/workflows/axis-pipeline-validation.yml",
+    ".github/workflows/nexkit-application-readiness.yml",
     ".github/workflows/nexkit-clarify.yml",
+    ".github/workflows/nexkit-delivery-clarify.yml",
+    ".github/workflows/nexkit-delivery.yml",
     ".github/workflows/nexkit-discovery.yml",
     ".github/workflows/nexkit-intake.yml",
+    ".github/workflows/nexkit-pr-continuation.yml",
+    ".github/workflows/nexkit-pr-review-events.yml",
+    ".github/workflows/nexkit-release.yml",
     ".github/workflows/nexkit-runner-probe.yml",
-    ".nexkit/controls/platform-discovery.md"
+    ".nexkit/controls/application-readiness.json",
+    ".nexkit/controls/application-readiness.py",
+    ".nexkit/controls/check-pipeline.py",
+    ".nexkit/controls/delivery-change.md",
+    ".nexkit/controls/delivery-plan.md",
+    ".nexkit/controls/delivery-review.md",
+    ".nexkit/controls/platform-discovery.md",
+    ".nexkit/controls/test-pipeline.py"
   ],
   "files": {
     ".agents/skills/nexkit-deliver/SKILL.md": "d7092e2ac5446513c27537b37146b70544a9e1bef34d3b27cb28ff149995d770",
@@ -16,15 +30,29 @@
     ".agents/skills/nexkit-review/SKILL.md": "75640fe5054e4238a8a06f247e4ba21a099fb626444a0d179fd5f75b7ab40283",
     ".agents/skills/nexkit-status/SKILL.md": "91f803a924aec14040f9a09d6a0abaef9678d38adf2bd9ca3667e96e2bccfb25",
     ".agents/skills/nexkit-task/SKILL.md": "adcc6fef7321fee3af69dfbd7e29715f5b04b1b406573db852749b3adb815430",
+    ".github/workflows/axis-pipeline-validation.yml": "85215a0900fcb7da962dc05c619fb8ca0d3766a7bb519553167b151f2b9430ec",
+    ".github/workflows/nexkit-application-readiness.yml": "ee4243ac3219e62aa164b44e4a0e39b5cc4f91c6f41591f1ea657f0e6a09a2eb",
     ".github/workflows/nexkit-clarify.yml": "5e2b1b2dda45c5971259ca21d543fa134dbe647d3cc4907bb59b483b2b9a5b5a",
+    ".github/workflows/nexkit-delivery-clarify.yml": "9fa4bebf9c0058b988a6379e83fc0296bc97ba3475169c7f1696e4ee24edcd51",
+    ".github/workflows/nexkit-delivery.yml": "b19c320e3c3f2c329ffb1b6ff42b2495a434b1a1bf07d61caa2a8ec799431096",
     ".github/workflows/nexkit-discovery.yml": "af7784e488144d63daa3e966a702728a857523306a6f9fa6395b4d3de1a5c254",
-    ".github/workflows/nexkit-intake.yml": "7a180bbb6d881bad1309ba044fda940039fc78ba91a753d0e82b129a76facbb7",
+    ".github/workflows/nexkit-intake.yml": "bcce78eb8ab4717b41f99931882ba1c6ee9279eb0d33cb339ad586e14eaf705a",
+    ".github/workflows/nexkit-pr-continuation.yml": "fb8b038a99c00bccf705aa8b10bf0a4753638aabd60d8b9cf78fe13e0f5dcdb0",
+    ".github/workflows/nexkit-pr-review-events.yml": "82f83796068609db769fb887f5403f8fb99b845af9fbf89497ab2d2b2bffc46c",
+    ".github/workflows/nexkit-release.yml": "b12ee4a6717deb93d119c18a3eff7098851bd3c7d6f01eda22586a73c1137f76",
     ".github/workflows/nexkit-runner-probe.yml": "72c0c350298c9b7dc0f8a667f5c4ac46c3cfeaf3738958c08c427662e1d24f8a",
-    ".nexkit/controls/platform-discovery.md": "01194b6d032c46e92a92d16798dc02eaca49f57fb2e9ee0d316c9543d9c935ce"
+    ".nexkit/controls/application-readiness.json": "e11ee66667080e2d150ee54de1058b7828b7d34c8452aed98725d897d7d58231",
+    ".nexkit/controls/application-readiness.py": "14dd8195cadef7d6f75f3a4e920f65a5e6dc013e8f7f32a7d113cdfc2419738d",
+    ".nexkit/controls/check-pipeline.py": "522f25014fe0cab96514896da808fa7b4dba03029becc4bfa2acc9ad18b9ab16",
+    ".nexkit/controls/delivery-change.md": "c5a1dcc8d9457799cd30f753115d37cbc1a063ee019fe0f23d7c7c87baf2b0cc",
+    ".nexkit/controls/delivery-plan.md": "c154b64f08e155f787a86905cd17ca1f5442f278e9e6c69b9407765e449c182b",
+    ".nexkit/controls/delivery-review.md": "7d8bddf814cec8ea446f72c95fc136b09738c778004f21946baff21bf6604a29",
+    ".nexkit/controls/platform-discovery.md": "faa92722aa71a4f6fb2512838ce77875509fd0a0cccf106b1060dff32ce9ff23",
+    ".nexkit/controls/test-pipeline.py": "b20aef90ed68e07ec3d87ea598a28a1b23ffe26440850aff3c0c46d032f664c4"
   },
   "hosts": [
     "codex"
   ],
-  "project": "4a57ee20363b93cb0b0e9d9acf19c8429455a6a4d5f4fe52657f3eef76d87225",
+  "project": "b147459fc9188f5a0663b83388f17cf290ad77501b8ecaa2185b8787c3fc71c4",
   "version": "1.1.0"
 }

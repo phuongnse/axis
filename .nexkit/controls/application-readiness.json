@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "enabled": false,
+  "architecture": "docs/architecture.md",
+  "reason": "Application delivery and release wait for an accepted architecture, an application, real test/E2E commands and release artifacts."
+}

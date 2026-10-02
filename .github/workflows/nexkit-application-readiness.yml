@@ -1,0 +1,38 @@
+# Accepted Axis caller; NexKit source is pinned to an immutable release commit.
+name: "Axis application prerequisites"
+on:
+  workflow_call:
+    inputs:
+      pipeline:
+        type: "string"
+        required: true
+permissions: {}
+jobs:
+  check:
+    name: "Check accepted application prerequisites"
+    runs-on: "ubuntu-24.04"
+    timeout-minutes: 3
+    permissions:
+      contents: "read"
+    steps:
+      -
+        name: "Require the accepted default branch"
+        env:
+          AXIS_WORKFLOW_REF: "${{ github.ref }}"
+        shell: "python"
+        run: |
+          import os
+          assert os.environ['AXIS_WORKFLOW_REF'] == 'refs/heads/main', 'Application workflows run only on main'
+      -
+        uses: "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"
+        with:
+          ref: "${{ github.workflow_sha }}"
+          persist-credentials: false
+      -
+        name: "Block application work until architecture and real checks are configured"
+        env:
+          AXIS_PIPELINE: "${{ inputs.pipeline }}"
+        shell: "python"
+        run: |
+          import os, subprocess, sys
+          subprocess.run([sys.executable, '.nexkit/controls/application-readiness.py', '--pipeline', os.environ['AXIS_PIPELINE']], check=True)
