@@ -176,7 +176,7 @@
         "application": "absent",
         "checks": [],
         "clarification": {
-          "agent_minutes": 10,
+          "agent_minutes": 30,
           "max_calls": 3
         },
         "engine": {
