@@ -1,0 +1,24 @@
+name: NexKit administrative setup
+on:
+  push:
+    branches: [nexkit/setup-38f9312cda29c4e1bca36a3c]
+permissions: {}
+concurrency:
+  group: nexkit-administration-38f9312cda29c4e1bca36a3c407508d2f39515b24da6a2934fabe359d3153faf
+  cancel-in-progress: false
+jobs:
+  setup:
+    permissions:
+      contents: write
+      actions: read
+      issues: read
+      pull-requests: write
+      checks: write
+    uses: phuongnse/nexkit/.github/workflows/administration.yml@e2eac504aef602ec8342ea1441918dd5ae9791a7
+    with:
+      kit_repository: phuongnse/nexkit
+      kit_ref: e2eac504aef602ec8342ea1441918dd5ae9791a7
+      proposal: 38f9312cda29c4e1bca36a3c407508d2f39515b24da6a2934fabe359d3153faf
+      proposal_sha: ${{ github.sha }}
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
