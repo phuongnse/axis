@@ -117,7 +117,7 @@ Production deployment requires a separately configured integration and authority
 | --- | --- |
 | Discovery clarification | Three calls, ten minutes each |
 | Discovery analysis | Two calls, two attempts, forty-five minutes total; fifteen minutes per invocation |
-| Delivery clarification | Three calls, ten minutes each |
+| Delivery clarification | Three calls, thirty minutes each |
 | Delivery execution | Nine calls, three attempts, 120 minutes total |
 | Delivery invocations | Planning fifteen minutes, implementation thirty minutes, review fifteen minutes |
 | PR approval window | Seven days, separate from execution time |
