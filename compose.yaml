@@ -1,0 +1,15 @@
+# Local development database. Matches src/Axis.Server/appsettings.Development.json.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: axis
+      POSTGRES_PASSWORD: axis
+      POSTGRES_DB: axis
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - axis-postgres:/var/lib/postgresql
+
+volumes:
+  axis-postgres:

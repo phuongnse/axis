@@ -12,8 +12,14 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Axis is at milestone **M0, Foundation**. The repository holds product and
-architecture documentation only; there is no application code yet.
+Axis is at milestone **M0, Foundation**. The repository contains:
+
+- the server host, with health checks backed by PostgreSQL
+- the SPA shell, with light and dark mode
+- real unit, integration and end-to-end checks, run by CI and NexKit
+
+No platform features exist yet. See [AGENTS.md](AGENTS.md#commands) for the
+commands.
 
 ## Documentation
 

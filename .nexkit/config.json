@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "model": "opus",
+  "setup": [
+    "scripts/setup.sh"
+  ],
+  "checks": [
+    {
+      "name": "build",
+      "run": "scripts/build.sh",
+      "timeout_minutes": 10
+    },
+    {
+      "name": "lint",
+      "run": "scripts/lint.sh",
+      "timeout_minutes": 10
+    },
+    {
+      "name": "test",
+      "run": "scripts/test.sh",
+      "timeout_minutes": 10
+    },
+    {
+      "name": "integration",
+      "run": "scripts/integration.sh",
+      "timeout_minutes": 15
+    },
+    {
+      "name": "e2e",
+      "run": "scripts/e2e.sh",
+      "timeout_minutes": 20
+    }
+  ],
+  "max_auto_fixes": 2,
+  "auto_merge": false
+}

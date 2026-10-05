@@ -49,6 +49,9 @@ samples/
   apps/purchase-requests/ the first sample application, as configuration only
 ```
 
+Projects are created when the first issue needs them. M0 contains only
+`Axis.Server`, the test projects and `web/`.
+
 ## Module rules
 
 - **Ownership.** Each module owns its tables and its public contracts. Other
