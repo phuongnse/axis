@@ -1,0 +1,20 @@
+{
+  "id": "4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a01",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    { "name": "supplier", "type": "reference", "target": "Supplier" },
+    { "name": "total", "type": "decimal", "precision": 18, "scale": 2 },
+    { "name": "neededBy", "type": "date" },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": ["draft", "submitted", "approved", "rejected"],
+      "label": { "textKey": "purchaseRequest.status.label" }
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Axis.Configuration/Axis.Configuration.csproj" />
     <Project Path="src/Axis.Server/Axis.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Axis.Configuration.Tests/Axis.Configuration.Tests.csproj" />
     <Project Path="tests/Axis.Integration.Tests/Axis.Integration.Tests.csproj" />
     <Project Path="tests/Axis.Server.Tests/Axis.Server.Tests.csproj" />
   </Folder>

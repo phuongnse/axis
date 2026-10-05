@@ -1,0 +1,7 @@
+{
+  "id": "11111111-1111-4111-8111-111111111104",
+  "kind": "entity",
+  "name": "Supplier",
+  "formatVersion": 1,
+  "fields": [{ "name": "name", "type": "text" }]
+}

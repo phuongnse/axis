@@ -83,7 +83,13 @@ flowchart LR
     Release --> Activate[Apply schema changes, activate]
 ```
 
-1. **Load.** Each JSON file is validated against the schema for its `kind`.
+1. **Load.** Every `*.json` file in the folder and its subfolders is one
+   resource. Each is validated against the JSON Schema for its `kind`
+   (`application` or `entity`). The manifest is the single `application`
+   resource, stored as `application.json` at the folder root; an `application`
+   resource in any other file is not used as the manifest. Resource IDs are
+   unique across the application, compared as UUIDs. Names are unique per
+   kind, ignoring letter case.
 2. **Resolve.** Every reference must resolve inside the application or its
    declared modules.
 3. **Check.** Expressions, data source fields, form bindings and operation
@@ -96,8 +102,25 @@ flowchart LR
 6. **Activate.** Schema changes are applied. The release becomes active for
    new work only after preparation has completed successfully.
 
-Diagnostics always carry `resourceId`, `path`, `code` and a message. Compile
-reports all diagnostics, not just the first.
+Diagnostics always carry `file`, `resourceId` (when the file has a readable
+ID), `path`, `code` and a message. `file` is relative to the application
+folder and uses `/` separators. `path` is a JSON Pointer (RFC 6901) into that
+file, such as `/fields/0/type`, or empty when the problem concerns the whole
+file. Codes have the form `AXCnnnn` and never change meaning. Compile reports
+all diagnostics, not just the first, sorted by file and then path.
+
+| Code | Meaning |
+| --- | --- |
+| `AXC0001` | The file is not valid JSON. |
+| `AXC0002` | The resource has no `kind`, or `kind` is not a string. |
+| `AXC0003` | The `kind` is not a known resource kind. |
+| `AXC0004` | The resource does not match the JSON Schema for its kind. |
+| `AXC0005` | Another resource already uses this `id`. |
+| `AXC0006` | Another resource of the same kind already uses this `name`. |
+| `AXC0007` | The folder has no `application` manifest. |
+| `AXC0008` | The folder has more than one `application` manifest. |
+| `AXC0009` | An `application` resource is not `application.json` at the folder root, or the root `application.json` has another kind. |
+| `AXC0010` | The file could not be read, for example because access is denied. |
 
 ### Resource file shape
 

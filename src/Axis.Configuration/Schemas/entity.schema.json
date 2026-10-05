@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis entity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "fields"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "entity" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "label": { "$ref": "#/$defs/textReference" },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/field" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$"
+    },
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": {
+          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference"]
+        },
+        "label": { "$ref": "#/$defs/textReference" },
+        "required": { "type": "boolean" },
+        "unique": { "type": "boolean" },
+        "maxLength": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "precision": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "scale": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "target": { "type": "string" },
+        "values": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

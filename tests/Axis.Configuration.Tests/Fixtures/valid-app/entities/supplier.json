@@ -1,0 +1,11 @@
+{
+  "id": "7b2f5a3c-4d5e-4f6a-9b0c-1d2e3f4a5b03",
+  "kind": "entity",
+  "name": "Supplier",
+  "formatVersion": 1,
+  "label": { "textKey": "supplier.label" },
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "active", "type": "boolean" }
+  ]
+}
