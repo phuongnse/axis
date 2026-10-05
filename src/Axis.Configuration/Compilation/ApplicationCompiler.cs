@@ -179,6 +179,7 @@ public static class ApplicationCompiler
             Id = entity.Id,
             Name = entity.Name,
             Label = entity.Label,
+            File = entity.File,
             Fields = entity.Fields.Select(field => BuildField(field, entitiesByName)).ToList(),
         };
 
