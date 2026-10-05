@@ -42,7 +42,9 @@
       "timeout_minutes": 45
     },
     "review": {
-      "timeout_minutes": 20
+      "model": "claude-fable-5-1",
+      "effort": "high",
+      "timeout_minutes": 25
     }
   },
   "max_auto_fixes": 2,
