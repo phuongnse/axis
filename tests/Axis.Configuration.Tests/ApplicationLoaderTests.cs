@@ -24,6 +24,7 @@ public sealed class ApplicationLoaderTests
         Assert.Equal("PurchaseRequests", result.Application.Name);
         Assert.Equal(1, result.Application.FormatVersion);
         Assert.Equal(new TextReference("purchaseRequests.label"), result.Application.Label);
+        Assert.Equal("application.json", result.Application.File);
 
         Assert.Equal(["Department", "PurchaseRequest", "Supplier"], result.Entities.Select(entity => entity.Name));
 
@@ -31,6 +32,7 @@ public sealed class ApplicationLoaderTests
         Assert.Equal(Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a01"), purchaseRequest.Id);
         Assert.Equal(ResourceKinds.Entity, purchaseRequest.Kind);
         Assert.Equal(new TextReference("purchaseRequest.label"), purchaseRequest.Label);
+        Assert.Equal("entities/purchase-request.json", purchaseRequest.File);
         Assert.Equal(
             ["title", "department", "supplier", "total", "neededBy", "status"],
             purchaseRequest.Fields.Select(field => field.Name));

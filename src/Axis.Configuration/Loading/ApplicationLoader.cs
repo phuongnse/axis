@@ -78,10 +78,10 @@ public static class ApplicationLoader
                 switch (kind)
                 {
                     case ResourceKinds.Application when file == ManifestFileName:
-                        application = root.Deserialize<ApplicationManifest>(_serializerOptions)!;
+                        application = root.Deserialize<ApplicationManifest>(_serializerOptions)! with { File = file };
                         break;
                     case ResourceKinds.Entity:
-                        entities.Add(root.Deserialize<EntityResource>(_serializerOptions)!);
+                        entities.Add(root.Deserialize<EntityResource>(_serializerOptions)! with { File = file });
                         break;
                 }
             }
@@ -89,14 +89,7 @@ public static class ApplicationLoader
 
         CheckManifests(manifestFiles, manifestFileReported, diagnostics);
 
-        var sorted = diagnostics
-            .OrderBy(diagnostic => diagnostic.File, StringComparer.Ordinal)
-            .ThenBy(diagnostic => diagnostic.Path, StringComparer.Ordinal)
-            .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
-            .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
-            .ToList();
-
-        return new ApplicationLoadResult(application, entities, sorted);
+        return new ApplicationLoadResult(application, entities, DiagnosticOrder.Sort(diagnostics));
     }
 
     private static List<string> EnumerateResourceFiles(string folderPath)

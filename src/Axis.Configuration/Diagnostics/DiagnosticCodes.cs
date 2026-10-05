@@ -13,4 +13,8 @@ public static class DiagnosticCodes
     public const string MultipleManifests = "AXC0008";
     public const string MisplacedManifest = "AXC0009";
     public const string UnreadableFile = "AXC0010";
+    public const string DuplicateFieldName = "AXC0011";
+    public const string UnknownReferenceTarget = "AXC0012";
+    public const string InvalidConstraint = "AXC0013";
+    public const string MissingTypeProperty = "AXC0014";
 }

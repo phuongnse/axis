@@ -91,7 +91,14 @@ flowchart LR
    unique across the application, compared as UUIDs. Names are unique per
    kind, ignoring letter case.
 2. **Resolve.** Every reference must resolve inside the application or its
-   declared modules.
+   declared modules. The entity model is built here: each field's `type`
+   becomes a typed field type, every type-specific property is checked against
+   the field type and against what storage accepts (see
+   [Entity field types and constraints](#entity-field-types-and-constraints)),
+   field names must be unique within their entity ignoring letter case, and a
+   reference field's `target` must name a loaded entity, ignoring letter case.
+   An entity may reference itself. No model is produced while any error
+   remains.
 3. **Check.** Expressions, data source fields, form bindings and operation
    inputs are type-checked.
 4. **Plan.** The current tenant schema is compared with the new entity
@@ -121,6 +128,10 @@ all diagnostics, not just the first, sorted by file and then path.
 | `AXC0008` | The folder has more than one `application` manifest. |
 | `AXC0009` | An `application` resource is not `application.json` at the folder root, or the root `application.json` has another kind. |
 | `AXC0010` | The file could not be read, for example because access is denied. |
+| `AXC0011` | Another field of the same entity already uses this `name`, ignoring letter case. |
+| `AXC0012` | A reference field's `target` names no loaded entity. |
+| `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. |
+| `AXC0014` | A field lacks a property its type needs: `target` on a reference, `values` on an enum. |
 
 ### Resource file shape
 
@@ -142,6 +153,32 @@ all diagnostics, not just the first, sorted by file and then path.
 - `id` is permanent.
 - `name` is the stable technical name used in references and storage.
 - Labels always come from text resources.
+
+### Entity field types and constraints
+
+A field property is allowed only on the types that have an entry for it below.
+Properties are optional unless marked *needed*. A property on another type is
+`AXC0013`; a missing *needed* property is `AXC0014`.
+Value ranges follow what PostgreSQL accepts, so an invalid value fails at
+compile time rather than when the table is created; a value outside the range
+is `AXC0013`.
+
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | | | | |
+| `integer` | yes | yes | | | | | |
+| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | |
+| `boolean` | yes | yes | | | | | |
+| `date` | yes | yes | | | | | |
+| `date-time` | yes | yes | | | | | |
+| `enum` | yes | yes | | | | | needed |
+| `reference` | yes | yes | | | | needed | |
+
+- `required` and `unique` default to `false`.
+- `maxLength` is capped at 10485760, the largest `varchar` length.
+- `values` is a non-empty list of distinct strings; the JSON Schema checks
+  this (`AXC0004`).
+- `target` names an entity in the same application, ignoring letter case.
 
 ## Storage
 
