@@ -34,14 +34,14 @@ public static class ApplicationLoader
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
 
         var diagnostics = new List<Diagnostic>();
-        var manifests = new Dictionary<string, ApplicationManifest>(StringComparer.Ordinal);
+        ApplicationManifest? application = null;
         var entities = new List<EntityResource>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
         var firstFileByKindAndName = new Dictionary<(string Kind, string Name), string>();
 
-        // Set when the root application.json is already reported as unreadable, so the folder is
-        // not also told that its manifest is missing.
+        // Set when the root application.json is already reported as unreadable or as the wrong kind,
+        // so the folder is not also told that its manifest is missing.
         var manifestFileReported = false;
 
         foreach (var file in EnumerateResourceFiles(folderPath))
@@ -56,7 +56,10 @@ public static class ApplicationLoader
             var root = document.RootElement;
             var resourceId = ReadResourceId(root);
             var kind = ReadKind(file, root, resourceId, diagnostics);
-            manifestFileReported |= kind is null && file == ManifestFileName;
+            if (file == ManifestFileName)
+            {
+                manifestFileReported |= kind is null || !CheckManifestFileKind(file, kind, resourceId, diagnostics);
+            }
 
             var schemaValid = false;
             if (kind is not null)
@@ -74,8 +77,8 @@ public static class ApplicationLoader
             {
                 switch (kind)
                 {
-                    case ResourceKinds.Application:
-                        manifests.Add(file, root.Deserialize<ApplicationManifest>(_serializerOptions)!);
+                    case ResourceKinds.Application when file == ManifestFileName:
+                        application = root.Deserialize<ApplicationManifest>(_serializerOptions)!;
                         break;
                     case ResourceKinds.Entity:
                         entities.Add(root.Deserialize<EntityResource>(_serializerOptions)!);
@@ -84,10 +87,7 @@ public static class ApplicationLoader
             }
         }
 
-        // The root application.json is the manifest; any other application resource is extra.
-        manifestFiles = [.. manifestFiles.OrderBy(manifest => manifest.File != ManifestFileName)];
-        CheckManifestCount(manifestFiles, manifestFileReported, diagnostics);
-        var application = manifestFiles.Count > 0 ? manifests.GetValueOrDefault(manifestFiles[0].File) : null;
+        CheckManifests(manifestFiles, manifestFileReported, diagnostics);
 
         var sorted = diagnostics
             .OrderBy(diagnostic => diagnostic.File, StringComparer.Ordinal)
@@ -111,10 +111,19 @@ public static class ApplicationLoader
 
     private static JsonDocument? Parse(string folderPath, string file, List<Diagnostic> diagnostics)
     {
-        using var stream = File.OpenRead(Path.Combine(folderPath, file));
         try
         {
+            using var stream = File.OpenRead(Path.Combine(folderPath, file));
             return JsonDocument.Parse(stream, _documentOptions);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.UnreadableFile,
+                $"The file could not be read: {exception.Message}",
+                file,
+                ""));
+            return null;
         }
         catch (JsonException exception)
         {
@@ -172,6 +181,22 @@ public static class ApplicationLoader
         }
 
         return kind;
+    }
+
+    private static bool CheckManifestFileKind(string file, string kind, Guid? resourceId, List<Diagnostic> diagnostics)
+    {
+        if (kind == ResourceKinds.Application)
+        {
+            return true;
+        }
+
+        diagnostics.Add(new Diagnostic(
+            DiagnosticCodes.MisplacedManifest,
+            $"'{ManifestFileName}' at the folder root is reserved for the '{ResourceKinds.Application}' manifest, but its kind is '{kind}'.",
+            file,
+            "/kind",
+            resourceId));
+        return false;
     }
 
     private static bool Validate(string file, JsonElement root, string kind, Guid? resourceId, List<Diagnostic> diagnostics)
@@ -264,18 +289,16 @@ public static class ApplicationLoader
         }
     }
 
-    private static void CheckManifestCount(
+    private static void CheckManifests(
         List<(string File, Guid? ResourceId)> manifestFiles,
         bool manifestFileReported,
         List<Diagnostic> diagnostics)
     {
-        if (manifestFiles.Count == 0)
+        // Only the root application.json is the manifest. Another application resource is extra when
+        // that file exists, and misplaced when it does not.
+        var hasManifest = manifestFiles.Exists(manifest => manifest.File == ManifestFileName);
+        if (!hasManifest && !manifestFileReported && manifestFiles.Count == 0)
         {
-            if (manifestFileReported)
-            {
-                return;
-            }
-
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.ManifestMissing,
                 $"The application folder has no '{ResourceKinds.Application}' manifest. Add '{ManifestFileName}' at the folder root.",
@@ -284,14 +307,21 @@ public static class ApplicationLoader
             return;
         }
 
-        foreach (var (file, resourceId) in manifestFiles.Skip(1))
+        foreach (var (file, resourceId) in manifestFiles.Where(manifest => manifest.File != ManifestFileName))
         {
-            diagnostics.Add(new Diagnostic(
-                DiagnosticCodes.MultipleManifests,
-                $"Only one '{ResourceKinds.Application}' manifest is allowed; '{manifestFiles[0].File}' is already the manifest.",
-                file,
-                "/kind",
-                resourceId));
+            diagnostics.Add(hasManifest
+                ? new Diagnostic(
+                    DiagnosticCodes.MultipleManifests,
+                    $"Only one '{ResourceKinds.Application}' manifest is allowed; '{ManifestFileName}' is already the manifest.",
+                    file,
+                    "/kind",
+                    resourceId)
+                : new Diagnostic(
+                    DiagnosticCodes.MisplacedManifest,
+                    $"The '{ResourceKinds.Application}' manifest must be '{ManifestFileName}' at the folder root, not '{file}'.",
+                    file,
+                    "/kind",
+                    resourceId));
         }
     }
 }

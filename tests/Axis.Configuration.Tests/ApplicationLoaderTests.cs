@@ -137,6 +137,60 @@ public sealed class ApplicationLoaderTests
     }
 
     [Fact]
+    public void Manifest_only_in_a_subfolder_is_reported_as_misplaced()
+    {
+        using var folder = new TemporaryFolder().With("config/application.json", Manifest);
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MisplacedManifest, "config/application.json", "/kind"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(Guid.Parse("0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01"), diagnostic.ResourceId);
+        Assert.Null(result.Application);
+    }
+
+    [Fact]
+    public void Root_application_file_of_another_kind_is_reported_as_misplaced()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", """{ "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text" }] }""");
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MisplacedManifest, "application.json", "/kind"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'entity'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Application);
+        Assert.Equal("Order", Assert.Single(result.Entities).Name);
+    }
+
+    [Fact]
+    public void Unreadable_file_is_reported_without_stopping_the_load()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("locked.json", """{ "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Locked", "formatVersion": 1, "fields": [{ "name": "number", "type": "text" }] }""")
+            .With("order.json", """{ "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text" }] }""");
+
+        // An exclusive lock makes the loader's read fail with an IOException on every platform.
+        using (File.Open(Path.Combine(folder.Path, "locked.json"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            var result = ApplicationLoader.Load(folder.Path);
+
+            var diagnostic = Assert.Single(result.Diagnostics);
+            Assert.Equal(
+                (DiagnosticCodes.UnreadableFile, "locked.json", ""),
+                (diagnostic.Code, diagnostic.File, diagnostic.Path));
+            Assert.Equal("Sample", result.Application?.Name);
+            Assert.Equal("Order", Assert.Single(result.Entities).Name);
+        }
+    }
+
+    [Fact]
     public void Kind_that_is_not_a_string_is_reported_at_the_kind_property()
     {
         using var folder = new TemporaryFolder()

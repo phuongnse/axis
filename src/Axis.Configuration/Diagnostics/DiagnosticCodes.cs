@@ -11,4 +11,6 @@ public static class DiagnosticCodes
     public const string DuplicateName = "AXC0006";
     public const string ManifestMissing = "AXC0007";
     public const string MultipleManifests = "AXC0008";
+    public const string MisplacedManifest = "AXC0009";
+    public const string UnreadableFile = "AXC0010";
 }

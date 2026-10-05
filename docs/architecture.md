@@ -86,7 +86,8 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application` or `entity`). The manifest is the single `application`
-   resource, stored as `application.json` at the folder root. Resource IDs are
+   resource, stored as `application.json` at the folder root; an `application`
+   resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
    kind, ignoring letter case.
 2. **Resolve.** Every reference must resolve inside the application or its
@@ -118,6 +119,8 @@ all diagnostics, not just the first, sorted by file and then path.
 | `AXC0006` | Another resource of the same kind already uses this `name`. |
 | `AXC0007` | The folder has no `application` manifest. |
 | `AXC0008` | The folder has more than one `application` manifest. |
+| `AXC0009` | An `application` resource is not `application.json` at the folder root, or the root `application.json` has another kind. |
+| `AXC0010` | The file could not be read, for example because access is denied. |
 
 ### Resource file shape
 
