@@ -34,7 +34,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host (M3)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
-  Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics
+  Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
   Axis.Expressions/       expression parser, type checker, interpreter (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
   Axis.Processes/         process engine, tasks, outbox, timers (M3)
@@ -104,8 +104,23 @@ flowchart LR
 4. **Plan.** The current tenant schema is compared with the new entity
    definitions. Additive changes are planned automatically; incompatible
    changes are rejected with a diagnostic until migrations exist (M6).
-5. **Release.** The compiled plan is stored with a content hash. It is
-   immutable.
+5. **Release.** The compiled application is stored as a release with a
+   content hash. It is immutable.
+   - **Content hash.** Every resource file is canonicalized as in RFC 8785
+     (JCS): no whitespace, object properties sorted by UTF-16 code units,
+     minimal string escaping, numbers written as ECMAScript does. The hash is
+     SHA-256 over every resource in ordinal order of its relative path (`/`
+     separators), each contributing `path`, a newline, its canonical JSON and
+     a newline, encoded as UTF-8. It is written as lowercase hex.
+     Formatting-only changes (whitespace, key order, line endings) keep the
+     hash; a changed value, or an added, removed or renamed file changes it.
+   - **Identity.** A release is unique per application `id` and content hash.
+     Compiling an unchanged folder returns the stored release instead of
+     storing a second one, also when two compiles run at the same time.
+   - **Content.** A release stores the canonical content of every resource
+     with its relative path, so it can be read back without the folder.
+   - **Errors.** A folder with any error diagnostic produces no release;
+     compile returns the diagnostics only.
 6. **Activate.** Schema changes are applied. The release becomes active for
    new work only after preparation has completed successfully.
 
@@ -184,6 +199,20 @@ is `AXC0013`.
 
 - **Platform tables.** These are managed by EF Core migrations shipped with
   Axis.
+- **System tables.** These live in the `axis` schema of each tenant database.
+  Each module owns its tables and manages them with its own EF Core context
+  and migrations. Each module context keeps its migration history in its own
+  table, `axis.__<module>_migrations`, so the contexts sharing the schema do
+  not collide.
+  - `Axis.Configuration` owns `axis.releases` and `axis.release_resources`,
+    with history in `axis.__configuration_migrations`. The caller supplies
+    the tenant database connection.
+  - Releases are immutable, enforced through the context's change tracking:
+    a release and its resources are only inserted together. Saving fails when
+    a stored release or resource is modified or deleted, or when a resource is
+    added to a stored release. Bulk operations (`ExecuteUpdate`,
+    `ExecuteDelete`) and raw SQL bypass this guard; a database-level guard
+    is a later change.
 - **Entity tables.** These are generated per entity in the tenant database and
   live in a dedicated schema, separate from the system tables.
 - **Physical names.** Table and column names are derived from stable IDs and

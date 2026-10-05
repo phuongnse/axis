@@ -2,6 +2,10 @@
 
   <ItemGroup>
     <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <!-- Keeps EF Core at the Design package's version for every project that references this one. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
   <ItemGroup>

@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 dotnet restore Axis.slnx
+dotnet tool restore
 npm ci --prefix web
 npm ci --prefix tests/e2e
 if [[ "${CI:-}" == "true" ]]; then
