@@ -31,21 +31,29 @@ jobs:
       - name: Setup
         run: scripts/setup.sh
       - name: Build
+        id: build
         run: scripts/build.sh
+      # Every check runs once the build succeeds, so one run shows all results.
       - name: Lint
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: scripts/lint.sh
       - name: Unit tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: scripts/test.sh
       - name: Integration tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: scripts/integration.sh
       - name: End-to-end tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: scripts/e2e.sh
-      - name: Upload Playwright report
-        if: failure()
+      - name: Upload test results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: test-results
           path: |
+            artifacts
             tests/e2e/playwright-report
             tests/e2e/test-results
-          retention-days: 7
+          if-no-files-found: ignore
+          retention-days: 14
