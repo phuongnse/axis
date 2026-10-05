@@ -51,6 +51,50 @@ public sealed class ApplicationCompilerTests
 
         Assert.True(result.Model.TryGetEntity("Supplier", out var supplierEntity));
         Assert.Equal([FieldType.Text, FieldType.Boolean], supplierEntity.Fields.Select(field => field.Type));
+        Assert.Equal("entities/supplier.json", supplierEntity.File);
+    }
+
+    [Theory]
+    [InlineData(61, 1, "/name")]
+    [InlineData(1, 61, "/fields/0/name")]
+    public void Entity_or_field_name_longer_than_60_characters_is_a_schema_violation(int entityNameLength, int fieldNameLength, string path)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity(Name(entityNameLength), $$"""{ "name": "{{Name(fieldNameLength)}}", "type": "text" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "order.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Application_name_longer_than_60_characters_is_a_schema_violation()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest.Replace("\"Sample\"", $"\"{Name(61)}\"", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "application.json", "/name"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Names_of_60_characters_compile()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest.Replace("\"Sample\"", $"\"{Name(60)}\"", StringComparison.Ordinal))
+            .With("entities/order.json", Entity(Name(60), $$"""{ "name": "{{Name(60)}}", "type": "text" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var entity = Assert.Single(result.Model.Entities);
+        Assert.Equal((Name(60), Name(60), "entities/order.json"), (entity.Name, Assert.Single(entity.Fields).Name, entity.File));
     }
 
     [Fact]
@@ -283,6 +327,8 @@ public sealed class ApplicationCompilerTests
 
     private static string Entity(string name, string fields, string id = OrderId) =>
         $$"""{ "id": "{{id}}", "kind": "entity", "name": "{{name}}", "formatVersion": 1, "fields": [{{fields}}] }""";
+
+    private static string Name(int length) => "N" + new string('a', length - 1);
 
     private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 }

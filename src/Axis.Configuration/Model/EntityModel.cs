@@ -12,6 +12,9 @@ public sealed record EntityModel
 
     public TextReference? Label { get; init; }
 
+    /// <summary>The entity's file, relative to the application folder with <c>/</c> separators.</summary>
+    public required string File { get; init; }
+
     public required IReadOnlyList<FieldModel> Fields { get; init; }
 
     /// <summary>Finds a field by name, ignoring letter case.</summary>

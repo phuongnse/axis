@@ -17,4 +17,7 @@ public static class DiagnosticCodes
     public const string UnknownReferenceTarget = "AXC0012";
     public const string InvalidConstraint = "AXC0013";
     public const string MissingTypeProperty = "AXC0014";
+    public const string RemovedField = "AXC0015";
+    public const string IncompatibleFieldChange = "AXC0016";
+    public const string RemovedEntity = "AXC0017";
 }

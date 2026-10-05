@@ -103,7 +103,8 @@ flowchart LR
    inputs are type-checked.
 4. **Plan.** The current tenant schema is compared with the new entity
    definitions. Additive changes are planned automatically; incompatible
-   changes are rejected with a diagnostic until migrations exist (M6).
+   changes are rejected with a diagnostic until migrations exist (M6). See
+   [Schema planning](#schema-planning).
 5. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
    - **Content hash.** Every resource file is canonicalized as in RFC 8785
@@ -147,6 +148,9 @@ all diagnostics, not just the first, sorted by file and then path.
 | `AXC0012` | A reference field's `target` names no loaded entity. |
 | `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference, `values` on an enum. |
+| `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
+| `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
+| `AXC0017` | An entity provisioned for the application is missing from it. Reported at `application.json` with an empty path. |
 
 ### Resource file shape
 
@@ -166,7 +170,9 @@ all diagnostics, not just the first, sorted by file and then path.
 ```
 
 - `id` is permanent.
-- `name` is the stable technical name used in references and storage.
+- `name` is the stable technical name used in references and storage. It
+  starts with a letter, contains only ASCII letters and digits, and is at most
+  60 characters long (`AXC0004`). The same rule applies to field names.
 - Labels always come from text resources.
 
 ### Entity field types and constraints
@@ -214,14 +220,88 @@ is `AXC0013`.
     `ExecuteDelete`) and raw SQL bypass this guard; a database-level guard
     is a later change.
 - **Entity tables.** These are generated per entity in the tenant database and
-  live in a dedicated schema, separate from the system tables.
+  live in the `entities` schema, separate from the `axis` system tables.
+  `Axis.Data` plans them (see [Schema planning](#schema-planning)).
 - **Physical names.** Table and column names are derived from stable IDs and
-  names, never from labels. Renaming a label never touches storage.
+  names, never from labels. Renaming a label, or renaming an entity while
+  keeping its `id`, never touches storage.
+
+  | Object | Name | Length |
+  | --- | --- | --- |
+  | Table | `e_` + entity `id` as 32 lowercase hex characters | 34 |
+  | Primary key column | `id` (`uuid`) | 2 |
+  | Field column | `f_` + field name in lowercase | at most 62 |
+  | Primary key | `pk_` + table | 37 |
+  | Unique constraint | `uq_` + table + `_` + hash of the column name | 54 |
+  | Foreign key | `fk_` + table + `_` + hash of the column name | 54 |
+
+  The hash is the first 16 lowercase hex characters of SHA-256 over the UTF-8
+  column name. Because names are ASCII and at most 60 characters, every
+  identifier fits PostgreSQL's 63-byte limit by construction and is never
+  truncated. Identifiers are always double-quoted in SQL.
+- **Column types.** Each field type maps to one PostgreSQL type, spelled as
+  `format_type` renders it, so a catalog column matches by string equality.
+
+  | Field type | Column type |
+  | --- | --- |
+  | `text` | `character varying(n)` with `maxLength`, otherwise `text` |
+  | `integer` | `bigint` |
+  | `decimal` | `numeric(p,s)` with `precision` (`s` is 0 when `scale` is omitted), otherwise `numeric` |
+  | `boolean` | `boolean` |
+  | `date` | `date` |
+  | `date-time` | `timestamp with time zone` |
+  | `enum` | `text`; the values are recorded, not enforced by a `CHECK` |
+  | `reference` | `uuid` with a foreign key to the target table's `id` |
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
   module; values are always parameters. Configuration can never supply raw SQL.
 - **Database credentials.** Runtime access and schema changes use different
   database roles.
+
+### Schema planning
+
+`Axis.Data` compares a compiled application with a snapshot of the tenant
+catalog (entity tables, their columns, types, `NOT NULL`, single-column
+unique constraints, foreign key targets and whether the table has rows) and
+with the provisioning records (each provisioned entity with its application
+and table, and each recorded enum value). The planner itself has no database
+access. It returns diagnostics, SQL statements and the new records to write.
+
+- **Missing table.** It is created with every column, `NOT NULL` for
+  required fields and a unique constraint for unique fields. The entity and
+  its enum values are recorded.
+- **Missing column.** It is added. `NOT NULL` is added only when the table
+  has no rows; a required field added to a table with rows is `AXC0016` at
+  `/fields/{i}/required`. A unique field also gets its unique constraint.
+- **Existing column.**
+  - The type must equal the expected type. Widening text
+    (`character varying(n)` to a larger `n` or to `text`) is applied.
+    Narrowing it, including `text` to `character varying(n)`, is `AXC0016` at
+    `/fields/{i}/maxLength`. Any other type difference is `AXC0016` at
+    `/fields/{i}/type`.
+  - Dropping `required` drops `NOT NULL`, and dropping `unique` drops the
+    unique constraint. Adding either to an existing column is `AXC0016` at
+    `/fields/{i}/required` or `/fields/{i}/unique`.
+  - A reference column without a foreign key gets one. A foreign key that
+    points at another table than the target's is `AXC0016` at
+    `/fields/{i}/target`.
+- **Enum values.** Values are compared ordinally, so letter case matters.
+  Recorded values missing from the field's `values` are one `AXC0016` at
+  `/fields/{i}/values` listing them; new values become new records and need
+  no SQL. A column switching between `enum` and another type (recorded values
+  present for a non-enum field, or absent for an enum field) is `AXC0016` at
+  `/fields/{i}/type`.
+- **Removed field.** A column other than `id` without a matching field is
+  `AXC0015` at `/fields`, naming the column.
+- **Removed entity.** An entity recorded for the application but missing from
+  it is `AXC0017` at `application.json` with an empty path and the entity's
+  `id` as `resourceId`.
+- **Labels.** A label change produces no statements.
+- **Order.** Every `CREATE TABLE` comes first, then the `ALTER TABLE` column
+  changes, then every `ADD CONSTRAINT ... FOREIGN KEY`, so references between
+  entities, cycles and self-references need no further ordering.
+- **Errors.** When any diagnostic exists, the plan has no statements and no
+  new records; nothing is applied.
 
 ## Tenancy (D10)
 
