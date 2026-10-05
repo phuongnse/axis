@@ -1,0 +1,196 @@
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
+using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
+
+namespace Axis.Configuration.Compilation;
+
+/// <summary>
+/// Compiles an application folder: loads it, checks every entity's fields against the field type
+/// rules and resolves references between entities. Every problem is reported, together with the
+/// loader's, in one sorted list.
+/// </summary>
+public static class ApplicationCompiler
+{
+    /// <summary>The largest length PostgreSQL accepts for <c>varchar(n)</c>.</summary>
+    public const int MaxTextLength = 10_485_760;
+
+    /// <summary>The largest precision PostgreSQL accepts for <c>numeric(p, s)</c>.</summary>
+    public const int MaxPrecision = 1000;
+
+    public static CompilationResult Compile(string folderPath)
+    {
+        var loaded = ApplicationLoader.Load(folderPath);
+        var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
+
+        // Entity names are unique ignoring letter case; a second entity with the same name is
+        // already reported by the loader, so references resolve to the first one.
+        var entitiesByName = new Dictionary<string, EntityResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entity in loaded.Entities)
+        {
+            entitiesByName.TryAdd(entity.Name, entity);
+        }
+
+        foreach (var entity in loaded.Entities)
+        {
+            CheckEntity(entity, entitiesByName, diagnostics);
+        }
+
+        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
+        if (result.HasErrors || loaded.Application is null)
+        {
+            return result;
+        }
+
+        var model = new ApplicationModel
+        {
+            Manifest = loaded.Application,
+            Entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName)).ToList(),
+        };
+        return result with { Model = model };
+    }
+
+    private static void CheckEntity(
+        EntityResource entity,
+        Dictionary<string, EntityResource> entitiesByName,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, entity.File, path, entity.Id));
+
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < entity.Fields.Count; index++)
+        {
+            var field = entity.Fields[index];
+            var path = $"/fields/{index}";
+
+            if (!firstIndexByName.TryAdd(field.Name, index))
+            {
+                var firstIndex = firstIndexByName[field.Name];
+                Report(
+                    DiagnosticCodes.DuplicateFieldName,
+                    $"The field name '{field.Name}' is already used by field '{entity.Fields[firstIndex].Name}' at '/fields/{firstIndex}'.",
+                    $"{path}/name");
+            }
+
+            CheckField(field, path, entitiesByName, Report);
+        }
+    }
+
+    private static void CheckField(
+        FieldDefinition field,
+        string path,
+        Dictionary<string, EntityResource> entitiesByName,
+        Action<string, string, string> report)
+    {
+        var type = FieldTypes.Parse(field.Type);
+
+        // Reports a type-specific property on a field of another type. Returns whether it fits.
+        bool Fits(string property, FieldType fittingType, string fittingTypeName)
+        {
+            if (type == fittingType)
+            {
+                return true;
+            }
+
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'{property}' applies only to {fittingTypeName} fields, not to {field.Type} fields.",
+                $"{path}/{property}");
+            return false;
+        }
+
+        if (field.MaxLength is { } maxLength
+            && Fits("maxLength", FieldType.Text, "text")
+            && maxLength is < 1 or > MaxTextLength)
+        {
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'maxLength' must be between 1 and {MaxTextLength}, but is {maxLength}.",
+                $"{path}/maxLength");
+        }
+
+        var precisionValid = false;
+        if (field.Precision is { } precision && Fits("precision", FieldType.Decimal, "decimal"))
+        {
+            precisionValid = precision is >= 1 and <= MaxPrecision;
+            if (!precisionValid)
+            {
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    $"'precision' must be between 1 and {MaxPrecision}, but is {precision}.",
+                    $"{path}/precision");
+            }
+        }
+
+        if (field.Scale is { } scale && Fits("scale", FieldType.Decimal, "decimal"))
+        {
+            if (field.Precision is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    "'scale' can only be set together with 'precision'.",
+                    $"{path}/scale");
+            }
+            else if (precisionValid && scale > field.Precision)
+            {
+                // An invalid precision is reported on its own; comparing against it would only add noise.
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    $"'scale' must be between 0 and the precision ({field.Precision}), but is {scale}.",
+                    $"{path}/scale");
+            }
+        }
+
+        if (field.Target is { } target)
+        {
+            if (Fits("target", FieldType.Reference, "reference") && !entitiesByName.ContainsKey(target))
+            {
+                report(
+                    DiagnosticCodes.UnknownReferenceTarget,
+                    $"The target entity '{target}' was not found. No loaded entity has that name.",
+                    $"{path}/target");
+            }
+        }
+        else if (type == FieldType.Reference)
+        {
+            report(DiagnosticCodes.MissingTypeProperty, "A reference field must name its target entity in 'target'.", path);
+        }
+
+        if (field.Values is not null)
+        {
+            Fits("values", FieldType.Enum, "enum");
+        }
+        else if (type == FieldType.Enum)
+        {
+            report(DiagnosticCodes.MissingTypeProperty, "An enum field must list its 'values'.", path);
+        }
+    }
+
+    private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName) =>
+        new()
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Label = entity.Label,
+            Fields = entity.Fields.Select(field => BuildField(field, entitiesByName)).ToList(),
+        };
+
+    private static FieldModel BuildField(FieldDefinition field, Dictionary<string, EntityResource> entitiesByName)
+    {
+        var target = field.Target is null ? null : entitiesByName[field.Target];
+        return new FieldModel
+        {
+            Name = field.Name,
+            Type = FieldTypes.Parse(field.Type),
+            Label = field.Label,
+            Required = field.Required ?? false,
+            Unique = field.Unique ?? false,
+            MaxLength = field.MaxLength,
+            Precision = field.Precision,
+            Scale = field.Scale,
+            Values = field.Values,
+            Target = target is null ? null : new EntityReference(target.Id, target.Name),
+        };
+    }
+}

@@ -1,8 +1,9 @@
 namespace Axis.Configuration.Resources;
 
 /// <summary>
-/// A field as written in the entity file. Whether a constraint applies to the field's type is
-/// checked by a later compile stage, not by the loader.
+/// A field as written in the entity file. Whether a constraint applies to the field's type, and
+/// whether its value is valid for storage, is checked by
+/// <see cref="Compilation.ApplicationCompiler"/>, not by the loader.
 /// </summary>
 public sealed record FieldDefinition
 {
