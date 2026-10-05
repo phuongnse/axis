@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- __ROOT__ is replaced with the fixture tree before the report reads this file. -->
+<testsuites name="mixed tests" tests="5" failures="2" errors="1" time="2.4">
+    <testsuite name="src/sample.test.ts" tests="3" failures="1" errors="0" skipped="1" time="0.75">
+        <testcase classname="src/sample.test.ts" name="Sample &gt; adds numbers" time="0.5">
+        </testcase>
+        <testcase classname="src/sample.test.ts" name="Sample &gt; subtracts numbers" file="src/sample.test.ts" time="0.25">
+            <failure message="expected 1 to be 2 // Object.is equality" type="AssertionError">
+AssertionError: expected 1 to be 2 // Object.is equality
+ ❯ node_modules/vitest/dist/index.js:10:5
+ ❯ src/sample.test.ts:3:13
+            </failure>
+        </testcase>
+        <testcase classname="src/sample.test.ts" name="Sample &gt; divides numbers" time="0">
+            <skipped/>
+        </testcase>
+    </testsuite>
+    <testsuite name="__ROOT__/tests/Sample.Tests/bin/Sample.Tests.dll" tests="2" failures="1" errors="1" time="1.5">
+        <testcase name="Sample.Tests.SampleTests.Compares_text" time="1.25" classname="Sample.Tests.SampleTests"><failure message="Assert.Equal() Failure: Strings differ&#xA;Expected: &quot;a&lt;b&amp;c&quot;&#xA;Actual:   &quot;x&quot;"><![CDATA[   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at Other.Library.Helper.Run() in /elsewhere/Other.cs:line 3
+   at Sample.Tests.SampleTests.Compares_text() in __ROOT__/tests/Sample.Tests/SampleTests.cs:line 12]]></failure></testcase>
+        <testcase name="Sample.Tests.SampleTests.Throws" time="0.25" classname="Sample.Tests.SampleTests"><error message="Boom, 100% broken" /></testcase>
+    </testsuite>
+</testsuites>

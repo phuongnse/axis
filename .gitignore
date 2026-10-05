@@ -12,6 +12,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Test results and logs written by scripts/
+artifacts/
+
 # Local environment
 .env
 .env.*
