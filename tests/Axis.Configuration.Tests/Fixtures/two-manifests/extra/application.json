@@ -1,0 +1,7 @@
+{
+  "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e09",
+  "kind": "application",
+  "name": "Expenses",
+  "formatVersion": 1,
+  "label": { "textKey": "expenses.label" }
+}

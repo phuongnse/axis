@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis application manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "application" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "label": { "$ref": "#/$defs/textReference" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$"
+    },
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

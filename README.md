@@ -16,9 +16,11 @@ Axis is at milestone **M0, Foundation**. The repository contains:
 
 - the server host, with health checks backed by PostgreSQL
 - the SPA shell, with light and dark mode
+- the configuration loader, which reads an application folder, validates each
+  resource against its JSON Schema and reports every problem as a diagnostic
 - real unit, integration and end-to-end checks, run by CI and NexKit
 
-No platform features exist yet. See [AGENTS.md](AGENTS.md#commands) for the
+No runtime features exist yet. See [AGENTS.md](AGENTS.md#commands) for the
 commands.
 
 ## Documentation
