@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Json.Schema;
 
@@ -36,6 +37,7 @@ public static class ApplicationLoader
         var diagnostics = new List<Diagnostic>();
         ApplicationManifest? application = null;
         var entities = new List<EntityResource>();
+        var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
         var firstFileByKindAndName = new Dictionary<(string Kind, string Name), string>();
@@ -75,6 +77,9 @@ public static class ApplicationLoader
 
             if (schemaValid)
             {
+                // Files are enumerated in path order, so the contents are too. A file that fails
+                // validation is already an error, so it never becomes part of a release.
+                resources.Add(new ResourceContent(file, JsonCanonicalizer.Canonicalize(root)));
                 switch (kind)
                 {
                     case ResourceKinds.Application when file == ManifestFileName:
@@ -89,7 +94,7 @@ public static class ApplicationLoader
 
         CheckManifests(manifestFiles, manifestFileReported, diagnostics);
 
-        return new ApplicationLoadResult(application, entities, DiagnosticOrder.Sort(diagnostics));
+        return new ApplicationLoadResult(application, entities, resources, DiagnosticOrder.Sort(diagnostics));
     }
 
     private static List<string> EnumerateResourceFiles(string folderPath)

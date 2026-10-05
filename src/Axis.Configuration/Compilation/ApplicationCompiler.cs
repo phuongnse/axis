@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Compilation;
@@ -8,7 +9,7 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Compiles an application folder: loads it, checks every entity's fields against the field type
 /// rules and resolves references between entities. Every problem is reported, together with the
-/// loader's, in one sorted list.
+/// loader's, in one sorted list. A folder without errors also gets its content hash.
 /// </summary>
 public static class ApplicationCompiler
 {
@@ -47,7 +48,12 @@ public static class ApplicationCompiler
             Manifest = loaded.Application,
             Entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName)).ToList(),
         };
-        return result with { Model = model };
+        return result with
+        {
+            Model = model,
+            ContentHash = ContentHash.Compute(loaded.Resources),
+            Resources = loaded.Resources,
+        };
     }
 
     private static void CheckEntity(
