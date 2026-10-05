@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Server.Tests" />
+    <InternalsVisibleTo Include="Axis.Integration.Tests" />
+  </ItemGroup>
+
+</Project>

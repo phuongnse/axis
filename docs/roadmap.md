@@ -48,7 +48,7 @@ working checks before it can verify anything.
    analyzers on), central package management and an `.editorconfig`.
 2. `Axis.Server` serves `/health` and a placeholder SPA page.
 3. Create the `web/` Vite + React + TypeScript app with Ant Design and
-   ProComponents, ESLint, Prettier and Vitest.
+   ProComponents, oxlint, Prettier and Vitest.
 4. Add one integration test project that starts PostgreSQL through
    Testcontainers and runs one real query.
 5. Add a Playwright project that starts the server against a PostgreSQL

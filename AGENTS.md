@@ -38,5 +38,22 @@ Vietnamese.
 
 ## Commands
 
-The commands are defined in milestone M0 (see the [roadmap](docs/roadmap.md)).
-Until then there is nothing to build.
+Run from the repository root. Each script is also a NexKit check and a CI step.
+
+| Script | What it does | Needs |
+| --- | --- | --- |
+| `scripts/setup.sh` | Restores .NET packages, installs npm packages and the Playwright browser | Network |
+| `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution | |
+| `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks | |
+| `scripts/test.sh` | .NET unit tests and Vitest | |
+| `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium | Docker |
+
+For local development:
+
+- Run `docker compose up -d` to start PostgreSQL.
+- Run `dotnet run --project src/Axis.Server` to start the server on port 5206.
+- Run `npm run dev --prefix web` to start the SPA with hot reload. It proxies
+  `/api` and `/health` to the server.
+
+Formatting fixes: `dotnet format Axis.slnx` and `npm run format --prefix web`.
