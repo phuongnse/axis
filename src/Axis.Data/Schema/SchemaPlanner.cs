@@ -39,6 +39,20 @@ public static class SchemaPlanner
 
         public void PlanEntity(EntityModel entity)
         {
+            // Tables are keyed by entity id, so an id recorded for another application would share
+            // its table, for example in an application copied with only its manifest id changed.
+            var owner = records.Entities.FirstOrDefault(recorded => recorded.EntityId == entity.Id && recorded.ApplicationId != model.Manifest.Id);
+            if (owner is not null)
+            {
+                _diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.EntityOwnedByOtherApplication,
+                    $"The entity id '{entity.Id}' is already provisioned for the application with id '{owner.ApplicationId}'. Give the entity a new id.",
+                    entity.File,
+                    "/id",
+                    entity.Id));
+                return;
+            }
+
             var table = EntityNaming.Table(entity.Id);
             if (_tablesByName.TryGetValue(table, out var existing))
             {

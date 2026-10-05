@@ -28,7 +28,7 @@ public static class ReleaseCompiler
         var compiled = ApplicationCompiler.Compile(folderPath);
         if (compiled.Model is null || compiled.ContentHash is null)
         {
-            return new ReleaseCompilationResult(null, compiled.Diagnostics);
+            return new ReleaseCompilationResult(null, null, compiled.Diagnostics);
         }
 
         var applicationId = compiled.Model.Manifest.Id;
@@ -36,7 +36,7 @@ public static class ReleaseCompiler
         var existing = await FindAsync(context, applicationId, contentHash, cancellationToken);
         if (existing is not null)
         {
-            return new ReleaseCompilationResult(existing, compiled.Diagnostics);
+            return new ReleaseCompilationResult(existing, compiled.Model, compiled.Diagnostics);
         }
 
         var releaseId = Guid.CreateVersion7();
@@ -55,7 +55,7 @@ public static class ReleaseCompiler
         try
         {
             await context.SaveChangesAsync(cancellationToken);
-            return new ReleaseCompilationResult(release, compiled.Diagnostics);
+            return new ReleaseCompilationResult(release, compiled.Model, compiled.Diagnostics);
         }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException
         {
@@ -68,7 +68,7 @@ public static class ReleaseCompiler
             context.ChangeTracker.Clear();
             existing = await FindAsync(context, applicationId, contentHash, cancellationToken)
                 ?? throw new InvalidOperationException("The release that violated the unique index could not be found.", exception);
-            return new ReleaseCompilationResult(existing, compiled.Diagnostics);
+            return new ReleaseCompilationResult(existing, compiled.Model, compiled.Diagnostics);
         }
     }
 
