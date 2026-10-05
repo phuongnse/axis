@@ -2,6 +2,7 @@
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/lib/test-results.sh
 
 image="postgres:18-alpine"
 container="axis-e2e-postgres-$$"
@@ -43,5 +44,24 @@ fi
 
 scripts/build.sh
 
+mkdir -p artifacts/logs
+export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
+export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
+: >"$AXIS_E2E_SERVER_LOG"
+
 export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis;Password=$password"
-npm test --prefix tests/e2e
+run_suite playwright tests/e2e npm test --prefix tests/e2e
+
+if [ "$status" -ne 0 ]; then
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    echo "::group::Axis server log (last 100 lines)"
+  else
+    echo "Axis server log (last 100 lines of artifacts/logs/e2e-server.log):"
+  fi
+  tail -n 100 "$AXIS_E2E_SERVER_LOG"
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    echo "::endgroup::"
+  fi
+fi
+
+finish_report
