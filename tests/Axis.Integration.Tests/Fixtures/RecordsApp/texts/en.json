@@ -1,0 +1,16 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a08",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Records",
+    "nav.items": "Items",
+    "nav.departments": "Departments",
+    "items.title": "Items",
+    "itemForm.title": "Item",
+    "departments.title": "Departments",
+    "item.department": "Department"
+  }
+}

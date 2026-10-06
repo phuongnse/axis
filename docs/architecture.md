@@ -52,8 +52,9 @@ samples/
 
 Projects are created when the first issue needs them. M0 contains only
 `Axis.Server`, the test projects and `web/`. `Axis.Configuration`, `Axis.Data`,
-`Axis.Core` (only the tenant context so far), `Axis.Presentation` (only the
-built-in platform site and its texts so far) and `Axis.Tenancy` exist now.
+`Axis.Core` (only the tenant context so far), `Axis.Presentation` (the
+platform site, its texts and the shapes of application site metadata) and
+`Axis.Tenancy` exist now.
 
 ## Module rules
 
@@ -903,19 +904,100 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   [D15](decisions.md#d15-presentation-model--agreed), where those parts are
   still **Proposed**.
 - **Text.** All UI strings come from text resources.
-- **Site and texts.** The server describes the site to the SPA through two
+- **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
   host.
+- **Platform site.** The built-in platform site in `Axis.Presentation` serves
+  the shell and the home page through two endpoints.
   - `GET /api/site` returns the site name, its title key, the locales
     (default, fallback and available) and the navigation items. Navigation
     labels are text keys, never literal text.
   - `GET /api/texts/{locale}` returns a flat map from text key to text for
     one locale. A locale without texts gets a 404 problem response.
-  - For now the built-in platform site in `Axis.Presentation` is the only
-    site. It offers English (`en`, default and fallback) and Vietnamese
-    (`vi`). An application-defined site can replace it later without changing
-    the SPA. A test checks that every locale has exactly the same keys as
+  - The platform site offers English (`en`, default and fallback) and
+    Vietnamese (`vi`). The platform site stays: application sites never
+    replace or merge into it. The SPA reaches them through the site endpoints
+    below. A test checks that every locale has exactly the same keys as
     English.
+- **Application sites.** The sites of the tenant's active applications are
+  found by path, not by application name, because the path is what users see
+  and one application can have several sites. Four endpoints describe them.
+
+  | Method and path | Response |
+  | --- | --- |
+  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles" } ] }`, every site of every active application, in path order |
+  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey" } ] }` |
+  | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the texts of the site's application for one locale, in the shape of the platform texts |
+  | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |
+
+  A page response looks like this:
+
+  ```json
+  {
+    "name": "Items",
+    "titleKey": "items.title",
+    "widgets": [
+      {
+        "type": "table",
+        "formPage": "ItemForm",
+        "entity": {
+          "name": "Item",
+          "labelKey": "item.label",
+          "displayField": "name",
+          "recordsPath": "/api/apps/RecordsApp/entities/Item/records",
+          "fields": [
+            {
+              "name": "name", "type": "text", "labelKey": null,
+              "required": true, "unique": false, "maxLength": 100,
+              "precision": null, "scale": null, "values": null, "target": null
+            },
+            {
+              "name": "department", "type": "reference", "labelKey": "item.department",
+              "required": false, "unique": false, "maxLength": null,
+              "precision": null, "scale": null, "values": null,
+              "target": {
+                "entity": "Department",
+                "displayField": "name",
+                "recordsPath": "/api/apps/RecordsApp/entities/Department/records"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+  ```
+
+  - `titles` in the site list has one entry per available locale of the site,
+    from the locale as the site declares it to the title text. The home page
+    can show each site without one more request per site.
+  - `type` of a widget is `table` or `form`. `formPage` is the page holding
+    the form for a table's records, and `null` otherwise.
+  - `entity` is the widget's entity: its name, its label key, its display
+    field, the path of its record API in `recordsPath`, and its fields in
+    declaration order.
+  - Each field has its name, its `type` as written in entity files (such as
+    `date-time`), its label key, `required` and `unique`, `maxLength` for
+    text, `precision` and `scale` for decimal, `values` for enum, and
+    `target` for reference. A property the field's type does not have, or a
+    label the file leaves out, is `null`; it is never left out.
+  - `target` names the referenced entity, its display field and the path of
+    its record API, so the SPA never builds a record URL itself.
+  - Names in responses (page, form page, entity, and the application in
+    `recordsPath`) are the model's declared names, not the letter case of the
+    request.
+  - The texts endpoint serves any locale the site's application has texts
+    for, and the page endpoint any page of the site's application, not only
+    pages in the site's navigation, because form pages opened from a table
+    are not in navigation.
+  - `{path}`, `{locale}` and `{page}` match ignoring letter case. A path
+    outside the pattern (an ASCII letter, then ASCII letters, digits or
+    hyphens, at most 60 characters, matched ignoring letter case) is a 404
+    without a query. A reserved path such as `api` is a 404 because no site
+    can hold it.
+  - An unknown site, page or locale is a 404 problem with a fixed title. A
+    site active only in another tenant does not exist for the request.
+  - The endpoints have no authorization yet, like the record API.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. The shell keeps the current

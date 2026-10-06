@@ -78,6 +78,7 @@ public sealed class PresentationEndpointTests
     [Theory]
     [InlineData("/api/site")]
     [InlineData("/api/texts/en")]
+    [InlineData("/api/sites")]
     public async Task Unknown_host_is_denied(string path)
     {
         await using var factory = CreateFactory();
@@ -90,6 +91,25 @@ public sealed class PresentationEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync(CancellationToken);
         Assert.Contains("No tenant is configured for this host.", body, StringComparison.Ordinal);
+    }
+
+    // The tenant database is unreachable, so a 404 here shows the path rule answered before any query.
+    [Theory]
+    [InlineData("/api/sites/-bad")]
+    [InlineData("/api/sites/%E2%84%AArecords")]
+    [InlineData("/api/sites/-bad/texts/en")]
+    [InlineData("/api/sites/-bad/pages/Items")]
+    public async Task Site_path_outside_the_pattern_is_a_404_problem_without_a_query(string path)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync(new Uri(path, UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.Contains("No site is active under this path.", body, StringComparison.Ordinal);
     }
 
     private static WebApplicationFactory<Program> CreateFactory() =>

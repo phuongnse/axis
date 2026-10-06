@@ -15,8 +15,14 @@ public static class FieldTypes
         ["reference"] = FieldType.Reference,
     };
 
+    private static readonly Dictionary<FieldType, string> _namesByType = _typesByName.ToDictionary(pair => pair.Value, pair => pair.Key);
+
     public static bool TryParse(string name, out FieldType type) => _typesByName.TryGetValue(name, out type);
 
     public static FieldType Parse(string name) =>
         TryParse(name, out var type) ? type : throw new ArgumentException($"Unknown field type '{name}'.", nameof(name));
+
+    /// <summary>The name of <paramref name="type"/> as written in configuration files.</summary>
+    public static string Name(FieldType type) =>
+        _namesByType.TryGetValue(type, out var name) ? name : throw new ArgumentOutOfRangeException(nameof(type), type, null);
 }

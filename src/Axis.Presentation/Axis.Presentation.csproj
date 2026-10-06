@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Texts\*.json" LogicalName="Axis.Presentation.Texts.%(Filename)%(Extension)" />
   </ItemGroup>
 

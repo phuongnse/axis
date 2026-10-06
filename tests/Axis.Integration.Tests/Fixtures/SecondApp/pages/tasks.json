@@ -1,0 +1,8 @@
+{
+  "id": "6f2e8b31-9d5c-4a4f-8c3b-4e7d2f1a5b04",
+  "kind": "page",
+  "name": "Tasks",
+  "formatVersion": 1,
+  "title": { "textKey": "tasks.title" },
+  "widgets": [{ "type": "table", "entity": "Task" }]
+}

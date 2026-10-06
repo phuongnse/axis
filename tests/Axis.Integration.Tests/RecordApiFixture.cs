@@ -20,8 +20,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Two tenant databases in one PostgreSQL container, each with both migrations applied and the
 /// RecordsApp fixture application activated, served by the real server on hosts
-/// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has a compiled release of an
-/// application that was never activated.
+/// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp fixture
+/// activated, and a compiled release of an application that was never activated.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
 {
@@ -76,6 +76,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
 
             if (tenant == TenantA)
             {
+                var second = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "SecondApp"), configuration);
+                Assert.Empty(second.Diagnostics);
+                var secondActivated = await ReleaseActivator.ActivateAsync(second, new ActiveReleaseStore(configuration), data);
+                Assert.Empty(secondActivated.Diagnostics);
+
                 using var dormant = new TemporaryFolder().With(
                     "application.json",
                     $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "application", "name": "{{DormantApp}}", "formatVersion": 1 }""");

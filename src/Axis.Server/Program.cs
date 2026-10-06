@@ -48,6 +48,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapHealthEndpoints();
 app.MapPresentationEndpoints();
+app.MapSiteEndpoints();
 app.MapRecordEndpoints();
 app.MapFallbackToFile("index.html");
 
