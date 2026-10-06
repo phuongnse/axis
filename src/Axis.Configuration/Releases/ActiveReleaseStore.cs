@@ -33,6 +33,18 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
             .Select(row => new ActiveRelease(row.ApplicationId, row.Name, row.ReleaseId, row.ActivatedAt))
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default)
+    {
+        var release = await context.Releases
+            .AsNoTracking()
+            .Include(r => r.Resources)
+            .SingleOrDefaultAsync(r => r.Id == releaseId, cancellationToken);
+
+        // Database collation may not be ordinal, so resources are put in path order here.
+        release?.Resources.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
+        return release;
+    }
+
     public async Task<bool> TrySetAsync(
         Guid applicationId,
         string name,

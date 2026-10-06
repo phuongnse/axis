@@ -1,6 +1,7 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 
 namespace Axis.Configuration.Tests;
 
@@ -356,10 +357,63 @@ public sealed class ApplicationCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void Compiling_a_folder_and_its_resources_in_memory_gives_the_same_model_and_content_hash()
+    {
+        var folder = ApplicationCompiler.Compile(Fixture("valid-app"));
+        var memory = ApplicationCompiler.Compile(ReadResources(Fixture("valid-app")));
+
+        Assert.Empty(memory.Diagnostics);
+        Assert.NotNull(folder.Model);
+        Assert.NotNull(memory.Model);
+        ModelAssert.Equal(folder.Model, memory.Model);
+        Assert.NotNull(memory.ContentHash);
+        Assert.Equal(folder.ContentHash, memory.ContentHash);
+        Assert.Equal(folder.Resources, memory.Resources);
+    }
+
+    [Fact]
+    public void Compiling_an_invalid_folder_and_its_resources_in_memory_gives_the_same_diagnostics()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("entities/order.json", Entity("Order", """{ "name": "number", "type": "text" }"""))
+            .With("entities/invoice.json", Entity("Invoice", """{ "name": "number", "type": "text" }"""))
+            .With("entities/repeated.json", """{ "kind": "entity", "kind": "entity" }""");
+
+        var fromFolder = ApplicationCompiler.Compile(folder.Path);
+        var fromMemory = ApplicationCompiler.Compile(ReadResources(folder.Path));
+
+        Assert.Contains(fromFolder.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.DuplicateId);
+        Assert.Contains(fromFolder.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.InvalidJson);
+        Assert.Equal(fromFolder.Diagnostics, fromMemory.Diagnostics);
+        Assert.Null(fromFolder.Model);
+        Assert.Null(fromMemory.Model);
+    }
+
+    [Fact]
+    public void Resources_in_memory_with_a_repeated_path_throw()
+    {
+        IReadOnlyList<ResourceContent> resources =
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("application.json", Manifest),
+        ];
+
+        Assert.Throws<ArgumentException>(() => ApplicationCompiler.Compile(resources));
+    }
+
     private static string Entity(string name, string fields, string id = OrderId) =>
         $$"""{ "id": "{{id}}", "kind": "entity", "name": "{{name}}", "formatVersion": 1, "fields": [{{fields}}] }""";
 
     private static string Name(int length) => "N" + new string('a', length - 1);
 
     private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
+
+    /// <summary>Every <c>*.json</c> file of the folder as written, with its relative path and <c>/</c> separators.</summary>
+    private static List<ResourceContent> ReadResources(string folderPath) =>
+        [.. Directory.EnumerateFiles(folderPath, "*.json", SearchOption.AllDirectories)
+            .Select(path => new ResourceContent(
+                Path.GetRelativePath(folderPath, path).Replace(Path.DirectorySeparatorChar, '/'),
+                File.ReadAllText(path)))];
 }

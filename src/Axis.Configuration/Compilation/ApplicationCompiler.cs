@@ -7,9 +7,10 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Compiles an application folder: loads it, checks every entity's fields against the field type
-/// rules and resolves references between entities. Every problem is reported, together with the
-/// loader's, in one sorted list. A folder without errors also gets its content hash.
+/// Compiles an application folder, or its resources held in memory: loads them, checks every
+/// entity's fields against the field type rules and resolves references between entities. Every
+/// problem is reported, together with the loader's, in one sorted list. An application without
+/// errors also gets its content hash. Both inputs give the same result for the same resources.
 /// </summary>
 public static class ApplicationCompiler
 {
@@ -19,9 +20,14 @@ public static class ApplicationCompiler
     /// <summary>The largest precision PostgreSQL accepts for <c>numeric(p, s)</c>.</summary>
     public const int MaxPrecision = 1000;
 
-    public static CompilationResult Compile(string folderPath)
+    public static CompilationResult Compile(string folderPath) => Compile(ApplicationLoader.Load(folderPath));
+
+    /// <summary>Compiles resources held in memory, such as the stored resources of a release.</summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static CompilationResult Compile(IReadOnlyList<ResourceContent> resources) => Compile(ApplicationLoader.Load(resources));
+
+    private static CompilationResult Compile(ApplicationLoadResult loaded)
     {
-        var loaded = ApplicationLoader.Load(folderPath);
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
         // Entity names are unique ignoring letter case; a second entity with the same name is

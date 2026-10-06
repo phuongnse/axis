@@ -1,3 +1,4 @@
+using Axis.Server.Applications;
 using Axis.Server.Health;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
@@ -16,6 +17,9 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
 builder.Services.AddTenancy(builder.Configuration);
+builder.Services.AddScoped<TenantDatabase>();
+builder.Services.AddSingleton<ActiveModelCache>();
+builder.Services.AddScoped<ActiveApplicationResolver>();
 
 var app = builder.Build();
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
@@ -13,6 +14,7 @@ namespace Axis.Configuration.Loading;
 /// stops at the first one. A folder that cannot be listed, or has a subfolder that cannot be
 /// listed, is reported as <see cref="DiagnosticCodes.UnlistableFolder"/> and nothing in it is
 /// loaded, so no file is ever left out silently. Loading does not throw for an unreadable folder.
+/// Resources held in memory, such as those stored in a release, go through the same checks.
 /// </summary>
 public static class ApplicationLoader
 {
@@ -49,6 +51,37 @@ public static class ApplicationLoader
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
 
+        return Load(files.ConvertAll(file => new ResourceSource(file, () => File.OpenRead(Path.Combine(folderPath, file)))));
+    }
+
+    /// <summary>
+    /// Loads resources held in memory, such as the stored resources of a release, with the same
+    /// checks as a folder. Each path is relative with <c>/</c> separators, as in a folder.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static ApplicationLoadResult Load(IReadOnlyList<ResourceContent> resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+
+        // A folder cannot hold the same path twice, and neither can a release, so a repeat is a caller error.
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var resource in resources)
+        {
+            if (!paths.Add(resource.Path))
+            {
+                throw new ArgumentException($"The resource path '{resource.Path}' appears more than once.", nameof(resources));
+            }
+        }
+
+        return Load(resources
+            .OrderBy(resource => resource.Path, StringComparer.Ordinal)
+            .Select(resource => new ResourceSource(resource.Path, () => new MemoryStream(Encoding.UTF8.GetBytes(resource.Content))))
+            .ToList());
+    }
+
+    /// <summary>Loads resources in the given order, which is path order.</summary>
+    private static ApplicationLoadResult Load(IReadOnlyList<ResourceSource> sources)
+    {
         var diagnostics = new List<Diagnostic>();
         ApplicationManifest? application = null;
         var entities = new List<EntityResource>();
@@ -62,9 +95,10 @@ public static class ApplicationLoader
         // so the folder is not also told that its manifest is missing.
         var manifestFileReported = false;
 
-        foreach (var file in files)
+        foreach (var source in sources)
         {
-            using var document = Parse(folderPath, file, diagnostics);
+            var file = source.Path;
+            using var document = Parse(source, diagnostics);
             if (document is null)
             {
                 manifestFileReported |= file == ManifestFileName;
@@ -98,7 +132,7 @@ public static class ApplicationLoader
 
             if (schemaValid)
             {
-                // Files are enumerated in path order, so the contents are too. A file that fails
+                // Sources come in path order, so the contents do too. A file that fails
                 // validation is already an error, so it never becomes part of a release.
                 resources.Add(new ResourceContent(file, JsonCanonicalizer.Canonicalize(root)));
                 switch (kind)
@@ -148,11 +182,12 @@ public static class ApplicationLoader
         }
     }
 
-    private static JsonDocument? Parse(string folderPath, string file, List<Diagnostic> diagnostics)
+    private static JsonDocument? Parse(ResourceSource source, List<Diagnostic> diagnostics)
     {
+        var file = source.Path;
         try
         {
-            using var stream = File.OpenRead(Path.Combine(folderPath, file));
+            using var stream = source.Open();
             return JsonDocument.Parse(stream, _documentOptions);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -170,7 +205,7 @@ public static class ApplicationLoader
             // Syntax errors carry a zero-based position; a duplicate property does not.
             var message = exception.LineNumber is { } line
                 ? $"The file is not valid JSON (line {line + 1}, byte {exception.BytePositionInLine + 1})."
-                : DescribeDuplicateProperty(folderPath, file);
+                : DescribeDuplicateProperty(source);
             diagnostics.Add(new Diagnostic(DiagnosticCodes.InvalidJson, message, file, ""));
             return null;
         }
@@ -180,11 +215,11 @@ public static class ApplicationLoader
     /// Names the first repeated property and where it is, without the exception text, by parsing
     /// the file again with duplicates allowed.
     /// </summary>
-    private static string DescribeDuplicateProperty(string folderPath, string file)
+    private static string DescribeDuplicateProperty(ResourceSource source)
     {
         try
         {
-            using var stream = File.OpenRead(Path.Combine(folderPath, file));
+            using var stream = source.Open();
             using var document = JsonDocument.Parse(stream, new JsonDocumentOptions { AllowDuplicateProperties = true });
             if (FindDuplicateProperty(document.RootElement, "") is { } duplicate)
             {
@@ -433,4 +468,7 @@ public static class ApplicationLoader
                     resourceId));
         }
     }
+
+    /// <summary>One resource to load: its relative path and a way to open its bytes.</summary>
+    private sealed record ResourceSource(string Path, Func<Stream> Open);
 }
