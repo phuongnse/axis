@@ -31,6 +31,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.locale.loadFailed': 'The texts for this language could not be loaded.',
     'shell.home.sites.title': 'Sites',
     'shell.home.sites.empty': 'No application is active.',
+    'shell.home.sites.loadFailed': 'The sites could not be loaded.',
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
@@ -98,7 +99,7 @@ function json(body: unknown, status = 200) {
 }
 
 /** Stubs `fetch` with the server's routes. */
-function stubServer({ ready = true, siteStatus = 200, failingLocale = '' } = {}) {
+function stubServer({ ready = true, siteStatus = 200, sitesStatus = 200, failingLocale = '' } = {}) {
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/health/ready') {
       return json({}, ready ? 200 : 503)
@@ -107,7 +108,7 @@ function stubServer({ ready = true, siteStatus = 200, failingLocale = '' } = {})
       return json(siteStatus === 200 ? site : {}, siteStatus)
     }
     if (input === '/api/sites') {
-      return json({ sites })
+      return sitesStatus === 200 ? json({ sites }) : json({}, sitesStatus)
     }
     if (input.startsWith('/api/sites/')) {
       return siteRoute(input.replace('/api/sites/', ''), failingLocale)
@@ -277,6 +278,18 @@ describe('App', () => {
     await userEvent.click(link)
     expect(await screen.findByText('All notes')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('keeps the sites card and shows an error when the sites cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer({ sitesStatus: 500 })
+
+    renderApp()
+
+    const error = await screen.findByTestId('sites-error')
+    expect(error).toHaveTextContent('The sites could not be loaded.')
+    expect(screen.getByText('Sites')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'E2E notes' })).not.toBeInTheDocument()
   })
 
   it('shows site titles in the current locale', async () => {

@@ -1,5 +1,5 @@
 import { PageContainer, ProCard } from '@ant-design/pro-components'
-import { Badge, List } from 'antd'
+import { Alert, Badge, List } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useServerStatus, type ServerStatus } from '../platform/serverStatus'
@@ -37,21 +37,22 @@ function SiteList() {
     return () => controller.abort()
   }, [])
 
-  if (failed) {
-    return null
-  }
   return (
     <ProCard title={t('shell.home.sites.title')}>
-      <List
-        loading={!sites}
-        dataSource={sites ?? []}
-        locale={{ emptyText: t('shell.home.sites.empty') }}
-        renderItem={(site) => (
-          <List.Item key={site.path}>
-            <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>
-          </List.Item>
-        )}
-      />
+      {failed ? (
+        <Alert data-testid="sites-error" type="error" message={t('shell.home.sites.loadFailed')} />
+      ) : (
+        <List
+          loading={!sites}
+          dataSource={sites ?? []}
+          locale={{ emptyText: t('shell.home.sites.empty') }}
+          renderItem={(site) => (
+            <List.Item key={site.path}>
+              <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>
+            </List.Item>
+          )}
+        />
+      )}
     </ProCard>
   )
 }

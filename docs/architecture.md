@@ -1013,6 +1013,8 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     navigation links write it. The server matches both ignoring letter case.
   - An unknown site shows the not-found page inside the platform shell. An
     unknown page shows it inside the site shell.
+    An address with more than three segments, such as `/e2e/notes/42/edit`,
+    matches no route and shows the not-found page inside the platform shell.
   - Inside a site, the shell shows the site's title, navigation and locales.
     The theme toggle and the locale switch work as they do on the platform
     site.
