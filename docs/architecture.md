@@ -327,6 +327,8 @@ is `AXC0013`.
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
   module; values are always parameters. Configuration can never supply raw SQL.
+  Request text, such as the entity segment, `sort` and `values` names, is
+  matched against the model's declared names and never used as an identifier.
 - **Database credentials.** Runtime access and schema changes use different
   database roles.
 
@@ -406,11 +408,11 @@ endpoint from M4 (see "Authentication and authorization").
 | `GET /api/apps/{app}/entities/{entity}/records/{id}` | `200` with one record |
 | `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
 | `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
+| `DELETE /api/apps/{app}/entities/{entity}/records/{id}` | `204` with no body |
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
-hyphenated 8-4-4-4-12 hex form, in either letter case. A delete route is
-planned.
+hyphenated 8-4-4-4-12 hex form, in either letter case.
 
 ### Record shape
 
@@ -468,7 +470,7 @@ entity.
 The parameters are digits only: a sign, a space or a repeated parameter
 (`page=1&page=2`) is invalid.
 
-### Create and update
+### Create, update and delete
 
 - **Create.** `POST` takes `{ "values": { ... } }`. The record gets a new
   version 7 UUID as its id and `version` 1. Fields the body leaves out are
@@ -480,6 +482,9 @@ The parameters are digits only: a sign, a space or a repeated parameter
   fields in `values` change, and fields left out keep their value. `null`
   clears a field that is not required. An empty `values` only increments
   `version`. The response is `200` with the record and its new version.
+- **Delete.** `DELETE` removes the record by id only. It needs no body and no
+  version. The response is `204` with no body. A record that another record
+  references through a `reference` field is kept, and the response is `409`.
 - **Content type.** Both need `Content-Type: application/json`. The media
   type matches ignoring letter case. The only allowed parameter is `charset`
   with the value `utf-8`, in any letter case. A cross-site page can send a
@@ -507,7 +512,8 @@ fixed and never contain text from the request.
 A request is checked in this order, and the first failure is the response:
 the path (`404`), the content type (`415`), the body (`400`), then storage
 (`400`, `404` or `409`). A request with the wrong content type is answered
-before its body is read.
+before its body is read. A delete has no body, so it is checked for the path
+and then in storage (`404` or `409`).
 
 - **`404`.** An unknown application, an application with no active release,
   an unknown entity, an unknown record and an `{id}` that is not a UUID in the
@@ -528,12 +534,23 @@ before its body is read.
   violated constraint against the names the model declares.
 - **`409` for a stale version.** An update whose `version` is not the stored
   one.
+- **`409` for a referenced record.** A delete of a record that another record
+  references. Any foreign-key violation on delete maps to it. The title is
+  fixed, and the response never names the referencing entity, table or
+  constraint.
 - **`409` for a schema conflict.** The table has a constraint the active model
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response
   never names a table, column or constraint.
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
+
+**No leaks.** No response body, including `title`, `detail` and the `errors`
+messages, ever contains SQL, the `entities` schema, a table, column or
+constraint name, an exception type or a stack trace. The `errors` keys repeat
+the request's property names by design, so they can hold any text the request
+sent. The integration tests check every error response of the record API for
+this.
 
 ### Request bodies and values
 

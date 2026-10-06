@@ -110,9 +110,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
 
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-        using var problem = await ReadJsonAsync(response);
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal([key], ErrorKeys(problem));
         using var list = await GetJsonAsync(Items, HostA);
         Assert.Equal(update ? 1 : 0, list.RootElement.GetProperty("totalCount").GetInt64());
@@ -142,8 +140,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
 
         foreach (var response in new[] { postResponse, patchResponse })
         {
-            Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
-            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+            using var problem = await ReadProblemAsync(response, HttpStatusCode.UnsupportedMediaType);
         }
 
         using var list = await GetJsonAsync(Items, HostA);
@@ -180,9 +177,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
 
         foreach (var response in new[] { createResponse, updateResponse })
         {
-            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-            using var problem = await ReadJsonAsync(response);
+            using var problem = await ReadProblemAsync(response, HttpStatusCode.Conflict);
             Assert.Equal(["/values/name"], ErrorKeys(problem));
         }
 
@@ -206,11 +201,8 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
             using var request = Request(HttpMethod.Post, Items, HostA, """{ "values": { "name": "Desk" } }""");
             using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-            var body = await response.Content.ReadAsStringAsync(CancellationToken);
-            Assert.DoesNotContain("extra", body, StringComparison.OrdinalIgnoreCase);
-            using var problem = JsonDocument.Parse(body);
+            using var problem = await ReadProblemAsync(response, HttpStatusCode.Conflict);
+            Assert.DoesNotContain("extra", problem.RootElement.GetRawText(), StringComparison.OrdinalIgnoreCase);
             Assert.Equal("The stored schema does not match the active model.", problem.RootElement.GetProperty("title").GetString());
         }
         finally
@@ -228,8 +220,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
         using var request = Request(HttpMethod.Patch, $"{Departments}/{id:D}", HostB, """{ "version": 1, "values": { "name": "Finance" } }""");
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.NotFound);
         using var record = await GetJsonAsync($"{Departments}/{id:D}", HostA);
         Assert.Equal(1, record.RootElement.GetProperty("version").GetInt64());
         Assert.Equal("\"Sales\"", record.RootElement.GetProperty("values").GetProperty("name").GetRawText());
@@ -243,8 +234,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
         using var request = Request(HttpMethod.Patch, $"{Items}/{Guid.NewGuid():D}", HostA, """{ "version": 1, "values": {} }""");
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.NotFound);
     }
 
     private async Task<Guid> CreateDepartmentAsync(string host, string name)
@@ -269,6 +259,11 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
     {
         using var request = Request(HttpMethod.Patch, $"{Items}/{id}", HostA, body);
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
+        if (expected != HttpStatusCode.OK)
+        {
+            return await ReadProblemAsync(response, expected);
+        }
+
         Assert.Equal(expected, response.StatusCode);
         return await ReadJsonAsync(response);
     }

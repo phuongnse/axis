@@ -1,4 +1,6 @@
+using System.Net;
 using System.Text;
+using System.Text.Json;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
@@ -27,6 +29,13 @@ public sealed class RecordApiFixture : IAsyncLifetime
     public const string TenantB = "b";
     public const string HostA = "a.example.test";
     public const string HostB = "b.example.test";
+
+    /// <summary>
+    /// Text no error response may contain: SQL keywords, the storage schema and identifier
+    /// prefixes, an exception type and the indent of a stack frame. Matched ordinal.
+    /// </summary>
+    private static readonly string[] _forbiddenText =
+        ["SELECT", "INSERT", "UPDATE", "DELETE", "entities", "e_", "f_", "uq_", "fk_", "Exception", "   at "];
 
     private readonly PostgreSqlFixture _database = new();
     private readonly Dictionary<string, string> _connectionStrings = [];
@@ -152,6 +161,99 @@ public sealed class RecordApiFixture : IAsyncLifetime
     {
         await using var command = _dataSources[tenant].CreateCommand(sql);
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>The catalog columns of the table of <paramref name="entityName"/> in order, and its row count.</summary>
+    public async Task<(IReadOnlyList<string> Columns, long RowCount)> TableShapeAsync(string tenant, string entityName)
+    {
+        Assert.True(Model.TryGetEntity(entityName, out var entity));
+        var table = EntityNaming.Table(entity.Id);
+        var columns = new List<string>();
+        await using (var command = _dataSources[tenant].CreateCommand(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'entities' AND table_name = @table ORDER BY ordinal_position"))
+        {
+            command.Parameters.AddWithValue("table", table);
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                columns.Add(reader.GetString(0));
+            }
+        }
+
+        await using var count = _dataSources[tenant].CreateCommand($"SELECT count(*) FROM {EntityNaming.QualifiedTable(table)}");
+        return (columns, (long)(await count.ExecuteScalarAsync())!);
+    }
+
+    /// <summary>
+    /// Asserts that <paramref name="response"/> is a problem with status <paramref name="expected"/>
+    /// that passes <see cref="AssertNoLeak"/>, and returns its parsed body.
+    /// </summary>
+    public static async Task<JsonDocument> ReadProblemAsync(HttpResponseMessage response, HttpStatusCode expected)
+    {
+        Assert.Equal(expected, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        AssertNoLeak(problem);
+        return problem;
+    }
+
+    /// <summary>
+    /// Asserts that no property name or string value of <paramref name="problem"/> contains SQL, a
+    /// storage name, an exception type or a stack trace. The keys of the top-level <c>errors</c>
+    /// are left out: they are JSON Pointers that repeat the request's property names by design.
+    /// Their messages are checked.
+    /// </summary>
+    public static void AssertNoLeak(JsonDocument problem)
+    {
+        var texts = new List<string>();
+        foreach (var property in problem.RootElement.EnumerateObject())
+        {
+            texts.Add(property.Name);
+            if (property.NameEquals("errors") && property.Value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var error in property.Value.EnumerateObject())
+                {
+                    Collect(error.Value, texts);
+                }
+            }
+            else
+            {
+                Collect(property.Value, texts);
+            }
+        }
+
+        foreach (var text in texts)
+        {
+            foreach (var forbidden in _forbiddenText)
+            {
+                Assert.False(text.Contains(forbidden, StringComparison.Ordinal), $"The problem contains '{forbidden}' in '{text}'.");
+            }
+        }
+
+        static void Collect(JsonElement element, List<string> texts)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        texts.Add(property.Name);
+                        Collect(property.Value, texts);
+                    }
+
+                    break;
+                case JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        Collect(item, texts);
+                    }
+
+                    break;
+                case JsonValueKind.String:
+                    texts.Add(element.GetString()!);
+                    break;
+            }
+        }
     }
 
     public static HttpRequestMessage Request(string path, string host) => Request(HttpMethod.Get, path, host);
