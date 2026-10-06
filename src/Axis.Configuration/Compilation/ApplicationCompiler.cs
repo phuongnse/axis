@@ -32,9 +32,13 @@ public static class ApplicationCompiler
             entitiesByName.TryAdd(entity.Name, entity);
         }
 
+        // A target naming an entity file that is in the folder but was not loaded is not reported
+        // again; that file's own diagnostics already are.
+        bool IsKnownEntity(string name) => entitiesByName.ContainsKey(name) || loaded.UnloadedEntityNames.Contains(name);
+
         foreach (var entity in loaded.Entities)
         {
-            CheckEntity(entity, entitiesByName, diagnostics);
+            CheckEntity(entity, IsKnownEntity, diagnostics);
         }
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
@@ -58,7 +62,7 @@ public static class ApplicationCompiler
 
     private static void CheckEntity(
         EntityResource entity,
-        Dictionary<string, EntityResource> entitiesByName,
+        Func<string, bool> isKnownEntity,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
@@ -79,14 +83,14 @@ public static class ApplicationCompiler
                     $"{path}/name");
             }
 
-            CheckField(field, path, entitiesByName, Report);
+            CheckField(field, path, isKnownEntity, Report);
         }
     }
 
     private static void CheckField(
         FieldDefinition field,
         string path,
-        Dictionary<string, EntityResource> entitiesByName,
+        Func<string, bool> isKnownEntity,
         Action<string, string, string> report)
     {
         var type = FieldTypes.Parse(field.Type);
@@ -150,7 +154,7 @@ public static class ApplicationCompiler
 
         if (field.Target is { } target)
         {
-            if (Fits("target", FieldType.Reference, "reference") && !entitiesByName.ContainsKey(target))
+            if (Fits("target", FieldType.Reference, "reference") && !isKnownEntity(target))
             {
                 report(
                     DiagnosticCodes.UnknownReferenceTarget,
