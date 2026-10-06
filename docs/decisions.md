@@ -183,6 +183,9 @@ Policies grant access to resources, records, fields and actions.
 *Why:* a large up-front breakdown into layered issues delays anything
 runnable until the very end, and its issues are too big for one session.
 
+See [delivery.md](delivery.md) for the step-by-step workflow and who does each
+step.
+
 ## D14. Repository language — Agreed
 
 Everything in the repository and on GitHub is in English.

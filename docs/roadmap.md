@@ -9,7 +9,9 @@
   learned.
 - **Issue size.** One issue is one behaviour, with 2–5 acceptance criteria that
   a test or command can verify. It must fit in a single NexKit agent session.
-  If a NexKit plan reports `too_large`, use its suggested split.
+  If a NexKit plan reports `too_large`, split the issue into parts and add each
+  as a sub-issue of the parent, in order and in the parent's milestone. See
+  [delivery.md](delivery.md).
 - **Docs first.** An issue links to the doc sections it implements. When an
   issue changes agreed behaviour, it updates the docs in the same pull request.
 - **Cross-cutting qualities are built in, not added later.** Every milestone
