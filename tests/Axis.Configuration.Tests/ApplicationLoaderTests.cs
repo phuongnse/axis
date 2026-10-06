@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Resources;
@@ -187,6 +188,8 @@ public sealed class ApplicationLoaderTests
             Assert.Equal(
                 (DiagnosticCodes.UnreadableFile, "locked.json", ""),
                 (diagnostic.Code, diagnostic.File, diagnostic.Path));
+            Assert.Equal("The file could not be read.", diagnostic.Message);
+            Assert.DoesNotContain(folder.Path, diagnostic.Message, StringComparison.Ordinal);
             Assert.Equal("Sample", result.Application?.Name);
             Assert.Equal("Order", Assert.Single(result.Entities).Name);
         }
@@ -228,6 +231,77 @@ public sealed class ApplicationLoaderTests
 
         Assert.Equal((DiagnosticCodes.InvalidJson, "order.json", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("'name'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(folder.Path, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Json_syntax_error_message_names_no_absolute_path()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", "{ \"kind\": ");
+
+        var diagnostic = Assert.Single(ApplicationLoader.Load(folder.Path).Diagnostics);
+
+        Assert.Equal((DiagnosticCodes.InvalidJson, "order.json", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.DoesNotContain(folder.Path, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Missing_folder_is_reported_as_unlistable_without_throwing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"axis-config-{Guid.NewGuid():N}");
+
+        var result = ApplicationLoader.Load(path);
+
+        AssertUnlistable(result, path);
+    }
+
+    // Skipped on Windows before any Unix-only call is made.
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void Application_folder_that_cannot_be_listed_is_reported_as_unlistable()
+    {
+        SkipWhereFilePermissionsCannotDenyAccess();
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("entities/order.json", OrderEntity)
+            .DenyAccess("");
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        AssertUnlistable(result, folder.Path);
+    }
+
+    // Skipped on Windows before any Unix-only call is made.
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void Subfolder_that_cannot_be_listed_fails_the_whole_load()
+    {
+        SkipWhereFilePermissionsCannotDenyAccess();
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("entities/order.json", OrderEntity)
+            .DenyAccess("entities");
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        AssertUnlistable(result, folder.Path);
+    }
+
+    [Fact]
+    public void Entity_file_that_fails_validation_is_listed_as_unloaded_by_name()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("customer.json", """{ "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Customer", "formatVersion": 1 }""")
+            .With("order.json", OrderEntity);
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        Assert.Equal(["Customer"], result.UnloadedEntityNames);
+        Assert.Contains("CUSTOMER", result.UnloadedEntityNames);
+        Assert.Equal("Order", Assert.Single(result.Entities).Name);
     }
 
     [Fact]
@@ -278,6 +352,29 @@ public sealed class ApplicationLoaderTests
         var order = Assert.Single(result.Entities);
         Assert.Equal(1, order.FormatVersion);
         Assert.Equal(20, order.Fields[0].MaxLength);
+    }
+
+    private const string OrderEntity = """
+        { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text" }] }
+        """;
+
+    private static void AssertUnlistable(ApplicationLoadResult result, string folderPath)
+    {
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnlistableFolder, "", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal("The application folder could not be listed.", diagnostic.Message);
+        Assert.DoesNotContain(folderPath, diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.ManifestMissing);
+        Assert.True(result.HasErrors);
+        Assert.Null(result.Application);
+        Assert.Empty(result.Entities);
+        Assert.Empty(result.Resources);
+    }
+
+    private static void SkipWhereFilePermissionsCannotDenyAccess()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "File permissions are not Unix modes on Windows.");
+        Assert.SkipWhen(Environment.IsPrivilegedProcess, "A privileged process ignores file permissions.");
     }
 
     private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);

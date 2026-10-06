@@ -100,17 +100,48 @@ public sealed class ApplicationCompilerTests
     [Fact]
     public void Reference_to_an_unknown_entity_is_reported_at_the_target()
     {
+        // Another entity file that failed to load does not hide an unknown target.
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
+            .With("entities/invoice.json", """{ "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Invoice", "formatVersion": 1 }""")
             .With("entities/order.json", Entity("Order", """{ "name": "customer", "type": "reference", "target": "Customer" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            [DiagnosticCodes.SchemaViolation, DiagnosticCodes.UnknownReferenceTarget],
+            result.Diagnostics.Select(diagnostic => diagnostic.Code));
+        var diagnostic = result.Diagnostics[1];
         Assert.Equal(
             (DiagnosticCodes.UnknownReferenceTarget, "entities/order.json", "/fields/0/target", Guid.Parse(OrderId)),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         Assert.Contains("'Customer'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Reference_to_an_entity_that_failed_to_load_reports_only_that_entity_file()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("customer.json", """{ "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Customer", "formatVersion": 1 }""")
+            .With("order.json", Entity("Order", """{ "name": "customer", "type": "reference", "target": "customer" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "customer.json", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.UnknownReferenceTarget);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Missing_folder_compiles_into_only_the_unlistable_folder_diagnostic()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(Path.GetTempPath(), $"axis-config-{Guid.NewGuid():N}"));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnlistableFolder, "", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
     }
 

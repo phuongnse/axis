@@ -98,8 +98,11 @@ flowchart LR
    [Entity field types and constraints](#entity-field-types-and-constraints)),
    field names must be unique within their entity ignoring letter case, and a
    reference field's `target` must name a loaded entity, ignoring letter case.
-   An entity may reference itself. No model is produced while any error
-   remains.
+   An entity may reference itself. A `target` naming an entity whose file is
+   in the folder, has kind `entity` and a string `name`, but was not loaded
+   because of its own errors (such as a schema violation) is not reported
+   again; only that file's own diagnostics are. No model is produced while
+   any error remains.
 3. **Check.** Expressions, data source fields, form bindings and operation
    inputs are type-checked.
 4. **Plan.** The current tenant schema is compared with the new entity
@@ -128,10 +131,13 @@ flowchart LR
 
 Diagnostics always carry `file`, `resourceId` (when the file has a readable
 ID), `path`, `code` and a message. `file` is relative to the application
-folder and uses `/` separators. `path` is a JSON Pointer (RFC 6901) into that
-file, such as `/fields/0/type`, or empty when the problem concerns the whole
-file. Codes have the form `AXCnnnn` and never change meaning. Compile reports
-all diagnostics, not just the first, sorted by file and then path.
+folder and uses `/` separators, or is empty when the diagnostic concerns the
+whole application folder. `path` is a JSON Pointer (RFC 6901) into that file,
+such as `/fields/0/type`, or empty when the problem concerns the whole file or
+the whole folder. Messages never contain absolute paths or exception text,
+because they are shown to application authors. Codes have the form `AXCnnnn`
+and never change meaning. Compile reports all diagnostics, not just the first,
+sorted by file and then path.
 
 | Code | Meaning |
 | --- | --- |
@@ -146,13 +152,14 @@ all diagnostics, not just the first, sorted by file and then path.
 | `AXC0009` | An `application` resource is not `application.json` at the folder root, or the root `application.json` has another kind. |
 | `AXC0010` | The file could not be read, for example because access is denied. |
 | `AXC0011` | Another field of the same entity already uses this `name`, ignoring letter case. |
-| `AXC0012` | A reference field's `target` names no loaded entity. |
+| `AXC0012` | A reference field's `target` names no loaded entity. Not reported when the target names an entity file in the folder that was not loaded because of its own errors. |
 | `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference, `values` on an enum. |
 | `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
 | `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
 | `AXC0017` | An entity provisioned for the application is missing from it. Reported at `application.json` with an empty path. |
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
+| `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 
 ### Resource file shape
 
