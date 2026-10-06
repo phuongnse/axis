@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
+# The server starts with the generic E2E test application in tests/e2e/fixtures/e2e-app active.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh

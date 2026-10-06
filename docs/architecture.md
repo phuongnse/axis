@@ -45,6 +45,7 @@ web/                      React + TypeScript SPA (Vite), Ant Design, ProComponen
 tests/
   Axis.*.Tests/           unit tests and PostgreSQL integration tests per module
   e2e/                    Playwright journeys against the running server
+    fixtures/e2e-app/     generic test application the E2E server activates
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
 ```
@@ -203,6 +204,35 @@ sorted by file and then path.
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
+
+### Startup activation
+
+The server can compile and activate application folders when it starts, so a
+development or E2E server serves a real application without a separate step.
+
+- **Setting.** `ActivateOnStartup` is an array of application folders, such
+  as `"ActivateOnStartup": ["../../samples/apps/purchase-requests"]` or the
+  environment variable `ActivateOnStartup__0=/path/to/folder`. Relative paths
+  are resolved against the server content root. When the setting is absent or
+  empty the step does not run. That is the default, and so the Production
+  behaviour.
+- **Order.** Tenants are processed in ordinal order of their id. For each
+  tenant, the step applies the configuration and data migrations to the
+  tenant database, then compiles each listed folder against that database and
+  activates the release, in the listed order. The same folders apply to
+  every tenant.
+- **Before listening.** The step runs before any hosted service starts, so
+  the server accepts no request until every tenant is done.
+- **Failures.** Any compile or activation diagnostic, or any error, stops the
+  start and the process exits. Each diagnostic is logged with its code, file
+  and path, together with the folder and tenant. An error after provisioning
+  committed is logged with the folder and tenant too. The previously active
+  release stays active, and the first failing tenant stops the whole start,
+  so no server runs with some tenants on old releases and others on new ones.
+- **Restarts.** Restarting with unchanged folders is safe. An unchanged
+  folder returns its stored release, and activating the active release again
+  only updates its activation time. After a failure, the next start
+  activates again safely because provisioning is additive.
 
 ### Resource file shape
 
@@ -755,3 +785,8 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
+
+The E2E server starts with the generic test application in
+`tests/e2e/fixtures/e2e-app` listed in `ActivateOnStartup` (see
+[Startup activation](#startup-activation)), so Playwright journeys run against
+real metadata and records. It is not the purchase request sample.

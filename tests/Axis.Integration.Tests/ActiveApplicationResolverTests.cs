@@ -95,8 +95,8 @@ public sealed class ActiveApplicationResolverTests(DataDatabaseFixture database)
 
     public ValueTask InitializeAsync()
     {
-        // The server does not migrate tenant databases. Both tenants use the fixture's database,
-        // which the fixture has already migrated.
+        // The server migrates tenant databases only when ActivateOnStartup is set, which it is not
+        // here. Both tenants use the fixture's database, which the fixture has already migrated.
         var connectionString = database.ConnectionString;
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
