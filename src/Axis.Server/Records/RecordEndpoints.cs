@@ -3,12 +3,14 @@ using Axis.Configuration.Model;
 using Axis.Data.Records;
 using Axis.Server.Applications;
 using Axis.Server.Tenancy;
+using Microsoft.Net.Http.Headers;
 
 namespace Axis.Server.Records;
 
 /// <summary>
-/// Read-only endpoints for the records of an entity in the active release of an application. A
-/// path that names no active application, entity or record is a 404 before the query is checked.
+/// Endpoints for the records of an entity in the active release of an application. A path that
+/// names no active application, entity or record is a 404 before the query or body is checked.
+/// A body is checked in order: content type (415), then body (400), then storage (404, 409).
 /// The problem titles never contain text from the request.
 /// </summary>
 internal static class RecordEndpoints
@@ -24,6 +26,8 @@ internal static class RecordEndpoints
         var records = endpoints.MapGroup("/api/apps/{app}/entities/{entity}/records");
         records.MapGet("", ListAsync);
         records.MapGet("/{id}", GetAsync);
+        records.MapPost("", CreateAsync);
+        records.MapPatch("/{id}", UpdateAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -38,7 +42,7 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
-        var (model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -81,14 +85,13 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
-        var (model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
         }
 
-        // Only the hyphenated form names a record; any other text is no record, not a bad request.
-        if (id.Length != 36 || !Guid.TryParseExact(id, "D", out var recordId))
+        if (!TryParseId(id, out var recordId))
         {
             return RecordNotFound();
         }
@@ -99,8 +102,83 @@ internal static class RecordEndpoints
             : RecordNotFound();
     }
 
-    /// <summary>Finds the entity in the active release of the application, or the 404 that says which is missing.</summary>
-    private static async Task<(EntityModel? Entity, IResult? NotFound)> ResolveEntityAsync(
+    // The body is read here rather than bound, so the parser reports every body problem by JSON
+    // Pointer and the content type is checked before any of the body is read.
+    private static async Task<IResult> CreateAsync(
+        string app,
+        string entity,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        if (!IsJson(request))
+        {
+            return UnsupportedMediaType();
+        }
+
+        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, RecordOperation.Create);
+        if (parsed.Errors is { } errors)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, model, parsed.Input!.Values, cancellationToken);
+
+        // The location uses the model's names, so a record has one URL whatever case the caller used.
+        return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
+            ? Results.Created($"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{record.Id:D}", record)
+            : WriteFailure(result);
+    }
+
+    private static async Task<IResult> UpdateAsync(
+        string app,
+        string entity,
+        string id,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        if (!TryParseId(id, out var recordId))
+        {
+            return RecordNotFound();
+        }
+
+        if (!IsJson(request))
+        {
+            return UnsupportedMediaType();
+        }
+
+        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, RecordOperation.Update);
+        if (parsed.Errors is { } errors)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var input = parsed.Input!;
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        var result = await RecordCommands.UpdateAsync(connection, model, recordId, input.Version!.Value, input.Values, cancellationToken);
+        return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
+            ? Results.Ok(record)
+            : WriteFailure(result);
+    }
+
+    /// <summary>Finds the application and the entity in its active release, or the 404 that says which is missing.</summary>
+    private static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound)> ResolveEntityAsync(
         string app,
         string entity,
         ActiveApplicationResolver resolver,
@@ -108,13 +186,56 @@ internal static class RecordEndpoints
     {
         if (await resolver.ResolveAsync(app, cancellationToken) is not { } application)
         {
-            return (null, NotFound("No application is active under this name."));
+            return (null, null, NotFound("No application is active under this name."));
         }
 
         return application.TryGetEntity(entity, out var model)
-            ? (model, null)
-            : (null, NotFound("The application has no entity with this name."));
+            ? (application, model, null)
+            : (null, null, NotFound("The application has no entity with this name."));
     }
+
+    // Only the hyphenated form names a record; any other text is no record, not a bad request.
+    private static bool TryParseId(string id, out Guid recordId) =>
+        Guid.TryParseExact(id, "D", out recordId) && id.Length == 36;
+
+    /// <summary>
+    /// Whether the content type is <c>application/json</c> with at most a <c>utf-8</c> charset.
+    /// A cross-site page can send other types, such as <c>text/plain</c>, without a preflight.
+    /// </summary>
+    private static bool IsJson(HttpRequest request) =>
+        MediaTypeHeaderValue.TryParse(request.ContentType, out var contentType)
+        && contentType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+        && contentType.Parameters.All(parameter =>
+            parameter.Name.Equals("charset", StringComparison.OrdinalIgnoreCase)
+            && HeaderUtilities.RemoveQuotes(parameter.Value).Equals("utf-8", StringComparison.OrdinalIgnoreCase));
+
+    private static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        using var body = new MemoryStream();
+        await request.Body.CopyToAsync(body, cancellationToken);
+        return body.ToArray();
+    }
+
+    private static IResult WriteFailure(RecordWriteResult result) =>
+        result.Outcome switch
+        {
+            RecordWriteOutcome.NotFound => RecordNotFound(),
+            RecordWriteOutcome.StaleVersion => Conflict("The record has changed since this version was read."),
+            RecordWriteOutcome.MissingReference => Results.ValidationProblem(result.Errors!),
+            RecordWriteOutcome.UniqueViolation => Results.ValidationProblem(
+                result.Errors!,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "A value must be unique."),
+            // Names no column or constraint: the storage names are not part of the API.
+            RecordWriteOutcome.SchemaConflict => Conflict("The stored schema does not match the active model."),
+            _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
+        };
+
+    private static IResult UnsupportedMediaType() =>
+        Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The request body must be application/json.");
+
+    private static IResult Conflict(string title) =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: title);
 
     private static bool TryParseInteger(string text, out int value) =>
         int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);

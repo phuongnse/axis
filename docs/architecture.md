@@ -404,11 +404,13 @@ endpoint from M4 (see "Authentication and authorization").
 | --- | --- |
 | `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=` | `200` with one page of records |
 | `GET /api/apps/{app}/entities/{entity}/records/{id}` | `200` with one record |
+| `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
+| `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
-hyphenated 8-4-4-4-12 hex form, in either letter case. Create, update and
-delete routes are planned.
+hyphenated 8-4-4-4-12 hex form, in either letter case. A delete route is
+planned.
 
 ### Record shape
 
@@ -466,10 +468,46 @@ entity.
 The parameters are digits only: a sign, a space or a repeated parameter
 (`page=1&page=2`) is invalid.
 
+### Create and update
+
+- **Create.** `POST` takes `{ "values": { ... } }`. The record gets a new
+  version 7 UUID as its id and `version` 1. Fields the body leaves out are
+  SQL `NULL`. The response is `201` with the record, and `Location` is
+  `/api/apps/{app}/entities/{entity}/records/{id}`. It uses the application
+  and entity names from the active model, not the letter case of the request,
+  so a record always has one URL. The id is in the lowercase hyphenated form.
+- **Update.** `PATCH` takes `{ "version": n, "values": { ... } }`. Only the
+  fields in `values` change, and fields left out keep their value. `null`
+  clears a field that is not required. An empty `values` only increments
+  `version`. The response is `200` with the record and its new version.
+- **Content type.** Both need `Content-Type: application/json`. The media
+  type matches ignoring letter case. The only allowed parameter is `charset`
+  with the value `utf-8`, in any letter case. A cross-site page can send a
+  `text/plain` or form body without a CORS preflight, so accepting it would
+  open a CSRF path once M4 adds the session cookie. SameSite cookies and the
+  M4 CSRF protection stay the main defence.
+- **References.** Before the write, each non-null `reference` value is looked
+  up in the target table by id. The check and the write share the request's
+  connection without a transaction. The foreign key is the backstop: a target
+  removed in between is a foreign-key violation that maps to the same error.
+
+### Concurrency
+
+Every record has a `version` that starts at 1 and grows by one on each update.
+An update names the version it read and is applied only when the stored
+version is still that one: `WHERE "id" = @id AND "version" = @version`. When
+no row matches, a read by id decides between an unknown record (`404`) and a
+stale version (`409`). The client then reads the record again and retries.
+
 ### Errors
 
 Every error is problem details (`application/problem+json`). The titles are
 fixed and never contain text from the request.
+
+A request is checked in this order, and the first failure is the response:
+the path (`404`), the content type (`415`), the body (`400`), then storage
+(`400`, `404` or `409`). A request with the wrong content type is answered
+before its body is read.
 
 - **`404`.** An unknown application, an application with no active release,
   an unknown entity, an unknown record and an `{id}` that is not a UUID in the
@@ -478,6 +516,22 @@ fixed and never contain text from the request.
 - **`400`.** An invalid `page`, `pageSize` or `sort` is a validation problem
   whose `errors` is keyed `page`, `pageSize` and `sort`. Every invalid
   parameter is reported in the same response.
+- **`400` for a body.** A body the parser rejects (see "Request bodies and
+  values") is a validation problem whose `errors` is keyed by JSON Pointer. A
+  `reference` value that names no record of the target entity is an error at
+  `/values/<field>`.
+- **`415`.** A `POST` or `PATCH` without `Content-Type` or with any type other
+  than `application/json` with an optional `utf-8` charset.
+- **`409` for a unique value.** A value that repeats the value of a `unique`
+  field in another record is a validation problem with status `409`, whose
+  `errors` is keyed `/values/<field>`. The field is found by matching the
+  violated constraint against the names the model declares.
+- **`409` for a stale version.** An update whose `version` is not the stored
+  one.
+- **`409` for a schema conflict.** The table has a constraint the active model
+  does not declare, such as a `NOT NULL` column left by an activation that
+  failed after provisioning committed. The title is fixed, and the response
+  never names a table, column or constraint.
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
 
