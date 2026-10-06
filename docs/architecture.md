@@ -51,7 +51,8 @@ samples/
 
 Projects are created when the first issue needs them. M0 contains only
 `Axis.Server`, the test projects and `web/`. `Axis.Configuration`, `Axis.Data`,
-`Axis.Core` (only the tenant context so far) and `Axis.Tenancy` exist now.
+`Axis.Core` (only the tenant context so far), `Axis.Presentation` (only the
+built-in platform site and its texts so far) and `Axis.Tenancy` exist now.
 
 ## Module rules
 
@@ -548,6 +549,25 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   modes live in `web/src/platform/`. Feature code assembles them and adds no
   styling of its own.
 - **Text.** All UI strings come from text resources.
+- **Site and texts.** The server describes the site to the SPA through two
+  read-only endpoints. Like every other `/api` path, they need a known tenant
+  host.
+  - `GET /api/site` returns the site name, its title key, the locales
+    (default, fallback and available) and the navigation items. Navigation
+    labels are text keys, never literal text.
+  - `GET /api/texts/{locale}` returns a flat map from text key to text for
+    one locale. A locale without texts gets a 404 problem response.
+  - For now the built-in platform site in `Axis.Presentation` is the only
+    site. It offers English (`en`, default and fallback) and Vietnamese
+    (`vi`). An application-defined site can replace it later without changing
+    the SPA.
+- **Locale.** The shell header has a locale switch next to the light/dark
+  toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
+  like the theme mode under `axis.themeMode`.
+- **Missing texts.** The SPA resolves each key in the current locale first.
+  A key missing there shows its key name in development builds, so it gets
+  noticed, and the fallback-locale text otherwise. A key missing from both
+  locales shows its key name.
 
 ## Testing
 

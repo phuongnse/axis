@@ -12,7 +12,7 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <ThemeModeProvider>
-      <App />
+      <App development={import.meta.env.DEV} />
     </ThemeModeProvider>
   </StrictMode>,
 )

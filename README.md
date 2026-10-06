@@ -15,7 +15,8 @@ amount, and an approved request is sent to a purchasing system.
 Axis is at milestone **M0, Foundation**. The repository contains:
 
 - the server host, with health checks backed by PostgreSQL
-- the SPA shell, with light and dark mode
+- the SPA shell, with navigation from the site metadata, light and dark mode,
+  and texts in English or Vietnamese served by the server
 - the configuration loader, which reads an application folder, validates each
   resource against its JSON Schema and reports every problem as a diagnostic
 - real unit, integration and end-to-end checks, run by CI and NexKit

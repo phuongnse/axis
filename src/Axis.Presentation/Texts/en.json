@@ -1,0 +1,15 @@
+{
+  "shell.title": "Axis",
+  "shell.nav.home": "Home",
+  "shell.home.title": "Welcome to Axis",
+  "shell.serverStatus.title": "Server status",
+  "shell.serverStatus.checking": "Checking",
+  "shell.serverStatus.ready": "Ready",
+  "shell.serverStatus.unavailable": "Unavailable",
+  "shell.theme.dark": "Dark mode",
+  "shell.theme.darkShort": "Dark",
+  "shell.theme.lightShort": "Light",
+  "shell.locale.label": "Language",
+  "shell.locale.en": "English",
+  "shell.locale.vi": "Tiếng Việt"
+}

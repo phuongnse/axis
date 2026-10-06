@@ -3,6 +3,7 @@
     <Project Path="src/Axis.Configuration/Axis.Configuration.csproj" />
     <Project Path="src/Axis.Core/Axis.Core.csproj" />
     <Project Path="src/Axis.Data/Axis.Data.csproj" />
+    <Project Path="src/Axis.Presentation/Axis.Presentation.csproj" />
     <Project Path="src/Axis.Server/Axis.Server.csproj" />
     <Project Path="src/Axis.Tenancy/Axis.Tenancy.csproj" />
   </Folder>
