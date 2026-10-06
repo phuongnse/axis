@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Axis.Configuration.Tests\ModelAssert.cs" Link="ModelAssert.cs" />
     <Compile Include="..\Axis.Configuration.Tests\TemporaryFolder.cs" Link="TemporaryFolder.cs" />
     <Compile Include="..\Axis.Data.Tests\Models.cs" Link="Models.cs" />
   </ItemGroup>

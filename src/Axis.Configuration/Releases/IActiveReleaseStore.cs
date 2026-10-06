@@ -1,3 +1,5 @@
+using Axis.Configuration.Storage;
+
 namespace Axis.Configuration.Releases;
 
 /// <summary>
@@ -10,6 +12,12 @@ public interface IActiveReleaseStore
     Task<ActiveRelease?> FindByNameAsync(string name, CancellationToken cancellationToken = default);
 
     Task<ActiveRelease?> FindByApplicationIdAsync(Guid applicationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads the release <paramref name="releaseId"/> with its resources in ordinal path order, or
+    /// returns <see langword="null"/> when there is no such release.
+    /// </summary>
+    Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Makes <paramref name="releaseId"/> the active release of <paramref name="applicationId"/>

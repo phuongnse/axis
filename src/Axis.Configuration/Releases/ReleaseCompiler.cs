@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Model;
 using Axis.Configuration.Storage;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -8,7 +9,7 @@ namespace Axis.Configuration.Releases;
 /// <summary>
 /// Compiles an application folder into an immutable release in the tenant database. A folder with
 /// errors produces no release. An unchanged folder returns the release already stored for its
-/// application id and content hash.
+/// application id and content hash. A stored release can be compiled back into its model.
 /// </summary>
 public static class ReleaseCompiler
 {
@@ -70,6 +71,40 @@ public static class ReleaseCompiler
                 ?? throw new InvalidOperationException("The release that violated the unique index could not be found.", exception);
             return new ReleaseCompilationResult(existing, compiled.Model, compiled.Diagnostics);
         }
+    }
+
+    /// <summary>
+    /// Rebuilds the model of <paramref name="release"/> from its stored resources, without the
+    /// folder. A release is stored only when it compiles clean, so any diagnostic, another content
+    /// hash or another application id means the stored rows are wrong.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The stored release does not compile back into the same application.</exception>
+    public static ApplicationModel BuildModel(Release release)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+
+        var compiled = ApplicationCompiler.Compile(
+            release.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content)).ToList());
+        if (compiled.Diagnostics.Count > 0 || compiled.Model is null)
+        {
+            var code = compiled.Diagnostics.Count > 0 ? compiled.Diagnostics[0].Code : "none";
+            throw new InvalidOperationException(
+                $"The stored release '{release.Id}' no longer compiles (first diagnostic: {code}).");
+        }
+
+        if (compiled.ContentHash != release.ContentHash)
+        {
+            throw new InvalidOperationException(
+                $"The stored release '{release.Id}' compiles to another content hash than the one stored with it.");
+        }
+
+        if (compiled.Model.Manifest.Id != release.ApplicationId)
+        {
+            throw new InvalidOperationException(
+                $"The stored release '{release.Id}' compiles to another application id than the one stored with it.");
+        }
+
+        return compiled.Model;
     }
 
     private static async Task<Release?> FindAsync(

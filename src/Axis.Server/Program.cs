@@ -1,5 +1,6 @@
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
+using Axis.Server.Applications;
 using Axis.Server.Health;
 using Axis.Server.Presentation;
 using Axis.Server.Tenancy;
@@ -19,6 +20,9 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
 builder.Services.AddTenancy(builder.Configuration);
+builder.Services.AddScoped<TenantDatabase>();
+builder.Services.AddSingleton<ActiveModelCache>();
+builder.Services.AddScoped<ActiveApplicationResolver>();
 builder.Services.AddSingleton<ISiteMetadataProvider, PlatformSiteMetadataProvider>();
 builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
 

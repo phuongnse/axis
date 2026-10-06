@@ -91,7 +91,8 @@ flowchart LR
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
-   kind, ignoring letter case.
+   kind, ignoring letter case. The same checks run on a release's stored
+   resources when the server rebuilds its model.
 2. **Resolve.** Every reference must resolve inside the application or its
    declared modules. The entity model is built here: each field's `type`
    becomes a typed field type, every type-specific property is checked against
@@ -160,6 +161,15 @@ flowchart LR
      `id` and not active.
    - **Re-activation.** Activating the active release again provisions
      nothing and changes only its activation time.
+   - **Serving.** The server rebuilds the `ApplicationModel` from the
+     release's stored resources through `IActiveReleaseStore` and caches it
+     per tenant and release id. A stored release that no longer compiles
+     clean, or compiles to another content hash, is an error, never served.
+     The active row is read on every request, so a new activation is served
+     by the next request. A name outside the manifest name rule (an ASCII
+     letter, then ASCII letters or digits, at most 60 characters) resolves to
+     nothing without a query, so Unicode case folding such as the Kelvin sign
+     never aliases an application name.
 
 Diagnostics always carry `file`, `resourceId` (when the file has a readable
 ID), `path`, `code` and a message. `file` is relative to the application
@@ -499,6 +509,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   disposed with the host.
 - The current tenant is held per asynchronous flow (`AsyncLocal`), so
   concurrent requests never see each other's tenant.
+- In the server, a request scope holds one tenant connection, opened on first
+  use and disposed with the scope. The module contexts and raw commands share
+  it.
 
 ## Authentication and authorization
 

@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
@@ -332,6 +333,9 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
 
         public Task<ActiveRelease?> FindByApplicationIdAsync(Guid applicationId, CancellationToken cancellationToken = default) =>
             inner.FindByApplicationIdAsync(applicationId, cancellationToken);
+
+        public Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default) =>
+            inner.GetReleaseAsync(releaseId, cancellationToken);
 
         public Task<bool> TrySetAsync(Guid applicationId, string name, Guid releaseId, DateTimeOffset activatedAt, CancellationToken cancellationToken = default) =>
             inner.TrySetAsync(applicationId, name, releaseId, activatedAt, cancellationToken);
