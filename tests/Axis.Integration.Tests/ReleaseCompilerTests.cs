@@ -33,11 +33,18 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
     public async Task Migrations_history_is_kept_in_the_module_table()
     {
         await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
-        await using var command = dataSource.CreateCommand("""SELECT "MigrationId" FROM axis.__configuration_migrations""");
+        await using var command = dataSource.CreateCommand("""SELECT "MigrationId" FROM axis.__configuration_migrations ORDER BY "MigrationId" """);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var migrations = new List<string>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            migrations.Add(reader.GetString(0));
+        }
 
-        var migration = await command.ExecuteScalarAsync(CancellationToken);
-
-        Assert.EndsWith("_CreateReleases", Assert.IsType<string>(migration), StringComparison.Ordinal);
+        Assert.Collection(
+            migrations,
+            migration => Assert.EndsWith("_CreateReleases", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_CreateActiveReleases", migration, StringComparison.Ordinal));
     }
 
     [Fact]

@@ -93,7 +93,7 @@ public sealed class SchemaPlannerTests
         var changed = ChangeOrder(model, fields => [.. fields, Field("priority", FieldType.Integer)]);
         var catalog = ChangeOrderColumns(Catalog(model, hasRows: true), columns => columns.Where(column => column.Name != EntityNaming.VersionColumn));
 
-        var plan = SchemaPlanner.Plan(changed, catalog, Records(model));
+        var plan = SchemaPlanner.Plan(changed, catalog, Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal(
@@ -115,7 +115,7 @@ public sealed class SchemaPlannerTests
             Catalog(model, hasRows: true),
             columns => columns.Select(column => column.Name == EntityNaming.VersionColumn ? column with { Type = type, NotNull = notNull } : column));
 
-        var plan = SchemaPlanner.Plan(model, catalog, Records(model));
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         AssertNothingPlanned(plan);

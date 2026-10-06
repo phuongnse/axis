@@ -22,4 +22,5 @@ public static class DiagnosticCodes
     public const string RemovedEntity = "AXC0017";
     public const string EntityOwnedByOtherApplication = "AXC0018";
     public const string UnlistableFolder = "AXC0019";
+    public const string ApplicationNameActiveForOtherApplication = "AXC0020";
 }

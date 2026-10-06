@@ -1,6 +1,7 @@
 using Axis.Configuration.Storage;
 using Axis.Data.Storage;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -19,6 +20,18 @@ public sealed class DataDatabaseFixture : IAsyncLifetime
     public ConfigurationDbContext CreateConfigurationContext() =>
         new(new DbContextOptionsBuilder<ConfigurationDbContext>()
             .UseNpgsql(ConnectionString)
+            .Options);
+
+    /// <summary>A data context over <paramref name="connection"/>, which the caller owns.</summary>
+    public static DataDbContext CreateContext(NpgsqlConnection connection) =>
+        new(new DbContextOptionsBuilder<DataDbContext>()
+            .UseNpgsql(connection)
+            .Options);
+
+    /// <summary>A configuration context over <paramref name="connection"/>, which the caller owns.</summary>
+    public static ConfigurationDbContext CreateConfigurationContext(NpgsqlConnection connection) =>
+        new(new DbContextOptionsBuilder<ConfigurationDbContext>()
+            .UseNpgsql(connection)
             .Options);
 
     public async ValueTask InitializeAsync()
