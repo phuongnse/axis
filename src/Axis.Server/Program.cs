@@ -1,5 +1,8 @@
+using Axis.Presentation.Sites;
+using Axis.Presentation.Texts;
 using Axis.Server.Applications;
 using Axis.Server.Health;
+using Axis.Server.Presentation;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Npgsql;
@@ -20,6 +23,8 @@ builder.Services.AddTenancy(builder.Configuration);
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
+builder.Services.AddSingleton<ISiteMetadataProvider, PlatformSiteMetadataProvider>();
+builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
 
 var app = builder.Build();
 
@@ -28,6 +33,7 @@ app.UseTenantResolution();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapHealthEndpoints();
+app.MapPresentationEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();

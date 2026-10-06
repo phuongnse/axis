@@ -1,42 +1,119 @@
-import { PageContainer, ProCard, ProLayout } from '@ant-design/pro-components'
-import { Badge, Switch } from 'antd'
+import { PageContainer, ProCard } from '@ant-design/pro-components'
+import { Alert, Badge } from 'antd'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { readStoredLocale, storeLocale } from './platform/locale'
 import { useServerStatus, type ServerStatus } from './platform/serverStatus'
-import { useThemeMode } from './platform/themeMode'
+import { Shell } from './platform/Shell'
+import { fetchSite, type SiteMetadata } from './platform/site'
+import { TextProvider } from './platform/TextProvider'
+import { fetchTexts, useText, type TextMap } from './platform/texts'
 
-const statusBadge: Record<ServerStatus, { status: 'processing' | 'success' | 'error'; text: string }> = {
-  checking: { status: 'processing', text: 'Checking' },
-  ready: { status: 'success', text: 'Ready' },
-  unavailable: { status: 'error', text: 'Unavailable' },
+const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
+  checking: 'processing',
+  ready: 'success',
+  unavailable: 'error',
 }
 
-export function App() {
-  const { mode, toggleMode } = useThemeMode()
+interface LoadedShell {
+  site: SiteMetadata
+  fallbackTexts: TextMap
+  locale: string
+  texts: TextMap
+}
+
+function HomePage() {
+  const t = useText()
   const serverStatus = useServerStatus()
-  const badge = statusBadge[serverStatus]
 
   return (
-    <ProLayout
-      title="Axis"
-      logo={false}
-      layout="top"
-      navTheme={mode === 'dark' ? 'realDark' : 'light'}
-      menuDataRender={() => []}
-      actionsRender={() => [
-        <Switch
-          key="theme"
-          aria-label="Dark mode"
-          checked={mode === 'dark'}
-          checkedChildren="Dark"
-          unCheckedChildren="Light"
-          onChange={toggleMode}
-        />,
-      ]}
-    >
-      <PageContainer title="Welcome to Axis">
-        <ProCard title="Server status">
-          <Badge data-testid="server-status" status={badge.status} text={badge.text} />
-        </ProCard>
-      </PageContainer>
-    </ProLayout>
+    <PageContainer title={t('shell.home.title')}>
+      <ProCard title={t('shell.serverStatus.title')}>
+        <Badge
+          data-testid="server-status"
+          status={statusBadge[serverStatus]}
+          text={t(`shell.serverStatus.${serverStatus}`)}
+        />
+      </ProCard>
+    </PageContainer>
+  )
+}
+
+function LocaleLoadFailed({ onClose }: { onClose: () => void }) {
+  const t = useText()
+  return (
+    <Alert
+      data-testid="locale-error"
+      type="error"
+      banner
+      closable
+      message={t('shell.locale.loadFailed')}
+      onClose={onClose}
+    />
+  )
+}
+
+export function App({ development }: { development: boolean }) {
+  const [shell, setShell] = useState<LoadedShell>()
+  const [failed, setFailed] = useState(false)
+  const [localeFailed, setLocaleFailed] = useState(false)
+  const localeRequest = useRef<AbortController>(undefined)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    async function load() {
+      const site = await fetchSite(controller.signal)
+      const locale = readStoredLocale(site.locales.available, site.locales.default)
+      const [fallbackTexts, texts] = await Promise.all([
+        fetchTexts(site.locales.fallback, controller.signal),
+        locale === site.locales.fallback ? undefined : fetchTexts(locale, controller.signal),
+      ])
+      setShell({ site, fallbackTexts, locale, texts: texts ?? fallbackTexts })
+    }
+    load().catch((error: unknown) => {
+      if (!controller.signal.aborted) {
+        console.warn('Loading the site failed', error)
+        setFailed(true)
+      }
+    })
+    return () => {
+      controller.abort()
+      localeRequest.current?.abort()
+    }
+  }, [])
+
+  // Keeps the current texts until the new locale has loaded, and drops a superseded switch.
+  const changeLocale = useCallback((locale: string) => {
+    localeRequest.current?.abort()
+    const controller = new AbortController()
+    localeRequest.current = controller
+    setLocaleFailed(false)
+    fetchTexts(locale, controller.signal)
+      .then((texts) => {
+        storeLocale(locale)
+        setShell((current) => current && { ...current, locale, texts })
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.warn(`Loading the texts of '${locale}' failed`, error)
+          setLocaleFailed(true)
+        }
+      })
+  }, [])
+
+  if (failed) {
+    // There are no texts to render, so this is the one fixed string in the shell.
+    return <Alert data-testid="shell-error" type="error" banner message="Could not load the site." />
+  }
+  if (!shell) {
+    return null
+  }
+
+  return (
+    <TextProvider texts={shell.texts} fallbackTexts={shell.fallbackTexts} development={development}>
+      <Shell site={shell.site} locale={shell.locale} onLocaleChange={changeLocale}>
+        {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
+        <HomePage />
+      </Shell>
+    </TextProvider>
   )
 }

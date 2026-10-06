@@ -1,0 +1,16 @@
+{
+  "shell.title": "Axis",
+  "shell.nav.home": "Trang chủ",
+  "shell.home.title": "Chào mừng đến với Axis",
+  "shell.serverStatus.title": "Trạng thái máy chủ",
+  "shell.serverStatus.checking": "Đang kiểm tra",
+  "shell.serverStatus.ready": "Sẵn sàng",
+  "shell.serverStatus.unavailable": "Không khả dụng",
+  "shell.theme.dark": "Chế độ tối",
+  "shell.theme.darkShort": "Tối",
+  "shell.theme.lightShort": "Sáng",
+  "shell.locale.label": "Ngôn ngữ",
+  "shell.locale.en": "English",
+  "shell.locale.vi": "Tiếng Việt",
+  "shell.locale.loadFailed": "Không thể tải văn bản cho ngôn ngữ này."
+}
