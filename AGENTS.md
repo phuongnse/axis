@@ -39,7 +39,8 @@ Vietnamese.
 ## Working through NexKit
 
 - All work goes through NexKit, as described in
-  [docs/delivery.md](docs/delivery.md).
+  [docs/delivery.md](docs/delivery.md). The exception is changes in paths
+  NexKit may not change: those are hand-made pull requests.
 - Only the owner approves pull requests, approves waiting CI runs and merges.
 
 Writing on GitHub, for issues, plans, pull request descriptions and reviews:

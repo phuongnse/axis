@@ -1,6 +1,6 @@
 ---
 name: axis-nexkit
-description: Runbook for the local agent session that drives NexKit for the Axis owner (posting commands, reading plans, triaging pull requests, splitting issues). Not for agents running inside the NexKit pipeline.
+description: Runbook for the local agent session that drives NexKit for the Axis owner (posting commands, reading plans, triaging pull requests, splitting issues). Use when the owner asks to plan, implement, check, fix or split work through NexKit, or asks about the state of a NexKit issue or pull request. Not for agents running inside the NexKit pipeline.
 ---
 
 # Driving NexKit for Axis

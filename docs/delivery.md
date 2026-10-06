@@ -30,7 +30,10 @@ them up where they live.
   change.** Those paths are set by NexKit's
   [`protected_paths` setting][nexkit-config].
   Such changes are hand-made pull requests on any branch name, for example a
-  NexKit version bump. They still need the owner's approval.
+  NexKit version bump. The owner opens them from their own account, and
+  GitHub does not let an author approve their own pull request. So the owner
+  merges them with an admin bypass of the rules on `main`, after the required
+  checks pass.
 
 ## The life of an issue
 
