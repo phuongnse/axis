@@ -17,6 +17,9 @@ public static class RecordQueries
     // PostgreSQL stores microseconds, so six fraction digits show every stored value exactly.
     private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
 
+    /// <summary>The alias of the entity table in a read. Joined targets have their own id and version columns.</summary>
+    internal const string RowAlias = "r";
+
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> records, ordered by the
     /// sort field and then by id ascending, or by id alone without a sort, and counts every record
@@ -42,12 +45,13 @@ public static class RecordQueries
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        var id = EntityNaming.Quote(EntityNaming.IdColumn);
+        var row = EntityNaming.Quote(RowAlias);
+        var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
         var order = sort is null
             ? $"{id} ASC"
-            : $"{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
+            : $"{row}.{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
         await using var command = new NpgsqlCommand(
-            $"SELECT {SelectList(entity)} FROM {table} ORDER BY {order} LIMIT @limit OFFSET @offset",
+            $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)} ORDER BY {order} LIMIT @limit OFFSET @offset",
             connection);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
@@ -72,8 +76,9 @@ public static class RecordQueries
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(entity);
 
+        var row = EntityNaming.Quote(RowAlias);
         await using var command = new NpgsqlCommand(
-            $"SELECT {SelectList(entity)} FROM {Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
+            $"SELECT {SelectList(entity, RowAlias)} FROM {Table(entity)} AS {row}{LabelJoins(entity, RowAlias)} WHERE {row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
             connection);
         command.Parameters.AddWithValue("id", id);
 
@@ -83,14 +88,40 @@ public static class RecordQueries
 
     internal static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
 
-    /// <summary>The id, the version, then every field in declaration order; decimals as text so no digit is lost.</summary>
-    internal static string SelectList(EntityModel entity) =>
-        string.Join(", ", [
-            EntityNaming.Quote(EntityNaming.IdColumn),
-            EntityNaming.Quote(EntityNaming.VersionColumn),
+    /// <summary>
+    /// The id, the version, then every field in declaration order, all of the row named
+    /// <paramref name="alias"/>; decimals as text so no digit is lost. Then the display field of
+    /// each reference's target, joined by <see cref="LabelJoins"/>.
+    /// </summary>
+    internal static string SelectList(EntityModel entity, string alias)
+    {
+        var row = EntityNaming.Quote(alias) + ".";
+        return string.Join(", ", [
+            row + EntityNaming.Quote(EntityNaming.IdColumn),
+            row + EntityNaming.Quote(EntityNaming.VersionColumn),
             .. entity.Fields.Select(field =>
-                EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")),
+                row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")),
+            .. References(entity).Select((field, index) =>
+                $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"),
         ]);
+    }
+
+    /// <summary>
+    /// One left join per reference field to the target table, aliased by the reference's position,
+    /// so each record's labels come from the same statement. Empty without a reference field.
+    /// </summary>
+    internal static string LabelJoins(EntityModel entity, string alias) =>
+        string.Concat(References(entity).Select((field, index) =>
+        {
+            var target = EntityNaming.Quote(LabelAlias(index));
+            return $" LEFT JOIN {EntityNaming.QualifiedTable(EntityNaming.Table(field.Target!.Id))} AS {target}"
+                + $" ON {target}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {EntityNaming.Quote(alias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}";
+        }));
+
+    private static string LabelAlias(int index) => $"l{index}";
+
+    private static IEnumerable<FieldModel> References(EntityModel entity) =>
+        entity.Fields.Where(field => field.Type == FieldType.Reference);
 
     internal static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity)
     {
@@ -102,7 +133,20 @@ public static class RecordQueries
             values[field.Name] = reader.IsDBNull(ordinal) ? null : ReadValue(reader, ordinal, field);
         }
 
-        return new Record(reader.GetGuid(0), reader.GetInt64(1), values);
+        // A null reference, or a target whose display column is NULL, has no label.
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        var labelOrdinal = entity.Fields.Count + 2;
+        foreach (var field in References(entity))
+        {
+            if (!reader.IsDBNull(labelOrdinal))
+            {
+                labels[field.Name] = reader.GetString(labelOrdinal);
+            }
+
+            labelOrdinal++;
+        }
+
+        return new Record(reader.GetGuid(0), reader.GetInt64(1), values, labels);
     }
 
     private static JsonValue ReadValue(NpgsqlDataReader reader, int ordinal, FieldModel field) =>

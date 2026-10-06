@@ -40,6 +40,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
         Assert.Equal($"{Items}/{id}", response.Headers.Location?.OriginalString);
         Assert.Equal(Guid.Parse(id!).ToString("D"), id);
         Assert.Equal(1, created.RootElement.GetProperty("version").GetInt64());
+        Assert.Equal("Sales", created.RootElement.GetProperty("labels").GetProperty("department").GetString());
 
         using var read = await GetJsonAsync(response.Headers.Location!.OriginalString, HostA);
 
@@ -81,6 +82,24 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
         Assert.Equal(
             cleared.RootElement.GetProperty("values").GetRawText(),
             bumped.RootElement.GetProperty("values").GetRawText());
+    }
+
+    [Fact]
+    public async Task Update_returns_the_label_of_a_reference_it_sets_and_drops_it_when_cleared()
+    {
+        await fixture.ResetAsync();
+        var departmentId = await CreateDepartmentAsync(HostA, "Finance");
+        var id = await CreateItemAsync(HostA, """{ "name": "Desk" }""");
+
+        using var set = await PatchJsonAsync(id, $$"""{ "version": 1, "values": { "department": "{{departmentId:D}}" } }""", HttpStatusCode.OK);
+
+        Assert.Equal("""{"department":"Finance"}""", set.RootElement.GetProperty("labels").GetRawText());
+        Assert.Equal(departmentId.ToString("D"), set.RootElement.GetProperty("values").GetProperty("department").GetString());
+
+        using var cleared = await PatchJsonAsync(id, """{ "version": 2, "values": { "department": null } }""", HttpStatusCode.OK);
+
+        Assert.Equal("{}", cleared.RootElement.GetProperty("labels").GetRawText());
+        Assert.Equal(JsonValueKind.Null, cleared.RootElement.GetProperty("values").GetProperty("department").ValueKind);
     }
 
     public static TheoryData<bool, string, string> InvalidBodies => new()

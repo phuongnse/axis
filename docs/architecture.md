@@ -581,7 +581,10 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
     "quantity": 3,
     "price": 1250.50,
     "orderedAt": "2026-10-06T02:00:00.123456Z",
-    "department": null
+    "department": "0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b"
+  },
+  "labels": {
+    "department": "Finance"
   }
 }
 ```
@@ -589,10 +592,25 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
 `values` holds every declared field of the entity under its declared name, in
 declaration order. A field that is SQL `NULL` is `null`; it is never left out.
 
+`labels` maps each `reference` field that is not `null` to the display field
+value of the referenced record, so a page can show "Finance" without one more
+request per row. It is always present, and it is `{}` when the entity has no
+reference or every reference is `null`. A `null` reference has no entry.
+`values` keeps the record id of each reference, so a record read and sent back
+is unchanged.
+
+The labels come from the same SQL statement as the records, through one left
+join per reference field to the target table. They are never read with one
+query per row. Create and update return their labels from the same statement
+as the write: the write is a data-modifying `WITH` clause, and the labels are
+selected from it with the same joins, because `RETURNING` cannot join. Labels
+are not filtered by access yet. From M4 the server decides whether a caller may
+see the label of a record it cannot read.
+
 A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
-"totalCount": 42 }`. `items` holds records in the shape above, `page` and
-`pageSize` are the values used, and `totalCount` counts every record of the
-entity.
+"totalCount": 42 }`. `items` holds records in the shape above, including
+`labels`. `page` and `pageSize` are the values used, and `totalCount` counts
+every record of the entity.
 
 ### Reading values
 
@@ -604,7 +622,7 @@ entity.
 | `boolean` | `true` or `false` |
 | `date` | A string `yyyy-MM-dd` |
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
-| `reference` | A string with the record id in the lowercase hyphenated form |
+| `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
 
 ### Paging and sorting
 

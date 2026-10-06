@@ -349,6 +349,7 @@ public static class ApplicationCompiler
             Scale = field.Scale,
             Values = field.Values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
+            TargetDisplayField = target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
         };
     }
 

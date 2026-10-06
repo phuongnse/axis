@@ -32,17 +32,20 @@ public sealed class ApplicationCompilerTests
 
         Assert.True(purchaseRequest.TryGetField("department", out var department));
         Assert.Equal(new EntityReference(Guid.Parse("6a1e4f2b-3c4d-4e5f-8a9b-0c1d2e3f4a02"), "Department"), department.Target);
+        Assert.Equal("name", department.TargetDisplayField);
         Assert.True(department.Required);
         Assert.False(department.Unique);
 
         Assert.True(purchaseRequest.TryGetField("supplier", out var supplier));
         Assert.Equal(new EntityReference(Guid.Parse("7b2f5a3c-4d5e-4f6a-9b0c-1d2e3f4a5b03"), "Supplier"), supplier.Target);
+        Assert.Equal("name", supplier.TargetDisplayField);
         Assert.False(supplier.Required);
         Assert.False(supplier.Unique);
 
         Assert.True(purchaseRequest.TryGetField("total", out var total));
         Assert.Equal((18, 2), (total.Precision, total.Scale));
         Assert.Null(total.Target);
+        Assert.Null(total.TargetDisplayField);
 
         Assert.True(purchaseRequest.TryGetField("status", out var status));
         Assert.Equal(["draft", "submitted", "approved", "rejected"], status.Values);
@@ -193,6 +196,7 @@ public sealed class ApplicationCompilerTests
         Assert.True(result.Model.TryGetEntity("Order", out var order));
         Assert.Equal(new EntityReference(Guid.Parse("22222222-2222-4222-8222-222222222222"), "Customer"), order.Fields[0].Target);
         Assert.Equal(new EntityReference(Guid.Parse(OrderId), "Order"), order.Fields[1].Target);
+        Assert.Equal(("name", "number"), (order.Fields[0].TargetDisplayField, order.Fields[1].TargetDisplayField));
     }
 
     [Theory]
@@ -491,13 +495,21 @@ public sealed class ApplicationCompilerTests
     {
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
-            .With("order.json", Entity("Order", """{ "name": "orderNumber", "type": "text", "required": true }""", displayField: "ORDERNUMBER"));
+            .With("order.json", Entity(
+                "Order",
+                """
+                { "name": "orderNumber", "type": "text", "required": true },
+                { "name": "parent", "type": "reference", "target": "Order" }
+                """,
+                displayField: "ORDERNUMBER"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal("orderNumber", Assert.Single(result.Model.Entities).DisplayField);
+        var order = Assert.Single(result.Model.Entities);
+        Assert.Equal("orderNumber", order.DisplayField);
+        Assert.Equal("orderNumber", order.Fields[1].TargetDisplayField);
     }
 
     [Fact]
