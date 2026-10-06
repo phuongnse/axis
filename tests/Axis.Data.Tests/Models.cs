@@ -56,6 +56,7 @@ internal static class Models
             EntityNaming.Table(entity.Id),
             [
                 new CatalogColumn(EntityNaming.IdColumn, "uuid", NotNull: true, Unique: false, ReferencedTable: null),
+                new CatalogColumn(EntityNaming.VersionColumn, "bigint", NotNull: true, Unique: false, ReferencedTable: null),
                 .. entity.Fields.Select(field => new CatalogColumn(
                     EntityNaming.Column(field.Name),
                     ColumnTypes.Render(field),

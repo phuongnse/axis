@@ -78,6 +78,37 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
     }
 
     [Fact]
+    public async Task Missing_version_column_is_added_back_and_fills_existing_rows()
+    {
+        var model = BaseModel();
+        await ProvisionAsync(model);
+        var customerTable = EntityNaming.QualifiedTable(EntityNaming.Table(_customerId));
+        await using (var dataSource = NpgsqlDataSource.Create(database.ConnectionString))
+        {
+            await using var command = dataSource.CreateCommand($"""ALTER TABLE {customerTable} DROP COLUMN "version" """);
+            await command.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        var rowId = await InsertCustomerAsync();
+
+        var result = await ProvisionAsync(model);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal([$"""ALTER TABLE {customerTable} ADD COLUMN "version" bigint NOT NULL DEFAULT 1"""], result.Statements);
+        var table = Assert.Single(await ReadTablesAsync(model), table => table.Name == EntityNaming.Table(_customerId));
+        Assert.True(table.HasRows);
+        Assert.Equal(
+            new CatalogColumn("version", "bigint", NotNull: true, Unique: false, ReferencedTable: null),
+            Assert.Single(table.Columns, column => column.Name == "version"));
+        await using (var dataSource = NpgsqlDataSource.Create(database.ConnectionString))
+        {
+            await using var command = dataSource.CreateCommand($"""SELECT "version" FROM {customerTable} WHERE "id" = @id""");
+            command.Parameters.AddWithValue("id", rowId);
+            Assert.Equal(1L, await command.ExecuteScalarAsync(CancellationToken));
+        }
+    }
+
+    [Fact]
     public async Task Label_only_change_applies_nothing()
     {
         var model = BaseModel();
@@ -248,6 +279,7 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         Assert.Equal(
             [
                 new CatalogColumn("id", "uuid", NotNull: true, Unique: false, ReferencedTable: null),
+                new CatalogColumn("version", "bigint", NotNull: true, Unique: false, ReferencedTable: null),
                 new CatalogColumn("f_number", "character varying(20)", NotNull: true, Unique: false, ReferencedTable: null),
                 new CatalogColumn("f_note", "text", NotNull: false, Unique: false, ReferencedTable: null),
             ],
