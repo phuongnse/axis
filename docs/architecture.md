@@ -254,6 +254,7 @@ is `AXC0013`.
   | --- | --- | --- |
   | Table | `e_` + entity `id` as 32 lowercase hex characters | 34 |
   | Primary key column | `id` (`uuid`) | 2 |
+  | Version column | `version` (`bigint`) | 7 |
   | Field column | `f_` + field name in lowercase | at most 62 |
   | Primary key | `pk_` + table | 37 |
   | Unique constraint | `uq_` + table + `_` + hash of the column name | 54 |
@@ -293,9 +294,15 @@ entities and any entity recorded with one of its entity `id`s, whatever its
 application. The planner itself has no database
 access. It returns diagnostics, SQL statements and the new records to write.
 
-- **Missing table.** It is created with every column, `NOT NULL` for
-  required fields and a unique constraint for unique fields. The entity and
-  its enum values are recorded.
+- **System columns.** `id` and `version` are created with the table.
+  `version` is added to an existing table that lacks it as
+  `bigint NOT NULL DEFAULT 1`, even when the table has rows, because the
+  default fills them. System columns are never compared or changed otherwise:
+  only Axis DDL creates them, and an author cannot fix them through
+  configuration.
+- **Missing table.** It is created with the system columns and every field
+  column, `NOT NULL` for required fields and a unique constraint for unique
+  fields. The entity and its enum values are recorded.
 - **Missing column.** It is added. `NOT NULL` is added only when the table
   has no rows; a required field added to a table with rows is `AXC0016` at
   `/fields/{i}/required`. A unique field also gets its unique constraint.
@@ -317,8 +324,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   no SQL. A column switching between `enum` and another type (recorded values
   present for a non-enum field, or absent for an enum field) is `AXC0016` at
   `/fields/{i}/type`.
-- **Removed field.** A column other than `id` without a matching field is
-  `AXC0015` at `/fields`, naming the column.
+- **Removed field.** A column other than the system columns without a
+  matching field is `AXC0015` at `/fields`, naming the column.
 - **Removed entity.** An entity recorded for the application but missing from
   it is `AXC0017` at `application.json` with an empty path and the entity's
   `id` as `resourceId`.

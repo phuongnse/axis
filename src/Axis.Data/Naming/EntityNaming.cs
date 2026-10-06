@@ -16,6 +16,9 @@ public static class EntityNaming
     /// <summary>The primary key column of every entity table.</summary>
     public const string IdColumn = "id";
 
+    /// <summary>The row version column of every entity table, starting at 1 for each row.</summary>
+    public const string VersionColumn = "version";
+
     /// <summary><c>e_</c> and the entity id as 32 lowercase hex characters (34 characters).</summary>
     public static string Table(Guid entityId) => "e_" + entityId.ToString("N");
 

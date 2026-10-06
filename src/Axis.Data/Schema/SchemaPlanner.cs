@@ -11,6 +11,9 @@ namespace Axis.Data.Schema;
 /// </summary>
 public static class SchemaPlanner
 {
+    // The version column definition, rendered the same in CREATE TABLE and ADD COLUMN.
+    private static readonly string _versionDefinition = $"{EntityNaming.Quote(EntityNaming.VersionColumn)} bigint NOT NULL DEFAULT 1";
+
     public static SchemaPlan Plan(ApplicationModel model, CatalogSnapshot catalog, ProvisioningRecords records)
     {
         var planning = new Planning(model, catalog, records);
@@ -88,7 +91,7 @@ public static class SchemaPlanner
 
         private void PlanNewTable(EntityModel entity, string table)
         {
-            var definitions = new List<string> { $"{EntityNaming.Quote(EntityNaming.IdColumn)} uuid NOT NULL" };
+            var definitions = new List<string> { $"{EntityNaming.Quote(EntityNaming.IdColumn)} uuid NOT NULL", _versionDefinition };
             var constraints = new List<string>
             {
                 $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(table))} PRIMARY KEY ({EntityNaming.Quote(EntityNaming.IdColumn)})",
@@ -120,6 +123,14 @@ public static class SchemaPlanner
                 _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, entity.File, path, entity.Id));
 
             var columnsByName = table.Columns.ToDictionary(column => column.Name, StringComparer.Ordinal);
+
+            // System columns are never compared; only a missing version column is added. Its
+            // default fills existing rows, so this holds even when the table has rows.
+            if (!columnsByName.ContainsKey(EntityNaming.VersionColumn))
+            {
+                _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD COLUMN {_versionDefinition}");
+            }
+
             for (var index = 0; index < entity.Fields.Count; index++)
             {
                 var field = entity.Fields[index];
@@ -137,7 +148,7 @@ public static class SchemaPlanner
             var fieldColumns = entity.Fields.Select(field => EntityNaming.Column(field.Name)).ToHashSet(StringComparer.Ordinal);
             foreach (var column in table.Columns)
             {
-                if (column.Name != EntityNaming.IdColumn && !fieldColumns.Contains(column.Name))
+                if (column.Name != EntityNaming.IdColumn && column.Name != EntityNaming.VersionColumn && !fieldColumns.Contains(column.Name))
                 {
                     _diagnostics.Add(new Diagnostic(
                         DiagnosticCodes.RemovedField,

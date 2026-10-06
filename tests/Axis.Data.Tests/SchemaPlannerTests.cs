@@ -53,8 +53,8 @@ public sealed class SchemaPlannerTests
         Assert.False(plan.HasErrors);
         Assert.Equal(
             [
-                $"""CREATE TABLE "entities"."{CustomerTable}" ("id" uuid NOT NULL, "f_name" character varying(200) NOT NULL, "f_lastorder" uuid, CONSTRAINT "pk_{CustomerTable}" PRIMARY KEY ("id"))""",
-                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "f_code" character varying(20) NOT NULL, "f_customer" uuid NOT NULL, "f_parent" uuid, "f_total" numeric(18,2), "f_quantity" bigint, "f_paid" boolean, "f_due" date, "f_placedat" timestamp with time zone, "f_notes" text, "f_status" text NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"), CONSTRAINT "{EntityNaming.Unique(OrderTable, "f_code")}" UNIQUE ("f_code"))""",
+                $"""CREATE TABLE "entities"."{CustomerTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "f_name" character varying(200) NOT NULL, "f_lastorder" uuid, CONSTRAINT "pk_{CustomerTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "f_code" character varying(20) NOT NULL, "f_customer" uuid NOT NULL, "f_parent" uuid, "f_total" numeric(18,2), "f_quantity" bigint, "f_paid" boolean, "f_due" date, "f_placedat" timestamp with time zone, "f_notes" text, "f_status" text NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"), CONSTRAINT "{EntityNaming.Unique(OrderTable, "f_code")}" UNIQUE ("f_code"))""",
                 ForeignKey(CustomerTable, "f_lastorder", OrderTable),
                 ForeignKey(OrderTable, "f_customer", CustomerTable),
                 ForeignKey(OrderTable, "f_parent", OrderTable),
@@ -84,6 +84,41 @@ public sealed class SchemaPlannerTests
         Assert.Equal([$"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_priority" bigint"""], plan.Statements);
         Assert.Empty(plan.NewEntities);
         Assert.Empty(plan.NewEnumValues);
+    }
+
+    [Fact]
+    public void Missing_version_column_on_a_table_with_rows_is_added_before_the_field_changes()
+    {
+        var model = BaseModel();
+        var changed = ChangeOrder(model, fields => [.. fields, Field("priority", FieldType.Integer)]);
+        var catalog = ChangeOrderColumns(Catalog(model, hasRows: true), columns => columns.Where(column => column.Name != EntityNaming.VersionColumn));
+
+        var plan = SchemaPlanner.Plan(changed, catalog, Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "version" bigint NOT NULL DEFAULT 1""",
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_priority" bigint""",
+            ],
+            plan.Statements);
+    }
+
+    [Theory]
+    [InlineData("bigint", true)]
+    [InlineData("integer", true)]
+    [InlineData("bigint", false)]
+    public void Existing_version_column_is_never_compared_or_reported(string type, bool notNull)
+    {
+        var model = BaseModel();
+        var catalog = ChangeOrderColumns(
+            Catalog(model, hasRows: true),
+            columns => columns.Select(column => column.Name == EntityNaming.VersionColumn ? column with { Type = type, NotNull = notNull } : column));
+
+        var plan = SchemaPlanner.Plan(model, catalog, Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        AssertNothingPlanned(plan);
     }
 
     [Fact]
@@ -351,6 +386,9 @@ public sealed class SchemaPlannerTests
 
     private static ApplicationModel ChangeOrderField(ApplicationModel model, int index, Func<FieldModel, FieldModel> change) =>
         ChangeOrder(model, fields => [.. fields.Select((field, i) => i == index ? change(field) : field)]);
+
+    private static CatalogSnapshot ChangeOrderColumns(CatalogSnapshot catalog, Func<IEnumerable<CatalogColumn>, IEnumerable<CatalogColumn>> change) =>
+        new([.. catalog.Tables.Select(table => table.Name == OrderTable ? table with { Columns = [.. change(table.Columns)] } : table)]);
 
     private static string ForeignKey(string table, string column, string targetTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "entities"."{targetTable}" ("id")""";
