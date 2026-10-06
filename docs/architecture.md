@@ -50,7 +50,8 @@ samples/
 ```
 
 Projects are created when the first issue needs them. M0 contains only
-`Axis.Server`, the test projects and `web/`.
+`Axis.Server`, the test projects and `web/`. `Axis.Configuration`, `Axis.Data`,
+`Axis.Core` (only the tenant context so far) and `Axis.Tenancy` exist now.
 
 ## Module rules
 
@@ -335,6 +336,57 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Scoping.** Cache keys, file storage paths, job records and log scopes all
   include the tenant.
 - **Tenant source.** Until M9, tenants come from server configuration.
+
+### Tenant configuration
+
+The `Tenants` section of the server configuration is keyed by tenant id:
+
+```json
+"Tenants": {
+  "default": { "Hosts": [ "localhost" ], "ConnectionString": "Host=..." }
+}
+```
+
+Environment variables override it in the usual form, such as
+`Tenants__default__ConnectionString` or `Tenants__default__Hosts__0`.
+`appsettings.Development.json` maps `localhost` to tenant `default` on the
+compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
+database. The `Platform` connection string is separate and still serves the
+readiness check.
+
+Startup fails with an `InvalidOperationException` naming every problem when:
+
+- no tenant is configured;
+- a tenant id contains anything other than lowercase letters, digits and
+  hyphens;
+- a tenant has no hosts, or a host entry that is blank or only whitespace;
+- a tenant has no connection string, or one that is only whitespace;
+- the same host is listed under two tenants, compared ignoring letter case.
+
+### Request resolution
+
+- **Host matching.** Middleware in `Axis.Server` runs before static files and
+  endpoints. It matches `Request.Host.Host` against the configured hosts,
+  ignoring letter case. The port is ignored, so `A.Example.TEST:8443` matches
+  `a.example.test`.
+- **Unknown host.** The response is `404` problem details
+  (`application/problem+json`) titled "No tenant is configured for this
+  host." It names neither the requested host nor any configured tenant or
+  host. This covers API and SPA paths alike.
+- **Health exemption.** Paths under `/health` are not resolved, so
+  `/health/live` and `/health/ready` answer for any host.
+- **Log scope.** While a resolved request runs, the logging scope carries
+  `TenantId` with the tenant id.
+
+### Tenant connections
+
+- `ITenantConnectionFactory` opens connections to the current tenant's
+  database only. Without a tenant context it throws
+  `InvalidOperationException`.
+- There is one `NpgsqlDataSource` per tenant. It is created on first use and
+  disposed with the host.
+- The current tenant is held per asynchronous flow (`AsyncLocal`), so
+  concurrent requests never see each other's tenant.
 
 ## Authentication and authorization
 

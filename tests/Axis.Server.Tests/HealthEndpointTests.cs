@@ -64,6 +64,8 @@ public sealed class HealthEndpointTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            builder.UseSetting("Tenants:default:Hosts:0", "localhost");
+            builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             if (connectionString is not null)
             {
                 builder.UseSetting("ConnectionStrings:Platform", connectionString);
