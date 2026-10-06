@@ -1,4 +1,6 @@
 using Axis.Server.Health;
+using Axis.Server.Tenancy;
+using Axis.Tenancy;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,9 +14,13 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
+builder.Services.AddProblemDetails();
+builder.Services.AddTenancy(builder.Configuration);
 
 var app = builder.Build();
 
+// First, so API and SPA paths alike need a known tenant host.
+app.UseTenantResolution();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapHealthEndpoints();

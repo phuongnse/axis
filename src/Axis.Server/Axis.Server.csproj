@@ -5,6 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Axis.Server.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
   </ItemGroup>

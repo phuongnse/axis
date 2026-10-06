@@ -37,6 +37,9 @@ export default defineConfig({
       ASPNETCORE_URLS: baseURL,
       ASPNETCORE_ENVIRONMENT: 'Production',
       ConnectionStrings__Platform: connectionString,
+      // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
+      Tenants__default__Hosts__0: '127.0.0.1',
+      Tenants__default__ConnectionString: connectionString,
     },
   },
 })
