@@ -11,6 +11,11 @@ public sealed class EmbeddedTextResourceProvider : ITextResourceProvider
 
     private static readonly Assembly _assembly = typeof(EmbeddedTextResourceProvider).Assembly;
 
+    // Maps each lowercase locale tag to the name of its embedded resource.
+    private static readonly Dictionary<string, string> _resourceNames = _assembly.GetManifestResourceNames()
+        .Where(name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal) && name.EndsWith(ResourceSuffix, StringComparison.Ordinal))
+        .ToDictionary(name => name[ResourcePrefix.Length..^ResourceSuffix.Length].ToLowerInvariant(), StringComparer.OrdinalIgnoreCase);
+
     private readonly Lazy<Dictionary<string, TextResources>> _textsByLocale;
 
     public EmbeddedTextResourceProvider()
@@ -19,18 +24,14 @@ public sealed class EmbeddedTextResourceProvider : ITextResourceProvider
     }
 
     /// <summary>The locales that have embedded texts, as lowercase tags.</summary>
-    public IReadOnlyList<string> Locales { get; } = _assembly.GetManifestResourceNames()
-        .Where(name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal) && name.EndsWith(ResourceSuffix, StringComparison.Ordinal))
-        .Select(name => name[ResourcePrefix.Length..^ResourceSuffix.Length])
-        .Order(StringComparer.Ordinal)
-        .ToArray();
+    public IReadOnlyList<string> Locales { get; } = _resourceNames.Keys.Order(StringComparer.Ordinal).ToArray();
 
     public TextResources? GetTexts(string locale) =>
         _textsByLocale.Value.GetValueOrDefault(locale);
 
     private static TextResources Load(string locale)
     {
-        var resourceName = $"{ResourcePrefix}{locale}{ResourceSuffix}";
+        var resourceName = _resourceNames[locale];
         using var stream = _assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException($"Embedded texts '{resourceName}' were not found.");
         var texts = JsonSerializer.Deserialize<Dictionary<string, string>>(stream)

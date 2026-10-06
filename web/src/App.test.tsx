@@ -27,6 +27,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.locale.label': 'Language',
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
+    'shell.locale.loadFailed': 'The texts for this language could not be loaded.',
   },
   vi: {
     'shell.nav.home': 'Trang chủ',
@@ -45,7 +46,7 @@ function json(body: unknown, status = 200) {
 }
 
 /** Stubs `fetch` with the server's routes. */
-function stubServer({ ready = true, siteStatus = 200 } = {}) {
+function stubServer({ ready = true, siteStatus = 200, failingLocale = '' } = {}) {
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/health/ready') {
       return json({}, ready ? 200 : 503)
@@ -54,6 +55,9 @@ function stubServer({ ready = true, siteStatus = 200 } = {}) {
       return json(siteStatus === 200 ? site : {}, siteStatus)
     }
     const locale = input.replace('/api/texts/', '')
+    if (locale === failingLocale) {
+      return json({}, 500)
+    }
     return locale in texts ? json({ locale, texts: texts[locale] }) : json({}, 404)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -131,6 +135,23 @@ describe('App', () => {
     expect(screen.getByRole('menuitem', { name: 'Trang chủ' })).toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: 'Ngôn ngữ' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
+  })
+
+  it('shows an error and keeps the current locale when the chosen texts cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer({ failingLocale: 'vi' })
+    renderApp()
+    await screen.findByText('Welcome to Axis')
+
+    const language = screen.getByRole('radiogroup', { name: 'Language' })
+    await userEvent.click(within(language).getByText('Tiếng Việt'))
+
+    expect(await screen.findByTestId('locale-error')).toHaveTextContent(
+      'The texts for this language could not be loaded.',
+    )
+    expect(screen.getByText('Welcome to Axis')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'English' })).toBeChecked()
+    expect(localStorage.getItem('axis.locale')).toBeNull()
   })
 
   it('starts in the stored locale', async () => {

@@ -11,5 +11,6 @@
   "shell.theme.lightShort": "Sáng",
   "shell.locale.label": "Ngôn ngữ",
   "shell.locale.en": "English",
-  "shell.locale.vi": "Tiếng Việt"
+  "shell.locale.vi": "Tiếng Việt",
+  "shell.locale.loadFailed": "Không thể tải văn bản cho ngôn ngữ này."
 }

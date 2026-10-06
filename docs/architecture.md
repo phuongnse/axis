@@ -573,10 +573,13 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - For now the built-in platform site in `Axis.Presentation` is the only
     site. It offers English (`en`, default and fallback) and Vietnamese
     (`vi`). An application-defined site can replace it later without changing
-    the SPA.
+    the SPA. A test checks that every locale has exactly the same keys as
+    English.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
-  like the theme mode under `axis.themeMode`.
+  like the theme mode under `axis.themeMode`. The shell keeps the current
+  texts until the chosen locale's texts have loaded. If they fail to load, it
+  stays in the current locale and shows an error message.
 - **Missing texts.** The SPA resolves each key in the current locale first.
   A key missing there shows its key name in development builds, so it gets
   noticed, and the fallback-locale text otherwise. A key missing from both

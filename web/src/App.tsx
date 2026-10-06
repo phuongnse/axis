@@ -38,9 +38,24 @@ function HomePage() {
   )
 }
 
+function LocaleLoadFailed({ onClose }: { onClose: () => void }) {
+  const t = useText()
+  return (
+    <Alert
+      data-testid="locale-error"
+      type="error"
+      banner
+      closable
+      message={t('shell.locale.loadFailed')}
+      onClose={onClose}
+    />
+  )
+}
+
 export function App({ development }: { development: boolean }) {
   const [shell, setShell] = useState<LoadedShell>()
   const [failed, setFailed] = useState(false)
+  const [localeFailed, setLocaleFailed] = useState(false)
   const localeRequest = useRef<AbortController>(undefined)
 
   useEffect(() => {
@@ -71,6 +86,7 @@ export function App({ development }: { development: boolean }) {
     localeRequest.current?.abort()
     const controller = new AbortController()
     localeRequest.current = controller
+    setLocaleFailed(false)
     fetchTexts(locale, controller.signal)
       .then((texts) => {
         storeLocale(locale)
@@ -79,6 +95,7 @@ export function App({ development }: { development: boolean }) {
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           console.warn(`Loading the texts of '${locale}' failed`, error)
+          setLocaleFailed(true)
         }
       })
   }, [])
@@ -94,6 +111,7 @@ export function App({ development }: { development: boolean }) {
   return (
     <TextProvider texts={shell.texts} fallbackTexts={shell.fallbackTexts} development={development}>
       <Shell site={shell.site} locale={shell.locale} onLocaleChange={changeLocale}>
+        {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
         <HomePage />
       </Shell>
     </TextProvider>
