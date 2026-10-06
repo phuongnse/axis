@@ -17,6 +17,9 @@ public sealed record EntityModel
 
     public required IReadOnlyList<FieldModel> Fields { get; init; }
 
+    /// <summary>The declared name of the required text field that names a record, or null when there is none.</summary>
+    public string? DisplayField { get; init; }
+
     /// <summary>Finds a field by name, ignoring letter case.</summary>
     public bool TryGetField(string name, [NotNullWhen(true)] out FieldModel? field)
     {

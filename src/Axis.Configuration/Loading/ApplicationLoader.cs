@@ -47,6 +47,7 @@ public static class ApplicationLoader
                 null,
                 [],
                 [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
@@ -85,6 +86,7 @@ public static class ApplicationLoader
         var diagnostics = new List<Diagnostic>();
         ApplicationManifest? application = null;
         var entities = new List<EntityResource>();
+        var texts = new List<TextResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -143,6 +145,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Entity:
                         entities.Add(root.Deserialize<EntityResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Text:
+                        texts.Add(root.Deserialize<TextResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -152,6 +157,7 @@ public static class ApplicationLoader
         return new ApplicationLoadResult(
             application,
             entities,
+            texts,
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames);
@@ -317,7 +323,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}' or '{ResourceKinds.Entity}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}' or '{ResourceKinds.Text}'.",
                 file,
                 "/kind",
                 resourceId));

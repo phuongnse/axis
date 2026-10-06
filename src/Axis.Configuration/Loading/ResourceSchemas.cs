@@ -11,6 +11,7 @@ internal static class ResourceSchemas
     {
         [ResourceKinds.Application] = Load("application.schema.json"),
         [ResourceKinds.Entity] = Load("entity.schema.json"),
+        [ResourceKinds.Text] = Load("text.schema.json"),
     };
 
     public static bool TryGet(string kind, out JsonSchema schema) =>

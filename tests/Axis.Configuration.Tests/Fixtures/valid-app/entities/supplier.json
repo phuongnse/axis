@@ -4,6 +4,7 @@
   "name": "Supplier",
   "formatVersion": 1,
   "label": { "textKey": "supplier.label" },
+  "displayField": "name",
   "fields": [
     { "name": "name", "type": "text", "required": true, "maxLength": 200 },
     { "name": "active", "type": "boolean" }

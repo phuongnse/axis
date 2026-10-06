@@ -114,7 +114,7 @@ Later types:
 | **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. | M1 (basic), M3 (full) |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. | M1 |
 | **Theme** | Design tokens for light and dark mode, shared by every site. A site can adjust tokens but cannot add per-page styling. | M1 |
-| **Text resource** | A localized text with a stable key. Every UI string comes from text resources. Releases pin text versions, and a key that is still in use cannot be deleted. | M1 (basic), M6 (full) |
+| **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Releases pin text versions, and a key that is still in use cannot be deleted. | M1 (basic), M6 (full) |
 
 ## Security and operations
 
