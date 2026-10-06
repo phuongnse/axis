@@ -85,7 +85,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             }
         }
 
-        // The server does not migrate tenant databases; both were migrated above.
+        // The server migrates tenant databases only when ActivateOnStartup is set; both were migrated above.
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");

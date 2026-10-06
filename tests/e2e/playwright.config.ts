@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 
 const port = Number(process.env.AXIS_E2E_PORT ?? 5280)
@@ -11,6 +12,9 @@ if (!connectionString) {
 const serverCommand = 'dotnet run --project ../../src/Axis.Server --no-launch-profile --no-build -c Release'
 const serverLog = process.env.AXIS_E2E_SERVER_LOG
 const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
+
+// The server compiles and activates this generic test application in the tenant when it starts.
+const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 
 export default defineConfig({
   testDir: './specs',
@@ -40,6 +44,7 @@ export default defineConfig({
       // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
       Tenants__default__Hosts__0: '127.0.0.1',
       Tenants__default__ConnectionString: connectionString,
+      ActivateOnStartup__0: e2eApp,
     },
   },
 })

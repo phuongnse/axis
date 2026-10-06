@@ -21,6 +21,16 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
 builder.Services.AddTenancy(builder.Configuration);
+
+// Off unless folders are listed, which is the Production default.
+var startupFolders = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
+if (startupFolders.Length > 0)
+{
+    builder.Services.AddSingleton(new StartupActivationOptions(
+        [.. startupFolders.Select(folder => Path.GetFullPath(folder, builder.Environment.ContentRootPath))]));
+    builder.Services.AddHostedService<StartupActivation>();
+}
+
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
