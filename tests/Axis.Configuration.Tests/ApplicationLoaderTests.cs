@@ -68,7 +68,14 @@ public sealed class ApplicationLoaderTests
             (ResourceKinds.Text, "TextsEn", "en", "texts/en.json"),
             (english.Kind, english.Name, english.Locale, english.File));
         Assert.Equal("Purchase requests", english.Texts["purchaseRequests.label"]);
-        Assert.Equal(5, english.Texts.Count);
+        Assert.Equal(9, english.Texts.Count);
+
+        var site = Assert.Single(result.Sites);
+        Assert.Equal(
+            (ResourceKinds.Site, "Purchasing", "purchasing", "sites/purchasing.json"),
+            (site.Kind, site.Name, site.Path, site.File));
+        Assert.Equal(["PurchaseRequestForm", "PurchaseRequests"], result.Pages.Select(page => page.Name));
+        Assert.Empty(result.UnloadedPageNames);
     }
 
     [Theory]

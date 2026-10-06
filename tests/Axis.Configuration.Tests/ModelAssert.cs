@@ -22,6 +22,25 @@ internal static class ModelAssert
             }
         }
 
+        Assert.Equal(expected.Sites.Count, actual.Sites.Count);
+        foreach (var (expectedSite, actualSite) in expected.Sites.Zip(actual.Sites))
+        {
+            Assert.Equal(
+                (expectedSite.Id, expectedSite.Name, expectedSite.Path, expectedSite.Title, expectedSite.Locales.Default, expectedSite.Locales.Fallback, expectedSite.File),
+                (actualSite.Id, actualSite.Name, actualSite.Path, actualSite.Title, actualSite.Locales.Default, actualSite.Locales.Fallback, actualSite.File));
+            Assert.Equal(expectedSite.Locales.Available, actualSite.Locales.Available);
+            Assert.Equal(expectedSite.Navigation, actualSite.Navigation);
+        }
+
+        Assert.Equal(expected.Pages.Count, actual.Pages.Count);
+        foreach (var (expectedPage, actualPage) in expected.Pages.Zip(actual.Pages))
+        {
+            Assert.Equal(
+                (expectedPage.Id, expectedPage.Name, expectedPage.Title, expectedPage.File),
+                (actualPage.Id, actualPage.Name, actualPage.Title, actualPage.File));
+            Assert.Equal(expectedPage.Widgets, actualPage.Widgets);
+        }
+
         Assert.Equal(expected.Texts.Count, actual.Texts.Count);
         foreach (var (expectedText, actualText) in expected.Texts.Zip(actual.Texts))
         {

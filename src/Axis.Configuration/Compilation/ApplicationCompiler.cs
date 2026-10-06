@@ -8,8 +8,8 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
-/// of every locale, checks every entity's fields against the field type rules and resolves
-/// references between entities. Every problem is reported, together with the loader's, in one
+/// of every locale, checks every entity's fields against the field type rules, checks sites and
+/// pages, and resolves references between entities, pages and sites. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
 /// </summary>
@@ -41,6 +41,15 @@ public static class ApplicationCompiler
 
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
 
+        // Page names follow the same rule as entity names.
+        var pagesByName = new Dictionary<string, PageResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var page in loaded.Pages)
+        {
+            pagesByName.TryAdd(page.Name, page);
+        }
+
+        PageResource? FindPage(string name) => pagesByName.GetValueOrDefault(name);
+
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
@@ -52,6 +61,8 @@ public static class ApplicationCompiler
             CheckEntity(entity, FindEntity, loaded.UnloadedEntityNames, textKeys, diagnostics);
         }
 
+        PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
+
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
         {
@@ -62,6 +73,8 @@ public static class ApplicationCompiler
         {
             Manifest = loaded.Application,
             Entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName)).ToList(),
+            Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
+            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName)).ToList(),
             Texts = loaded.Texts,
         };
         return result with
@@ -128,7 +141,7 @@ public static class ApplicationCompiler
     }
 
     /// <summary>Reports a label whose text key no locale has. Unused keys are allowed.</summary>
-    private static void CheckTextKey(
+    internal static void CheckTextKey(
         TextReference? label,
         string file,
         Guid? resourceId,
@@ -338,4 +351,42 @@ public static class ApplicationCompiler
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
         };
     }
+
+    private static SiteModel BuildSite(SiteResource site, Dictionary<string, PageResource> pagesByName) =>
+        new()
+        {
+            Id = site.Id,
+            Name = site.Name,
+            Path = site.Path,
+            Title = site.Title,
+            Locales = site.Locales,
+            File = site.File,
+            Navigation = site.Navigation
+                .Select(entry => new NavigationModel(PageReferenceTo(pagesByName[entry.Page]), entry.Label))
+                .ToList(),
+        };
+
+    private static PageModel BuildPage(
+        PageResource page,
+        Dictionary<string, EntityResource> entitiesByName,
+        Dictionary<string, PageResource> pagesByName) =>
+        new()
+        {
+            Id = page.Id,
+            Name = page.Name,
+            Title = page.Title,
+            File = page.File,
+            Widgets = page.Widgets
+                .Select(widget =>
+                {
+                    var entity = entitiesByName[widget.Entity];
+                    return new WidgetModel(
+                        WidgetTypes.Parse(widget.Type),
+                        new EntityReference(entity.Id, entity.Name),
+                        widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]));
+                })
+                .ToList(),
+        };
+
+    private static PageReference PageReferenceTo(PageResource page) => new(page.Id, page.Name);
 }

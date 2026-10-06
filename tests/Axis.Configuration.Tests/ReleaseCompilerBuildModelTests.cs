@@ -53,6 +53,21 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_of_the_valid_fixture_compiles_back_into_its_sites_and_pages()
+    {
+        var compiled = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Fixtures", "valid-app"));
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.Equal("purchasing", Assert.Single(model.Sites).Path);
+        Assert.Equal(["PurchaseRequestForm", "PurchaseRequests"], model.Pages.Select(page => page.Name));
+    }
+
+    [Fact]
     public void Stored_release_with_invalid_content_throws()
     {
         var release = StoredRelease(Compile());

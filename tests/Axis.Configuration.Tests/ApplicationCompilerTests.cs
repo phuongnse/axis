@@ -2,6 +2,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Tests;
 
@@ -59,6 +60,24 @@ public sealed class ApplicationCompilerTests
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(text => text.Locale));
         Assert.Equal(["texts/en.json", "texts/vi.json"], result.Model.Texts.Select(text => text.File));
         Assert.Equal("Phòng ban", result.Model.Texts[1].Texts["department.label"]);
+
+        var purchaseRequestReference = new EntityReference(Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a01"), "PurchaseRequest");
+        var formPage = new PageReference(Guid.Parse("e7a0f4c3-9d5b-4e1a-9f3c-4b5d6e7f8a08"), "PurchaseRequestForm");
+        var tablePage = new PageReference(Guid.Parse("d6f9e3b2-8c4a-4d0f-8e2b-3a4c5d6e7f07"), "PurchaseRequests");
+        Assert.Equal([formPage.Name, tablePage.Name], result.Model.Pages.Select(page => page.Name));
+        Assert.Equal(
+            new WidgetModel(WidgetType.Form, purchaseRequestReference, null),
+            Assert.Single(result.Model.Pages[0].Widgets));
+        Assert.Equal(
+            new WidgetModel(WidgetType.Table, purchaseRequestReference, formPage),
+            Assert.Single(result.Model.Pages[1].Widgets));
+        Assert.Equal(("pages/purchase-requests.json", "pages.requests.title"), (result.Model.Pages[1].File, result.Model.Pages[1].Title.TextKey));
+
+        var site = Assert.Single(result.Model.Sites);
+        Assert.Equal(("Purchasing", "purchasing", "purchasing.title"), (site.Name, site.Path, site.Title.TextKey));
+        Assert.Equal(("en", "en"), (site.Locales.Default, site.Locales.Fallback));
+        Assert.Equal(["en", "vi"], site.Locales.Available);
+        Assert.Equal(new NavigationModel(tablePage, new TextReference("purchasing.nav.requests")), Assert.Single(site.Navigation));
     }
 
     [Theory]

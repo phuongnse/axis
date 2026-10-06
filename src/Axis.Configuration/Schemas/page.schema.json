@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "title", "widgets"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "page" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "title": { "$ref": "#/$defs/textReference" },
+    "widgets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/widget" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "widget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "entity"],
+      "properties": {
+        "type": { "enum": ["table", "form"] },
+        "entity": { "$ref": "#/$defs/name" },
+        "formPage": { "$ref": "#/$defs/name" }
+      }
+    }
+  }
+}

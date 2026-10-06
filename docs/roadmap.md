@@ -150,10 +150,10 @@ with a fallback locale and a visible missing-key marker.
 - Switching locale changes the text.
 - A missing key shows its key name in development builds.
 
-### 8. Generic ListPage and FormPage
+### 8. Table and form widgets
 
-Render list and form pages from entity and page metadata, using
-ProComponents.
+Render pages from page and widget metadata, with `table` and `form` widgets
+over entities, using ProComponents.
 
 - The list page supports paging and sorting.
 - The form page supports create and edit, with server validation errors shown

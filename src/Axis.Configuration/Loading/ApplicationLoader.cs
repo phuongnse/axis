@@ -48,7 +48,10 @@ public static class ApplicationLoader
                 [],
                 [],
                 [],
+                [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
 
@@ -86,12 +89,15 @@ public static class ApplicationLoader
         var diagnostics = new List<Diagnostic>();
         ApplicationManifest? application = null;
         var entities = new List<EntityResource>();
+        var sites = new List<SiteResource>();
+        var pages = new List<PageResource>();
         var texts = new List<TextResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
         var firstFileByKindAndName = new Dictionary<(string Kind, string Name), string>();
         var unloadedEntityNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedPageNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Set when the root application.json is already reported as unreadable or as the wrong kind,
         // so the folder is not also told that its manifest is missing.
@@ -132,6 +138,11 @@ public static class ApplicationLoader
                 unloadedEntityNames.Add(unloadedName);
             }
 
+            if (kind == ResourceKinds.Page && !schemaValid && ReadName(root) is { } unloadedPageName)
+            {
+                unloadedPageNames.Add(unloadedPageName);
+            }
+
             if (schemaValid)
             {
                 // Sources come in path order, so the contents do too. A file that fails
@@ -145,6 +156,12 @@ public static class ApplicationLoader
                     case ResourceKinds.Entity:
                         entities.Add(root.Deserialize<EntityResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Site:
+                        sites.Add(root.Deserialize<SiteResource>(_serializerOptions)! with { File = file });
+                        break;
+                    case ResourceKinds.Page:
+                        pages.Add(root.Deserialize<PageResource>(_serializerOptions)! with { File = file });
+                        break;
                     case ResourceKinds.Text:
                         texts.Add(root.Deserialize<TextResource>(_serializerOptions)! with { File = file });
                         break;
@@ -157,10 +174,13 @@ public static class ApplicationLoader
         return new ApplicationLoadResult(
             application,
             entities,
+            sites,
+            pages,
             texts,
             resources,
             DiagnosticOrder.Sort(diagnostics),
-            unloadedEntityNames);
+            unloadedEntityNames,
+            unloadedPageNames);
     }
 
     /// <summary>
@@ -323,7 +343,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}' or '{ResourceKinds.Text}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}' or '{ResourceKinds.Text}'.",
                 file,
                 "/kind",
                 resourceId));

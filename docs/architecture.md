@@ -88,7 +88,7 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application`, `entity` or `text`). The manifest is the single `application`
+   (`application`, `entity`, `site`, `page` or `text`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -123,9 +123,25 @@ flowchart LR
      the reference is `AXC0030` at `/fields/{i}/target`. It is not reported
      when the target is already `AXC0012` or names an entity file that was
      not loaded.
+   - **Sites and pages.** A site belongs to one application. Its `path` is
+     lower-case letters, digits and hyphens, starting with a letter. A path
+     reserved by the platform (`api`, `health`, `assets`), or one that an
+     earlier site of the application already uses in path order, is
+     `AXC0024` at `/path`. A reserved path is not also checked for
+     duplicates. The `default` and `fallback` locales must be in
+     `available`, and every available locale needs a `text` resource,
+     ignoring letter case, otherwise it is `AXC0025`. A widget's `entity`
+     must name a loaded entity (`AXC0021`). A `formPage` is allowed only on
+     a `table` widget and must name a page whose widget is a `form` over the
+     same entity (`AXC0022`). A navigation entry must name a loaded page
+     (`AXC0023`). Entity and page names resolve ignoring letter case, and a
+     name whose file was not loaded because of its own errors is not
+     reported again. Site titles, navigation labels and page titles join the
+     `AXC0028` check.
 
-   The model holds the text resources and each entity's display field. No
-   model is produced while any error remains.
+   The model holds the text resources, each entity's display field, and the
+   sites and pages with their entity and page references resolved. No model
+   is produced while any error remains.
 3. **Check.** Expressions, data source fields, form bindings and operation
    inputs are type-checked.
 4. **Plan.** The current tenant schema is compared with the new entity
@@ -224,6 +240,11 @@ sorted by file and then path.
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
+| `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
+| `AXC0022` | A widget's `formPage` is set on a `form` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity. Reported at `/widgets/{i}/formPage`. |
+| `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
+| `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
+| `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |
 | `AXC0026` | Another `text` resource already holds this locale, ignoring letter case. Reported at `/locale` of the later file. |
 | `AXC0027` | A text key that another locale has is missing from this locale. Reported at `/texts`, naming the key and a locale that has it. |
 | `AXC0028` | No locale has the text key of this label. Reported at the label's `/textKey`. |
@@ -307,6 +328,40 @@ text:
   (`AXC0004`). Locales are compared ignoring letter case.
 - Each locale has one `text` resource, and every locale has the same keys.
 - Texts are never shared across applications.
+
+A `site` is an entry point of the application. A `page` is a route in a
+site, and its widgets are its content:
+
+```json
+{
+  "id": "c5e8d2a1-7b3f-4c9e-9d1a-2f3b4c5d6e06",
+  "kind": "site",
+  "name": "Purchasing",
+  "formatVersion": 1,
+  "path": "purchasing",
+  "title": { "textKey": "purchasing.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "navigation": [{ "page": "PurchaseRequests", "label": { "textKey": "purchasing.nav.requests" } }]
+}
+```
+
+```json
+{
+  "id": "d6f9e3b2-8c4a-4d0f-8e2b-3a4c5d6e7f07",
+  "kind": "page",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.requests.title" },
+  "widgets": [{ "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }]
+}
+```
+
+- A page holds exactly one widget in M1. The widget `type` is `table` or
+  `form`, and both name an `entity`.
+- A `table` widget may name a `formPage`: the page with the `form` widget
+  that opens one of its records.
+- The page has no entity or template of its own, so more widgets and a
+  layout can be added later without a format change.
 
 ### Entity field types and constraints
 
@@ -797,10 +852,18 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   the server: site navigation, page templates, widget definitions, data source
   schemas and text resources. Publishing an application never rebuilds the
   frontend.
-- **Shared look and feel.** Shared page templates (`ListPage`, `DetailPage`,
-  `FormPage`, `WizardPage`) and a single token-based theme with light and dark
-  modes live in `web/src/platform/`. Feature code assembles them and adds no
-  styling of its own.
+- **Shared look and feel.** A page is a route in a site, and its widgets are
+  its content. Each widget type, such as `table` and `form`, has one shared
+  component, and layout comes from container widgets rather than per-page
+  templates. Those components and a single token-based theme with light and
+  dark modes live in `web/src/platform/`. Feature code assembles them and
+  adds no styling of its own.
+- **How pages and widgets grow.** M1 has one widget per page and binds it to
+  an entity. Container widgets such as tabs, sections and columns will hold
+  other widgets. Data sources, navigate actions and shared `form` resources
+  are expected to replace the M1 shortcuts; see
+  [D15](decisions.md#d15-presentation-model--agreed), where those parts are
+  still **Proposed**.
 - **Text.** All UI strings come from text resources.
 - **Site and texts.** The server describes the site to the SPA through two
   read-only endpoints. Like every other `/api` path, they need a known tenant

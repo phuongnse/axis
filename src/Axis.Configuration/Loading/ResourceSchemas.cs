@@ -11,6 +11,8 @@ internal static class ResourceSchemas
     {
         [ResourceKinds.Application] = Load("application.schema.json"),
         [ResourceKinds.Entity] = Load("entity.schema.json"),
+        [ResourceKinds.Site] = Load("site.schema.json"),
+        [ResourceKinds.Page] = Load("page.schema.json"),
         [ResourceKinds.Text] = Load("text.schema.json"),
     };
 

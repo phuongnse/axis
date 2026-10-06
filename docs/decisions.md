@@ -186,3 +186,25 @@ runnable until the very end, and its issues are too big for one session.
 ## D14. Repository language — Agreed
 
 Everything in the repository and on GitHub is in English.
+
+## D15. Presentation model — Agreed
+
+- **Pages:** a page is a route in a site.
+- **Widgets:** widgets are a page's content. A page has no entity or
+  template of its own.
+- **Layout:** layout comes later as container widgets, such as tabs,
+  sections and columns, that hold other widgets.
+
+Still **Proposed**, because they show how the M1 shortcuts are expected to
+grow but are not settled yet:
+
+- **Data:** a widget binds to a `dataSource` in M2, and `entity` stays as
+  shorthand for all records of an entity.
+- **Navigation:** `formPage` gives way to navigate actions with page
+  parameters.
+- **Forms:** form layout becomes its own `form` resource that both a `form`
+  widget and a process task (M3) can use.
+
+*Why:* the page and widget split shapes data sources (M2), process task forms
+(M3) and authorization (M4). Keeping the page free of an entity or template
+lets more widgets and a layout be added without a format change.

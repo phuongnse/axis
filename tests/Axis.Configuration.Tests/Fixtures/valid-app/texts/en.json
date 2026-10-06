@@ -9,6 +9,10 @@
     "purchaseRequest.label": "Purchase request",
     "purchaseRequest.status.label": "Status",
     "department.label": "Department",
-    "supplier.label": "Supplier"
+    "supplier.label": "Supplier",
+    "purchasing.title": "Purchasing",
+    "purchasing.nav.requests": "Purchase requests",
+    "pages.requests.title": "Purchase requests",
+    "pages.requestForm.title": "Purchase request"
   }
 }
