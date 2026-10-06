@@ -77,14 +77,18 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(JsonValueKind.Null, entity.GetProperty("displayField").ValueKind);
         Assert.Equal("/api/apps/RecordsApp/entities/Item/records", entity.GetProperty("recordsPath").GetString());
 
-        var fields = entity.GetProperty("fields").EnumerateArray().ToDictionary(field => field.GetProperty("name").GetString()!);
-        Assert.Equal(["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "department"], fields.Keys);
+        var fieldList = entity.GetProperty("fields").EnumerateArray().ToList();
+        Assert.Equal(
+            ["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "department"],
+            fieldList.Select(field => field.GetProperty("name").GetString()));
         Assert.Equal(
             ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference"],
-            fields.Values.Select(field => field.GetProperty("type").GetString()));
-        Assert.All(fields.Values, field => Assert.Equal(
+            fieldList.Select(field => field.GetProperty("type").GetString()));
+        Assert.All(fieldList, field => Assert.Equal(
             ["name", "type", "labelKey", "required", "unique", "maxLength", "precision", "scale", "values", "target"],
             field.EnumerateObject().Select(property => property.Name)));
+
+        var fields = fieldList.ToDictionary(field => field.GetProperty("name").GetString()!);
 
         Assert.Equal(
             """{"name":"name","type":"text","labelKey":null,"required":true,"unique":false,"maxLength":100,"precision":null,"scale":null,"values":null,"target":null}""",
