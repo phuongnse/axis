@@ -31,6 +31,28 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_keeps_the_text_files_and_compiles_back_into_its_texts()
+    {
+        var compiled = ApplicationCompiler.Compile(
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("entities/order.json", Order),
+            new ResourceContent("texts/en.json", """{ "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "order.label": "Order" } }"""),
+            new ResourceContent("texts/vi.json", """{ "id": "44444444-4444-4444-8444-444444444444", "kind": "text", "name": "TextsVi", "formatVersion": 1, "locale": "vi", "texts": { "order.label": "Đơn hàng" } }"""),
+        ]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.Equal(["application.json", "entities/order.json", "texts/en.json", "texts/vi.json"], release.Resources.Select(resource => resource.Path));
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.Equal(["en", "vi"], model.Texts.Select(text => text.Locale));
+        Assert.Equal("Đơn hàng", model.Texts[1].Texts["order.label"]);
+    }
+
+    [Fact]
     public void Stored_release_with_invalid_content_throws()
     {
         var release = StoredRelease(Compile());

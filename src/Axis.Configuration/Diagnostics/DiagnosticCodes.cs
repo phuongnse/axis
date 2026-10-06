@@ -23,4 +23,11 @@ public static class DiagnosticCodes
     public const string EntityOwnedByOtherApplication = "AXC0018";
     public const string UnlistableFolder = "AXC0019";
     public const string ApplicationNameActiveForOtherApplication = "AXC0020";
+
+    // AXC0021–AXC0025 are reserved for sites and pages.
+    public const string DuplicateLocale = "AXC0026";
+    public const string LocaleDrift = "AXC0027";
+    public const string MissingTextKey = "AXC0028";
+    public const string InvalidDisplayField = "AXC0029";
+    public const string ReferenceTargetWithoutDisplayField = "AXC0030";
 }

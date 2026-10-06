@@ -88,7 +88,7 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application` or `entity`). The manifest is the single `application`
+   (`application`, `entity` or `text`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -104,8 +104,28 @@ flowchart LR
    An entity may reference itself. A `target` naming an entity whose file is
    in the folder, has kind `entity` and a string `name`, but was not loaded
    because of its own errors (such as a schema violation) is not reported
-   again; only that file's own diagnostics are. No model is produced while
-   any error remains.
+   again; only that file's own diagnostics are.
+   - **Texts.** Each `text` resource holds the texts of one locale. Two text
+     resources for the same locale, ignoring letter case, are `AXC0026` at
+     `/locale` of the later file in path order. Every locale must have the
+     same keys: a key that one locale has and another lacks is `AXC0027` at
+     `/texts` of the file that lacks it, once per key, naming the first
+     locale in path order that has it. A file already reported as a duplicate
+     locale is left out of this check. Keys are compared ordinally.
+   - **Labels.** The text key of the application label, an entity label or a
+     field label must be in some locale, otherwise it is `AXC0028` at that
+     label's `/textKey`. This applies also when the application has no text
+     resource. Unused keys are allowed.
+   - **Display field.** An entity's `displayField` must name one of its own
+     required `text` fields, ignoring letter case, otherwise it is `AXC0029`
+     at `/displayField`. Every entity that is the `target` of a reference,
+     including a reference to itself, must have a `displayField`, otherwise
+     the reference is `AXC0030` at `/fields/{i}/target`. It is not reported
+     when the target is already `AXC0012` or names an entity file that was
+     not loaded.
+
+   The model holds the text resources and each entity's display field. No
+   model is produced while any error remains.
 3. **Check.** Expressions, data source fields, form bindings and operation
    inputs are type-checked.
 4. **Plan.** The current tenant schema is compared with the new entity
@@ -204,6 +224,11 @@ sorted by file and then path.
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
+| `AXC0026` | Another `text` resource already holds this locale, ignoring letter case. Reported at `/locale` of the later file. |
+| `AXC0027` | A text key that another locale has is missing from this locale. Reported at `/texts`, naming the key and a locale that has it. |
+| `AXC0028` | No locale has the text key of this label. Reported at the label's `/textKey`. |
+| `AXC0029` | The entity's `displayField` names no required `text` field of the entity. Reported at `/displayField`. |
+| `AXC0030` | A reference field's target entity has no `displayField`. Reported at `/fields/{i}/target`. |
 
 ### Startup activation
 
@@ -243,6 +268,7 @@ development or E2E server serves a real application without a separate step.
   "name": "PurchaseRequest",
   "formatVersion": 1,
   "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
   "fields": [
     { "name": "title", "type": "text", "required": true, "maxLength": 200 },
     { "name": "department", "type": "reference", "target": "Department", "required": true },
@@ -256,6 +282,31 @@ development or E2E server serves a real application without a separate step.
   starts with a letter, contains only ASCII letters and digits, and is at most
   60 characters long (`AXC0004`). The same rule applies to field names.
 - Labels always come from text resources.
+- `displayField` names the required `text` field that gives a record its
+  name, for example in lookups. An entity that is the target of a reference
+  must have one.
+
+A `text` resource holds the texts of one locale, as a map from text key to
+text:
+
+```json
+{
+  "id": "8c3a6b4d-5e6f-4a7b-8c9d-0e1f2a3b4c04",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "purchaseRequest.label": "Purchase request"
+  }
+}
+```
+
+- `locale` is a language tag such as `en`, `vi` or `pt-BR`: two or three
+  letters, then any number of `-` parts of two to eight letters or digits
+  (`AXC0004`). Locales are compared ignoring letter case.
+- Each locale has one `text` resource, and every locale has the same keys.
+- Texts are never shared across applications.
 
 ### Entity field types and constraints
 

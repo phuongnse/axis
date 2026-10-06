@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Department",
   "formatVersion": 1,
+  "displayField": "name",
   "fields": [
     {
       "name": "name",

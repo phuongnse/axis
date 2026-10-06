@@ -53,6 +53,12 @@ public sealed class ApplicationCompilerTests
         Assert.True(result.Model.TryGetEntity("Supplier", out var supplierEntity));
         Assert.Equal([FieldType.Text, FieldType.Boolean], supplierEntity.Fields.Select(field => field.Type));
         Assert.Equal("entities/supplier.json", supplierEntity.File);
+
+        Assert.Equal(("name", "name"), (departmentEntity.DisplayField, supplierEntity.DisplayField));
+        Assert.Null(purchaseRequest.DisplayField);
+        Assert.Equal(["en", "vi"], result.Model.Texts.Select(text => text.Locale));
+        Assert.Equal(["texts/en.json", "texts/vi.json"], result.Model.Texts.Select(text => text.File));
+        Assert.Equal("Phòng ban", result.Model.Texts[1].Texts["department.label"]);
     }
 
     [Theory]
@@ -151,13 +157,15 @@ public sealed class ApplicationCompilerTests
     {
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
-            .With("customer.json", Entity("Customer", """{ "name": "name", "type": "text" }""", "22222222-2222-4222-8222-222222222222"))
+            .With("customer.json", Entity("Customer", """{ "name": "name", "type": "text", "required": true }""", "22222222-2222-4222-8222-222222222222", displayField: "name"))
             .With("order.json", Entity(
                 "Order",
                 """
                 { "name": "customer", "type": "reference", "target": "CUSTOMER" },
-                { "name": "parent", "type": "reference", "target": "Order" }
-                """));
+                { "name": "parent", "type": "reference", "target": "Order" },
+                { "name": "number", "type": "text", "required": true }
+                """,
+                displayField: "number"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -178,9 +186,10 @@ public sealed class ApplicationCompilerTests
     [InlineData("""{ "name": "f", "type": "reference", "target": "Order", "values": ["a"] }""", "/fields/0/values")]
     public void Property_on_a_type_it_does_not_fit_is_reported_at_the_property(string field, string path)
     {
+        // The required text field names Order's records, so Order can be a reference target.
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
-            .With("order.json", Entity("Order", field));
+            .With("order.json", Entity("Order", $$"""{{field}}, { "name": "number", "type": "text", "required": true }""", displayField: "number"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -259,13 +268,16 @@ public sealed class ApplicationCompilerTests
     {
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
-            .With("order.json", Entity("Order", $$"""{ "name": "f", "type": "{{type}}", "required": true, "unique": true{{extra}} }"""));
+            .With("order.json", Entity(
+                "Order",
+                $$"""{ "name": "f", "type": "{{type}}", "required": true, "unique": true{{extra}} }, { "name": "number", "type": "text", "required": true }""",
+                displayField: "number"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        var field = Assert.Single(Assert.Single(result.Model.Entities).Fields);
+        Assert.True(Assert.Single(result.Model.Entities).TryGetField("f", out var field));
         Assert.Equal((FieldTypes.Parse(type), true, true), (field.Type, field.Required, field.Unique));
     }
 
@@ -358,6 +370,150 @@ public sealed class ApplicationCompilerTests
     }
 
     [Fact]
+    public void Second_text_file_for_a_locale_ignoring_letter_case_is_a_duplicate_locale()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("texts/en.json", Texts("en", """ "a.label": "A" """, "33333333-3333-4333-8333-333333333333", "TextsEn"))
+            .With("texts/english.json", Texts("EN", """ "b.label": "B" """, "44444444-4444-4444-8444-444444444444", "TextsEnglish"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        // The duplicate is left out of the drift check, so its other keys are not reported on top.
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateLocale, "texts/english.json", "/locale", Guid.Parse("44444444-4444-4444-8444-444444444444")),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'texts/en.json'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Key_that_one_locale_lacks_is_reported_in_that_locale_naming_a_locale_that_has_it()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("texts/en.json", Texts("en", """ "a.label": "A", "b.label": "B" """, "33333333-3333-4333-8333-333333333333", "TextsEn"))
+            .With("texts/vi.json", Texts("vi", """ "a.label": "A" """, "44444444-4444-4444-8444-444444444444", "TextsVi"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.LocaleDrift, "texts/vi.json", "/texts", Guid.Parse("44444444-4444-4444-8444-444444444444")),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'b.label'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'en'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "number", "type": "text", "label": { "textKey": "a.label" } }""", "missing.label", "/label/textKey")]
+    [InlineData("""{ "name": "number", "type": "text", "label": { "textKey": "missing.label" } }""", "a.label", "/fields/0/label/textKey")]
+    public void Label_key_that_no_locale_has_is_reported_at_the_label(string field, string entityTextKey, string path)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", $$"""{ "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1, "label": { "textKey": "{{entityTextKey}}" }, "fields": [{{field}}] }""")
+            .With("texts/en.json", Texts("en", """ "a.label": "A", "unused.label": "Unused" """, "33333333-3333-4333-8333-333333333333"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingTextKey, "order.json", path, Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'missing.label'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Application_label_without_any_text_resource_is_a_missing_key()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest.Replace("\"formatVersion\": 1", "\"formatVersion\": 1, \"label\": { \"textKey\": \"sample.label\" }", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTextKey, "application.json", "/label/textKey"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("unknown", "'unknown'")]
+    [InlineData("note", "an optional text")]
+    [InlineData("count", "a required integer")]
+    public void Display_field_that_is_not_a_required_text_field_is_reported(string displayField, string expected)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity(
+                "Order",
+                """
+                { "name": "number", "type": "text", "required": true },
+                { "name": "note", "type": "text" },
+                { "name": "count", "type": "integer", "required": true }
+                """,
+                displayField: displayField));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDisplayField, "order.json", "/displayField", Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains(expected, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Display_field_matches_ignoring_letter_case_and_keeps_the_declared_name()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "orderNumber", "type": "text", "required": true }""", displayField: "ORDERNUMBER"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal("orderNumber", Assert.Single(result.Model.Entities).DisplayField);
+    }
+
+    [Fact]
+    public void Reference_to_an_entity_without_a_display_field_is_reported_at_the_target()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("customer.json", Entity("Customer", """{ "name": "name", "type": "text", "required": true }""", "22222222-2222-4222-8222-222222222222"))
+            .With("order.json", Entity("Order", """{ "name": "customer", "type": "reference", "target": "customer" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ReferenceTargetWithoutDisplayField, "order.json", "/fields/0/target", Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'Customer'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Self_reference_requires_a_display_field()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "parent", "type": "reference", "target": "Order" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ReferenceTargetWithoutDisplayField, "/fields/0/target"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void Compiling_a_folder_and_its_resources_in_memory_gives_the_same_model_and_content_hash()
     {
         var folder = ApplicationCompiler.Compile(Fixture("valid-app"));
@@ -403,8 +559,13 @@ public sealed class ApplicationCompilerTests
         Assert.Throws<ArgumentException>(() => ApplicationCompiler.Compile(resources));
     }
 
-    private static string Entity(string name, string fields, string id = OrderId) =>
-        $$"""{ "id": "{{id}}", "kind": "entity", "name": "{{name}}", "formatVersion": 1, "fields": [{{fields}}] }""";
+    private static string Entity(string name, string fields, string id = OrderId, string? displayField = null) =>
+        displayField is null
+            ? $$"""{ "id": "{{id}}", "kind": "entity", "name": "{{name}}", "formatVersion": 1, "fields": [{{fields}}] }"""
+            : $$"""{ "id": "{{id}}", "kind": "entity", "name": "{{name}}", "formatVersion": 1, "displayField": "{{displayField}}", "fields": [{{fields}}] }""";
+
+    private static string Texts(string locale, string texts, string id, string name = "Texts") =>
+        $$"""{ "id": "{{id}}", "kind": "text", "name": "{{name}}", "formatVersion": 1, "locale": "{{locale}}", "texts": {{{texts}}} }""";
 
     private static string Name(int length) => "N" + new string('a', length - 1);
 

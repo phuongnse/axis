@@ -10,10 +10,10 @@ namespace Axis.Configuration.Loading;
 /// canonical content of those same files, in path order.
 /// </summary>
 /// <remarks>
-/// When <see cref="HasErrors"/> is true, <see cref="Application"/> and <see cref="Entities"/> hold
-/// only the files that passed schema validation. They may be used to find further diagnostics, but
-/// never to build a model or a release. When the folder could not be listed, the result has no
-/// application, entities or resources and a single <see cref="DiagnosticCodes.UnlistableFolder"/>
+/// When <see cref="HasErrors"/> is true, <see cref="Application"/>, <see cref="Entities"/> and
+/// <see cref="Texts"/> hold only the files that passed schema validation. They may be used to find
+/// further diagnostics, but never to build a model or a release. When the folder could not be
+/// listed, the result has no application, entities, texts or resources and a single <see cref="DiagnosticCodes.UnlistableFolder"/>
 /// diagnostic.
 /// </remarks>
 /// <param name="UnloadedEntityNames">
@@ -24,6 +24,7 @@ namespace Axis.Configuration.Loading;
 public sealed record ApplicationLoadResult(
     ApplicationManifest? Application,
     IReadOnlyList<EntityResource> Entities,
+    IReadOnlyList<TextResource> Texts,
     IReadOnlyList<ResourceContent> Resources,
     IReadOnlyList<Diagnostic> Diagnostics,
     IReadOnlySet<string> UnloadedEntityNames)

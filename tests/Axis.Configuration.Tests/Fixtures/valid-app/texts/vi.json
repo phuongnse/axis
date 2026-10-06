@@ -1,0 +1,14 @@
+{
+  "id": "9d4b7c5e-6f7a-4b8c-9d0e-1f2a3b4c5d05",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "purchaseRequests.label": "Đề nghị mua hàng",
+    "purchaseRequest.label": "Đề nghị mua hàng",
+    "purchaseRequest.status.label": "Trạng thái",
+    "department.label": "Phòng ban",
+    "supplier.label": "Nhà cung cấp"
+  }
+}

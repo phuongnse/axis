@@ -58,6 +58,53 @@ public sealed class ApplicationLoaderTests
         Assert.Equal("enum", status.Type);
         Assert.Equal(["draft", "submitted", "approved", "rejected"], status.Values);
         Assert.Equal(new TextReference("purchaseRequest.status.label"), status.Label);
+
+        Assert.Equal("name", Assert.Single(result.Entities, entity => entity.Name == "Department").DisplayField);
+        Assert.Null(purchaseRequest.DisplayField);
+
+        Assert.Equal(2, result.Texts.Count);
+        var english = result.Texts[0];
+        Assert.Equal(
+            (ResourceKinds.Text, "TextsEn", "en", "texts/en.json"),
+            (english.Kind, english.Name, english.Locale, english.File));
+        Assert.Equal("Purchase requests", english.Texts["purchaseRequests.label"]);
+        Assert.Equal(5, english.Texts.Count);
+    }
+
+    [Theory]
+    [InlineData(""" "locale": "english" """, "/locale")]
+    [InlineData(""" "locale": "en_US" """, "/locale")]
+    [InlineData(""" "locale": "en", "texts": { "a.label": 1 } """, "/texts/a.label")]
+    [InlineData(""" "locale": "en", "label": { "textKey": "a.label" } """, "/label")]
+    public void Text_resource_with_a_bad_locale_text_or_property_is_a_schema_violation(string properties, string path)
+    {
+        var texts = properties.Contains("\"texts\"", StringComparison.Ordinal) ? properties : $$"""{{properties}}, "texts": {}""";
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("texts/en.json", $$"""{ "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "Texts", "formatVersion": 1, {{texts}} }""");
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "texts/en.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Empty(result.Texts);
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("vi")]
+    [InlineData("pt-BR")]
+    [InlineData("zh-Hant-TW")]
+    public void Text_resource_accepts_locale_tags(string locale)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("texts/texts.json", $$"""{ "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "Texts", "formatVersion": 1, "locale": "{{locale}}", "texts": { "a.label": "A" } }""");
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(locale, Assert.Single(result.Texts).Locale);
     }
 
     [Fact]
