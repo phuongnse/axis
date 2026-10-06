@@ -38,6 +38,10 @@ internal static class RecordInputMessages
 
     public const string Reference = "Must be a UUID.";
 
+    public const string MissingReference = "No record has this id.";
+
+    public const string NotUnique = "Must be unique.";
+
     public static string MaxLength(int maxLength) =>
         string.Create(CultureInfo.InvariantCulture, $"Must be at most {maxLength} characters.");
 

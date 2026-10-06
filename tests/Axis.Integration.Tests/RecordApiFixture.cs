@@ -1,3 +1,4 @@
+using System.Text;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
@@ -146,10 +147,37 @@ public sealed class RecordApiFixture : IAsyncLifetime
         }
     }
 
-    public static HttpRequestMessage Request(string path, string host)
+    /// <summary>Runs one SQL statement on the database of <paramref name="tenant"/>.</summary>
+    public async Task ExecuteAsync(string tenant, string sql)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
+        await using var command = _dataSources[tenant].CreateCommand(sql);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static HttpRequestMessage Request(string path, string host) => Request(HttpMethod.Get, path, host);
+
+    /// <summary>
+    /// A request to <paramref name="host"/>. A <paramref name="body"/> is sent as UTF-8 bytes
+    /// with <paramref name="contentType"/> as is, or with no content type when it is null.
+    /// </summary>
+    public static HttpRequestMessage Request(
+        HttpMethod method,
+        string path,
+        string host,
+        string? body = null,
+        string? contentType = "application/json")
+    {
+        var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         request.Headers.Host = host;
+        if (body is not null)
+        {
+            request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body));
+            if (contentType is not null)
+            {
+                request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+            }
+        }
+
         return request;
     }
 

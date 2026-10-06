@@ -81,10 +81,10 @@ public static class RecordQueries
         return await reader.ReadAsync(cancellationToken) ? ReadRecord(reader, entity) : null;
     }
 
-    private static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
+    internal static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
 
     /// <summary>The id, the version, then every field in declaration order; decimals as text so no digit is lost.</summary>
-    private static string SelectList(EntityModel entity) =>
+    internal static string SelectList(EntityModel entity) =>
         string.Join(", ", [
             EntityNaming.Quote(EntityNaming.IdColumn),
             EntityNaming.Quote(EntityNaming.VersionColumn),
@@ -92,7 +92,7 @@ public static class RecordQueries
                 EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")),
         ]);
 
-    private static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity)
+    internal static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity)
     {
         var values = new Dictionary<string, JsonValue?>(entity.Fields.Count, StringComparer.Ordinal);
         for (var index = 0; index < entity.Fields.Count; index++)
