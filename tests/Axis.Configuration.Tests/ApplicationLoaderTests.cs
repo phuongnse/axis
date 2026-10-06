@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Resources;
@@ -230,8 +231,25 @@ public sealed class ApplicationLoaderTests
         var diagnostic = Assert.Single(ApplicationLoader.Load(folder.Path).Diagnostics);
 
         Assert.Equal((DiagnosticCodes.InvalidJson, "order.json", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("'name'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal("The file is not valid JSON: property 'name' appears more than once.", diagnostic.Message);
         Assert.DoesNotContain(folder.Path, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Duplicate_property_message_names_the_property_and_its_location_without_exception_text()
+    {
+        const string Json = """{ "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text", "name": "total" }] }""";
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Json);
+        var exception = Assert.ThrowsAny<JsonException>(
+            () => JsonDocument.Parse(Json, new JsonDocumentOptions { AllowDuplicateProperties = false }));
+
+        var diagnostic = Assert.Single(ApplicationLoader.Load(folder.Path).Diagnostics);
+
+        Assert.Equal((DiagnosticCodes.InvalidJson, "order.json", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal("The file is not valid JSON: property 'name' appears more than once at /fields/0.", diagnostic.Message);
+        Assert.DoesNotContain(exception.Message, diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -334,6 +334,67 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
 
+## Record API
+
+Records of an entity are read and written through the record API. #35 and
+#37 add its routes, response shapes and status codes to this section.
+
+### Request bodies and values
+
+`Axis.Data` parses a create or update body against the compiled entity
+(`RecordInputParser`) without database access. It reports every problem in
+one pass, or returns the typed values in the entity's field declaration order,
+holding only the fields the body names.
+
+- **Body.** The body is UTF-8 JSON. An empty body, malformed JSON, invalid
+  UTF-8, nesting beyond the default depth of 64, a property name with an
+  unpaired surrogate escape, or a body that is not an object is one error at
+  `""`.
+- **Body properties.** The body object has only `values`, plus `version` on
+  update. Any other property, including `version` on create, is an error at
+  `/<property>`.
+- **`values`.** It is required and must be an object; otherwise it is one
+  error at `/values`, and required fields are not reported as well. On update
+  it may be empty, so the update only increments `version`.
+- **Field names.** A `values` property name must equal a declared field name
+  exactly, so letter case matters. Any other name is an error at
+  `/values/<name>`.
+- **Duplicates.** A property name repeated in the body or in `values` is an
+  error at that property's pointer; the repeated value is not parsed.
+- **Required fields.** On create, a required field that is missing or `null`
+  is an error at `/values/<field>`. On update, missing fields are left
+  untouched; `null` clears a field that is not required and is an error for a
+  required one. `null` is SQL `NULL`.
+- **`version`.** On update it is required and is an integral number from 1 to
+  2^63 − 1, by the same integral rule as `integer`; otherwise an error at
+  `/version`.
+
+Values are never coerced between JSON types: `"5"` is not an `integer` and `5`
+is not a `text`. A wrong JSON type or a value outside its bounds is an error at
+`/values/<field>`.
+
+| Field type | JSON value | Parsed as |
+| --- | --- | --- |
+| `text` | A string with no U+0000 and no unpaired surrogate escape, at most `maxLength` Unicode code points when set; a character outside the BMP counts as one | `string` |
+| `integer` | A number that is integral and within the signed 64-bit range; `5.0` and `5e0` are integral, `5.5` is not | `long` |
+| `decimal` | A number. After the exponent is applied, integer digits are counted without leading zeros and fraction digits without trailing zeros. With `precision`, at most `scale` (0 when omitted) fraction digits and `precision - scale` integer digits; without it, at most 131072 integer and 16383 fraction digits. Values are never rounded, and the limits are checked on the number text before any text is built, so a huge exponent is cheap to reject | `string` in plain notation that keeps the written trailing zeros (`1.50` stays `1.50`, `1.5e2` becomes `150`, `-0` becomes `0`), bound as text cast to `numeric` |
+| `boolean` | `true` or `false` | `bool` |
+| `date` | A string `yyyy-MM-dd` that is a valid date from 0001-01-01 to 9999-12-31 | `DateOnly` |
+| `date-time` | An RFC 3339 string `yyyy-MM-ddTHH:mm:ss` with an optional fraction of 1 to 6 digits and `Z` or `±HH:mm`; `T` and `Z` may be lower case. A missing offset, an offset beyond ±14:00, a leap second (`:60`), more than 6 fraction digits (PostgreSQL stores microseconds) or an instant outside 0001..9999 in UTC is an error | `DateTimeOffset` converted to UTC with offset zero, the only offset Npgsql writes to `timestamp with time zone` |
+| `enum` | A string equal to one of `values`, compared ordinally | `string` |
+| `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
+
+**Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
+messages, in ordinal key order, usable as is for a validation problem
+response. The keys are `""` for the body, `/<property>` for a body property,
+`/values`, `/values/<field>` and `/version`. Pointers escape `~` as `~0` and
+`/` as `~1`; declared names never need it, but unknown names can. Each key has
+one fixed English message for the first problem found there, such as
+"Unknown property." or "Must be at most 200 characters.". Messages may use
+field type names and limits from the model. They never contain a table,
+column, constraint or schema name, a PostgreSQL type name, exception text, or
+text from the request; the key already says where the problem is.
+
 ## Tenancy (D10)
 
 - **Resolution.** `TenantContext` is resolved from the request host. For
