@@ -36,6 +36,19 @@ Vietnamese.
   sample applications live as configuration under `samples/`.
 - Never commit secrets, tokens, local logs or machine snapshots.
 
+## Working through NexKit
+
+- All work goes through NexKit, as described in
+  [docs/delivery.md](docs/delivery.md).
+- Only the owner approves pull requests, approves waiting CI runs and merges.
+
+Writing on GitHub, for issues, plans, pull request descriptions and reviews:
+
+- Lead with the point. Use short sentences and one idea per bullet.
+- Say what changes in behaviour, and why, before naming classes or files.
+- Put decisions and risks the owner must judge in their own short section.
+- Keep implementation detail out of the main text, or in a `<details>` block.
+
 ## Commands
 
 Run from the repository root. Each script is also a NexKit check and a CI step.
