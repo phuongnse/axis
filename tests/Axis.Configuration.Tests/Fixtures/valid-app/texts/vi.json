@@ -9,6 +9,10 @@
     "purchaseRequest.label": "Đề nghị mua hàng",
     "purchaseRequest.status.label": "Trạng thái",
     "department.label": "Phòng ban",
-    "supplier.label": "Nhà cung cấp"
+    "supplier.label": "Nhà cung cấp",
+    "purchasing.title": "Mua hàng",
+    "purchasing.nav.requests": "Đề nghị mua hàng",
+    "pages.requests.title": "Đề nghị mua hàng",
+    "pages.requestForm.title": "Đề nghị mua hàng"
   }
 }

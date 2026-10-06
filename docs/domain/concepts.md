@@ -108,9 +108,9 @@ Later types:
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Site** | An entry point for a group of users, with its own route prefix or domain, navigation, theme, identity provider binding and locale settings. | M1 |
-| **Page** | A route in a site, built from a shared template: `ListPage`, `DetailPage`, `FormPage` or `WizardPage`. | M1 |
-| **Widget** | A UI block on a page, bound to a data source or form. The standard widgets are table, list, detail, form, tabs, task inbox and process inspector. Custom widgets come later. | M1 |
+| **Site** | An entry point of one application, with its own path, title, locales (default, fallback and available) and navigation. Theme, identity provider binding and domain come later. | M1 |
+| **Page** | A route in a site. It has a title, and its content is its widgets: exactly one in M1. A page has no entity or template of its own. | M1 |
+| **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, and a table may name a `formPage` that opens its records. More types (list, detail, task inbox, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
 | **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. | M1 (basic), M3 (full) |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. | M1 |
 | **Theme** | Design tokens for light and dark mode, shared by every site. A site can adjust tokens but cannot add per-page styling. | M1 |

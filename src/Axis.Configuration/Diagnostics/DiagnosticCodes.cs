@@ -24,7 +24,11 @@ public static class DiagnosticCodes
     public const string UnlistableFolder = "AXC0019";
     public const string ApplicationNameActiveForOtherApplication = "AXC0020";
 
-    // AXC0021–AXC0025 are reserved for sites and pages.
+    public const string UnknownWidgetEntity = "AXC0021";
+    public const string InvalidFormPage = "AXC0022";
+    public const string UnknownNavigationPage = "AXC0023";
+    public const string InvalidSitePath = "AXC0024";
+    public const string InvalidSiteLocale = "AXC0025";
     public const string DuplicateLocale = "AXC0026";
     public const string LocaleDrift = "AXC0027";
     public const string MissingTextKey = "AXC0028";
