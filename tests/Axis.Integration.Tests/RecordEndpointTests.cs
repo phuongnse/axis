@@ -131,9 +131,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
 
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        using var body = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal(["page", "pageSize", "sort"], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
     }
 
@@ -149,8 +147,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
 
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        using var body = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal([key], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
     }
 
@@ -189,8 +186,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
 
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.NotFound);
     }
 
     private static (int Page, int PageSize, long TotalCount) Paging(JsonDocument list) =>

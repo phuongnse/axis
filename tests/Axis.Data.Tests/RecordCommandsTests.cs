@@ -14,7 +14,7 @@ public sealed class RecordCommandsTests
         Field("name", FieldType.Text));
 
     [Fact]
-    public async Task Create_and_update_reject_a_missing_entity_or_values_before_using_the_connection()
+    public async Task Create_update_and_delete_reject_a_missing_entity_or_values_before_using_the_connection()
     {
         // The connection is never opened; the arguments are checked first.
         await using var connection = new NpgsqlConnection();
@@ -23,5 +23,6 @@ public sealed class RecordCommandsTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _entity, null!, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, null!, Guid.NewGuid(), 1, [], TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _entity, Guid.NewGuid(), 1, null!, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.DeleteAsync(connection, null!, Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 }

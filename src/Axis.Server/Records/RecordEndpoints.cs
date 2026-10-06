@@ -11,7 +11,8 @@ namespace Axis.Server.Records;
 /// Endpoints for the records of an entity in the active release of an application. A path that
 /// names no active application, entity or record is a 404 before the query or body is checked.
 /// A body is checked in order: content type (415), then body (400), then storage (404, 409).
-/// The problem titles never contain text from the request.
+/// A delete is 204, or 404 or 409 from storage. The problem titles never contain text from the
+/// request.
 /// </summary>
 internal static class RecordEndpoints
 {
@@ -28,6 +29,7 @@ internal static class RecordEndpoints
         records.MapGet("/{id}", GetAsync);
         records.MapPost("", CreateAsync);
         records.MapPatch("/{id}", UpdateAsync);
+        records.MapDelete("/{id}", DeleteAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -175,6 +177,36 @@ internal static class RecordEndpoints
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
             ? Results.Ok(record)
             : WriteFailure(result);
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        string app,
+        string entity,
+        string id,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        if (!TryParseId(id, out var recordId))
+        {
+            return RecordNotFound();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        return await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken) switch
+        {
+            RecordDeleteOutcome.Deleted => Results.NoContent(),
+            RecordDeleteOutcome.NotFound => RecordNotFound(),
+            // Names no table or constraint: the referencing entity is not part of the response.
+            RecordDeleteOutcome.Referenced => Conflict("Another record references this record."),
+            var outcome => throw new InvalidOperationException($"Unexpected delete outcome {outcome}."),
+        };
     }
 
     /// <summary>Finds the application and the entity in its active release, or the 404 that says which is missing.</summary>

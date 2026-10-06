@@ -7,10 +7,10 @@ using Messages = Axis.Data.Records.RecordInputMessages;
 namespace Axis.Data.Records;
 
 /// <summary>
-/// Creates and updates records of an entity table over a tenant connection. Every identifier
-/// comes from <see cref="EntityNaming"/> and is quoted, and every value is a typed parameter.
-/// Storage failures the request can cause become a <see cref="RecordWriteResult"/> that never
-/// names a table, column or constraint.
+/// Creates, updates and deletes records of an entity table over a tenant connection. Every
+/// identifier comes from <see cref="EntityNaming"/> and is quoted, and every value is a typed
+/// parameter. Storage failures the request can cause become a <see cref="RecordWriteResult"/> or
+/// <see cref="RecordDeleteOutcome"/> that never names a table, column or constraint.
 /// </summary>
 public static class RecordCommands
 {
@@ -97,6 +97,36 @@ public static class RecordCommands
         return await ExistsAsync(connection, table, id, cancellationToken)
             ? new RecordWriteResult(RecordWriteOutcome.StaleVersion)
             : new RecordWriteResult(RecordWriteOutcome.NotFound);
+    }
+
+    /// <summary>
+    /// Deletes the record with <paramref name="id"/>. A record that another record references is
+    /// kept and is <see cref="RecordDeleteOutcome.Referenced"/>.
+    /// </summary>
+    public static async Task<RecordDeleteOutcome> DeleteAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        await using var command = new NpgsqlCommand(
+            $"DELETE FROM {RecordQueries.Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        try
+        {
+            return await command.ExecuteNonQueryAsync(cancellationToken) == 0
+                ? RecordDeleteOutcome.NotFound
+                : RecordDeleteOutcome.Deleted;
+        }
+        // The violated constraint belongs to the referencing table, which may be another entity.
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return RecordDeleteOutcome.Referenced;
+        }
     }
 
     /// <summary>Runs the write and reads the returned row; <see langword="null"/> when no row was written.</summary>
