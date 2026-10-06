@@ -78,7 +78,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = ChangeOrder(model, fields => [.. fields, Field("priority", FieldType.Integer)]);
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal([$"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_priority" bigint"""], plan.Statements);
@@ -127,7 +127,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = ChangeOrder(model, fields => [.. fields, Field("billTo", FieldType.Reference, required: true, unique: true, target: Customer())]);
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: false), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: false), Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal(
@@ -153,7 +153,7 @@ public sealed class SchemaPlannerTests
             },
             Supplier());
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Empty(plan.Statements);
@@ -175,7 +175,7 @@ public sealed class SchemaPlannerTests
             _ => title => title with { Required = false },
         });
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal([$"""ALTER TABLE "entities"."{OrderTable}" {statement}"""], plan.Statements);
@@ -187,7 +187,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = ChangeOrderField(model, 1, code => code with { Unique = false });
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal([$"ALTER TABLE \"entities\".\"{OrderTable}\" DROP CONSTRAINT \"{EntityNaming.Unique(OrderTable, "f_code")}\""], plan.Statements);
@@ -205,7 +205,7 @@ public sealed class SchemaPlannerTests
                     : table with { Columns = [.. table.Columns.Select(column => column.Name == "f_customer" ? column with { ReferencedTable = null } : column)] }),
             ]);
 
-        var plan = SchemaPlanner.Plan(model, catalog, Records(model));
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal([ForeignKey(OrderTable, "f_customer", CustomerTable)], plan.Statements);
@@ -217,7 +217,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = ChangeOrderField(model, 3, status => status with { Values = ["draft", "submitted", "Draft"] });
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         Assert.Empty(plan.Diagnostics);
         Assert.Empty(plan.Statements);
@@ -231,7 +231,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = ChangeOrder(model, fields => [.. fields.Where(field => field.Name != "amount")]);
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         var diagnostic = Assert.Single(plan.Diagnostics);
         Assert.Equal(
@@ -272,7 +272,7 @@ public sealed class SchemaPlannerTests
             _ => throw new ArgumentOutOfRangeException(nameof(change)),
         };
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         var diagnostic = Assert.Single(plan.Diagnostics);
         Assert.Equal(
@@ -288,7 +288,7 @@ public sealed class SchemaPlannerTests
         var model = ChangeOrderField(BaseModel(), 3, status => status with { Values = ["draft", "submitted", "approved"] });
         var changed = ChangeOrderField(model, 3, status => status with { Values = ["draft"] });
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         var diagnostic = Assert.Single(plan.Diagnostics);
         Assert.Equal("/fields/3/values", diagnostic.Path);
@@ -301,7 +301,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = model with { Entities = [.. model.Entities.Where(entity => entity.Id != _supplierId)] };
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         var diagnostic = Assert.Single(plan.Diagnostics);
         Assert.Equal(
@@ -315,7 +315,7 @@ public sealed class SchemaPlannerTests
     {
         var model = BaseModel();
         var otherId = Guid.Parse("44444444-4444-4444-8444-444444444444");
-        var records = Records(model);
+        var records = Models.Records(model);
         records = records with { Entities = [.. records.Entities, new ProvisionedEntity(otherId, Guid.NewGuid(), EntityNaming.Table(otherId))] };
 
         var plan = SchemaPlanner.Plan(model, Catalog(model, hasRows: true), records);
@@ -328,7 +328,7 @@ public sealed class SchemaPlannerTests
     public void Entity_id_recorded_for_another_application_is_reported_at_the_entity_id()
     {
         var model = BaseModel();
-        var records = Records(model);
+        var records = Models.Records(model);
         records = records with
         {
             Entities = [.. records.Entities.Select(recorded => recorded.EntityId == _orderId ? recorded with { ApplicationId = Guid.NewGuid() } : recorded)],
@@ -349,7 +349,7 @@ public sealed class SchemaPlannerTests
         var model = BaseModel();
         var changed = ChangeOrder(model, fields => [fields[0] with { MaxLength = 10 }, fields[1], fields[2], fields[3], fields[4] with { Unique = true }]);
 
-        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Records(model));
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
 
         Assert.Equal(
             [

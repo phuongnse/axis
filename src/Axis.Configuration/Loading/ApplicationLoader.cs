@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
@@ -166,13 +167,75 @@ public static class ApplicationLoader
         }
         catch (JsonException exception)
         {
-            // Syntax errors carry a zero-based position; other errors, such as a duplicate property, do not.
+            // Syntax errors carry a zero-based position; a duplicate property does not.
             var message = exception.LineNumber is { } line
                 ? $"The file is not valid JSON (line {line + 1}, byte {exception.BytePositionInLine + 1})."
-                : $"The file is not valid JSON: {exception.Message}";
+                : DescribeDuplicateProperty(folderPath, file);
             diagnostics.Add(new Diagnostic(DiagnosticCodes.InvalidJson, message, file, ""));
             return null;
         }
+    }
+
+    /// <summary>
+    /// Names the first repeated property and where it is, without the exception text, by parsing
+    /// the file again with duplicates allowed.
+    /// </summary>
+    private static string DescribeDuplicateProperty(string folderPath, string file)
+    {
+        try
+        {
+            using var stream = File.OpenRead(Path.Combine(folderPath, file));
+            using var document = JsonDocument.Parse(stream, new JsonDocumentOptions { AllowDuplicateProperties = true });
+            if (FindDuplicateProperty(document.RootElement, "") is { } duplicate)
+            {
+                var location = duplicate.Pointer.Length == 0 ? "" : $" at {duplicate.Pointer}";
+                return $"The file is not valid JSON: property '{duplicate.Name}' appears more than once{location}.";
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        {
+            // InvalidOperationException is thrown for a property name that cannot be unescaped.
+        }
+
+        return "The file is not valid JSON: a property appears more than once.";
+    }
+
+    /// <summary>Finds the first repeated property name in document order, with the pointer of its object.</summary>
+    private static (string Name, string Pointer)? FindDuplicateProperty(JsonElement element, string pointer)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (!names.Add(property.Name))
+                    {
+                        return (property.Name, pointer);
+                    }
+
+                    var escaped = property.Name.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
+                    if (FindDuplicateProperty(property.Value, $"{pointer}/{escaped}") is { } duplicate)
+                    {
+                        return duplicate;
+                    }
+                }
+
+                break;
+            case JsonValueKind.Array:
+                var index = 0;
+                foreach (var item in element.EnumerateArray())
+                {
+                    if (FindDuplicateProperty(item, string.Create(CultureInfo.InvariantCulture, $"{pointer}/{index++}")) is { } duplicate)
+                    {
+                        return duplicate;
+                    }
+                }
+
+                break;
+        }
+
+        return null;
     }
 
     private static Guid? ReadResourceId(JsonElement root) =>
