@@ -7,15 +7,15 @@ namespace Axis.Data;
 
 /// <summary>
 /// Makes a compiled release the active release of its application: it checks that no other
-/// application is active under the manifest name, provisions the entity tables and then sets the
-/// active release.
+/// application is active under the manifest name or holds one of its site paths, provisions the
+/// entity tables and then sets the active release with its site paths.
 /// <para>
-/// Provisioning runs in its own transaction, and the active release is written afterwards in a
-/// separate statement. No store call runs while that transaction is open, so the store and
-/// <see cref="DataDbContext"/> may share one open tenant connection or use two. When writing the
-/// active release fails after provisioning committed, the exception propagates: the new tables and
-/// columns stay, recorded for the application, and the previous release stays active. Activating
-/// again is safe because provisioning is additive.
+/// Provisioning runs in its own transaction, and the active release and its site paths are written
+/// afterwards in a separate short transaction. No store call runs while the provisioning
+/// transaction is open, so the store and <see cref="DataDbContext"/> may share one open tenant
+/// connection or use two. When writing the active release fails after provisioning committed, the
+/// exception propagates: the new tables and columns stay, recorded for the application, and the
+/// previous release stays active. Activating again is safe because provisioning is additive.
 /// </para>
 /// </summary>
 public static class ReleaseActivator
@@ -50,19 +50,38 @@ public static class ReleaseActivator
             return new ActivationResult([NameActiveForOtherApplication(model)]);
         }
 
+        // Every taken path is reported, so the author can fix them all at once.
+        var takenPaths = new List<Diagnostic>();
+        foreach (var site in model.Sites)
+        {
+            var holder = await store.FindBySitePathAsync(site.Path, cancellationToken);
+            if (holder is not null && holder.ApplicationId != manifest.Id)
+            {
+                takenPaths.Add(SitePathActiveForOtherApplication(site));
+            }
+        }
+
+        if (takenPaths.Count > 0)
+        {
+            return new ActivationResult(takenPaths);
+        }
+
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, cancellationToken);
         if (provisioned.Diagnostics.Count > 0)
         {
             return new ActivationResult(provisioned.Diagnostics);
         }
 
-        // Another application can take the name between the check above and this write.
-        if (!await store.TrySetAsync(manifest.Id, manifest.Name, release.Id, DateTimeOffset.UtcNow, cancellationToken))
+        // Another application can take the name or a site path between the checks above and this write.
+        var sitePaths = model.Sites.Select(site => site.Path).ToList();
+        var set = await store.TrySetAsync(manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, cancellationToken);
+        return set.Conflict switch
         {
-            return new ActivationResult([NameActiveForOtherApplication(model)]);
-        }
-
-        return new ActivationResult([]);
+            ActiveReleaseConflict.None => new ActivationResult([]),
+            ActiveReleaseConflict.Name => new ActivationResult([NameActiveForOtherApplication(model)]),
+            ActiveReleaseConflict.SitePath => new ActivationResult([SitePathActiveForOtherApplication(model.Sites.Single(site => site.Path == set.SitePath))]),
+            _ => throw new InvalidOperationException($"Unknown active release conflict '{set.Conflict}'."),
+        };
     }
 
     private static Diagnostic NameActiveForOtherApplication(ApplicationModel model) =>
@@ -72,4 +91,12 @@ public static class ReleaseActivator
             model.Manifest.File,
             "/name",
             model.Manifest.Id);
+
+    private static Diagnostic SitePathActiveForOtherApplication(SiteModel site) =>
+        new(
+            DiagnosticCodes.SitePathActiveForOtherApplication,
+            $"The site path '{site.Path}' is already active for another application. Give the site another path.",
+            site.File,
+            "/path",
+            site.Id);
 }

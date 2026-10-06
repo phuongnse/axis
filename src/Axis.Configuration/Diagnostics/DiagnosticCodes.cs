@@ -34,4 +34,5 @@ public static class DiagnosticCodes
     public const string MissingTextKey = "AXC0028";
     public const string InvalidDisplayField = "AXC0029";
     public const string ReferenceTargetWithoutDisplayField = "AXC0030";
+    public const string SitePathActiveForOtherApplication = "AXC0031";
 }

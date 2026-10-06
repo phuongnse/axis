@@ -44,7 +44,8 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
         Assert.Collection(
             migrations,
             migration => Assert.EndsWith("_CreateReleases", migration, StringComparison.Ordinal),
-            migration => Assert.EndsWith("_CreateActiveReleases", migration, StringComparison.Ordinal));
+            migration => Assert.EndsWith("_CreateActiveReleases", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_CreateActiveSites", migration, StringComparison.Ordinal));
     }
 
     [Fact]

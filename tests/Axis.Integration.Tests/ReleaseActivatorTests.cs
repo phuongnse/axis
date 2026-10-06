@@ -17,6 +17,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     private readonly Guid _applicationId = Guid.NewGuid();
     private readonly Guid _orderId = Guid.NewGuid();
     private readonly string _name = $"App{Guid.NewGuid():N}";
+    private readonly string _sitePath = $"site-{Guid.NewGuid():N}";
 
     private const string NumberField = """{ "name": "number", "type": "text", "required": true, "maxLength": 20 }""";
     private const string NoteField = """{ "name": "note", "type": "text" }""";
@@ -126,7 +127,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         // provisions the tables and is then refused the name.
         await using var configuration = database.CreateConfigurationContext();
         await using var data = database.CreateContext();
-        var hiding = await ReleaseActivator.ActivateAsync(compiled, new NameHidingStore(new ActiveReleaseStore(configuration)), data, CancellationToken);
+        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, CancellationToken);
 
         AssertNameActiveForOtherApplication(hiding);
         Assert.Single(await ReadTablesAsync(_orderId));
@@ -174,9 +175,11 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await using var configuration = database.CreateConfigurationContext();
         var store = new ActiveReleaseStore(configuration);
 
-        Assert.True(await store.TrySetAsync(_applicationId, _name, first.Release.Id, activatedAt, CancellationToken));
-        Assert.True(await store.TrySetAsync(_applicationId, _name, second.Release.Id, activatedAt.AddMinutes(1), CancellationToken));
-        Assert.False(await store.TrySetAsync(otherApplicationId, _name.ToUpperInvariant(), first.Release.Id, activatedAt, CancellationToken));
+        Assert.True((await store.TrySetAsync(_applicationId, _name, first.Release.Id, [], activatedAt, CancellationToken)).IsSet);
+        Assert.True((await store.TrySetAsync(_applicationId, _name, second.Release.Id, [], activatedAt.AddMinutes(1), CancellationToken)).IsSet);
+        var refused = await store.TrySetAsync(otherApplicationId, _name.ToUpperInvariant(), first.Release.Id, [], activatedAt, CancellationToken);
+        Assert.Equal(new SetActiveReleaseResult(ActiveReleaseConflict.Name), refused);
+        Assert.False(refused.IsSet);
 
         Assert.Equal(new ActiveRelease(_applicationId, _name, second.Release.Id, activatedAt.AddMinutes(1)), await store.FindByApplicationIdAsync(_applicationId, CancellationToken));
         Assert.Null(await store.FindByApplicationIdAsync(otherApplicationId, CancellationToken));
@@ -190,10 +193,111 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         var store = new ActiveReleaseStore(configuration);
 
         var exception = await Assert.ThrowsAsync<PostgresException>(
-            () => store.TrySetAsync(_applicationId, _name, Guid.NewGuid(), DateTimeOffset.UtcNow, CancellationToken));
+            () => store.TrySetAsync(_applicationId, _name, Guid.NewGuid(), [_sitePath], DateTimeOffset.UtcNow, CancellationToken));
 
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
         Assert.Null(await store.FindByApplicationIdAsync(_applicationId, CancellationToken));
+        Assert.Equal(0L, await CountActiveSiteRowsAsync(_applicationId, _sitePath));
+    }
+
+    [Fact]
+    public async Task Site_path_active_for_another_application_returns_one_diagnostic_and_changes_nothing()
+    {
+        var otherApplicationId = Guid.NewGuid();
+        using var other = WithSite(ApplicationFolder(otherApplicationId, $"App{Guid.NewGuid():N}", Guid.NewGuid(), NumberField), _sitePath);
+        Assert.Empty((await ActivateAsync(await CompileAsync(other))).Diagnostics);
+        var otherActive = await FindActiveAsync(otherApplicationId);
+        Assert.NotNull(otherActive);
+        var siteId = Guid.NewGuid();
+        using var folder = WithSite(ApplicationFolder(_applicationId, _name, _orderId, NumberField), _sitePath, siteId);
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled);
+
+        AssertSitePathActiveForOtherApplication(result, siteId);
+        Assert.Empty(await ReadTablesAsync(_orderId));
+        var records = await ReadRecordsAsync(_applicationId);
+        Assert.Empty(records.Entities);
+        Assert.Empty(records.EnumValues);
+        Assert.Null(await FindActiveAsync(_applicationId));
+        Assert.Equal(otherActive, await FindActiveAsync(otherApplicationId));
+        Assert.Equal(1L, await CountActiveSiteRowsAsync(otherApplicationId, _sitePath));
+
+        // A store that does not see the other application's path, as when it activates
+        // concurrently, provisions the tables and is then refused the path by the unique index.
+        await using var configuration = database.CreateConfigurationContext();
+        await using var data = database.CreateContext();
+        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, CancellationToken);
+
+        AssertSitePathActiveForOtherApplication(hiding, siteId);
+        Assert.Single(await ReadTablesAsync(_orderId));
+        Assert.Equal(_applicationId, Assert.Single((await ReadRecordsAsync(_applicationId)).Entities).ApplicationId);
+        Assert.Null(await FindActiveAsync(_applicationId));
+        Assert.Equal(0L, await CountActiveSiteRowsAsync(_applicationId, _sitePath));
+        Assert.Equal(otherActive, await FindActiveAsync(otherApplicationId));
+        Assert.Equal(1L, await CountActiveSiteRowsAsync(otherApplicationId, _sitePath));
+    }
+
+    [Fact]
+    public async Task Reactivating_keeps_one_site_row_and_a_renamed_path_frees_the_old_one()
+    {
+        var siteId = Guid.NewGuid();
+        var newPath = $"site-{Guid.NewGuid():N}";
+        using var folder = WithSite(ApplicationFolder(_applicationId, _name, _orderId, NumberField), _sitePath, siteId);
+        var compiled = await CompileAsync(folder);
+
+        Assert.Empty((await ActivateAsync(compiled)).Diagnostics);
+        Assert.Empty((await ActivateAsync(compiled)).Diagnostics);
+
+        Assert.Equal(1L, await CountActiveSiteRowsAsync(_applicationId, _sitePath));
+
+        folder.With("sites/main.json", Site(siteId, newPath));
+        var renamed = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(renamed)).Diagnostics);
+
+        await using var configuration = database.CreateConfigurationContext();
+        var store = new ActiveReleaseStore(configuration);
+        Assert.Null(await store.FindBySitePathAsync(_sitePath, CancellationToken));
+        var active = await store.FindBySitePathAsync(newPath, CancellationToken);
+        Assert.Equal((_applicationId, renamed.Release?.Id), (active?.ApplicationId, active?.ReleaseId));
+        Assert.Equal(0L, await CountActiveSiteRowsAsync(_applicationId, _sitePath));
+        Assert.Equal(1L, await CountActiveSiteRowsAsync(_applicationId, newPath));
+
+        var otherApplicationId = Guid.NewGuid();
+        using var other = WithSite(ApplicationFolder(otherApplicationId, $"App{Guid.NewGuid():N}", Guid.NewGuid(), NumberField), _sitePath);
+        Assert.Empty((await ActivateAsync(await CompileAsync(other))).Diagnostics);
+        Assert.Equal(otherApplicationId, (await store.FindBySitePathAsync(_sitePath, CancellationToken))?.ApplicationId);
+    }
+
+    [Fact]
+    public async Task Store_lists_active_releases_and_finds_them_by_site_path()
+    {
+        using var folder = WithSite(ApplicationFolder(_applicationId, _name, _orderId, NumberField), _sitePath);
+        var otherApplicationId = Guid.NewGuid();
+        var otherName = $"App{Guid.NewGuid():N}";
+        var otherPath = $"site-{Guid.NewGuid():N}";
+        using var other = WithSite(ApplicationFolder(otherApplicationId, otherName, Guid.NewGuid(), NumberField), otherPath);
+        var compiled = await CompileAsync(folder);
+        var otherCompiled = await CompileAsync(other);
+        Assert.NotNull(compiled.Release);
+        Assert.NotNull(otherCompiled.Release);
+        var activatedAt = new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero);
+        await using var configuration = database.CreateConfigurationContext();
+        var store = new ActiveReleaseStore(configuration);
+
+        Assert.True((await store.TrySetAsync(_applicationId, _name, compiled.Release.Id, [_sitePath], activatedAt, CancellationToken)).IsSet);
+        Assert.True((await store.TrySetAsync(otherApplicationId, otherName, otherCompiled.Release.Id, [otherPath], activatedAt, CancellationToken)).IsSet);
+        var refused = await store.TrySetAsync(Guid.NewGuid(), $"App{Guid.NewGuid():N}", compiled.Release.Id, [_sitePath], activatedAt, CancellationToken);
+        Assert.Equal(new SetActiveReleaseResult(ActiveReleaseConflict.SitePath, _sitePath), refused);
+
+        var active = new ActiveRelease(_applicationId, _name, compiled.Release.Id, activatedAt);
+        var otherActive = new ActiveRelease(otherApplicationId, otherName, otherCompiled.Release.Id, activatedAt);
+        var listed = await store.ListAsync(CancellationToken);
+        Assert.Contains(active, listed);
+        Assert.Contains(otherActive, listed);
+        Assert.Equal(active, await store.FindBySitePathAsync(_sitePath, CancellationToken));
+        Assert.Equal(otherActive, await store.FindBySitePathAsync(otherPath, CancellationToken));
+        Assert.Null(await store.FindBySitePathAsync($"site-{Guid.NewGuid():N}", CancellationToken));
     }
 
     [Fact]
@@ -219,6 +323,14 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
     }
 
+    private static void AssertSitePathActiveForOtherApplication(ActivationResult result, Guid siteId)
+    {
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SitePathActiveForOtherApplication, "sites/main.json", "/path", siteId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+    }
+
     private static string Manifest(Guid id, string name) =>
         $$"""{ "id": "{{id}}", "kind": "application", "name": "{{name}}", "formatVersion": 1 }""";
 
@@ -231,6 +343,32 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         new TemporaryFolder()
             .With("application.json", Manifest(applicationId, name))
             .With("entities/order.json", OrderFile(orderId, fields));
+
+    /// <summary>Gives the folder a site at <paramref name="path"/> whose navigation opens a table page of orders.</summary>
+    private static TemporaryFolder WithSite(TemporaryFolder folder, string path, Guid? siteId = null) =>
+        folder
+            .With("texts/en.json", Texts(Guid.NewGuid()))
+            .With("pages/orders.json", OrdersPage(Guid.NewGuid()))
+            .With("sites/main.json", Site(siteId ?? Guid.NewGuid(), path));
+
+    private static string Texts(Guid id) =>
+        $$"""
+        { "id": "{{id}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "site.title": "Sales", "nav.orders": "Orders", "orders.title": "Orders" } }
+        """;
+
+    private static string OrdersPage(Guid id) =>
+        $$"""
+        { "id": "{{id}}", "kind": "page", "name": "Orders", "formatVersion": 1,
+          "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
+        """;
+
+    private static string Site(Guid id, string path) =>
+        $$"""
+        { "id": "{{id}}", "kind": "site", "name": "Main", "formatVersion": 1, "path": "{{path}}",
+          "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+          "navigation": [ { "page": "Orders", "label": { "textKey": "nav.orders" } } ] }
+        """;
 
     private async Task<ReleaseCompilationResult> CompileAsync(TemporaryFolder folder)
     {
@@ -261,6 +399,16 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await using var command = dataSource.CreateCommand("SELECT count(*) FROM axis.active_releases WHERE application_id = @id OR lower(name) = lower(@name)");
         command.Parameters.AddWithValue("id", applicationId);
         command.Parameters.AddWithValue("name", name);
+        return Assert.IsType<long>(await command.ExecuteScalarAsync(CancellationToken));
+    }
+
+    /// <summary>The active site rows of the application with the path.</summary>
+    private async Task<long> CountActiveSiteRowsAsync(Guid applicationId, string path)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT count(*) FROM axis.active_sites WHERE application_id = @id AND path = @path");
+        command.Parameters.AddWithValue("id", applicationId);
+        command.Parameters.AddWithValue("path", path);
         return Assert.IsType<long>(await command.ExecuteScalarAsync(CancellationToken));
     }
 
@@ -325,8 +473,11 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         }
     }
 
-    /// <summary>A store that never finds an active release by name, as when another activation takes the name concurrently.</summary>
-    private sealed class NameHidingStore(IActiveReleaseStore inner) : IActiveReleaseStore
+    /// <summary>
+    /// A store that never finds an active release by name or site path, as when another activation
+    /// takes the name or path concurrently.
+    /// </summary>
+    private sealed class ConflictHidingStore(IActiveReleaseStore inner) : IActiveReleaseStore
     {
         public Task<ActiveRelease?> FindByNameAsync(string name, CancellationToken cancellationToken = default) =>
             Task.FromResult<ActiveRelease?>(null);
@@ -337,7 +488,19 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         public Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default) =>
             inner.GetReleaseAsync(releaseId, cancellationToken);
 
-        public Task<bool> TrySetAsync(Guid applicationId, string name, Guid releaseId, DateTimeOffset activatedAt, CancellationToken cancellationToken = default) =>
-            inner.TrySetAsync(applicationId, name, releaseId, activatedAt, cancellationToken);
+        public Task<IReadOnlyList<ActiveRelease>> ListAsync(CancellationToken cancellationToken = default) =>
+            inner.ListAsync(cancellationToken);
+
+        public Task<ActiveRelease?> FindBySitePathAsync(string path, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ActiveRelease?>(null);
+
+        public Task<SetActiveReleaseResult> TrySetAsync(
+            Guid applicationId,
+            string name,
+            Guid releaseId,
+            IReadOnlyList<string> sitePaths,
+            DateTimeOffset activatedAt,
+            CancellationToken cancellationToken = default) =>
+            inner.TrySetAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
     }
 }
