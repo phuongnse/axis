@@ -1,0 +1,8 @@
+{
+  "id": "7a3e9c10-2b4d-4e6f-8a90-1c2d3e4f5a07",
+  "kind": "page",
+  "name": "Categories",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.categories.title" },
+  "widgets": [{ "type": "table", "entity": "Category" }]
+}

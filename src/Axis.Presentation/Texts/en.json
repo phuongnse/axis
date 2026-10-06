@@ -12,5 +12,11 @@
   "shell.locale.label": "Language",
   "shell.locale.en": "English",
   "shell.locale.vi": "Tiếng Việt",
-  "shell.locale.loadFailed": "The texts for this language could not be loaded."
+  "shell.locale.loadFailed": "The texts for this language could not be loaded.",
+  "shell.home.sites.title": "Sites",
+  "shell.home.sites.empty": "No application is active.",
+  "shell.notFound.title": "Page not found",
+  "shell.notFound.message": "There is nothing at this address.",
+  "shell.notFound.home": "Go to the home page",
+  "shell.widget.form.unavailable": "Forms are not available yet."
 }

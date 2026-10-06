@@ -1,62 +1,26 @@
-import { PageContainer, ProCard } from '@ant-design/pro-components'
-import { Alert, Badge } from 'antd'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { readStoredLocale, storeLocale } from './platform/locale'
-import { useServerStatus, type ServerStatus } from './platform/serverStatus'
-import { Shell } from './platform/Shell'
+import { useEffect, useMemo, useState } from 'react'
+import { Outlet, Route, Routes } from 'react-router'
+import { HomePage } from './pages/HomePage'
+import { ShellError } from './pages/LocaleLoadFailed'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { PageRoute } from './pages/PageRoute'
+import { PlatformContext, type Platform, type PlatformTexts } from './pages/context'
+import { PlatformShellRoute } from './pages/PlatformShellRoute'
+import { SiteIndex, SiteRoute } from './pages/SiteRoute'
+import { readStoredLocale } from './platform/locale'
 import { fetchSite, type SiteMetadata } from './platform/site'
-import { TextProvider } from './platform/TextProvider'
-import { fetchTexts, useText, type TextMap } from './platform/texts'
+import { fetchTexts, type TextMap } from './platform/texts'
 
-const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
-  checking: 'processing',
-  ready: 'success',
-  unavailable: 'error',
-}
-
-interface LoadedShell {
+interface LoadedPlatform {
   site: SiteMetadata
   fallbackTexts: TextMap
-  locale: string
-  texts: TextMap
+  current: PlatformTexts
 }
 
-function HomePage() {
-  const t = useText()
-  const serverStatus = useServerStatus()
-
-  return (
-    <PageContainer title={t('shell.home.title')}>
-      <ProCard title={t('shell.serverStatus.title')}>
-        <Badge
-          data-testid="server-status"
-          status={statusBadge[serverStatus]}
-          text={t(`shell.serverStatus.${serverStatus}`)}
-        />
-      </ProCard>
-    </PageContainer>
-  )
-}
-
-function LocaleLoadFailed({ onClose }: { onClose: () => void }) {
-  const t = useText()
-  return (
-    <Alert
-      data-testid="locale-error"
-      type="error"
-      banner
-      closable
-      message={t('shell.locale.loadFailed')}
-      onClose={onClose}
-    />
-  )
-}
-
-export function App({ development }: { development: boolean }) {
-  const [shell, setShell] = useState<LoadedShell>()
+/** Loads the platform site and its texts once, then renders the matching route. */
+function PlatformRoot({ development }: { development: boolean }) {
+  const [loaded, setLoaded] = useState<LoadedPlatform>()
   const [failed, setFailed] = useState(false)
-  const [localeFailed, setLocaleFailed] = useState(false)
-  const localeRequest = useRef<AbortController>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -67,7 +31,7 @@ export function App({ development }: { development: boolean }) {
         fetchTexts(site.locales.fallback, controller.signal),
         locale === site.locales.fallback ? undefined : fetchTexts(locale, controller.signal),
       ])
-      setShell({ site, fallbackTexts, locale, texts: texts ?? fallbackTexts })
+      setLoaded({ site, fallbackTexts, current: { locale, texts: texts ?? fallbackTexts } })
     }
     load().catch((error: unknown) => {
       if (!controller.signal.aborted) {
@@ -75,45 +39,61 @@ export function App({ development }: { development: boolean }) {
         setFailed(true)
       }
     })
-    return () => {
-      controller.abort()
-      localeRequest.current?.abort()
-    }
+    return () => controller.abort()
   }, [])
 
-  // Keeps the current texts until the new locale has loaded, and drops a superseded switch.
-  const changeLocale = useCallback((locale: string) => {
-    localeRequest.current?.abort()
-    const controller = new AbortController()
-    localeRequest.current = controller
-    setLocaleFailed(false)
-    fetchTexts(locale, controller.signal)
-      .then((texts) => {
-        storeLocale(locale)
-        setShell((current) => current && { ...current, locale, texts })
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn(`Loading the texts of '${locale}' failed`, error)
-          setLocaleFailed(true)
-        }
-      })
-  }, [])
+  const platform = useMemo<Platform | undefined>(
+    () =>
+      loaded && {
+        ...loaded,
+        development,
+        setCurrent: (current) => setLoaded((previous) => previous && { ...previous, current }),
+      },
+    [loaded, development],
+  )
 
   if (failed) {
-    // There are no texts to render, so this is the one fixed string in the shell.
-    return <Alert data-testid="shell-error" type="error" banner message="Could not load the site." />
+    return <ShellError />
   }
-  if (!shell) {
+  if (!platform) {
     return null
   }
-
   return (
-    <TextProvider texts={shell.texts} fallbackTexts={shell.fallbackTexts} development={development}>
-      <Shell site={shell.site} locale={shell.locale} onLocaleChange={changeLocale}>
-        {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
-        <HomePage />
-      </Shell>
-    </TextProvider>
+    <PlatformContext.Provider value={platform}>
+      <Outlet />
+    </PlatformContext.Provider>
+  )
+}
+
+/** The routes of the SPA. The caller provides the router, so tests can start at any address. */
+export function App({ development }: { development: boolean }) {
+  return (
+    <Routes>
+      <Route element={<PlatformRoot development={development} />}>
+        <Route
+          index
+          element={
+            <PlatformShellRoute>
+              <HomePage />
+            </PlatformShellRoute>
+          }
+        />
+        <Route path=":site" element={<SiteRoute />}>
+          <Route index element={<SiteIndex />} />
+          <Route path=":page" element={<PageRoute />} />
+          {/* Reserved for the form routes of #53. */}
+          <Route path=":page/new" element={<NotFoundPage />} />
+          <Route path=":page/:id" element={<NotFoundPage />} />
+        </Route>
+        <Route
+          path="*"
+          element={
+            <PlatformShellRoute>
+              <NotFoundPage />
+            </PlatformShellRoute>
+          }
+        />
+      </Route>
+    </Routes>
   )
 }

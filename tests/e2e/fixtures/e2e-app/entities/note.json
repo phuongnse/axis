@@ -3,8 +3,11 @@
   "kind": "entity",
   "name": "Note",
   "formatVersion": 1,
+  "label": { "textKey": "note.label" },
   "fields": [
-    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
-    { "name": "done", "type": "boolean" }
+    { "name": "title", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "note.title" } },
+    { "name": "done", "type": "boolean", "label": { "textKey": "note.done" } },
+    { "name": "dueAt", "type": "date-time", "label": { "textKey": "note.dueAt" } },
+    { "name": "category", "type": "reference", "target": "Category", "label": { "textKey": "note.category" } }
   ]
 }

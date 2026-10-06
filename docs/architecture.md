@@ -998,15 +998,49 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - An unknown site, page or locale is a 404 problem with a fixed title. A
     site active only in another tenant does not exist for the request.
   - The endpoints have no authorization yet, like the record API.
+- **Routing.** The SPA routes on the client with `react-router` v7. The
+  server answers every other path with the SPA, so each address below
+  answers 200.
+
+  | Address | Shows |
+  | --- | --- |
+  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one |
+  | `/{site}` | the site's first navigation entry, by redirect |
+  | `/{site}/{page}` | the page inside the site shell, with the page title |
+  | `/{site}/{page}/new`, `/{site}/{page}/{id}` | reserved for the forms of #53, and not found until then |
+
+  - `{site}` is the site path. `{page}` is the page name in lower case, as
+    navigation links write it. The server matches both ignoring letter case.
+  - An unknown site shows the not-found page inside the platform shell. An
+    unknown page shows it inside the site shell.
+  - Inside a site, the shell shows the site's title, navigation and locales.
+    The theme toggle and the locale switch work as they do on the platform
+    site.
+  - A page whose widget is a `form` shows a shared "not available yet" state
+    until #53.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
-  like the theme mode under `axis.themeMode`. The shell keeps the current
-  texts until the chosen locale's texts have loaded. If they fail to load, it
-  stays in the current locale and shows an error message.
-- **Missing texts.** The SPA resolves each key in the current locale first.
-  A key missing there shows its key name in development builds, so it gets
-  noticed, and the fallback-locale text otherwise. A key missing from both
-  locales shows its key name.
+  like the theme mode under `axis.themeMode`. One key serves every site: a
+  site starts in the stored locale when it offers it, and in its default
+  locale otherwise. The shell keeps the current texts until the chosen
+  locale's texts have loaded. If they fail to load, it stays in the current
+  locale and shows an error message.
+- **Text resolution.** The SPA resolves each key through catalogs in order.
+  On the platform site the only catalog is the platform texts. Inside an
+  application site, the site texts come first and the platform texts second,
+  so shared shell texts such as the theme toggle keep working.
+  - Inside a site, the platform texts load in the site's current locale when
+    the platform offers it. Otherwise only the platform fallback-locale texts
+    serve the shell.
+  - So a key resolves from the site's current locale, then the site's
+    fallback locale, then the platform's current locale, then the platform's
+    fallback locale. A key no catalog has shows its key name.
+  - Within one catalog, a key missing from the current locale but present in
+    the fallback locale shows its key name in development builds, so it gets
+    noticed, and the fallback-locale text otherwise. Only a key missing from
+    both locales of a catalog moves on to the next catalog. Every locale of a
+    catalog has the same keys, so the development rule never hides a
+    platform text behind a site that lacks it.
 
 ## Testing
 

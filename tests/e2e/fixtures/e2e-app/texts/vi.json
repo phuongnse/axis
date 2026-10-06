@@ -1,0 +1,22 @@
+{
+  "id": "7a3e9c10-2b4d-4e6f-8a90-1c2d3e4f5a09",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "site.title": "Ghi chú E2E",
+    "nav.notes": "Ghi chú",
+    "nav.categories": "Danh mục",
+    "pages.notes.title": "Ghi chú",
+    "pages.noteForm.title": "Ghi chú",
+    "pages.categories.title": "Danh mục",
+    "note.label": "Ghi chú",
+    "note.title": "Tiêu đề",
+    "note.done": "Đã xong",
+    "note.dueAt": "Hạn",
+    "note.category": "Danh mục",
+    "category.label": "Danh mục",
+    "category.name": "Tên"
+  }
+}
