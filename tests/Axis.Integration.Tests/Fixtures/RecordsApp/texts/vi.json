@@ -1,0 +1,16 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a09",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "site.title": "Hồ sơ",
+    "nav.items": "Mặt hàng",
+    "nav.departments": "Phòng ban",
+    "items.title": "Mặt hàng",
+    "itemForm.title": "Mặt hàng",
+    "departments.title": "Phòng ban",
+    "item.department": "Phòng ban"
+  }
+}

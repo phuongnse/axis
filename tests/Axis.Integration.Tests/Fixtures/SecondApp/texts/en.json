@@ -1,0 +1,12 @@
+{
+  "id": "6f2e8b31-9d5c-4a4f-8c3b-4e7d2f1a5b05",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Second",
+    "nav.tasks": "Tasks",
+    "tasks.title": "Tasks"
+  }
+}

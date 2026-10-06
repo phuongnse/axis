@@ -11,6 +11,6 @@
     { "name": "neededBy", "type": "date" },
     { "name": "orderedAt", "type": "date-time" },
     { "name": "status", "type": "enum", "values": ["open", "closed"] },
-    { "name": "department", "type": "reference", "target": "Department" }
+    { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "item.department" } }
   ]
 }

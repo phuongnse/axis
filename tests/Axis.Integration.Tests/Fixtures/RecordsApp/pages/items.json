@@ -1,0 +1,8 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a05",
+  "kind": "page",
+  "name": "Items",
+  "formatVersion": 1,
+  "title": { "textKey": "items.title" },
+  "widgets": [{ "type": "table", "entity": "Item", "formPage": "ItemForm" }]
+}
