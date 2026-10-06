@@ -151,6 +151,7 @@ all diagnostics, not just the first, sorted by file and then path.
 | `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
 | `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
 | `AXC0017` | An entity provisioned for the application is missing from it. Reported at `application.json` with an empty path. |
+| `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 
 ### Resource file shape
 
@@ -213,6 +214,9 @@ is `AXC0013`.
   - `Axis.Configuration` owns `axis.releases` and `axis.release_resources`,
     with history in `axis.__configuration_migrations`. The caller supplies
     the tenant database connection.
+  - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity
+    with its application and table) and `axis.provisioned_enum_values` (each
+    recorded enum value), with history in `axis.__data_migrations`.
   - Releases are immutable, enforced through the context's change tracking:
     a release and its resources are only inserted together. Saving fails when
     a stored release or resource is modified or deleted, or when a resource is
@@ -221,7 +225,19 @@ is `AXC0013`.
     is a later change.
 - **Entity tables.** These are generated per entity in the tenant database and
   live in the `entities` schema, separate from the `axis` system tables.
-  `Axis.Data` plans them (see [Schema planning](#schema-planning)).
+  `Axis.Data` plans them (see [Schema planning](#schema-planning)) and
+  applies the plan.
+  - In M1, plan and apply run together in one transaction. One fixed
+    advisory transaction lock (`pg_advisory_xact_lock`) serializes entity
+    schema changes, so the catalog and records read for the plan are still
+    current when it is applied.
+  - The provisioning records are written in the same transaction as the DDL.
+    When the plan has any diagnostic, the transaction is rolled back and
+    nothing is applied.
+  - The lock does not block runtime writes to entity tables, so a statement
+    can still fail, for example adding a `NOT NULL` column after a row was
+    inserted following the catalog read. Any failing statement rolls back the
+    whole transaction, DDL and records, and the exception propagates.
 - **Physical names.** Table and column names are derived from stable IDs and
   names, never from labels. Renaming a label, or renaming an entity while
   keeping its `id`, never touches storage.
@@ -264,7 +280,9 @@ is `AXC0013`.
 catalog (entity tables, their columns, types, `NOT NULL`, single-column
 unique constraints, foreign key targets and whether the table has rows) and
 with the provisioning records (each provisioned entity with its application
-and table, and each recorded enum value). The planner itself has no database
+and table, and each recorded enum value). The records cover the application's
+entities and any entity recorded with one of its entity `id`s, whatever its
+application. The planner itself has no database
 access. It returns diagnostics, SQL statements and the new records to write.
 
 - **Missing table.** It is created with every column, `NOT NULL` for
@@ -296,6 +314,11 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Removed entity.** An entity recorded for the application but missing from
   it is `AXC0017` at `application.json` with an empty path and the entity's
   `id` as `resourceId`.
+- **Entity owned by another application.** Tables are keyed by entity `id`,
+  so an entity whose `id` is recorded for another application, for example in
+  an application copied with only its manifest `id` changed, would share that
+  application's table. It is `AXC0018` at `/id` of the entity file, and the
+  entity is not planned.
 - **Labels.** A label change produces no statements.
 - **Order.** Every `CREATE TABLE` comes first, then the `ALTER TABLE` column
   changes, then every `ADD CONSTRAINT ... FOREIGN KEY`, so references between

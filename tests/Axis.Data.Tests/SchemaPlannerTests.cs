@@ -290,6 +290,25 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void Entity_id_recorded_for_another_application_is_reported_at_the_entity_id()
+    {
+        var model = BaseModel();
+        var records = Records(model);
+        records = records with
+        {
+            Entities = [.. records.Entities.Select(recorded => recorded.EntityId == _orderId ? recorded with { ApplicationId = Guid.NewGuid() } : recorded)],
+        };
+
+        var plan = SchemaPlanner.Plan(model, Catalog(model, hasRows: true), records);
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.EntityOwnedByOtherApplication, "entities/order.json", "/id", _orderId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
     public void Several_problems_are_all_reported_in_diagnostic_order()
     {
         var model = BaseModel();
