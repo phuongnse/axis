@@ -25,7 +25,10 @@ internal static class Models
         };
 
     public static EntityModel Entity(Guid id, string name, string file, params FieldModel[] fields) =>
-        new() { Id = id, Name = name, File = file, Fields = fields };
+        Entity(id, name, file, displayField: null, fields);
+
+    public static EntityModel Entity(Guid id, string name, string file, string? displayField, params FieldModel[] fields) =>
+        new() { Id = id, Name = name, File = file, Fields = fields, DisplayField = displayField };
 
     public static FieldModel Field(
         string name,
@@ -48,6 +51,7 @@ internal static class Models
             Scale = scale,
             Values = values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
+            TargetDisplayField = target?.DisplayField,
         };
 
     /// <summary>The catalog after the model's tables were created as planned.</summary>

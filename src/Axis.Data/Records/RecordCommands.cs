@@ -16,6 +16,9 @@ public static class RecordCommands
 {
     private const string ValuesPointer = "/values/";
 
+    /// <summary>The alias of the written row, read back with its labels in the same statement.</summary>
+    private const string WriteAlias = "w";
+
     /// <summary>
     /// Inserts a record with a new version 7 id and version 1, holding <paramref name="values"/>
     /// and SQL <c>NULL</c> or the column default for every other field.
@@ -45,8 +48,9 @@ public static class RecordCommands
             placeholders.Add(AddValue(command, index, values[index]));
         }
 
-        command.CommandText =
-            $"INSERT INTO {RecordQueries.Table(entity)} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)}) RETURNING {RecordQueries.SelectList(entity)}";
+        command.CommandText = WithLabels(
+            entity,
+            $"INSERT INTO {RecordQueries.Table(entity)} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)}) RETURNING *");
         return await WriteAsync(command, entity, cancellationToken)
             ?? throw new InvalidOperationException("The insert returned no row.");
     }
@@ -86,8 +90,9 @@ public static class RecordCommands
         }
 
         assignments.Add($"{versionColumn} = {versionColumn} + 1");
-        command.CommandText =
-            $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {idColumn} = @id AND {versionColumn} = @version RETURNING {RecordQueries.SelectList(entity)}";
+        command.CommandText = WithLabels(
+            entity,
+            $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {idColumn} = @id AND {versionColumn} = @version RETURNING *");
         if (await WriteAsync(command, entity, cancellationToken) is { } result)
         {
             return result;
@@ -127,6 +132,18 @@ public static class RecordCommands
         {
             return RecordDeleteOutcome.Referenced;
         }
+    }
+
+    /// <summary>
+    /// Wraps a write that returns its row in a data-modifying <c>WITH</c>, and selects the row and
+    /// its labels from it. <c>RETURNING</c> cannot join, so this keeps the labels in the write's statement.
+    /// The joins see the tables as they were before the write, so a record that references itself
+    /// gets the label it had before an update that changes its display field.
+    /// </summary>
+    private static string WithLabels(EntityModel entity, string write)
+    {
+        var row = EntityNaming.Quote(WriteAlias);
+        return $"WITH {row} AS ({write}) SELECT {RecordQueries.SelectList(entity, WriteAlias)} FROM {row}{RecordQueries.LabelJoins(entity, WriteAlias)}";
     }
 
     /// <summary>Runs the write and reads the returned row; <see langword="null"/> when no row was written.</summary>

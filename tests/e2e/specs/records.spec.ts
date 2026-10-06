@@ -11,5 +11,10 @@ test('a record of the E2E application is created and read through the record API
   const read = await request.get(`/api/apps/E2eApp/entities/Note/records/${record.id}`)
 
   expect(read.status()).toBe(200)
-  expect(await read.json()).toEqual({ id: record.id, version: 1, values: { title: 'Smoke test', done: false } })
+  expect(await read.json()).toEqual({
+    id: record.id,
+    version: 1,
+    values: { title: 'Smoke test', done: false },
+    labels: {},
+  })
 })

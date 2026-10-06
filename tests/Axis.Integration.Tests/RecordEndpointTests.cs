@@ -32,7 +32,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
         using var record = await GetJsonAsync($"{Items}/{id}", HostA);
 
         var root = record.RootElement;
-        Assert.Equal(["id", "version", "values"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["id", "version", "values", "labels"], root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(id.ToString("D"), root.GetProperty("id").GetString());
         Assert.Equal(1, root.GetProperty("version").GetInt64());
         Assert.Equal(
@@ -47,6 +47,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
                 ("department", $"\"{departmentId:D}\""),
             ],
             root.GetProperty("values").EnumerateObject().Select(property => (property.Name, property.Value.GetRawText())));
+        Assert.Equal("""{"department":"Sales"}""", root.GetProperty("labels").GetRawText());
 
         using var bare = await GetJsonAsync($"{Items}/{bareId}", HostA);
 
@@ -54,6 +55,33 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
         Assert.Equal("\"Chair\"", bareValues[0].Value.GetRawText());
         Assert.Equal(8, bareValues.Count);
         Assert.All(bareValues.Skip(1), property => Assert.Equal(JsonValueKind.Null, property.Value.ValueKind));
+        Assert.Equal("{}", bare.RootElement.GetProperty("labels").GetRawText());
+    }
+
+    [Fact]
+    public async Task List_and_get_carry_the_display_field_of_each_reference_as_a_label()
+    {
+        await fixture.ResetAsync();
+        var financeId = await InsertDepartmentAsync(TenantA, "Finance");
+        var salesId = await InsertDepartmentAsync(TenantA, "Sales");
+        var deskId = await InsertItemAsync("Desk", financeId);
+        var labels = new Dictionary<Guid, string>
+        {
+            [deskId] = """{"department":"Finance"}""",
+            [await InsertItemAsync("Chair", salesId)] = """{"department":"Sales"}""",
+            [await InsertItemAsync("Lamp", null)] = "{}",
+        };
+
+        using var list = await GetJsonAsync(Items, HostA);
+        using var desk = await GetJsonAsync($"{Items}/{deskId}", HostA);
+        using var department = await GetJsonAsync($"{Departments}/{financeId}", HostA);
+
+        var items = list.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(3, items.Count);
+        Assert.All(items, item => Assert.Equal(labels[item.GetProperty("id").GetGuid()], item.GetProperty("labels").GetRawText()));
+        Assert.Equal("""{"department":"Finance"}""", desk.RootElement.GetProperty("labels").GetRawText());
+        Assert.Equal(financeId.ToString("D"), desk.RootElement.GetProperty("values").GetProperty("department").GetString());
+        Assert.Equal("{}", department.RootElement.GetProperty("labels").GetRawText());
     }
 
     [Fact]
@@ -171,6 +199,9 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
 
     private Task<Guid> InsertDepartmentAsync(string tenant, string name) =>
         fixture.InsertAsync(tenant, "Department", new Dictionary<string, string?> { ["name"] = name });
+
+    private Task<Guid> InsertItemAsync(string name, Guid? departmentId) =>
+        fixture.InsertAsync(TenantA, "Item", new Dictionary<string, string?> { ["name"] = name, ["department"] = departmentId?.ToString() });
 
     private async Task<JsonDocument> GetJsonAsync(string path, string host)
     {
