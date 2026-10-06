@@ -20,9 +20,17 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 
     public const string ReleaseIdentityIndex = "ix_releases_application_id_content_hash";
 
+    /// <summary>
+    /// The unique index on <c>lower(name)</c> of the active releases. Migrations create it with raw
+    /// SQL because the model cannot express an index on an expression.
+    /// </summary>
+    public const string ActiveReleaseNameIndex = "ix_active_releases_lower_name";
+
     public DbSet<Release> Releases => Set<Release>();
 
     public DbSet<ReleaseResource> ReleaseResources => Set<ReleaseResource>();
+
+    public DbSet<ActiveReleaseRow> ActiveReleases => Set<ActiveReleaseRow>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -66,6 +74,22 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             resource.Property(r => r.ReleaseId).HasColumnName("release_id");
             resource.Property(r => r.Path).HasColumnName("path");
             resource.Property(r => r.Content).HasColumnName("content").HasColumnType("text");
+        });
+
+        modelBuilder.Entity<ActiveReleaseRow>(active =>
+        {
+            active.ToTable("active_releases");
+            active.HasKey(r => r.ApplicationId).HasName("pk_active_releases");
+            active.Property(r => r.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
+            active.Property(r => r.Name).HasColumnName("name").HasMaxLength(60);
+            active.Property(r => r.ReleaseId).HasColumnName("release_id");
+            active.Property(r => r.ActivatedAt).HasColumnName("activated_at");
+            active.HasIndex(r => r.ReleaseId).HasDatabaseName("ix_active_releases_release_id");
+            active.HasOne<Release>()
+                .WithMany()
+                .HasForeignKey(r => r.ReleaseId)
+                .HasConstraintName("fk_active_releases_releases_release_id")
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

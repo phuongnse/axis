@@ -128,6 +128,37 @@ flowchart LR
      compile returns the diagnostics only.
 6. **Activate.** Schema changes are applied. The release becomes active for
    new work only after preparation has completed successfully.
+   - **Active release.** Each application `id` has at most one active
+     release, stored with the manifest `name` as written. The name is unique
+     across the active applications, ignoring letter case; names are ASCII
+     (`AXC0004`), so the database's `lower(name)` matches. An application
+     may change its name: its active release then holds the new name and the
+     old one is free for another application.
+   - **Order.** Activation first checks that no other application `id` is
+     active under the manifest name; if one is, it returns `AXC0020` and
+     changes nothing. It then provisions the entity tables (see
+     [Storage](#storage)); when provisioning returns diagnostics, they are
+     returned and the active release is untouched. Only then is the release
+     set active, in one upsert per application `id`, so two activations of
+     the same application never conflict and the last one wins. When another
+     application took the name after the check, the upsert is refused and
+     activation returns the same `AXC0020`.
+   - **Transactions.** Provisioning runs in its own transaction (DDL,
+     provisioning records and the schema lock). The active release is
+     written afterwards in a separate statement, and no other configuration
+     statement runs while the provisioning transaction is open, so the caller
+     may use one tenant connection for both or two connections.
+   - **Failure after provisioning.** When writing the active release fails
+     after provisioning committed, the error propagates. The new tables and
+     columns stay, recorded for the application, and the previous release
+     stays active and keeps serving: it reads and writes only its own
+     columns, so only a new required column on a table that had no rows
+     rejects its inserts. Activating again is safe because provisioning is
+     additive. An activation that loses the name to a concurrent one also
+     leaves its provisioned tables in place, recorded for its application
+     `id` and not active.
+   - **Re-activation.** Activating the active release again provisions
+     nothing and changes only its activation time.
 
 Diagnostics always carry `file`, `resourceId` (when the file has a readable
 ID), `path`, `code` and a message. `file` is relative to the application
@@ -160,6 +191,7 @@ sorted by file and then path.
 | `AXC0017` | An entity provisioned for the application is missing from it. Reported at `application.json` with an empty path. |
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
+| `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 
 ### Resource file shape
 
@@ -219,9 +251,13 @@ is `AXC0013`.
   and migrations. Each module context keeps its migration history in its own
   table, `axis.__<module>_migrations`, so the contexts sharing the schema do
   not collide.
-  - `Axis.Configuration` owns `axis.releases` and `axis.release_resources`,
-    with history in `axis.__configuration_migrations`. The caller supplies
-    the tenant database connection.
+  - `Axis.Configuration` owns `axis.releases`, `axis.release_resources` and
+    `axis.active_releases` (the active release of each application `id`,
+    with its name, unique ignoring letter case), with history in
+    `axis.__configuration_migrations`. The caller supplies the tenant
+    database connection. Other modules read and set the active release only
+    through `IActiveReleaseStore`; they never use `axis.active_releases` or
+    the configuration context directly.
   - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity
     with its application and table) and `axis.provisioned_enum_values` (each
     recorded enum value), with history in `axis.__data_migrations`.
