@@ -1,0 +1,16 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a03",
+  "kind": "entity",
+  "name": "Item",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "quantity", "type": "integer" },
+    { "name": "price", "type": "decimal", "precision": 20, "scale": 2 },
+    { "name": "active", "type": "boolean" },
+    { "name": "neededBy", "type": "date" },
+    { "name": "orderedAt", "type": "date-time" },
+    { "name": "status", "type": "enum", "values": ["open", "closed"] },
+    { "name": "department", "type": "reference", "target": "Department" }
+  ]
+}
