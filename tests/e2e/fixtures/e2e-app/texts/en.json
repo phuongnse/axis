@@ -1,0 +1,22 @@
+{
+  "id": "7a3e9c10-2b4d-4e6f-8a90-1c2d3e4f5a08",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "E2E notes",
+    "nav.notes": "Notes",
+    "nav.categories": "Categories",
+    "pages.notes.title": "Notes",
+    "pages.noteForm.title": "Note",
+    "pages.categories.title": "Categories",
+    "note.label": "Note",
+    "note.title": "Title",
+    "note.done": "Done",
+    "note.dueAt": "Due at",
+    "note.category": "Category",
+    "category.label": "Category",
+    "category.name": "Name"
+  }
+}

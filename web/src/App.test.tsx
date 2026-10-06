@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
-import type { SiteMetadata } from './platform/site'
+import type { ApplicationSite, PageMetadata, SiteListItem, SiteMetadata } from './platform/site'
 import { ThemeModeProvider } from './platform/theme'
 
 const site: SiteMetadata = {
@@ -28,6 +29,13 @@ const texts: Record<string, Record<string, string>> = {
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
     'shell.locale.loadFailed': 'The texts for this language could not be loaded.',
+    'shell.home.sites.title': 'Sites',
+    'shell.home.sites.empty': 'No application is active.',
+    'shell.home.sites.loadFailed': 'The sites could not be loaded.',
+    'shell.notFound.title': 'Page not found',
+    'shell.notFound.message': 'There is nothing at this address.',
+    'shell.notFound.home': 'Go to the home page',
+    'shell.widget.form.unavailable': 'Forms are not available yet.',
   },
   vi: {
     'shell.nav.home': 'Trang chủ',
@@ -35,6 +43,51 @@ const texts: Record<string, Record<string, string>> = {
     'shell.locale.label': 'Ngôn ngữ',
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
+  },
+}
+
+const sites: SiteListItem[] = [{ path: 'e2e', titleKey: 'site.title', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } }]
+
+const e2eSite: ApplicationSite = {
+  path: 'e2e',
+  titleKey: 'site.title',
+  locales: { default: 'en', fallback: 'en', available: ['en', 'vi'] },
+  navigation: [
+    { page: 'Notes', labelKey: 'nav.notes' },
+    { page: 'Categories', labelKey: 'nav.categories' },
+  ],
+}
+
+// The site texts carry their own 'shell.theme.dark', which wins over the platform text inside the site.
+const siteTexts: Record<string, Record<string, string>> = {
+  en: {
+    'site.title': 'E2E notes',
+    'nav.notes': 'Notes',
+    'nav.categories': 'Categories',
+    'pages.notes.title': 'All notes',
+    'pages.noteForm.title': 'Note',
+    'shell.theme.dark': 'Night mode',
+  },
+  vi: {
+    'site.title': 'Ghi chú E2E',
+    'nav.notes': 'Ghi chú',
+    'nav.categories': 'Danh mục',
+    'pages.notes.title': 'Tất cả ghi chú',
+    'pages.noteForm.title': 'Ghi chú',
+    'shell.theme.dark': 'Chế độ đêm',
+  },
+}
+
+const pages: Record<string, PageMetadata> = {
+  notes: {
+    name: 'Notes',
+    titleKey: 'pages.notes.title',
+    widgets: [{ type: 'table', formPage: 'NoteForm', entity: {} }],
+  },
+  noteform: {
+    name: 'NoteForm',
+    titleKey: 'pages.noteForm.title',
+    widgets: [{ type: 'form', formPage: null, entity: {} }],
   },
 }
 
@@ -46,13 +99,19 @@ function json(body: unknown, status = 200) {
 }
 
 /** Stubs `fetch` with the server's routes. */
-function stubServer({ ready = true, siteStatus = 200, failingLocale = '' } = {}) {
+function stubServer({ ready = true, siteStatus = 200, sitesStatus = 200, failingLocale = '' } = {}) {
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/health/ready') {
       return json({}, ready ? 200 : 503)
     }
     if (input === '/api/site') {
       return json(siteStatus === 200 ? site : {}, siteStatus)
+    }
+    if (input === '/api/sites') {
+      return sitesStatus === 200 ? json({ sites }) : json({}, sitesStatus)
+    }
+    if (input.startsWith('/api/sites/')) {
+      return siteRoute(input.replace('/api/sites/', ''), failingLocale)
     }
     const locale = input.replace('/api/texts/', '')
     if (locale === failingLocale) {
@@ -63,11 +122,37 @@ function stubServer({ ready = true, siteStatus = 200, failingLocale = '' } = {})
   vi.stubGlobal('fetch', fetchMock)
 }
 
-function renderApp() {
+/** Answers the application site endpoints for the site `e2e`, and 404 for anything else. */
+function siteRoute(path: string, failingLocale: string) {
+  const notFound = json({ title: 'Not found', status: 404 }, 404)
+  const [sitePath, kind, name, ...rest] = path.split('/')
+  if (sitePath !== 'e2e' || rest.length > 0) {
+    return notFound
+  }
+  if (kind === undefined) {
+    return json(e2eSite)
+  }
+  if (kind === 'texts' && name !== undefined && name in siteTexts) {
+    return name === failingLocale ? json({}, 500) : json({ locale: name, texts: siteTexts[name] })
+  }
+  if (kind === 'pages' && name !== undefined && name.toLowerCase() in pages) {
+    return json(pages[name.toLowerCase()])
+  }
+  return notFound
+}
+
+function CurrentPath() {
+  return <output data-testid="location">{useLocation().pathname}</output>
+}
+
+function renderApp(path = '/') {
   return render(
-    <ThemeModeProvider>
-      <App development={false} />
-    </ThemeModeProvider>,
+    <MemoryRouter initialEntries={[path]}>
+      <ThemeModeProvider>
+        <App development={false} />
+      </ThemeModeProvider>
+      <CurrentPath />
+    </MemoryRouter>,
   )
 }
 
@@ -181,5 +266,138 @@ describe('App', () => {
     renderApp()
 
     expect(await screen.findByTestId('shell-error')).toHaveTextContent('Could not load the site.')
+  })
+
+  it('lists the sites of the tenant on the home page', async () => {
+    stubServer()
+
+    renderApp()
+
+    const link = await screen.findByRole('link', { name: 'E2E notes' })
+    expect(link).toHaveAttribute('href', '/e2e')
+    await userEvent.click(link)
+    expect(await screen.findByText('All notes')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('keeps the sites card and shows an error when the sites cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer({ sitesStatus: 500 })
+
+    renderApp()
+
+    const error = await screen.findByTestId('sites-error')
+    expect(error).toHaveTextContent('The sites could not be loaded.')
+    expect(screen.getByText('Sites')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'E2E notes' })).not.toBeInTheDocument()
+  })
+
+  it('shows site titles in the current locale', async () => {
+    localStorage.setItem('axis.locale', 'vi')
+    stubServer()
+
+    renderApp()
+
+    expect(await screen.findByRole('link', { name: 'Ghi chú E2E' })).toBeInTheDocument()
+  })
+
+  it('shows a page title inside the site shell with the site navigation', async () => {
+    stubServer()
+
+    renderApp('/e2e/notes')
+
+    expect(await screen.findByText('All notes')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Categories' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Home' })).not.toBeInTheDocument()
+    expect(screen.getByText('E2E notes')).toBeInTheDocument()
+  })
+
+  it('resolves a key both catalogs have to the site text, and other keys to the platform text', async () => {
+    stubServer()
+
+    renderApp('/e2e/notes')
+
+    expect(await screen.findByRole('switch', { name: 'Night mode' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Language' })).toBeInTheDocument()
+  })
+
+  it('switches the locale inside a site and remembers the choice', async () => {
+    stubServer()
+    renderApp('/e2e/notes')
+    await screen.findByText('All notes')
+
+    const language = screen.getByRole('radiogroup', { name: 'Language' })
+    await userEvent.click(within(language).getByText('Tiếng Việt'))
+
+    expect(await screen.findByText('Tất cả ghi chú')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/texts/vi', expect.anything())
+    expect(screen.getByRole('menuitem', { name: 'Danh mục' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Chế độ đêm' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Ngôn ngữ' })).toBeInTheDocument()
+    expect(localStorage.getItem('axis.locale')).toBe('vi')
+  })
+
+  it('keeps the site locale and shows an error when the chosen site texts cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer({ failingLocale: 'vi' })
+    renderApp('/e2e/notes')
+    await screen.findByText('All notes')
+
+    const language = screen.getByRole('radiogroup', { name: 'Language' })
+    await userEvent.click(within(language).getByText('Tiếng Việt'))
+
+    expect(await screen.findByTestId('locale-error')).toBeInTheDocument()
+    expect(screen.getByText('All notes')).toBeInTheDocument()
+    expect(localStorage.getItem('axis.locale')).toBeNull()
+  })
+
+  it('opens the first navigation entry of a site', async () => {
+    stubServer()
+
+    renderApp('/e2e')
+
+    expect(await screen.findByText('All notes')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('shows a placeholder for a form page', async () => {
+    stubServer()
+
+    renderApp('/e2e/noteform')
+
+    expect(await screen.findByTestId('form-placeholder')).toHaveTextContent('Forms are not available yet.')
+    expect(screen.getByText('Note')).toBeInTheDocument()
+  })
+
+  it('shows the not-found page in the platform shell for an unknown site', async () => {
+    stubServer()
+
+    renderApp('/no-such-site')
+
+    expect(await screen.findByTestId('not-found')).toHaveTextContent('Page not found')
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the home page' })).toHaveAttribute('href', '/')
+  })
+
+  it('shows the not-found page in the site shell for an unknown page and the reserved form routes', async () => {
+    stubServer()
+
+    for (const path of ['/e2e/no-such-page', '/e2e/notes/new', '/e2e/notes/42']) {
+      const { unmount } = renderApp(path)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('shows the not-found page in the platform shell for a deeper unknown address', async () => {
+    stubServer()
+
+    renderApp('/e2e/notes/42/edit')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument()
   })
 })

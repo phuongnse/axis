@@ -1,47 +1,53 @@
 import { ProLayout } from '@ant-design/pro-components'
 import { Segmented, Switch } from 'antd'
 import type { ReactNode } from 'react'
-import type { SiteMetadata } from './site'
+import { Link, useLocation } from 'react-router'
+import type { NavigationItem } from './site'
 import { useText } from './texts'
 import { useThemeMode } from './themeMode'
 
 interface ShellProps {
-  site: SiteMetadata
+  titleKey: string
+  navigation: readonly NavigationItem[]
+  locales: readonly string[]
   locale: string
   onLocaleChange: (locale: string) => void
   children: ReactNode
 }
 
-/** The platform layout: site title and navigation, locale switch and theme toggle. */
-export function Shell({ site, locale, onLocaleChange, children }: ShellProps) {
+/**
+ * The layout of every site, the platform site and application sites alike: site title and
+ * navigation, locale switch and theme toggle.
+ */
+export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, children }: ShellProps) {
   const t = useText()
   const { mode, toggleMode } = useThemeMode()
+  const { pathname } = useLocation()
 
   return (
     <div data-theme-mode={mode}>
       <ProLayout
-        title={t(site.titleKey)}
+        title={t(titleKey)}
         // The document title is the site title, not the title of the matching navigation entry.
         pageTitleRender={false}
         logo={false}
         layout="top"
         navTheme={mode === 'dark' ? 'realDark' : 'light'}
-        location={{ pathname: window.location.pathname }}
+        location={{ pathname }}
         route={{
-          routes: site.navigation.map((item) => ({
+          routes: navigation.map((item) => ({
             key: item.key,
             path: item.path,
             name: t(item.labelKey),
           })),
         }}
-        // No client-side router yet: each entry is a plain link.
-        menuItemRender={(item, dom) => <a href={item.path}>{dom}</a>}
+        menuItemRender={(item, dom) => <Link to={item.path ?? '/'}>{dom}</Link>}
         actionsRender={() => [
           <Segmented
             key="locale"
             aria-label={t('shell.locale.label')}
             value={locale}
-            options={site.locales.available.map((tag) => ({
+            options={locales.map((tag) => ({
               value: tag,
               label: t(`shell.locale.${tag}`),
             }))}

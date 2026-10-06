@@ -14,7 +14,7 @@ test('a record of the E2E application is created and read through the record API
   expect(await read.json()).toEqual({
     id: record.id,
     version: 1,
-    values: { title: 'Smoke test', done: false },
+    values: { title: 'Smoke test', done: false, dueAt: null, category: null },
     labels: {},
   })
 })

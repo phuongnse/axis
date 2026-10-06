@@ -48,11 +48,37 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
   await expect(page.getByRole('radio', { name: 'Tiếng Việt' })).toBeChecked()
 })
 
-test('deep links are served by the single-page app', async ({ page }) => {
-  const response = await page.goto('/apps/unknown/page')
+test('the home page opens a site in its own shell, in light and dark mode', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByRole('link', { name: 'E2E notes' }).click()
+
+  await expect(page).toHaveURL(/\/e2e\/notes$/)
+  await expect(page.getByRole('main').getByText('Notes', { exact: true })).toBeVisible()
+  for (const mode of ['light', 'dark']) {
+    if (mode === 'dark') {
+      await page.getByRole('switch', { name: 'Dark mode' }).click()
+    }
+    const shell = page.locator(`[data-theme-mode="${mode}"]`)
+    await expect(shell.getByRole('menuitem', { name: 'Notes' })).toBeVisible()
+    await expect(shell.getByRole('menuitem', { name: 'Categories' })).toBeVisible()
+  }
+})
+
+test('an unknown site is not found inside the platform shell', async ({ page }) => {
+  const response = await page.goto('/no-such-site')
 
   expect(response?.status()).toBe(200)
-  await expect(page.getByRole('main').getByText('Welcome to Axis')).toBeVisible()
+  await expect(page.getByTestId('not-found')).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Home' })).toBeVisible()
+})
+
+test('an unknown page is not found inside the site shell', async ({ page }) => {
+  const response = await page.goto('/e2e/no-such-page')
+
+  expect(response?.status()).toBe(200)
+  await expect(page.getByTestId('not-found')).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Notes' })).toBeVisible()
 })
 
 test('the readiness endpoint reports the database check', async ({ request }) => {

@@ -12,5 +12,12 @@
   "shell.locale.label": "Ngôn ngữ",
   "shell.locale.en": "English",
   "shell.locale.vi": "Tiếng Việt",
-  "shell.locale.loadFailed": "Không thể tải văn bản cho ngôn ngữ này."
+  "shell.locale.loadFailed": "Không thể tải văn bản cho ngôn ngữ này.",
+  "shell.home.sites.title": "Trang ứng dụng",
+  "shell.home.sites.empty": "Chưa có ứng dụng nào được kích hoạt.",
+  "shell.home.sites.loadFailed": "Không thể tải danh sách trang ứng dụng.",
+  "shell.notFound.title": "Không tìm thấy trang",
+  "shell.notFound.message": "Không có gì ở địa chỉ này.",
+  "shell.notFound.home": "Về trang chủ",
+  "shell.widget.form.unavailable": "Biểu mẫu chưa khả dụng."
 }
