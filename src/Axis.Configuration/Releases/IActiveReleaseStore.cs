@@ -19,16 +19,28 @@ public interface IActiveReleaseStore
     /// </summary>
     Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default);
 
+    /// <summary>Lists every active release, ordered by manifest name ignoring letter case.</summary>
+    Task<IReadOnlyList<ActiveRelease>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds the active release that holds the site path <paramref name="path"/>. The path is
+    /// compared exactly; site paths are always lower-case.
+    /// </summary>
+    Task<ActiveRelease?> FindBySitePathAsync(string path, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Makes <paramref name="releaseId"/> the active release of <paramref name="applicationId"/>
-    /// under <paramref name="name"/>, replacing any previous one; the last call wins. Returns
-    /// <see langword="false"/> and changes nothing when another application id holds the name,
-    /// ignoring letter case.
+    /// under <paramref name="name"/> with the site paths <paramref name="sitePaths"/>, replacing any
+    /// previous one; the last call wins. The release and its site paths are written in one
+    /// transaction, so call it outside an explicit transaction. Returns a conflict and changes
+    /// nothing when another application id holds the name, ignoring letter case, or one of the
+    /// site paths.
     /// </summary>
-    Task<bool> TrySetAsync(
+    Task<SetActiveReleaseResult> TrySetAsync(
         Guid applicationId,
         string name,
         Guid releaseId,
+        IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
         CancellationToken cancellationToken = default);
 }

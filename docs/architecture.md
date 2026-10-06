@@ -173,31 +173,48 @@ flowchart LR
      (`AXC0004`), so the database's `lower(name)` matches. An application
      may change its name: its active release then holds the new name and the
      old one is free for another application.
+   - **Site paths.** A site path is active for at most one application `id`
+     in the tenant. The active release stores the paths of its sites. A site
+     whose path another application's active release holds gets `AXC0031` at
+     `/path` of its site file. Activation checks the paths before
+     provisioning, and a unique index on the path enforces the rule when the
+     active release is set. Site paths are lower-case (`AXC0004`), so the
+     plain index already ignores letter case.
    - **Order.** Activation first checks that no other application `id` is
      active under the manifest name; if one is, it returns `AXC0020` and
-     changes nothing. It then provisions the entity tables (see
+     changes nothing. It then checks each site path; it returns one `AXC0031`
+     for every site whose path another application holds, and changes
+     nothing. It then provisions the entity tables (see
      [Storage](#storage)); when provisioning returns diagnostics, they are
      returned and the active release is untouched. Only then is the release
      set active, in one upsert per application `id`, so two activations of
      the same application never conflict and the last one wins. When another
      application took the name after the check, the upsert is refused and
-     activation returns the same `AXC0020`.
+     activation returns the same `AXC0020`. When another application took a
+     site path after the check, the unique index refuses it and activation
+     returns one `AXC0031` for that path.
    - **Transactions.** Provisioning runs in its own transaction (DDL,
-     provisioning records and the schema lock). The active release is
-     written afterwards in a separate statement, and no other configuration
-     statement runs while the provisioning transaction is open, so the caller
-     may use one tenant connection for both or two connections.
+     provisioning records and the schema lock). The active release and its
+     `axis.active_sites` rows are written afterwards, after provisioning
+     committed, in one short transaction of their own. A refused name or path
+     leaves neither written. No other configuration statement runs while the
+     provisioning transaction is open, so the caller may use one tenant
+     connection for both or two connections. Activation must run outside an
+     explicit transaction.
    - **Failure after provisioning.** When writing the active release fails
      after provisioning committed, the error propagates. The new tables and
      columns stay, recorded for the application, and the previous release
      stays active and keeps serving: it reads and writes only its own
      columns, so only a new required column on a table that had no rows
      rejects its inserts. Activating again is safe because provisioning is
-     additive. An activation that loses the name to a concurrent one also
+     additive. An activation that loses the name or a site path to a
+     concurrent one also
      leaves its provisioned tables in place, recorded for its application
      `id` and not active.
    - **Re-activation.** Activating the active release again provisions
-     nothing and changes only its activation time.
+     nothing, keeps its site paths and changes only its activation time. A
+     release that renames a site path frees the old path for another
+     application.
    - **Serving.** The server rebuilds the `ApplicationModel` from the
      release's stored resources through `IActiveReleaseStore` and caches it
      per tenant and release id. A stored release that no longer compiles
@@ -250,6 +267,7 @@ sorted by file and then path.
 | `AXC0028` | No locale has the text key of this label. Reported at the label's `/textKey`. |
 | `AXC0029` | The entity's `displayField` names no required `text` field of the entity. Reported at `/displayField`. |
 | `AXC0030` | A reference field's target entity has no `displayField`. Reported at `/fields/{i}/target`. |
+| `AXC0031` | A site path is active for another application. Reported at `/path` of the site file; nothing is provisioned or activated. |
 
 ### Startup activation
 
@@ -398,13 +416,15 @@ is `AXC0013`.
   and migrations. Each module context keeps its migration history in its own
   table, `axis.__<module>_migrations`, so the contexts sharing the schema do
   not collide.
-  - `Axis.Configuration` owns `axis.releases`, `axis.release_resources` and
+  - `Axis.Configuration` owns `axis.releases`, `axis.release_resources`,
     `axis.active_releases` (the active release of each application `id`,
-    with its name, unique ignoring letter case), with history in
-    `axis.__configuration_migrations`. The caller supplies the tenant
-    database connection. Other modules read and set the active release only
-    through `IActiveReleaseStore`; they never use `axis.active_releases` or
-    the configuration context directly.
+    with its name, unique ignoring letter case) and `axis.active_sites` (the
+    site paths of each active release, as application `id` and path, unique
+    on path), with history in `axis.__configuration_migrations`. The caller
+    supplies the tenant database connection. Other modules read and set the
+    active release and its site paths only through `IActiveReleaseStore`;
+    they never use `axis.active_releases`, `axis.active_sites` or the
+    configuration context directly.
   - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity
     with its application and table) and `axis.provisioned_enum_values` (each
     recorded enum value), with history in `axis.__data_migrations`.

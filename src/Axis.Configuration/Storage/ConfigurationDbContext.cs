@@ -26,11 +26,16 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     /// </summary>
     public const string ActiveReleaseNameIndex = "ix_active_releases_lower_name";
 
+    /// <summary>The unique index on the <c>path</c> of the active sites, so a site path is active for at most one application.</summary>
+    public const string ActiveSitePathIndex = "ix_active_sites_path";
+
     public DbSet<Release> Releases => Set<Release>();
 
     public DbSet<ReleaseResource> ReleaseResources => Set<ReleaseResource>();
 
     public DbSet<ActiveReleaseRow> ActiveReleases => Set<ActiveReleaseRow>();
+
+    public DbSet<ActiveSiteRow> ActiveSites => Set<ActiveSiteRow>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -90,6 +95,20 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
                 .HasForeignKey(r => r.ReleaseId)
                 .HasConstraintName("fk_active_releases_releases_release_id")
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ActiveSiteRow>(site =>
+        {
+            site.ToTable("active_sites");
+            site.HasKey(s => new { s.ApplicationId, s.Path }).HasName("pk_active_sites");
+            site.Property(s => s.ApplicationId).HasColumnName("application_id");
+            site.Property(s => s.Path).HasColumnName("path").HasMaxLength(60);
+            site.HasIndex(s => s.Path).IsUnique().HasDatabaseName(ActiveSitePathIndex);
+            site.HasOne<ActiveReleaseRow>()
+                .WithMany()
+                .HasForeignKey(s => s.ApplicationId)
+                .HasConstraintName("fk_active_sites_active_releases_application_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

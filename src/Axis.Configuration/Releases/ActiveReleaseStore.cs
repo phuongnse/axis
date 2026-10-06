@@ -7,7 +7,8 @@ namespace Axis.Configuration.Releases;
 
 /// <summary>
 /// The active releases stored through <see cref="ConfigurationDbContext"/>. Reads do not track, and
-/// writes are single raw SQL statements, so the context's change tracker is never affected.
+/// writes are raw SQL statements in one transaction, so the context's change tracker is never
+/// affected.
 /// </summary>
 public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActiveReleaseStore
 {
@@ -33,6 +34,29 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
             .Select(row => new ActiveRelease(row.ApplicationId, row.Name, row.ReleaseId, row.ActivatedAt))
             .SingleOrDefaultAsync(cancellationToken);
 
+    [SuppressMessage("Performance", "CA1862:Use the 'StringComparison' method overloads", Justification = "The query must translate to lower(name) to order like the unique index.")]
+    public async Task<IReadOnlyList<ActiveRelease>> ListAsync(CancellationToken cancellationToken = default) =>
+        await context.ActiveReleases
+            .AsNoTracking()
+            .OrderBy(row => row.Name.ToLower())
+            .Select(row => new ActiveRelease(row.ApplicationId, row.Name, row.ReleaseId, row.ActivatedAt))
+            .ToListAsync(cancellationToken);
+
+    public Task<ActiveRelease?> FindBySitePathAsync(string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        return context.ActiveSites
+            .AsNoTracking()
+            .Where(site => site.Path == path)
+            .Join(
+                context.ActiveReleases.AsNoTracking(),
+                site => site.ApplicationId,
+                row => row.ApplicationId,
+                (site, row) => new ActiveRelease(row.ApplicationId, row.Name, row.ReleaseId, row.ActivatedAt))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default)
     {
         var release = await context.Releases
@@ -45,18 +69,24 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
         return release;
     }
 
-    public async Task<bool> TrySetAsync(
+    public async Task<SetActiveReleaseResult> TrySetAsync(
         Guid applicationId,
         string name,
         Guid releaseId,
+        IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(sitePaths);
 
+        var paths = sitePaths.ToArray();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            // One statement, so two activations of the same application never fail on the primary key.
+            // The release row comes first, so the site rows' foreign key target exists on a first
+            // activation. One statement, so two activations of the same application never fail on
+            // the primary key.
             await context.Database.ExecuteSqlAsync(
                 $"""
                 INSERT INTO axis.active_releases (application_id, name, release_id, activated_at)
@@ -65,7 +95,38 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
                 SET name = EXCLUDED.name, release_id = EXCLUDED.release_id, activated_at = EXCLUDED.activated_at
                 """,
                 cancellationToken);
-            return true;
+
+            // Paths the release no longer has are freed; paths it keeps stay as they are.
+            await context.Database.ExecuteSqlAsync(
+                $"DELETE FROM axis.active_sites WHERE application_id = {applicationId} AND NOT (path = ANY({paths}))",
+                cancellationToken);
+
+            // One statement per path, so a refused statement names the taken path.
+            foreach (var path in paths)
+            {
+                try
+                {
+                    await context.Database.ExecuteSqlAsync(
+                        $"""
+                        INSERT INTO axis.active_sites (application_id, path)
+                        VALUES ({applicationId}, {path})
+                        ON CONFLICT (application_id, path) DO NOTHING
+                        """,
+                        cancellationToken);
+                }
+                catch (PostgresException exception) when (exception is
+                {
+                    SqlState: PostgresErrorCodes.UniqueViolation,
+                    ConstraintName: ConfigurationDbContext.ActiveSitePathIndex,
+                })
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return new SetActiveReleaseResult(ActiveReleaseConflict.SitePath, path);
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return SetActiveReleaseResult.Set;
         }
         catch (PostgresException exception) when (exception is
         {
@@ -73,7 +134,8 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
             ConstraintName: ConfigurationDbContext.ActiveReleaseNameIndex,
         })
         {
-            return false;
+            await transaction.RollbackAsync(cancellationToken);
+            return new SetActiveReleaseResult(ActiveReleaseConflict.Name);
         }
     }
 }
