@@ -3,6 +3,7 @@ using Axis.Presentation.Texts;
 using Axis.Server.Applications;
 using Axis.Server.Health;
 using Axis.Server.Presentation;
+using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Npgsql;
@@ -28,12 +29,16 @@ builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvide
 
 var app = builder.Build();
 
-// First, so API and SPA paths alike need a known tenant host.
+// Outermost, so an unexpected error on any path is a 500 problem without exception text.
+app.UseExceptionHandler();
+
+// Then tenant resolution, so API and SPA paths alike need a known tenant host.
 app.UseTenantResolution();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapHealthEndpoints();
 app.MapPresentationEndpoints();
+app.MapRecordEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();

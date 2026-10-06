@@ -390,8 +390,96 @@ access. It returns diagnostics, SQL statements and the new records to write.
 
 ## Record API
 
-Records of an entity are read and written through the record API. #35 and
-#37 add its routes, response shapes and status codes to this section.
+Records of an entity are read and written through the record API. It serves
+the entities of the active release of an application, in the tenant that the
+request host resolves to. A record of another tenant does not exist for the
+request, so it is a 404 like any unknown record.
+
+The endpoints have no authorization yet. Policies are checked on every record
+endpoint from M4 (see "Authentication and authorization").
+
+### Routes
+
+| Method and path | Response |
+| --- | --- |
+| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=` | `200` with one page of records |
+| `GET /api/apps/{app}/entities/{entity}/records/{id}` | `200` with one record |
+
+`{app}` is the name of an active release, and `{entity}` an entity name in that
+release. Both match ignoring letter case. `{id}` is a record id in the
+hyphenated 8-4-4-4-12 hex form, in either letter case. Create, update and
+delete routes are planned.
+
+### Record shape
+
+```json
+{
+  "id": "6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7",
+  "version": 1,
+  "values": {
+    "name": "Desk",
+    "quantity": 3,
+    "price": 1250.50,
+    "orderedAt": "2026-10-06T02:00:00.123456Z",
+    "department": null
+  }
+}
+```
+
+`values` holds every declared field of the entity under its declared name, in
+declaration order. A field that is SQL `NULL` is `null`; it is never left out.
+
+A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
+"totalCount": 42 }`. `items` holds records in the shape above, `page` and
+`pageSize` are the values used, and `totalCount` counts every record of the
+entity.
+
+### Reading values
+
+| Field type | JSON value |
+| --- | --- |
+| `text`, `enum` | A string |
+| `integer` | A number |
+| `decimal` | A number written as PostgreSQL renders the stored `numeric`. It is read as text, so no digit is lost and stored trailing zeros stay, such as `1250.50` |
+| `boolean` | `true` or `false` |
+| `date` | A string `yyyy-MM-dd` |
+| `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
+| `reference` | A string with the record id in the lowercase hyphenated form |
+
+### Paging and sorting
+
+- **`page`.** An integer of at least 1. It defaults to 1.
+- **`pageSize`.** An integer from 1 to 100. It defaults to 20.
+- **`sort`.** A declared field name, or `-` and the name for descending
+  order. The name matches exactly, so letter case matters.
+- **Order.** Records are ordered by the sort column and then by `id`
+  ascending, also for descending sorts. Without `sort`, they are ordered by
+  `id` alone. `NULL` values follow the PostgreSQL defaults: last when
+  ascending and first when descending. Text sorts by the tenant database's
+  collation.
+- **Past the end.** A page past the last one is `200` with empty `items` and
+  the real `totalCount`.
+- **Count.** `totalCount` is counted in a separate statement from the page,
+  without a transaction. Under concurrent writes it can differ from the items
+  by a few rows.
+
+The parameters are digits only: a sign, a space or a repeated parameter
+(`page=1&page=2`) is invalid.
+
+### Errors
+
+Every error is problem details (`application/problem+json`). The titles are
+fixed and never contain text from the request.
+
+- **`404`.** An unknown application, an application with no active release,
+  an unknown entity, an unknown record and an `{id}` that is not a UUID in the
+  hyphenated form. The path is resolved before the query is checked, so a
+  path that names nothing is a 404 whatever its query.
+- **`400`.** An invalid `page`, `pageSize` or `sort` is a validation problem
+  whose `errors` is keyed `page`, `pageSize` and `sort`. Every invalid
+  parameter is reported in the same response.
+- **`500`.** An unexpected error on any path is caught by the exception
+  handler. The response has no exception type, message or stack trace.
 
 ### Request bodies and values
 
