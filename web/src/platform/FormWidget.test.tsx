@@ -122,6 +122,15 @@ describe('FormWidget', () => {
     expect(screen.getByLabelText('Category')).toHaveAttribute('readonly')
   })
 
+  it('marks required fields without blocking submit', async () => {
+    stubFetch()
+    renderForm()
+
+    // Ant Design marks a required item by a class on its label; the server still decides.
+    expect(screen.getByText('Title', { selector: 'label' })).toHaveClass('ant-form-item-required')
+    expect(screen.getByText('Code', { selector: 'label' })).not.toHaveClass('ant-form-item-required')
+  })
+
   it('confirms a picker value on Enter without sending the form', async () => {
     const requests = stubFetch()
     renderForm()

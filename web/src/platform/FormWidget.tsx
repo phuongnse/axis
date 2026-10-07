@@ -256,6 +256,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
               key={field.name}
               label={field.labelKey ? t(field.labelKey) : field.name}
               htmlFor={field.name}
+              required={field.required}
               validateStatus={errors ? 'error' : undefined}
               help={errors && <span data-testid={`field-error-${field.name}`}>{errors.join(' ')}</span>}
             >

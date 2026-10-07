@@ -1084,7 +1084,8 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
   record API. It adds no rules of its own: the server validates.
   - **Inputs.** There is one input per field, in declaration order, labelled
-    with the field's label or the field name.
+    with the field's label or the field name. A required field's label is
+    marked, but the mark blocks nothing: the server still decides.
 
     | Field type | Input |
     | --- | --- |
