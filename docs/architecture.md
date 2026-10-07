@@ -1229,7 +1229,11 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
-The E2E server starts with the generic test application in
-`tests/e2e/fixtures/e2e-app` listed in `ActivateOnStartup` (see
+The E2E server starts with two applications listed in `ActivateOnStartup` (see
 [Startup activation](#startup-activation)), so Playwright journeys run against
-real metadata and records. It is not the purchase request sample.
+real metadata and records:
+
+- the generic test application in `tests/e2e/fixtures/e2e-app`, for the
+  platform journeys;
+- the purchase request sample in `samples/apps/purchase-requests`, for the
+  purchase request skeleton journeys.

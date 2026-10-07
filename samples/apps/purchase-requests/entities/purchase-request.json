@@ -1,0 +1,23 @@
+{
+  "id": "d9ccbf89-5004-4d52-8885-2ee377b7caa5",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "purchaseRequest.title" } },
+    { "name": "requester", "type": "text", "maxLength": 100, "label": { "textKey": "purchaseRequest.requester" } },
+    { "name": "department", "type": "reference", "target": "Department", "required": true, "label": { "textKey": "purchaseRequest.department" } },
+    { "name": "supplier", "type": "reference", "target": "Supplier", "label": { "textKey": "purchaseRequest.supplier" } },
+    { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"], "label": { "textKey": "purchaseRequest.currency" } },
+    { "name": "totalAmount", "type": "decimal", "precision": 18, "scale": 2, "label": { "textKey": "purchaseRequest.totalAmount" } },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": ["draft", "submitted", "approved", "returned", "rejected"],
+      "label": { "textKey": "purchaseRequest.status" }
+    },
+    { "name": "submittedAt", "type": "date-time", "label": { "textKey": "purchaseRequest.submittedAt" } },
+    { "name": "decisionComments", "type": "text", "maxLength": 2000, "label": { "textKey": "purchaseRequest.decisionComments" } }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20a80495-3566-40d6-bf99-74fcdd9bb42b",
+  "kind": "page",
+  "name": "PurchaseRequestForm",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.purchaseRequestForm.title" },
+  "widgets": [{ "type": "form", "entity": "PurchaseRequest" }]
+}

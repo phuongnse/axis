@@ -1,0 +1,33 @@
+{
+  "id": "494288c9-ce9b-4fc9-bea0-d618094e66fe",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Purchasing",
+    "nav.purchaseRequests": "Purchase requests",
+    "nav.departments": "Departments",
+    "nav.suppliers": "Suppliers",
+    "pages.purchaseRequests.title": "Purchase requests",
+    "pages.purchaseRequestForm.title": "Purchase request",
+    "pages.departments.title": "Departments",
+    "pages.suppliers.title": "Suppliers",
+    "department.label": "Department",
+    "department.code": "Code",
+    "department.name": "Name",
+    "supplier.label": "Supplier",
+    "supplier.code": "Code",
+    "supplier.name": "Name",
+    "purchaseRequest.label": "Purchase request",
+    "purchaseRequest.title": "Title",
+    "purchaseRequest.requester": "Requester",
+    "purchaseRequest.department": "Department",
+    "purchaseRequest.supplier": "Supplier",
+    "purchaseRequest.currency": "Currency",
+    "purchaseRequest.totalAmount": "Total amount",
+    "purchaseRequest.status": "Status",
+    "purchaseRequest.submittedAt": "Submitted at",
+    "purchaseRequest.decisionComments": "Decision comments"
+  }
+}

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\apps\purchase-requests\**\*" Link="Samples\purchase-requests\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

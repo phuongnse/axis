@@ -1,0 +1,14 @@
+{
+  "id": "0cec2d63-0949-465f-a29e-80b546dfa347",
+  "kind": "site",
+  "name": "Purchasing",
+  "formatVersion": 1,
+  "path": "purchasing",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "navigation": [
+    { "page": "PurchaseRequests", "label": { "textKey": "nav.purchaseRequests" } },
+    { "page": "Departments", "label": { "textKey": "nav.departments" } },
+    { "page": "Suppliers", "label": { "textKey": "nav.suppliers" } }
+  ]
+}

@@ -76,11 +76,12 @@ For local development:
 - Run `dotnet run --project src/Axis.Server` to start the server on port 5206.
 - Run `npm run dev --prefix web` to start the SPA with hot reload. It proxies
   `/api` and `/health` to the server.
-- To compile and activate an application folder on `dotnet run`, add
-  `"ActivateOnStartup": ["../../samples/apps/purchase-requests"]` to
-  `src/Axis.Server/appsettings.Development.json`, or set
-  `ActivateOnStartup__0=<folder>`. Relative paths are resolved from
-  `src/Axis.Server`. The server then migrates every tenant database and
-  activates the folder before it listens, and stops on any diagnostic.
+- `src/Axis.Server/appsettings.Development.json` lists the purchase request
+  sample, `../../samples/apps/purchase-requests`, in `ActivateOnStartup`. So
+  `dotnet run` migrates every tenant database, then compiles and activates the
+  sample before it listens, and stops on any diagnostic.
+- To activate another application folder, add it to that list, or set
+  `ActivateOnStartup__0=<folder>` to activate it in place of the sample.
+  Relative paths are resolved from `src/Axis.Server`.
 
 Formatting fixes: `dotnet format Axis.slnx` and `npm run format --prefix web`.

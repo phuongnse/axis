@@ -1,0 +1,12 @@
+{
+  "id": "e9139b79-4dd5-485e-89a1-48b0e93eeaf9",
+  "kind": "seed",
+  "name": "Suppliers",
+  "formatVersion": 1,
+  "entity": "Supplier",
+  "records": [
+    { "id": "06e1abca-17bb-4a84-a05d-508f7428a7e5", "values": { "code": "ACME", "name": "Acme Supplies" } },
+    { "id": "d97fc520-bc90-442b-8e4d-8d2b94b77c65", "values": { "code": "GLOBEX", "name": "Globex" } },
+    { "id": "d1ed68b4-6ad2-4267-80fb-926651b50648", "values": { "code": "INITECH", "name": "Initech" } }
+  ]
+}

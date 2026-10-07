@@ -1,0 +1,12 @@
+{
+  "id": "ebe6bc20-4772-4d6c-839b-65d426ebeeca",
+  "kind": "entity",
+  "name": "Department",
+  "formatVersion": 1,
+  "label": { "textKey": "department.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "code", "type": "text", "required": true, "unique": true, "maxLength": 20, "label": { "textKey": "department.code" } },
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "department.name" } }
+  ]
+}

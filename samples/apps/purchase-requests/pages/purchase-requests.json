@@ -1,0 +1,8 @@
+{
+  "id": "e0ee63b0-ff11-4f06-95ee-e73922f2c1a9",
+  "kind": "page",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.purchaseRequests.title" },
+  "widgets": [{ "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "9b707fe9-a837-433e-8062-48a2a9b4d62a",
+  "kind": "page",
+  "name": "Suppliers",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.suppliers.title" },
+  "widgets": [{ "type": "table", "entity": "Supplier" }]
+}
