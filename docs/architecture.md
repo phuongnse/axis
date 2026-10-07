@@ -541,7 +541,7 @@ is `AXC0013`.
   module; values are always parameters. Configuration can never supply raw SQL.
   Request text, such as the entity segment, `sort` and `values` names, is
   matched against the model's declared names and never used as an identifier.
-- **Database credentials** *(planned for M6)*. Runtime access and schema
+- **Database credentials** *(planned)*. Runtime access and schema
   changes will use different database roles. M1 uses one connection string per
   tenant.
 
