@@ -2,7 +2,9 @@
 
 This is the vocabulary used in code, APIs, configuration files and UI. The
 **From** column gives the milestone that introduces the concept (see the
-[roadmap](../roadmap.md)).
+[roadmap](../roadmap.md)). The docs sweep at milestone close checks this
+column and moves a concept to a later milestone when it was not delivered.
+See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 
 ## Packaging and lifecycle
 

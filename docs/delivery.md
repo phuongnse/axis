@@ -77,6 +77,38 @@ them up where they live.
    worktree. Run build, lint and tests, ask the owner before pushing, then
    comment `/nexkit review`.
 
+## The life of a milestone
+
+1. **Break it down.** When the current milestone is nearly done, break the
+   next one into issues, as the [roadmap](roadmap.md#how-work-is-planned)
+   describes.
+2. **Deliver the issues.** Each one follows the life of an issue above.
+3. **Docs sweep.** Before the owner closes the milestone, one issue in it
+   checks the docs and fixes what the milestone made stale. It checks at
+   least:
+   - the roadmap status of this milestone and the next one;
+   - the **From** column of [concepts.md](domain/concepts.md) for every
+     concept listed for this milestone, moved to a later milestone when the
+     concept was not delivered;
+   - every *(planned for Mx)* marker for this milestone in any doc, removed
+     when the work was built and moved to a later milestone when it was not.
+4. **Close.** The owner closes the milestone on GitHub once the docs sweep
+   is merged.
+
+## Keeping the docs current
+
+- **The roadmap is the only place for milestone status.**
+  [roadmap.md](roadmap.md) records each milestone's status and what it
+  delivers. Other docs link to it instead of repeating it.
+- **One marker for planned work.** Any doc text that describes something not
+  built yet carries *(planned for Mx)*, where Mx is the milestone that builds
+  it. This applies to every doc, not only the architecture. The docs sweep
+  removes or moves these markers when a milestone closes.
+- **No false statements left behind.** A change that makes any doc statement
+  false fixes it in the same change. The rule is in the
+  [AGENTS.md working rules](../AGENTS.md#working-rules), so the NexKit review
+  applies it to every pull request.
+
 ## Writing on GitHub
 
 These rules apply to issues, plans, pull request descriptions and reviews.

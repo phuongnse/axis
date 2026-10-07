@@ -1,8 +1,9 @@
 # Axis architecture
 
 This is the target structure. Sections marked *(planned for Mx)* describe work
-that has not been built yet. Decisions referenced as Dn are in
-[decisions.md](decisions.md).
+that has not been built yet, as defined in
+[delivery.md](delivery.md#keeping-the-docs-current). Decisions referenced as
+Dn are in [decisions.md](decisions.md).
 
 ## Overview
 
