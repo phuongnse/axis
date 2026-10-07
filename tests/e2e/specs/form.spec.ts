@@ -27,7 +27,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
 
   await page.getByRole('link', { name: 'New' }).click()
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await page.getByLabel('Title', { exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title' }).fill(title)
   await page.getByLabel('Code', { exact: true }).fill(`C-${run}`)
   await page.getByLabel('Priority', { exact: true }).fill('7')
   await page.getByLabel('Amount', { exact: true }).fill('12.50')
@@ -47,8 +47,8 @@ test('a note is created and edited in the form, in light and dark mode', async (
   }
 
   await row.getByRole('link', { name: 'Open' }).click()
-  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
-  await page.getByLabel('Title', { exact: true }).fill(`${title} edited`)
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await page.getByRole('textbox', { name: 'Title' }).fill(`${title} edited`)
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(tablePath)
@@ -60,7 +60,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await page.getByRole('switch', { name: 'Dark mode' }).click()
   await edited.getByRole('link', { name: 'Open' }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
-  await expect(dark.getByLabel('Title', { exact: true })).toHaveValue(`${title} edited`)
+  await expect(dark.getByRole('textbox', { name: 'Title' })).toHaveValue(`${title} edited`)
   await dark.getByRole('button', { name: 'Cancel' }).click()
   await expect(page).toHaveURL(tablePath)
 })
@@ -79,7 +79,7 @@ test('editing the title leaves an untouched date-time unchanged', async ({ page,
   const note = await createRecord(request, 'Note', { title: `Fraction ${run}`, dueAt: '2026-10-06T02:00:00.123456Z' })
 
   await page.goto(`/e2e/noteform/${note.id}`)
-  await page.getByLabel('Title', { exact: true }).fill(`Fraction ${run} edited`)
+  await page.getByRole('textbox', { name: 'Title' }).fill(`Fraction ${run} edited`)
   await page.getByRole('button', { name: 'Save' }).click()
   // Opened without a table, the form returns to the site, which opens its first page.
   await expect(page).toHaveURL(/\/e2e\/notes$/)
@@ -97,7 +97,7 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
   await createRecord(request, 'Note', { title: `Conflict ${run} B`, code: `B-${run}` })
 
   await page.goto(`/e2e/noteform/${a.id}`)
-  const titleInput = page.getByLabel('Title', { exact: true })
+  const titleInput = page.getByRole('textbox', { name: 'Title' })
   await expect(titleInput).toHaveValue(`Conflict ${run} A`)
   const patched = await request.patch(`${notesPath}/${a.id}`, {
     data: { version: 1, values: { title: 'Changed elsewhere' } },
