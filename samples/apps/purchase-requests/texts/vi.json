@@ -1,0 +1,33 @@
+{
+  "id": "05298509-1d5c-40d1-96ab-21909ec74972",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "site.title": "Mua hàng",
+    "nav.purchaseRequests": "Yêu cầu mua hàng",
+    "nav.departments": "Phòng ban",
+    "nav.suppliers": "Nhà cung cấp",
+    "pages.purchaseRequests.title": "Yêu cầu mua hàng",
+    "pages.purchaseRequestForm.title": "Yêu cầu mua hàng",
+    "pages.departments.title": "Phòng ban",
+    "pages.suppliers.title": "Nhà cung cấp",
+    "department.label": "Phòng ban",
+    "department.code": "Mã",
+    "department.name": "Tên",
+    "supplier.label": "Nhà cung cấp",
+    "supplier.code": "Mã",
+    "supplier.name": "Tên",
+    "purchaseRequest.label": "Yêu cầu mua hàng",
+    "purchaseRequest.title": "Tiêu đề",
+    "purchaseRequest.requester": "Người yêu cầu",
+    "purchaseRequest.department": "Phòng ban",
+    "purchaseRequest.supplier": "Nhà cung cấp",
+    "purchaseRequest.currency": "Tiền tệ",
+    "purchaseRequest.totalAmount": "Tổng tiền",
+    "purchaseRequest.status": "Trạng thái",
+    "purchaseRequest.submittedAt": "Gửi lúc",
+    "purchaseRequest.decisionComments": "Ý kiến phê duyệt"
+  }
+}

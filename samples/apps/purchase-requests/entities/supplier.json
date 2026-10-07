@@ -1,0 +1,12 @@
+{
+  "id": "2deb5acd-dfd8-4c5a-b546-a1aa03df6964",
+  "kind": "entity",
+  "name": "Supplier",
+  "formatVersion": 1,
+  "label": { "textKey": "supplier.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "code", "type": "text", "required": true, "unique": true, "maxLength": 20, "label": { "textKey": "supplier.code" } },
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "supplier.name" } }
+  ]
+}

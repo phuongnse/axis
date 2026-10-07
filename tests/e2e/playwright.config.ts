@@ -13,8 +13,10 @@ const serverCommand = 'dotnet run --project ../../src/Axis.Server --no-launch-pr
 const serverLog = process.env.AXIS_E2E_SERVER_LOG
 const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
 
-// The server compiles and activates this generic test application in the tenant when it starts.
+// The server compiles and activates both applications in the tenant when it starts: the generic test
+// application and the purchase request sample.
 const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
+const purchaseRequests = path.resolve(import.meta.dirname, '..', '..', 'samples', 'apps', 'purchase-requests')
 
 export default defineConfig({
   testDir: './specs',
@@ -45,6 +47,7 @@ export default defineConfig({
       Tenants__default__Hosts__0: '127.0.0.1',
       Tenants__default__ConnectionString: connectionString,
       ActivateOnStartup__0: e2eApp,
+      ActivateOnStartup__1: purchaseRequests,
     },
   },
 })

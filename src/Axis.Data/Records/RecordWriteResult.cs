@@ -25,7 +25,7 @@ public enum RecordWriteOutcome
 /// <summary>
 /// The outcome of a record create or update. <see cref="Errors"/> is set for
 /// <see cref="RecordWriteOutcome.MissingReference"/> and <see cref="RecordWriteOutcome.UniqueViolation"/>,
-/// keyed by RFC 6901 JSON Pointer such as <c>/values/department</c>, with fixed messages that
+/// keyed by RFC 6901 JSON Pointer such as <c>/values/category</c>, with fixed messages that
 /// never name a table, column or constraint.
 /// </summary>
 public sealed record RecordWriteResult(RecordWriteOutcome Outcome, Record? Record = null, SortedDictionary<string, string[]>? Errors = null);
