@@ -54,3 +54,61 @@ export async function fetchRecords(recordsPath: string, query: string, signal?: 
     totalCount: Number(body.totalCount),
   }
 }
+
+/** A 400 or 409 problem of the record API. `errors` maps a JSON Pointer into the body to its messages. */
+export interface RecordProblem {
+  status: number
+  title: string
+  errors: Record<string, string[]>
+}
+
+/** The outcome of a create or update: the saved record, or the problem the server reported. */
+export type SaveResult = { ok: true; record: RecordItem } | { ok: false; problem: RecordProblem }
+
+function parseRecord(text: string): RecordItem {
+  // The reviver turned `version` into a string too. Only `values` keep the source text.
+  const record = parseRecordJson<Omit<RecordItem, 'version'> & { version: string }>(text)
+  return { ...record, version: Number(record.version) }
+}
+
+/** Loads one record, or returns `null` when the entity has no record with the id. */
+export async function fetchRecord(recordsPath: string, id: string, signal?: AbortSignal): Promise<RecordItem | null> {
+  const response = await fetch(`${recordsPath}/${id}`, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading the record '${id}' of '${recordsPath}' failed with status ${response.status}.`)
+  }
+  return parseRecord(await response.text())
+}
+
+/**
+ * Creates a record when `id` is `null`, and updates the record otherwise. `body` is the prepared
+ * body text, so number text reaches the server unchanged. A 400 or 409 comes back as the problem;
+ * any other failure throws.
+ */
+export async function saveRecord(
+  recordsPath: string,
+  id: string | null,
+  body: string,
+  signal?: AbortSignal,
+): Promise<SaveResult> {
+  const response = await fetch(id === null ? recordsPath : `${recordsPath}/${id}`, {
+    method: id === null ? 'POST' : 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    signal,
+  })
+  if (response.status === 200 || response.status === 201) {
+    return { ok: true, record: parseRecord(await response.text()) }
+  }
+  if (response.status === 400 || response.status === 409) {
+    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+    return {
+      ok: false,
+      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
+    }
+  }
+  throw new Error(`Saving a record of '${recordsPath}' failed with status ${response.status}.`)
+}

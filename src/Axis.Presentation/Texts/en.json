@@ -19,11 +19,16 @@
   "shell.notFound.title": "Page not found",
   "shell.notFound.message": "There is nothing at this address.",
   "shell.notFound.home": "Go to the home page",
-  "shell.widget.form.unavailable": "Forms are not available yet.",
   "shell.table.create": "New",
   "shell.table.open": "Open",
   "shell.table.yes": "Yes",
   "shell.table.no": "No",
   "shell.table.empty": "No records yet.",
-  "shell.table.loadFailed": "The records could not be loaded."
+  "shell.table.loadFailed": "The records could not be loaded.",
+  "shell.form.save": "Save",
+  "shell.form.cancel": "Cancel",
+  "shell.form.reload": "Reload",
+  "shell.form.conflict": "This record was changed since you opened it. Reload it to see the current values.",
+  "shell.form.saveFailed": "The record could not be saved.",
+  "shell.form.loadFailed": "The record could not be loaded."
 }

@@ -81,9 +81,8 @@ export function App({ development }: { development: boolean }) {
         <Route path=":site" element={<SiteRoute />}>
           <Route index element={<SiteIndex />} />
           <Route path=":page" element={<PageRoute />} />
-          {/* Reserved for the form routes of #53. */}
-          <Route path=":page/new" element={<NotFoundPage />} />
-          <Route path=":page/:id" element={<NotFoundPage />} />
+          <Route path=":page/new" element={<PageRoute form="new" />} />
+          <Route path=":page/:id" element={<PageRoute form="edit" />} />
         </Route>
         <Route
           path="*"

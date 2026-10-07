@@ -6,8 +6,13 @@
   "label": { "textKey": "note.label" },
   "fields": [
     { "name": "title", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "note.title" } },
+    { "name": "code", "type": "text", "unique": true, "maxLength": 50, "label": { "textKey": "note.code" } },
+    { "name": "priority", "type": "integer", "label": { "textKey": "note.priority" } },
+    { "name": "amount", "type": "decimal", "precision": 18, "scale": 2, "label": { "textKey": "note.amount" } },
     { "name": "done", "type": "boolean", "label": { "textKey": "note.done" } },
+    { "name": "dueOn", "type": "date", "label": { "textKey": "note.dueOn" } },
     { "name": "dueAt", "type": "date-time", "label": { "textKey": "note.dueAt" } },
+    { "name": "status", "type": "enum", "values": ["open", "closed"], "label": { "textKey": "note.status" } },
     { "name": "category", "type": "reference", "target": "Category", "label": { "textKey": "note.category" } }
   ]
 }

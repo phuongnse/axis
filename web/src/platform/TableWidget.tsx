@@ -1,6 +1,6 @@
 import { Alert, Button, Flex, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useHref, useNavigate, useSearchParams } from 'react-router'
+import { Link, useHref, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { formatValue } from './formatValue'
 import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
 import type { WidgetMetadata } from './site'
@@ -42,6 +42,9 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const formPath = formPage && `/${sitePath}/${formPage.toLowerCase()}`
   const createPath = formPath ? `${formPath}/new` : ''
   const createHref = useHref(createPath)
+  // The form returns to this address, with its paging and sorting, after save or cancel.
+  const location = useLocation()
+  const from = `${location.pathname}${location.search}`
 
   const query = useMemo(() => parseTableQuery(searchParams, entity.fields), [searchParams, entity.fields])
   const requestQuery = recordQuery(query)
@@ -106,11 +109,13 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
       {
         key: openColumnKey,
         render: (_value: unknown, record: RecordItem) => (
-          <Link to={`${formPath}/${record.id}`}>{t('shell.table.open')}</Link>
+          <Link to={`${formPath}/${record.id}`} state={{ from }}>
+            {t('shell.table.open')}
+          </Link>
         ),
       },
     ]
-  }, [entity.fields, formPath, locale, query.sort, t])
+  }, [entity.fields, formPath, from, locale, query.sort, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<RecordItem>['onChange'] = (pagination, _filters, sorter) => {
@@ -135,7 +140,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
                 return
               }
               event.preventDefault()
-              navigate(createPath)
+              navigate(createPath, { state: { from } })
             }}
           >
             {t('shell.table.create')}

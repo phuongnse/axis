@@ -13,8 +13,13 @@
     "pages.categories.title": "Categories",
     "note.label": "Note",
     "note.title": "Title",
+    "note.code": "Code",
+    "note.priority": "Priority",
+    "note.amount": "Amount",
     "note.done": "Done",
+    "note.dueOn": "Due on",
     "note.dueAt": "Due at",
+    "note.status": "Status",
     "note.category": "Category",
     "category.label": "Category",
     "category.name": "Name"

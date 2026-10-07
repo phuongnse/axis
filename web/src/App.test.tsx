@@ -35,7 +35,8 @@ const texts: Record<string, Record<string, string>> = {
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
-    'shell.widget.form.unavailable': 'Forms are not available yet.',
+    'shell.form.save': 'Save',
+    'shell.form.cancel': 'Cancel',
     'shell.table.create': 'New',
     'shell.table.empty': 'No records yet.',
   },
@@ -137,7 +138,10 @@ function stubServer({ ready = true, siteStatus = 200, sitesStatus = 200, failing
       return siteRoute(input.replace('/api/sites/', ''), failingLocale)
     }
     if (input.startsWith('/api/apps/')) {
-      return json({ items: [], page: 1, pageSize: 20, totalCount: 0 })
+      // A list of records has no id segment. No record exists, so a record by id is not found.
+      return input.startsWith(`${noteEntity.recordsPath}/`)
+        ? json({ title: 'Not found', status: 404 }, 404)
+        : json({ items: [], page: 1, pageSize: 20, totalCount: 0 })
     }
     const locale = input.replace('/api/texts/', '')
     if (locale === failingLocale) {
@@ -398,13 +402,30 @@ describe('App', () => {
     expect(fetch).toHaveBeenCalledWith('/api/apps/E2eApp/entities/Note/records', expect.anything())
   })
 
-  it('shows a placeholder for a form page', async () => {
+  it('shows the form of a form page to create a record', async () => {
     stubServer()
 
-    renderApp('/e2e/noteform')
+    renderApp('/e2e/noteform/new')
 
-    expect(await screen.findByTestId('form-placeholder')).toHaveTextContent('Forms are not available yet.')
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'title' })).toBeInTheDocument()
     expect(screen.getByText('Note')).toBeInTheDocument()
+  })
+
+  it('shows the not-found page for a record id the form page has no record for, or that is not an id', async () => {
+    stubServer()
+
+    for (const path of ['/e2e/noteform/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7', '/e2e/noteform/42']) {
+      const { unmount } = renderApp(path)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      unmount()
+    }
+    expect(fetch).toHaveBeenCalledWith(
+      `${noteEntity.recordsPath}/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7`,
+      expect.anything(),
+    )
+    expect(fetch).not.toHaveBeenCalledWith(`${noteEntity.recordsPath}/42`, expect.anything())
   })
 
   it('shows the not-found page in the platform shell for an unknown site', async () => {
@@ -417,10 +438,10 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toHaveAttribute('href', '/')
   })
 
-  it('shows the not-found page in the site shell for an unknown page and the reserved form routes', async () => {
+  it('shows the not-found page in the site shell for an unknown page, a bare form page and form routes of a table', async () => {
     stubServer()
 
-    for (const path of ['/e2e/no-such-page', '/e2e/notes/new', '/e2e/notes/42']) {
+    for (const path of ['/e2e/no-such-page', '/e2e/noteform', '/e2e/notes/new', '/e2e/notes/42']) {
       const { unmount } = renderApp(path)
 
       expect(await screen.findByTestId('not-found')).toBeInTheDocument()
