@@ -14,6 +14,7 @@ internal static class ResourceSchemas
         [ResourceKinds.Site] = Load("site.schema.json"),
         [ResourceKinds.Page] = Load("page.schema.json"),
         [ResourceKinds.Text] = Load("text.schema.json"),
+        [ResourceKinds.Seed] = Load("seed.schema.json"),
     };
 
     public static bool TryGet(string kind, out JsonSchema schema) =>

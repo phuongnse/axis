@@ -7,4 +7,5 @@ public static class ResourceKinds
     public const string Site = "site";
     public const string Page = "page";
     public const string Text = "text";
+    public const string Seed = "seed";
 }

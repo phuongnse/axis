@@ -50,6 +50,7 @@ public static class ApplicationLoader
                 [],
                 [],
                 [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
@@ -92,6 +93,7 @@ public static class ApplicationLoader
         var sites = new List<SiteResource>();
         var pages = new List<PageResource>();
         var texts = new List<TextResource>();
+        var seeds = new List<SeedResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -165,6 +167,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Text:
                         texts.Add(root.Deserialize<TextResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Seed:
+                        seeds.Add(root.Deserialize<SeedResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -177,6 +182,7 @@ public static class ApplicationLoader
             sites,
             pages,
             texts,
+            seeds,
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames,
@@ -343,7 +349,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}' or '{ResourceKinds.Text}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}' or '{ResourceKinds.Seed}'.",
                 file,
                 "/kind",
                 resourceId));

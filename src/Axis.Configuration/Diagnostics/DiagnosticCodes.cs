@@ -35,4 +35,7 @@ public static class DiagnosticCodes
     public const string InvalidDisplayField = "AXC0029";
     public const string ReferenceTargetWithoutDisplayField = "AXC0030";
     public const string SitePathActiveForOtherApplication = "AXC0031";
+    public const string UnknownSeedEntity = "AXC0032";
+    public const string InvalidSeedValue = "AXC0033";
+    public const string DuplicateSeedRecordId = "AXC0034";
 }

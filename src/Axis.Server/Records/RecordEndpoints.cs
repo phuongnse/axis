@@ -132,7 +132,7 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordCommands.CreateAsync(connection, model, parsed.Input!.Values, cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, model, parsed.Input!.Values, cancellationToken: cancellationToken);
 
         // The location uses the model's names, so a record has one URL whatever case the caller used.
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }

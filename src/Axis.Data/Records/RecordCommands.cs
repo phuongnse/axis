@@ -20,13 +20,15 @@ public static class RecordCommands
     private const string WriteAlias = "w";
 
     /// <summary>
-    /// Inserts a record with a new version 7 id and version 1, holding <paramref name="values"/>
-    /// and SQL <c>NULL</c> or the column default for every other field.
+    /// Inserts a record with version 1, holding <paramref name="values"/> and SQL <c>NULL</c> or the
+    /// column default for every other field. Its id is <paramref name="id"/>, such as a seed
+    /// record's fixed id, or a new version 7 id when <paramref name="id"/> is not given.
     /// </summary>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
         EntityModel entity,
         IReadOnlyList<RecordValue> values,
+        Guid? id = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -39,7 +41,7 @@ public static class RecordCommands
         }
 
         await using var command = new NpgsqlCommand { Connection = connection };
-        command.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("id", id ?? Guid.CreateVersion7());
         var columns = new List<string> { EntityNaming.Quote(EntityNaming.IdColumn), EntityNaming.Quote(EntityNaming.VersionColumn) };
         var placeholders = new List<string> { "@id", "1" };
         for (var index = 0; index < values.Count; index++)
@@ -211,7 +213,7 @@ public static class RecordCommands
         return errors.Count > 0 ? new RecordWriteResult(RecordWriteOutcome.MissingReference, Errors: errors) : null;
     }
 
-    private static async Task<bool> ExistsAsync(NpgsqlConnection connection, string table, Guid id, CancellationToken cancellationToken)
+    internal static async Task<bool> ExistsAsync(NpgsqlConnection connection, string table, Guid id, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             $"SELECT EXISTS (SELECT 1 FROM {table} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id)",
