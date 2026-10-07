@@ -4,9 +4,10 @@ import { expect, test, type Page } from '@playwright/test'
 // suppliers of the purchase request sample, and on the requests they create.
 const tablePath = /\/purchasing\/purchaserequests\?pageSize=100&sort=-title$/
 
-/** Opens the lookup of the reference field at `index` in form order and picks the row named `name`. */
-async function choose(page: Page, index: number, label: string, name: string) {
-  await page.getByRole('button', { name: 'Choose' }).nth(index).click()
+/** Opens the lookup of the reference field labelled `label` and picks the row named `name`. */
+async function choose(page: Page, label: string, name: string) {
+  const field = page.locator('.ant-form-item', { has: page.getByLabel(label, { exact: true }) })
+  await field.getByRole('button', { name: 'Choose' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
@@ -30,9 +31,8 @@ test('a purchase request is created with a seeded department and supplier, edite
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
   await page.getByLabel('Requester', { exact: true }).fill('Lan Nguyen')
-  // The form shows department before supplier, as the entity declares them.
-  await choose(page, 0, 'Department', 'Finance')
-  await choose(page, 1, 'Supplier', 'Acme Supplies')
+  await choose(page, 'Department', 'Finance')
+  await choose(page, 'Supplier', 'Acme Supplies')
   await select(page, 'Currency', 'VND')
   await page.getByLabel('Total amount', { exact: true }).fill('1500.00')
   await select(page, 'Status', 'draft')
