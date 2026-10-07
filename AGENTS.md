@@ -20,7 +20,10 @@ Vietnamese.
 
 - Docs are the source of truth. An issue links to the relevant section; it
   does not copy it. If a change alters agreed behaviour, update the doc in the
-  same change.
+  same change. When a change makes any statement in the docs false, including
+  summaries such as the README status, the roadmap or the concepts table, fix
+  it in the same change. See
+  [docs/delivery.md](docs/delivery.md#keeping-the-docs-current).
 - Keep the [decisions](docs/decisions.md) status words exact: **Agreed**
   means agreed, and **Proposed** means still open. Never present a proposal as
   agreed.
