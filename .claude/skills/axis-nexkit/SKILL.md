@@ -11,8 +11,9 @@ only the practical parts: where values live, the `gh` commands, two review
 checklists and what to do when something fails.
 
 You may post `/nexkit plan`, `/nexkit fix` and `/nexkit review` yourself. Post
-`/nexkit go` only when the owner says so explicitly. Never approve a pull
-request, approve a waiting CI run or merge. Those are the owner's.
+`/nexkit go` only when the owner says so explicitly, and only on the latest
+plan, after the check below that it holds every agreed change. Never approve
+a pull request, approve a waiting CI run or merge. Those are the owner's.
 
 ## Where the values live
 
@@ -106,8 +107,15 @@ returns 404, upgrade `gh` and try again.
 - The decisions and risks the owner must judge are in their own short sections.
 - A `too_large` result leads to sub-issues of the parent, in order and in the
   parent's milestone.
-- Fixes are commented in the same issue, and `/nexkit plan` is run again there.
-  No follow-up issues.
+- Every change agreed after the plan was posted, from the review or from the
+  owner while approving, however small, is commented in the same issue and
+  `/nexkit plan` is run again. No follow-up issues.
+- Before asking the owner for go, or posting `/nexkit go`, the latest plan
+  holds every agreed change. If not, re-plan first. The plan is the contract:
+  it holds the acceptance criteria the pull request is checked against, and it
+  is the record a later reader looks at. Re-planning also lets the plan agent
+  find other places the change affects, such as another doc that must say the
+  same.
 
 ## Checklist: reviewing a pull request
 

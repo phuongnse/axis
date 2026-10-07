@@ -43,14 +43,21 @@ them up where they live.
 2. **Plan.** Comment `/nexkit plan` on the issue. NexKit's plan agent posts a
    plan as a comment.
 3. **Review the plan.** Check it against [decisions.md](decisions.md), and
-   never treat a **Proposed** decision as **Agreed**. When the review finds
-   gaps, comment the fixes in the same issue and run `/nexkit plan` again. Do
-   not open follow-up issues. When the plan reports `too_large`, split the
-   issue into parts. Add each part as a GitHub sub-issue of the parent, in
-   order and in the parent's milestone. The parent closes when all parts are
-   done.
-4. **Implement.** The owner says go, and `/nexkit go` is posted. NexKit
-   implements the plan and opens a pull request.
+   never treat a **Proposed** decision as **Agreed**. Any change agreed after
+   the plan is posted, whether the review finds a gap or the owner decides
+   something while approving, however small, is commented in the same issue
+   and `/nexkit plan` is run again before `/nexkit go`. `/nexkit go` only runs
+   on the latest plan, and that plan holds every agreed change. The reason:
+   the plan is the contract. It holds the acceptance criteria the pull request
+   is checked against, and it is the record a later reader looks at. A change
+   that lives only in a comment is missing from both. Re-planning also lets
+   the plan agent find other places the change affects, such as another doc
+   that must say the same. Do not open follow-up issues. When the plan reports
+   `too_large`, split the issue into parts. Add each part as a GitHub
+   sub-issue of the parent, in order and in the parent's milestone. The parent
+   closes when all parts are done.
+4. **Implement.** The owner says go on the latest plan, and `/nexkit go` is
+   posted. NexKit implements that plan and opens a pull request.
 5. **Pull request.** If the CI run waits as `action_required`, the owner
    approves it. Merging needs the required checks on `main` to be green, plus
    the owner's approval.
