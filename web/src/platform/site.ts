@@ -35,11 +35,51 @@ export interface ApplicationSite {
   navigation: { page: string; labelKey: string }[]
 }
 
+/** A field type as written in entity files. */
+export type FieldType = 'text' | 'integer' | 'decimal' | 'boolean' | 'date' | 'date-time' | 'enum' | 'reference'
+
+/** The entity a reference field points to, its display field and the path of its record API. */
+export interface ReferenceTarget {
+  entity: string
+  displayField: string | null
+  recordsPath: string
+}
+
+/** One field of an entity. Properties the field's type does not have are `null`. */
+export interface FieldMetadata {
+  name: string
+  type: FieldType
+  labelKey: string | null
+  required: boolean
+  unique: boolean
+  maxLength: number | null
+  precision: number | null
+  scale: number | null
+  values: string[] | null
+  target: ReferenceTarget | null
+}
+
+/** The entity a widget shows, with its fields in declaration order and the path of its record API. */
+export interface EntityMetadata {
+  name: string
+  labelKey: string | null
+  displayField: string | null
+  recordsPath: string
+  fields: FieldMetadata[]
+}
+
+/** One widget of a page. `formPage` is set only on a table that names the page holding its form. */
+export interface WidgetMetadata {
+  type: 'table' | 'form'
+  formPage: string | null
+  entity: EntityMetadata
+}
+
 /** A page of an application site, as served by `GET /api/sites/{path}/pages/{page}`. */
 export interface PageMetadata {
   name: string
   titleKey: string
-  widgets: { type: 'table' | 'form'; formPage: string | null; entity: unknown }[]
+  widgets: WidgetMetadata[]
 }
 
 export async function fetchSite(signal?: AbortSignal): Promise<SiteMetadata> {

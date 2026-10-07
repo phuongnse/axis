@@ -7,7 +7,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { fetchSiteTexts, type TextMap } from '../platform/texts'
 import { LocaleLoadFailed, ShellError } from './LocaleLoadFailed'
 import { NotFoundPage } from './NotFoundPage'
-import { platformTextsFor, useApplicationSite, usePlatform } from './context'
+import { platformTextsFor, useApplicationSite, usePlatform, type SiteOutlet } from './context'
 import { PlatformShellRoute } from './PlatformShellRoute'
 
 interface LoadedSite {
@@ -141,7 +141,7 @@ function SiteShell({ path }: { path: string }) {
         onLocaleChange={changeLocale}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
-        <Outlet context={site} />
+        <Outlet context={{ site, locale } satisfies SiteOutlet} />
       </Shell>
     </TextProvider>
   )

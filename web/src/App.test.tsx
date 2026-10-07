@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
-import type { ApplicationSite, PageMetadata, SiteListItem, SiteMetadata } from './platform/site'
+import type { ApplicationSite, EntityMetadata, PageMetadata, SiteListItem, SiteMetadata } from './platform/site'
 import { ThemeModeProvider } from './platform/theme'
 
 const site: SiteMetadata = {
@@ -36,6 +36,8 @@ const texts: Record<string, Record<string, string>> = {
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
     'shell.widget.form.unavailable': 'Forms are not available yet.',
+    'shell.table.create': 'New',
+    'shell.table.empty': 'No records yet.',
   },
   vi: {
     'shell.nav.home': 'Trang chủ',
@@ -78,16 +80,37 @@ const siteTexts: Record<string, Record<string, string>> = {
   },
 }
 
+const noteEntity: EntityMetadata = {
+  name: 'Note',
+  labelKey: null,
+  displayField: null,
+  recordsPath: '/api/apps/E2eApp/entities/Note/records',
+  fields: [
+    {
+      name: 'title',
+      type: 'text',
+      labelKey: null,
+      required: true,
+      unique: false,
+      maxLength: 200,
+      precision: null,
+      scale: null,
+      values: null,
+      target: null,
+    },
+  ],
+}
+
 const pages: Record<string, PageMetadata> = {
   notes: {
     name: 'Notes',
     titleKey: 'pages.notes.title',
-    widgets: [{ type: 'table', formPage: 'NoteForm', entity: {} }],
+    widgets: [{ type: 'table', formPage: 'NoteForm', entity: noteEntity }],
   },
   noteform: {
     name: 'NoteForm',
     titleKey: 'pages.noteForm.title',
-    widgets: [{ type: 'form', formPage: null, entity: {} }],
+    widgets: [{ type: 'form', formPage: null, entity: noteEntity }],
   },
 }
 
@@ -112,6 +135,9 @@ function stubServer({ ready = true, siteStatus = 200, sitesStatus = 200, failing
     }
     if (input.startsWith('/api/sites/')) {
       return siteRoute(input.replace('/api/sites/', ''), failingLocale)
+    }
+    if (input.startsWith('/api/apps/')) {
+      return json({ items: [], page: 1, pageSize: 20, totalCount: 0 })
     }
     const locale = input.replace('/api/texts/', '')
     if (locale === failingLocale) {
@@ -359,6 +385,17 @@ describe('App', () => {
 
     expect(await screen.findByText('All notes')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('shows the records of a table page', async () => {
+    stubServer()
+
+    renderApp('/e2e/notes')
+
+    expect(await screen.findByText('No records yet.')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'title' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'New' })).toHaveAttribute('href', '/e2e/noteform/new')
+    expect(fetch).toHaveBeenCalledWith('/api/apps/E2eApp/entities/Note/records', expect.anything())
   })
 
   it('shows a placeholder for a form page', async () => {
