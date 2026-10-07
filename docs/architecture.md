@@ -1037,7 +1037,10 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - **Invalid values.** A `page` that is not a positive integer, a `pageSize`
     other than the offered 10, 20, 50 and 100, and a `sort` that names no
     field or a reference field are ignored. The default is requested instead,
-    and the URL is rewritten without them and without a history entry.
+    and the URL is rewritten without them and without a history entry. Once
+    the total is known, a `page` past the last page (at least 1) becomes the
+    last page in the same way, so the URL and the pagination agree. With no
+    records the last page is 1, so `page` is removed.
   - **Sorting.** Every column but a reference is sortable. The record API
     sorts a reference by the stored id, which does not match the label people
     see. Repeated clicks on a header sort ascending, then descending, then
@@ -1056,15 +1059,21 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 
   - **Number source text.** The SPA parses record responses with the source
     text of each JSON number, so `values` holds integers and decimals as
-    strings, and `version` too. A plain parse would show `1250.50` as
-    `1250.5` and lose digits beyond double precision. The API never coerces a
-    string to a number, so the forms of #53 must send numbers and `version`
-    back as JSON numbers.
+    strings. A plain parse would show `1250.50` as `1250.5` and lose digits
+    beyond double precision. `version`, `page`, `pageSize` and `totalCount`
+    are record metadata, not field values, so they are turned back into
+    numbers. A browser without `JSON.parse` source text access (older than
+    Chromium 114, Firefox 135 or Safari 18.4) falls back to the parsed
+    number, so `1250.50` shows as `1250.5` there. The web unit tests need
+    Node 22 or later for the same reason. The API never coerces a string to a
+    number, so the forms of #53 must send numbers back as JSON numbers.
   - **Links.** When the widget names a form page, a create button links to
     `/{site}/{formpage}/new` and each row has an open link to
-    `/{site}/{formpage}/{id}`, with the page name in lower case. Those routes
-    show the not-found page until #53. Without a form page there is no
-    create button and no open column.
+    `/{site}/{formpage}/{id}`, with the page name in lower case. The create
+    button is a link: a click with a modifier key or the middle button opens
+    the form in a new tab or window. Those routes show the not-found page
+    until #53. Without a form page there is no create button and no open
+    column.
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.

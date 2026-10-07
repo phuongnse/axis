@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -74,8 +74,14 @@ function stubRecords(body = notePage, status = 200) {
   return () => fetchMock.mock.calls.map(([url]) => url)
 }
 
-function CurrentSearch() {
-  return <output data-testid="search">{useLocation().search}</output>
+function CurrentLocation() {
+  const location = useLocation()
+  return (
+    <>
+      <output data-testid="path">{location.pathname}</output>
+      <output data-testid="search">{location.search}</output>
+    </>
+  )
 }
 
 function search() {
@@ -88,7 +94,7 @@ function renderWidget(search = '', widget = noteWidget) {
       <TextProvider catalogs={catalogs} development={false}>
         <TableWidget sitePath="e2e" widget={widget} locale="en" />
       </TextProvider>
-      <CurrentSearch />
+      <CurrentLocation />
     </MemoryRouter>,
   )
 }
@@ -115,6 +121,47 @@ describe('TableWidget', () => {
     const row = await screen.findByRole('row', { name: /Buy paper/ })
     expect(screen.getByRole('link', { name: 'New' })).toHaveAttribute('href', '/e2e/noteform/new')
     expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+  })
+
+  it('opens the form in place on a plain click of the create button', async () => {
+    stubRecords()
+    renderWidget()
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('link', { name: 'New' }))
+
+    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/new')
+  })
+
+  it('keeps the link behaviour of the create button on a ctrl-click', async () => {
+    stubRecords()
+    renderWidget()
+    await screen.findByRole('row', { name: /Buy paper/ })
+    const link = screen.getByRole('link', { name: 'New' })
+    const click = createEvent.click(link, { ctrlKey: true })
+    // jsdom cannot open a new tab, so stop the default action once the widget has seen the click.
+    const browserDefault = vi.fn((event: Event) => event.preventDefault())
+    window.addEventListener('click', browserDefault)
+
+    fireEvent(link, click)
+
+    window.removeEventListener('click', browserDefault)
+    expect(browserDefault).toHaveBeenCalled()
+    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('keeps a field named open next to the open column', async () => {
+    stubRecords(
+      `{"items":[{"id":"${noteId}","version":1,"values":{"open":"Monday"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
+    )
+
+    renderWidget('', { ...noteWidget, entity: { ...noteWidget.entity, fields: [field('open', 'text', null)] } })
+
+    const row = await screen.findByRole('row', { name: /Monday/ })
+    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+    await userEvent.click(screen.getByText('open'))
+    await waitFor(() => expect(search()).toBe('?sort=open'))
+    expect(screen.getByRole('columnheader', { name: 'open' })).toHaveAttribute('aria-sort', 'ascending')
   })
 
   it('has no create button and no open link without a form page', async () => {
@@ -162,6 +209,23 @@ describe('TableWidget', () => {
 
     await waitFor(() => expect(search()).toBe('?sort=title'))
     await waitFor(() => expect(requests()).toContain(`${recordsPath}?sort=title`))
+  })
+
+  it('moves a page past the end to the last page', async () => {
+    const requests = stubRecords()
+
+    renderWidget('?page=9&x=1')
+
+    await waitFor(() => expect(search()).toBe('?x=1&page=3'))
+    await waitFor(() => expect(requests()).toEqual([`${recordsPath}?page=9`, `${recordsPath}?page=3`]))
+  })
+
+  it('removes the page when there are no records', async () => {
+    stubRecords('{"items":[],"page":4,"pageSize":20,"totalCount":0}')
+
+    renderWidget('?page=4')
+
+    await waitFor(() => expect(search()).toBe(''))
   })
 
   it('drops invalid parameters and requests the default page', async () => {

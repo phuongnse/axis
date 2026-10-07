@@ -4,10 +4,10 @@
  */
 export type RecordValue = string | boolean | null
 
-/** One record of the record API. `version` keeps its JSON source text too. */
+/** One record of the record API. `version` is record metadata, so it is a number. */
 export interface RecordItem {
   id: string
-  version: string
+  version: number
   values: Record<string, RecordValue>
   labels: Record<string, string>
 }
@@ -40,12 +40,15 @@ export async function fetchRecords(recordsPath: string, query: string, signal?: 
   if (!response.ok) {
     throw new Error(`Loading the records of '${recordsPath}' failed with status ${response.status}.`)
   }
-  // The reviver turned the paging numbers into strings too.
-  const body = parseRecordJson<{ items: RecordItem[]; page: string; pageSize: string; totalCount: string }>(
-    await response.text(),
-  )
+  // The reviver turned the metadata numbers into strings too. Only `values` keep the source text.
+  const body = parseRecordJson<{
+    items: (Omit<RecordItem, 'version'> & { version: string })[]
+    page: string
+    pageSize: string
+    totalCount: string
+  }>(await response.text())
   return {
-    items: body.items,
+    items: body.items.map((item) => ({ ...item, version: Number(item.version) })),
     page: Number(body.page),
     pageSize: Number(body.pageSize),
     totalCount: Number(body.totalCount),

@@ -23,6 +23,9 @@ interface LoadState {
   failed: boolean
 }
 
+// Field names start with a letter, so this key never names a field column.
+const openColumnKey = '$open'
+
 function sameSort(a: TableSort | null, b: TableSort | null): boolean {
   return a?.field === b?.field && a?.descending === b?.descending
 }
@@ -46,6 +49,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const [state, setState] = useState<LoadState>({ failed: false })
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
+  const totalCount = loading ? undefined : state.page?.totalCount
 
   // An invalid or out-of-order parameter is rewritten without a history entry.
   useEffect(() => {
@@ -54,6 +58,18 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
       setSearchParams(canonical, { replace: true })
     }
   }, [searchParams, query, setSearchParams])
+
+  // A page past the end becomes the last page once the total is known, so the URL and the
+  // pagination agree.
+  useEffect(() => {
+    if (totalCount === undefined) {
+      return
+    }
+    const lastPage = Math.max(1, Math.ceil(totalCount / query.pageSize))
+    if (query.page > lastPage) {
+      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }), { replace: true })
+    }
+  }, [totalCount, searchParams, query, setSearchParams])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -88,7 +104,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     return [
       ...fieldColumns,
       {
-        key: 'open',
+        key: openColumnKey,
         render: (_value: unknown, record: RecordItem) => (
           <Link to={`${formPath}/${record.id}`}>{t('shell.table.open')}</Link>
         ),
@@ -114,6 +130,10 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
             type="primary"
             href={createHref}
             onClick={(event) => {
+              // A modified click keeps the link behaviour, such as opening a new tab.
+              if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+                return
+              }
               event.preventDefault()
               navigate(createPath)
             }}
