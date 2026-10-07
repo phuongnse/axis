@@ -6,11 +6,11 @@ namespace Axis.Configuration.Tests;
 
 public sealed class PresentationCompilerTests
 {
-    private const string Manifest = """
+    internal const string Manifest = """
         { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }
         """;
 
-    private const string Order = """
+    internal const string Order = """
         { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
           "fields": [ { "name": "number", "type": "text", "required": true } ] }
         """;

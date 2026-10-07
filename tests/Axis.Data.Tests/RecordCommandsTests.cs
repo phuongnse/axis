@@ -19,10 +19,10 @@ public sealed class RecordCommandsTests
         // The connection is never opened; the arguments are checked first.
         await using var connection = new NpgsqlConnection();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, null!, [], TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _entity, null!, TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, null!, Guid.NewGuid(), 1, [], TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _entity, Guid.NewGuid(), 1, null!, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, null!, [], cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _entity, null!, cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, null!, Guid.NewGuid(), 1, [], cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _entity, Guid.NewGuid(), 1, null!, cancellationToken: TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.DeleteAsync(connection, null!, Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 }

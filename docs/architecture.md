@@ -89,7 +89,7 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application`, `entity`, `site`, `page` or `text`). The manifest is the single `application`
+   (`application`, `entity`, `site`, `page`, `text` or `seed`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -139,9 +139,20 @@ flowchart LR
      name whose file was not loaded because of its own errors is not
      reported again. Site titles, navigation labels and page titles join the
      `AXC0028` check.
+   - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
+     case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
+     was not loaded because of its own errors is not reported again. Seed
+     record ids are unique across every seed file of the application,
+     compared as UUIDs: a record whose id an earlier record already uses, in
+     the same file or an earlier file in path order, is `AXC0034` at
+     `/records/{i}/id`, naming the file of the first one. Seed record ids are
+     not compared with resource ids. Seed values are not checked at compile
+     time; the startup step checks them before it inserts any record (see
+     [Startup activation](#startup-activation)).
 
-   The model holds the text resources, each entity's display field, and the
-   sites and pages with their entity and page references resolved. No model
+   The model holds the text resources, each entity's display field, the
+   sites and pages with their entity and page references resolved, and the
+   seeds in path order with their entity resolved. No model
    is produced while any error remains.
 3. **Check.** Expressions, data source fields, form bindings and operation
    inputs are type-checked.
@@ -269,6 +280,9 @@ sorted by file and then path.
 | `AXC0029` | The entity's `displayField` names no required `text` field of the entity. Reported at `/displayField`. |
 | `AXC0030` | A reference field's target entity has no `displayField`. Reported at `/fields/{i}/target`. |
 | `AXC0031` | A site path is active for another application. Reported at `/path` of the site file; nothing is provisioned or activated. |
+| `AXC0032` | A seed's `entity` names no loaded entity. Reported at `/entity`. |
+| `AXC0033` | A seed value is one the record API would reject, or the seed record could not be inserted, for example because a reference names no record. Reported by the startup step at `/records/{i}/values/<field>` of the seed file, or at `/records/{i}` when the stored schema does not match the active model. |
+| `AXC0034` | An earlier seed record of the application already uses this record id. Reported at `/records/{i}/id` of the later record, naming the file of the first one. |
 
 ### Startup activation
 
@@ -294,6 +308,22 @@ development or E2E server serves a real application without a separate step.
   committed is logged with the folder and tenant too. The previously active
   release stays active, and the first failing tenant stops the whole start,
   so no server runs with some tenants on old releases and others on new ones.
+- **Seeding.** After a folder is activated in a tenant, the step inserts
+  every seed record whose id the entity table does not hold yet. Existing
+  records are left alone, including records edited through the UI, so
+  restarts never duplicate seeds. Only the id decides: a seed record that was
+  deleted is inserted again on the next start. Each record goes through the
+  record input parser as a create body and is inserted by the record create
+  command, so the record API's rules apply. Every record is parsed before any
+  insert, and every invalid value is `AXC0033` at
+  `/records/{i}/values/<field>`. Then all inserts of the folder run in one
+  transaction, seed files in path order and records in file order, so a
+  reference value must name an existing record or one inserted earlier in
+  the same run. The first record that storage refuses, for a missing
+  reference, a duplicate unique value or a schema conflict, is reported as
+  `AXC0033`, and the transaction is rolled back. Any
+  `AXC0033` stops the start like any other diagnostic, and the release stays
+  active.
 - **Restarts.** Restarting with unchanged folders is safe. An unchanged
   folder returns its stored release, and activating the active release again
   only updates its activation time. After a failure, the next start
@@ -381,6 +411,29 @@ site, and its widgets are its content:
   that opens one of its records.
 - The page has no entity or template of its own, so more widgets and a
   layout can be added later without a format change.
+
+A `seed` holds records with fixed ids for one entity:
+
+```json
+{
+  "id": "e7a0f4c3-9d5b-4e1f-8f3c-4b5d6e7f8a08",
+  "kind": "seed",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "records": [
+    { "id": "0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b", "values": { "name": "Finance" } }
+  ]
+}
+```
+
+- Each record's `id` is the record id, fixed so that the startup step
+  inserts the record once. It is unique across every seed file of the
+  application (`AXC0034`).
+- `values` has the shape of the `values` of a record API create body (see
+  [Request bodies and values](#request-bodies-and-values)).
+- Seed files are inserted in path order, so a seed whose records reference
+  another seed's records sorts after it.
 
 ### Entity field types and constraints
 

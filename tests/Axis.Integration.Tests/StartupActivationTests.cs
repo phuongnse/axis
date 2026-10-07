@@ -1,8 +1,11 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
+using Axis.Data.Naming;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +26,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     private readonly Guid _applicationId = Guid.NewGuid();
     private readonly Guid _noteId = Guid.NewGuid();
     private readonly string _name = $"Startup{Guid.NewGuid():N}";
+    private readonly Guid _firstSeedId = Guid.NewGuid();
+    private readonly Guid _secondSeedId = Guid.NewGuid();
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -106,6 +111,93 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Seed_records_are_inserted_once_and_a_record_edited_between_starts_keeps_its_edit()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First", "done": false }""", """{ "title": "Second", "done": false }"""));
+
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs))
+        {
+            using var client = factory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}")
+            {
+                Content = JsonContent.Create(new { version = 1, values = new { title = "Edited" } }),
+            };
+            request.Headers.Host = HostA;
+            using var response = await client.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 2 seed record(s)", StringComparison.Ordinal));
+        await StartAsync(a, b, folder);
+
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(_noteId));
+        Assert.Equal(2L, await ScalarAsync(a, $"SELECT count(*) FROM {table}"));
+        Assert.Equal(2L, await ScalarAsync(b, $"SELECT count(*) FROM {table}"));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
+        {
+            using var client = factory.CreateClient();
+            foreach (var (host, title, version) in new[] { (HostA, "Edited", 2L), (HostB, "First", 1L) })
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}");
+                request.Headers.Host = host;
+                using var response = await client.SendAsync(request, CancellationToken);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                var record = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+                Assert.Equal(
+                    (title, version),
+                    (record.GetProperty("values").GetProperty("title").GetString(), record.GetProperty("version").GetInt64()));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Invalid_seed_value_stops_the_start_is_logged_with_its_file_and_pointer_and_inserts_no_seed_record()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField)
+            .With("seeds/notes.json", SeedFile("""{ "title": 5, "done": false }""", """{ "title": "Second", "done": false }"""));
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(a, b, folder.Path, logs);
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains(folder.Path, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.InvalidSeedValue, StringComparison.Ordinal)
+            && entry.Contains("seeds/notes.json", StringComparison.Ordinal)
+            && entry.Contains("/records/0/values/title", StringComparison.Ordinal));
+        Assert.NotNull(await ActiveAsync(a));
+        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_noteId))}"));
+    }
+
+    [Fact]
+    public async Task Seed_reference_to_a_missing_record_stops_the_start_and_rolls_back_the_earlier_seed_records()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField)
+            .With("entities/note.json", $$"""
+                { "id": "{{_noteId}}", "kind": "entity", "name": "Note", "formatVersion": 1, "displayField": "title",
+                  "fields": [{{TitleField}}, { "name": "parent", "type": "reference", "target": "Note" }] }
+                """)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First" }""", $$"""{ "title": "Second", "parent": "{{Guid.NewGuid()}}" }"""));
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(a, b, folder.Path, logs);
+
+        Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.InvalidSeedValue, StringComparison.Ordinal)
+            && entry.Contains("seeds/notes.json", StringComparison.Ordinal)
+            && entry.Contains("/records/1/values/parent", StringComparison.Ordinal));
+        Assert.NotNull(await ActiveAsync(a));
+        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_noteId))}"));
+    }
+
+    [Fact]
     public async Task Without_the_setting_the_server_starts_and_leaves_the_tenant_database_unmigrated()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
@@ -176,6 +268,13 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         new TemporaryFolder()
             .With("application.json", $$"""{ "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1 }""")
             .With("entities/note.json", NoteFile(fields));
+
+    /// <summary>A seed over <c>Note</c> with two records, which have the fixed seed ids and the given values.</summary>
+    private string SeedFile(string firstValues, string secondValues) =>
+        $$"""
+        { "id": "{{Guid.NewGuid()}}", "kind": "seed", "name": "Notes", "formatVersion": 1, "entity": "Note",
+          "records": [ { "id": "{{_firstSeedId}}", "values": {{firstValues}} }, { "id": "{{_secondSeedId}}", "values": {{secondValues}} } ] }
+        """;
 
     private string NoteFile(params string[] fields) =>
         $$"""{ "id": "{{_noteId}}", "kind": "entity", "name": "Note", "formatVersion": 1, "fields": [{{string.Join(", ", fields)}}] }""";

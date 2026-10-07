@@ -8,8 +8,8 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
-/// of every locale, checks every entity's fields against the field type rules, checks sites and
-/// pages, and resolves references between entities, pages and sites. Every problem is reported, together with the loader's, in one
+/// of every locale, checks every entity's fields against the field type rules, checks sites,
+/// pages and seeds, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
 /// </summary>
@@ -62,6 +62,7 @@ public static class ApplicationCompiler
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
+        CheckSeeds(loaded, FindEntity, diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -76,6 +77,7 @@ public static class ApplicationCompiler
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName)).ToList(),
             Texts = loaded.Texts,
+            Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
         };
         return result with
         {
@@ -323,6 +325,43 @@ public static class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Checks the seeds, which come in path order: each names a loaded entity, and every seed record
+    /// id is used once across all seeds, compared as a UUID. The values are not checked here; the
+    /// startup step checks them with the record API's rules before it inserts any record.
+    /// </summary>
+    private static void CheckSeeds(ApplicationLoadResult loaded, Func<string, EntityResource?> findEntity, List<Diagnostic> diagnostics)
+    {
+        var firstFileById = new Dictionary<Guid, string>();
+        foreach (var seed in loaded.Seeds)
+        {
+            // An entity file that was not loaded because of its own errors is not reported again.
+            if (findEntity(seed.Entity) is null && !loaded.UnloadedEntityNames.Contains(seed.Entity))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.UnknownSeedEntity,
+                    $"The entity '{seed.Entity}' was not found. No loaded entity has that name.",
+                    seed.File,
+                    "/entity",
+                    seed.Id));
+            }
+
+            for (var index = 0; index < seed.Records.Count; index++)
+            {
+                var id = seed.Records[index].Id;
+                if (!firstFileById.TryAdd(id, seed.File))
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.DuplicateSeedRecordId,
+                        $"The seed record id '{id:D}' is already used in '{firstFileById[id]}'.",
+                        seed.File,
+                        $"/records/{index}/id",
+                        seed.Id));
+                }
+            }
+        }
+    }
+
     private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName) =>
         new()
         {
@@ -388,6 +427,19 @@ public static class ApplicationCompiler
                 })
                 .ToList(),
         };
+
+    private static SeedModel BuildSeed(SeedResource seed, Dictionary<string, EntityResource> entitiesByName)
+    {
+        var entity = entitiesByName[seed.Entity];
+        return new SeedModel
+        {
+            Id = seed.Id,
+            Name = seed.Name,
+            File = seed.File,
+            Entity = new EntityReference(entity.Id, entity.Name),
+            Records = seed.Records,
+        };
+    }
 
     private static PageReference PageReferenceTo(PageResource page) => new(page.Id, page.Name);
 }

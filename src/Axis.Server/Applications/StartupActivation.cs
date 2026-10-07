@@ -2,6 +2,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data;
+using Axis.Data.Seeding;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace Axis.Server.Applications;
 
 /// <summary>
 /// Migrates every configured tenant database, then compiles and activates the configured
-/// application folders in it. The work runs in <see cref="StartingAsync"/>, before any hosted
+/// application folders in it and inserts their missing seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
 /// Restarting with unchanged folders stores no new release and only refreshes the activation time.
@@ -79,6 +80,17 @@ internal sealed partial class StartupActivation(
                 }
 
                 LogActivated(compiled.Model.Manifest.Name, compiled.Release.Id, folder, tenantId);
+                if (compiled.Model.Seeds.Count > 0)
+                {
+                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, await database.GetConnectionAsync(cancellationToken), cancellationToken);
+                    if (seeded.Diagnostics.Count > 0)
+                    {
+                        LogDiagnostics(seeded.Diagnostics, folder, tenantId);
+                        throw Failure("could not be seeded", seeded.Diagnostics, folder, tenantId);
+                    }
+
+                    LogSeeded(seeded.Inserted, folder, tenantId);
+                }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -117,6 +129,9 @@ internal sealed partial class StartupActivation(
 
     [LoggerMessage(LogLevel.Information, "Activated application {Application} release {ReleaseId} from folder {Folder} for tenant {TenantId}.")]
     private partial void LogActivated(string application, Guid releaseId, string folder, string tenantId);
+
+    [LoggerMessage(LogLevel.Information, "Inserted {Count} seed record(s) from folder {Folder} for tenant {TenantId}.")]
+    private partial void LogSeeded(int count, string folder, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Activating application folder {Folder} for tenant {TenantId} failed.")]
     private partial void LogFailed(Exception exception, string folder, string tenantId);
