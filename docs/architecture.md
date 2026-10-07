@@ -17,13 +17,14 @@ flowchart LR
     Worker -->|connectors| External[External systems]
 ```
 
-- **Axis.Server** serves the SPA. It is the BFF (OIDC client and cookie
-  session) and hosts the authoring and runtime APIs.
+- **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
+  It becomes the BFF (OIDC client and cookie session) *(planned for M4)*.
 - **Axis.Worker** *(planned for M3)* executes durable work: process steps,
   timers, outbox delivery, triggers and schedules. It loads the same modules
   as the server.
 - **Platform database** stores installation-level data: the tenant directory
-  and platform settings.
+  and platform settings *(tenant directory planned for M9; tenants come from
+  server configuration until then)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -43,18 +44,20 @@ src/
   Axis.Tenancy/           tenant resolution, connection factory
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
 tests/
-  Axis.*.Tests/           unit tests and PostgreSQL integration tests per module
+  Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Tenancy.Tests)
+  Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
 ```
 
-Projects are created when the first issue needs them. M0 contains only
-`Axis.Server`, the test projects and `web/`. `Axis.Configuration`, `Axis.Data`,
-`Axis.Core` (only the tenant context so far), `Axis.Presentation` (the
-platform site, its texts and the shapes of application site metadata) and
-`Axis.Tenancy` exist now.
+Projects are created when the first issue needs them. As of M1 the solution
+holds `Axis.Server`, `Axis.Core` (only the tenant context so far),
+`Axis.Configuration`, `Axis.Data`, `Axis.Presentation` (the platform site, its
+texts and the shapes of application site metadata), `Axis.Tenancy`, the test
+projects and `web/`. `Axis.Worker`, `Axis.Expressions`, `Axis.Processes` and
+`Axis.Policy` do not exist yet.
 
 ## Module rules
 
@@ -81,10 +84,9 @@ platform site, its texts and the shapes of application site metadata) and
 flowchart LR
     Folder[Application folder] --> Load[Load + schema validation]
     Load --> Resolve[Resolve references]
-    Resolve --> Check[Type-check expressions and bindings]
-    Check --> Plan[Plan storage changes]
-    Plan --> Release[Immutable release]
-    Release --> Activate[Apply schema changes, activate]
+    Resolve --> Check["Type-check expressions and bindings (planned for M2)"]
+    Check --> Release[Immutable release]
+    Release --> Activate[Plan and apply schema changes, activate]
 ```
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
@@ -154,13 +156,10 @@ flowchart LR
    sites and pages with their entity and page references resolved, and the
    seeds in path order with their entity resolved. No model
    is produced while any error remains.
-3. **Check.** Expressions, data source fields, form bindings and operation
-   inputs are type-checked.
-4. **Plan.** The current tenant schema is compared with the new entity
-   definitions. Additive changes are planned automatically; incompatible
-   changes are rejected with a diagnostic until migrations exist (M6). See
-   [Schema planning](#schema-planning).
-5. **Release.** The compiled application is stored as a release with a
+3. **Check** *(planned for M2)*. Expressions, data source fields, form
+   bindings and operation inputs are type-checked. M1 has no check step; the
+   model goes straight to the release.
+4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
    - **Content hash.** Every resource file is canonicalized as in RFC 8785
      (JCS): no whitespace, object properties sorted by UTF-16 code units,
@@ -177,8 +176,11 @@ flowchart LR
      with its relative path, so it can be read back without the folder.
    - **Errors.** A folder with any error diagnostic produces no release;
      compile returns the diagnostics only.
-6. **Activate.** Schema changes are applied. The release becomes active for
-   new work only after preparation has completed successfully.
+5. **Activate.** The current tenant schema is compared with the entity
+   definitions of the release. Additive changes are planned and applied;
+   incompatible changes are rejected with a diagnostic until migrations exist
+   (M6). See [Schema planning](#schema-planning). The release becomes active
+   for new work only after that has completed successfully.
    - **Active release.** Each application `id` has at most one active
      release, stored with the manifest `name` as written. The name is unique
      across the active applications, ignoring letter case; names are ASCII
@@ -539,8 +541,9 @@ is `AXC0013`.
   module; values are always parameters. Configuration can never supply raw SQL.
   Request text, such as the entity segment, `sort` and `values` names, is
   matched against the model's declared names and never used as an identifier.
-- **Database credentials.** Runtime access and schema changes use different
-  database roles.
+- **Database credentials** *(planned for M6)*. Runtime access and schema
+  changes will use different database roles. M1 uses one connection string per
+  tenant.
 
 ### Schema planning
 
@@ -839,7 +842,7 @@ text from the request; the key already says where the problem is.
 ## Tenancy (D10)
 
 - **Resolution.** `TenantContext` is resolved from the request host. For
-  background jobs it is resolved from the job's tenant ID.
+  background jobs it is resolved from the job's tenant ID *(planned for M3)*.
 - **Connections.** A connection factory returns connections only for the
   current tenant. Without a tenant context, data access fails.
 - **Scoping.** Cache keys, file storage paths, job records and log scopes all
@@ -913,9 +916,10 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Record filters from policies are added to every data source query.
   - Field policies remove or mask fields from results and reject writes to
     protected fields.
-- **Before M4.** M1–M3 use a development-only authentication handler with a
-  fixed set of test users. It must be impossible to enable it outside the
-  `Development` and test environments.
+- **Before M4.** M1 has no authentication: every endpoint is open. A
+  development-only authentication handler with a fixed set of test users
+  arrives in M2 or M3, before M4. It must be impossible to enable it outside
+  the `Development` and test environments.
 
 ## Process engine (D11, planned for M3)
 
@@ -941,9 +945,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 ## Frontend
 
 - **One SPA for all applications.** The SPA renders from metadata served by
-  the server: site navigation, page templates, widget definitions, data source
-  schemas and text resources. Publishing an application never rebuilds the
-  frontend.
+  the server: site navigation, pages and their widgets, data source schemas
+  *(planned for M2)* and text resources. Publishing an application never
+  rebuilds the frontend.
 - **Shared look and feel.** A page is a route in a site, and its widgets are
   its content. Each widget type, such as `table` and `form`, has one shared
   component, and layout comes from container widgets rather than per-page
@@ -961,7 +965,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   read-only endpoints. Like every other `/api` path, they need a known tenant
   host.
 - **Platform site.** The built-in platform site in `Axis.Presentation` serves
-  the shell and the home page through two endpoints.
+  the shell through two endpoints, `GET /api/site` and
+  `GET /api/texts/{locale}`. The home page also uses `GET /api/sites` (see
+  Application sites below) to list the tenant's sites.
   - `GET /api/site` returns the site name, its title key, the locales
     (default, fallback and available) and the navigation items. Navigation
     labels are text keys, never literal text.
