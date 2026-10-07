@@ -23,7 +23,8 @@ the commands.
 | --- | --- |
 | [Product brief](docs/product-brief.md) | What Axis is, who uses it, the first application |
 | [Decisions](docs/decisions.md) | Decisions that have been agreed, with reasons |
-| [Architecture](docs/architecture.md) | Modules, hosts, storage, execution and testing |
+| [Architecture](docs/architecture.md) | Modules, hosts, tenancy, security, execution and testing |
+| [Reference](docs/reference/) | Detailed behaviour: configuration, storage, record API and frontend |
 | [Concepts](docs/domain/concepts.md) | The Axis vocabulary and what each resource does |
 | [Design knowledge](docs/domain/knowledge.md) | What business applications need and the pitfalls to avoid |
 | [Roadmap](docs/roadmap.md) | Milestones, what each delivers and its status |
