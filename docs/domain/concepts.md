@@ -43,15 +43,20 @@ Later types:
 - child collection (owned rows such as line items)
 - JSON object
 
-**Field constraints:**
+**Field constraints** in M1:
 
 - required
-- length or range
 - unique
+- maxLength (text)
+- precision and scale (decimal)
+
+Later constraints:
+
+- range
 - index
 - default value
 
-**Field flags:**
+**Field flags** (later):
 
 - searchable
 - audited
@@ -112,8 +117,8 @@ Later types:
 | **Page** | A route in a site. It has a title, and its content is its widgets: exactly one in M1. A page has no entity or template of its own. | M1 |
 | **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, and a table may name a `formPage` that opens its records. More types (list, detail, task inbox, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
 | **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. | M1 (basic), M3 (full) |
-| **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. | M1 |
-| **Theme** | Design tokens for light and dark mode, shared by every site. A site can adjust tokens but cannot add per-page styling. | M1 |
+| **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M1 only has the table's `formPage` link; navigate actions are still **Proposed** in [D15](../decisions.md#d15-presentation-model--agreed). | M3 |
+| **Theme** | Design tokens for light and dark mode, shared by every site. M1 has the shared tokens. A site will be able to adjust tokens later, but never add per-page styling. | M1 (shared tokens), later (site adjustments) |
 | **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Releases pin text versions, and a key that is still in use cannot be deleted. | M1 (basic), M6 (full) |
 
 ## Security and operations

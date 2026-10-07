@@ -213,8 +213,9 @@ and upgrades all break at those points.
 
 **Axis rules:**
 
-- **Shared templates and tokens.** Pages are built only from shared templates
-  and widgets, styled through shared tokens in light and dark mode.
+- **Shared widgets and tokens.** Pages are built only from shared widgets,
+  styled through shared tokens in light and dark mode. A page has no template
+  of its own (D15).
 - **Strong standard forms.** Standard forms cover these needs from the start:
   - sections and wizard steps
   - conditional visibility, required and read-only states
