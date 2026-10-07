@@ -1006,7 +1006,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   | --- | --- |
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one |
   | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title |
+  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=` |
   | `/{site}/{page}/new`, `/{site}/{page}/{id}` | reserved for the forms of #53, and not found until then |
 
   - `{site}` is the site path. `{page}` is the page name in lower case, as
@@ -1020,6 +1020,54 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     site.
   - A page whose widget is a `form` shows a shared "not available yet" state
     until #53.
+- **Table widget.** A page whose widget is a `table` lists the records of its
+  entity through the record API, in the shared Ant Design table.
+  - **Columns.** There is one column per field, in declaration order. The
+    header is the field's label, or the field name when it has no label.
+  - **URL state.** Paging and sorting live in the URL as the record API's own
+    `page`, `pageSize` and `sort` (`-` and the field name for descending), so
+    reload, sharing and the back button keep them. The widget writes them
+    after every other parameter, always in the order `page`, `pageSize`,
+    `sort`, and leaves out defaults (page 1, 20 a page, no sort). It changes
+    only its own three parameters: any other parameter, such as `x=1`, stays
+    as it is.
+  - **Changes.** A new sort or page size starts again at page 1, because the
+    old page number means nothing under a new order or size. Only the
+    pagination control moves between pages. Each change adds a history entry.
+  - **Invalid values.** A `page` that is not a positive integer, a `pageSize`
+    other than the offered 10, 20, 50 and 100, and a `sort` that names no
+    field or a reference field are ignored. The default is requested instead,
+    and the URL is rewritten without them and without a history entry.
+  - **Sorting.** Every column but a reference is sortable. The record API
+    sorts a reference by the stored id, which does not match the label people
+    see. Repeated clicks on a header sort ascending, then descending, then
+    not at all.
+  - **Values.** Values are formatted for display and never changed:
+
+    | Field type | Shown as |
+    | --- | --- |
+    | `date-time` | date and time to the second in the UI locale and the browser's time zone. The fraction is dropped |
+    | `date` | the date in the UI locale, without a time-zone shift |
+    | `integer`, `decimal` | exactly as the API wrote them, right-aligned |
+    | `boolean` | a localized yes or no |
+    | `reference` | the label from `labels` |
+    | `text`, `enum` | the value |
+    | `null` | an empty cell |
+
+  - **Number source text.** The SPA parses record responses with the source
+    text of each JSON number, so `values` holds integers and decimals as
+    strings, and `version` too. A plain parse would show `1250.50` as
+    `1250.5` and lose digits beyond double precision. The API never coerces a
+    string to a number, so the forms of #53 must send numbers and `version`
+    back as JSON numbers.
+  - **Links.** When the widget names a form page, a create button links to
+    `/{site}/{formpage}/new` and each row has an open link to
+    `/{site}/{formpage}/{id}`, with the page name in lower case. Those routes
+    show the not-found page until #53. Without a form page there is no
+    create button and no open column.
+  - **States.** Loading, empty and error states use the shared table and
+    alert with platform texts. While the next page loads, the current rows
+    stay under the loading overlay.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

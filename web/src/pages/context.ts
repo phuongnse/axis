@@ -42,7 +42,18 @@ export function platformTextsFor(platform: Platform, locale: string, signal: Abo
   return fetchTexts(locale, signal)
 }
 
+/** What a site passes to the routes inside it: the site and its current locale. */
+export interface SiteOutlet {
+  site: ApplicationSite
+  locale: string
+}
+
 /** The site the current route belongs to, for the routes inside a site. */
 export function useApplicationSite(): ApplicationSite {
-  return useOutletContext<ApplicationSite>()
+  return useOutletContext<SiteOutlet>().site
+}
+
+/** The current locale of the site, for the routes inside a site. */
+export function useSiteLocale(): string {
+  return useOutletContext<SiteOutlet>().locale
 }

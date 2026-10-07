@@ -226,6 +226,12 @@ and upgrades all break at those points.
 - **Custom widgets later.** Custom widgets come later as packaged React
   components (D8). Each one is reviewed as a sign of a missing standard
   capability.
+- **Display is formatting only.** The UI formats a value for the locale and
+  never changes it. What the API returned is what is shown and what is sent
+  back.
+- **The URL holds the page state.** Paging, sorting and similar view state
+  live in the address, so reload, sharing and the back button keep them.
+  Components change only their own parameters.
 
 ## Testing applications
 
