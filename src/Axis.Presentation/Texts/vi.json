@@ -19,11 +19,16 @@
   "shell.notFound.title": "Không tìm thấy trang",
   "shell.notFound.message": "Không có gì ở địa chỉ này.",
   "shell.notFound.home": "Về trang chủ",
-  "shell.widget.form.unavailable": "Biểu mẫu chưa khả dụng.",
   "shell.table.create": "Tạo mới",
   "shell.table.open": "Mở",
   "shell.table.yes": "Có",
   "shell.table.no": "Không",
   "shell.table.empty": "Chưa có bản ghi nào.",
-  "shell.table.loadFailed": "Không thể tải bản ghi."
+  "shell.table.loadFailed": "Không thể tải bản ghi.",
+  "shell.form.save": "Lưu",
+  "shell.form.cancel": "Hủy",
+  "shell.form.reload": "Tải lại",
+  "shell.form.conflict": "Bản ghi này đã thay đổi kể từ khi bạn mở. Tải lại để xem giá trị hiện tại.",
+  "shell.form.saveFailed": "Không thể lưu bản ghi.",
+  "shell.form.loadFailed": "Không thể tải bản ghi."
 }

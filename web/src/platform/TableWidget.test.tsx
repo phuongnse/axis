@@ -76,10 +76,12 @@ function stubRecords(body = notePage, status = 200) {
 
 function CurrentLocation() {
   const location = useLocation()
+  const state = location.state as { from?: string } | null
   return (
     <>
       <output data-testid="path">{location.pathname}</output>
       <output data-testid="search">{location.search}</output>
+      <output data-testid="from">{state?.from}</output>
     </>
   )
 }
@@ -131,6 +133,28 @@ describe('TableWidget', () => {
     await userEvent.click(screen.getByRole('link', { name: 'New' }))
 
     expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/new')
+  })
+
+  it('passes the table address with its paging and sorting to the form it opens', async () => {
+    stubRecords()
+    renderWidget('?pageSize=10&sort=-title')
+    const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(within(row).getByRole('link', { name: 'Open' }))
+
+    expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+    expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?pageSize=10&sort=-title')
+  })
+
+  it('passes the table address to the create form', async () => {
+    stubRecords()
+    renderWidget('?page=2')
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('link', { name: 'New' }))
+
+    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/new')
+    expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
   })
 
   it('keeps the link behaviour of the create button on a ctrl-click', async () => {

@@ -13,8 +13,13 @@
     "pages.categories.title": "Danh mục",
     "note.label": "Ghi chú",
     "note.title": "Tiêu đề",
+    "note.code": "Mã",
+    "note.priority": "Ưu tiên",
+    "note.amount": "Số tiền",
     "note.done": "Đã xong",
+    "note.dueOn": "Hạn ngày",
     "note.dueAt": "Hạn",
+    "note.status": "Trạng thái",
     "note.category": "Danh mục",
     "category.label": "Danh mục",
     "category.name": "Tên"

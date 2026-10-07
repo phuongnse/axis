@@ -1007,7 +1007,8 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=` |
-  | `/{site}/{page}/new`, `/{site}/{page}/{id}` | reserved for the forms of #53, and not found until then |
+  | `/{site}/{page}/new` | the form of a form page, to create a record |
+  | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
 
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
@@ -1015,11 +1016,13 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     unknown page shows it inside the site shell.
     An address with more than three segments, such as `/e2e/notes/42/edit`,
     matches no route and shows the not-found page inside the platform shell.
+  - A form page without `new` or an id, `new` or an id on a table page, an
+    id that is not in the hyphenated 8-4-4-4-12 hex form, and an id the
+    entity has no record for show the not-found page inside the site shell.
+    An id in the wrong form is not requested.
   - Inside a site, the shell shows the site's title, navigation and locales.
     The theme toggle and the locale switch work as they do on the platform
     site.
-  - A page whose widget is a `form` shows a shared "not available yet" state
-    until #53.
 - **Table widget.** A page whose widget is a `table` lists the records of its
   entity through the record API, in the shared Ant Design table.
   - **Columns.** There is one column per field, in declaration order. The
@@ -1066,17 +1069,60 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     Chromium 114, Firefox 135 or Safari 18.4) falls back to the parsed
     number, so `1250.50` shows as `1250.5` there. The web unit tests need
     Node 22 or later for the same reason. The API never coerces a string to a
-    number, so the forms of #53 must send numbers back as JSON numbers.
+    number, so the form widget sends numbers back as JSON numbers.
   - **Links.** When the widget names a form page, a create button links to
     `/{site}/{formpage}/new` and each row has an open link to
     `/{site}/{formpage}/{id}`, with the page name in lower case. The create
     button is a link: a click with a modifier key or the middle button opens
-    the form in a new tab or window. Those routes show the not-found page
-    until #53. Without a form page there is no create button and no open
-    column.
+    the form in a new tab or window. Both pass the table's address, with
+    its paging and sorting, to the form in history state. Without a form
+    page there is no create button and no open column.
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.
+- **Form widget.** A page whose widget is a `form` creates a record at
+  `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
+  record API. It adds no rules of its own: the server validates.
+  - **Inputs.** There is one input per field, in declaration order, labelled
+    with the field's label or the field name.
+
+    | Field type | Input |
+    | --- | --- |
+    | `text` | a text input limited to `maxLength` |
+    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is |
+    | `boolean` | a checkbox |
+    | `date` | a date picker |
+    | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
+    | `enum` | a choice of the declared values, as written in the entity file |
+    | `reference` | the label from `labels`, read-only. It is never sent |
+
+  - **Changed fields.** The form sends only the fields whose value differs
+    from the value it started from. A new record starts with every field
+    `null`, so an untouched field stays out of a create and the server
+    decides what is required. An edit also sends the `version` it read. An
+    emptied text or number input is sent as `null`.
+  - **Number text.** The body is written by hand, so an integer or decimal
+    goes out as the typed text and no digit is lost. Text that is not a JSON
+    number, such as `1,5`, goes out as a JSON string, and the server rejects
+    it on its field. The form never turns number text into a JavaScript
+    number.
+  - **Errors.** A `400` or `409` problem is mapped by its JSON Pointer keys. A
+    key `/values/<field>` for a field of the form shows its messages under
+    that field. Every other key, such as `""`, `/values` or `/version`, shows
+    above the form. A save that fails in any other way shows a shared error
+    there too.
+  - **Conflicts.** A `409` on edit that names no field is a stale version. The
+    form shows a conflict message with a reload button, which loads the
+    current values and version and drops the user's changes. A duplicate
+    unique value is a `409` keyed `/values/<field>`, so it shows under its
+    field.
+  - **Return address.** Save and cancel return to the table page that opened
+    the form, with its paging and sorting, which the table passes in history
+    state. Without it, such as in a new tab, they go to `/{site}`, which opens
+    the site's first page. Only an address inside the same site is used.
+  - **Keys.** Enter in a date or date-time picker only confirms the picked
+    value and never sends the form. Enter in a text input sends the form, as
+    in any form.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a
@@ -1084,6 +1130,11 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   locale otherwise. The shell keeps the current texts until the chosen
   locale's texts have loaded. If they fail to load, it stays in the current
   locale and shows an error message.
+  - Ant Design components, such as picker placeholders, follow the UI
+    locale. `en` maps to Ant Design's `en_US` and `vi` to `vi_VN`, ignoring
+    letter case, and any other locale uses `en_US`. dayjs, which the pickers
+    use, follows the same locale. The shell sets both through a nested
+    `ConfigProvider` that inherits the theme tokens.
 - **Text resolution.** The SPA resolves each key through catalogs in order.
   On the platform site the only catalog is the platform texts. Inside an
   application site, the site texts come first and the platform texts second,
