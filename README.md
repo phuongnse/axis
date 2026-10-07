@@ -12,17 +12,10 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Axis is at milestone **M0, Foundation**. The repository contains:
-
-- the server host, with health checks backed by PostgreSQL
-- the SPA shell, with navigation from the site metadata, light and dark mode,
-  and texts in English or Vietnamese served by the server
-- the configuration loader, which reads an application folder, validates each
-  resource against its JSON Schema and reports every problem as a diagnostic
-- real unit, integration and end-to-end checks, run by CI and NexKit
-
-No runtime features exist yet. See [AGENTS.md](AGENTS.md#commands) for the
-commands.
+Milestone **M1, Walking skeleton**, is complete. The current milestone is
+**M2, Data and rules**. The [roadmap](docs/roadmap.md) says what each
+milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
+the commands.
 
 ## Documentation
 
@@ -33,7 +26,8 @@ commands.
 | [Architecture](docs/architecture.md) | Modules, hosts, storage, execution and testing |
 | [Concepts](docs/domain/concepts.md) | The Axis vocabulary and what each resource does |
 | [Design knowledge](docs/domain/knowledge.md) | What business applications need and the pitfalls to avoid |
-| [Roadmap](docs/roadmap.md) | Milestones and the current backlog |
+| [Roadmap](docs/roadmap.md) | Milestones, what each delivers and its status |
+| [Delivery](docs/delivery.md) | How work flows through NexKit, from issue to merged pull request |
 
 Contributors and agents start with [AGENTS.md](AGENTS.md).
 
