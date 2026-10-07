@@ -111,8 +111,11 @@ returns 404, upgrade `gh` and try again.
   owner while approving, however small, is commented in the same issue and
   `/nexkit plan` is run again. No follow-up issues.
 - Before asking the owner for go, or posting `/nexkit go`, the latest plan
-  holds every agreed change. If not, re-plan first. The reviewer judges the
-  pull request against the plan, not against the comments.
+  holds every agreed change. If not, re-plan first. The plan is the contract:
+  it holds the acceptance criteria the pull request is checked against, and it
+  is the record a later reader looks at. Re-planning also lets the plan agent
+  find other places the change affects, such as another doc that must say the
+  same.
 
 ## Checklist: reviewing a pull request
 

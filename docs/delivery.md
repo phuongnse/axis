@@ -48,13 +48,14 @@ them up where they live.
    something while approving, however small, is commented in the same issue
    and `/nexkit plan` is run again before `/nexkit go`. `/nexkit go` only runs
    on the latest plan, and that plan holds every agreed change. The reason:
-   NexKit's implementer also reads the issue discussion, but the reviewer
-   judges the pull request against the plan. A change that lives only in a
-   comment is implemented, then blocked as a deviation and reverted. Do not
-   open follow-up issues. When the plan reports `too_large`, split the
-   issue into parts. Add each part as a GitHub sub-issue of the parent, in
-   order and in the parent's milestone. The parent closes when all parts are
-   done.
+   the plan is the contract. It holds the acceptance criteria the pull request
+   is checked against, and it is the record a later reader looks at. A change
+   that lives only in a comment is missing from both. Re-planning also lets
+   the plan agent find other places the change affects, such as another doc
+   that must say the same. Do not open follow-up issues. When the plan reports
+   `too_large`, split the issue into parts. Add each part as a GitHub
+   sub-issue of the parent, in order and in the parent's milestone. The parent
+   closes when all parts are done.
 4. **Implement.** The owner says go on the latest plan, and `/nexkit go` is
    posted. NexKit implements that plan and opens a pull request.
 5. **Pull request.** If the CI run waits as `action_required`, the owner
