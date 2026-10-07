@@ -34,7 +34,7 @@
   ],
   "stages": {
     "plan": {
-      "model": "claude-fable-5-1",
+      "model": "claude-opus-5-5",
       "effort": "high",
       "timeout_minutes": 20
     },
