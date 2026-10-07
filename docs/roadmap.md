@@ -23,19 +23,21 @@
 
 ## Milestones
 
-| | Milestone | Done when |
-| --- | --- | --- |
-| **M0** | Foundation | The solution builds; CI runs build, lint, unit, PostgreSQL integration and Playwright E2E for real; NexKit is installed with those checks. |
-| **M1** | Walking skeleton | An entity defined in a JSON file is compiled into a release, its table is created, and a user can list, create and edit records through generic pages, in light and dark mode. Two tenant databases are isolated. |
-| **M2** | Data and rules | Expression language, named rules, validation and computed fields, data sources (filters, sorting, paging, relations, aggregates), seed data, and line items on the purchase request form. |
-| **M3** | Processes and tasks | Worker host. Purchase request submit → manager task → finance task above the threshold → approved, returned or rejected. Survives worker restart. One decision per task, one start per submission. Audit trail and sequence numbers. |
-| **M4** | Identity and authorization | OIDC login through the BFF (Keycloak in tests), roles, default-deny policies at resource, record, field and action level. Denied-access E2E for the purchase request scenarios. |
-| **M5** | Events, triggers and integration | Events, data change triggers, schedules, inbound endpoints, connectors with idempotency and reconciliation, deployment bindings and secrets, extension packages. The approved request creates exactly one purchase order, even when a response is lost. |
-| **M6** | Releases and versioning | Immutable releases with full pinning, waiting instances finishing on their old release, schema evolution with migrations, text resource lifecycle, configuration test scenarios in CI. |
-| **M7** | Inspection and operations | Process inspector (graph, path, attempts, input and output, failures), correlated logs, metrics and traces, health checks, operator retry, cancel and resolve. |
-| **M8** | Studio and modules | Visual authoring that uses the same resource contracts, a dependency graph and a "where is this used" view, reusable modules, and a second sample application. |
-| **M9** | Tenancy and deployment | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. |
-| **M10** | Hardening | Performance SLOs and load tests, FAPI 2.0 profile, security verification against an agreed ASVS level, custom widgets. |
+| | Milestone | Status | Done when |
+| --- | --- | --- | --- |
+| **M0** | Foundation | Done | The solution builds; CI runs build, lint, unit, PostgreSQL integration and Playwright E2E for real; NexKit is installed with those checks. |
+| **M1** | Walking skeleton | Done | An entity defined in a JSON file is compiled into a release, its table is created, and a user can list, create and edit records through generic pages, in light and dark mode. Two tenant databases are isolated. |
+| **M2** | Data and rules | Next | Expression language, named rules, validation and computed fields, data sources (filters, sorting, paging, relations, aggregates), seed data beyond insert-once, such as updating seeded records, and line items on the purchase request form. |
+| **M3** | Processes and tasks | Planned | Worker host. Purchase request submit → manager task → finance task above the threshold → approved, returned or rejected. Survives worker restart. One decision per task, one start per submission. Audit trail and sequence numbers. |
+| **M4** | Identity and authorization | Planned | OIDC login through the BFF (Keycloak in tests), roles, default-deny policies at resource, record, field and action level. Denied-access E2E for the purchase request scenarios. |
+| **M5** | Events, triggers and integration | Planned | Events, data change triggers, schedules, inbound endpoints, connectors with idempotency and reconciliation, deployment bindings and secrets, extension packages. The approved request creates exactly one purchase order, even when a response is lost. |
+| **M6** | Releases and versioning | Planned | Immutable releases with full pinning, waiting instances finishing on their old release, schema evolution with migrations, separate database roles for runtime access and schema changes, text resource lifecycle, configuration test scenarios in CI. |
+| **M7** | Inspection and operations | Planned | Process inspector (graph, path, attempts, input and output, failures), correlated logs, metrics and traces, health checks, operator retry, cancel and resolve. |
+| **M8** | Studio and modules | Planned | Visual authoring that uses the same resource contracts, a dependency graph and a "where is this used" view, reusable modules, and a second sample application. |
+| **M9** | Tenancy and deployment | Planned | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. |
+| **M10** | Hardening | Planned | Performance SLOs and load tests, FAPI 2.0 profile, security verification against an agreed ASVS level, custom widgets. |
+
+M2 is the next milestone to break down into issues.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4
 stay in this order.
@@ -65,10 +67,13 @@ working checks before it can verify anything.
 Done when a trivial NexKit issue goes from `/nexkit plan` to a green pull
 request.
 
-## M1 — Walking skeleton: backlog
+## M1 — Walking skeleton (done)
 
-Each item becomes one GitHub issue once M0 is done. Item numbers give the
-order; items in the same row of the dependency list can run in parallel.
+This milestone is complete. See the closed
+[M1 milestone](https://github.com/phuongnse/axis/milestone/1?closed=1) on
+GitHub. The items below are the original plan, kept as a record. Item numbers
+gave the order; items in the same row of the dependency list could run in
+parallel.
 
 **Dependencies:**
 
@@ -80,7 +85,9 @@ order; items in the same row of the dependency list can run in parallel.
 ### 1. Resource file loader with diagnostics
 
 Load an application folder of JSON resources (`application` manifest plus
-`entity` resources) and validate each one against its JSON Schema.
+`entity` resources) and validate each one against its JSON Schema. As built,
+the loader handles the `application`, `entity`, `site`, `page`, `text` and
+`seed` kinds.
 
 - Valid sample folder loads into typed resource objects.
 - Invalid JSON, unknown `kind`, schema violations and duplicate `id` or `name`
