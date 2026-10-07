@@ -1,10 +1,11 @@
-import { Alert, Button, Checkbox, DatePicker, Flex, Form, Input, Select } from 'antd'
+import { Alert, Button, Checkbox, DatePicker, Flex, Form, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { buildRecordBody } from './recordBody'
 import { fetchRecord, saveRecord, type RecordItem, type RecordValue } from './records'
+import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata, WidgetMetadata } from './site'
 import { useText } from './texts'
 
@@ -60,6 +61,10 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, RecordValue>>(snapshot.initial)
+  // The label of each reference, which follows the record picked in the lookup.
+  const [labels, setLabels] = useState<Record<string, string>>(snapshot.labels)
+  // The name of the reference field whose lookup is open.
+  const [lookup, setLookup] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [conflict, setConflict] = useState(false)
@@ -69,6 +74,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
     const next = snapshotOf(record)
     setSnapshot(next)
     setValues(next.initial)
+    setLabels(next.labels)
     setFieldErrors({})
     setFormErrors([])
     setConflict(false)
@@ -114,7 +120,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
     }
     const changed = Object.fromEntries(
       entity.fields
-        .filter((field) => field.type !== 'reference' && values[field.name] !== snapshot.initial[field.name])
+        .filter((field) => values[field.name] !== snapshot.initial[field.name])
         .map((field) => [field.name, values[field.name]]),
     )
     const body = buildRecordBody(entity.fields, changed, recordId === null ? undefined : snapshot.version)
@@ -170,6 +176,26 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
   }
 
   const set = (name: string, value: RecordValue) => setValues((previous) => ({ ...previous, [name]: value }))
+  const labelOf = (field: FieldMetadata) => (field.labelKey ? t(field.labelKey) : field.name)
+
+  const pick = (field: FieldMetadata, record: RecordItem) => {
+    const display = field.target?.displayField
+    set(field.name, record.id)
+    setLabels((previous) => ({
+      ...previous,
+      [field.name]: display ? String(record.values[display] ?? '') : record.id,
+    }))
+    setLookup(null)
+  }
+
+  const clear = (field: FieldMetadata) => {
+    set(field.name, null)
+    setLabels((previous) => {
+      const next = { ...previous }
+      delete next[field.name]
+      return next
+    })
+  }
 
   const input = (field: FieldMetadata): ReactNode => {
     const value = values[field.name] ?? null
@@ -232,8 +258,14 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
           />
         )
       case 'reference':
-        // The lookup to choose a record comes later. Until then the label is shown and never sent.
-        return <Input id={id} readOnly value={snapshot.labels[field.name] ?? ''} />
+        // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
+        return (
+          <Space.Compact block>
+            <Input id={id} readOnly value={labels[field.name] ?? ''} />
+            <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
+            {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
+          </Space.Compact>
+        )
     }
   }
 
@@ -254,7 +286,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
           return (
             <Form.Item
               key={field.name}
-              label={field.labelKey ? t(field.labelKey) : field.name}
+              label={labelOf(field)}
               htmlFor={field.name}
               required={field.required}
               validateStatus={errors ? 'error' : undefined}
@@ -271,6 +303,18 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
           <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
         </Flex>
       </Form>
+      {entity.fields
+        .filter((field) => field.type === 'reference' && field.target)
+        .map((field) => (
+          <ReferenceLookup
+            key={field.name}
+            field={field}
+            title={labelOf(field)}
+            open={lookup === field.name}
+            onPick={(record) => pick(field, record)}
+            onClose={() => setLookup(null)}
+          />
+        ))}
     </Flex>
   )
 }
