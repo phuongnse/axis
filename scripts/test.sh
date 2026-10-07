@@ -11,7 +11,8 @@ done
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
-# The report script's own tests.
+# The report and link check scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
+node --test scripts/check-links.test.mjs || status=1
 
 finish_report

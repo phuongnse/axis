@@ -1236,6 +1236,13 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
+Some doc facts are checked by machine. `scripts/lint.sh` checks every relative
+Markdown link and `#anchor` in the repository. Unit tests in
+`Axis.Configuration.Tests` compare the diagnostic code table and the resource
+kinds in the [configuration pipeline](#configuration-pipeline) with
+`DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
+heading or table header, so the sections may move within `docs/`.
+
 The E2E server starts with two applications listed in `ActivateOnStartup` (see
 [Startup activation](#startup-activation)), so Playwright journeys run against
 real metadata and records:

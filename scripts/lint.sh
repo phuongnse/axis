@@ -6,3 +6,4 @@ cd "$(dirname "$0")/.."
 dotnet format Axis.slnx --verify-no-changes
 npm run lint --prefix web
 npx --prefix tests/e2e tsc -p tests/e2e/tsconfig.json
+node scripts/check-links.mjs

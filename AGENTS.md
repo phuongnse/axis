@@ -61,7 +61,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | --- | --- | --- |
 | `scripts/setup.sh` | Restores .NET packages, installs npm packages and the Playwright browser | Network |
 | `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution | |
-| `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks | |
+| `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers | Docker |
 | `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium | Docker |
