@@ -1095,8 +1095,19 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     | `date` | a date picker |
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
     | `enum` | a choice of the declared values, as written in the entity file |
-    | `reference` | the label from `labels`, read-only. It is never sent |
+    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
 
+  - **Lookup.** The choose button opens a dialog titled with the field's
+    label. It lists the target entity's records through their record API,
+    sorted ascending by the target's display field, in one column for that
+    field. It pages 20 records at a time and keeps nothing in the URL.
+    Loading, empty and error states use the table's texts. Clicking a row
+    or pressing Enter on it picks the record and closes the dialog. Search
+    comes with filtering in M2.
+  - **Reference label.** On edit, the label starts from the record's
+    `labels`. A picked record's display field value replaces it at once. A
+    changed reference is sent as the record id, and a cleared one as `null`.
+    Picking the record that was already set leaves the field unchanged.
   - **Changed fields.** The form sends only the fields whose value differs
     from the value it started from. A new record starts with every field
     `null`, so an untouched field stays out of a create and the server

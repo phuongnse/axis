@@ -117,3 +117,25 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
 
   await expect(page.getByTestId('field-error-code')).toHaveText('Must be unique.')
 })
+
+test('a category is picked in the lookup and shows on the saved note', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  // Other specs create categories too. A leading digit sorts this one onto the first lookup page.
+  const category = `0 Lookup ${run}`
+  await createRecord(request, 'Category', { name: category })
+  const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
+  await page.goto('/e2e/notes?pageSize=100&sort=-title')
+
+  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('textbox', { name: 'Title' }).fill(`Lookup ${run}`)
+  await page.getByRole('button', { name: 'Choose' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('row', { name: new RegExp(category) }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByLabel('Category', { exact: true })).toHaveValue(category)
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page).toHaveURL(tablePath)
+  await expect(page.getByRole('row', { name: new RegExp(`Lookup ${run} `) })).toContainText(category)
+})

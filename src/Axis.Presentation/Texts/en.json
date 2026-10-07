@@ -30,5 +30,7 @@
   "shell.form.reload": "Reload",
   "shell.form.conflict": "This record was changed since you opened it. Reload it to see the current values.",
   "shell.form.saveFailed": "The record could not be saved.",
-  "shell.form.loadFailed": "The record could not be loaded."
+  "shell.form.loadFailed": "The record could not be loaded.",
+  "shell.form.choose": "Choose",
+  "shell.form.clear": "Clear"
 }

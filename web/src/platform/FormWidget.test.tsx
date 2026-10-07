@@ -1,8 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import dayjs from 'dayjs'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { FormWidget } from './FormWidget'
 import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
@@ -55,6 +58,8 @@ function noteJson(title: string, version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"${title}","code":null,"priority":7,"amount":12.50,"done":false,"dueOn":null,"dueAt":"2026-10-06T02:00:00.123456Z","status":null,"category":"${categoryId}"},"labels":{"category":"Office"}}`
 }
 
+const categoryPageJson = `{"items":[{"id":"${categoryId}","version":1,"values":{"name":"Office"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`
+
 const texts = {
   'shell.form.save': 'Save',
   'shell.form.cancel': 'Cancel',
@@ -62,6 +67,10 @@ const texts = {
   'shell.form.conflict': 'This record was changed since you opened it.',
   'shell.form.saveFailed': 'The record could not be saved.',
   'shell.form.loadFailed': 'The record could not be loaded.',
+  'shell.form.choose': 'Choose',
+  'shell.form.clear': 'Clear',
+  'shell.table.empty': 'No records yet.',
+  'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
   'note.title': 'Title',
   'note.code': 'Code',
@@ -92,13 +101,16 @@ function CurrentLocation() {
   return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
 }
 
-function renderForm(recordId: string | null = null) {
+function renderForm(recordId: string | null = null, widget: WidgetMetadata = noteWidget) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
   return render(
     <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
-      <TextProvider catalogs={catalogs} development={false}>
-        <FormWidget widget={noteWidget} recordId={recordId} returnTo="/e2e/notes?pageSize=10" />
-      </TextProvider>
+      {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <TextProvider catalogs={catalogs} development={false}>
+          <FormWidget widget={widget} recordId={recordId} returnTo="/e2e/notes?pageSize=10" />
+        </TextProvider>
+      </ConfigProvider>
       <CurrentLocation />
     </MemoryRouter>,
   )
@@ -222,6 +234,112 @@ describe('FormWidget', () => {
 
     expect(await screen.findByTestId('field-error-code')).toHaveTextContent('Must be unique.')
     expect(screen.queryByTestId('form-conflict')).not.toBeInTheDocument()
+  })
+
+  it('picks a reference from the lookup and sends its id', async () => {
+    const requests = stubFetch({ status: 200, body: categoryPageJson }, { status: 201, body: noteJson('Buy paper', 1) })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    // The dialog renders into the document body, outside the form.
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialog).findByText('Office'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Category')).toHaveValue('Office')
+    expect(requests()[0]).toEqual({
+      url: '/api/apps/E2eApp/entities/Category/records?sort=name',
+      method: 'GET',
+      body: undefined,
+    })
+
+    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: recordsPath,
+      method: 'POST',
+      body: `{"values":{"title":"Buy paper","category":"${categoryId}"}}`,
+    })
+  })
+
+  it('leaves a reference out when the record already set is picked again', async () => {
+    const requests = stubFetch(
+      { status: 200, body: noteJson('Buy paper', 1) },
+      { status: 200, body: categoryPageJson },
+      { status: 200, body: noteJson('New', 2) },
+    )
+    renderForm(noteId)
+    const title = await screen.findByLabelText('Title')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
+    await userEvent.type(title, '!')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(3))
+    expect(requests()[2].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
+  })
+
+  it('shows the lookup error when the target records cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubFetch({ status: 500, body: '{}' })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+
+    expect(await screen.findByTestId('reference-lookup-error')).toHaveTextContent('The records could not be loaded.')
+  })
+
+  it('clears a reference and sends null', async () => {
+    const requests = stubFetch(
+      { status: 200, body: noteJson('Buy paper', 1) },
+      { status: 200, body: noteJson('Buy paper', 2) },
+    )
+    renderForm(noteId)
+    expect(await screen.findByLabelText('Category')).toHaveValue('Office')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
+
+    expect(screen.getByLabelText('Category')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"category":null}}',
+    })
+  })
+
+  it('shows no clear button for a required reference or an empty one', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    const requiredWidget: WidgetMetadata = {
+      ...noteWidget,
+      entity: {
+        ...noteWidget.entity,
+        fields: noteWidget.entity.fields.map((f) => (f.name === 'category' ? { ...f, required: true } : f)),
+      },
+    }
+    const { unmount } = renderForm(noteId, requiredWidget)
+    expect(await screen.findByLabelText('Category')).toHaveValue('Office')
+    expect(screen.getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
+    unmount()
+
+    stubFetch()
+    renderForm()
+    expect(screen.getByLabelText('Category')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
+  })
+
+  it('has the choose and clear texts in every platform locale', () => {
+    for (const catalog of [platformEnglish, platformVietnamese]) {
+      expect(catalog).toHaveProperty(['shell.form.choose'])
+      expect(catalog).toHaveProperty(['shell.form.clear'])
+    }
   })
 
   it('returns to the table on cancel without a request', async () => {

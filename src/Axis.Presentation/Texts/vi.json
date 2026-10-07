@@ -30,5 +30,7 @@
   "shell.form.reload": "Tải lại",
   "shell.form.conflict": "Bản ghi này đã thay đổi kể từ khi bạn mở. Tải lại để xem giá trị hiện tại.",
   "shell.form.saveFailed": "Không thể lưu bản ghi.",
-  "shell.form.loadFailed": "Không thể tải bản ghi."
+  "shell.form.loadFailed": "Không thể tải bản ghi.",
+  "shell.form.choose": "Chọn",
+  "shell.form.clear": "Xóa"
 }
