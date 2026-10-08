@@ -28,6 +28,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     private readonly string _name = $"Startup{Guid.NewGuid():N}";
     private readonly Guid _firstSeedId = Guid.NewGuid();
     private readonly Guid _secondSeedId = Guid.NewGuid();
+    private readonly Guid _seedResourceId = Guid.NewGuid();
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -155,6 +156,92 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Synced_seed_updates_a_changed_record_and_an_unchanged_start_writes_nothing()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First", "done": false }""", """{ "title": "Second", "done": false }""", sync: true));
+
+        var logs = new LogCollector();
+        await StartAsync(a, b, folder, logs);
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 2 seed record(s) and updated 0 ", StringComparison.Ordinal));
+
+        logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs))
+        {
+            using var client = factory.CreateClient();
+            Assert.Equal(("First", false, 1L), await GetRecordAsync(client, HostA, _firstSeedId));
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 0 seed record(s) and updated 0 ", StringComparison.Ordinal));
+
+        folder.With("seeds/notes.json", SeedFile("""{ "title": "Renamed", "done": false }""", """{ "title": "Second", "done": false }""", sync: true));
+        logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs))
+        {
+            using var client = factory.CreateClient();
+            foreach (var host in new[] { HostA, HostB })
+            {
+                Assert.Equal(("Renamed", false, 2L), await GetRecordAsync(client, host, _firstSeedId));
+                Assert.Equal(("Second", false, 1L), await GetRecordAsync(client, host, _secondSeedId));
+            }
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 0 seed record(s) and updated 1 ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Synced_seed_keeps_edits_to_undeclared_fields_and_records_removed_from_the_file()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First" }""", """{ "title": "Second" }""", sync: true));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
+        {
+            using var client = factory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}")
+            {
+                Content = JsonContent.Create(new { version = 1, values = new { done = true } }),
+            };
+            request.Headers.Host = HostA;
+            using var response = await client.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        folder.With("seeds/notes.json", SeedFile("""{ "title": "Renamed" }""", secondValues: null, sync: true));
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
+        {
+            using var client = factory.CreateClient();
+            Assert.Equal(("Renamed", true, 3L), await GetRecordAsync(client, HostA, _firstSeedId));
+            Assert.Equal(("Second", null, 1L), await GetRecordAsync(client, HostA, _secondSeedId));
+        }
+
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(_noteId));
+        Assert.Equal(2L, await ScalarAsync(a, $"SELECT count(*) FROM {table}"));
+        Assert.Equal(2L, await ScalarAsync(b, $"SELECT count(*) FROM {table}"));
+    }
+
+    [Fact]
+    public async Task Seed_without_sync_ignores_a_changed_file_value()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First", "done": false }""", """{ "title": "Second", "done": false }"""));
+        await StartAsync(a, b, folder);
+
+        folder.With("seeds/notes.json", SeedFile("""{ "title": "Renamed", "done": false }""", """{ "title": "Second", "done": false }"""));
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs))
+        {
+            using var client = factory.CreateClient();
+            Assert.Equal(("First", false, 1L), await GetRecordAsync(client, HostA, _firstSeedId));
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 0 seed record(s) and updated 0 ", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Invalid_seed_value_stops_the_start_is_logged_with_its_file_and_pointer_and_inserts_no_seed_record()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
@@ -229,9 +316,9 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         });
 
     /// <summary>Starts the server once with <paramref name="folder"/> and returns the active release ids in both tenants.</summary>
-    private async Task<Guid?[]> StartAsync(string a, string b, TemporaryFolder folder)
+    private async Task<Guid?[]> StartAsync(string a, string b, TemporaryFolder folder, LogCollector? logs = null)
     {
-        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
+        await using (var factory = CreateFactory(a, b, folder.Path, logs ?? new LogCollector()))
         {
             factory.CreateClient().Dispose();
         }
@@ -239,6 +326,19 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         Guid?[] active = [(await ActiveAsync(a))?.ReleaseId, (await ActiveAsync(b))?.ReleaseId];
         Assert.All(active, id => Assert.NotNull(id));
         return active;
+    }
+
+    /// <summary>Reads a <c>Note</c> record through the record API; <c>Done</c> is null when the field has no value.</summary>
+    private async Task<(string? Title, bool? Done, long Version)> GetRecordAsync(HttpClient client, string host, Guid id)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/apps/{_name}/entities/Note/records/{id}");
+        request.Headers.Host = host;
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var record = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var values = record.GetProperty("values");
+        bool? done = values.TryGetProperty("done", out var value) && value.ValueKind != JsonValueKind.Null ? value.GetBoolean() : null;
+        return (values.GetProperty("title").GetString(), done, record.GetProperty("version").GetInt64());
     }
 
     private async Task<ActiveRelease?> ActiveAsync(string connectionString)
@@ -269,12 +369,20 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
             .With("application.json", $$"""{ "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1 }""")
             .With("entities/note.json", NoteFile(fields));
 
-    /// <summary>A seed over <c>Note</c> with two records, which have the fixed seed ids and the given values.</summary>
-    private string SeedFile(string firstValues, string secondValues) =>
-        $$"""
-        { "id": "{{Guid.NewGuid()}}", "kind": "seed", "name": "Notes", "formatVersion": 1, "entity": "Note",
-          "records": [ { "id": "{{_firstSeedId}}", "values": {{firstValues}} }, { "id": "{{_secondSeedId}}", "values": {{secondValues}} } ] }
-        """;
+    /// <summary>
+    /// A seed over <c>Note</c> with the fixed seed ids and the given values, synced when
+    /// <paramref name="sync"/> is set. The second record is left out when its values are null.
+    /// </summary>
+    private string SeedFile(string firstValues, string? secondValues, bool sync = false)
+    {
+        var records = secondValues is null
+            ? $$"""{ "id": "{{_firstSeedId}}", "values": {{firstValues}} }"""
+            : $$"""{ "id": "{{_firstSeedId}}", "values": {{firstValues}} }, { "id": "{{_secondSeedId}}", "values": {{secondValues}} }""";
+        return $$"""
+            { "id": "{{_seedResourceId}}", "kind": "seed", "name": "Notes", "formatVersion": 1, "entity": "Note",{{(sync ? " \"sync\": true," : "")}}
+              "records": [ {{records}} ] }
+            """;
+    }
 
     private string NoteFile(params string[] fields) =>
         $$"""{ "id": "{{_noteId}}", "kind": "entity", "name": "Note", "formatVersion": 1, "fields": [{{string.Join(", ", fields)}}] }""";

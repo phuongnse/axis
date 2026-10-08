@@ -7,18 +7,21 @@ using Npgsql;
 namespace Axis.Data.Seeding;
 
 /// <summary>
-/// Inserts the seed records of an active application whose id is missing, and leaves existing
-/// records alone, also when they were edited. Seed values follow the record API's rules: each
-/// record goes through <see cref="RecordInputParser"/> as a create body and is inserted by
-/// <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any insert, and every
-/// parse problem is reported. The inserts run in one transaction in path order of the seed files
-/// and file order of the records, so a reference may name a record inserted earlier in the same
-/// run. The first storage problem rolls back every insert.
+/// Inserts the seed records of an active application whose id is missing. A seed without
+/// <see cref="SeedModel.Sync"/> leaves existing records alone, also when they were edited. A synced
+/// seed updates an existing record whose declared values differ from the stored ones, through
+/// <see cref="RecordCommands.UpdateAsync"/>, so its version grows by one; an identical record is not
+/// written, undeclared fields keep their values, and no record is deleted. Seed values follow the
+/// record API's rules: each record goes through <see cref="RecordInputParser"/> as a create body
+/// and is inserted by <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any
+/// write, and every parse problem is reported. The writes run in one transaction in path order of
+/// the seed files and file order of the records, so a reference may name a record inserted earlier
+/// in the same run. The first storage problem rolls back every write.
 /// </summary>
 public static class SeedApplier
 {
-    /// <summary>The message of a create refused by a constraint the active model does not declare.</summary>
-    private const string SchemaConflictMessage = "The record could not be inserted because the stored schema does not match the active model.";
+    /// <summary>The message of a write refused by a constraint the active model does not declare.</summary>
+    private const string SchemaConflictMessage = "The record could not be written because the stored schema does not match the active model.";
 
     /// <summary>
     /// Applies <paramref name="model"/>'s seeds over <paramref name="connection"/>, whose entity
@@ -55,35 +58,69 @@ public static class SeedApplier
 
         if (diagnostics.Count > 0)
         {
-            return new SeedResult(DiagnosticOrder.Sort(diagnostics), 0);
+            return new SeedResult(DiagnosticOrder.Sort(diagnostics), 0, 0);
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var inserted = 0;
+        var updated = 0;
         foreach (var (seed, entity, index, id, input) in parsed)
         {
-            if (await RecordCommands.ExistsAsync(connection, RecordQueries.Table(entity), id, cancellationToken))
+            RecordWriteResult result;
+            var updating = false;
+            if (seed.Sync)
             {
-                continue;
+                var found = await RecordCommands.FindVersionAsync(connection, entity, id, input.Values, cancellationToken);
+                if (found is { Differs: false })
+                {
+                    continue;
+                }
+
+                updating = found is not null;
+                result = found is { } stored
+                    ? await RecordCommands.UpdateAsync(connection, entity, id, stored.Version, input.Values, cancellationToken)
+                    : await RecordCommands.CreateAsync(connection, entity, input.Values, id, cancellationToken);
+            }
+            else
+            {
+                if (await RecordCommands.ExistsAsync(connection, RecordQueries.Table(entity), id, cancellationToken))
+                {
+                    continue;
+                }
+
+                result = await RecordCommands.CreateAsync(connection, entity, input.Values, id, cancellationToken);
             }
 
-            var result = await RecordCommands.CreateAsync(connection, entity, input.Values, id, cancellationToken);
             if (result.Outcome != RecordWriteOutcome.Written)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                var path = $"/records/{index}";
-                return new SeedResult(
-                    result.Errors is { } errors
-                        ? DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, path + error.Key, error.Value[0])))
-                        : [Invalid(seed, path, SchemaConflictMessage)],
-                    0);
+                return Failed(seed, index, result);
             }
 
-            inserted++;
+            if (updating)
+            {
+                updated++;
+            }
+            else
+            {
+                inserted++;
+            }
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return new SeedResult([], inserted);
+        return new SeedResult([], inserted, updated);
+    }
+
+    /// <summary>Reports a refused write at the record's path, or at the pointers of its errors.</summary>
+    private static SeedResult Failed(SeedModel seed, int index, RecordWriteResult result)
+    {
+        var path = $"/records/{index}";
+        return new SeedResult(
+            result.Errors is { } errors
+                ? DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, path + error.Key, error.Value[0])))
+                : [Invalid(seed, path, SchemaConflictMessage)],
+            0,
+            0);
     }
 
     private static Diagnostic Invalid(SeedModel seed, string path, string message) =>

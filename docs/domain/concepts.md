@@ -25,7 +25,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Computed field** | A field whose value comes from an expression over the record's own fields and its child rows. It is stored and recomputed on every write. | M2 |
 | **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. | M2 |
 | **Sequence** | A counter that hands out business numbers, such as `PR-2026-00042`, inside the caller's transaction. | M3 |
-| **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. | M1 (basic), M2 |
+| **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. A seed can be synced so changed values update the seeded records on start. | M1 (basic), M2 |
 
 **Field types** start with:
 
