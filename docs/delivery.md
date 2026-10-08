@@ -92,9 +92,7 @@ them.
    repeat what the issue or the merged docs already say. Link to the doc
    instead. For example:
    `Accepted: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
-   "Accepted as in the plan" is not enough. On #98 a comment accepted "the
-   other choices listed under Decisions to check", and the re-plan chose
-   differently. On #99 a long, wordy comment led to mistakes. `/nexkit go`
+   "Accepted as in the plan" is not enough. `/nexkit go`
    only runs on the latest plan, and that plan holds every agreed change. The reason:
    the plan is the contract. It holds the acceptance criteria the pull request
    is checked against, and it is the record a later reader looks at. A change
