@@ -37,9 +37,14 @@ public static partial class RecordInputParser
 
     private static readonly TimeSpan _maxOffset = TimeSpan.FromHours(14);
 
-    public static RecordInputResult Parse(ReadOnlyMemory<byte> utf8Body, EntityModel entity, RecordOperation operation)
+    /// <summary>
+    /// Parses <paramref name="utf8Body"/> against <paramref name="entity"/>. The rows of a child
+    /// collection are checked against the child entity that <paramref name="application"/> declares.
+    /// </summary>
+    public static RecordInputResult Parse(ReadOnlyMemory<byte> utf8Body, EntityModel entity, ApplicationModel application, RecordOperation operation)
     {
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(application);
 
         // Checked up front so invalid bytes are a body error wherever they sit, not a value error.
         if (!Utf8.IsValid(utf8Body.Span))
@@ -70,6 +75,7 @@ public static partial class RecordInputParser
             var names = new HashSet<string>(StringComparer.Ordinal);
             JsonElement? values = null;
             var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
+            var rows = new Dictionary<string, RecordRows>(StringComparer.Ordinal);
             long? version = null;
 
             foreach (var property in root.EnumerateObject())
@@ -90,7 +96,7 @@ public static partial class RecordInputParser
                 {
                     case ValuesProperty when property.Value.ValueKind == JsonValueKind.Object:
                         values = property.Value;
-                        if (!ReadValues(property.Value, entity, parsed, errors))
+                        if (!ReadValues(property.Value, ValuesPointer, entity, application, parsed, rows, errors))
                         {
                             return MalformedBody();
                         }
@@ -129,10 +135,7 @@ public static partial class RecordInputParser
             // Required fields are checked only when values is an object, so a missing values is one error.
             if (operation == RecordOperation.Create && values is { } valuesElement)
             {
-                foreach (var field in RecordQueries.Columns(entity).Where(field => field.Required && !valuesElement.TryGetProperty(field.Name, out _)))
-                {
-                    AddError(errors, Pointer(ValuesPointer, field.Name), Messages.Required);
-                }
+                AddMissingRequired(valuesElement, ValuesPointer, entity, errors);
             }
 
             if (errors.Count > 0)
@@ -146,19 +149,29 @@ public static partial class RecordInputParser
                     .Where(field => parsed.ContainsKey(field.Name))
                     .Select(field => new RecordValue(field, parsed[field.Name]))
                     .ToList(),
+                Rows = entity.Fields
+                    .Where(field => rows.ContainsKey(field.Name))
+                    .Select(field => rows[field.Name])
+                    .ToList(),
                 Version = version,
             });
         }
     }
 
-    /// <summary>Reads the values object; returns false when a property name cannot be read.</summary>
+    /// <summary>
+    /// Reads the values object at <paramref name="pointer"/>, the owner's values or one row, against
+    /// the fields of <paramref name="entity"/>. Returns false when a property name cannot be read.
+    /// <paramref name="rows"/> is null for a row, whose entity has no child collection.
+    /// </summary>
     private static bool ReadValues(
         JsonElement values,
+        string pointer,
         EntityModel entity,
+        ApplicationModel application,
         Dictionary<string, object?> parsed,
+        Dictionary<string, RecordRows>? rows,
         SortedDictionary<string, string[]> errors)
     {
-        var columns = RecordQueries.Columns(entity);
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in values.EnumerateObject())
         {
@@ -167,25 +180,34 @@ public static partial class RecordInputParser
                 return false;
             }
 
-            var pointer = Pointer(ValuesPointer, name);
+            var propertyPointer = Pointer(pointer, name);
             if (!names.Add(name))
             {
-                AddError(errors, pointer, Messages.DuplicateProperty);
+                AddError(errors, propertyPointer, Messages.DuplicateProperty);
                 continue;
             }
 
-            // Field names are matched exactly; EntityModel.TryGetField ignores letter case. A child
-            // collection has no column, so it is an unknown property.
-            var field = columns.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
-            if (field is null)
+            // Field names are matched exactly; EntityModel.TryGetField ignores letter case.
+            var field = entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
+            if (field is null || (field.Type == FieldType.ChildCollection && rows is null))
             {
-                AddError(errors, pointer, Messages.UnknownProperty);
+                AddError(errors, propertyPointer, Messages.UnknownProperty);
+                continue;
+            }
+
+            if (field.Type == FieldType.ChildCollection)
+            {
+                if (!ReadRows(property.Value, propertyPointer, field, application, rows!, errors))
+                {
+                    return false;
+                }
+
                 continue;
             }
 
             if (ReadValue(property.Value, field, out var value) is { } message)
             {
-                AddError(errors, pointer, message);
+                AddError(errors, propertyPointer, message);
             }
             else
             {
@@ -194,6 +216,64 @@ public static partial class RecordInputParser
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Reads the rows of a child collection. Each row is read like a create body, so a required
+    /// field of the child must be present. Returns false when a property name cannot be read.
+    /// </summary>
+    private static bool ReadRows(
+        JsonElement element,
+        string pointer,
+        FieldModel collection,
+        ApplicationModel application,
+        Dictionary<string, RecordRows> rows,
+        SortedDictionary<string, string[]> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            AddError(errors, pointer, Messages.MustBeArray);
+            return true;
+        }
+
+        var child = application.FindEntity(collection.Target!.Id)
+            ?? throw new InvalidOperationException("The application has no entity for the child collection.");
+        var columns = RecordQueries.Columns(child);
+        var parsedRows = new List<IReadOnlyList<RecordValue>>();
+        var index = 0;
+        foreach (var row in element.EnumerateArray())
+        {
+            var rowPointer = Pointer(pointer, index.ToString(CultureInfo.InvariantCulture));
+            index++;
+            if (row.ValueKind != JsonValueKind.Object)
+            {
+                AddError(errors, rowPointer, Messages.MustBeObject);
+                continue;
+            }
+
+            var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
+            if (!ReadValues(row, rowPointer, child, application, parsed, rows: null, errors))
+            {
+                return false;
+            }
+
+            AddMissingRequired(row, rowPointer, child, errors);
+
+            // Every column is written, so a field the row leaves out is SQL NULL.
+            parsedRows.Add([.. columns.Select(field => new RecordValue(field, parsed.GetValueOrDefault(field.Name)))]);
+        }
+
+        rows[collection.Name] = new RecordRows(collection, child, parsedRows);
+        return true;
+    }
+
+    /// <summary>Reports each required column field of <paramref name="entity"/> that <paramref name="values"/> leaves out.</summary>
+    private static void AddMissingRequired(JsonElement values, string pointer, EntityModel entity, SortedDictionary<string, string[]> errors)
+    {
+        foreach (var field in RecordQueries.Columns(entity).Where(field => field.Required && !values.TryGetProperty(field.Name, out _)))
+        {
+            AddError(errors, Pointer(pointer, field.Name), Messages.Required);
+        }
     }
 
     /// <summary>Reads one field value; returns the error message, or null when the value is valid.</summary>

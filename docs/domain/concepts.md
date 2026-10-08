@@ -37,8 +37,8 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 - date-time
 - enum
 - reference (to another entity)
-- child collection (owned rows such as line items). Its child table is
-  created, but the record API does not serve its rows yet.
+- child collection (owned rows such as line items). The record API reads and
+  writes its rows through the owner record.
 
 Later types:
 

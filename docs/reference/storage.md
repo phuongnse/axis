@@ -183,7 +183,7 @@ Child tables are built, and their planning rules are in
   Rows are deleted with their owner.
 - **No version.** A child table has no `version` column. Its rows live under
   the owner's version, and a write to the rows increments the owner's
-  `version` *(planned for M2)*.
+  `version`.
 - **Computed column** *(planned for M2)*. A computed field is an ordinary
   column of its type. It is never `NOT NULL`, because a computed field cannot
   be `required`. It is written in the same transaction as the record, and for

@@ -4,12 +4,15 @@ using Axis.Data.Records;
 using Axis.Server.Applications;
 using Axis.Server.Tenancy;
 using Microsoft.Net.Http.Headers;
+using Npgsql;
 
 namespace Axis.Server.Records;
 
 /// <summary>
 /// Endpoints for the records of an entity in the active release of an application. A path that
-/// names no active application, entity or record is a 404 before the query or body is checked.
+/// names no active application, entity or record is a 404 before the query or body is checked; a
+/// child entity is no entity here. A create or update writes the record and its child rows in one
+/// transaction.
 /// A body is checked in order: content type (415), then body (400), then storage (404, 409).
 /// A delete is 204, or 404 or 409 from storage. The problem titles never contain text from the
 /// request.
@@ -87,7 +90,7 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
-        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -99,7 +102,7 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        return await RecordQueries.GetAsync(connection, model, recordId, cancellationToken) is { } record
+        return await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is { } record
             ? Results.Ok(record)
             : RecordNotFound();
     }
@@ -125,14 +128,20 @@ internal static class RecordEndpoints
             return UnsupportedMediaType();
         }
 
-        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, RecordOperation.Create);
+        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, application!, RecordOperation.Create);
         if (parsed.Errors is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
 
+        var input = parsed.Input!;
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordCommands.CreateAsync(connection, model, parsed.Input!.Values, cancellationToken: cancellationToken);
+        RecordWriteResult result;
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            result = await RecordCommands.CreateAsync(connection, application!, model, input.Values, input.Rows, cancellationToken: cancellationToken);
+            await CompleteAsync(transaction, result, cancellationToken);
+        }
 
         // The location uses the model's names, so a record has one URL whatever case the caller used.
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
@@ -149,7 +158,7 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
-        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -165,7 +174,7 @@ internal static class RecordEndpoints
             return UnsupportedMediaType();
         }
 
-        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, RecordOperation.Update);
+        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, application!, RecordOperation.Update);
         if (parsed.Errors is { } errors)
         {
             return Results.ValidationProblem(errors);
@@ -173,7 +182,13 @@ internal static class RecordEndpoints
 
         var input = parsed.Input!;
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordCommands.UpdateAsync(connection, model, recordId, input.Version!.Value, input.Values, cancellationToken);
+        RecordWriteResult result;
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, input.Values, input.Rows, cancellationToken);
+            await CompleteAsync(transaction, result, cancellationToken);
+        }
+
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
             ? Results.Ok(record)
             : WriteFailure(result);
@@ -209,7 +224,10 @@ internal static class RecordEndpoints
         };
     }
 
-    /// <summary>Finds the application and the entity in its active release, or the 404 that says which is missing.</summary>
+    /// <summary>
+    /// Finds the application and the entity in its active release, or the 404 that says which is
+    /// missing. A child entity has no record routes: its rows are served through the owner record.
+    /// </summary>
     private static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound)> ResolveEntityAsync(
         string app,
         string entity,
@@ -221,9 +239,25 @@ internal static class RecordEndpoints
             return (null, null, NotFound("No application is active under this name."));
         }
 
-        return application.TryGetEntity(entity, out var model)
+        return application.TryGetEntity(entity, out var model) && !application.IsChildEntity(model)
             ? (application, model, null)
             : (null, null, NotFound("The application has no entity with this name."));
+    }
+
+    /// <summary>
+    /// Commits the owner and its rows when the record was written, and rolls back every write
+    /// otherwise. Disposing the transaction rolls back on an exception.
+    /// </summary>
+    private static async Task CompleteAsync(NpgsqlTransaction transaction, RecordWriteResult result, CancellationToken cancellationToken)
+    {
+        if (result.Outcome == RecordWriteOutcome.Written)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+        else
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
     }
 
     // Only the hyphenated form names a record; any other text is no record, not a bad request.

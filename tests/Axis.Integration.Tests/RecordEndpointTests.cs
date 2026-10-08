@@ -44,6 +44,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
                 ("neededBy", "\"2026-10-06\""),
                 ("orderedAt", "\"2026-10-06T02:00:00.123456Z\""),
                 ("status", "\"open\""),
+                ("parts", "[]"),
                 ("department", $"\"{departmentId:D}\""),
             ],
             root.GetProperty("values").EnumerateObject().Select(property => (property.Name, property.Value.GetRawText())));
@@ -53,8 +54,9 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
 
         var bareValues = bare.RootElement.GetProperty("values").EnumerateObject().ToList();
         Assert.Equal("\"Chair\"", bareValues[0].Value.GetRawText());
-        Assert.Equal(8, bareValues.Count);
-        Assert.All(bareValues.Skip(1), property => Assert.Equal(JsonValueKind.Null, property.Value.ValueKind));
+        Assert.Equal(9, bareValues.Count);
+        Assert.Equal("[]", bareValues[7].Value.GetRawText());
+        Assert.All(bareValues.Skip(1).Where((_, index) => index != 6), property => Assert.Equal(JsonValueKind.Null, property.Value.ValueKind));
         Assert.Equal("{}", bare.RootElement.GetProperty("labels").GetRawText());
     }
 

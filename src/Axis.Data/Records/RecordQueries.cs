@@ -66,24 +66,89 @@ public static class RecordQueries
         return new RecordPage(items, totalCount);
     }
 
-    /// <summary>Reads the record with <paramref name="id"/>, or <see langword="null"/> when there is none.</summary>
+    /// <summary>
+    /// Reads the record with <paramref name="id"/> and the rows of its child collections, or
+    /// <see langword="null"/> when there is none. <paramref name="application"/> declares the child entities.
+    /// </summary>
     public static async Task<Record?> GetAsync(
         NpgsqlConnection connection,
+        ApplicationModel application,
         EntityModel entity,
         Guid id,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
 
         var row = EntityNaming.Quote(RowAlias);
-        await using var command = new NpgsqlCommand(
+        Record? record;
+        await using (var command = new NpgsqlCommand(
             $"SELECT {SelectList(entity, RowAlias)} FROM {Table(entity)} AS {row}{LabelJoins(entity, RowAlias)} WHERE {row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
-            connection);
-        command.Parameters.AddWithValue("id", id);
+            connection))
+        {
+            command.Parameters.AddWithValue("id", id);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            record = await reader.ReadAsync(cancellationToken) ? ReadRecord(reader, entity) : null;
+        }
 
+        return record is null ? null : await WithRowsAsync(connection, application, entity, record, cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds the rows of each child collection of <paramref name="entity"/> to
+    /// <paramref name="record"/>, in position order, with one query per collection. The values
+    /// keep the entity's field declaration order.
+    /// </summary>
+    internal static async Task<Record> WithRowsAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        Record record,
+        CancellationToken cancellationToken)
+    {
+        var values = new Dictionary<string, JsonNode?>(entity.Fields.Count, StringComparer.Ordinal);
+        foreach (var field in entity.Fields)
+        {
+            values[field.Name] = field.Type == FieldType.ChildCollection
+                ? await ReadRowsAsync(connection, application, field, record.Id, cancellationToken)
+                : record.Values[field.Name];
+        }
+
+        return record with { Values = values };
+    }
+
+    private static async Task<JsonArray> ReadRowsAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        FieldModel collection,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var child = application.FindEntity(collection.Target!.Id)
+            ?? throw new InvalidOperationException("The application has no entity for the child collection.");
+        var columns = Columns(child);
+        var selected = columns.Select(field =>
+            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : ""));
+        await using var command = new NpgsqlCommand(
+            $"SELECT {string.Join(", ", selected)} FROM {Table(child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {EntityNaming.Quote(EntityNaming.PositionColumn)}",
+            connection);
+        command.Parameters.AddWithValue("owner", ownerId);
+
+        var rows = new JsonArray();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadRecord(reader, entity) : null;
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var row = new JsonObject();
+            for (var ordinal = 0; ordinal < columns.Count; ordinal++)
+            {
+                row[columns[ordinal].Name] = reader.IsDBNull(ordinal) ? null : ReadValue(reader, ordinal, columns[ordinal]);
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
     }
 
     internal static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
@@ -125,7 +190,7 @@ public static class RecordQueries
 
     /// <summary>
     /// The fields stored in a column of the entity table, in declaration order. A child collection
-    /// has none, so it is left out of every read and write.
+    /// has none: its rows are read and written in the child table.
     /// </summary>
     internal static IReadOnlyList<FieldModel> Columns(EntityModel entity) =>
         [.. entity.Fields.Where(field => field.HasColumn)];
@@ -133,7 +198,7 @@ public static class RecordQueries
     internal static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity)
     {
         var columns = Columns(entity);
-        var values = new Dictionary<string, JsonValue?>(columns.Count, StringComparer.Ordinal);
+        var values = new Dictionary<string, JsonNode?>(columns.Count, StringComparer.Ordinal);
         for (var index = 0; index < columns.Count; index++)
         {
             var field = columns[index];

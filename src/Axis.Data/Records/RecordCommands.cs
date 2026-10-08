@@ -1,3 +1,4 @@
+using System.Globalization;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
 using Npgsql;
@@ -21,19 +22,26 @@ public static class RecordCommands
 
     /// <summary>
     /// Inserts a record with version 1, holding <paramref name="values"/> and SQL <c>NULL</c> or the
-    /// column default for every other field. Its id is <paramref name="id"/>, such as a seed
-    /// record's fixed id, or a new version 7 id when <paramref name="id"/> is not given.
+    /// column default for every other field, and the rows of each collection in
+    /// <paramref name="rows"/>. Its id is <paramref name="id"/>, such as a seed record's fixed id,
+    /// or a new version 7 id when <paramref name="id"/> is not given. The caller must hold a
+    /// transaction when <paramref name="rows"/> is not empty, and roll it back unless the record
+    /// is <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
+        ApplicationModel application,
         EntityModel entity,
         IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
         Guid? id = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(rows);
 
         if (await FindMissingReferencesAsync(connection, values, cancellationToken) is { } missing)
         {
@@ -53,26 +61,34 @@ public static class RecordCommands
         command.CommandText = WithLabels(
             entity,
             $"INSERT INTO {RecordQueries.Table(entity)} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)}) RETURNING *");
-        return await WriteAsync(command, entity, cancellationToken)
+        var result = await WriteAsync(command, entity, cancellationToken)
             ?? throw new InvalidOperationException("The insert returned no row.");
+        return await WriteRowsAsync(connection, application, entity, result, rows, replace: false, cancellationToken);
     }
 
     /// <summary>
-    /// Sets <paramref name="values"/> on the record with <paramref name="id"/> and increments its
-    /// version, when its version is <paramref name="version"/>. Fields not in
-    /// <paramref name="values"/> are left untouched; no values only increments the version.
+    /// Sets <paramref name="values"/> on the record with <paramref name="id"/>, replaces all the
+    /// rows of each collection in <paramref name="rows"/> and increments its version, when its
+    /// version is <paramref name="version"/>. Fields and collections not named are left untouched;
+    /// no values and no rows only increments the version. The caller must hold a transaction when
+    /// <paramref name="rows"/> is not empty, and roll it back unless the record is
+    /// <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
+        ApplicationModel application,
         EntityModel entity,
         Guid id,
         long version,
         IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(rows);
 
         if (await FindMissingReferencesAsync(connection, values, cancellationToken) is { } missing)
         {
@@ -97,7 +113,7 @@ public static class RecordCommands
             $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {idColumn} = @id AND {versionColumn} = @version RETURNING *");
         if (await WriteAsync(command, entity, cancellationToken) is { } result)
         {
-            return result;
+            return await WriteRowsAsync(connection, application, entity, result, rows, replace: true, cancellationToken);
         }
 
         // One UPDATE cannot tell an unknown id from a stale version, so the id decides.
@@ -137,6 +153,72 @@ public static class RecordCommands
     }
 
     /// <summary>
+    /// After the owner's write, inserts the rows of each collection in <paramref name="rows"/> one
+    /// statement per row, so a violation is keyed by the row's index. With
+    /// <paramref name="replace"/>, the stored rows of each collection are deleted first. Returns the
+    /// record with the rows of every collection, or the first row's violation.
+    /// </summary>
+    private static async Task<RecordWriteResult> WriteRowsAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        RecordWriteResult owner,
+        IReadOnlyList<RecordRows> rows,
+        bool replace,
+        CancellationToken cancellationToken)
+    {
+        if (owner is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
+        {
+            return owner;
+        }
+
+        var ownerColumn = EntityNaming.Quote(EntityNaming.OwnerColumn);
+        foreach (var collection in rows)
+        {
+            var table = RecordQueries.Table(collection.Child);
+            if (replace)
+            {
+                await using var delete = new NpgsqlCommand($"DELETE FROM {table} WHERE {ownerColumn} = @owner", connection);
+                delete.Parameters.AddWithValue("owner", record.Id);
+                await delete.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            for (var position = 0; position < collection.Rows.Count; position++)
+            {
+                var values = collection.Rows[position];
+                await using var insert = new NpgsqlCommand { Connection = connection };
+                insert.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                insert.Parameters.AddWithValue("owner", record.Id);
+                insert.Parameters.AddWithValue("position", position);
+                var columns = new List<string>
+                {
+                    EntityNaming.Quote(EntityNaming.IdColumn),
+                    ownerColumn,
+                    EntityNaming.Quote(EntityNaming.PositionColumn),
+                };
+                var placeholders = new List<string> { "@id", "@owner", "@position" };
+                for (var index = 0; index < values.Count; index++)
+                {
+                    columns.Add(EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name)));
+                    placeholders.Add(AddValue(insert, index, values[index]));
+                }
+
+                insert.CommandText = $"INSERT INTO {table} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)})";
+                try
+                {
+                    await insert.ExecuteNonQueryAsync(cancellationToken);
+                }
+                catch (PostgresException exception) when (MapRowViolation(exception, collection, position) is { } result)
+                {
+                    return result;
+                }
+            }
+        }
+
+        return owner with { Record = await RecordQueries.WithRowsAsync(connection, application, entity, record, cancellationToken) };
+    }
+
+    /// <summary>
     /// Wraps a write that returns its row in a data-modifying <c>WITH</c>, and selects the row and
     /// its labels from it. <c>RETURNING</c> cannot join, so this keeps the labels in the write's statement.
     /// The joins see the tables as they were before the write, so a record that references itself
@@ -158,17 +240,28 @@ public static class RecordCommands
                 ? new RecordWriteResult(RecordWriteOutcome.Written, RecordQueries.ReadRecord(reader, entity))
                 : null;
         }
-        catch (PostgresException exception) when (MapViolation(exception, entity) is { } result)
+        catch (PostgresException exception) when (MapViolation(exception, entity, ValuesPointer) is { } result)
         {
             return result;
         }
     }
 
     /// <summary>
-    /// Maps a constraint violation to its result by the constraint names the model declares. The
-    /// exception's column and constraint names never reach the result.
+    /// Maps a violation in a row of a child collection like one of the owner, keyed by the row's
+    /// pointer, such as <c>/values/parts/1/</c>. A child has no reference field, so a foreign key
+    /// the row violates is not one the model declares for the row: a schema conflict.
     /// </summary>
-    private static RecordWriteResult? MapViolation(PostgresException exception, EntityModel entity)
+    private static RecordWriteResult? MapRowViolation(PostgresException exception, RecordRows collection, int position) =>
+        exception.SqlState == PostgresErrorCodes.ForeignKeyViolation
+            ? new RecordWriteResult(RecordWriteOutcome.SchemaConflict)
+            : MapViolation(exception, collection.Child, string.Create(CultureInfo.InvariantCulture, $"{ValuesPointer}{collection.Collection.Name}/{position}/"));
+
+    /// <summary>
+    /// Maps a constraint violation to its result by the constraint names the model declares, with
+    /// error keys under <paramref name="pointer"/>. The exception's column and constraint names
+    /// never reach the result.
+    /// </summary>
+    private static RecordWriteResult? MapViolation(PostgresException exception, EntityModel entity, string pointer)
     {
         var table = EntityNaming.Table(entity.Id);
         switch (exception.SqlState)
@@ -178,14 +271,14 @@ public static class RecordCommands
                 var reference = entity.Fields.FirstOrDefault(field =>
                     field.Type == FieldType.Reference
                     && string.Equals(exception.ConstraintName, EntityNaming.ForeignKey(table, EntityNaming.Column(field.Name)), StringComparison.Ordinal));
-                return reference is null ? null : Failure(RecordWriteOutcome.MissingReference, reference, Messages.MissingReference);
+                return reference is null ? null : Failure(RecordWriteOutcome.MissingReference, pointer + reference.Name, Messages.MissingReference);
             case PostgresErrorCodes.UniqueViolation:
                 var unique = entity.Fields.FirstOrDefault(field =>
                     field.Unique
                     && string.Equals(exception.ConstraintName, EntityNaming.Unique(table, EntityNaming.Column(field.Name)), StringComparison.Ordinal));
                 return unique is null
                     ? new RecordWriteResult(RecordWriteOutcome.SchemaConflict)
-                    : Failure(RecordWriteOutcome.UniqueViolation, unique, Messages.NotUnique);
+                    : Failure(RecordWriteOutcome.UniqueViolation, pointer + unique.Name, Messages.NotUnique);
             // A NOT NULL column the active model does not require, left by a failed activation.
             case PostgresErrorCodes.NotNullViolation:
                 return new RecordWriteResult(RecordWriteOutcome.SchemaConflict);
@@ -273,6 +366,6 @@ public static class RecordCommands
         return value.Field.Type == FieldType.Decimal ? $"@{name}::numeric" : $"@{name}";
     }
 
-    private static RecordWriteResult Failure(RecordWriteOutcome outcome, FieldModel field, string message) =>
-        new(outcome, Errors: new SortedDictionary<string, string[]>(StringComparer.Ordinal) { [ValuesPointer + field.Name] = [message] });
+    private static RecordWriteResult Failure(RecordWriteOutcome outcome, string key, string message) =>
+        new(outcome, Errors: new SortedDictionary<string, string[]>(StringComparer.Ordinal) { [key] = [message] });
 }
