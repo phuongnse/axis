@@ -27,8 +27,11 @@ expression     = or ;
 or             = and , { "or" , and } ;
 and            = not , { "and" , not } ;
 not            = "not" , not | comparison ;
-comparison     = additive , [ compareOp , additive | "is" , [ "not" ] , "null" ] ;
+comparison     = additive , [ compareOp , additive | "is" , [ "not" ] , "null"
+               | "in" , "(" , item , { "," , item } , ")" ] ;
 compareOp      = "==" | "!=" | "<" | "<=" | ">" | ">=" ;
+item           = ( literal - "null" ) | "date" , "(" , text , ")"
+               | "dateTime" , "(" , text , ")" ;
 additive       = multiplicative , { ( "+" | "-" ) , multiplicative } ;
 multiplicative = unary , { ( "*" | "/" ) , unary } ;
 unary          = "-" , unary | path ;
@@ -45,11 +48,14 @@ name           = letter , { letter | digit } ;
 - **Whitespace.** Space, tab and line break between tokens are ignored.
 - **Names.** A name is ASCII letters and digits that start with a letter, like
   a field name.
-- **Keywords.** `and`, `or`, `not`, `is`, `null`, `true` and `false` are
+- **Keywords.** `and`, `or`, `not`, `is`, `in`, `null`, `true` and `false` are
   reserved in any letter case. Names ignore letter case, so a field named
   `Null` would otherwise be ambiguous.
 - **No chaining.** Comparisons do not chain, so `a < b < c` is a syntax
   error. Write `a < b and b < c`.
+- **`in` list.** An item is a literal other than `null`, or a `date('…')` or
+  `dateTime('…')` call with a text literal argument. The list cannot be empty.
+  An item that is not a constant is a syntax error.
 - **Nothing else.** There are no loops, variables, assignment, comments or
   inline code (D6).
 
@@ -95,7 +101,7 @@ From lowest to highest precedence:
 | 1 | `or` | Left to right. |
 | 2 | `and` | Left to right. |
 | 3 | `not` | Prefix. |
-| 4 | `==` `!=` `<` `<=` `>` `>=` `is null` `is not null` | Non-associative. |
+| 4 | `==` `!=` `<` `<=` `>` `>=` `is null` `is not null` `in` | Non-associative. |
 | 5 | `+` `-` | Left to right. |
 | 6 | `*` `/` | Left to right. |
 | 7 | unary `-` | Prefix. |
@@ -118,6 +124,19 @@ Typing rules:
   including references and `null`. A reference compares by the record it
   points to.
 - **Booleans.** `and`, `or`, `not` and the condition of `if` need `boolean`.
+- **Membership.** `x in (a, b, …)` gives a boolean. It is true when `x == item`
+  for some item. Every item must fit the type of `x`, under the same rules as
+  `==`. An integer widens to a decimal. For an enum, each text item must be
+  one of the field's `values`, checked at compile time. A wrong item type or
+  an unknown enum value is a type diagnostic. `in` does not chain, and it
+  sits at level 4, so `not x in ('a', 'b')` means `not (x in ('a', 'b'))`.
+  There is no `not in` operator. Each item counts as a syntax node.
+
+Example:
+
+```text
+status in ('submitted', 'approved')
+```
 
 ## Null semantics
 
@@ -131,6 +150,9 @@ An empty field is `null`. These rules decide what `null` does.
   are a second way to write the same test. Equality is null-safe so that
   `status != previousStatus` is true when `previousStatus` is empty. Authors
   do not expect it to be unknown.
+- **`in` is null-safe.** `x in (…)` is true when `x == item` for some item.
+  When `x` is `null`, the result is `false`, never `null`. So
+  `not (x in (…))` is true for an empty `x`.
 - **Three-valued logic.** `and`, `or` and `not` treat `null` as unknown:
 
   | `a` | `b` | `a and b` | `a or b` |
@@ -258,7 +280,7 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | --- | --- |
 | Expression length | 2,000 characters |
 | Nesting depth | 32 |
-| Syntax nodes | 500 |
+| Syntax nodes | 500, counting each `in` item |
 | Reference hops per path | 3 |
 | Rule calls nested | 8 deep |
 | Rule call cycles | None allowed |
@@ -296,6 +318,8 @@ These translate to SQL:
 - `+`, `-`, `*` and unary `-`;
 - `and`, `or` and `not`, because PostgreSQL is also three-valued;
 - `is null` and `is not null`;
+- `in`, as `(x IS NOT NULL AND x IN ($1, $2, …))`, with every item sent as a
+  parameter;
 - `if`, as `CASE WHEN … THEN … ELSE … END`;
 - `coalesce` and `concat`;
 - `length`, as `char_length`;
