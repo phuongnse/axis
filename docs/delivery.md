@@ -82,17 +82,18 @@ them.
    wrong choice, fix that text in a hand-made pull request. Any change agreed after
    the plan is posted, whether the review finds a gap or the owner decides
    something while approving, however small, is commented in the same issue
-   and `/nexkit plan` is run again before `/nexkit go`. The plan agent sees
-   only the issue body, collaborators' comments and the note on the command.
-   It never sees earlier plans, because the bot posts them. So a review
-   comment that accepts choices from a plan writes out every value: the
-   numbers, the names and the rules. Write each choice tersely, on one short
-   line, and drop reasons and prose. The reasons are in the plan and the docs.
-   Write only what the plan agent could otherwise choose differently. Do not
-   repeat what the issue or the merged docs already say. Link to the doc
-   instead. For example:
-   `Accepted: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
-   "Accepted as in the plan" is not enough. `/nexkit go`
+   and `/nexkit plan` is run again before `/nexkit go`. A re-plan revises the
+   latest plan. It keeps what no newer comment asks to change, and its *Since
+   the last plan* section lists what changed. So a review comment states only
+   the changes. Write each one tersely, on one short line, with the exact
+   values, names and rules, and drop reasons and prose. The reasons are in the
+   plan and the docs. Do not repeat what the issue or the merged docs already
+   say. Link to the doc instead. For example:
+   `Change: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
+   Check the *Since the last plan* section against those comments. A note such
+   as `/nexkit plan from scratch` plans again without the latest plan's
+   choices. Use it only when the plan has gone wrong, and then comment every
+   choice to keep first. `/nexkit go`
    only runs on the latest plan, and that plan holds every agreed change. The reason:
    the plan is the contract. It holds the acceptance criteria the pull request
    is checked against, and it is the record a later reader looks at. A change

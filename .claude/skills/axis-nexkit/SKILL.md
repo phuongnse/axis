@@ -139,15 +139,16 @@ returns 404, upgrade `gh` and try again.
 - Every change agreed after the plan was posted, from the review or from the
   owner while approving, however small, is commented in the same issue and
   `/nexkit plan` is run again. No follow-up issues.
-- Before each `/nexkit plan`, the issue body and collaborators' comments hold
-  every agreed choice on their own, with every value written out. The plan
-  agent never sees earlier plans, so "as in the plan above" does not count.
-- Agreed choices in a comment are terse: one short line each, with the exact
-  values, names and rules, and no reasons or prose. Nothing the issue or the
-  docs already say. See
+- A re-plan revises the latest plan, so the comments since that plan state
+  only the changes. Choices accepted as they are need no comment.
+- Changes in a comment are terse: one short line each, with the exact values,
+  names and rules, and no reasons or prose. Nothing the issue or the docs
+  already say. See
   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
-- After a re-plan, compare the new plan with the last one. Look for agreed
-  choices that came back changed.
+- After a re-plan, its *Since the last plan* section lists every change that
+  was asked for, and nothing else changed without a reason.
+- Use `/nexkit plan from scratch` only when the plan has gone wrong, and
+  comment every choice to keep before posting it.
 - Before asking the owner for go, or posting `/nexkit go`, the latest plan
   holds every agreed change. If not, re-plan first. The plan is the contract:
   it holds the acceptance criteria the pull request is checked against, and it
