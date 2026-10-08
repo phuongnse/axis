@@ -38,4 +38,9 @@ public static class DiagnosticCodes
     public const string UnknownSeedEntity = "AXC0032";
     public const string InvalidSeedValue = "AXC0033";
     public const string DuplicateSeedRecordId = "AXC0034";
+
+    public const string UnknownDataSourceEntity = "AXC0042";
+    public const string InvalidDataSourceFieldPath = "AXC0043";
+    public const string DuplicateDataSourceFieldName = "AXC0044";
+    public const string InvalidDataSourceSort = "AXC0045";
 }

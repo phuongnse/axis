@@ -149,7 +149,7 @@ public static class RecordQueries
         return new Record(reader.GetGuid(0), reader.GetInt64(1), values, labels);
     }
 
-    private static JsonValue ReadValue(NpgsqlDataReader reader, int ordinal, FieldModel field) =>
+    internal static JsonValue ReadValue(NpgsqlDataReader reader, int ordinal, FieldModel field) =>
         field.Type switch
         {
             FieldType.Text or FieldType.Enum => JsonValue.Create(reader.GetString(ordinal)),

@@ -8,4 +8,5 @@ public static class ResourceKinds
     public const string Page = "page";
     public const string Text = "text";
     public const string Seed = "seed";
+    public const string DataSource = "dataSource";
 }

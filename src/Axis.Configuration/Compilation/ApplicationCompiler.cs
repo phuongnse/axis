@@ -63,6 +63,7 @@ public static class ApplicationCompiler
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
+        CheckDataSources(loaded, FindEntity, diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -70,14 +71,16 @@ public static class ApplicationCompiler
             return result;
         }
 
+        var entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName)).ToList();
         var model = new ApplicationModel
         {
             Manifest = loaded.Application,
-            Entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName)).ToList(),
+            Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
+            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities)).ToList(),
         };
         return result with
         {
@@ -362,6 +365,78 @@ public static class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Checks the data sources: each names a loaded entity, each projected <c>path</c> is a single
+    /// field of that entity, projected names are unique, and the default <c>sort</c> names a
+    /// projected field that is not a reference. Entity and field names resolve ignoring letter
+    /// case; projected names compare exactly, as the query <c>sort</c> does.
+    /// </summary>
+    private static void CheckDataSources(ApplicationLoadResult loaded, Func<string, EntityResource?> findEntity, List<Diagnostic> diagnostics)
+    {
+        foreach (var dataSource in loaded.DataSources)
+        {
+            void Report(string code, string message, string path) =>
+                diagnostics.Add(new Diagnostic(code, message, dataSource.File, path, dataSource.Id));
+
+            var entity = findEntity(dataSource.Entity);
+            if (entity is null)
+            {
+                // An entity file that was not loaded because of its own errors is not reported again.
+                if (!loaded.UnloadedEntityNames.Contains(dataSource.Entity))
+                {
+                    Report(
+                        DiagnosticCodes.UnknownDataSourceEntity,
+                        $"The entity '{dataSource.Entity}' was not found. No loaded entity has that name.",
+                        "/entity");
+                }
+
+                // The paths and the sort cannot be checked without the entity.
+                continue;
+            }
+
+            var fieldsByName = new Dictionary<string, FieldDefinition?>(StringComparer.Ordinal);
+            for (var index = 0; index < dataSource.Fields.Count; index++)
+            {
+                var projected = dataSource.Fields[index];
+                var field = projected.Path.Contains('.', StringComparison.Ordinal) ? null : FindField(entity, projected.Path);
+                if (!fieldsByName.TryAdd(projected.Name, field))
+                {
+                    Report(
+                        DiagnosticCodes.DuplicateDataSourceFieldName,
+                        $"The name '{projected.Name}' is already used by an earlier projected field.",
+                        $"/fields/{index}/name");
+                }
+
+                if (field is null)
+                {
+                    Report(
+                        DiagnosticCodes.InvalidDataSourceFieldPath,
+                        $"The path '{projected.Path}' must name a field of the entity '{entity.Name}'. Paths through references are not supported yet.",
+                        $"/fields/{index}/path");
+                }
+            }
+
+            if (dataSource.Sort is { } sort)
+            {
+                var name = sort.StartsWith('-') ? sort[1..] : sort;
+                if (!fieldsByName.TryGetValue(name, out var field))
+                {
+                    Report(
+                        DiagnosticCodes.InvalidDataSourceSort,
+                        $"The sort '{sort}' must name a projected field, optionally preceded by '-'.",
+                        "/sort");
+                }
+                else if (field is not null && FieldTypes.Parse(field.Type) == FieldType.Reference)
+                {
+                    Report(
+                        DiagnosticCodes.InvalidDataSourceSort,
+                        $"The sort '{sort}' names the reference field '{name}'. A data source cannot sort by a reference.",
+                        "/sort");
+                }
+            }
+        }
+    }
+
     private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName) =>
         new()
         {
@@ -439,6 +514,29 @@ public static class ApplicationCompiler
             Entity = new EntityReference(entity.Id, entity.Name),
             Sync = seed.Sync,
             Records = seed.Records,
+        };
+    }
+
+    /// <summary>Builds a checked data source over the built entities, so each projected field is the entity's own field model.</summary>
+    private static DataSourceModel BuildDataSource(DataSourceResource dataSource, IReadOnlyList<EntityModel> entities)
+    {
+        var entity = entities.First(candidate => string.Equals(candidate.Name, dataSource.Entity, StringComparison.OrdinalIgnoreCase));
+        var descending = dataSource.Sort?.StartsWith('-') == true;
+        return new DataSourceModel
+        {
+            Id = dataSource.Id,
+            Name = dataSource.Name,
+            File = dataSource.File,
+            Entity = new EntityReference(entity.Id, entity.Name),
+            Fields = dataSource.Fields
+                .Select(field =>
+                {
+                    entity.TryGetField(field.Path, out var fieldModel);
+                    return new DataSourceFieldModel(field.Name, fieldModel!);
+                })
+                .ToList(),
+            Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
+            PageSize = dataSource.PageSize ?? DataSourceModel.DefaultPageSize,
         };
     }
 

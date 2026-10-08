@@ -1,8 +1,15 @@
 # Data sources
 
 Detailed reference for data sources: the resource shape, the compile checks,
-the read endpoint, the response and the errors. Everything in this file is
-*(planned for M2)*, and nothing here is built yet. Dn refers to
+the read endpoint, the response and the errors. Parts of this file are built:
+
+- the `dataSource` resource with `entity`, `fields` whose `path` is one field
+  of the root entity, `sort` and `pageSize`
+- the read endpoint with `page`, `pageSize` and `sort`
+- `labels` for projected `reference` fields
+
+The rest is marked *(planned for M2)*: paths through references,
+`parameters`, `filter`, `aggregate` and the widget binding. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -73,21 +80,22 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`entity`.** The root entity. In M2 it cannot be a child entity.
 - **`fields`.** The projection, in order. Each entry has a `name`, which is
   the key in a row, and a `path` to a value of the root entity.
-- **`path`.** A dotted path through `reference` fields, with at most 3 hops,
+- **`path`.** A field name of the root entity, ignoring letter case.
+  *(Planned for M2)*: a dotted path through `reference` fields, with at most 3 hops,
   as in [expressions.md](expressions.md#names-and-references). A path cannot
   go through or end at a `child-collection`. A `null` reference along the
   path gives `null` and the row is kept, because each hop is a left join.
-- **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a
+- **`parameters`** *(planned for M2)*. Typed inputs of the filter. A parameter has a `name`, a
   `type` and `required`, which defaults to `false`. The types are the scalar
   field types plus `enum` and `reference`. An `enum` needs `values`, and a
   `reference` needs `target`. They are checked by the same rules as entity
   fields, see
   [Entity field types and constraints](configuration.md#entity-field-types-and-constraints).
-- **Parameter `label`.** Optional, with the `{ "textKey" }` shape of a field
+- **Parameter `label`** *(planned for M2)*. Optional, with the `{ "textKey" }` shape of a field
   label. A table shows it on the parameter's filter input.
-- **Missing parameter.** An optional parameter that is not given is `null` in
+- **Missing parameter** *(planned for M2)*. An optional parameter that is not given is `null` in
   the filter. The idiom is `p is null or field == p`, as in the first example.
-- **`filter`.** A boolean expression. It sees the root entity's fields and
+- **`filter`** *(planned for M2)*. A boolean expression. It sees the root entity's fields and
   the parameters as plain names. It uses the syntax of
   [expressions.md](expressions.md#grammar) and only the
   [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
@@ -98,7 +106,12 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   tie-break below.
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
 
+Until a property is built, the JSON Schema rejects it: a `parameters`,
+`filter` or `aggregate` property is `AXC0004`.
+
 ### Aggregates
+
+Aggregates are *(planned for M2)*.
 
 - **`groupBy`.** A list of names from `fields`. An empty list gives one total
   row.
@@ -116,13 +129,24 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 ## Compile checks
 
 A data source is checked when the application is compiled. Any failure is a
-compile error and no release is produced. These checks are listed without
+compile error and no release is produced. The built checks have their codes,
+see the Data sources bullet of the Resolve step in
+[configuration.md](configuration.md):
+
+- `entity` names a loaded entity (`AXC0042`).
+- Each `path` names a field of the root entity (`AXC0043`). A dotted path is
+  `AXC0043` until paths through references are built.
+- Field names are unique, compared exactly (`AXC0044`).
+- `sort` names a projected field that is not a `reference` (`AXC0045`).
+- `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
+
+The remaining checks are *(planned for M2)*. They are listed without
 diagnostic codes. The codes come with the issue that builds them.
 
-- `entity` names a loaded entity that is not a child entity.
+- `entity` is not a child entity.
 - Each `path` resolves through `reference` fields only, takes at most 3 hops,
   and never goes through or ends at a `child-collection`.
-- Field names are unique, parameter names are unique, and measure names are
+- Parameter names are unique, and measure names are
   unique. A measure name also differs from every group field, because both
   are keys of one row.
 - A parameter name differs from every field of the root entity, because the
@@ -141,9 +165,8 @@ diagnostic codes. The codes come with the issue that builds them.
 - `groupBy` names entries of `fields`.
 - Measure fields name entries of `fields`, and their types follow the
   aggregate rules above.
-- `sort` names a projected field that does not end at a `reference`. When the
-  data source is grouped, it names a group field or a measure instead.
-- `pageSize` is from 1 to 100.
+- When the data source is grouped, `sort` names a group field or a measure
+  instead of a projected field.
 
 ## Endpoint
 
@@ -167,18 +190,19 @@ every data source query from M4 (see
   `fields`, or a group field or measure when the data source is grouped. It
   matches exactly, so letter case matters. A `sort` cannot name a projected
   field whose path ends at a `reference`.
-- **Data source parameters.** They are query parameters under their declared
+- **Data source parameters** *(planned for M2)*. They are query parameters under their declared
   names. The names match exactly.
 - **Empty value.** An empty value means the parameter was not given.
 - **Repeated parameter.** A parameter given twice, such as `page=1&page=2`, is
   invalid.
 - **Unknown parameters.** They are ignored.
-- **Required parameter.** A required parameter that is not given is invalid.
+- **Required parameter** *(planned for M2)*. A required parameter that is not given is invalid.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
   fields in `groupBy` order when the data source is grouped. `NULL` ordering
   and the count statement work as in the record API.
 
-Query strings have no JSON types, so each type has a plain text form:
+Query strings have no JSON types, so each parameter type has a plain text
+form *(planned for M2)*:
 
 | Parameter type | Query value |
 | --- | --- |
@@ -230,7 +254,7 @@ Each item is `{ "id", "values", "labels" }`:
   otherwise. Like the record API, the labels come from the same SQL statement
   as the rows.
 
-A grouped row has `id: null`. Its `values` holds the group fields in
+A grouped row *(planned for M2)* has `id: null`. Its `values` holds the group fields in
 `groupBy` order, then the measures. `totalCount` counts groups.
 
 ```json
@@ -262,8 +286,9 @@ the path, then the query, then the database.
 - **`400` for the query.** A validation problem whose `errors` is keyed
   `page`, `pageSize`, `sort` and the parameter names. It covers a bad value, a
   missing required value and a repeated parameter. Every invalid parameter is
-  reported in the same response.
-- **`400` for the database.** A database error while evaluating the filter,
+  reported in the same response. The keys for data source parameters come
+  with the filters, *(planned for M2)*.
+- **`400` for the database** *(planned for M2)*. A database error while evaluating the filter,
   such as an overflow or a date out of range. The title is fixed, and the
   response holds no SQL.
 - **`500`.** An unexpected error is caught by the exception handler. The
@@ -275,6 +300,8 @@ SQL, a table, column or constraint name, an exception type or a stack trace.
 The `errors` keys repeat the request's parameter names by design.
 
 ## Widget binding
+
+The widget binding is *(planned for M2)*.
 
 - **Widgets.** In M2 only the `table` widget binds to a data source. A widget
   names an `entity` or a `dataSource`, never both. `entity` stays as shorthand

@@ -47,5 +47,16 @@ internal static class ModelAssert
             Assert.Equal(expectedText with { Texts = actualText.Texts }, actualText);
             Assert.Equal(expectedText.Texts.OrderBy(text => text.Key, StringComparer.Ordinal), actualText.Texts.OrderBy(text => text.Key, StringComparer.Ordinal));
         }
+
+        Assert.Equal(expected.DataSources.Count, actual.DataSources.Count);
+        foreach (var (expectedDataSource, actualDataSource) in expected.DataSources.Zip(actual.DataSources))
+        {
+            Assert.Equal(
+                (expectedDataSource.Id, expectedDataSource.Name, expectedDataSource.File, expectedDataSource.Entity, expectedDataSource.Sort, expectedDataSource.PageSize),
+                (actualDataSource.Id, actualDataSource.Name, actualDataSource.File, actualDataSource.Entity, actualDataSource.Sort, actualDataSource.PageSize));
+            Assert.Equal(
+                expectedDataSource.Fields.Select(field => (field.Name, field.Field.Name)),
+                actualDataSource.Fields.Select(field => (field.Name, field.Field.Name)));
+        }
     }
 }
