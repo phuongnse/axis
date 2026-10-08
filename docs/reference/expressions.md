@@ -213,9 +213,12 @@ An empty field is `null`. These rules decide what `null` does.
   which only aggregates accept.
 - **Rule call.** A named rule is called like a function, such as
   `isLargeRequest(total)`. Arguments are checked against the rule's typed
-  parameters. A rule body sees only its declared parameters. A parameter may
-  be a record of an entity. A rule name may not reuse a built-in function
-  name.
+  parameters. A rule body sees only its declared parameters. Parameter and
+  result types are the scalar field types (see
+  [Resource file shape](configuration.md#resource-file-shape)). A rule name
+  may not reuse a built-in function name.
+- **Scope in a computed field.** The expression sees the record's own fields
+  and its child collections, and no reference path.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
   data source parameters as plain names.
 
@@ -359,7 +362,8 @@ An expression is one JSON string:
 ```
 
 The property name above is illustrative. The issue for each feature defines
-the real property names.
+the real property names. For `expression` on a field, on a validation and on a
+rule, see [Entity logic](configuration.md#entity-logic).
 
 - **Quotes.** Text literals use single quotes, so they need no JSON escaping.
 - **Long expressions.** A long expression can hold `\n` line breaks, because

@@ -76,6 +76,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `date-time` | `timestamp with time zone` |
   | `enum` | `text`; the values are recorded, not enforced by a `CHECK` |
   | `reference` | `uuid` with a foreign key to the target table's `id` |
+  | `child-collection` *(planned for M2)* | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns) |
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
   module; values are always parameters. Configuration can never supply raw SQL.
@@ -142,3 +143,28 @@ access. It returns diagnostics, SQL statements and the new records to write.
   entities, cycles and self-references need no further ordering.
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
+
+## Child tables and computed columns
+
+Everything in this section is *(planned for M2)* (D17). It leaves the changes
+to [Schema planning](#schema-planning) to later issues.
+
+- **Child table.** The entity that a `child-collection` field names has a
+  table with the usual names. Besides `id` (`uuid`) and its field columns, it
+  has two system columns:
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `owner_id` | `uuid NOT NULL` | The owner record's `id`. A foreign key to the owner table's `id` with `ON DELETE CASCADE`, named `fk_` + table + `_` + hash as usual |
+  | `position` | `integer NOT NULL` | The row's order in the collection, the zero-based index in the array |
+
+  Rows are deleted with their owner.
+- **No version.** A child table has no `version` column. Its rows live under
+  the owner's version, and a write to the rows increments the owner's
+  `version`.
+- **Computed column.** A computed field is an ordinary column of its type. It
+  is never `NOT NULL`, because a computed field cannot be `required`. It is
+  written in the same transaction as the record, and for a child row before
+  the owner's computed fields.
+- **Existing rows.** A computed field added to a table that has rows leaves
+  them `NULL`. Each record gets its value the next time it is written.

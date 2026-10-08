@@ -49,6 +49,8 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
 
 `values` holds every declared field of the entity under its declared name, in
 declaration order. A field that is SQL `NULL` is `null`; it is never left out.
+List responses leave child collections out *(planned for M2)*. See
+[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
 
 `labels` maps each `reference` field that is not `null` to the display field
 value of the referenced record, so a page can show "Finance" without one more
@@ -81,13 +83,15 @@ every record of the entity.
 | `date` | A string `yyyy-MM-dd` |
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
+| `child-collection` *(planned for M2)* | An array of row objects. See [Child rows](#child-rows-computed-fields-and-validations) |
 
 ## Paging and sorting
 
 - **`page`.** An integer of at least 1. It defaults to 1.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
 - **`sort`.** A declared field name, or `-` and the name for descending
-  order. The name matches exactly, so letter case matters.
+  order. The name matches exactly, so letter case matters. A
+  `child-collection` field is not a valid `sort` *(planned for M2)*.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -144,7 +148,9 @@ fixed and never contain text from the request.
 A request is checked in this order, and the first failure is the response:
 the path (`404`), the content type (`415`), the body (`400`), then storage
 (`400`, `404` or `409`). A request with the wrong content type is answered
-before its body is read. A delete has no body, so it is checked for the path
+before its body is read. Validations *(planned for M2)* are a step between the
+body and storage: see
+[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations). A delete has no body, so it is checked for the path
 and then in storage (`404` or `409`).
 
 - **`404`.** An unknown application, an application with no active release,
@@ -181,7 +187,8 @@ and then in storage (`404` or `409`).
 messages, ever contains SQL, the `entities` schema, a table, column or
 constraint name, an exception type or a stack trace. The `errors` keys repeat
 the request's property names by design, so they can hold any text the request
-sent. The integration tests check every error response of the record API for
+sent. A row of a child collection has a key such as
+`/values/lineItems/1/quantity` *(planned for M2)*. The integration tests check every error response of the record API for
 this.
 
 ## Request bodies and values
@@ -234,8 +241,88 @@ messages, in ordinal key order, usable as is for a validation problem
 response. The keys are `""` for the body, `/<property>` for a body property,
 `/values`, `/values/<field>` and `/version`. Pointers escape `~` as `~0` and
 `/` as `~1`; declared names never need it, but unknown names can. Each key has
-one fixed English message for the first problem found there, such as
+one fixed English message for the first problem found there, except that the
+message of a failed validation is its text key *(planned for M2)*, such as
 "Unknown property." or "Must be at most 200 characters.". Messages may use
 field type names and limits from the model. They never contain a table,
 column, constraint or schema name, a PostgreSQL type name, exception text, or
 text from the request; the key already says where the problem is.
+
+## Child rows, computed fields and validations
+
+Everything in this section is *(planned for M2)* (D17). It changes the record
+shape, the bodies and the order of checks described above.
+
+A record with a child collection holds its rows inside `values`:
+
+```json
+{
+  "id": "6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7",
+  "version": 2,
+  "values": {
+    "title": "Standing desks",
+    "total": 2550.90,
+    "lineItems": [
+      { "description": "Desk", "quantity": 2, "unitPrice": 1250.45, "amount": 2500.90 },
+      { "description": "Cable tray", "quantity": 1, "unitPrice": 50.00, "amount": 50.00 }
+    ]
+  },
+  "labels": {}
+}
+```
+
+- **Rows.** A row is a flat object of the child entity's fields, in
+  declaration order. It has no id. Rows are ordered by `position`, and the
+  array index is the position. Computed values are included.
+- **Reads.** A single read and the response of a create or update include the
+  collections. List responses leave them out.
+- **Create.** A missing collection means no rows. `null` is an error at
+  `/values/<collection>`.
+- **Update.** A missing collection keeps its rows. An array replaces all the
+  rows, in the same transaction, and increments the owner's `version`. `null`
+  is an error at `/values/<collection>`.
+- **Parsing.** A row is parsed like a create body, so a required field of the
+  child entity must be present in every row. An array element that is not an
+  object is an error at its index. A row error is keyed
+  `/values/<collection>/<index>/<field>`, with a zero-based index.
+- **Computed fields.** A body that sets a computed field, of the owner or of a
+  row, is an error at its pointer. The server calculates the value on every
+  write of the record. Child rows are calculated before the owner.
+- **Delete.** Deleting the owner deletes its rows.
+
+**Validations.** The order for a write is:
+
+1. Validations run only on a body that parsed cleanly. A body with parse
+   errors is answered with those errors alone.
+2. On update, the stored record is read first. An unknown record is still a
+   `404`, never a validation `400`. The server then builds the record as it
+   will be stored: the stored values, the changes from the body and the
+   computed fields.
+3. The validations of the entity and of each row run. Any failure is a `400`.
+4. Storage runs. It answers as described above, for example `409` for a stale
+   `version`.
+
+A failure is keyed `/values/<field>` or by a row path such as
+`/values/lineItems/1/quantity`. Each key holds one message. When several
+validations fail on one key, it reports the first in declaration order. Every
+other key is reported in the same response. The message is the validation's
+text key, and the client shows the text in the user's locale. Validation on
+the client as the user types comes in M3.
+
+A run-time error in an expression, or a computed value that does not fit its
+field, such as one with more fraction digits than `scale`, rejects the write
+with a `400` at that field's pointer. Values are never rounded.
+
+For example, a create or update with `quantity` `0` in the second row is
+answered with `400`:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "/values/lineItems/1/quantity": ["lineItem.quantityPositive"]
+  }
+}
+```

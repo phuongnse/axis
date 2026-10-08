@@ -22,7 +22,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | --- | --- | --- |
 | **Entity** | A business record type. Each entity becomes a typed PostgreSQL table in the tenant database. | M1 |
 | **Field** | A typed attribute of an entity, with constraints. | M1 |
-| **Computed field** | A field whose value comes from an expression over the record and its related records. | M2 |
+| **Computed field** | A field whose value comes from an expression over the record's own fields and its child rows. It is stored and recomputed on every write. | M2 |
 | **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. | M2 |
 | **Sequence** | A counter that hands out business numbers, such as `PR-2026-00042`, inside the caller's transaction. | M3 |
 | **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. | M1 (basic), M2 |
@@ -38,11 +38,14 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 - enum
 - reference (to another entity)
 
+M2 adds:
+
+- child collection (owned rows such as line items)
+
 Later types:
 
 - money
 - file
-- child collection (owned rows such as line items)
 - JSON object
 
 **Field constraints** in M1:
@@ -70,7 +73,7 @@ Later constraints:
 | Concept | Meaning | From |
 | --- | --- | --- |
 | **Expression** | A typed, side-effect-free formula in Axis's [expression language](../reference/expressions.md), checked at compile time. | M2 |
-| **Rule** | A named, reusable expression with declared typed parameters. Rules are used for validation, routing, conditions and policy filters. | M2 |
+| **Rule** | A named, reusable expression with declared typed parameters and a result type. Rules are used for validation, routing, conditions and policy filters. | M2 |
 | **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. | M3 |
 | **Extension package** | Versioned C# code, and later React components, that adds operations and widgets under declared capabilities. | M5 |
 

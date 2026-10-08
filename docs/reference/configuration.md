@@ -364,6 +364,30 @@ A `seed` holds records with fixed ids for one entity:
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
+A `rule` resource *(planned for M2)* holds a named expression with typed
+parameters and a result type. Any expression can call it (see
+[Expression language](expressions.md#names-and-references)):
+
+```json
+{
+  "id": "8e16aa07-44d2-435b-8260-557ea9f3c1b2",
+  "kind": "rule",
+  "name": "IsPositive",
+  "formatVersion": 1,
+  "parameters": [{ "name": "value", "type": "integer" }],
+  "resultType": "boolean",
+  "expression": "value > 0"
+}
+```
+
+- `parameters` is a list of `name` and `type`. Parameter and result types are
+  the scalar field types: `text`, `integer`, `decimal`, `boolean`, `date`,
+  `date-time` and `enum`. A parameter is never a record.
+- A rule is called by name, ignoring letter case, such as `IsPositive(quantity)`.
+- The `expression` must give the `resultType`, and sees only its parameters.
+- The `rule` kind is not in the Load step's list of kinds yet. It is added by
+  the issue that builds it.
+
 ## Entity field types and constraints
 
 A field property is allowed only on the types that have an entry for it below.
@@ -373,19 +397,123 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | | | | |
-| `integer` | yes | yes | | | | | |
-| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | |
-| `boolean` | yes | yes | | | | | |
-| `date` | yes | yes | | | | | |
-| `date-time` | yes | yes | | | | | |
-| `enum` | yes | yes | | | | | needed |
-| `reference` | yes | yes | | | | needed | |
-
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` *(planned for M2)* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | | | | | yes |
+| `integer` | yes | yes | | | | | | yes |
+| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes |
+| `boolean` | yes | yes | | | | | | yes |
+| `date` | yes | yes | | | | | | yes |
+| `date-time` | yes | yes | | | | | | yes |
+| `enum` | yes | yes | | | | | needed | yes |
+| `reference` | yes | yes | | | | needed | | |
+| `child-collection` *(planned for M2)* | | | | | | needed | | |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
   this (`AXC0004`).
 - `target` names an entity in the same application, ignoring letter case.
+- `child-collection` *(planned for M2)* owns the rows of the entity that
+  `target` names. It allows no other type-specific property. It has no
+  `required`, because a missing collection means no rows.
+- `expression` *(planned for M2)* makes the field a computed field. It is not
+  allowed with `required`. See [Entity logic](#entity-logic).
+
+## Entity logic
+
+Everything in this section is *(planned for M2)*. It adds validations,
+computed fields and child collections to an entity (D17). Expressions use the
+syntax of the [expression language](expressions.md), and diagnostic codes come
+with the issues that build each check.
+
+```json
+{
+  "id": "0ec02f4a-bf31-4409-8eb9-bfb9c39b6756",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "lineItems", "type": "child-collection", "target": "LineItem" },
+    {
+      "name": "total",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "expression": "sum(lineItems, amount)"
+    }
+  ],
+  "validations": [
+    {
+      "expression": "count(lineItems) >= 1",
+      "message": { "textKey": "purchaseRequest.needsLineItem" },
+      "field": "lineItems"
+    }
+  ]
+}
+```
+
+```json
+{
+  "id": "b6c15e88-82e5-43e7-a589-c48ba8a56bc3",
+  "kind": "entity",
+  "name": "LineItem",
+  "formatVersion": 1,
+  "label": { "textKey": "lineItem.label" },
+  "fields": [
+    { "name": "description", "type": "text", "maxLength": 200 },
+    { "name": "quantity", "type": "integer" },
+    { "name": "unitPrice", "type": "decimal", "precision": 18, "scale": 2 },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "expression": "quantity * unitPrice"
+    }
+  ],
+  "validations": [
+    {
+      "expression": "IsPositive(quantity)",
+      "message": { "textKey": "lineItem.quantityPositive" },
+      "field": "quantity"
+    }
+  ]
+}
+```
+
+- **Validations.** `validations` is a list on the entity. Each entry has:
+  - `expression`, which must be boolean.
+  - `message`, a label that is checked like other labels (`AXC0028`). Its text
+    key is the message of a failure.
+  - `field`, which names a field of the same entity.
+
+  The server runs them on create and update, on the record as it will be
+  stored and after computed fields are calculated. A validation fails when its
+  condition is `false` or `null`. The validations of a child entity run on
+  each row. See
+  [the record API](record-api.md#child-rows-computed-fields-and-validations).
+- **Computed fields.** A field with an `expression` is a computed field.
+  - The expression type must match the field's type.
+  - The type must be a scalar type. A `reference` or a `child-collection`
+    cannot be computed.
+  - `required` is not allowed. `unique`, `maxLength`, `precision`, `scale` and
+    `values` keep their usual meaning, because they describe the column that
+    stores the value.
+  - It reads only the record's own fields and its child rows, never a
+    reference path.
+  - The rows of a child collection are computed before the owner.
+  - Clients cannot write it. See
+    [Child tables and computed columns](storage.md#child-tables-and-computed-columns).
+- **Child collections.** The field type `child-collection` needs a `target`
+  that names the child entity. Its rows are read and written only through the
+  owner record.
+- **M2 limits on a child entity.** These are limits of M2, not permanent
+  rules. Real line items often point to a product, so a later milestone is
+  expected to lift the last one. A child entity:
+  - is owned by exactly one `child-collection` field;
+  - is never the `target` of a `reference`;
+  - has no record routes of its own;
+  - has no `reference` or `child-collection` fields.
