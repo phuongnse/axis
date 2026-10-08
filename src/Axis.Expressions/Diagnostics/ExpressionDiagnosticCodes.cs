@@ -10,4 +10,8 @@ public static class ExpressionDiagnosticCodes
     public const string TooLong = "AXC0036";
     public const string TooDeep = "AXC0037";
     public const string TooManyNodes = "AXC0038";
+    public const string UnknownName = "AXC0046";
+    public const string TypeMismatch = "AXC0047";
+    public const string ResultTypeMismatch = "AXC0048";
+    public const string UnknownEnumValue = "AXC0049";
 }

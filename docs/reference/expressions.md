@@ -3,9 +3,10 @@
 Detailed reference for the expression language: grammar, types, operators,
 null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
-`Axis.Expressions`. Sections marked *(planned for M2)* are not built yet. No
-resource file reads expressions yet, so authors see none of this until the
-type checker and compiler use the parser. Dn refers to
+`Axis.Expressions`. So is the type checker for literals, bare field names,
+`date` and `dateTime`, and every operator. Sections marked *(planned for M2)*
+are not built yet. No resource file reads expressions yet, so authors see none
+of this until the compiler uses the parser and the type checker. Dn refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
 and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
@@ -64,8 +65,6 @@ name           = letter , { letter | digit } ;
 
 ## Types
 
-*(planned for M2)*
-
 Every expression has a type, found at compile time.
 
 | Field type | Expression type | Notes |
@@ -83,7 +82,7 @@ Two more types exist only inside expressions:
 
 - **`null`.** The type of the literal `null`. It fits any type.
 - **`list<Entity>`.** The type of a child collection field. Only
-  [aggregates](#functions) accept it.
+  [aggregates](#functions) accept it. *(planned for M2)*
 
 Rules:
 
@@ -92,12 +91,16 @@ Rules:
 - **Enums.** Two enum values compare only when both come from the same
   field's value set, or when one side is a text literal. A data source
   parameter of type `enum` also compares with an enum field when every value
-  in the parameter's `values` is one of the field's `values`. A text literal
+  in the parameter's `values` is one of the field's `values` *(planned for
+  M2, with data source parameters)*. A text literal
   compared with an enum must be one of the field's `values`, compared
   ordinally. Otherwise it is a type error at compile time.
 - **Result type.** Each use sets the type its expression must have.
   Validation, rule and filter expressions need `boolean`. A computed field
-  needs its field's type.
+  needs its field's type. The result fits under the rules of `==`, except
+  that a decimal never narrows to an integer. So an integer meets an expected
+  decimal, `null` meets any type, and a listed text literal meets an expected
+  enum.
 
 ## Operators and precedence
 
@@ -114,7 +117,7 @@ From lowest to highest precedence:
 | 7 | unary `-` | Prefix. |
 | 8 | `.` | Path. See [Names and references](#names-and-references). |
 
-Typing rules *(planned for M2)*:
+Typing rules:
 
 - **Arithmetic.** `+`, `-` and `*` on two integers give an integer. With a
   decimal on either side they give a decimal. They are exact.
@@ -199,9 +202,9 @@ An empty field is `null`. These rules decide what `null` does.
 | Date | `date('2026-10-08')` | `yyyy-MM-dd`. |
 | Date-time | `dateTime('2026-10-08T09:30:00Z')` | Same RFC 3339 rules as the record API: an offset is required, and the fraction has up to 6 digits. See [request bodies and values](record-api.md#request-bodies-and-values). |
 
-- **Date and date-time.** The argument of `date` and `dateTime` must be a text
-  literal. It is checked at compile time *(planned for M2)*. The parser keeps
-  `date('…')` and `dateTime('…')` as calls and does not check the text.
+- **Date and date-time.** The argument of `date` and `dateTime` must be one
+  text literal. The type checker enforces this. Checking the text itself at
+  compile time is *(planned for M2)*. Until then, `date('2026-13-45')` passes.
 - **Enum values.** An enum value is a text literal, checked against the
   field's `values`. See [Types](#types).
 - **Negative numbers.** A negative number is unary minus applied to a
@@ -211,7 +214,8 @@ An empty field is `null`. These rules decide what `null` does.
 
 ## Names and references
 
-*(planned for M2)*
+*(planned for M2)*. Only bare field names are built: the type checker
+resolves them against the fields it is given, ignoring letter case.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -427,9 +431,21 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   parsed.
 - **`AXC0037`.** The expression is deeper than 32 levels.
 - **`AXC0038`.** The expression has more than 500 syntax nodes.
-- **First problem only.** The parser stops at the first problem and reports
-  only that one, so one expression gives at most one syntax or cost
-  diagnostic.
+- **`AXC0046`.** A name that is not in scope, named in the message. Until
+  they are built, functions other than `date` and `dateTime` and `.` paths
+  are reported this way too.
+- **`AXC0047`.** Operand types an operator does not accept, at the operator.
+  This includes an `in` item that does not fit, two different enums, and a
+  `date` or `dateTime` call without one text literal argument. The message
+  names the types.
+- **`AXC0048`.** The expression's type does not fit the type its use needs.
+  The message names the expected and the actual type.
+- **`AXC0049`.** A text literal compared with an enum, or given where an enum
+  is needed, is not one of the field's `values`. Reported at the literal.
+- **First problem only.** The parser and the type checker each stop at the
+  first problem and report only that one. So one expression gives at most
+  one diagnostic.
 
-The type and cost codes that need names resolved are added by the issues
-that build those checks.
+The cost codes for hops, rule call depth and cycles, and the type codes for
+function and rule calls and the SQL subset, are added by the issues that
+build those checks.
