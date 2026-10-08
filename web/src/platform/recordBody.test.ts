@@ -14,6 +14,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     scale: null,
     values: null,
     target: null,
+    fields: null,
   }
 }
 
@@ -64,5 +65,33 @@ describe('buildRecordBody', () => {
 
   it('writes a number-like text field as a string', () => {
     expect(buildRecordBody(fields, { title: '7' })).toBe('{"values":{"title":"7"}}')
+  })
+
+  describe('a child collection', () => {
+    const lines = {
+      ...field('lines', 'child-collection'),
+      fields: [field('description', 'text'), field('quantity', 'integer'), field('price', 'decimal')],
+    }
+
+    it('writes an empty row list', () => {
+      expect(buildRecordBody([field('title', 'text'), lines], { lines: [] })).toBe('{"values":{"lines":[]}}')
+    })
+
+    it('writes each row with numbers as typed, in child field declaration order', () => {
+      expect(buildRecordBody([lines], { lines: [{ price: '1.50', description: 'Pens', quantity: '2' }] })).toBe(
+        '{"values":{"lines":[{"description":"Pens","quantity":2,"price":1.50}]}}',
+      )
+    })
+
+    it('leaves the null fields of a row out', () => {
+      expect(
+        buildRecordBody([lines], {
+          lines: [
+            { description: null, quantity: '3', price: null },
+            { description: 'Ink', quantity: null, price: null },
+          ],
+        }),
+      ).toBe('{"values":{"lines":[{"quantity":3},{"description":"Ink"}]}}')
+    })
   })
 })

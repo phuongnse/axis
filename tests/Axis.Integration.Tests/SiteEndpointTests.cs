@@ -79,19 +79,19 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         var fieldList = entity.GetProperty("fields").EnumerateArray().ToList();
         Assert.Equal(
-            ["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "department"],
+            ["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "parts", "department"],
             fieldList.Select(field => field.GetProperty("name").GetString()));
         Assert.Equal(
-            ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference"],
+            ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "child-collection", "reference"],
             fieldList.Select(field => field.GetProperty("type").GetString()));
         Assert.All(fieldList, field => Assert.Equal(
-            ["name", "type", "labelKey", "required", "unique", "maxLength", "precision", "scale", "values", "target"],
+            ["name", "type", "labelKey", "required", "unique", "maxLength", "precision", "scale", "values", "target", "fields"],
             field.EnumerateObject().Select(property => property.Name)));
 
         var fields = fieldList.ToDictionary(field => field.GetProperty("name").GetString()!);
 
         Assert.Equal(
-            """{"name":"name","type":"text","labelKey":null,"required":true,"unique":false,"maxLength":100,"precision":null,"scale":null,"values":null,"target":null}""",
+            """{"name":"name","type":"text","labelKey":null,"required":true,"unique":false,"maxLength":100,"precision":null,"scale":null,"values":null,"target":null,"fields":null}""",
             fields["name"].GetRawText());
         Assert.Equal(20, fields["price"].GetProperty("precision").GetInt32());
         Assert.Equal(2, fields["price"].GetProperty("scale").GetInt32());
@@ -101,6 +101,13 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(
             """{"entity":"Department","displayField":"name","recordsPath":"/api/apps/RecordsApp/entities/Department/records"}""",
             fields["department"].GetProperty("target").GetRawText());
+
+        // A child collection carries its child entity's fields, and no target: a child has no record API.
+        Assert.Equal(
+            """{"name":"parts","type":"child-collection","labelKey":null,"required":false,"unique":false,"maxLength":null,"precision":null,"scale":null,"values":null,"target":null,"fields":[{"name":"name","type":"text","labelKey":null,"required":false,"unique":true,"maxLength":100,"precision":null,"scale":null,"values":null,"target":null,"fields":null}]}""",
+            fields["parts"].GetRawText());
+        Assert.All(fieldList.Where(field => field.GetProperty("name").GetString() != "parts"), field =>
+            Assert.Equal(JsonValueKind.Null, field.GetProperty("fields").ValueKind));
     }
 
     [Fact]

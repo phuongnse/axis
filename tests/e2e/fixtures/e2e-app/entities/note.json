@@ -13,6 +13,7 @@
     { "name": "dueOn", "type": "date", "label": { "textKey": "note.dueOn" } },
     { "name": "dueAt", "type": "date-time", "label": { "textKey": "note.dueAt" } },
     { "name": "status", "type": "enum", "values": ["open", "closed"], "label": { "textKey": "note.status" } },
-    { "name": "category", "type": "reference", "target": "Category", "label": { "textKey": "note.category" } }
+    { "name": "category", "type": "reference", "target": "Category", "label": { "textKey": "note.category" } },
+    { "name": "lines", "type": "child-collection", "target": "NoteLine", "label": { "textKey": "note.lines" } }
   ]
 }

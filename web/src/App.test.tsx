@@ -98,6 +98,7 @@ const noteEntity: EntityMetadata = {
       scale: null,
       values: null,
       target: null,
+      fields: null,
     },
   ],
 }

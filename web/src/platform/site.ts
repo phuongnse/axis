@@ -36,7 +36,8 @@ export interface ApplicationSite {
 }
 
 /** A field type as written in entity files. */
-export type FieldType = 'text' | 'integer' | 'decimal' | 'boolean' | 'date' | 'date-time' | 'enum' | 'reference'
+export type FieldType =
+  'text' | 'integer' | 'decimal' | 'boolean' | 'date' | 'date-time' | 'enum' | 'reference' | 'child-collection'
 
 /** The entity a reference field points to, its display field and the path of its record API. */
 export interface ReferenceTarget {
@@ -45,7 +46,10 @@ export interface ReferenceTarget {
   recordsPath: string
 }
 
-/** One field of an entity. Properties the field's type does not have are `null`. */
+/**
+ * One field of an entity. Properties the field's type does not have are `null`: `target` is for a
+ * reference, and `fields` holds a child collection's child fields in declaration order.
+ */
 export interface FieldMetadata {
   name: string
   type: FieldType
@@ -57,6 +61,7 @@ export interface FieldMetadata {
   scale: number | null
   values: string[] | null
   target: ReferenceTarget | null
+  fields: FieldMetadata[] | null
 }
 
 /** The entity a widget shows, with its fields in declaration order and the path of its record API. */

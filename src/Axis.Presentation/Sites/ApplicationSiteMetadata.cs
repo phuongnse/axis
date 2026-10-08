@@ -28,10 +28,11 @@ public sealed record EntityMetadata(string Name, string? LabelKey, string? Displ
 
 /// <summary>
 /// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> is for
-/// text, <see cref="Precision"/> and <see cref="Scale"/> for decimal, <see cref="Values"/> for enum
-/// and <see cref="Target"/> for reference.
+/// text, <see cref="Precision"/> and <see cref="Scale"/> for decimal, <see cref="Values"/> for enum,
+/// <see cref="Target"/> for reference and <see cref="Fields"/> for child collection.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
+/// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
 public sealed record FieldMetadata(
     string Name,
     string Type,
@@ -42,7 +43,8 @@ public sealed record FieldMetadata(
     int? Precision,
     int? Scale,
     IReadOnlyList<string>? Values,
-    ReferenceTarget? Target);
+    ReferenceTarget? Target,
+    IReadOnlyList<FieldMetadata>? Fields);
 
 /// <summary>The entity a reference field points to, its display field and the path of its record API.</summary>
 public sealed record ReferenceTarget(string Entity, string? DisplayField, string RecordsPath);

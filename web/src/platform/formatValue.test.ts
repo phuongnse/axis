@@ -14,6 +14,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     scale: null,
     values: null,
     target: null,
+    fields: null,
   }
 }
 

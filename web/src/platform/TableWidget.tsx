@@ -46,7 +46,9 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
 
-  const query = useMemo(() => parseTableQuery(searchParams, entity.fields), [searchParams, entity.fields])
+  // A child collection has no column and cannot be sorted by.
+  const fields = useMemo(() => entity.fields.filter((field) => field.type !== 'child-collection'), [entity.fields])
+  const query = useMemo(() => parseTableQuery(searchParams, fields), [searchParams, fields])
   const requestQuery = recordQuery(query)
   const requestUrl = `${entity.recordsPath}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
@@ -91,7 +93,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const columns = useMemo<TableColumnsType<RecordItem>>(() => {
     const sortOrder = (field: string) =>
       query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
-    const fieldColumns: TableColumnsType<RecordItem> = entity.fields.map((field) => ({
+    const fieldColumns: TableColumnsType<RecordItem> = fields.map((field) => ({
       key: field.name,
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
@@ -115,7 +117,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
         ),
       },
     ]
-  }, [entity.fields, formPath, from, locale, query.sort, t])
+  }, [fields, formPath, from, locale, query.sort, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<RecordItem>['onChange'] = (pagination, _filters, sorter) => {

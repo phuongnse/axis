@@ -71,7 +71,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
             {
               "name": "name", "type": "text", "labelKey": null,
               "required": true, "unique": false, "maxLength": 100,
-              "precision": null, "scale": null, "values": null, "target": null
+              "precision": null, "scale": null, "values": null, "target": null,
+              "fields": null
             },
             {
               "name": "department", "type": "reference", "labelKey": "item.department",
@@ -81,7 +82,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
                 "entity": "Department",
                 "displayField": "name",
                 "recordsPath": "/api/apps/RecordsApp/entities/Department/records"
-              }
+              },
+              "fields": null
             }
           ]
         }
@@ -97,15 +99,21 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     the form for a table's records, and `null` otherwise.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
-    declaration order. A `child-collection` field is left out until forms
-    show child rows in M3, so a table has no empty column for it.
+    declaration order. A `child-collection` field is listed too. Tables show
+    no column for it, and forms show its rows.
   - Each field has its name, its `type` as written in entity files (such as
     `date-time`), its label key, `required` and `unique`, `maxLength` for
-    text, `precision` and `scale` for decimal, `values` for enum, and
-    `target` for reference. A property the field's type does not have, or a
-    label the file leaves out, is `null`; it is never left out.
+    text, `precision` and `scale` for decimal, `values` for enum, `target`
+    for reference, and `fields` for child collection. A property the field's
+    type does not have, or a label the file leaves out, is `null`; it is
+    never left out.
   - `target` names the referenced entity, its display field and the path of
-    its record API, so the SPA never builds a record URL itself.
+    its record API, so the SPA never builds a record URL itself. It is only
+    for a reference. A child collection's `target` is `null`, because a child
+    entity has no record API of its own.
+  - `fields` lists a child collection's child entity fields in declaration
+    order, each in the same shape as an entity field. The form builds the
+    columns and inputs of the collection's table from them.
   - Names in responses (page, form page, entity, and the application in
     `recordsPath`) are the model's declared names, not the letter case of the
     request.
@@ -149,7 +157,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Table widget.** A page whose widget is a `table` lists the records of its
   entity through the record API, in the shared Ant Design table.
   - **Columns.** There is one column per field, in declaration order. The
-    header is the field's label, or the field name when it has no label.
+    header is the field's label, or the field name when it has no label. A
+    child collection has no column.
   - **URL state.** Paging and sorting live in the URL as the record API's own
     `page`, `pageSize` and `sort` (`-` and the field name for descending), so
     reload, sharing and the back button keep them. The widget writes them
@@ -202,7 +211,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     pagination control moves between pages. Each change adds a history entry.
   - **Invalid values.** A `page` that is not a positive integer, a `pageSize`
     other than the offered 10, 20, 50 and 100, and a `sort` that names no
-    field or a reference field are ignored. The default is requested instead,
+    field, a reference field or a child collection field are ignored. The default is requested instead,
     and the URL is rewritten without them and without a history entry. Once
     the total is known, a `page` past the last page (at least 1) becomes the
     last page in the same way, so the URL and the pagination agree. With no
@@ -259,6 +268,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
     | `enum` | a choice of the declared values, as written in the entity file |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
+    | `child-collection` | a table of its rows, described under **Child collections** |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
@@ -271,9 +281,29 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `labels`. A picked record's display field value replaces it at once. A
     changed reference is sent as the record id, and a cleared one as `null`.
     Picking the record that was already set leaves the field unchanged.
+  - **Child collections.** A child collection field shows its rows as a
+    table under the field's label.
+    - There is one column per child field, headed by its label or its name.
+      Each cell uses the input the form uses for that field type, so number
+      text, dates and enums behave as in the rest of the form. A cell
+      input's accessible name is the column header and the one-based row
+      number, such as `Quantity 2`.
+    - Each row has a remove button. An add button below the table appends a
+      row with every child field `null`. Rows cannot be reordered.
+    - When rows were added, removed or edited, the form sends the whole row
+      list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
+      non-null child fields in declaration order. Rows are compared by value
+      with the rows the form started from, so an edit that is typed and then
+      undone leaves the collection out of the body.
+    - A key `/values/<collection>/<index>/<field>` for an existing row and a
+      child field shows its messages under that cell. A key
+      `/values/<collection>` shows under the table. Any other key inside the
+      collection, such as a whole row, shows above the form. Adding or
+      removing a row clears the collection's cell errors, because their
+      indexes would point at the wrong rows.
   - **Changed fields.** The form sends only the fields whose value differs
     from the value it started from. A new record starts with every field
-    `null`, so an untouched field stays out of a create and the server
+    `null` and every child collection empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
   - **Number text.** The body is written by hand, so an integer or decimal

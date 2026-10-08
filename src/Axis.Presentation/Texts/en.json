@@ -32,5 +32,7 @@
   "shell.form.saveFailed": "The record could not be saved.",
   "shell.form.loadFailed": "The record could not be loaded.",
   "shell.form.choose": "Choose",
-  "shell.form.clear": "Clear"
+  "shell.form.clear": "Clear",
+  "shell.form.addRow": "Add row",
+  "shell.form.removeRow": "Remove"
 }

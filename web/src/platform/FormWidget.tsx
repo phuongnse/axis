@@ -1,10 +1,11 @@
-import { Alert, Button, Checkbox, DatePicker, Flex, Form, Input, Select, Space } from 'antd'
-import dayjs from 'dayjs'
-import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Alert, Button, Flex, Form, Input, Space } from 'antd'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { ChildCollectionTable } from './ChildCollectionTable'
+import { FieldInput } from './FieldInput'
 import { buildRecordBody } from './recordBody'
-import { fetchRecord, saveRecord, type RecordItem, type RecordValue } from './records'
+import { fetchRecord, saveRecord, type FieldValue, type RecordItem, type RecordRow, type RecordValue } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata, WidgetMetadata } from './site'
 import { useText } from './texts'
@@ -19,7 +20,7 @@ interface FormWidgetProps {
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
 interface Snapshot {
-  initial: Record<string, RecordValue>
+  initial: Record<string, FieldValue>
   labels: Record<string, string>
   version: number
 }
@@ -29,30 +30,41 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
 const fieldPointer = '/values/'
 
 function emptySnapshot(fields: readonly FieldMetadata[]): Snapshot {
-  return { initial: Object.fromEntries(fields.map((field) => [field.name, null])), labels: {}, version: 0 }
+  return {
+    initial: Object.fromEntries(fields.map((field) => [field.name, field.type === 'child-collection' ? [] : null])),
+    labels: {},
+    version: 0,
+  }
 }
 
 function snapshotOf(record: RecordItem): Snapshot {
   return { initial: record.values, labels: record.labels, version: record.version }
 }
 
-// Enter in a picker only confirms the picked value. The picker handles it first, so stopping the
-// default here only stops the browser's implicit form submission.
-function confirmOnly(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-  }
+function rowsOf(value: FieldValue | undefined): RecordRow[] {
+  return Array.isArray(value) ? value : []
 }
 
-// The record API writes six fraction digits, and the picker works to the second.
-function dateTimeValue(value: RecordValue) {
-  return value === null ? null : dayjs(String(value).replace(/\.\d+(?=Z$)/, ''))
+// Rows are compared by value, so an edit that is typed and then undone sends nothing.
+function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValue | undefined): boolean {
+  if (field.type !== 'child-collection') {
+    return a === b
+  }
+  const rowsA = rowsOf(a)
+  const rowsB = rowsOf(b)
+  return (
+    rowsA.length === rowsB.length &&
+    rowsA.every((row, index) =>
+      (field.fields ?? []).every((child) => (row[child.name] ?? null) === (rowsB[index][child.name] ?? null)),
+    )
+  )
 }
 
 /**
  * Creates or edits one record of the widget's entity. The form sends only the fields that differ
  * from the values it started from, plus `version` on edit, and adds no rules of its own: the server
- * validates, and its errors appear on the fields their JSON Pointer names.
+ * validates, and its errors appear on the fields their JSON Pointer names. A child collection that
+ * changed is sent as its whole row list, and a row's errors appear on its cells.
  */
 export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
   const t = useText()
@@ -60,12 +72,14 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
   const { entity } = widget
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
-  const [values, setValues] = useState<Record<string, RecordValue>>(snapshot.initial)
+  const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
   // The label of each reference, which follows the record picked in the lookup.
   const [labels, setLabels] = useState<Record<string, string>>(snapshot.labels)
   // The name of the reference field whose lookup is open.
   const [lookup, setLookup] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+  // The errors of each child collection's cells, keyed by collection, then by `<index>/<field>`.
+  const [cellErrors, setCellErrors] = useState<Record<string, Record<string, string[]>>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -76,6 +90,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
     setValues(next.initial)
     setLabels(next.labels)
     setFieldErrors({})
+    setCellErrors({})
     setFormErrors([])
     setConflict(false)
     setLoad('ready')
@@ -114,18 +129,36 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
     }
   }
 
+  // A pointer such as `lines/1/quantity` names a cell when the collection, its row and the child
+  // field all exist.
+  const cellOf = (name: string) => {
+    const [collection, index, child, ...rest] = name.split('/')
+    const field = entity.fields.find((candidate) => candidate.name === collection)
+    if (
+      rest.length > 0 ||
+      field?.type !== 'child-collection' ||
+      !/^(0|[1-9]\d*)$/.test(index ?? '') ||
+      Number(index) >= rowsOf(values[collection]).length ||
+      !field.fields?.some((candidate) => candidate.name === child)
+    ) {
+      return null
+    }
+    return { collection, key: `${index}/${child}` }
+  }
+
   const save = async () => {
     if (saving) {
       return
     }
     const changed = Object.fromEntries(
       entity.fields
-        .filter((field) => values[field.name] !== snapshot.initial[field.name])
+        .filter((field) => !sameValue(field, values[field.name], snapshot.initial[field.name]))
         .map((field) => [field.name, values[field.name]]),
     )
     const body = buildRecordBody(entity.fields, changed, recordId === null ? undefined : snapshot.version)
     setSaving(true)
     setFieldErrors({})
+    setCellErrors({})
     setFormErrors([])
     setConflict(false)
     try {
@@ -146,16 +179,21 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
         return
       }
       const onFields: Record<string, string[]> = {}
+      const onCells: Record<string, Record<string, string[]>> = {}
       const onForm: string[] = []
       for (const pointer of pointers) {
         const name = pointer.startsWith(fieldPointer) ? pointer.slice(fieldPointer.length) : null
-        if (name !== null && entity.fields.some((field) => field.name === name)) {
+        const cell = name === null ? null : cellOf(name)
+        if (cell) {
+          onCells[cell.collection] = { ...onCells[cell.collection], [cell.key]: problem.errors[pointer] }
+        } else if (name !== null && entity.fields.some((field) => field.name === name)) {
           onFields[name] = problem.errors[pointer]
         } else {
           onForm.push(...problem.errors[pointer])
         }
       }
       setFieldErrors(onFields)
+      setCellErrors(onCells)
       setFormErrors(onForm)
     } catch (error) {
       console.warn(`Saving a record of '${entity.name}' failed`, error)
@@ -175,7 +213,19 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
     return <Alert data-testid="form-load-error" type="error" message={t('shell.form.loadFailed')} />
   }
 
-  const set = (name: string, value: RecordValue) => setValues((previous) => ({ ...previous, [name]: value }))
+  const set = (name: string, value: FieldValue) => setValues((previous) => ({ ...previous, [name]: value }))
+
+  // Error keys use row indexes, so adding or removing a row clears the collection's cell errors.
+  const setRows = (field: FieldMetadata, rows: RecordRow[]) => {
+    if (rows.length !== rowsOf(values[field.name]).length) {
+      setCellErrors((previous) => {
+        const next = { ...previous }
+        delete next[field.name]
+        return next
+      })
+    }
+    set(field.name, rows)
+  }
   const labelOf = (field: FieldMetadata) => (field.labelKey ? t(field.labelKey) : field.name)
 
   const pick = (field: FieldMetadata, record: RecordItem) => {
@@ -200,63 +250,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
   const input = (field: FieldMetadata): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
-    const text = (event: { target: { value: string } }) => set(field.name, event.target.value || null)
     switch (field.type) {
-      case 'text':
-        return (
-          <Input
-            id={id}
-            value={value === null ? '' : String(value)}
-            maxLength={field.maxLength ?? undefined}
-            onChange={text}
-          />
-        )
-      case 'integer':
-      case 'decimal':
-        // Plain text inputs keep the typed text unchanged, so no digit is lost.
-        return (
-          <Input
-            id={id}
-            inputMode={field.type === 'integer' ? 'numeric' : 'decimal'}
-            value={value === null ? '' : String(value)}
-            onChange={text}
-          />
-        )
-      case 'boolean':
-        return <Checkbox id={id} checked={value === true} onChange={(event) => set(field.name, event.target.checked)} />
-      case 'date':
-        return (
-          <DatePicker
-            id={id}
-            value={value === null ? null : dayjs(String(value))}
-            onChange={(date) => set(field.name, date ? date.format('YYYY-MM-DD') : null)}
-            onKeyDown={confirmOnly}
-          />
-        )
-      case 'date-time':
-        return (
-          <DatePicker
-            id={id}
-            showTime
-            format="YYYY-MM-DD HH:mm:ss"
-            value={dateTimeValue(value)}
-            // UTC to the second, as an RFC 3339 string the record API accepts.
-            onChange={(date) =>
-              set(field.name, date ? new Date(date.valueOf()).toISOString().replace(/\.\d{3}Z$/, 'Z') : null)
-            }
-            onKeyDown={confirmOnly}
-          />
-        )
-      case 'enum':
-        return (
-          <Select
-            id={id}
-            allowClear
-            value={value === null ? null : String(value)}
-            options={(field.values ?? []).map((option) => ({ value: option, label: option }))}
-            onChange={(option: string | undefined) => set(field.name, option ?? null)}
-          />
-        )
       case 'reference':
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
         return (
@@ -265,6 +259,19 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
             <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
             {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
           </Space.Compact>
+        )
+      case 'child-collection':
+        return (
+          <ChildCollectionTable
+            field={field}
+            rows={rowsOf(value)}
+            onChange={(rows) => setRows(field, rows)}
+            errors={cellErrors[field.name] ?? {}}
+          />
+        )
+      default:
+        return (
+          <FieldInput field={field} id={id} value={value as RecordValue} onChange={(next) => set(field.name, next)} />
         )
     }
   }
@@ -287,7 +294,8 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
             <Form.Item
               key={field.name}
               label={labelOf(field)}
-              htmlFor={field.name}
+              // A child collection is a table, with no single input for the label to point to.
+              htmlFor={field.type === 'child-collection' ? undefined : field.name}
               required={field.required}
               validateStatus={errors ? 'error' : undefined}
               help={errors && <span data-testid={`field-error-${field.name}`}>{errors.join(' ')}</span>}
