@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
 
 namespace Axis.Configuration.Tests;
 
@@ -44,10 +45,13 @@ public sealed class DocumentationTests
 
         Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Code |' under docs/, found {tables.Count}.");
         var documented = tables[0];
-        var declared = Constants(typeof(DiagnosticCodes));
+        // Configuration and expression codes share one number range and one table.
+        var declared = Constants(typeof(DiagnosticCodes)).Concat(Constants(typeof(ExpressionDiagnosticCodes))).ToList();
+        var duplicates = declared.GroupBy(code => code).Where(group => group.Count() > 1).Select(group => group.Key).ToList();
 
+        Assert.True(duplicates.Count == 0, $"Declared more than once: {string.Join(", ", duplicates)}.");
         Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
-        Assert.True(!documented.Except(declared).Any(), $"Not in DiagnosticCodes: {string.Join(", ", documented.Except(declared))}.");
+        Assert.True(!documented.Except(declared).Any(), $"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", documented.Except(declared))}.");
         Assert.Equal(documented.Count, documented.Distinct().Count());
     }
 

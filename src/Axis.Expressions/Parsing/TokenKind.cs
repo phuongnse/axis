@@ -1,0 +1,32 @@
+namespace Axis.Expressions.Parsing;
+
+internal enum TokenKind
+{
+    End,
+    Integer,
+    Decimal,
+    Text,
+    Name,
+    And,
+    Or,
+    Not,
+    Is,
+    In,
+    Null,
+    True,
+    False,
+    Equal,
+    NotEqual,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    OpenParen,
+    CloseParen,
+    Comma,
+    Dot,
+}

@@ -1,8 +1,11 @@
 # Expression language
 
 Detailed reference for the expression language: grammar, types, operators,
-null rules, functions, cost limits and the SQL subset. Everything in this file
-is *(planned for M2)*, and nothing here is built yet. Dn refers to
+null rules, functions, cost limits and the SQL subset. The grammar, the syntax
+diagnostics and the length, depth and node limits are built in
+`Axis.Expressions`. Sections marked *(planned for M2)* are not built yet. No
+resource file reads expressions yet, so authors see none of this until the
+type checker and compiler use the parser. Dn refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
 and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
@@ -61,6 +64,8 @@ name           = letter , { letter | digit } ;
 
 ## Types
 
+*(planned for M2)*
+
 Every expression has a type, found at compile time.
 
 | Field type | Expression type | Notes |
@@ -109,7 +114,7 @@ From lowest to highest precedence:
 | 7 | unary `-` | Prefix. |
 | 8 | `.` | Path. See [Names and references](#names-and-references). |
 
-Typing rules:
+Typing rules *(planned for M2)*:
 
 - **Arithmetic.** `+`, `-` and `*` on two integers give an integer. With a
   decimal on either side they give a decimal. They are exact.
@@ -141,6 +146,8 @@ status in ('submitted', 'approved')
 ```
 
 ## Null semantics
+
+*(planned for M2)*
 
 An empty field is `null`. These rules decide what `null` does.
 
@@ -193,7 +200,8 @@ An empty field is `null`. These rules decide what `null` does.
 | Date-time | `dateTime('2026-10-08T09:30:00Z')` | Same RFC 3339 rules as the record API: an offset is required, and the fraction has up to 6 digits. See [request bodies and values](record-api.md#request-bodies-and-values). |
 
 - **Date and date-time.** The argument of `date` and `dateTime` must be a text
-  literal. It is checked at compile time.
+  literal. It is checked at compile time *(planned for M2)*. The parser keeps
+  `date('…')` and `dateTime('…')` as calls and does not check the text.
 - **Enum values.** An enum value is a text literal, checked against the
   field's `values`. See [Types](#types).
 - **Negative numbers.** A negative number is unary minus applied to a
@@ -202,6 +210,8 @@ An empty field is `null`. These rules decide what `null` does.
   together with a time zone rule.
 
 ## Names and references
+
+*(planned for M2)*
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -225,6 +235,8 @@ An empty field is `null`. These rules decide what `null` does.
   data source parameters as plain names.
 
 ## Functions
+
+*(planned for M2)*
 
 Function names ignore letter case. In the signatures, `n` is an integer or a
 decimal. Unless the table says otherwise, a function returns `null` when an
@@ -290,7 +302,21 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | Rule calls nested | 8 deep |
 | Rule call cycles | None allowed |
 
-Run-time limit:
+The first three are built. The hop, rule call depth and cycle limits are
+*(planned for M2)*, because they need names to be resolved.
+
+- **Depth.** Depth is the height of the syntax tree. A name or literal has
+  depth 1. Each operator, call, path step, `is null` and `in` adds one level
+  above its highest operand. Each pair of parentheses also adds one level. So
+  `-1` has depth 2, and `(a + b)` has depth 3.
+- **Nodes.** Each literal, name, operator, call, `.name` path step, `is null`
+  and `in` is one node. So each `in` item counts, and a `date('…')` item is two
+  nodes: the call and its text. Parentheses are not nodes.
+- **Positions.** A diagnostic's offset is a zero-based index in UTF-16
+  characters, the same as a C# string index. Messages show it one-based, as
+  "at character N".
+
+Run-time limit *(planned for M2)*:
 
 - **Step budget.** Each top-level evaluation has a budget of 10,000 steps.
   Each node evaluated is one step. An aggregate's item expression costs its
@@ -300,6 +326,8 @@ Run-time limit:
   bound its size.
 
 ## Run-time errors
+
+*(planned for M2)*
 
 These are errors:
 
@@ -313,6 +341,8 @@ policy denies, and a computed field rejects the write. A run-time error is not
 a compile diagnostic.
 
 ## SQL subset
+
+*(planned for M2)*
 
 These translate to SQL:
 
@@ -355,6 +385,8 @@ Rules:
 
 ## Writing expressions in resource files
 
+*(planned for M2)*
+
 An expression is one JSON string:
 
 ```json
@@ -385,4 +417,19 @@ There are three families:
 
 Each diagnostic points at the JSON Pointer of the expression string. Its
 message gives the character position inside the expression. The `AXCnnnn`
-codes are added by the issues that build each check.
+codes are in the [diagnostic table](configuration.md#configuration-pipeline):
+
+- **`AXC0035`.** Every syntax error: an unknown character, a bad token, a
+  literal that cannot be held exactly, or text the grammar does not allow. An
+  integer above the signed 64-bit maximum and a decimal with more digits than
+  .NET `decimal` holds are syntax errors.
+- **`AXC0036`.** The expression is longer than 2,000 characters. It is not
+  parsed.
+- **`AXC0037`.** The expression is deeper than 32 levels.
+- **`AXC0038`.** The expression has more than 500 syntax nodes.
+- **First problem only.** The parser stops at the first problem and reports
+  only that one, so one expression gives at most one syntax or cost
+  diagnostic.
+
+The type and cost codes that need names resolved are added by the issues
+that build those checks.
