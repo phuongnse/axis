@@ -82,7 +82,13 @@ them.
    wrong choice, fix that text in a hand-made pull request. Any change agreed after
    the plan is posted, whether the review finds a gap or the owner decides
    something while approving, however small, is commented in the same issue
-   and `/nexkit plan` is run again before `/nexkit go`. `/nexkit go` only runs
+   and `/nexkit plan` is run again before `/nexkit go`. The plan agent sees
+   only the issue body, collaborators' comments and the note on the command.
+   It never sees earlier plans, because the bot posts them. So a review
+   comment that accepts choices from a plan writes each one out in full: the
+   numbers, the names and the rules. "Accepted as in the plan" is not enough.
+   On #98 a comment accepted "the other choices listed under Decisions to
+   check", and the re-plan chose differently. `/nexkit go` only runs
    on the latest plan, and that plan holds every agreed change. The reason:
    the plan is the contract. It holds the acceptance criteria the pull request
    is checked against, and it is the record a later reader looks at. A change
