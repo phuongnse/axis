@@ -1,6 +1,7 @@
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
 using Axis.Server.Applications;
+using Axis.Server.DataSources;
 using Axis.Server.Health;
 using Axis.Server.Presentation;
 using Axis.Server.Records;
@@ -50,6 +51,7 @@ app.MapHealthEndpoints();
 app.MapPresentationEndpoints();
 app.MapSiteEndpoints();
 app.MapRecordEndpoints();
+app.MapDataSourceEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();

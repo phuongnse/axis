@@ -17,7 +17,7 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application`, `entity`, `site`, `page`, `text` or `seed`). The manifest is the single `application`
+   (`application`, `entity`, `site`, `page`, `text`, `seed` or `dataSource`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -88,10 +88,25 @@ flowchart LR
      not compared with resource ids. Seed values are not checked at compile
      time; the startup step checks them before it inserts any record (see
      [Startup activation](#startup-activation)).
+   - **Data sources.** A data source's `entity` must name a loaded entity,
+     ignoring letter case, otherwise it is `AXC0042` at `/entity`, and its
+     fields and sort are not checked further. A name whose entity file was
+     not loaded because of its own errors is not reported again. Each `path`
+     must name a field of that entity, ignoring letter case, otherwise it is
+     `AXC0043` at `/fields/{i}/path`. A path naming a `child-collection`
+     field is `AXC0043` too, because that field has no column. So is a
+     dotted path through a reference, until relations are built. Projected names compare
+     exactly: a name that an earlier entry of `fields` already uses is
+     `AXC0044` at `/fields/{i}/name`. The `sort`, without its leading `-`,
+     must exactly match a projected name whose field is not a `reference`,
+     otherwise it is `AXC0045` at `/sort`. A sort naming an entry whose path
+     is already `AXC0043` is not reported again. See
+     [data sources](data-sources.md#compile-checks).
 
    The model holds the text resources, each entity's display field, the
-   sites and pages with their entity and page references resolved, and the
-   seeds in path order with their entity resolved. No model
+   sites and pages with their entity and page references resolved, the
+   seeds in path order with their entity resolved, and the data sources in
+   path order with their entity and projected fields resolved. No model
    is produced while any error remains.
 3. **Check** *(planned for M2)*. Expressions (see
    [Expression language](expressions.md)), [data source](data-sources.md#compile-checks) fields, form
@@ -230,6 +245,10 @@ sorted by file and then path.
 | `AXC0039` | The child entity is already owned by another `child-collection` field. Reported at `/fields/{i}/target` of the later field, naming the owner. |
 | `AXC0040` | A reference field's target is a child entity. Reported at `/fields/{i}/target`, naming the owner. |
 | `AXC0041` | A child entity has a `reference` or `child-collection` field. Reported at `/fields/{i}/type` of that field, naming the owner. |
+| `AXC0042` | A data source's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
+| `AXC0043` | A data source field's `path` names no field of the data source's entity, names a `child-collection` field, which has no column, or goes through a reference, which is not supported yet. Reported at `/fields/{i}/path`. |
+| `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
+| `AXC0045` | A data source's `sort` names no projected field, or names a projected `reference` field. Reported at `/sort`. |
 | `AXC0046` | An expression names a field that is not in its scope. Functions other than `date` and `dateTime`, and `.` paths, are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0047` | An expression gives an operator or function operands of types it does not accept, such as `'a' < 'b'` or `quantity and true`. Reported at the JSON Pointer of the expression string, with the character position of the operator in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
@@ -374,8 +393,7 @@ site, and its widgets are its content:
   layout can be added later without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`
   *(planned for M2)*. See [data sources](data-sources.md). The `dataSource`
-  kind is not in the Load step's list of kinds yet. It is added by the issue
-  that builds it.
+  kind is built, but no widget can name one yet.
 
 A `seed` holds records with fixed ids for one entity:
 
