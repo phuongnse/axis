@@ -32,5 +32,7 @@
   "shell.form.saveFailed": "Không thể lưu bản ghi.",
   "shell.form.loadFailed": "Không thể tải bản ghi.",
   "shell.form.choose": "Chọn",
-  "shell.form.clear": "Xóa"
+  "shell.form.clear": "Xóa",
+  "shell.form.addRow": "Thêm dòng",
+  "shell.form.removeRow": "Xóa dòng"
 }

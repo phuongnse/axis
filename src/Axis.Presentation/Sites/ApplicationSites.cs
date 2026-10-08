@@ -65,7 +65,6 @@ public static class ApplicationSites
             throw new InvalidOperationException($"The widget entity '{widget.Entity.Name}' is not in the model.");
         }
 
-        // A child collection has no column, so tables and forms leave it out until forms show its rows.
         return new WidgetMetadata(
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
@@ -74,7 +73,7 @@ public static class ApplicationSites
                 entity.Label?.TextKey,
                 entity.DisplayField,
                 RecordsPath(application, entity.Name),
-                [.. entity.Fields.Where(field => field.HasColumn).Select(field => Field(application, field))]));
+                [.. entity.Fields.Select(field => Field(application, field))]));
     }
 
     private static FieldMetadata Field(ApplicationModel application, FieldModel field) =>
@@ -88,9 +87,18 @@ public static class ApplicationSites
             field.Precision,
             field.Scale,
             field.Values,
-            field.Target is { } target
-                ? new ReferenceTarget(target.Name, field.TargetDisplayField, RecordsPath(application, target.Name))
-                : null);
+            field.Type == FieldType.Reference
+                ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
+                : null,
+            field.Type == FieldType.ChildCollection ? ChildFields(application, field) : null);
+
+    // A child entity has no reference or child collection fields, so this goes one level deep.
+    private static FieldMetadata[] ChildFields(ApplicationModel application, FieldModel collection)
+    {
+        var child = application.FindEntity(collection.Target!.Id)
+            ?? throw new InvalidOperationException("The application has no entity for the child collection.");
+        return [.. child.Fields.Select(field => Field(application, field))];
+    }
 
     private static string RecordsPath(ApplicationModel application, string entityName) =>
         $"/api/apps/{application.Manifest.Name}/entities/{entityName}/records";

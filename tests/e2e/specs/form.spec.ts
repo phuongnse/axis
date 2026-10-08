@@ -65,6 +65,53 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await expect(page).toHaveURL(tablePath)
 })
 
+test('line items are added, edited and removed in the form, in light and dark mode', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const title = `Lines ${run}`
+  const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
+  const cell = (label: string) => page.getByLabel(label, { exact: true })
+  await page.goto('/e2e/notes?pageSize=100&sort=-title')
+
+  await page.getByRole('link', { name: 'New' }).click()
+  await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
+  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await page.getByRole('button', { name: 'Add row' }).click()
+  await page.getByRole('button', { name: 'Add row' }).click()
+  await cell('Description 1').fill('Pens')
+  await cell('Quantity 1').fill('2')
+  await cell('Description 2').fill('Ink')
+  await cell('Quantity 2').fill('1')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page).toHaveURL(tablePath)
+  const row = page.getByRole('row', { name: new RegExp(`${title} `) })
+  await row.getByRole('link', { name: 'Open' }).click()
+  await expect(cell('Description 1')).toHaveValue('Pens')
+  await expect(cell('Quantity 1')).toHaveValue('2')
+  await expect(cell('Description 2')).toHaveValue('Ink')
+  await expect(cell('Quantity 2')).toHaveValue('1')
+  const id = /\/e2e\/noteform\/([0-9a-f-]+)$/.exec(page.url())![1]
+
+  await page.getByRole('switch', { name: 'Dark mode' }).click()
+  const dark = page.locator('[data-theme-mode="dark"]')
+  await dark.getByLabel('Quantity 1', { exact: true }).fill('5')
+  await dark.getByRole('button', { name: 'Remove', exact: true }).nth(1).click()
+  await expect(cell('Description 2')).toHaveCount(0)
+  await dark.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page).toHaveURL(tablePath)
+  await row.getByRole('link', { name: 'Open' }).click()
+  await expect(page).toHaveURL(new RegExp(`/e2e/noteform/${id}$`))
+  await page.reload()
+  await expect(dark.getByLabel('Description 1', { exact: true })).toHaveValue('Pens')
+  await expect(dark.getByLabel('Quantity 1', { exact: true })).toHaveValue('5')
+  await expect(cell('Description 2')).toHaveCount(0)
+
+  const read = await request.get(`${notesPath}/${id}`)
+  const record = await read.json()
+  expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5 }])
+})
+
 test('an empty form shows the server error under the title', async ({ page }) => {
   await page.goto('/e2e/noteform/new')
 

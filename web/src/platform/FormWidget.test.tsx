@@ -22,6 +22,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     scale: null,
     values: null,
     target: null,
+    fields: null,
   }
 }
 
@@ -54,6 +55,28 @@ const noteWidget: WidgetMetadata = {
   },
 }
 
+// A note with only a title and its lines, a child collection.
+const linesWidget: WidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      {
+        ...field('lines', 'child-collection', 'note.lines'),
+        fields: [
+          { ...field('description', 'text', 'noteLine.description'), required: true, maxLength: 100 },
+          field('quantity', 'integer', 'noteLine.quantity'),
+        ],
+      },
+    ],
+  },
+}
+
+function linesJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","lines":[{"description":"Pens","quantity":2},{"description":"Ink","quantity":1}]},"labels":{}}`
+}
+
 function noteJson(title: string, version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"${title}","code":null,"priority":7,"amount":12.50,"done":false,"dueOn":null,"dueAt":"2026-10-06T02:00:00.123456Z","status":null,"category":"${categoryId}"},"labels":{"category":"Office"}}`
 }
@@ -69,6 +92,8 @@ const texts = {
   'shell.form.loadFailed': 'The record could not be loaded.',
   'shell.form.choose': 'Choose',
   'shell.form.clear': 'Clear',
+  'shell.form.addRow': 'Add row',
+  'shell.form.removeRow': 'Remove',
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
@@ -81,6 +106,9 @@ const texts = {
   'note.dueAt': 'Due at',
   'note.status': 'Status',
   'note.category': 'Category',
+  'note.lines': 'Lines',
+  'noteLine.description': 'Description',
+  'noteLine.quantity': 'Quantity',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -339,6 +367,91 @@ describe('FormWidget', () => {
     for (const catalog of [platformEnglish, platformVietnamese]) {
       expect(catalog).toHaveProperty(['shell.form.choose'])
       expect(catalog).toHaveProperty(['shell.form.clear'])
+    }
+  })
+
+  it('sends added rows with numbers as typed and without their null fields', async () => {
+    const requests = stubFetch({ status: 201, body: linesJson(1) })
+    renderForm(null, linesWidget)
+
+    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+    await userEvent.type(screen.getByLabelText('Description 1'), 'Pens')
+    await userEvent.type(screen.getByLabelText('Quantity 1'), '12')
+    await userEvent.type(screen.getByLabelText('Description 2'), 'Ink')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(1))
+    expect(requests()[0]).toEqual({
+      url: recordsPath,
+      method: 'POST',
+      body: '{"values":{"title":"Buy paper","lines":[{"description":"Pens","quantity":12},{"description":"Ink"}]}}',
+    })
+  })
+
+  it('sends the version and the whole remaining row list when rows change', async () => {
+    const requests = stubFetch({ status: 200, body: linesJson(1) }, { status: 200, body: linesJson(2) })
+    renderForm(noteId, linesWidget)
+    const quantity = await screen.findByLabelText('Quantity 1')
+    expect(quantity).toHaveValue('2')
+    expect(screen.getByLabelText('Description 2')).toHaveValue('Ink')
+
+    await userEvent.clear(quantity)
+    await userEvent.type(quantity, '3')
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1])
+    expect(screen.queryByLabelText('Description 2')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"lines":[{"description":"Pens","quantity":3}]}}',
+    })
+  })
+
+  it('leaves the rows out when an edit to them is undone', async () => {
+    const requests = stubFetch({ status: 200, body: linesJson(1) }, { status: 200, body: linesJson(2) })
+    renderForm(noteId, linesWidget)
+    const quantity = await screen.findByLabelText('Quantity 1')
+
+    await userEvent.type(quantity, '5{Backspace}')
+    await userEvent.type(screen.getByLabelText('Title'), '!')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
+  })
+
+  it('shows a row error on its cell, and clears cell errors when a row is added', async () => {
+    stubFetch({
+      status: 400,
+      body: '{"title":"Invalid","status":400,"errors":{"/values/lines":["Too many rows."],"/values/lines/1/quantity":["Must be an integer."],"/values/lines/7/quantity":["Out of range."]}}',
+    })
+    renderForm(null, linesWidget)
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+    await userEvent.type(screen.getByLabelText('Quantity 2'), 'x')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('field-error-lines-1-quantity')).toHaveTextContent('Must be an integer.')
+    expect(screen.getByLabelText('Quantity 2').closest('.ant-form-item')).toHaveClass('ant-form-item-has-error')
+    expect(screen.getByLabelText('Quantity 1').closest('.ant-form-item')).not.toHaveClass('ant-form-item-has-error')
+    expect(screen.getByTestId('field-error-lines')).toHaveTextContent('Too many rows.')
+    // A row the form does not have cannot hold the error, so it shows above the form.
+    expect(screen.getByTestId('form-error')).toHaveTextContent('Out of range.')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+
+    expect(screen.queryByTestId('field-error-lines-1-quantity')).not.toBeInTheDocument()
+  })
+
+  it('has the add-row and remove-row texts in every platform locale', () => {
+    for (const catalog of [platformEnglish, platformVietnamese]) {
+      expect(catalog).toHaveProperty(['shell.form.addRow'])
+      expect(catalog).toHaveProperty(['shell.form.removeRow'])
     }
   })
 

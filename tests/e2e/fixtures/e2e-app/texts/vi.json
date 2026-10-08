@@ -21,6 +21,9 @@
     "note.dueAt": "Hạn",
     "note.status": "Trạng thái",
     "note.category": "Danh mục",
+    "note.lines": "Các dòng",
+    "noteLine.description": "Mô tả",
+    "noteLine.quantity": "Số lượng",
     "category.label": "Danh mục",
     "category.name": "Tên"
   }

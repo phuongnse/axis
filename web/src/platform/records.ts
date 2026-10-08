@@ -4,11 +4,17 @@
  */
 export type RecordValue = string | boolean | null
 
+/** One row of a child collection: its child fields' values. */
+export type RecordRow = Record<string, RecordValue>
+
+/** A value of a record field. A child collection holds its rows in order. */
+export type FieldValue = RecordValue | RecordRow[]
+
 /** One record of the record API. `version` is record metadata, so it is a number. */
 export interface RecordItem {
   id: string
   version: number
-  values: Record<string, RecordValue>
+  values: Record<string, FieldValue>
   labels: Record<string, string>
 }
 

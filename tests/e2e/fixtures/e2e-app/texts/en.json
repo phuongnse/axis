@@ -21,6 +21,9 @@
     "note.dueAt": "Due at",
     "note.status": "Status",
     "note.category": "Category",
+    "note.lines": "Lines",
+    "noteLine.description": "Description",
+    "noteLine.quantity": "Quantity",
     "category.label": "Category",
     "category.name": "Name"
   }

@@ -18,6 +18,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     scale: null,
     values: null,
     target: null,
+    fields: null,
   }
 }
 
@@ -64,6 +65,7 @@ const texts = {
   'note.done': 'Done',
   'note.dueAt': 'Due at',
   'note.category': 'Category',
+  'note.lines': 'Lines',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -270,6 +272,24 @@ describe('TableWidget', () => {
     await screen.findByRole('row', { name: /Buy paper/ })
     expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveClass('ant-table-column-has-sorters')
     expect(screen.getByRole('columnheader', { name: 'Category' })).not.toHaveClass('ant-table-column-has-sorters')
+  })
+
+  it('shows no column for a child collection and ignores it as a sort', async () => {
+    const requests = stubRecords()
+    const lines: FieldMetadata = {
+      ...field('lines', 'child-collection', 'note.lines'),
+      fields: [field('description', 'text', null)],
+    }
+
+    renderWidget('?sort=lines', {
+      ...noteWidget,
+      entity: { ...noteWidget.entity, fields: [...noteWidget.entity.fields, lines] },
+    })
+
+    await screen.findByRole('row', { name: /Buy paper/ })
+    await waitFor(() => expect(search()).toBe(''))
+    expect(requests()).toEqual([recordsPath])
+    expect(screen.queryByRole('columnheader', { name: 'Lines' })).not.toBeInTheDocument()
   })
 
   it('right-aligns numbers and shows them as the API wrote them', async () => {
