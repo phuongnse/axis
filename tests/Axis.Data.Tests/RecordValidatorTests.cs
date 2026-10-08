@@ -104,6 +104,21 @@ public sealed class RecordValidatorTests
     }
 
     [Fact]
+    public void Update_of_an_owner_without_validations_still_validates_child_rows()
+    {
+        // The owner has no validations, so the update needs no stored record.
+        var lines = _plainOrder.Fields.Single(field => field.Name == "lines");
+        var rows = new RecordRows(lines, _line, [Row(("qty", 2L)), Row(("qty", 0L))]);
+
+        var failures = RecordValidator.ValidateUpdate(_plainOrder, null, Values(_plainOrder, ("quantity", 0L)), [rows]);
+
+        Assert.NotNull(failures);
+        var failure = Assert.Single(failures);
+        Assert.Equal("/values/lines/1/qty", failure.Key);
+        Assert.Equal(["line.qtyPositive"], failure.Value);
+    }
+
+    [Fact]
     public void Update_validates_the_stored_record_merged_with_the_changes()
     {
         // Every stored type is converted, so a rule over all of them can pass.
