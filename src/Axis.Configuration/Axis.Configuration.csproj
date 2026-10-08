@@ -9,6 +9,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Expressions\Axis.Expressions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Schemas\*.schema.json" LogicalName="Axis.Configuration.Schemas.%(Filename)%(Extension)" />
   </ItemGroup>
 

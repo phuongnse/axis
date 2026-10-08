@@ -5,8 +5,10 @@ null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
 bare field names, every operator and every [function](#functions) except the
-aggregates. Sections marked *(planned for M2)* are not built yet. No resource file reads expressions yet,
-so authors see none of this until the compiler and the engine use them. Dn
+aggregates. Sections marked *(planned for M2)* are not built yet. Entity
+[validations](configuration.md#entity-logic) are the first resource file use:
+the compiler type-checks them and the record API evaluates them. Other uses
+come with the issues that build them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
@@ -406,7 +408,8 @@ Rules:
 
 ## Writing expressions in resource files
 
-*(planned for M2)*
+Entity validations are written this way. The other uses are *(planned for
+M2)*.
 
 An expression is one JSON string:
 

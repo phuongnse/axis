@@ -3,12 +3,16 @@ using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Parsing;
+using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
-/// of every locale, checks every entity's fields against the field type rules, checks sites,
+/// of every locale, checks every entity's fields against the field type rules and type-checks its
+/// validations, checks sites,
 /// pages and seeds, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -266,6 +270,51 @@ public static class ApplicationCompiler
                     DiagnosticCodes.InvalidDisplayField,
                     $"The display field must be a required text field, but '{field.Name}' is {kind} field.",
                     "/displayField");
+            }
+        }
+
+        CheckValidations(entity, textKeys, diagnostics, Report);
+    }
+
+    /// <summary>
+    /// Checks each validation: its message is a known text key, its <c>field</c> names a field of
+    /// the entity, and its expression parses and type-checks as a boolean over the entity's fields.
+    /// An expression problem is reported at the expression with its own code.
+    /// </summary>
+    private static void CheckValidations(
+        EntityResource entity,
+        IReadOnlySet<string> textKeys,
+        List<Diagnostic> diagnostics,
+        Action<string, string, string> report)
+    {
+        if (entity.Validations.Count == 0)
+        {
+            return;
+        }
+
+        var scope = ExpressionScopes.ForEntity(entity.Fields);
+        for (var index = 0; index < entity.Validations.Count; index++)
+        {
+            var validation = entity.Validations[index];
+            var path = $"/validations/{index}";
+
+            CheckTextKey(validation.Message, entity.File, entity.Id, $"{path}/message", textKeys, diagnostics);
+
+            if (FindField(entity, validation.Field) is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownValidationField,
+                    $"The validation field '{validation.Field}' names no field of this entity.",
+                    $"{path}/field");
+            }
+
+            var parsed = ExpressionParser.Parse(validation.Expression);
+            ExpressionDiagnostic? problem = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic
+                : parsed.Diagnostic;
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, $"{path}/expression");
             }
         }
     }
@@ -530,16 +579,24 @@ public static class ApplicationCompiler
         }
     }
 
-    private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName) =>
-        new()
+    private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName)
+    {
+        var fields = entity.Fields.Select(field => BuildField(field, entitiesByName)).ToList();
+        var scope = ExpressionScopes.ForEntity(fields);
+        return new EntityModel
         {
             Id = entity.Id,
             Name = entity.Name,
             Label = entity.Label,
             File = entity.File,
-            Fields = entity.Fields.Select(field => BuildField(field, entitiesByName)).ToList(),
+            Fields = fields,
             DisplayField = entity.DisplayField is null ? null : FindField(entity, entity.DisplayField)!.Name,
+            Validations = entity.Validations
+                .Select(validation => ValidationModel.Compile(
+                    validation.Expression, scope, validation.Message, FindField(entity, validation.Field)!.Name))
+                .ToList(),
         };
+    }
 
     private static FieldModel BuildField(FieldDefinition field, Dictionary<string, EntityResource> entitiesByName)
     {

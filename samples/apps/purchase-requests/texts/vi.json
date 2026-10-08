@@ -28,6 +28,7 @@
     "purchaseRequest.totalAmount": "Tổng tiền",
     "purchaseRequest.status": "Trạng thái",
     "purchaseRequest.submittedAt": "Gửi lúc",
-    "purchaseRequest.decisionComments": "Ý kiến phê duyệt"
+    "purchaseRequest.decisionComments": "Ý kiến phê duyệt",
+    "purchaseRequest.totalAmountPositive": "Tổng tiền phải lớn hơn không."
   }
 }

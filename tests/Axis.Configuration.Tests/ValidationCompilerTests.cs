@@ -1,0 +1,106 @@
+using Axis.Configuration.Compilation;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
+
+namespace Axis.Configuration.Tests;
+
+public sealed class ValidationCompilerTests
+{
+    private const string OrderId = "11111111-1111-4111-8111-111111111111";
+
+    private const string Texts = """
+        { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "order.quantityPositive": "Quantity must be greater than zero." } }
+        """;
+
+    public static TheoryData<string, string, string, string> InvalidValidations => new()
+    {
+        { """{ "expression": "quantity > 'a'", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "character" },
+        { """{ "expression": "quantity + 1", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/validations/0/expression", "boolean" },
+        { """{ "expression": "quantity >", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.SyntaxError, "/validations/0/expression", "character" },
+        { """{ "expression": "lines is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'lines'" },
+        { """{ "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "nope" }""", DiagnosticCodes.UnknownValidationField, "/validations/0/field", "'nope'" },
+        { """{ "expression": "quantity > 0", "message": { "textKey": "order.missing" }, "field": "quantity" }""", DiagnosticCodes.MissingTextKey, "/validations/0/message/textKey", "'order.missing'" },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidValidations))]
+    public void Invalid_validation_is_reported_at_its_path_and_gives_no_model(string validation, string code, string path, string messagePart)
+    {
+        using var folder = Folder($"[{validation}]");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "entities/order.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(Guid.Parse(OrderId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Every_invalid_validation_is_reported_at_its_own_index()
+    {
+        using var folder = Folder("""
+            [
+              { "expression": "quantity", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
+              { "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
+              { "expression": "status == 'lost'", "message": { "textKey": "order.quantityPositive" }, "field": "status" }
+            ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (ExpressionDiagnosticCodes.ResultTypeMismatch, "/validations/0/expression"),
+                (ExpressionDiagnosticCodes.UnknownEnumValue, "/validations/2/expression"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Valid_validation_is_in_the_entity_model_and_changes_the_content_hash()
+    {
+        using var withoutValidations = Folder(null);
+        // The field resolves ignoring letter case, and the model holds its declared name.
+        using var withValidations = Folder("""
+            [{ "expression": "quantity is null or quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "Quantity" }]
+            """);
+
+        var before = ApplicationCompiler.Compile(withoutValidations.Path);
+        var result = ApplicationCompiler.Compile(withValidations.Path);
+
+        Assert.Empty(before.Diagnostics);
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        var validation = Assert.Single(order.Validations);
+        Assert.Equal(
+            ("quantity is null or quantity > 0", "quantity", new TextReference("order.quantityPositive")),
+            (validation.Expression, validation.Field, validation.Message));
+        Assert.True(validation.Check.Succeeded);
+        Assert.NotNull(before.ContentHash);
+        Assert.NotNull(result.ContentHash);
+        Assert.NotEqual(before.ContentHash, result.ContentHash);
+    }
+
+    private static TemporaryFolder Folder(string? validations) =>
+        new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("texts/en.json", Texts)
+            .With("entities/order.json", $$"""
+                { "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
+                  "fields": [
+                    { "name": "quantity", "type": "integer" },
+                    { "name": "status", "type": "enum", "values": ["open", "closed"] },
+                    { "name": "lines", "type": "child-collection", "target": "OrderLine" }
+                  ]{{(validations is null ? "" : $", \"validations\": {validations}")}} }
+                """)
+            .With("entities/order-line.json", """
+                { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
+                  "fields": [ { "name": "description", "type": "text" } ] }
+                """);
+}

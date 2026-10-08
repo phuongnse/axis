@@ -315,7 +315,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     key `/values/<field>` for a field of the form shows its messages under
     that field. Every other key, such as `""`, `/values` or `/version`, shows
     above the form. A save that fails in any other way shows a shared error
-    there too.
+    there too. Every message is looked up in the site texts first, so a
+    failed validation, whose message is a text key, shows its text in the
+    user's locale. A fixed message such as "Required." is no text key, so it
+    shows unchanged.
   - **Conflicts.** A `409` on edit that names no field is a stale version. The
     form shows a conflict message with a reload button, which loads the
     current values and version and drops the user's changes. A duplicate

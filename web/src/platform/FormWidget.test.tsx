@@ -109,6 +109,7 @@ const texts = {
   'note.lines': 'Lines',
   'noteLine.description': 'Description',
   'noteLine.quantity': 'Quantity',
+  'note.amountPositive': 'Amount must be positive.',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -229,6 +230,19 @@ describe('FormWidget', () => {
     expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
     expect(screen.getByTestId('form-error')).toHaveTextContent('Must be a JSON object.')
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
+  })
+
+  it('shows a validation text key as its text and a fixed message as is', async () => {
+    stubFetch({
+      status: 400,
+      body: '{"title":"Invalid","status":400,"errors":{"/values/amount":["note.amountPositive"],"/values/title":["Required."]}}',
+    })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('field-error-amount')).toHaveTextContent('Amount must be positive.')
+    expect(screen.getByTestId('field-error-title')).toHaveTextContent('Required.')
   })
 
   it('shows a stale version as a conflict and reloads the current values', async () => {

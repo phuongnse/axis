@@ -11,6 +11,10 @@
     "items.title": "Items",
     "itemForm.title": "Item",
     "departments.title": "Departments",
-    "item.department": "Department"
+    "item.department": "Department",
+    "item.quantityPositive": "Quantity must be greater than zero.",
+    "item.priceNotNegative": "Price must not be negative.",
+    "item.closedInactive": "A closed item cannot be active.",
+    "itemPart.noLeadingSpace": "A part name must not start with a space."
   }
 }

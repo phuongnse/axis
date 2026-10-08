@@ -28,6 +28,7 @@
     "purchaseRequest.totalAmount": "Total amount",
     "purchaseRequest.status": "Status",
     "purchaseRequest.submittedAt": "Submitted at",
-    "purchaseRequest.decisionComments": "Decision comments"
+    "purchaseRequest.decisionComments": "Decision comments",
+    "purchaseRequest.totalAmountPositive": "Total amount must be greater than zero."
   }
 }

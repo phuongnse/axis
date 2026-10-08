@@ -20,6 +20,9 @@ public sealed record EntityModel
     /// <summary>The declared name of the required text field that names a record, or null when there is none.</summary>
     public string? DisplayField { get; init; }
 
+    /// <summary>The validation rules, in declaration order. Each names its field by the field's declared name.</summary>
+    public IReadOnlyList<ValidationModel> Validations { get; init; } = [];
+
     /// <summary>Finds a field by name, ignoring letter case.</summary>
     public bool TryGetField(string name, [NotNullWhen(true)] out FieldModel? field)
     {
