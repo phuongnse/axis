@@ -1,6 +1,6 @@
 namespace Axis.Expressions;
 
-/// <summary>The compile-time cost bounds of an expression.</summary>
+/// <summary>The cost bounds of an expression.</summary>
 public static class ExpressionLimits
 {
     /// <summary>The most characters an expression may have.</summary>
@@ -14,4 +14,10 @@ public static class ExpressionLimits
 
     /// <summary>The most syntax nodes an expression may have, counting each <c>in</c> item.</summary>
     public const int MaxNodes = 500;
+
+    /// <summary>
+    /// The most steps one evaluation may take. This is a run-time bound: each node evaluated is one
+    /// step, and evaluation stops with an error as soon as it is used up.
+    /// </summary>
+    public const int MaxSteps = 10_000;
 }

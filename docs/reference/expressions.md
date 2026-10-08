@@ -3,10 +3,11 @@
 Detailed reference for the expression language: grammar, types, operators,
 null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
-`Axis.Expressions`. So is the type checker for literals, bare field names,
-`date` and `dateTime`, and every operator. Sections marked *(planned for M2)*
-are not built yet. No resource file reads expressions yet, so authors see none
-of this until the compiler uses the parser and the type checker. Dn refers to
+`Axis.Expressions`. So are the type checker and the interpreter for literals,
+bare field names, `date` and `dateTime`, and every operator. Sections marked
+*(planned for M2)* are not built yet. No resource file reads expressions yet,
+so authors see none of this until the compiler and the engine use them. Dn
+refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
 and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
@@ -71,7 +72,7 @@ Every expression has a type, found at compile time.
 | --- | --- | --- |
 | `text` | `text` | Unicode text. |
 | `integer` | `integer` | Signed 64-bit. |
-| `decimal` | `decimal` | Exact. Never rounded unless a function says so. |
+| `decimal` | `decimal` | Exact, held as a .NET `decimal`: up to 28 digits after the point and a mantissa below 2^96. A value it cannot hold exactly is a [run-time error](#run-time-errors), never rounded. Only division and functions that say so round. |
 | `boolean` | `boolean` | |
 | `date` | `date` | A calendar date without a time zone. |
 | `date-time` | `date-time` | A UTC instant, to the microsecond. |
@@ -122,8 +123,10 @@ Typing rules:
 - **Arithmetic.** `+`, `-` and `*` on two integers give an integer. With a
   decimal on either side they give a decimal. They are exact.
 - **Division.** `/` always gives a decimal, rounded half away from zero to 20
-  digits after the point. Dividing by zero is a
-  [run-time error](#run-time-errors).
+  digits after the point. When the whole-number part leaves no room for 20
+  digits, it rounds to as many digits as fit. Only a whole-number part that
+  does not fit at all is a [run-time error](#run-time-errors). Dividing by
+  zero is a run-time error too.
 - **Text.** `+` does not join text. Use `concat(...)`.
 - **Ordering.** `<`, `<=`, `>` and `>=` work only on integers, decimals,
   dates and date-times. Text cannot be ordered in v1, because .NET orders
@@ -150,13 +153,14 @@ status in ('submitted', 'approved')
 
 ## Null semantics
 
-*(planned for M2)*
-
-An empty field is `null`. These rules decide what `null` does.
+An empty field is `null`. These rules decide what `null` does. The rules for
+`if`, `coalesce` and `concat` come with [functions](#functions) *(planned for
+M2)*.
 
 - **Propagation.** Arithmetic, ordering comparisons and most functions return
   `null` when an operand is `null`. The function table says where a function
-  differs.
+  differs. The `null` check comes before any error check, so `null / 0` is
+  `null`, not a division by zero.
 - **Equality is null-safe.** `null == null` is true. `x == null` and
   `x != null` are valid and are not type errors. `is null` and `is not null`
   are a second way to write the same test. Equality is null-safe so that
@@ -174,6 +178,11 @@ An empty field is `null`. These rules decide what `null` does.
   | null | null | null | null |
 
   `not null` is `null`.
+
+- **Short circuit.** `and` and `or` evaluate from left to right and stop as
+  soon as the left side decides the result. `false and x` and `true or x` do
+  not evaluate `x`, so `x` costs no steps and raises no errors. This allows
+  guards such as `count == 0 or total / count > 5`.
 
 - **Null counts as false at the end.** Wherever the final boolean is used,
   `null` counts as false. This includes validation. So `quantity > 0` fails
@@ -204,7 +213,9 @@ An empty field is `null`. These rules decide what `null` does.
 
 - **Date and date-time.** The argument of `date` and `dateTime` must be one
   text literal. The type checker enforces this. Checking the text itself at
-  compile time is *(planned for M2)*. Until then, `date('2026-13-45')` passes.
+  compile time is *(planned for M2)*. Until then, `date('2026-13-45')` passes
+  the checker and is a [run-time error](#run-time-errors) when it is
+  evaluated.
 - **Enum values.** An enum value is a text literal, checked against the
   field's `values`. See [Types](#types).
 - **Negative numbers.** A negative number is unary minus applied to a
@@ -320,27 +331,28 @@ The first three are built. The hop, rule call depth and cycle limits are
   characters, the same as a C# string index. Messages show it one-based, as
   "at character N".
 
-Run-time limit *(planned for M2)*:
+Run-time limit:
 
 - **Step budget.** Each top-level evaluation has a budget of 10,000 steps.
-  Each node evaluated is one step. An aggregate's item expression costs its
-  steps once per row. The steps of a called rule count against the caller's
-  budget.
+  Each node evaluated is one step, and evaluation stops as soon as the budget
+  runs out. An aggregate's item expression costs its steps once per row. The
+  steps of a called rule count against the caller's budget. The budget is
+  built. Aggregates and rule calls are *(planned for M2)*.
 - **SQL.** The SQL translation has no step budget. The compile-time limits
   bound its size.
 
 ## Run-time errors
 
-*(planned for M2)*
-
 These are errors:
 
 - division by zero;
 - integer overflow;
-- a date outside 0001 to 9999;
+- a decimal result that a .NET `decimal` cannot hold exactly;
+- a `date` or `dateTime` literal that is not a valid date or date-time;
+- a date outside 0001 to 9999 *(planned for M2, with the date functions)*;
 - an exhausted step budget.
 
-An error stops the evaluation and counts as a failure. A validation fails, a
+A `null` operand gives `null` before any error is checked. An error stops the evaluation and counts as a failure. A validation fails, a
 policy denies, and a computed field rejects the write. A run-time error is not
 a compile diagnostic.
 

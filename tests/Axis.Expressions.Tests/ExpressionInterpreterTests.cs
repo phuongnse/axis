@@ -1,0 +1,391 @@
+using System.Globalization;
+using Axis.Expressions.Evaluation;
+using Axis.Expressions.Parsing;
+using Axis.Expressions.Syntax;
+using Axis.Expressions.Typing;
+
+namespace Axis.Expressions.Tests;
+
+public sealed class ExpressionInterpreterTests
+{
+    private static readonly Dictionary<string, ExpressionType> _fields = new()
+    {
+        ["t"] = ExpressionType.Text,
+        ["i"] = ExpressionType.Integer,
+        ["d"] = ExpressionType.Decimal,
+        ["b"] = ExpressionType.Boolean,
+        ["c"] = ExpressionType.Boolean,
+        ["dt"] = ExpressionType.Date,
+        ["ts"] = ExpressionType.DateTime,
+        ["e"] = ExpressionType.Enum("status", ["draft", "submitted"]),
+        ["r"] = ExpressionType.Reference("department"),
+    };
+
+    private static readonly ExpressionScope _scope = new(_fields);
+
+    /// <summary>A value for every field, so that no result is <c>null</c> unless the expression makes it so.</summary>
+    private static readonly Dictionary<string, object?> _setValues = new()
+    {
+        ["t"] = "a",
+        ["i"] = 3L,
+        ["d"] = 2.5m,
+        ["b"] = true,
+        ["c"] = false,
+        ["dt"] = new DateOnly(2026, 10, 8),
+        ["ts"] = new DateTimeOffset(2026, 10, 8, 2, 30, 0, TimeSpan.Zero),
+        ["e"] = "draft",
+        ["r"] = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000001"),
+    };
+
+    [Theory]
+    [InlineData("0.1 + 0.2 == 0.3")]
+    [InlineData("0.3 - 0.1 == 0.2")]
+    [InlineData("1.1 * 1.1 == 1.21")]
+    [InlineData("1 + 0.5 == 1.5")]
+    [InlineData("2 == 2.00")]
+    public void Decimal_arithmetic_is_exact(string text)
+    {
+        Assert.Equal(true, Evaluate(text).Value);
+    }
+
+    [Theory]
+    [InlineData("1 / 3", "0.33333333333333333333")]
+    [InlineData("2 / 3", "0.66666666666666666667")]
+    [InlineData("-2 / 3", "-0.66666666666666666667")]
+    [InlineData("1 / 8", "0.12500000000000000000")]
+    [InlineData("0.00000000000000000001 / 2", "0.00000000000000000001")]
+    [InlineData("0.00000000000000000001 / 3", "0.00000000000000000000")]
+    // A quotient whose whole-number part leaves no room for 20 digits keeps as many as fit.
+    [InlineData("10000000000 / 3", "3333333333.3333333333333333333")]
+    [InlineData("9223372036854775807 / 7", "1317624576693539401.0000000000")]
+    [InlineData("9223372036854775807 / 0.001", "9223372036854775807000.000000")]
+    public void Division_rounds_half_away_from_zero_to_20_digits_or_as_many_as_fit(string text, string expected)
+    {
+        var value = Assert.IsType<decimal>(Evaluate(text).Value);
+        Assert.Equal(expected, value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    // 10^-14 squared needs 28 digits after the point, which fits.
+    [InlineData("0.00000000000001", "0.0000000000000000000000000001")]
+    [InlineData("1.5", "2.25")]
+    public void A_decimal_product_that_fits_is_exact(string d, string expected)
+    {
+        var value = Assert.IsType<decimal>(Evaluate("d * d", ("d", decimal.Parse(d, CultureInfo.InvariantCulture))).Value);
+        Assert.Equal(expected, value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData("9223372036854775807 + 1", 20)]
+    [InlineData("i + 1", 2)]
+    [InlineData("i * 2", 2)]
+    [InlineData("0 - i - 2", 6)]
+    public void Integer_overflow_is_a_run_time_error(string text, int offset)
+    {
+        var error = EvaluateFails(text, ("i", long.MaxValue));
+
+        Assert.Equal(ExpressionRuntimeErrorKind.IntegerOverflow, error.Kind);
+        Assert.Equal(offset, error.Offset);
+        Assert.EndsWith($"is outside the integer range at character {offset + 1}.", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Negating_the_smallest_integer_is_an_overflow()
+    {
+        var error = EvaluateFails("-i", ("i", long.MinValue));
+
+        Assert.Equal(ExpressionRuntimeErrorKind.IntegerOverflow, error.Kind);
+        Assert.Equal(0, error.Offset);
+    }
+
+    [Theory]
+    // Past the largest decimal.
+    [InlineData("d + 1", "79228162514264337593543950335", 2)]
+    [InlineData("d * 2", "79228162514264337593543950335", 2)]
+    [InlineData("0 - d - 1", "79228162514264337593543950335", 6)]
+    // Too many digits: the sum needs 29 significant digits, which decimal would round.
+    [InlineData("d + 0.1", "9999999999999999999999999999", 2)]
+    // 10^-15 squared needs 30 digits after the point.
+    [InlineData("d * d", "0.000000000000001", 2)]
+    // A quotient whose whole-number part alone does not fit.
+    [InlineData("d / 0.1", "79228162514264337593543950335", 2)]
+    public void A_decimal_result_that_cannot_be_held_exactly_is_a_run_time_error(string text, string d, int offset)
+    {
+        var error = EvaluateFails(text, ("d", decimal.Parse(d, CultureInfo.InvariantCulture)));
+
+        Assert.Equal(ExpressionRuntimeErrorKind.DecimalOverflow, error.Kind);
+        Assert.Equal(offset, error.Offset);
+        Assert.EndsWith($"cannot be held exactly as a decimal at character {offset + 1}.", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("1 / 0", 2)]
+    [InlineData("1.5 / 0.0", 4)]
+    [InlineData("d / i", 2)]
+    public void Division_by_zero_is_a_run_time_error(string text, int offset)
+    {
+        var error = EvaluateFails(text, ("d", 1m), ("i", 0L));
+
+        Assert.Equal(ExpressionRuntimeErrorKind.DivisionByZero, error.Kind);
+        Assert.Equal(offset, error.Offset);
+        Assert.Equal($"Division by zero at character {offset + 1}.", error.Message);
+    }
+
+    [Theory]
+    [InlineData("date('2026-13-45') == dt", "'2026-13-45' is not a valid date at character 1.")]
+    [InlineData("dt == date('2026-02-29')", "'2026-02-29' is not a valid date at character 7.")]
+    [InlineData("ts == dateTime('2026-10-08T09:30:00')", "'2026-10-08T09:30:00' is not a valid date-time at character 7.")]
+    [InlineData("ts == dateTime('2026-10-08T24:00:00Z')", "'2026-10-08T24:00:00Z' is not a valid date-time at character 7.")]
+    [InlineData("ts == dateTime('2026-10-08T09:30:00.1234567Z')", "'2026-10-08T09:30:00.1234567Z' is not a valid date-time at character 7.")]
+    [InlineData("ts == dateTime('0001-01-01T00:00:00+01:00')", "'0001-01-01T00:00:00+01:00' is not a valid date-time at character 7.")]
+    public void A_date_literal_that_is_not_a_valid_date_is_a_run_time_error(string text, string message)
+    {
+        var error = EvaluateFails(text);
+
+        Assert.Equal(ExpressionRuntimeErrorKind.InvalidDateLiteral, error.Kind);
+        Assert.Equal(message, error.Message);
+    }
+
+    [Fact]
+    public void Date_literals_read_the_record_API_forms()
+    {
+        Assert.Equal(new DateOnly(2026, 10, 8), Evaluate("date('2026-10-08')").Value);
+        Assert.Equal(
+            new DateTimeOffset(2026, 10, 8, 2, 30, 0, 500, TimeSpan.Zero),
+            Evaluate("dateTime('2026-10-08t09:30:00.5+07:00')").Value);
+        Assert.Equal(TimeSpan.Zero, Assert.IsType<DateTimeOffset>(Evaluate("dateTime('2026-10-08T09:30:00-05:00')").Value).Offset);
+    }
+
+    [Theory]
+    [InlineData("i + 1")]
+    [InlineData("1 - i")]
+    [InlineData("d * 2")]
+    [InlineData("-i")]
+    [InlineData("i > 0")]
+    [InlineData("dt <= date('2026-10-08')")]
+    [InlineData("null < 1")]
+    // Null is checked before errors, so these are null rather than errors.
+    [InlineData("null / 0")]
+    [InlineData("i / 0")]
+    [InlineData("9223372036854775807 + i")]
+    public void Arithmetic_and_ordering_propagate_null(string text)
+    {
+        var result = Evaluate(text, ("i", null), ("d", null), ("dt", null));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Null(result.Value);
+    }
+
+    [Theory]
+    [InlineData("null == null", true)]
+    [InlineData("i == null", true)]
+    [InlineData("i != null", false)]
+    [InlineData("i == 1", false)]
+    [InlineData("i != 1", true)]
+    [InlineData("t != 'a'", true)]
+    [InlineData("i is null", true)]
+    [InlineData("i is not null", false)]
+    [InlineData("i in (1, 2)", false)]
+    [InlineData("not (i in (1))", true)]
+    [InlineData("not t in ('a', 'b')", true)]
+    public void Equality_and_membership_are_null_safe(string text, bool expected)
+    {
+        Assert.Equal(expected, Evaluate(text, ("i", null), ("t", null)).Value);
+    }
+
+    [Theory]
+    [InlineData(true, true, true, true)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, null, null, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, null, false, null)]
+    [InlineData(null, true, null, true)]
+    [InlineData(null, false, false, null)]
+    [InlineData(null, null, null, null)]
+    public void And_and_or_are_three_valued(bool? b, bool? c, bool? and, bool? or)
+    {
+        Assert.Equal(and, Evaluate("b and c", ("b", b), ("c", c)).Value);
+        Assert.Equal(or, Evaluate("b or c", ("b", b), ("c", c)).Value);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(null, null)]
+    public void Not_is_three_valued(bool? b, bool? expected)
+    {
+        Assert.Equal(expected, Evaluate("not b", ("b", b)).Value);
+    }
+
+    [Theory]
+    [InlineData("false and 1 / 0 > 0", false)]
+    [InlineData("true or 1 / 0 > 0", true)]
+    [InlineData("i == 0 or 10 / i > 5", true)]
+    public void And_and_or_do_not_evaluate_the_right_side_when_the_left_decides(string text, bool expected)
+    {
+        var result = Evaluate(text, ("i", 0L));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Theory]
+    [InlineData("i == 3.0", true)]
+    [InlineData("i in (1, 3.00)", true)]
+    [InlineData("i < d", false)]
+    [InlineData("d >= 2.50", true)]
+    [InlineData("t == 'A'", false)]
+    [InlineData("e == 'draft'", true)]
+    [InlineData("e in ('submitted')", false)]
+    [InlineData("b != c", true)]
+    [InlineData("r == r", true)]
+    [InlineData("dt in (date('2026-10-07'), date('2026-10-08'))", true)]
+    [InlineData("ts == dateTime('2026-10-08T09:30:00+07:00')", true)]
+    [InlineData("ts < dateTime('2026-10-08T02:30:00.000001Z')", true)]
+    public void Comparisons_follow_the_value_rules(string text, bool expected)
+    {
+        Assert.Equal(expected, Evaluate(text).Value);
+    }
+
+    [Fact]
+    public void Evaluation_stops_when_the_step_budget_runs_out()
+    {
+        // 2^14 leaves make 32,767 nodes. The division by zero is evaluated last, after the budget has run out.
+        var expression = Sum(1 << 14, new BinaryNode(5, BinaryOperator.Divide, new IntegerLiteral(4, 1), new IntegerLiteral(6, 0)));
+
+        var result = ExpressionInterpreter.Evaluate(expression, Values([]));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error.Kind);
+        Assert.EndsWith("ran past its budget of 10000 steps at character 2.", result.Error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Evaluation_may_use_the_whole_step_budget()
+    {
+        // 5,000 leaves make 9,999 nodes, and the minus on top makes 10,000.
+        var exact = new UnaryNode(0, UnaryOperator.Negate, Sum(5_000, new IntegerLiteral(0, 1)));
+        var over = new UnaryNode(0, UnaryOperator.Negate, exact);
+
+        Assert.Equal(-5_000L, ExpressionInterpreter.Evaluate(exact, Values([])).Value);
+        Assert.Equal(
+            ExpressionRuntimeErrorKind.StepBudgetExhausted,
+            ExpressionInterpreter.Evaluate(over, Values([])).Error?.Kind);
+    }
+
+    public static TheoryData<string, bool> Corpus
+    {
+        get
+        {
+            string[] expressions =
+            [
+                "1", "1.5", "'a'", "true", "null",
+                "t", "i", "d", "b", "dt", "ts", "e", "r",
+                "date('2026-10-08')", "dateTime('2026-10-08T09:30:00+07:00')",
+                "i + i", "i - 1", "i * 2", "i + d", "d - i", "1.5 * i", "i / 2", "d / d", "-i", "-d",
+                "null + null", "null * 1", "i + null",
+                "i < d", "dt >= date('2026-01-01')", "ts > dateTime('2026-10-08T09:30:00Z')",
+                "t == 'a'", "e != 'draft'", "r == r", "i == d",
+                "b and c", "b or c", "not b",
+                "i is null", "d is not null",
+                "i in (1, 2.5)", "e in ('draft', 'submitted')", "dt in (date('2026-10-08'))",
+            ];
+
+            var data = new TheoryData<string, bool>();
+            foreach (var expression in expressions)
+            {
+                data.Add(expression, false);
+                data.Add(expression, true);
+            }
+
+            return data;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Corpus))]
+    public void The_run_time_type_of_a_result_matches_its_checked_type(string text, bool fieldsAreNull)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+
+        var values = fieldsAreNull ? _fields.Keys.ToDictionary(name => name, _ => (object?)null) : _setValues;
+        var result = ExpressionInterpreter.Evaluate(parsed.Expression, new ExpressionValues(values));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        if (checkedType.Type.Kind == ExpressionTypeKind.Null)
+        {
+            Assert.Null(result.Value);
+        }
+        else if (result.Value is not null)
+        {
+            Assert.Equal(ClrType(checkedType.Type.Kind), result.Value.GetType());
+        }
+    }
+
+    [Fact]
+    public void A_value_of_an_unexpected_type_is_a_bug()
+    {
+        Assert.Throws<InvalidOperationException>(() => Evaluate("i + 1", ("i", 1)));
+    }
+
+    private static Type ClrType(ExpressionTypeKind kind) => kind switch
+    {
+        ExpressionTypeKind.Text or ExpressionTypeKind.Enum => typeof(string),
+        ExpressionTypeKind.Integer => typeof(long),
+        ExpressionTypeKind.Decimal => typeof(decimal),
+        ExpressionTypeKind.Boolean => typeof(bool),
+        ExpressionTypeKind.Date => typeof(DateOnly),
+        ExpressionTypeKind.DateTime => typeof(DateTimeOffset),
+        ExpressionTypeKind.Reference => typeof(Guid),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    };
+
+    /// <summary>A balanced sum of <paramref name="leaves"/> ones, with <paramref name="last"/> as the last leaf.</summary>
+    private static ExpressionNode Sum(int leaves, ExpressionNode last)
+    {
+        return Build(0, leaves);
+
+        ExpressionNode Build(int start, int count)
+        {
+            if (count == 1)
+            {
+                return start == leaves - 1 ? last : new IntegerLiteral(0, 1);
+            }
+
+            var half = count / 2;
+            return new BinaryNode(1, BinaryOperator.Add, Build(start, half), Build(start + half, count - half));
+        }
+    }
+
+    /// <summary>The values in <see cref="_setValues"/>, with <paramref name="overrides"/> replacing some.</summary>
+    private static ExpressionValues Values((string Name, object? Value)[] overrides)
+    {
+        var values = new Dictionary<string, object?>(_setValues);
+        foreach (var (name, value) in overrides)
+        {
+            values[name] = value;
+        }
+
+        return new ExpressionValues(values);
+    }
+
+    private static ExpressionEvaluationResult Evaluate(string text, params (string Name, object? Value)[] overrides)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, Values(overrides));
+    }
+
+    private static ExpressionRuntimeError EvaluateFails(string text, params (string Name, object? Value)[] overrides)
+    {
+        var result = Evaluate(text, overrides);
+        Assert.False(result.Succeeded, $"Expected a run-time error for '{text}', got {result.Value}.");
+        return result.Error;
+    }
+}
