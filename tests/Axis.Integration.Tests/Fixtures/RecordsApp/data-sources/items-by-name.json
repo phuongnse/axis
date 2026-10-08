@@ -1,0 +1,15 @@
+{
+  "id": "c883be91-d2b8-4ed0-9b1e-7948b711cbc6",
+  "kind": "dataSource",
+  "name": "ItemsByName",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "quantity", "path": "quantity" },
+    { "name": "unitPrice", "path": "price" },
+    { "name": "department", "path": "department" }
+  ],
+  "sort": "name",
+  "pageSize": 2
+}

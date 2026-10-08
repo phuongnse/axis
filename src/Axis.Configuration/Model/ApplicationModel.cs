@@ -4,8 +4,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled application: its manifest, every entity, site, page and seed with references
-/// resolved, and its texts.
+/// A compiled application: its manifest, every entity, site, page, seed and data source with
+/// references resolved, and its texts.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -25,6 +25,9 @@ public sealed record ApplicationModel
     /// <summary>The application's seeds, in path order.</summary>
     public IReadOnlyList<SeedModel> Seeds { get; init; } = [];
 
+    /// <summary>The application's data sources, in path order.</summary>
+    public IReadOnlyList<DataSourceModel> DataSources { get; init; } = [];
+
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)
     {
@@ -40,5 +43,12 @@ public sealed record ApplicationModel
     {
         ArgumentNullException.ThrowIfNull(entity);
         return Entities.Any(owner => owner.Fields.Any(field => field.Type == FieldType.ChildCollection && field.Target?.Id == entity.Id));
+    }
+
+    /// <summary>Finds a data source by name, ignoring letter case.</summary>
+    public bool TryGetDataSource(string name, [NotNullWhen(true)] out DataSourceModel? dataSource)
+    {
+        dataSource = DataSources.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        return dataSource is not null;
     }
 }

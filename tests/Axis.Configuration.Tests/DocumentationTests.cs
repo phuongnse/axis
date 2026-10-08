@@ -92,7 +92,7 @@ public sealed class DocumentationTests
         Assert.True(loadSteps.Count == 1, $"Expected exactly one Load step under a 'Configuration pipeline' heading in docs/, found {loadSteps.Count}.");
         var kindList = Regex.Match(loadSteps[0], @"`kind`\s*\(([^)]*)\)");
         Assert.True(kindList.Success, "The Load step no longer names the kinds as: for its `kind` (`application`, ... or `seed`).");
-        var documented = Regex.Matches(kindList.Groups[1].Value, "`([a-z]+)`").Select(match => match.Groups[1].Value).ToList();
+        var documented = Regex.Matches(kindList.Groups[1].Value, "`([A-Za-z]+)`").Select(match => match.Groups[1].Value).ToList();
         var declared = Constants(typeof(ResourceKinds));
 
         Assert.Equal(declared.Order().ToArray(), documented.Order().ToArray());

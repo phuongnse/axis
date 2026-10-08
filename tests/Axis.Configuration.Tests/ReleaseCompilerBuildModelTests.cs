@@ -68,6 +68,28 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_keeps_the_data_source_files_and_compiles_back_into_its_data_sources()
+    {
+        var compiled = ApplicationCompiler.Compile(
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("entities/order.json", Order),
+            new ResourceContent("data-sources/orders.json", """{ "id": "99999999-9999-4999-8999-999999999991", "kind": "dataSource", "name": "Orders", "formatVersion": 1, "entity": "Order", "fields": [{ "name": "orderNumber", "path": "number" }], "sort": "-orderNumber", "pageSize": 5 }"""),
+        ]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.Equal(["application.json", "data-sources/orders.json", "entities/order.json"], release.Resources.Select(resource => resource.Path));
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        var dataSource = Assert.Single(model.DataSources);
+        Assert.Equal(("orderNumber", "number"), (dataSource.Fields[0].Name, dataSource.Fields[0].Field.Name));
+        Assert.Equal(5, dataSource.PageSize);
+    }
+
+    [Fact]
     public void Stored_release_with_invalid_content_throws()
     {
         var release = StoredRelease(Compile());
