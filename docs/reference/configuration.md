@@ -230,6 +230,10 @@ sorted by file and then path.
 | `AXC0039` | The child entity is already owned by another `child-collection` field. Reported at `/fields/{i}/target` of the later field, naming the owner. |
 | `AXC0040` | A reference field's target is a child entity. Reported at `/fields/{i}/target`, naming the owner. |
 | `AXC0041` | A child entity has a `reference` or `child-collection` field. Reported at `/fields/{i}/type` of that field, naming the owner. |
+| `AXC0046` | An expression names a field that is not in its scope. Functions other than `date` and `dateTime`, and `.` paths, are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0047` | An expression gives an operator or function operands of types it does not accept, such as `'a' < 'b'` or `quantity and true`. Reported at the JSON Pointer of the expression string, with the character position of the operator in the message. |
+| `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
+| `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
 
 ## Startup activation
 

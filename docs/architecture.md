@@ -56,9 +56,10 @@ samples/
 
 Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
-`Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (only the parser so far),
-`Axis.Presentation` (the platform site, its texts and the shapes of application
-site metadata), `Axis.Tenancy`, the test projects and `web/`. `Axis.Worker`,
+`Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser and type
+checker so far), `Axis.Presentation` (the platform site, its texts and the
+shapes of application site metadata), `Axis.Tenancy`, the test projects and
+`web/`. `Axis.Worker`,
 `Axis.Processes` and `Axis.Policy` do not exist yet.
 
 ## Module rules
