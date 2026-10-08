@@ -76,7 +76,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `date-time` | `timestamp with time zone` |
   | `enum` | `text`; the values are recorded, not enforced by a `CHECK` |
   | `reference` | `uuid` with a foreign key to the target table's `id` |
-  | `child-collection` *(planned for M2)* | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns) |
+  | `child-collection` | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns) |
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
   module; values are always parameters. Configuration can never supply raw SQL.
@@ -97,15 +97,36 @@ entities and any entity recorded with one of its entity `id`s, whatever its
 application. The planner itself has no database
 access. It returns diagnostics, SQL statements and the new records to write.
 
-- **System columns.** `id` and `version` are created with the table.
-  `version` is added to an existing table that lacks it as
+- **System columns.** `id` and `version` are created with the table, or
+  `id`, `owner_id` and `position` for a child table (see **Child table**
+  below). `version` is added to an existing table other than a child table
+  that lacks it as
   `bigint NOT NULL DEFAULT 1`, even when the table has rows, because the
   default fills them. System columns are never compared or changed otherwise:
   only Axis DDL creates them, and an author cannot fix them through
   configuration.
 - **Missing table.** It is created with the system columns and every field
   column, `NOT NULL` for required fields and a unique constraint for unique
-  fields. The entity and its enum values are recorded.
+  fields. A `child-collection` field has no column. The entity and its enum
+  values are recorded.
+- **Child table.** The owner of a child entity is the entity whose
+  `child-collection` field names it; the compiler ensures there is exactly
+  one.
+  - A missing child table is created with `id`, `owner_id`, `position` and
+    its field columns, and no `version`. Its owner foreign key is added with
+    the other foreign keys, so the owner table exists whatever the entity
+    order. Adding a child collection and its child entity to an entity that
+    already has rows only creates the child table: the owner table and its
+    rows are untouched.
+  - An existing child table whose `owner_id` has no foreign key gets one. A
+    foreign key that points at another table than the owner's is `AXC0016`
+    at the owner's `/fields/{i}/target`.
+  - An existing table without `owner_id` cannot become a child table, because
+    adding a `NOT NULL` owner column needs a migration. It is `AXC0016` at the
+    owner's `/fields/{i}/target`.
+  - An entity that stops being a child keeps `owner_id` and `position`. They
+    are reported as removed fields (`AXC0015`), like any column without a
+    field.
 - **Missing column.** It is added. `NOT NULL` is added only when the table
   has no rows; a required field added to a table with rows is `AXC0016` at
   `/fields/{i}/required`. A unique field also gets its unique constraint.
@@ -127,8 +148,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   no SQL. A column switching between `enum` and another type (recorded values
   present for a non-enum field, or absent for an enum field) is `AXC0016` at
   `/fields/{i}/type`.
-- **Removed field.** A column other than the system columns without a
-  matching field is `AXC0015` at `/fields`, naming the column.
+- **Removed field.** A column other than the table's system columns without
+  a matching field is `AXC0015` at `/fields`, naming the column.
 - **Removed entity.** An entity recorded for the application but missing from
   it is `AXC0017` at `application.json` with an empty path and the entity's
   `id` as `resourceId`.
@@ -146,8 +167,9 @@ access. It returns diagnostics, SQL statements and the new records to write.
 
 ## Child tables and computed columns
 
-Everything in this section is *(planned for M2)* (D17). It leaves the changes
-to [Schema planning](#schema-planning) to later issues.
+Child tables are built, and their planning rules are in
+[Schema planning](#schema-planning). Computed columns are *(planned for M2)*
+(D17).
 
 - **Child table.** The entity that a `child-collection` field names has a
   table with the usual names. Besides `id` (`uuid`) and its field columns, it
@@ -161,10 +183,11 @@ to [Schema planning](#schema-planning) to later issues.
   Rows are deleted with their owner.
 - **No version.** A child table has no `version` column. Its rows live under
   the owner's version, and a write to the rows increments the owner's
-  `version`.
-- **Computed column.** A computed field is an ordinary column of its type. It
-  is never `NOT NULL`, because a computed field cannot be `required`. It is
-  written in the same transaction as the record, and for a child row before
-  the owner's computed fields.
-- **Existing rows.** A computed field added to a table that has rows leaves
-  them `NULL`. Each record gets its value the next time it is written.
+  `version` *(planned for M2)*.
+- **Computed column** *(planned for M2)*. A computed field is an ordinary
+  column of its type. It is never `NOT NULL`, because a computed field cannot
+  be `required`. It is written in the same transaction as the record, and for
+  a child row before the owner's computed fields.
+- **Existing rows** *(planned for M2)*. A computed field added to a table that
+  has rows leaves them `NULL`. Each record gets its value the next time it is
+  written.

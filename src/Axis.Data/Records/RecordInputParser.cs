@@ -129,7 +129,7 @@ public static partial class RecordInputParser
             // Required fields are checked only when values is an object, so a missing values is one error.
             if (operation == RecordOperation.Create && values is { } valuesElement)
             {
-                foreach (var field in entity.Fields.Where(field => field.Required && !valuesElement.TryGetProperty(field.Name, out _)))
+                foreach (var field in RecordQueries.Columns(entity).Where(field => field.Required && !valuesElement.TryGetProperty(field.Name, out _)))
                 {
                     AddError(errors, Pointer(ValuesPointer, field.Name), Messages.Required);
                 }
@@ -142,7 +142,7 @@ public static partial class RecordInputParser
 
             return RecordInputResult.Success(new RecordInput
             {
-                Values = entity.Fields
+                Values = RecordQueries.Columns(entity)
                     .Where(field => parsed.ContainsKey(field.Name))
                     .Select(field => new RecordValue(field, parsed[field.Name]))
                     .ToList(),
@@ -158,6 +158,7 @@ public static partial class RecordInputParser
         Dictionary<string, object?> parsed,
         SortedDictionary<string, string[]> errors)
     {
+        var columns = RecordQueries.Columns(entity);
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in values.EnumerateObject())
         {
@@ -173,8 +174,9 @@ public static partial class RecordInputParser
                 continue;
             }
 
-            // Field names are matched exactly; EntityModel.TryGetField ignores letter case.
-            var field = entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
+            // Field names are matched exactly; EntityModel.TryGetField ignores letter case. A child
+            // collection has no column, so it is an unknown property.
+            var field = columns.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
             if (field is null)
             {
                 AddError(errors, pointer, Messages.UnknownProperty);

@@ -180,6 +180,18 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
     }
 
     [Fact]
+    public async Task Child_collection_is_not_a_valid_sort()
+    {
+        await fixture.ResetAsync();
+        using var request = Request($"{Items}?sort=-parts", HostA);
+
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+
+        using var body = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        Assert.Equal(["sort"], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+    }
+
+    [Fact]
     public async Task Row_of_tenant_a_is_listed_and_read_only_through_the_host_of_tenant_a()
     {
         await fixture.ResetAsync();
