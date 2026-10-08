@@ -46,7 +46,7 @@ src/
   Axis.Tenancy/           tenant resolution, connection factory
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
 tests/
-  Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Tenancy.Tests)
+  Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
@@ -54,12 +54,12 @@ samples/
   apps/purchase-requests/ the first sample application, as configuration only
 ```
 
-Projects are created when the first issue needs them. As of M1 the solution
-holds `Axis.Server`, `Axis.Core` (only the tenant context so far),
-`Axis.Configuration`, `Axis.Data`, `Axis.Presentation` (the platform site, its
-texts and the shapes of application site metadata), `Axis.Tenancy`, the test
-projects and `web/`. `Axis.Worker`, `Axis.Expressions`, `Axis.Processes` and
-`Axis.Policy` do not exist yet.
+Projects are created when the first issue needs them. The solution holds
+`Axis.Server`, `Axis.Core` (only the tenant context so far),
+`Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (only the parser so far),
+`Axis.Presentation` (the platform site, its texts and the shapes of application
+site metadata), `Axis.Tenancy`, the test projects and `web/`. `Axis.Worker`,
+`Axis.Processes` and `Axis.Policy` do not exist yet.
 
 ## Module rules
 
