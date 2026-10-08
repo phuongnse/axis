@@ -82,7 +82,8 @@ flowchart LR
    sites and pages with their entity and page references resolved, and the
    seeds in path order with their entity resolved. No model
    is produced while any error remains.
-3. **Check** *(planned for M2)*. Expressions, data source fields, form
+3. **Check** *(planned for M2)*. Expressions (see
+   [Expression language](expressions.md)), data source fields, form
    bindings and operation inputs are type-checked. M1 has no check step; the
    model goes straight to the release.
 4. **Release.** The compiled application is stored as a release with a
