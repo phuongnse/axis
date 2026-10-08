@@ -249,10 +249,12 @@ sorted by file and then path.
 | `AXC0043` | A data source field's `path` names no field of the data source's entity, names a `child-collection` field, which has no column, or goes through a reference, which is not supported yet. Reported at `/fields/{i}/path`. |
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
 | `AXC0045` | A data source's `sort` names no projected field, or names a projected `reference` field. Reported at `/sort`. |
-| `AXC0046` | An expression names a field that is not in its scope. Functions other than `date` and `dateTime`, and `.` paths, are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
-| `AXC0047` | An expression gives an operator or function operands of types it does not accept, such as `'a' < 'b'` or `quantity and true`. Reported at the JSON Pointer of the expression string, with the character position of the operator in the message. |
+| `AXC0046` | An expression names a field that is not in its scope. `.` paths are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0047` | An expression gives an operator or function operands of types it does not accept, such as `'a' < 'b'`, `quantity and true` or `length(1)`. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
+| `AXC0050` | An expression calls a function that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
+| `AXC0051` | An expression calls a function with the wrong number of arguments, such as `round(1.5)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
 
 ## Startup activation
 

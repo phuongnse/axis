@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Syntax;
 
 namespace Axis.Expressions.Typing;
 
@@ -9,4 +10,10 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     [MemberNotNullWhen(true, nameof(Type))]
     [MemberNotNullWhen(false, nameof(Diagnostic))]
     public bool Succeeded => Diagnostic is null;
+
+    /// <summary>
+    /// The <c>coalesce</c> and <c>if</c> calls checked as decimal, compared by reference. The
+    /// interpreter returns an integer one of them picks as a decimal, so the run-time type matches.
+    /// </summary>
+    internal IReadOnlySet<CallNode> DecimalCalls { get; init; } = new HashSet<CallNode>(ReferenceEqualityComparer.Instance);
 }

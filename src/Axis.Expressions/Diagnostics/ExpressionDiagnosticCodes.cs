@@ -14,4 +14,6 @@ public static class ExpressionDiagnosticCodes
     public const string TypeMismatch = "AXC0047";
     public const string ResultTypeMismatch = "AXC0048";
     public const string UnknownEnumValue = "AXC0049";
+    public const string UnknownFunction = "AXC0050";
+    public const string WrongArgumentCount = "AXC0051";
 }

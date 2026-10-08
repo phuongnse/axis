@@ -122,8 +122,6 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("dt in (dateTime('2026-10-08T09:30:00Z'))", 3)]
     // 'date' and 'dateTime' need one text literal.
     [InlineData("date(t)", 0)]
-    [InlineData("date('a', 'b')", 0)]
-    [InlineData("dateTime()", 0)]
     [InlineData("dateTime(1)", 0)]
     public void Operand_types_that_do_not_fit_are_reported_at_the_operator(string text, int offset)
     {
@@ -153,10 +151,20 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
-    [InlineData("length(t) > 0", 0, "'length'")]
+    [InlineData("date('a', 'b')", "Function 'date' needs 1 argument, found 2 at character 1.")]
+    [InlineData("dateTime()", "Function 'dateTime' needs 1 argument, found 0 at character 1.")]
+    public void A_date_literal_with_the_wrong_argument_count_is_reported(string text, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null);
+
+        Assert.Equal(ExpressionDiagnosticCodes.WrongArgumentCount, diagnostic.Code);
+        Assert.Equal(message, diagnostic.Message);
+    }
+
+    [Theory]
     [InlineData("r.name == 'x'", 1, "'name'")]
     [InlineData("i + missing", 4, "'missing'")]
-    public void Functions_and_paths_that_are_not_built_are_unknown_names(string text, int offset, string name)
+    public void Paths_that_are_not_built_are_unknown_names(string text, int offset, string name)
     {
         var diagnostic = CheckFails(text, ExpressionType.Boolean);
 
