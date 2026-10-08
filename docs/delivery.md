@@ -157,6 +157,11 @@ them.
   false fixes it in the same change. The rule is in the
   [AGENTS.md working rules](../AGENTS.md#working-rules), so the NexKit review
   applies it to every pull request.
+- **Rules and reasons, not incident history.** Docs state each rule and why
+  it exists. They do not retell incidents or cite issue or pull request
+  numbers as examples. That history belongs in issues, pull requests and git.
+  Links to decisions and doc sections stay, and so do links that track work,
+  such as the roadmap's link to a GitHub milestone.
 
 ## Writing on GitHub
 
