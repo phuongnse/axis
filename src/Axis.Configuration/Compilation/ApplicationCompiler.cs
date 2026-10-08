@@ -521,6 +521,7 @@ public static class ApplicationCompiler
             Name = seed.Name,
             File = seed.File,
             Entity = new EntityReference(entity.Id, entity.Name),
+            Sync = seed.Sync,
             Records = seed.Records,
         };
     }

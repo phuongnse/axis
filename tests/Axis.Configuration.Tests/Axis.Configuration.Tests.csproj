@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Axis.Configuration\Axis.Configuration.csproj" />
+    <ProjectReference Include="..\..\src\Axis.Expressions\Axis.Expressions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

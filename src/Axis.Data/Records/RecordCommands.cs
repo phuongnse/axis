@@ -223,10 +223,40 @@ public static class RecordCommands
     }
 
     /// <summary>
+    /// Reads the version of the record with <paramref name="id"/> and whether any of
+    /// <paramref name="values"/> differs from its stored value; <see langword="null"/> when there
+    /// is no record. PostgreSQL compares the typed values, so a decimal stored as <c>1.50</c>
+    /// equals a value of <c>1.5</c>.
+    /// </summary>
+    internal static async Task<(long Version, bool Differs)?> FindVersionAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        Guid id,
+        IReadOnlyList<RecordValue> values,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand { Connection = connection };
+        command.Parameters.AddWithValue("id", id);
+        var comparisons = new List<string>();
+        for (var index = 0; index < values.Count; index++)
+        {
+            comparisons.Add($"{EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name))} IS DISTINCT FROM {AddValue(command, index, values[index])}");
+        }
+
+        var differs = comparisons.Count > 0 ? string.Join(" OR ", comparisons) : "false";
+        command.CommandText =
+            $"SELECT {EntityNaming.Quote(EntityNaming.VersionColumn)}, ({differs}) FROM {RecordQueries.Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? (reader.GetInt64(0), reader.GetBoolean(1))
+            : null;
+    }
+
+    /// <summary>
     /// Adds the value as parameter <c>p</c> and its index, typed so that a null binds as a typed
     /// <c>NULL</c>, and returns its SQL placeholder. A decimal is text cast to <c>numeric</c>.
     /// </summary>
-    private static string AddValue(NpgsqlCommand command, int index, RecordValue value)
+    internal static string AddValue(NpgsqlCommand command, int index, RecordValue value)
     {
         var name = $"p{index}";
         var type = value.Field.Type switch
