@@ -3,5 +3,5 @@
   "kind": "entity",
   "name": "ItemPart",
   "formatVersion": 1,
-  "fields": [{ "name": "name", "type": "text", "maxLength": 100 }]
+  "fields": [{ "name": "name", "type": "text", "unique": true, "maxLength": 100 }]
 }

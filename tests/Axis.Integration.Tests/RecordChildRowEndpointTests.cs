@@ -56,6 +56,22 @@ public sealed class RecordChildRowEndpointTests(RecordApiFixture fixture) : ICla
     }
 
     [Fact]
+    public async Task Row_repeating_a_stored_unique_value_is_a_409_problem_at_its_path_and_writes_neither_the_owner_nor_any_row()
+    {
+        await fixture.ResetAsync();
+        await CreateItemAsync("""{ "name": "Table", "parts": [{ "name": "Leg" }] }""");
+
+        using var request = Request(HttpMethod.Post, Items, HostA, """{ "values": { "name": "Chair", "parts": [{ "name": "Seat" }, { "name": "Leg" }] } }""");
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Conflict);
+        Assert.Equal(["/values/parts/1/name"], ErrorKeys(problem));
+        Assert.Equal("Must be unique.", problem.RootElement.GetProperty("errors").GetProperty("/values/parts/1/name")[0].GetString());
+        Assert.Equal(1, (await fixture.TableShapeAsync(TenantA, "Item")).RowCount);
+        Assert.Equal(1, (await fixture.TableShapeAsync(TenantA, "ItemPart")).RowCount);
+    }
+
+    [Fact]
     public async Task Update_with_rows_replaces_them_and_bumps_the_version_and_a_stale_version_changes_nothing()
     {
         await fixture.ResetAsync();
