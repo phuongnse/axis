@@ -16,8 +16,14 @@ public static class EntityNaming
     /// <summary>The primary key column of every entity table.</summary>
     public const string IdColumn = "id";
 
-    /// <summary>The row version column of every entity table, starting at 1 for each row.</summary>
+    /// <summary>The row version column of every entity table except a child table, starting at 1 for each row.</summary>
     public const string VersionColumn = "version";
+
+    /// <summary>The owner record's id in a child table, with a foreign key that deletes the row with its owner.</summary>
+    public const string OwnerColumn = "owner_id";
+
+    /// <summary>The row's order in its child collection, the zero-based index in the array.</summary>
+    public const string PositionColumn = "position";
 
     /// <summary><c>e_</c> and the entity id as 32 lowercase hex characters (34 characters).</summary>
     public static string Table(Guid entityId) => "e_" + entityId.ToString("N");

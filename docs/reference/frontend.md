@@ -95,7 +95,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     the form for a table's records, and `null` otherwise.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
-    declaration order.
+    declaration order. A `child-collection` field is left out until forms
+    show child rows in M3, so a table has no empty column for it.
   - Each field has its name, its `type` as written in entity files (such as
     `date-time`), its label key, `required` and `unique`, `maxLength` for
     text, `precision` and `scale` for decimal, `values` for enum, and

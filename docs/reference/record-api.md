@@ -49,7 +49,9 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
 
 `values` holds every declared field of the entity under its declared name, in
 declaration order. A field that is SQL `NULL` is `null`; it is never left out.
-List responses leave child collections out *(planned for M2)*. See
+The exception is a `child-collection` field: until its rows are served
+*(planned for M2)*, every response leaves it out. List responses will keep
+leaving it out. See
 [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
 
 `labels` maps each `reference` field that is not `null` to the display field
@@ -83,7 +85,7 @@ every record of the entity.
 | `date` | A string `yyyy-MM-dd` |
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
-| `child-collection` *(planned for M2)* | An array of row objects. See [Child rows](#child-rows-computed-fields-and-validations) |
+| `child-collection` | Left out of every response for now. In a body it is an unknown property. An array of row objects is *(planned for M2)*. See [Child rows](#child-rows-computed-fields-and-validations) |
 
 ## Paging and sorting
 
@@ -91,7 +93,7 @@ every record of the entity.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
 - **`sort`.** A declared field name, or `-` and the name for descending
   order. The name matches exactly, so letter case matters. A
-  `child-collection` field is not a valid `sort` *(planned for M2)*.
+  `child-collection` field is not a valid `sort`.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when

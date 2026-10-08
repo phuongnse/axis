@@ -65,6 +65,7 @@ public static class ApplicationSites
             throw new InvalidOperationException($"The widget entity '{widget.Entity.Name}' is not in the model.");
         }
 
+        // A child collection has no column, so tables and forms leave it out until forms show its rows.
         return new WidgetMetadata(
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
@@ -73,7 +74,7 @@ public static class ApplicationSites
                 entity.Label?.TextKey,
                 entity.DisplayField,
                 RecordsPath(application, entity.Name),
-                [.. entity.Fields.Select(field => Field(application, field))]));
+                [.. entity.Fields.Where(field => field.HasColumn).Select(field => Field(application, field))]));
     }
 
     private static FieldMetadata Field(ApplicationModel application, FieldModel field) =>

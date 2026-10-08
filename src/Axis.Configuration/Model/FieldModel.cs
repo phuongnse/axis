@@ -5,7 +5,8 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled field. Type-specific properties are set only for the type they belong to:
 /// <see cref="MaxLength"/> for text, <see cref="Precision"/> and <see cref="Scale"/> for decimal,
-/// <see cref="Values"/> for enum, and <see cref="Target"/> and <see cref="TargetDisplayField"/> for reference.
+/// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection, and
+/// <see cref="TargetDisplayField"/> for reference.
 /// </summary>
 public sealed record FieldModel
 {
@@ -31,4 +32,10 @@ public sealed record FieldModel
 
     /// <summary>The declared name of the target entity's display field, set only for reference fields.</summary>
     public string? TargetDisplayField { get; init; }
+
+    /// <summary>
+    /// Whether the field is stored in a column of its entity's table. A child collection has no
+    /// column: its rows live in the child entity's table.
+    /// </summary>
+    public bool HasColumn => Type != FieldType.ChildCollection;
 }

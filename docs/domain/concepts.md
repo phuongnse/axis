@@ -37,10 +37,8 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 - date-time
 - enum
 - reference (to another entity)
-
-M2 adds:
-
-- child collection (owned rows such as line items)
+- child collection (owned rows such as line items). Its child table is
+  created, but the record API does not serve its rows yet.
 
 Later types:
 

@@ -41,6 +41,8 @@ public static class ApplicationCompiler
 
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
 
+        var ownersByChildName = FindChildOwners(loaded.Entities, FindEntity, diagnostics);
+
         // Page names follow the same rule as entity names.
         var pagesByName = new Dictionary<string, PageResource>(StringComparer.OrdinalIgnoreCase);
         foreach (var page in loaded.Pages)
@@ -58,7 +60,7 @@ public static class ApplicationCompiler
 
         foreach (var entity in loaded.Entities)
         {
-            CheckEntity(entity, FindEntity, loaded.UnloadedEntityNames, textKeys, diagnostics);
+            CheckEntity(entity, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, textKeys, diagnostics);
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
@@ -162,9 +164,48 @@ public static class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Finds the owner of each child entity: the first child collection field, in entity order and
+    /// then field order, whose target names it. A later child collection with the same target is
+    /// reported at its target. Returns the owners by child entity name, ignoring letter case.
+    /// </summary>
+    private static Dictionary<string, ChildOwner> FindChildOwners(
+        IReadOnlyList<EntityResource> entities,
+        Func<string, EntityResource?> findEntity,
+        List<Diagnostic> diagnostics)
+    {
+        var ownersByChildName = new Dictionary<string, ChildOwner>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entity in entities)
+        {
+            for (var index = 0; index < entity.Fields.Count; index++)
+            {
+                var field = entity.Fields[index];
+                if (FieldTypes.Parse(field.Type) != FieldType.ChildCollection
+                    || field.Target is null
+                    || findEntity(field.Target) is not { } child)
+                {
+                    continue;
+                }
+
+                if (!ownersByChildName.TryAdd(child.Name, new ChildOwner(entity, index)))
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.ChildEntityOwnedTwice,
+                        $"The child entity '{child.Name}' is already owned by '{ownersByChildName[child.Name]}'. A child entity has exactly one owner.",
+                        entity.File,
+                        $"/fields/{index}/target",
+                        entity.Id));
+                }
+            }
+        }
+
+        return ownersByChildName;
+    }
+
     private static void CheckEntity(
         EntityResource entity,
         Func<string, EntityResource?> findEntity,
+        IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> unloadedEntityNames,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
@@ -174,6 +215,7 @@ public static class ApplicationCompiler
 
         CheckTextKey(entity.Label, entity.File, entity.Id, "/label", textKeys, diagnostics);
 
+        var childOwner = ownersByChildName.GetValueOrDefault(entity.Name);
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Fields.Count; index++)
         {
@@ -190,7 +232,18 @@ public static class ApplicationCompiler
             }
 
             CheckTextKey(field.Label, entity.File, entity.Id, $"{path}/label", textKeys, diagnostics);
-            CheckField(field, path, findEntity, unloadedEntityNames, Report);
+            CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, Report);
+
+            // A child entity's rows are read and written only through its owner, so they point nowhere else.
+            var type = FieldTypes.Parse(field.Type);
+            if (childOwner is not null && type is FieldType.Reference or FieldType.ChildCollection)
+            {
+                var kind = type == FieldType.Reference ? "a reference" : "a child collection";
+                Report(
+                    DiagnosticCodes.ChildEntityWithReference,
+                    $"The field '{field.Name}' is {kind}, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no reference or child collection fields.",
+                    $"{path}/type");
+            }
         }
 
         if (entity.DisplayField is { } displayField)
@@ -222,28 +275,43 @@ public static class ApplicationCompiler
         FieldDefinition field,
         string path,
         Func<string, EntityResource?> findEntity,
+        IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> unloadedEntityNames,
         Action<string, string, string> report)
     {
         var type = FieldTypes.Parse(field.Type);
 
-        // Reports a type-specific property on a field of another type. Returns whether it fits.
-        bool Fits(string property, FieldType fittingType, string fittingTypeName)
+        // A child collection has no column, and a missing collection already means no rows.
+        if (type == FieldType.ChildCollection)
         {
-            if (type == fittingType)
+            if (field.Required is not null)
+            {
+                report(DiagnosticCodes.InvalidConstraint, "'required' does not apply to child-collection fields.", $"{path}/required");
+            }
+
+            if (field.Unique is not null)
+            {
+                report(DiagnosticCodes.InvalidConstraint, "'unique' does not apply to child-collection fields.", $"{path}/unique");
+            }
+        }
+
+        // Reports a type-specific property on a field of another type. Returns whether it fits.
+        bool Fits(string property, string fittingTypeNames, params FieldType[] fittingTypes)
+        {
+            if (fittingTypes.Contains(type))
             {
                 return true;
             }
 
             report(
                 DiagnosticCodes.InvalidConstraint,
-                $"'{property}' applies only to {fittingTypeName} fields, not to {field.Type} fields.",
+                $"'{property}' applies only to {fittingTypeNames} fields, not to {field.Type} fields.",
                 $"{path}/{property}");
             return false;
         }
 
         if (field.MaxLength is { } maxLength
-            && Fits("maxLength", FieldType.Text, "text")
+            && Fits("maxLength", "text", FieldType.Text)
             && maxLength is < 1 or > MaxTextLength)
         {
             report(
@@ -253,7 +321,7 @@ public static class ApplicationCompiler
         }
 
         var precisionValid = false;
-        if (field.Precision is { } precision && Fits("precision", FieldType.Decimal, "decimal"))
+        if (field.Precision is { } precision && Fits("precision", "decimal", FieldType.Decimal))
         {
             precisionValid = precision is >= 1 and <= MaxPrecision;
             if (!precisionValid)
@@ -265,7 +333,7 @@ public static class ApplicationCompiler
             }
         }
 
-        if (field.Scale is { } scale && Fits("scale", FieldType.Decimal, "decimal"))
+        if (field.Scale is { } scale && Fits("scale", "decimal", FieldType.Decimal))
         {
             if (field.Precision is null)
             {
@@ -286,17 +354,28 @@ public static class ApplicationCompiler
 
         if (field.Target is { } target)
         {
-            if (Fits("target", FieldType.Reference, "reference"))
+            if (Fits("target", "reference and child-collection", FieldType.Reference, FieldType.ChildCollection))
             {
                 if (findEntity(target) is { } targetEntity)
                 {
-                    // Every record a reference points to is shown by its name.
-                    if (targetEntity.DisplayField is null)
+                    // A child collection's target is checked against the other owners by FindChildOwners.
+                    if (type == FieldType.Reference)
                     {
-                        report(
-                            DiagnosticCodes.ReferenceTargetWithoutDisplayField,
-                            $"The target entity '{targetEntity.Name}' has no 'displayField', so its records have no name to show.",
-                            $"{path}/target");
+                        if (ownersByChildName.TryGetValue(targetEntity.Name, out var owner))
+                        {
+                            report(
+                                DiagnosticCodes.ReferenceToChildEntity,
+                                $"The target entity '{targetEntity.Name}' is a child entity owned by '{owner}'. A child entity cannot be referenced.",
+                                $"{path}/target");
+                        }
+                        else if (targetEntity.DisplayField is null)
+                        {
+                            // Every record a reference points to is shown by its name.
+                            report(
+                                DiagnosticCodes.ReferenceTargetWithoutDisplayField,
+                                $"The target entity '{targetEntity.Name}' has no 'displayField', so its records have no name to show.",
+                                $"{path}/target");
+                        }
                     }
                 }
                 else if (!unloadedEntityNames.Contains(target))
@@ -314,10 +393,14 @@ public static class ApplicationCompiler
         {
             report(DiagnosticCodes.MissingTypeProperty, "A reference field must name its target entity in 'target'.", path);
         }
+        else if (type == FieldType.ChildCollection)
+        {
+            report(DiagnosticCodes.MissingTypeProperty, "A child collection field must name its child entity in 'target'.", path);
+        }
 
         if (field.Values is not null)
         {
-            Fits("values", FieldType.Enum, "enum");
+            Fits("values", "enum", FieldType.Enum);
         }
         else if (type == FieldType.Enum)
         {
@@ -375,11 +458,12 @@ public static class ApplicationCompiler
 
     private static FieldModel BuildField(FieldDefinition field, Dictionary<string, EntityResource> entitiesByName)
     {
+        var type = FieldTypes.Parse(field.Type);
         var target = field.Target is null ? null : entitiesByName[field.Target];
         return new FieldModel
         {
             Name = field.Name,
-            Type = FieldTypes.Parse(field.Type),
+            Type = type,
             Label = field.Label,
             Required = field.Required ?? false,
             Unique = field.Unique ?? false,
@@ -388,7 +472,7 @@ public static class ApplicationCompiler
             Scale = field.Scale,
             Values = field.Values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
-            TargetDisplayField = target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
+            TargetDisplayField = type == FieldType.Reference && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
         };
     }
 
@@ -442,4 +526,10 @@ public static class ApplicationCompiler
     }
 
     private static PageReference PageReferenceTo(PageResource page) => new(page.Id, page.Name);
+
+    /// <summary>The child collection field that owns a child entity, shown as <c>Entity.field</c>.</summary>
+    private sealed record ChildOwner(EntityResource Entity, int FieldIndex)
+    {
+        public override string ToString() => $"{Entity.Name}.{Entity.Fields[FieldIndex].Name}";
+    }
 }

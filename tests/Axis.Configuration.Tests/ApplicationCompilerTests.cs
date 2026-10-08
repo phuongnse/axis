@@ -14,6 +14,12 @@ public sealed class ApplicationCompilerTests
 
     private const string OrderId = "11111111-1111-4111-8111-111111111111";
 
+    private const string LineItemId = "22222222-2222-4222-8222-222222222222";
+
+    private const string CustomerId = "33333333-3333-4333-8333-333333333333";
+
+    private const string LineItem = """{ "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "LineItem", "formatVersion": 1, "fields": [{ "name": "description", "type": "text" }] }""";
+
     [Fact]
     public void Valid_fixture_compiles_into_a_typed_model_with_resolved_references()
     {
@@ -225,6 +231,7 @@ public sealed class ApplicationCompilerTests
     [Theory]
     [InlineData("""{ "name": "f", "type": "reference" }""", "'target'")]
     [InlineData("""{ "name": "f", "type": "enum" }""", "'values'")]
+    [InlineData("""{ "name": "f", "type": "child-collection" }""", "'target'")]
     public void Reference_without_target_and_enum_without_values_are_reported_at_the_field(string field, string property)
     {
         using var folder = new TemporaryFolder()
@@ -541,6 +548,162 @@ public sealed class ApplicationCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.ReferenceTargetWithoutDisplayField, "/fields/0/target"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Child_collection_compiles_with_its_target_and_without_a_column()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", LineItem)
+            .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "lineitem" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        var field = Assert.Single(order.Fields);
+        Assert.Equal(FieldType.ChildCollection, field.Type);
+        Assert.Equal(new EntityReference(Guid.Parse(LineItemId), "LineItem"), field.Target);
+        Assert.Null(field.TargetDisplayField);
+        Assert.False(field.HasColumn);
+        Assert.True(result.Model.TryGetEntity("LineItem", out var lineItem));
+        Assert.True(lineItem.Fields[0].HasColumn);
+    }
+
+    [Theory]
+    [InlineData("""
+        "required": true
+        """, "/fields/0/required")]
+    [InlineData("""
+        "required": false
+        """, "/fields/0/required")]
+    [InlineData("""
+        "unique": true
+        """, "/fields/0/unique")]
+    [InlineData("""
+        "maxLength": 10
+        """, "/fields/0/maxLength")]
+    [InlineData("""
+        "precision": 10
+        """, "/fields/0/precision")]
+    [InlineData("""
+        "scale": 2
+        """, "/fields/0/scale")]
+    [InlineData("""
+        "values": ["a"]
+        """, "/fields/0/values")]
+    public void Property_on_a_child_collection_is_reported_at_the_property(string property, string path)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", LineItem)
+            .With("order.json", Entity("Order", $$"""{ "name": "lineItems", "type": "child-collection", "target": "LineItem", {{property}} }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidConstraint, "order.json", path, Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Child_collection_with_an_unknown_target_is_reported_at_the_target()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "LineItem" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownReferenceTarget, "order.json", "/fields/0/target", Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'LineItem'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Child_entity_owned_by_a_second_field_is_reported_at_the_later_field()
+    {
+        // invoice.json comes first in path order, so its field is the owner.
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", LineItem)
+            .With("invoice.json", Entity("Invoice", """{ "name": "lines", "type": "child-collection", "target": "LineItem" }""", CustomerId))
+            .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "LINEITEM" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ChildEntityOwnedTwice, "order.json", "/fields/0/target", Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'Invoice.lines'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Reference_to_a_child_entity_is_reported_at_the_target()
+    {
+        // The child has no display field, which is not reported on top.
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", LineItem)
+            .With("customer.json", Entity("Customer", """{ "name": "lastLine", "type": "reference", "target": "LineItem" }""", CustomerId))
+            .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "LineItem" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ReferenceToChildEntity, "customer.json", "/fields/0/target", Guid.Parse(CustomerId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'Order.lineItems'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "customer", "type": "reference", "target": "Customer" }""", "a reference")]
+    [InlineData("""{ "name": "notes", "type": "child-collection", "target": "Customer" }""", "a child collection")]
+    public void Reference_or_child_collection_on_a_child_entity_is_reported_at_the_field_type(string field, string kind)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", Entity("LineItem", $$"""{ "name": "description", "type": "text" }, {{field}}""", LineItemId))
+            .With("customer.json", Entity("Customer", """{ "name": "name", "type": "text", "required": true }""", CustomerId, displayField: "name"))
+            .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "LineItem" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ChildEntityWithReference, "line-item.json", "/fields/1/type", Guid.Parse(LineItemId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains(kind, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'Order.lineItems'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Entity_owning_itself_is_a_child_entity_with_a_child_collection()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "number", "type": "text" }, { "name": "children", "type": "child-collection", "target": "Order" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ChildEntityWithReference, "order.json", "/fields/1/type"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'Order' is a child entity owned by 'Order.children'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
 
