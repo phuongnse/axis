@@ -60,8 +60,8 @@ internal static class Models
             EntityNaming.Table(entity.Id),
             [
                 new CatalogColumn(EntityNaming.IdColumn, "uuid", NotNull: true, Unique: false, ReferencedTable: null),
-                new CatalogColumn(EntityNaming.VersionColumn, "bigint", NotNull: true, Unique: false, ReferencedTable: null),
-                .. entity.Fields.Select(field => new CatalogColumn(
+                .. SystemColumns(model, entity),
+                .. entity.Fields.Where(field => field.HasColumn).Select(field => new CatalogColumn(
                     EntityNaming.Column(field.Name),
                     ColumnTypes.Render(field),
                     field.Required,
@@ -69,6 +69,20 @@ internal static class Models
                     field.Target is null ? null : EntityNaming.Table(field.Target.Id))),
             ],
             hasRows)).ToList());
+
+    /// <summary>The owner of a child entity, found from the child collection that names it as the planner does.</summary>
+    public static EntityModel? Owner(ApplicationModel model, EntityModel entity) =>
+        model.Entities.FirstOrDefault(owner => owner.Fields.Any(field => field.Type == FieldType.ChildCollection && field.Target?.Id == entity.Id));
+
+    // The version column, or the owner and position columns of a child table.
+    private static CatalogColumn[] SystemColumns(ApplicationModel model, EntityModel entity) =>
+        Owner(model, entity) is { } owner
+            ?
+            [
+                new CatalogColumn(EntityNaming.OwnerColumn, "uuid", NotNull: true, Unique: false, ReferencedTable: EntityNaming.Table(owner.Id)),
+                new CatalogColumn(EntityNaming.PositionColumn, "integer", NotNull: true, Unique: false, ReferencedTable: null),
+            ]
+            : [new CatalogColumn(EntityNaming.VersionColumn, "bigint", NotNull: true, Unique: false, ReferencedTable: null)];
 
     /// <summary>The records written when the model was first provisioned.</summary>
     public static ProvisioningRecords Records(ApplicationModel model)

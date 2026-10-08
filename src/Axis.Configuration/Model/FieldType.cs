@@ -14,4 +14,5 @@ public enum FieldType
     DateTime,
     Enum,
     Reference,
+    ChildCollection,
 }

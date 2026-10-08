@@ -28,9 +28,9 @@ flowchart LR
    becomes a typed field type, every type-specific property is checked against
    the field type and against what storage accepts (see
    [Entity field types and constraints](#entity-field-types-and-constraints)),
-   field names must be unique within their entity ignoring letter case, and a
-   reference field's `target` must name a loaded entity, ignoring letter case.
-   An entity may reference itself. A `target` naming an entity whose file is
+   field names must be unique within their entity ignoring letter case, and the
+   `target` of a reference or child collection field must name a loaded
+   entity, ignoring letter case. An entity may reference itself. A `target` naming an entity whose file is
    in the folder, has kind `entity` and a string `name`, but was not loaded
    because of its own errors (such as a schema violation) is not reported
    again; only that file's own diagnostics are.
@@ -50,8 +50,19 @@ flowchart LR
      at `/displayField`. Every entity that is the `target` of a reference,
      including a reference to itself, must have a `displayField`, otherwise
      the reference is `AXC0030` at `/fields/{i}/target`. It is not reported
-     when the target is already `AXC0012` or names an entity file that was
-     not loaded.
+     when the target is already `AXC0012` or `AXC0040`, or names an entity
+     file that was not loaded.
+   - **Child collections.** A `child-collection` field without `target` is
+     `AXC0014` at the field, and a `target` that names no loaded entity is
+     `AXC0012` at `/fields/{i}/target`. The entity it names is a child
+     entity, owned by that field. The owner is the first such field in path
+     order of the entity files, then in field order. A later field with the
+     same target is `AXC0039` at its `/fields/{i}/target`, naming the owner.
+     A `reference` whose target is a child entity is `AXC0040` at
+     `/fields/{i}/target`. A `reference` or `child-collection` field on a
+     child entity is `AXC0041` at its `/fields/{i}/type`, so an entity whose
+     child collection names itself is `AXC0041`. See
+     [Entity logic](#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
      reserved by the platform (`api`, `health`, `assets`), or one that an
@@ -189,9 +200,9 @@ sorted by file and then path.
 | `AXC0009` | An `application` resource is not `application.json` at the folder root, or the root `application.json` has another kind. |
 | `AXC0010` | The file could not be read, for example because access is denied. |
 | `AXC0011` | Another field of the same entity already uses this `name`, ignoring letter case. |
-| `AXC0012` | A reference field's `target` names no loaded entity. Not reported when the target names an entity file in the folder that was not loaded because of its own errors. |
+| `AXC0012` | A reference or child collection field's `target` names no loaded entity. Not reported when the target names an entity file in the folder that was not loaded because of its own errors. |
 | `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. |
-| `AXC0014` | A field lacks a property its type needs: `target` on a reference, `values` on an enum. |
+| `AXC0014` | A field lacks a property its type needs: `target` on a reference or child collection, `values` on an enum. |
 | `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
 | `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
 | `AXC0017` | An entity provisioned for the application is missing from it. Reported at `application.json` with an empty path. |
@@ -216,6 +227,9 @@ sorted by file and then path.
 | `AXC0036` | An expression is longer than 2,000 characters. Reported at the JSON Pointer of the expression string. |
 | `AXC0037` | An expression nests deeper than 32 levels. Reported at the JSON Pointer of the expression string, with the character position in the message. |
 | `AXC0038` | An expression has more than 500 syntax nodes. Reported at the JSON Pointer of the expression string, with the character position in the message. |
+| `AXC0039` | The child entity is already owned by another `child-collection` field. Reported at `/fields/{i}/target` of the later field, naming the owner. |
+| `AXC0040` | A reference field's target is a child entity. Reported at `/fields/{i}/target`, naming the owner. |
+| `AXC0041` | A child entity has a `reference` or `child-collection` field. Reported at `/fields/{i}/type` of that field, naming the owner. |
 | `AXC0046` | An expression names a field that is not in its scope. Functions other than `date` and `dateTime`, and `.` paths, are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0047` | An expression gives an operator or function operands of types it does not accept, such as `'a' < 'b'` or `quantity and true`. Reported at the JSON Pointer of the expression string, with the character position of the operator in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
@@ -434,22 +448,26 @@ is `AXC0013`.
 | `date-time` | yes | yes | | | | | | yes |
 | `enum` | yes | yes | | | | | needed | yes |
 | `reference` | yes | yes | | | | needed | | |
-| `child-collection` *(planned for M2)* | | | | | | needed | | |
+| `child-collection` | | | | | | needed | | |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
   this (`AXC0004`).
 - `target` names an entity in the same application, ignoring letter case.
-- `child-collection` *(planned for M2)* owns the rows of the entity that
-  `target` names. It allows no other type-specific property. It has no
-  `required`, because a missing collection means no rows.
+- `child-collection` owns the rows of the entity that `target` names. It
+  allows no other type-specific property. It has no `required`, because a
+  missing collection means no rows, and no `unique`. Setting either, even to
+  `false`, is `AXC0013`.
 - `expression` *(planned for M2)* makes the field a computed field. It is not
   allowed with `required`. See [Entity logic](#entity-logic).
 
 ## Entity logic
 
-Everything in this section is *(planned for M2)*. It adds validations,
-computed fields and child collections to an entity (D17). Expressions use the
+This section adds validations, computed fields and child collections to an
+entity (D17). Child collection fields and their child tables are built.
+Validations, computed fields and the `expression` property are *(planned for
+M2)*, and so are the parts of the child collection rules that the record API
+serves. Expressions use the
 syntax of the [expression language](expressions.md), and diagnostic codes come
 with the issues that build each check.
 
@@ -536,11 +554,12 @@ with the issues that build each check.
     [Child tables and computed columns](storage.md#child-tables-and-computed-columns).
 - **Child collections.** The field type `child-collection` needs a `target`
   that names the child entity. Its rows are read and written only through the
-  owner record.
+  owner record *(planned for M2)*. Until then the record API leaves the field
+  out, as [the record API](record-api.md#reading-values) describes.
 - **M2 limits on a child entity.** These are limits of M2, not permanent
   rules. Real line items often point to a product, so a later milestone is
   expected to lift the last one. A child entity:
-  - is owned by exactly one `child-collection` field;
-  - is never the `target` of a `reference`;
-  - has no record routes of its own;
-  - has no `reference` or `child-collection` fields.
+  - is owned by exactly one `child-collection` field (`AXC0039`);
+  - is never the `target` of a `reference` (`AXC0040`);
+  - has no record routes of its own *(planned for M2)*;
+  - has no `reference` or `child-collection` fields (`AXC0041`).

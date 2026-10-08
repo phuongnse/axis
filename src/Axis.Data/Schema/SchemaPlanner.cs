@@ -14,6 +14,10 @@ public static class SchemaPlanner
     // The version column definition, rendered the same in CREATE TABLE and ADD COLUMN.
     private static readonly string _versionDefinition = $"{EntityNaming.Quote(EntityNaming.VersionColumn)} bigint NOT NULL DEFAULT 1";
 
+    // The system columns of a child table, in place of the version column.
+    private static readonly string _ownerDefinition = $"{EntityNaming.Quote(EntityNaming.OwnerColumn)} uuid NOT NULL";
+    private static readonly string _positionDefinition = $"{EntityNaming.Quote(EntityNaming.PositionColumn)} integer NOT NULL";
+
     public static SchemaPlan Plan(ApplicationModel model, CatalogSnapshot catalog, ProvisioningRecords records)
     {
         var planning = new Planning(model, catalog, records);
@@ -40,6 +44,13 @@ public static class SchemaPlanner
         private readonly Dictionary<string, CatalogTable> _tablesByName =
             catalog.Tables.ToDictionary(table => table.Name, StringComparer.Ordinal);
 
+        // The compiler gives each child entity exactly one owner: the child collection field that names it.
+        private readonly Dictionary<Guid, ChildOwner> _ownersByChildId = model.Entities
+            .SelectMany(entity => entity.Fields
+                .Select((field, index) => (Field: field, Owner: new ChildOwner(entity, index)))
+                .Where(pair => pair.Field.Type == FieldType.ChildCollection))
+            .ToDictionary(pair => pair.Field.Target!.Id, pair => pair.Owner);
+
         public void PlanEntity(EntityModel entity)
         {
             // Tables are keyed by entity id, so an id recorded for another application would share
@@ -57,13 +68,14 @@ public static class SchemaPlanner
             }
 
             var table = EntityNaming.Table(entity.Id);
+            var childOwner = _ownersByChildId.GetValueOrDefault(entity.Id);
             if (_tablesByName.TryGetValue(table, out var existing))
             {
-                PlanExistingTable(entity, existing);
+                PlanExistingTable(entity, existing, childOwner);
             }
             else
             {
-                PlanNewTable(entity, table);
+                PlanNewTable(entity, table, childOwner);
             }
         }
 
@@ -89,15 +101,17 @@ public static class SchemaPlanner
                 ? new SchemaPlan(DiagnosticOrder.Sort(_diagnostics), [], [], [])
                 : new SchemaPlan([], [.. _creates, .. _alters, .. _foreignKeys], _newEntities, _newEnumValues);
 
-        private void PlanNewTable(EntityModel entity, string table)
+        private void PlanNewTable(EntityModel entity, string table, ChildOwner? childOwner)
         {
-            var definitions = new List<string> { $"{EntityNaming.Quote(EntityNaming.IdColumn)} uuid NOT NULL", _versionDefinition };
+            // A child table has no version: its rows live under the owner's version.
+            var definitions = new List<string> { $"{EntityNaming.Quote(EntityNaming.IdColumn)} uuid NOT NULL" };
+            definitions.AddRange(childOwner is null ? [_versionDefinition] : [_ownerDefinition, _positionDefinition]);
             var constraints = new List<string>
             {
                 $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(table))} PRIMARY KEY ({EntityNaming.Quote(EntityNaming.IdColumn)})",
             };
 
-            foreach (var field in entity.Fields)
+            foreach (var field in entity.Fields.Where(field => field.HasColumn))
             {
                 var column = EntityNaming.Column(field.Name);
                 definitions.Add($"{EntityNaming.Quote(column)} {ColumnTypes.Render(field)}{(field.Required ? " NOT NULL" : "")}");
@@ -111,29 +125,53 @@ public static class SchemaPlanner
             }
 
             _creates.Add($"CREATE TABLE {EntityNaming.QualifiedTable(table)} ({string.Join(", ", definitions.Concat(constraints))})");
+            if (childOwner is not null)
+            {
+                AddOwnerForeignKey(table, childOwner);
+            }
+
             if (!records.Entities.Any(recorded => recorded.EntityId == entity.Id))
             {
                 _newEntities.Add(new ProvisionedEntity(entity.Id, model.Manifest.Id, table));
             }
         }
 
-        private void PlanExistingTable(EntityModel entity, CatalogTable table)
+        private void PlanExistingTable(EntityModel entity, CatalogTable table, ChildOwner? childOwner)
         {
             void Report(string message, string path) =>
                 _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, entity.File, path, entity.Id));
 
             var columnsByName = table.Columns.ToDictionary(column => column.Name, StringComparer.Ordinal);
 
-            // System columns are never compared; only a missing version column is added. Its
-            // default fills existing rows, so this holds even when the table has rows.
-            if (!columnsByName.ContainsKey(EntityNaming.VersionColumn))
+            string[] systemColumns;
+            if (childOwner is null)
             {
-                _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD COLUMN {_versionDefinition}");
+                systemColumns = [EntityNaming.IdColumn, EntityNaming.VersionColumn];
+
+                // System columns are never compared; only a missing version column is added. Its
+                // default fills existing rows, so this holds even when the table has rows.
+                if (!columnsByName.ContainsKey(EntityNaming.VersionColumn))
+                {
+                    _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD COLUMN {_versionDefinition}");
+                }
+            }
+            else
+            {
+                systemColumns = [EntityNaming.IdColumn, EntityNaming.OwnerColumn, EntityNaming.PositionColumn];
+                if (!PlanOwnerColumn(entity, table, columnsByName, childOwner))
+                {
+                    return;
+                }
             }
 
             for (var index = 0; index < entity.Fields.Count; index++)
             {
                 var field = entity.Fields[index];
+                if (!field.HasColumn)
+                {
+                    continue;
+                }
+
                 var path = $"/fields/{index}";
                 if (columnsByName.TryGetValue(EntityNaming.Column(field.Name), out var column))
                 {
@@ -145,10 +183,13 @@ public static class SchemaPlanner
                 }
             }
 
-            var fieldColumns = entity.Fields.Select(field => EntityNaming.Column(field.Name)).ToHashSet(StringComparer.Ordinal);
+            var fieldColumns = entity.Fields
+                .Where(field => field.HasColumn)
+                .Select(field => EntityNaming.Column(field.Name))
+                .ToHashSet(StringComparer.Ordinal);
             foreach (var column in table.Columns)
             {
-                if (column.Name != EntityNaming.IdColumn && column.Name != EntityNaming.VersionColumn && !fieldColumns.Contains(column.Name))
+                if (!systemColumns.Contains(column.Name, StringComparer.Ordinal) && !fieldColumns.Contains(column.Name))
                 {
                     _diagnostics.Add(new Diagnostic(
                         DiagnosticCodes.RemovedField,
@@ -158,6 +199,41 @@ public static class SchemaPlanner
                         entity.Id));
                 }
             }
+        }
+
+        /// <summary>
+        /// Checks the owner column of an existing child table and adds its foreign key when it has
+        /// none. A table without an owner column, or whose owner column points at another table,
+        /// is reported at the owner's child collection field. Returns whether the table is a child
+        /// table of this owner, so its fields can be planned.
+        /// </summary>
+        private bool PlanOwnerColumn(EntityModel entity, CatalogTable table, Dictionary<string, CatalogColumn> columnsByName, ChildOwner childOwner)
+        {
+            void Report(string message) =>
+                _diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.IncompatibleFieldChange,
+                    message,
+                    childOwner.Entity.File,
+                    $"/fields/{childOwner.FieldIndex}/target",
+                    childOwner.Entity.Id));
+
+            // Adding a NOT NULL owner column to an existing table, or dropping it, would need a migration.
+            if (!columnsByName.TryGetValue(EntityNaming.OwnerColumn, out var ownerColumn))
+            {
+                Report($"The entity '{entity.Name}' cannot become a child entity: its table already exists without an owner column.");
+                return false;
+            }
+
+            if (ownerColumn.ReferencedTable is null)
+            {
+                AddOwnerForeignKey(table.Name, childOwner);
+            }
+            else if (ownerColumn.ReferencedTable != EntityNaming.Table(childOwner.Entity.Id))
+            {
+                Report($"The child entity '{entity.Name}' cannot change its owner to '{childOwner.Entity.Name}'.");
+            }
+
+            return true;
         }
 
         private void PlanNewColumn(EntityModel entity, CatalogTable table, FieldModel field, string path, Action<string, string> report)
@@ -276,15 +352,20 @@ public static class SchemaPlanner
 
         private void AddForeignKey(string table, string column, FieldModel field)
         {
-            if (field.Target is not { } target)
+            if (field.Target is { } target)
             {
-                return;
+                AddForeignKey(table, column, target.Id, "");
             }
+        }
 
+        // Child rows are deleted with their owner.
+        private void AddOwnerForeignKey(string table, ChildOwner childOwner) =>
+            AddForeignKey(table, EntityNaming.OwnerColumn, childOwner.Entity.Id, " ON DELETE CASCADE");
+
+        private void AddForeignKey(string table, string column, Guid targetId, string onDelete) =>
             _foreignKeys.Add(
                 $"ALTER TABLE {EntityNaming.QualifiedTable(table)} ADD CONSTRAINT {EntityNaming.Quote(EntityNaming.ForeignKey(table, column))} "
-                + $"FOREIGN KEY ({EntityNaming.Quote(column)}) REFERENCES {EntityNaming.QualifiedTable(EntityNaming.Table(target.Id))} ({EntityNaming.Quote(EntityNaming.IdColumn)})");
-        }
+                + $"FOREIGN KEY ({EntityNaming.Quote(column)}) REFERENCES {EntityNaming.QualifiedTable(EntityNaming.Table(targetId))} ({EntityNaming.Quote(EntityNaming.IdColumn)}){onDelete}");
 
         private void RecordNewEnumValues(EntityModel entity, FieldModel field)
         {
@@ -325,4 +406,7 @@ public static class SchemaPlanner
                 && expectedLength > currentLength;
         }
     }
+
+    /// <summary>The entity and the index of the child collection field that owns a child entity.</summary>
+    private sealed record ChildOwner(EntityModel Entity, int FieldIndex);
 }

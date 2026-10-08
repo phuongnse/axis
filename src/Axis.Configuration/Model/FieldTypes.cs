@@ -13,6 +13,7 @@ public static class FieldTypes
         ["date-time"] = FieldType.DateTime,
         ["enum"] = FieldType.Enum,
         ["reference"] = FieldType.Reference,
+        ["child-collection"] = FieldType.ChildCollection,
     };
 
     private static readonly Dictionary<FieldType, string> _namesByType = _typesByName.ToDictionary(pair => pair.Value, pair => pair.Key);

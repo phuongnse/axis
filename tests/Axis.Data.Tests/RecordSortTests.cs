@@ -11,7 +11,8 @@ public sealed class RecordSortTests
         "Order",
         "entities/order.json",
         Field("name", FieldType.Text),
-        Field("count", FieldType.Integer));
+        Field("count", FieldType.Integer),
+        Field("lines", FieldType.ChildCollection, target: Entity(Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a02"), "Line", "entities/line.json")));
 
     [Theory]
     [InlineData("name", false)]
@@ -30,6 +31,7 @@ public sealed class RecordSortTests
     [InlineData("-")]
     [InlineData("--name")]
     [InlineData("missing")]
+    [InlineData("lines")]
     public void Other_text_does_not_parse(string text)
     {
         Assert.False(RecordSort.TryParse(text, _entity, out var sort));
