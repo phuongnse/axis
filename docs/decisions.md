@@ -211,3 +211,19 @@ grow but are not settled yet:
 *Why:* the page and widget split shapes data sources (M2), process task forms
 (M3) and authorization (M4). Keeping the page free of an entity or template
 lets more widgets and a layout be added without a format change.
+
+## D16. Expression language — Agreed
+
+One expression language holds the logic of validation, named rules, computed
+fields and data source filters. See [the reference](reference/expressions.md).
+
+- **Syntax:** a small infix syntax familiar to authors, such as
+  `quantity * unitPrice` and `status == 'submitted' and total >= 10000`.
+- **Nothing else:** no loops, no variables or assignment, no side effects and
+  no inline code (D6).
+- **Bounded cost:** limits are checked at compile time, and a step budget
+  applies at run time.
+- **Two back ends:** one language, run by an interpreter and translated to SQL
+  for data source filters.
+
+*Why:* see [knowledge](domain/knowledge.md#logic-in-configuration).
