@@ -254,7 +254,7 @@ public sealed class ExpressionInterpreterTests
         // 2^14 leaves make 32,767 nodes. The division by zero is evaluated last, after the budget has run out.
         var expression = Sum(1 << 14, new BinaryNode(5, BinaryOperator.Divide, new IntegerLiteral(4, 1), new IntegerLiteral(6, 0)));
 
-        var result = ExpressionInterpreter.Evaluate(expression, Values([]));
+        var result = ExpressionInterpreter.Evaluate(expression, new ExpressionCheckResult(ExpressionType.Decimal, null), Values([]));
 
         Assert.False(result.Succeeded);
         Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error.Kind);
@@ -267,11 +267,12 @@ public sealed class ExpressionInterpreterTests
         // 5,000 leaves make 9,999 nodes, and the minus on top makes 10,000.
         var exact = new UnaryNode(0, UnaryOperator.Negate, Sum(5_000, new IntegerLiteral(0, 1)));
         var over = new UnaryNode(0, UnaryOperator.Negate, exact);
+        var checkedType = new ExpressionCheckResult(ExpressionType.Integer, null);
 
-        Assert.Equal(-5_000L, ExpressionInterpreter.Evaluate(exact, Values([])).Value);
+        Assert.Equal(-5_000L, ExpressionInterpreter.Evaluate(exact, checkedType, Values([])).Value);
         Assert.Equal(
             ExpressionRuntimeErrorKind.StepBudgetExhausted,
-            ExpressionInterpreter.Evaluate(over, Values([])).Error?.Kind);
+            ExpressionInterpreter.Evaluate(over, checkedType, Values([])).Error?.Kind);
     }
 
     public static TheoryData<string, bool> Corpus
@@ -290,6 +291,10 @@ public sealed class ExpressionInterpreterTests
                 "b and c", "b or c", "not b",
                 "i is null", "d is not null",
                 "i in (1, 2.5)", "e in ('draft', 'submitted')", "dt in (date('2026-10-08'))",
+                // A coalesce or if that mixes integer and decimal gives a decimal, even when it picks the integer.
+                "coalesce(d, 1)", "coalesce(i, d)", "coalesce(null, 1, 2.5)",
+                "if(b, 1, 2.5)", "if(c, 2.5, 1)", "if(b, i, d)",
+                "-coalesce(d, 1)", "floor(if(c, d, 1))",
             ];
 
             var data = new TheoryData<string, bool>();
@@ -313,7 +318,7 @@ public sealed class ExpressionInterpreterTests
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
 
         var values = fieldsAreNull ? _fields.Keys.ToDictionary(name => name, _ => (object?)null) : _setValues;
-        var result = ExpressionInterpreter.Evaluate(parsed.Expression, new ExpressionValues(values));
+        var result = ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, new ExpressionValues(values));
 
         Assert.True(result.Succeeded, result.Error?.Message);
         if (checkedType.Type.Kind == ExpressionTypeKind.Null)
@@ -379,7 +384,7 @@ public sealed class ExpressionInterpreterTests
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
         var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null);
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
-        return ExpressionInterpreter.Evaluate(parsed.Expression, Values(overrides));
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides));
     }
 
     private static ExpressionRuntimeError EvaluateFails(string text, params (string Name, object? Value)[] overrides)

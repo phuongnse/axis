@@ -1,11 +1,14 @@
+using System.Text;
+using Axis.Expressions.Functions;
 using Axis.Expressions.Syntax;
+using Axis.Expressions.Typing;
 
 namespace Axis.Expressions.Evaluation;
 
 /// <summary>
 /// Evaluates a checked expression against one record's field values, following the null rules and
-/// run-time errors in docs/reference/expressions.md. It covers literals, bare field names,
-/// <c>date</c> and <c>dateTime</c>, and every operator. It does no I/O. Arithmetic is exact, and an
+/// run-time errors in docs/reference/expressions.md. It covers literals, bare field names, every
+/// operator and every function in <see cref="ExpressionFunctions"/>. It does no I/O. Arithmetic is exact, and an
 /// evaluation stops after <see cref="ExpressionLimits.MaxSteps"/> steps. Values use the CLR types
 /// listed on <see cref="ExpressionValues"/>.
 /// </summary>
@@ -13,18 +16,28 @@ public static class ExpressionInterpreter
 {
     /// <summary>
     /// Evaluates <paramref name="expression"/>, which must have passed
-    /// <see cref="Typing.ExpressionTypeChecker"/> against the fields in <paramref name="values"/>.
-    /// A missing field, a value of an unexpected CLR type, or a node the interpreter does not build
-    /// yet is a bug in the caller, and throws <see cref="InvalidOperationException"/>.
+    /// <see cref="ExpressionTypeChecker"/> against the fields in <paramref name="values"/>.
+    /// <paramref name="checkResult"/> is that checker's result. It is required because the checked
+    /// type decides some run-time types: a <c>coalesce</c> or <c>if</c> checked as decimal returns
+    /// an integer it picks as a decimal, even when the field that would make it decimal is empty.
+    /// A failed check throws <see cref="ArgumentException"/>. A missing field, a value of an
+    /// unexpected CLR type, or a node the interpreter does not build yet is a bug in the caller, and
+    /// throws <see cref="InvalidOperationException"/>.
     /// </summary>
-    public static ExpressionEvaluationResult Evaluate(ExpressionNode expression, ExpressionValues values)
+    public static ExpressionEvaluationResult Evaluate(
+        ExpressionNode expression, ExpressionCheckResult checkResult, ExpressionValues values)
     {
         ArgumentNullException.ThrowIfNull(expression);
+        ArgumentNullException.ThrowIfNull(checkResult);
         ArgumentNullException.ThrowIfNull(values);
+        if (!checkResult.Succeeded)
+        {
+            throw new ArgumentException("Only an expression that passed the type checker can be evaluated.", nameof(checkResult));
+        }
 
         try
         {
-            return new ExpressionEvaluationResult(new Evaluator(values).Eval(expression), null);
+            return new ExpressionEvaluationResult(new Evaluator(values, checkResult.DecimalCalls).Eval(expression), null);
         }
         catch (EvaluationFailure failure)
         {
@@ -32,7 +45,7 @@ public static class ExpressionInterpreter
         }
     }
 
-    private sealed class Evaluator(ExpressionValues values)
+    private sealed class Evaluator(ExpressionValues values, IReadOnlySet<CallNode> decimalCalls)
     {
         private int _steps;
 
@@ -75,13 +88,96 @@ public static class ExpressionInterpreter
                 : throw Unexpected(value);
         }
 
-        private object Call(CallNode call)
+        private object? Call(CallNode call)
         {
-            var isDate = string.Equals(call.Name, "date", StringComparison.OrdinalIgnoreCase);
-            if ((!isDate && !string.Equals(call.Name, "dateTime", StringComparison.OrdinalIgnoreCase))
-                || call.Arguments is not [TextLiteral argument])
+            if (!ExpressionFunctions.TryGet(call.Name, out var signature))
             {
                 throw new InvalidOperationException($"The interpreter does not evaluate function '{call.Name}' yet.");
+            }
+
+            var arguments = call.Arguments;
+            switch (signature.Name)
+            {
+                case "if":
+                    // Only the picked branch is evaluated. A null condition picks the else branch.
+                    return Widen(call, Eval(Boolean(Eval(arguments[0])) == true ? arguments[1] : arguments[2]));
+
+                case "coalesce":
+                    // Arguments after the first one that is not null are not evaluated.
+                    foreach (var argument in arguments)
+                    {
+                        if (Eval(argument) is { } value)
+                        {
+                            return Widen(call, value);
+                        }
+                    }
+
+                    return null;
+
+                case "concat":
+                    var builder = new StringBuilder();
+                    foreach (var argument in arguments)
+                    {
+                        builder.Append(Eval(argument) is { } value ? Text(value) : string.Empty);
+                    }
+
+                    return builder.ToString();
+
+                case "date" or "dateTime":
+                    return DateLiteral(call, signature.Name == "date");
+            }
+
+            // Every argument is evaluated. A null one then gives null before any error is checked.
+            var results = new object[arguments.Count];
+            var anyNull = false;
+            for (var i = 0; i < results.Length; i++)
+            {
+                if (Eval(arguments[i]) is { } value)
+                {
+                    results[i] = value;
+                }
+                else
+                {
+                    anyNull = true;
+                }
+            }
+
+            if (anyNull)
+            {
+                return null;
+            }
+
+            return signature.Name switch
+            {
+                "length" => (long)Text(results[0]).EnumerateRunes().Count(),
+                "contains" => Text(results[0]).Contains(Text(results[1]), StringComparison.Ordinal),
+                "startsWith" => Text(results[0]).StartsWith(Text(results[1]), StringComparison.Ordinal),
+                "endsWith" => Text(results[0]).EndsWith(Text(results[1]), StringComparison.Ordinal),
+                "lower" => Text(results[0]).ToLowerInvariant(),
+                "upper" => Text(results[0]).ToUpperInvariant(),
+                "trim" => Text(results[0]).Trim(),
+                "abs" => Abs(call, results[0]),
+                "floor" => results[0] is decimal number ? decimal.Floor(number) : (object)Integer(results[0]),
+                "ceiling" => results[0] is decimal number ? decimal.Ceiling(number) : (object)Integer(results[0]),
+                "round" => Round(call, Number(results[0]), Integer(results[1])),
+                "year" => (long)Date(results[0]).Year,
+                "month" => (long)Date(results[0]).Month,
+                "day" => (long)Date(results[0]).Day,
+                "addDays" => AddDays(call, Date(results[0]), Integer(results[1])),
+                "daysBetween" => (long)(Date(results[1]).DayNumber - Date(results[0]).DayNumber),
+                _ => throw new InvalidOperationException($"The interpreter does not evaluate function '{signature.Name}' yet."),
+            };
+        }
+
+        /// <summary>An integer picked by a <c>coalesce</c> or <c>if</c> checked as decimal comes back as a decimal.</summary>
+        private object? Widen(CallNode call, object? value) =>
+            value is long integer && decimalCalls.Contains(call) ? (decimal)integer : value;
+
+        private object DateLiteral(CallNode call, bool isDate)
+        {
+            if (call.Arguments is not [TextLiteral argument])
+            {
+                throw new InvalidOperationException($"Function '{call.Name}' needs one text literal.");
             }
 
             var text = (string)Eval(argument)!;
@@ -95,6 +191,43 @@ public static class ExpressionInterpreter
             return DateLiterals.TryParseDateTime(text, out var dateTime)
                 ? dateTime
                 : throw Fail(ExpressionRuntimeErrorKind.InvalidDateLiteral, $"'{text}' is not a valid date-time", call.Offset);
+        }
+
+        /// <summary>Keeps the type of its argument, so an integer stays an integer.</summary>
+        private static object Abs(CallNode call, object value)
+        {
+            if (value is decimal number)
+            {
+                return Math.Abs(number);
+            }
+
+            var integer = Integer(value);
+            return integer == long.MinValue
+                ? throw Fail(ExpressionRuntimeErrorKind.IntegerOverflow, "The result of 'abs' is outside the integer range", call.Offset)
+                : Math.Abs(integer);
+        }
+
+        /// <summary>Rounds half away from zero. A digit count outside 0 to 28 is an error, because <see cref="decimal"/> holds at most 28.</summary>
+        private static decimal Round(CallNode call, decimal number, long digits) =>
+            digits is < 0 or > 28
+                ? throw Fail(
+                    ExpressionRuntimeErrorKind.ArgumentOutOfRange,
+                    $"The digit count of 'round' must be from 0 to 28, found {digits}",
+                    call.Offset)
+                : Math.Round(number, (int)digits, MidpointRounding.AwayFromZero);
+
+        private static DateOnly AddDays(CallNode call, DateOnly date, long days)
+        {
+            var day = date.DayNumber;
+            if (days < DateOnly.MinValue.DayNumber - day || days > DateOnly.MaxValue.DayNumber - day)
+            {
+                throw Fail(
+                    ExpressionRuntimeErrorKind.DateOutOfRange,
+                    "The result of 'addDays' is outside 0001-01-01 to 9999-12-31",
+                    call.Offset);
+            }
+
+            return DateOnly.FromDayNumber((int)(day + days));
         }
 
         private object? Unary(UnaryNode unary)
@@ -280,6 +413,12 @@ public static class ExpressionInterpreter
             bool boolean => boolean,
             _ => throw Unexpected(value),
         };
+
+        private static string Text(object value) => value as string ?? throw Unexpected(value);
+
+        private static long Integer(object value) => value is long integer ? integer : throw Unexpected(value);
+
+        private static DateOnly Date(object value) => value is DateOnly date ? date : throw Unexpected(value);
 
         private static decimal Number(object value) => value switch
         {

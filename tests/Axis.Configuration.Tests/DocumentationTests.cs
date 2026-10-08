@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
 
 namespace Axis.Configuration.Tests;
 
@@ -52,6 +53,43 @@ public sealed class DocumentationTests
         Assert.True(duplicates.Count == 0, $"Declared more than once: {string.Join(", ", duplicates)}.");
         Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
         Assert.True(!documented.Except(declared).Any(), $"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", documented.Except(declared))}.");
+        Assert.Equal(documented.Count, documented.Distinct().Count());
+    }
+
+    [Fact]
+    public void Function_table_matches_ExpressionFunctions()
+    {
+        var tables = new List<List<string>>();
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                // The aggregates table has other columns, so it is not matched.
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Function\s*\|\s*Result\s*\|\s*Notes\s*\|\s*SQL\s*\|"))
+                {
+                    continue;
+                }
+
+                var names = new List<string>();
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var match = Regex.Match(lines[j], @"^\|\s*`([A-Za-z]+)\(");
+                    if (match.Success)
+                    {
+                        names.Add(match.Groups[1].Value);
+                    }
+                }
+
+                tables.Add(names);
+            }
+        }
+
+        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Function | Result | Notes | SQL |' under docs/, found {tables.Count}.");
+        var documented = tables[0];
+        var declared = ExpressionFunctions.Names;
+
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
+        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}.");
         Assert.Equal(documented.Count, documented.Distinct().Count());
     }
 

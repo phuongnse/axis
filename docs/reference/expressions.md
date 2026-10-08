@@ -4,8 +4,8 @@ Detailed reference for the expression language: grammar, types, operators,
 null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
-bare field names, `date` and `dateTime`, and every operator. Sections marked
-*(planned for M2)* are not built yet. No resource file reads expressions yet,
+bare field names, every operator and every [function](#functions) except the
+aggregates. Sections marked *(planned for M2)* are not built yet. No resource file reads expressions yet,
 so authors see none of this until the compiler and the engine use them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
@@ -153,9 +153,8 @@ status in ('submitted', 'approved')
 
 ## Null semantics
 
-An empty field is `null`. These rules decide what `null` does. The rules for
-`if`, `coalesce` and `concat` come with [functions](#functions) *(planned for
-M2)*.
+An empty field is `null`. These rules decide what `null` does in operators
+and in [functions](#functions).
 
 - **Propagation.** Arithmetic, ordering comparisons and most functions return
   `null` when an operand is `null`. The function table says where a function
@@ -195,8 +194,10 @@ M2)*.
   This differs from a PostgreSQL `CHECK` constraint, which passes when its
   condition is `null`.
 
-- **`if`.** A `null` condition picks the else branch.
-- **`coalesce`.** It returns its first argument that is not `null`.
+- **`if`.** A `null` condition picks the else branch. Only the picked branch
+  is evaluated, so `if(count == 0, 0, total / count)` is a safe guard.
+- **`coalesce`.** It returns its first argument that is not `null`. The
+  arguments after it are not evaluated.
 - **`concat`.** It treats `null` as empty text.
 
 ## Literals
@@ -251,8 +252,6 @@ resolves them against the fields it is given, ignoring letter case.
 
 ## Functions
 
-*(planned for M2)*
-
 Function names ignore letter case. In the signatures, `n` is an integer or a
 decimal. Unless the table says otherwise, a function returns `null` when an
 argument is `null`.
@@ -268,23 +267,28 @@ argument is `null`.
 | `upper(text)` | text | | No |
 | `trim(text)` | text | | No |
 | `abs(n)` | same as `n` | | Yes |
-| `round(decimal, integer)` | decimal | Rounds half away from zero to the given number of digits after the point. | Yes |
+| `round(decimal, integer)` | decimal | Rounds half away from zero to the given number of digits after the point. An integer first argument widens to a decimal. A digit count outside 0 to 28 is a [run-time error](#run-time-errors). | Yes |
 | `floor(n)` | same as `n` | | Yes |
 | `ceiling(n)` | same as `n` | | Yes |
 | `year(date)` | integer | | Yes |
 | `month(date)` | integer | 1 to 12. | Yes |
 | `day(date)` | integer | 1 to 31. | Yes |
-| `addDays(date, integer)` | date | | Yes |
+| `addDays(date, integer)` | date | A result outside 0001 to 9999 is a [run-time error](#run-time-errors). | Yes |
 | `daysBetween(date, date)` | integer | Second minus first. | Yes |
-| `coalesce(a, b, …)` | type of the arguments | First argument that is not `null`. All arguments have the same type. | Yes |
-| `if(condition, then, else)` | type of the branches | A `null` condition picks `else`. Both branches have the same type. | Yes |
+| `coalesce(a, b, …)` | type of the arguments | First argument that is not `null`. The arguments after it are not evaluated. All arguments fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal. A listed text literal and an enum mix to the enum. | Yes |
+| `if(condition, then, else)` | type of the branches | A `null` condition picks `else`. Only the picked branch is evaluated. The branches fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal. | Yes |
 | `date(text literal)` | date | See [Literals](#literals). | Yes |
 | `dateTime(text literal)` | date-time | See [Literals](#literals). | Yes |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, and the time zone rule comes later.
 
+The text functions take `text` only. An enum value is not text to them,
+because no conversion is implicit except integer to decimal.
+
 ### Aggregates
+
+*(planned for M2)*
 
 An aggregate works on a child collection. The second argument is an item
 expression. Inside it, names refer only to the child row.
@@ -349,7 +353,8 @@ These are errors:
 - integer overflow;
 - a decimal result that a .NET `decimal` cannot hold exactly;
 - a `date` or `dateTime` literal that is not a valid date or date-time;
-- a date outside 0001 to 9999 *(planned for M2, with the date functions)*;
+- a date outside 0001 to 9999 from `addDays`;
+- a `round` digit count outside 0 to 28;
 - an exhausted step budget.
 
 A `null` operand gives `null` before any error is checked. An error stops the evaluation and counts as a failure. A validation fails, a
@@ -444,20 +449,26 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0037`.** The expression is deeper than 32 levels.
 - **`AXC0038`.** The expression has more than 500 syntax nodes.
 - **`AXC0046`.** A name that is not in scope, named in the message. Until
-  they are built, functions other than `date` and `dateTime` and `.` paths
-  are reported this way too.
-- **`AXC0047`.** Operand types an operator does not accept, at the operator.
-  This includes an `in` item that does not fit, two different enums, and a
-  `date` or `dateTime` call without one text literal argument. The message
-  names the types.
+  they are built, `.` paths are reported this way too.
+- **`AXC0047`.** Operand types an operator or function does not accept, at
+  the operator or the call. This includes an `in` item that does not fit, two
+  different enums, a function argument of the wrong type, `coalesce`
+  arguments or `if` branches that do not fit each other, and a `date` or
+  `dateTime` call without a text literal argument. The message names the
+  types.
 - **`AXC0048`.** The expression's type does not fit the type its use needs.
   The message names the expected and the actual type.
 - **`AXC0049`.** A text literal compared with an enum, or given where an enum
   is needed, is not one of the field's `values`. Reported at the literal.
+- **`AXC0050`.** A call to a function that does not exist, at the call. The
+  message names the function.
+- **`AXC0051`.** A function call with the wrong number of arguments, at the
+  call. The message names the expected count, such as "needs 2 arguments" or
+  "needs at least 1 argument", and the count found.
 - **First problem only.** The parser and the type checker each stop at the
   first problem and report only that one. So one expression gives at most
   one diagnostic.
 
 The cost codes for hops, rule call depth and cycles, and the type codes for
-function and rule calls and the SQL subset, are added by the issues that
-build those checks.
+rule calls, aggregates and the SQL subset, are added by the issues that build
+those checks.

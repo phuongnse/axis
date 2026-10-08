@@ -1,4 +1,5 @@
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
 using Axis.Expressions.Syntax;
 
 namespace Axis.Expressions.Typing;
@@ -6,9 +7,9 @@ namespace Axis.Expressions.Typing;
 /// <summary>
 /// Finds the type of a parsed expression, following the typing rules in
 /// docs/reference/expressions.md, and checks it against the type the use needs. It covers
-/// literals, bare field names, <c>date</c> and <c>dateTime</c>, and every operator. Other
-/// functions and paths are reported as unknown names until they are built. It stops at the first
-/// problem and reports only that one.
+/// literals, bare field names, every operator and every function in
+/// <see cref="ExpressionFunctions"/>. Paths are reported as unknown names until they are built. It
+/// stops at the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
@@ -20,7 +21,8 @@ public static class ExpressionTypeChecker
 
         try
         {
-            var actual = Infer(expression, scope);
+            var context = new Context(scope, new HashSet<CallNode>(ReferenceEqualityComparer.Instance));
+            var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
                 return new ExpressionCheckResult(null, new ExpressionDiagnostic(
@@ -29,7 +31,7 @@ public static class ExpressionTypeChecker
                     0));
             }
 
-            return new ExpressionCheckResult(actual, null);
+            return new ExpressionCheckResult(actual, null) { DecimalCalls = context.DecimalCalls };
         }
         catch (CheckFailure failure)
         {
@@ -37,46 +39,160 @@ public static class ExpressionTypeChecker
         }
     }
 
-    private static ExpressionType Infer(ExpressionNode node, ExpressionScope scope) => node switch
+    private static ExpressionType Infer(ExpressionNode node, Context context) => node switch
     {
         IntegerLiteral => ExpressionType.Integer,
         DecimalLiteral => ExpressionType.Decimal,
         TextLiteral => ExpressionType.Text,
         BooleanLiteral => ExpressionType.Boolean,
         NullLiteral => ExpressionType.Null,
-        NameNode name => scope.TryGetField(name.Name, out var type)
+        NameNode name => context.Scope.TryGetField(name.Name, out var type)
             ? type
             : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{name.Name}'", name.Offset),
         MemberNode member => throw Fail(
             ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' after '.'", member.Offset),
-        CallNode call => InferCall(call),
-        UnaryNode unary => InferUnary(unary, Infer(unary.Operand, scope)),
-        BinaryNode binary => InferBinary(binary, Infer(binary.Left, scope), Infer(binary.Right, scope)),
-        IsNullNode isNull => InferIsNull(isNull, scope),
-        InNode inNode => InferIn(inNode, scope),
+        CallNode call => InferCall(call, context),
+        UnaryNode unary => InferUnary(unary, Infer(unary.Operand, context)),
+        BinaryNode binary => InferBinary(binary, Infer(binary.Left, context), Infer(binary.Right, context)),
+        IsNullNode isNull => InferIsNull(isNull, context),
+        InNode inNode => InferIn(inNode, context),
         _ => throw new ArgumentOutOfRangeException(nameof(node), node.GetType().Name, "Unknown node type."),
     };
 
-    private static ExpressionType InferCall(CallNode call)
+    private static ExpressionType InferCall(CallNode call, Context context)
     {
-        ExpressionType result;
-        string name;
-        if (string.Equals(call.Name, "date", StringComparison.OrdinalIgnoreCase))
+        if (!ExpressionFunctions.TryGet(call.Name, out var signature))
         {
-            (result, name) = (ExpressionType.Date, "date");
-        }
-        else if (string.Equals(call.Name, "dateTime", StringComparison.OrdinalIgnoreCase))
-        {
-            (result, name) = (ExpressionType.DateTime, "dateTime");
-        }
-        else
-        {
-            throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown function '{call.Name}'", call.Offset);
+            throw Fail(ExpressionDiagnosticCodes.UnknownFunction, $"Unknown function '{call.Name}'", call.Offset);
         }
 
-        if (call.Arguments is not [TextLiteral])
+        var name = signature.Name;
+        var count = call.Arguments.Count;
+        if (count < signature.MinArguments || count > signature.MaxArguments)
         {
-            throw Fail(ExpressionDiagnosticCodes.TypeMismatch, $"Function '{name}' needs one text literal", call.Offset);
+            var needs = signature.MaxArguments == int.MaxValue ? $"at least {signature.MinArguments}" : $"{signature.MinArguments}";
+            var noun = signature.MinArguments == 1 ? "argument" : "arguments";
+            throw Fail(
+                ExpressionDiagnosticCodes.WrongArgumentCount,
+                $"Function '{name}' needs {needs} {noun}, found {count}",
+                call.Offset);
+        }
+
+        var types = new ExpressionType[count];
+        for (var i = 0; i < count; i++)
+        {
+            types[i] = Infer(call.Arguments[i], context);
+        }
+
+        switch (name)
+        {
+            case "length":
+                Need(call, name, types, 0, IsText, "text");
+                return ExpressionType.Integer;
+
+            case "contains" or "startsWith" or "endsWith":
+                Need(call, name, types, 0, IsText, "text");
+                Need(call, name, types, 1, IsText, "text");
+                return ExpressionType.Boolean;
+
+            case "concat" or "lower" or "upper" or "trim":
+                for (var i = 0; i < count; i++)
+                {
+                    Need(call, name, types, i, IsText, "text");
+                }
+
+                return ExpressionType.Text;
+
+            case "abs" or "floor" or "ceiling":
+                Need(call, name, types, 0, IsNumber, "a number");
+                return types[0];
+
+            case "round":
+                Need(call, name, types, 0, IsNumber, "a number");
+                Need(call, name, types, 1, IsInteger, "integer");
+                return ExpressionType.Decimal;
+
+            case "year" or "month" or "day":
+                Need(call, name, types, 0, IsDate, "date");
+                return ExpressionType.Integer;
+
+            case "addDays":
+                Need(call, name, types, 0, IsDate, "date");
+                Need(call, name, types, 1, IsInteger, "integer");
+                return ExpressionType.Date;
+
+            case "daysBetween":
+                Need(call, name, types, 0, IsDate, "date");
+                Need(call, name, types, 1, IsDate, "date");
+                return ExpressionType.Integer;
+
+            case "coalesce":
+                return Combine(call, name, types, 0, context);
+
+            case "if":
+                Need(call, name, types, 0, type => type.Kind == ExpressionTypeKind.Boolean, "boolean");
+                return Combine(call, name, types, 1, context);
+
+            case "date" or "dateTime":
+                if (call.Arguments is not [TextLiteral])
+                {
+                    throw Fail(ExpressionDiagnosticCodes.TypeMismatch, $"Function '{name}' needs one text literal", call.Offset);
+                }
+
+                return name == "date" ? ExpressionType.Date : ExpressionType.DateTime;
+
+            default:
+                throw new InvalidOperationException($"The type checker has no rule for function '{name}'.");
+        }
+    }
+
+    /// <summary>Argument <paramref name="index"/> must be <c>null</c> or a type <paramref name="accepts"/> allows.</summary>
+    private static void Need(
+        CallNode call, string name, ExpressionType[] types, int index, Func<ExpressionType, bool> accepts, string needs)
+    {
+        var type = types[index];
+        if (type.Kind != ExpressionTypeKind.Null && !accepts(type))
+        {
+            throw Fail(
+                ExpressionDiagnosticCodes.TypeMismatch,
+                $"Function '{name}' needs {needs} for argument {index + 1}, found {type}",
+                call.Offset);
+        }
+    }
+
+    /// <summary>
+    /// The type of the <c>coalesce</c> arguments or <c>if</c> branches from <paramref name="first"/> on.
+    /// Every two of them must fit each other under the rules of <c>==</c>. An integer and a decimal
+    /// give a decimal, and an enum and a listed text literal give the enum. A decimal call is recorded,
+    /// so that the interpreter returns an integer it picks as a decimal.
+    /// </summary>
+    private static ExpressionType Combine(CallNode call, string name, ExpressionType[] types, int first, Context context)
+    {
+        var result = ExpressionType.Null;
+        for (var i = first; i < types.Length; i++)
+        {
+            for (var j = first; j < i; j++)
+            {
+                if (!Comparable(call.Arguments[j], types[j], call.Arguments[i], types[i]))
+                {
+                    throw Fail(
+                        ExpressionDiagnosticCodes.TypeMismatch,
+                        $"Function '{name}' cannot combine {types[j]} and {types[i]}",
+                        call.Offset);
+                }
+            }
+
+            if (result.Kind == ExpressionTypeKind.Null
+                || (result.Kind == ExpressionTypeKind.Integer && types[i].Kind == ExpressionTypeKind.Decimal)
+                || (result.Kind == ExpressionTypeKind.Text && types[i].Kind == ExpressionTypeKind.Enum))
+            {
+                result = types[i];
+            }
+        }
+
+        if (result.Kind == ExpressionTypeKind.Decimal)
+        {
+            context.DecimalCalls.Add(call);
         }
 
         return result;
@@ -139,18 +255,18 @@ public static class ExpressionTypeChecker
         }
     }
 
-    private static ExpressionType InferIsNull(IsNullNode isNull, ExpressionScope scope)
+    private static ExpressionType InferIsNull(IsNullNode isNull, Context context)
     {
-        Infer(isNull.Operand, scope);
+        Infer(isNull.Operand, context);
         return ExpressionType.Boolean;
     }
 
-    private static ExpressionType InferIn(InNode inNode, ExpressionScope scope)
+    private static ExpressionType InferIn(InNode inNode, Context context)
     {
-        var operand = Infer(inNode.Operand, scope);
+        var operand = Infer(inNode.Operand, context);
         foreach (var item in inNode.Items)
         {
-            var itemType = Infer(item, scope);
+            var itemType = Infer(item, context);
             if (!Comparable(inNode.Operand, operand, item, itemType))
             {
                 throw Fail(
@@ -215,6 +331,12 @@ public static class ExpressionTypeChecker
     private static bool IsNumber(ExpressionType type) =>
         type.Kind is ExpressionTypeKind.Integer or ExpressionTypeKind.Decimal;
 
+    private static bool IsText(ExpressionType type) => type.Kind == ExpressionTypeKind.Text;
+
+    private static bool IsInteger(ExpressionType type) => type.Kind == ExpressionTypeKind.Integer;
+
+    private static bool IsDate(ExpressionType type) => type.Kind == ExpressionTypeKind.Date;
+
     private static bool IsNumberOrNull(ExpressionType type) => IsNumber(type) || type.Kind == ExpressionTypeKind.Null;
 
     private static bool IsBooleanOrNull(ExpressionType type) =>
@@ -242,6 +364,9 @@ public static class ExpressionTypeChecker
         BinaryOperator.Divide => "/",
         _ => op.ToString(),
     };
+
+    /// <summary>What one check carries down the tree: the fields in scope, and the decimal calls found so far.</summary>
+    private sealed record Context(ExpressionScope Scope, HashSet<CallNode> DecimalCalls);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)
