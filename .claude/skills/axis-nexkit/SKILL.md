@@ -140,8 +140,12 @@ returns 404, upgrade `gh` and try again.
   owner while approving, however small, is commented in the same issue and
   `/nexkit plan` is run again. No follow-up issues.
 - Before each `/nexkit plan`, the issue body and collaborators' comments hold
-  every agreed choice on their own, written out in full. The plan agent never
-  sees earlier plans, so "as in the plan above" does not count.
+  every agreed choice on their own, with every value written out. The plan
+  agent never sees earlier plans, so "as in the plan above" does not count.
+- Agreed choices in a comment are terse: one short line each, with the exact
+  values, names and rules, and no reasons or prose. Nothing the issue or the
+  docs already say. See
+  [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
 - After a re-plan, compare the new plan with the last one. Look for agreed
   choices that came back changed.
 - Before asking the owner for go, or posting `/nexkit go`, the latest plan

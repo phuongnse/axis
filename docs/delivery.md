@@ -85,11 +85,17 @@ them.
    and `/nexkit plan` is run again before `/nexkit go`. The plan agent sees
    only the issue body, collaborators' comments and the note on the command.
    It never sees earlier plans, because the bot posts them. So a review
-   comment that accepts choices from a plan writes each one out in full: the
-   numbers, the names and the rules. "Accepted as in the plan" is not enough.
-   On #98 a comment accepted "the other choices listed under Decisions to
-   check", and the re-plan chose differently. `/nexkit go` only runs
-   on the latest plan, and that plan holds every agreed change. The reason:
+   comment that accepts choices from a plan writes out every value: the
+   numbers, the names and the rules. Write each choice tersely, on one short
+   line, and drop reasons and prose. The reasons are in the plan and the docs.
+   Write only what the plan agent could otherwise choose differently. Do not
+   repeat what the issue or the merged docs already say. Link to the doc
+   instead. For example:
+   `Accepted: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
+   "Accepted as in the plan" is not enough. On #98 a comment accepted "the
+   other choices listed under Decisions to check", and the re-plan chose
+   differently. On #99 a long, wordy comment led to mistakes. `/nexkit go`
+   only runs on the latest plan, and that plan holds every agreed change. The reason:
    the plan is the contract. It holds the acceptance criteria the pull request
    is checked against, and it is the record a later reader looks at. A change
    that lives only in a comment is missing from both. Re-planning also lets
