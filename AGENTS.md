@@ -31,7 +31,9 @@ Vietnamese.
   agreed.
 - Each issue is one behaviour. It has 2–5 acceptance criteria that a test or
   command can verify, and it fits in a single agent session. Split anything
-  larger before starting.
+  larger before starting. Its text names the concepts it touches, because
+  NexKit chooses the issue's [profile](docs/delivery.md#profiles) from the
+  issue text alone.
 - Build in vertical slices. Every milestone ends with something that runs
   end to end and is covered by an automated test.
 - Every behaviour change needs a test. Use real PostgreSQL through

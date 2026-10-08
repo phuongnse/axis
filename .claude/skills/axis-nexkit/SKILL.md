@@ -44,6 +44,15 @@ change with a NexKit release or a settings change.
   jq '.protected_paths, .max_auto_fixes' .nexkit/config.json
   ```
 
+- **Profiles, their `when` texts and models:** `.nexkit/config.json`. A
+  profile's stage settings override `stages`, which override the top-level
+  `model` and `effort`. The rules behind the profiles are in
+  [delivery.md](../../../docs/delivery.md#profiles).
+
+  ```bash
+  jq '{default_profile, triage: .stages.triage, profiles}' .nexkit/config.json
+  ```
+
 - **Required checks on `main`:** the active rules for the branch.
 
   ```bash
@@ -65,7 +74,15 @@ gh issue comment <N> --body "/nexkit plan"
 gh pr comment <N> --body "/nexkit fix <instructions>"
 ```
 
-Read the latest plan. It is the newest NexKit comment on the issue:
+Change the profile of an issue. A request written in the issue text does not
+count; it must be a comment:
+
+```bash
+gh issue comment <N> --body "/nexkit plan Use the hard profile"
+```
+
+Read the latest plan. It is the newest NexKit comment on the issue. It shows
+the profile, its models and why triage chose it:
 
 ```bash
 gh issue view <N> --comments
@@ -97,10 +114,22 @@ gh api -X POST repos/{owner}/{repo}/issues/<parent>/sub_issues -F sub_issue_id="
 `sub_issue_id` is the issue's database `id`, not its number. If the endpoint
 returns 404, upgrade `gh` and try again.
 
+## Checklist: writing an issue
+
+- One behaviour with 2–5 acceptance criteria, each checkable by a test or
+  command.
+- The text names the concepts the issue touches, in the terms of
+  [concepts.md](../../../docs/domain/concepts.md), even when it links to the
+  docs. Triage reads only the issue and its discussion, not the links.
+
 ## Checklist: reviewing a plan
 
 - The issue is one behaviour with 2–5 acceptance criteria, and each one can be
   checked by a test or command.
+- The profile in the plan comment fits the issue, judged against the `when`
+  texts. If not, re-plan with `/nexkit plan Use the <profile> profile`. If a
+  `when` text caused the wrong choice, tell the owner and propose a fix to
+  that text as a hand-made pull request.
 - Every doc link in the issue and the plan resolves.
 - No **Proposed** decision in [decisions.md](../../../docs/decisions.md) is
   treated as **Agreed**.
@@ -116,6 +145,14 @@ returns 404, upgrade `gh` and try again.
   is the record a later reader looks at. Re-planning also lets the plan agent
   find other places the change affects, such as another doc that must say the
   same.
+
+## Checklist: breaking down a milestone
+
+- Compare the `when` texts with the concepts that the **From** column of
+  [concepts.md](../../../docs/domain/concepts.md) lists for the new
+  milestone. Each risky concept must fall under `hard` by its consequence.
+- Check whether newer models make a profile's models out of date.
+- Propose any change to the owner as a hand-made pull request.
 
 ## Checklist: reviewing a pull request
 
@@ -134,6 +171,8 @@ returns 404, upgrade `gh` and try again.
 | A round ends as `blocked` | Answer the question with `/nexkit fix <decision>`. Ask the owner first when the choice is theirs. |
 | Merge conflict with `main` | Comment `/nexkit fix`. NexKit merges `main` into the branch. Answer any `blocked` question it asks. |
 | Conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
+| The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that profile is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
+| A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | The review job errored | Comment `/nexkit review` to retry. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
 | A CI run waits as `action_required` | Remind the owner and give them the run URL. |
