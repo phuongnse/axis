@@ -35,6 +35,16 @@ public sealed record ApplicationModel
         return entity is not null;
     }
 
+    /// <summary>Finds an entity by id; <see langword="null"/> when the application has none.</summary>
+    public EntityModel? FindEntity(Guid id) => Entities.FirstOrDefault(candidate => candidate.Id == id);
+
+    /// <summary>Whether a child-collection field of any entity names this entity, so it has no record routes of its own.</summary>
+    public bool IsChildEntity(EntityModel entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        return Entities.Any(owner => owner.Fields.Any(field => field.Type == FieldType.ChildCollection && field.Target?.Id == entity.Id));
+    }
+
     /// <summary>Finds a data source by name, ignoring letter case.</summary>
     public bool TryGetDataSource(string name, [NotNullWhen(true)] out DataSourceModel? dataSource)
     {

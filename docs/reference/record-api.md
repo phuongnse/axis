@@ -39,6 +39,7 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
     "quantity": 3,
     "price": 1250.50,
     "orderedAt": "2026-10-06T02:00:00.123456Z",
+    "parts": [{ "name": "Leg" }, { "name": "Top" }],
     "department": "0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b"
   },
   "labels": {
@@ -49,9 +50,8 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
 
 `values` holds every declared field of the entity under its declared name, in
 declaration order. A field that is SQL `NULL` is `null`; it is never left out.
-The exception is a `child-collection` field: until its rows are served
-*(planned for M2)*, every response leaves it out. List responses will keep
-leaving it out. See
+A `child-collection` field is an array of its rows, in their stored order. It
+is `[]` when the record has no rows. List responses leave it out. See
 [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
 
 `labels` maps each `reference` field that is not `null` to the display field
@@ -85,7 +85,7 @@ every record of the entity.
 | `date` | A string `yyyy-MM-dd` |
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
-| `child-collection` | Left out of every response for now. In a body it is an unknown property. An array of row objects is *(planned for M2)*. See [Child rows](#child-rows-computed-fields-and-validations) |
+| `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
 
 ## Paging and sorting
 
@@ -129,10 +129,13 @@ The parameters are digits only: a sign, a space or a repeated parameter
   `text/plain` or form body without a CORS preflight, so accepting it would
   open a CSRF path once M4 adds the session cookie. SameSite cookies and the
   M4 CSRF protection stay the main defence.
+- **One transaction.** A create or update writes the record and the rows of
+  its child collections in one transaction. When any write fails, nothing is
+  written, neither the owner nor any row.
 - **References.** Before the write, each non-null `reference` value is looked
-  up in the target table by id. The check and the write share the request's
-  connection without a transaction. The foreign key is the backstop: a target
-  removed in between is a foreign-key violation that maps to the same error.
+  up in the target table by id, in the write's transaction. The check does not
+  lock the target. The foreign key is the backstop: a target removed in
+  between is a foreign-key violation that maps to the same error.
 
 ## Concurrency
 
@@ -170,7 +173,9 @@ and then in storage (`404` or `409`).
   than `application/json` with an optional `utf-8` charset.
 - **`409` for a unique value.** A value that repeats the value of a `unique`
   field in another record is a validation problem with status `409`, whose
-  `errors` is keyed `/values/<field>`. The field is found by matching the
+  `errors` is keyed `/values/<field>`. A unique field of a child row repeats
+  a value of any row in the child table, and is keyed
+  `/values/<collection>/<index>/<field>`. The field is found by matching the
   violated constraint against the names the model declares.
 - **`409` for a stale version.** An update whose `version` is not the stored
   one.
@@ -190,8 +195,8 @@ messages, ever contains SQL, the `entities` schema, a table, column or
 constraint name, an exception type or a stack trace. The `errors` keys repeat
 the request's property names by design, so they can hold any text the request
 sent. A row of a child collection has a key such as
-`/values/lineItems/1/quantity` *(planned for M2)*. The integration tests check every error response of the record API for
-this.
+`/values/lineItems/1/quantity`. The integration tests check every error
+response of the record API for this.
 
 ## Request bodies and values
 
@@ -213,6 +218,13 @@ holding only the fields the body names.
 - **Field names.** A `values` property name must equal a declared field name
   exactly, so letter case matters. Any other name is an error at
   `/values/<name>`.
+- **Child collections.** A `child-collection` value must be an array of row
+  objects. `null` or any other JSON type is an error at
+  `/values/<collection>`, and an element that is not an object is an error at
+  `/values/<collection>/<index>`. Each row is parsed like a create body
+  against the child entity, with its errors keyed
+  `/values/<collection>/<index>/<field>`. A parsed row holds every field of
+  the child entity, and a field the row leaves out is SQL `NULL`.
 - **Duplicates.** A property name repeated in the body or in `values` is an
   error at that property's pointer; the repeated value is not parsed.
 - **Required fields.** On create, a required field that is missing or `null`
@@ -241,7 +253,8 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 **Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
 messages, in ordinal key order, usable as is for a validation problem
 response. The keys are `""` for the body, `/<property>` for a body property,
-`/values`, `/values/<field>` and `/version`. Pointers escape `~` as `~0` and
+`/values`, `/values/<field>`, `/values/<collection>/<index>`,
+`/values/<collection>/<index>/<field>` and `/version`. Pointers escape `~` as `~0` and
 `/` as `~1`; declared names never need it, but unknown names can. Each key has
 one fixed English message for the first problem found there, except that the
 message of a failed validation is its text key *(planned for M2)*, such as
@@ -252,8 +265,9 @@ text from the request; the key already says where the problem is.
 
 ## Child rows, computed fields and validations
 
-Everything in this section is *(planned for M2)* (D17). It changes the record
-shape, the bodies and the order of checks described above.
+Child rows are built: the record shape and the bodies described above include
+them. Computed fields and validations are *(planned for M2)* (D17). They change
+the bodies and the order of checks described above.
 
 A record with a child collection holds its rows inside `values`:
 
@@ -275,24 +289,30 @@ A record with a child collection holds its rows inside `values`:
 
 - **Rows.** A row is a flat object of the child entity's fields, in
   declaration order. It has no id. Rows are ordered by `position`, and the
-  array index is the position. Computed values are included.
+  array index is the position. Computed values will be included
+  *(planned for M2)*.
 - **Reads.** A single read and the response of a create or update include the
   collections. List responses leave them out.
 - **Create.** A missing collection means no rows. `null` is an error at
   `/values/<collection>`.
 - **Update.** A missing collection keeps its rows. An array replaces all the
   rows, in the same transaction, and increments the owner's `version`. `null`
-  is an error at `/values/<collection>`.
+  is an error at `/values/<collection>`. A stale `version` is a `409`, and no
+  row changes.
+- **No routes of its own.** A child entity has no record routes. Every method
+  on `/api/apps/{app}/entities/{child}/records` is a `404` with the same title
+  as an unknown entity.
 - **Parsing.** A row is parsed like a create body, so a required field of the
   child entity must be present in every row. An array element that is not an
   object is an error at its index. A row error is keyed
   `/values/<collection>/<index>/<field>`, with a zero-based index.
-- **Computed fields.** A body that sets a computed field, of the owner or of a
-  row, is an error at its pointer. The server calculates the value on every
-  write of the record. Child rows are calculated before the owner.
+- **Computed fields** *(planned for M2)*. A body that sets a computed field,
+  of the owner or of a row, is an error at its pointer. The server calculates
+  the value on every write of the record. Child rows are calculated before the
+  owner.
 - **Delete.** Deleting the owner deletes its rows.
 
-**Validations.** The order for a write is:
+**Validations** *(planned for M2)*. The order for a write is:
 
 1. Validations run only on a body that parsed cleanly. A body with parse
    errors is answered with those errors alone.

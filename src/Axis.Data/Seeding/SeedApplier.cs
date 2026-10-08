@@ -11,7 +11,9 @@ namespace Axis.Data.Seeding;
 /// <see cref="SeedModel.Sync"/> leaves existing records alone, also when they were edited. A synced
 /// seed updates an existing record whose declared values differ from the stored ones, through
 /// <see cref="RecordCommands.UpdateAsync"/>, so its version grows by one; an identical record is not
-/// written, undeclared fields keep their values, and no record is deleted. Seed values follow the
+/// written, undeclared fields keep their values, and no record is deleted. Only the owner's column
+/// values are compared, so a synced record whose only change is in its child rows is not written.
+/// Seed values follow the
 /// record API's rules: each record goes through <see cref="RecordInputParser"/> as a create body
 /// and is inserted by <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any
 /// write, and every parse problem is reported. The writes run in one transaction in path order of
@@ -44,7 +46,7 @@ public static class SeedApplier
             {
                 var record = seed.Records[index];
                 var body = JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, JsonElement> { ["values"] = record.Values });
-                var result = RecordInputParser.Parse(body, entity, RecordOperation.Create);
+                var result = RecordInputParser.Parse(body, entity, model, RecordOperation.Create);
                 if (result.Errors is { } errors)
                 {
                     diagnostics.AddRange(errors.Select(error => Invalid(seed, $"/records/{index}{error.Key}", error.Value[0])));
@@ -78,8 +80,8 @@ public static class SeedApplier
 
                 updating = found is not null;
                 result = found is { } stored
-                    ? await RecordCommands.UpdateAsync(connection, entity, id, stored.Version, input.Values, cancellationToken)
-                    : await RecordCommands.CreateAsync(connection, entity, input.Values, id, cancellationToken);
+                    ? await RecordCommands.UpdateAsync(connection, model, entity, id, stored.Version, input.Values, input.Rows, cancellationToken)
+                    : await RecordCommands.CreateAsync(connection, model, entity, input.Values, input.Rows, id, cancellationToken);
             }
             else
             {
@@ -88,7 +90,7 @@ public static class SeedApplier
                     continue;
                 }
 
-                result = await RecordCommands.CreateAsync(connection, entity, input.Values, id, cancellationToken);
+                result = await RecordCommands.CreateAsync(connection, model, entity, input.Values, input.Rows, id, cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)

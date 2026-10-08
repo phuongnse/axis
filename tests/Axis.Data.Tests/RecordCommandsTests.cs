@@ -13,16 +13,22 @@ public sealed class RecordCommandsTests
         "entities/order.json",
         Field("name", FieldType.Text));
 
+    private static readonly ApplicationModel _application = Application(_entity);
+
     [Fact]
-    public async Task Create_update_and_delete_reject_a_missing_entity_or_values_before_using_the_connection()
+    public async Task Create_update_and_delete_reject_a_missing_application_entity_values_or_rows_before_using_the_connection()
     {
         // The connection is never opened; the arguments are checked first.
         await using var connection = new NpgsqlConnection();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, null!, [], cancellationToken: TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _entity, null!, cancellationToken: TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, null!, Guid.NewGuid(), 1, [], cancellationToken: TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _entity, Guid.NewGuid(), 1, null!, cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, null!, _entity, [], [], cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _application, null!, [], [], cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _application, _entity, null!, [], cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.CreateAsync(connection, _application, _entity, [], null!, cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, null!, _entity, Guid.NewGuid(), 1, [], [], TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _application, null!, Guid.NewGuid(), 1, [], [], TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _application, _entity, Guid.NewGuid(), 1, null!, [], TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _application, _entity, Guid.NewGuid(), 1, [], null!, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.DeleteAsync(connection, null!, Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 }

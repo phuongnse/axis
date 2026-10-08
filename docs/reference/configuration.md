@@ -484,10 +484,8 @@ is `AXC0013`.
 This section adds validations, computed fields and child collections to an
 entity (D17). Child collection fields and their child tables are built.
 Validations, computed fields and the `expression` property are *(planned for
-M2)*, and so are the parts of the child collection rules that the record API
-serves. Expressions use the
-syntax of the [expression language](expressions.md), and diagnostic codes come
-with the issues that build each check.
+M2)*. Expressions use the syntax of the [expression language](expressions.md),
+and diagnostic codes come with the issues that build each check.
 
 ```json
 {
@@ -572,12 +570,13 @@ with the issues that build each check.
     [Child tables and computed columns](storage.md#child-tables-and-computed-columns).
 - **Child collections.** The field type `child-collection` needs a `target`
   that names the child entity. Its rows are read and written only through the
-  owner record *(planned for M2)*. Until then the record API leaves the field
-  out, as [the record API](record-api.md#reading-values) describes.
+  owner record, as
+  [the record API](record-api.md#child-rows-computed-fields-and-validations)
+  describes.
 - **M2 limits on a child entity.** These are limits of M2, not permanent
   rules. Real line items often point to a product, so a later milestone is
   expected to lift the last one. A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
-  - has no record routes of its own *(planned for M2)*;
+  - has no record routes of its own;
   - has no `reference` or `child-collection` fields (`AXC0041`).

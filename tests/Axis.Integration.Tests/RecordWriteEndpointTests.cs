@@ -26,6 +26,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
               "neededBy": "2026-10-06",
               "orderedAt": "2026-10-06T02:00:00.123456Z",
               "status": "open",
+              "parts": [],
               "department": "{{departmentId:D}}"
             }
             """;
@@ -105,7 +106,8 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
     public static TheoryData<bool, string, string> InvalidBodies => new()
     {
         { false, """{ "values": { "name": "Desk", "extra": 1 } }""", "/values/extra" },
-        { false, """{ "values": { "name": "Desk", "parts": [] } }""", "/values/parts" },
+        { false, """{ "values": { "name": "Desk", "parts": null } }""", "/values/parts" },
+        { false, """{ "values": { "name": "Desk", "parts": [5] } }""", "/values/parts/0" },
         { false, """{ "values": { "quantity": 1 } }""", "/values/name" },
         { false, """{ "values": { "name": "Desk", "quantity": "5" } }""", "/values/quantity" },
         { false, """{ "values": { "name": "Desk", "status": "pending" } }""", "/values/status" },
@@ -114,7 +116,7 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
         { false, """[ { "values": {} } ]""", "" },
         { true, """{ "values": { "quantity": 1 } }""", "/version" },
         { true, $$"""{ "version": 1, "values": { "department": "{{Guid.NewGuid()}}" } }""", "/values/department" },
-        { true, """{ "version": 1, "values": { "parts": [{ "name": "Leg" }] } }""", "/values/parts" },
+        { true, """{ "version": 1, "values": { "parts": [{ "name": "Leg" }, { "name": 5 }] } }""", "/values/parts/1/name" },
         { true, "not json", "" },
         { true, "42", "" },
     };

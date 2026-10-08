@@ -14,6 +14,13 @@ public sealed class RecordInputParserTests
         "entities/department.json",
         Field("name", FieldType.Text));
 
+    private static readonly EntityModel _line = Entity(
+        Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e02"),
+        "Line",
+        "entities/line.json",
+        Field("name", FieldType.Text, required: true, maxLength: 5),
+        Field("qty", FieldType.Integer));
+
     private static readonly EntityModel _entity = Entity(
         Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a01"),
         "Order",
@@ -27,7 +34,9 @@ public sealed class RecordInputParserTests
         Field("at", FieldType.DateTime),
         Field("status", FieldType.Enum, values: ["Open", "Closed"]),
         Field("dept", FieldType.Reference, target: _target),
-        Field("lines", FieldType.ChildCollection, target: _target));
+        Field("lines", FieldType.ChildCollection, target: _line));
+
+    private static readonly ApplicationModel _application = Application(_entity, _target, _line);
 
     private static readonly string[] _forbidden =
     [
@@ -65,7 +74,6 @@ public sealed class RecordInputParserTests
         { """{ "values": { "title": "Hi", "Count": 1 } }""", RecordOperation.Create, "/values/Count", "Count" },
         { """{ "values": { "title": "Hi", "a/b~c": 1 } }""", RecordOperation.Create, "/values/a~1b~0c", "a/b~c" },
         { """{ "values": { "title": "Hi", "count": 1, "count": 2 } }""", RecordOperation.Create, "/values/count", "count" },
-        { """{ "values": { "title": "Hi", "lines": [] } }""", RecordOperation.Create, "/values/lines", "lines" },
 
         // Required fields.
         { """{ "values": {} }""", RecordOperation.Create, "/values/title", null },
@@ -136,6 +144,21 @@ public sealed class RecordInputParserTests
         { """{ "values": { "title": "Hi", "dept": "7c2e4f103b1a4d5e8f601a2b3c4d5e01" } }""", RecordOperation.Create, "/values/dept", "7c2e4f103b1a4d5e8f601a2b3c4d5e01" },
         { """{ "values": { "title": "Hi", "dept": "{7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e01}" } }""", RecordOperation.Create, "/values/dept", "{7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e01}" },
 
+        // child-collection rows
+        { """{ "values": { "title": "Hi", "lines": null } }""", RecordOperation.Create, "/values/lines", null },
+        { """{ "values": { "lines": null }, "version": 1 }""", RecordOperation.Update, "/values/lines", null },
+        { """{ "values": { "title": "Hi", "lines": { "name": "Leg" } } }""", RecordOperation.Create, "/values/lines", null },
+        { """{ "values": { "title": "Hi", "lines": [5] } }""", RecordOperation.Create, "/values/lines/0", null },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": "Leg" }, null] } }""", RecordOperation.Create, "/values/lines/1", null },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": "Leg", "colour": 1 }] } }""", RecordOperation.Create, "/values/lines/0/colour", "colour" },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": "Leg", "Qty": 1 }] } }""", RecordOperation.Create, "/values/lines/0/Qty", "Qty" },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": "Leg", "name": "Top" }] } }""", RecordOperation.Create, "/values/lines/0/name", "name" },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": 5 }] } }""", RecordOperation.Create, "/values/lines/0/name", null },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": "abcdef" }] } }""", RecordOperation.Create, "/values/lines/0/name", "abcdef" },
+        { """{ "values": { "title": "Hi", "lines": [{ "name": "Leg" }, { "qty": 1 }] } }""", RecordOperation.Create, "/values/lines/1/name", null },
+        { """{ "values": { "lines": [{ "qty": 1 }] }, "version": 1 }""", RecordOperation.Update, "/values/lines/0/name", null },
+        { """{ "values": { "lines": [{ "name": null }] }, "version": 1 }""", RecordOperation.Update, "/values/lines/0/name", null },
+
         // version on update
         { """{ "values": {} }""", RecordOperation.Update, "/version", null },
         { """{ "values": {}, "version": 1.5 }""", RecordOperation.Update, "/version", "1.5" },
@@ -194,7 +217,7 @@ public sealed class RecordInputParserTests
 
         foreach (var body in bodies)
         {
-            var result = RecordInputParser.Parse(body, _entity, RecordOperation.Create);
+            var result = RecordInputParser.Parse(body, _entity, _application, RecordOperation.Create);
 
             Assert.Null(result.Input);
             Assert.NotNull(result.Errors);
@@ -269,9 +292,40 @@ public sealed class RecordInputParserTests
         Assert.Null(result.Errors);
         Assert.NotNull(result.Input);
         Assert.Equal(7L, result.Input.Version);
+        Assert.Empty(result.Input.Rows);
         Assert.Equal(
             new (string, object?)[] { ("count", null), ("status", "Closed") },
             result.Input.Values.Select(value => (value.Field.Name, value.Value)));
+    }
+
+    [Fact]
+    public void Valid_rows_hold_every_child_field_in_declaration_order()
+    {
+        var result = Parse(
+            """{ "values": { "lines": [{ "qty": 2, "name": "Leg" }, { "name": "Top" }], "title": "Hi" } }""",
+            RecordOperation.Create);
+
+        Assert.Null(result.Errors);
+        Assert.NotNull(result.Input);
+        Assert.Equal(["title"], result.Input.Values.Select(value => value.Field.Name));
+        var rows = Assert.Single(result.Input.Rows);
+        Assert.Equal("lines", rows.Collection.Name);
+        Assert.Same(_line, rows.Child);
+        Assert.Equal(
+            ["name=Leg qty=2", "name=Top qty="],
+            rows.Rows.Select(row => string.Join(" ", row.Select(value => $"{value.Field.Name}={value.Value}"))));
+    }
+
+    [Fact]
+    public void Empty_array_is_a_collection_with_no_rows()
+    {
+        var result = Parse("""{ "version": 1, "values": { "lines": [] } }""", RecordOperation.Update);
+
+        Assert.NotNull(result.Input);
+        Assert.Empty(result.Input.Values);
+        var rows = Assert.Single(result.Input.Rows);
+        Assert.Equal("lines", rows.Collection.Name);
+        Assert.Empty(rows.Rows);
     }
 
     [Fact]
@@ -368,5 +422,5 @@ public sealed class RecordInputParserTests
     }
 
     private static RecordInputResult Parse(string json, RecordOperation operation) =>
-        RecordInputParser.Parse(Encoding.UTF8.GetBytes(json), _entity, operation);
+        RecordInputParser.Parse(Encoding.UTF8.GetBytes(json), _entity, _application, operation);
 }
