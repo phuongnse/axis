@@ -23,7 +23,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Entity** | A business record type. Each entity becomes a typed PostgreSQL table in the tenant database. | M1 |
 | **Field** | A typed attribute of an entity, with constraints. | M1 |
 | **Computed field** | A field whose value comes from an expression over the record's own fields and its child rows. It is stored and recomputed on every write. | M2 |
-| **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. | M2 |
+| **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. See [data sources](../reference/data-sources.md). | M2 |
 | **Sequence** | A counter that hands out business numbers, such as `PR-2026-00042`, inside the caller's transaction. | M3 |
 | **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. | M1 (basic), M2 |
 

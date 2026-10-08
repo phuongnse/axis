@@ -17,8 +17,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   adds no styling of its own.
 - **How pages and widgets grow.** M1 has one widget per page and binds it to
   an entity. Container widgets such as tabs, sections and columns will hold
-  other widgets. Data sources, navigate actions and shared `form` resources
-  are expected to replace the M1 shortcuts; see
+  other widgets. Data sources are agreed in
+  [D18](../decisions.md#d18-data-sources--agreed) and described in
+  [data-sources.md](data-sources.md). Navigate actions and shared `form`
+  resources are expected to replace the other M1 shortcuts; see
   [D15](../decisions.md#d15-presentation-model--agreed), where those parts are
   still **Proposed**.
 - **Text.** All UI strings come from text resources.
@@ -126,7 +128,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | --- | --- |
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one |
   | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=` |
+  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values *(planned for M2)* |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
 
@@ -154,6 +156,46 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `sort`, and leaves out defaults (page 1, 20 a page, no sort). It changes
     only its own three parameters: any other parameter, such as `x=1`, stays
     as it is.
+  - **Data source binding** *(planned for M2)*. A table may name a
+    `dataSource` instead of an `entity`. See
+    [data-sources.md](data-sources.md#widget-binding). Page metadata then
+    gives the widget `"entity": null` and a `dataSource` object. An entity
+    widget has `"dataSource": null`.
+
+    ```json
+    "dataSource": {
+      "name": "OpenRequests",
+      "rowsPath": "/api/apps/PurchasingApp/data-sources/OpenRequests/rows",
+      "entity": "PurchaseRequest",
+      "parameters": [
+        {
+          "name": "statusFilter", "type": "enum", "required": false,
+          "labelKey": "requests.statusFilter",
+          "values": ["draft", "submitted", "approved", "rejected"], "target": null
+        }
+      ],
+      "pageSize": 20,
+      "columns": [
+        {
+          "name": "status", "type": "enum", "labelKey": "request.status",
+          "values": ["draft", "submitted", "approved", "rejected"], "target": null
+        }
+      ]
+    }
+    ```
+
+    - **Parameters.** A parameter's `labelKey` is the text key of its label, or
+      `null` when it has none. `values` and `target` are `null` when the type
+      has none.
+    - **Columns.** There is one column per projected field, in order. The
+      header is the label of the field the path ends at, else the projected
+      name. A measure's header is its name.
+    - **Filter inputs.** There is one input per parameter, of the kind the form
+      widget uses for that type. It shows the parameter's label, or its name
+      when `labelKey` is `null`.
+    - **URL state.** The parameter values live in the URL under the parameter
+      names. The widget writes them before `page`, `pageSize` and `sort`.
+    - **Rows.** The table requests its rows from `rowsPath`.
   - **Changes.** A new sort or page size starts again at page 1, because the
     old page number means nothing under a new order or size. Only the
     pagination control moves between pages. Each change adds a history entry.

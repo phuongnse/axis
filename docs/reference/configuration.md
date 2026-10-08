@@ -83,7 +83,7 @@ flowchart LR
    seeds in path order with their entity resolved. No model
    is produced while any error remains.
 3. **Check** *(planned for M2)*. Expressions (see
-   [Expression language](expressions.md)), data source fields, form
+   [Expression language](expressions.md)), [data source](data-sources.md#compile-checks) fields, form
    bindings and operation inputs are type-checked. M1 has no check step; the
    model goes straight to the release.
 4. **Release.** The compiled application is stored as a release with a
@@ -340,6 +340,10 @@ site, and its widgets are its content:
   that opens one of its records.
 - The page has no entity or template of its own, so more widgets and a
   layout can be added later without a format change.
+- A `table` widget may name a `dataSource` instead of an `entity`
+  *(planned for M2)*. See [data sources](data-sources.md). The `dataSource`
+  kind is not in the Load step's list of kinds yet. It is added by the issue
+  that builds it.
 
 A `seed` holds records with fixed ids for one entity:
 

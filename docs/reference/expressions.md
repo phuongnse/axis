@@ -85,7 +85,9 @@ Rules:
 - **Widening.** An integer widens to a decimal when it is mixed with one. No
   other conversion is implicit. Text never becomes a number or a date.
 - **Enums.** Two enum values compare only when both come from the same
-  field's value set, or when one side is a text literal. A text literal
+  field's value set, or when one side is a text literal. A data source
+  parameter of type `enum` also compares with an enum field when every value
+  in the parameter's `values` is one of the field's `values`. A text literal
   compared with an enum must be one of the field's `values`, compared
   ordinally. Otherwise it is a type error at compile time.
 - **Result type.** Each use sets the type its expression must have.
