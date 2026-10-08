@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -303,7 +303,13 @@ describe('App', () => {
 
     renderApp()
 
-    const link = await screen.findByRole('link', { name: 'E2E notes' })
+    await screen.findByRole('link', { name: 'E2E notes' })
+    // Spin keeps the list blurred, with pointer-events: none, for one commit after loading ends.
+    const link = await waitFor(() => {
+      const found = screen.getByRole('link', { name: 'E2E notes' })
+      expect(found.closest('.ant-spin-blur')).toBeNull()
+      return found
+    })
     expect(link).toHaveAttribute('href', '/e2e')
     await userEvent.click(link)
     expect(await screen.findByText('All notes')).toBeInTheDocument()
