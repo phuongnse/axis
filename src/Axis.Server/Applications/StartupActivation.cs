@@ -11,7 +11,7 @@ namespace Axis.Server.Applications;
 
 /// <summary>
 /// Migrates every configured tenant database, then compiles and activates the configured
-/// application folders in it and inserts their missing seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
+/// application folders in it and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
 /// Restarting with unchanged folders stores no new release and only refreshes the activation time.
@@ -89,7 +89,7 @@ internal sealed partial class StartupActivation(
                         throw Failure("could not be seeded", seeded.Diagnostics, folder, tenantId);
                     }
 
-                    LogSeeded(seeded.Inserted, folder, tenantId);
+                    LogSeeded(seeded.Inserted, seeded.Updated, folder, tenantId);
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -130,8 +130,8 @@ internal sealed partial class StartupActivation(
     [LoggerMessage(LogLevel.Information, "Activated application {Application} release {ReleaseId} from folder {Folder} for tenant {TenantId}.")]
     private partial void LogActivated(string application, Guid releaseId, string folder, string tenantId);
 
-    [LoggerMessage(LogLevel.Information, "Inserted {Count} seed record(s) from folder {Folder} for tenant {TenantId}.")]
-    private partial void LogSeeded(int count, string folder, string tenantId);
+    [LoggerMessage(LogLevel.Information, "Inserted {Inserted} seed record(s) and updated {Updated} from folder {Folder} for tenant {TenantId}.")]
+    private partial void LogSeeded(int inserted, int updated, string folder, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Activating application folder {Folder} for tenant {TenantId} failed.")]
     private partial void LogFailed(Exception exception, string folder, string tenantId);

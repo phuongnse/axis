@@ -33,6 +33,7 @@ public sealed class SeedApplierTests
         var result = await SeedApplier.ApplyAsync(model, connection, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result.Inserted);
+        Assert.Equal(0, result.Updated);
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.InvalidSeedValue, diagnostic.Code));
         Assert.Equal(
             [

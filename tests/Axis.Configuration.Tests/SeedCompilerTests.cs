@@ -30,11 +30,26 @@ public sealed class SeedCompilerTests
             (Guid.Parse("77777777-7777-4777-8777-777777777771"), "Orders", "seeds/orders.json"),
             (seed.Id, seed.Name, seed.File));
         Assert.Equal(new EntityReference(Guid.Parse("11111111-1111-4111-8111-111111111111"), "Order"), seed.Entity);
+        Assert.False(seed.Sync);
         Assert.Equal([Guid.Parse(FirstRecordId), Guid.Parse(SecondRecordId)], seed.Records.Select(record => record.Id));
         Assert.Equal("A-2", seed.Records[1].Values.GetProperty("number").GetString());
         Assert.NotNull(before.ContentHash);
         Assert.NotNull(result.ContentHash);
         Assert.NotEqual(before.ContentHash, result.ContentHash);
+    }
+
+    [Fact]
+    public void Seed_with_sync_is_synced_in_the_model()
+    {
+        using var folder = Folder().With(
+            "seeds/orders.json",
+            $$"""{ "id": "77777777-7777-4777-8777-777777777771", "kind": "seed", "name": "Orders", "formatVersion": 1, "entity": "Order", "sync": true, "records": [{{Record(FirstRecordId, """{ "number": "A-1" }""")}}] }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(Assert.Single(result.Model.Seeds).Sync);
     }
 
     [Fact]

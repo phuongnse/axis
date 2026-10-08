@@ -14,6 +14,12 @@ public sealed record SeedModel
 
     public required EntityReference Entity { get; init; }
 
+    /// <summary>
+    /// Whether existing records are kept in step with the file: a record whose declared values
+    /// differ is updated. Without it, existing records are left alone.
+    /// </summary>
+    public bool Sync { get; init; }
+
     /// <summary>The seed records, in file order.</summary>
     public required IReadOnlyList<SeedRecordDefinition> Records { get; init; }
 }

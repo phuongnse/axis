@@ -10,6 +10,7 @@
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "entity": { "$ref": "#/$defs/name" },
+    "sync": { "type": "boolean" },
     "records": {
       "type": "array",
       "items": { "$ref": "#/$defs/record" }

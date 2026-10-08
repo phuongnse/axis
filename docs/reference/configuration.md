@@ -210,7 +210,7 @@ sorted by file and then path.
 | `AXC0030` | A reference field's target entity has no `displayField`. Reported at `/fields/{i}/target`. |
 | `AXC0031` | A site path is active for another application. Reported at `/path` of the site file; nothing is provisioned or activated. |
 | `AXC0032` | A seed's `entity` names no loaded entity. Reported at `/entity`. |
-| `AXC0033` | A seed value is one the record API would reject, or the seed record could not be inserted, for example because a reference names no record. Reported by the startup step at `/records/{i}/values/<field>` of the seed file, or at `/records/{i}` when the stored schema does not match the active model. |
+| `AXC0033` | A seed value is one the record API would reject, or the seed record could not be inserted or updated, for example because a reference names no record. Reported by the startup step at `/records/{i}/values/<field>` of the seed file, or at `/records/{i}` when the stored schema does not match the active model. |
 | `AXC0034` | An earlier seed record of the application already uses this record id. Reported at `/records/{i}/id` of the later record, naming the file of the first one. |
 
 ## Startup activation
@@ -238,21 +238,31 @@ development or E2E server serves a real application without a separate step.
   release stays active, and the first failing tenant stops the whole start,
   so no server runs with some tenants on old releases and others on new ones.
 - **Seeding.** After a folder is activated in a tenant, the step inserts
-  every seed record whose id the entity table does not hold yet. Existing
-  records are left alone, including records edited through the UI, so
+  every seed record whose id the entity table does not hold yet, so
   restarts never duplicate seeds. Only the id decides: a seed record that was
-  deleted is inserted again on the next start. Each record goes through the
-  record input parser as a create body and is inserted by the record create
-  command, so the record API's rules apply. Every record is parsed before any
-  insert, and every invalid value is `AXC0033` at
-  `/records/{i}/values/<field>`. Then all inserts of the folder run in one
-  transaction, seed files in path order and records in file order, so a
-  reference value must name an existing record or one inserted earlier in
-  the same run. The first record that storage refuses, for a missing
-  reference, a duplicate unique value or a schema conflict, is reported as
-  `AXC0033`, and the transaction is rolled back. Any
-  `AXC0033` stops the start like any other diagnostic, and the release stays
-  active.
+  deleted is inserted again on the next start. What happens to a record
+  that already exists depends on the seed's `sync` setting:
+  - Without `sync`, existing records are left alone, including records
+    edited through the UI.
+  - With `sync`, a record whose declared values differ from the stored ones
+    is updated by the record update command, and its version grows by one.
+    PostgreSQL compares the typed values, so `1.5` equals a stored `1.50`.
+    A record that is identical is not written, and its version stays the
+    same. Fields the seed does not declare keep their stored values, and a
+    record removed from the seed file stays in the table. A `null` value
+    clears the stored field.
+
+  Each record goes through the record input parser as a create body, so the
+  record API's rules apply, and a synced seed still needs every required
+  field. Every record is parsed before any write, and every invalid value is
+  `AXC0033` at `/records/{i}/values/<field>`. Then all inserts and updates of
+  the folder run in one transaction, seed files in path order and records in
+  file order, so a reference value must name an existing record or one
+  inserted earlier in the same run. The first record that storage refuses,
+  for a missing reference, a duplicate unique value or a schema conflict, is
+  reported as `AXC0033`, and the transaction is rolled back. Any `AXC0033`
+  stops the start like any other diagnostic, and the release stays active.
+  The step logs how many seed records it inserted and updated.
 - **Restarts.** Restarting with unchanged folders is safe. An unchanged
   folder returns its stored release, and activating the active release again
   only updates its activation time. After a failure, the next start
@@ -354,6 +364,7 @@ A `seed` holds records with fixed ids for one entity:
   "name": "Departments",
   "formatVersion": 1,
   "entity": "Department",
+  "sync": true,
   "records": [
     { "id": "0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b", "values": { "name": "Finance" } }
   ]
@@ -363,6 +374,10 @@ A `seed` holds records with fixed ids for one entity:
 - Each record's `id` is the record id, fixed so that the startup step
   inserts the record once. It is unique across every seed file of the
   application (`AXC0034`).
+- `sync` is optional and defaults to `false`. When `true`, the startup step
+  keeps existing records in step with the file. It writes only the fields
+  the seed declares and never deletes a record (see
+  [Startup activation](#startup-activation)).
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
 - Seed files are inserted in path order, so a seed whose records reference
