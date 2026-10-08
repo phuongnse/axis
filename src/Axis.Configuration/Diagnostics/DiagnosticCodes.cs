@@ -46,4 +46,6 @@ public static class DiagnosticCodes
     public const string InvalidDataSourceFieldPath = "AXC0043";
     public const string DuplicateDataSourceFieldName = "AXC0044";
     public const string InvalidDataSourceSort = "AXC0045";
+
+    public const string UnknownValidationField = "AXC0052";
 }

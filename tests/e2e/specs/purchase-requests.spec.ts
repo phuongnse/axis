@@ -65,6 +65,32 @@ test('a purchase request is created with a seeded department and supplier, edite
   await expect(page).toHaveURL(tablePath)
 })
 
+test('a total amount of zero or less shows the sample rule under Total amount, in light and dark mode', async ({ page }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const title = `Negative ${run}`
+  await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
+  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await choose(page, 'Department', 'Finance')
+  await page.getByLabel('Total amount', { exact: true }).fill('-1')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const error = page.getByTestId('field-error-totalAmount')
+  await expect(error).toHaveText('Total amount must be greater than zero.')
+  await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
+
+  await page.getByRole('switch', { name: 'Dark mode' }).click()
+  const dark = page.locator('[data-theme-mode="dark"]')
+  await dark.getByRole('button', { name: 'Save' }).click()
+  await expect(dark.getByTestId('field-error-totalAmount')).toHaveText('Total amount must be greater than zero.')
+  await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
+
+  await dark.getByLabel('Total amount', { exact: true }).fill('1')
+  await dark.getByRole('button', { name: 'Save' }).click()
+  await expect(page).toHaveURL(tablePath)
+  await expect(page.getByRole('row', { name: new RegExp(`${title} `) })).toContainText('1.00')
+})
+
 test('switching the locale to Vietnamese shows the Vietnamese navigation', async ({ page }) => {
   await page.goto('/purchasing/purchaserequests')
   await expect(page.getByRole('menuitem', { name: 'Purchase requests' })).toBeVisible()

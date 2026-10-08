@@ -44,6 +44,8 @@ internal static class RecordInputMessages
 
     public const string NotUnique = "Must be unique.";
 
+    public const string NotEvaluable = "Cannot be evaluated exactly.";
+
     public static string MaxLength(int maxLength) =>
         string.Create(CultureInfo.InvariantCulture, $"Must be at most {maxLength} characters.");
 

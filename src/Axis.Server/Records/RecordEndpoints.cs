@@ -13,7 +13,9 @@ namespace Axis.Server.Records;
 /// names no active application, entity or record is a 404 before the query or body is checked; a
 /// child entity is no entity here. A create or update writes the record and its child rows in one
 /// transaction.
-/// A body is checked in order: content type (415), then body (400), then storage (404, 409).
+/// A body is checked in order: content type (415), then body (400), then the entity's
+/// validations on the record as it will be stored (400), then storage (404, 409). An update of an
+/// entity with validations reads the stored record first, so an unknown record is a 404 there.
 /// A delete is 204, or 404 or 409 from storage. The problem titles never contain text from the
 /// request.
 /// </summary>
@@ -135,6 +137,11 @@ internal static class RecordEndpoints
         }
 
         var input = parsed.Input!;
+        if (RecordValidator.ValidateCreate(model, input.Values, input.Rows) is { } failures)
+        {
+            return Results.ValidationProblem(failures);
+        }
+
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -182,6 +189,24 @@ internal static class RecordEndpoints
 
         var input = parsed.Input!;
         var connection = await database.GetConnectionAsync(cancellationToken);
+
+        // The stored record is read outside the write transaction. The client read its version
+        // earlier, so a write that passes the version check finds the record as validated here.
+        Record? stored = null;
+        if (model.Validations.Count > 0)
+        {
+            stored = await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken);
+            if (stored is null)
+            {
+                return RecordNotFound();
+            }
+        }
+
+        if (RecordValidator.ValidateUpdate(model, stored, input.Values, input.Rows) is { } failures)
+        {
+            return Results.ValidationProblem(failures);
+        }
+
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {

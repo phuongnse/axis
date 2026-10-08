@@ -184,12 +184,14 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
       for (const pointer of pointers) {
         const name = pointer.startsWith(fieldPointer) ? pointer.slice(fieldPointer.length) : null
         const cell = name === null ? null : cellOf(name)
+        // A failed validation's message is a text key. A fixed message is no key, so it shows as is.
+        const messages = problem.errors[pointer].map((message) => t(message))
         if (cell) {
-          onCells[cell.collection] = { ...onCells[cell.collection], [cell.key]: problem.errors[pointer] }
+          onCells[cell.collection] = { ...onCells[cell.collection], [cell.key]: messages }
         } else if (name !== null && entity.fields.some((field) => field.name === name)) {
-          onFields[name] = problem.errors[pointer]
+          onFields[name] = messages
         } else {
-          onForm.push(...problem.errors[pointer])
+          onForm.push(...messages)
         }
       }
       setFieldErrors(onFields)

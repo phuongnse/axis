@@ -10,4 +10,7 @@ public sealed record EntityResource : Resource
     /// such a field is checked by <see cref="Compilation.ApplicationCompiler"/>.
     /// </summary>
     public string? DisplayField { get; init; }
+
+    /// <summary>The validation rules, in declaration order. They are checked by <see cref="Compilation.ApplicationCompiler"/>.</summary>
+    public IReadOnlyList<ValidationDefinition> Validations { get; init; } = [];
 }

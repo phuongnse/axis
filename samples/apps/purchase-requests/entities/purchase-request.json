@@ -19,5 +19,12 @@
     },
     { "name": "submittedAt", "type": "date-time", "label": { "textKey": "purchaseRequest.submittedAt" } },
     { "name": "decisionComments", "type": "text", "maxLength": 2000, "label": { "textKey": "purchaseRequest.decisionComments" } }
+  ],
+  "validations": [
+    {
+      "expression": "totalAmount is null or totalAmount > 0",
+      "message": { "textKey": "purchaseRequest.totalAmountPositive" },
+      "field": "totalAmount"
+    }
   ]
 }

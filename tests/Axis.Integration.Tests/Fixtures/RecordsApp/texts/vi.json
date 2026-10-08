@@ -11,6 +11,10 @@
     "items.title": "Mặt hàng",
     "itemForm.title": "Mặt hàng",
     "departments.title": "Phòng ban",
-    "item.department": "Phòng ban"
+    "item.department": "Phòng ban",
+    "item.quantityPositive": "Số lượng phải lớn hơn không.",
+    "item.priceNotNegative": "Giá không được âm.",
+    "item.closedInactive": "Mặt hàng đã đóng không thể hoạt động.",
+    "itemPart.noLeadingSpace": "Tên bộ phận không được bắt đầu bằng khoảng trắng."
   }
 }

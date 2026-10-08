@@ -20,6 +20,10 @@ internal static class ModelAssert
                 Assert.Equal(expectedField with { Values = null }, actualField with { Values = null });
                 Assert.Equal(expectedField.Values, actualField.Values);
             }
+
+            Assert.Equal(
+                expectedEntity.Validations.Select(validation => (validation.Expression, validation.Message, validation.Field)),
+                actualEntity.Validations.Select(validation => (validation.Expression, validation.Message, validation.Field)));
         }
 
         Assert.Equal(expected.Sites.Count, actual.Sites.Count);

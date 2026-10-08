@@ -10,7 +10,7 @@ conventions of [architecture.md](../architecture.md) apply: sections marked
 flowchart LR
     Folder[Application folder] --> Load[Load + schema validation]
     Load --> Resolve[Resolve references]
-    Resolve --> Check["Type-check expressions and bindings (planned for M2)"]
+    Resolve --> Check[Type-check expressions and bindings]
     Check --> Release[Immutable release]
     Release --> Activate[Plan and apply schema changes, activate]
 ```
@@ -108,10 +108,15 @@ flowchart LR
    seeds in path order with their entity resolved, and the data sources in
    path order with their entity and projected fields resolved. No model
    is produced while any error remains.
-3. **Check** *(planned for M2)*. Expressions (see
-   [Expression language](expressions.md)), [data source](data-sources.md#compile-checks) fields, form
-   bindings and operation inputs are type-checked. M1 has no check step; the
-   model goes straight to the release.
+3. **Check.** Each entity's [validations](#entity-logic) are parsed and
+   type-checked against the entity's own fields, and must be boolean. A
+   problem in the expression is reported with its
+   [expression diagnostic](expressions.md#diagnostics) code at
+   `/validations/{i}/expression`. A `field` that names no field of the
+   entity, ignoring letter case, is `AXC0052` at `/validations/{i}/field`,
+   and the `message` joins the `AXC0028` check. A validation with an error
+   produces no model. [Data source](data-sources.md#compile-checks) filters,
+   form bindings and operation inputs join this step as they are built.
 4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
    - **Content hash.** Every resource file is canonicalized as in RFC 8785
@@ -255,6 +260,7 @@ sorted by file and then path.
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
 | `AXC0050` | An expression calls a function that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
 | `AXC0051` | An expression calls a function with the wrong number of arguments, such as `round(1.5)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
+| `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
 
 ## Startup activation
 
@@ -298,7 +304,8 @@ development or E2E server serves a real application without a separate step.
   Each record goes through the record input parser as a create body, so the
   record API's rules apply, and a synced seed still needs every required
   field. Every record is parsed before any write, and every invalid value is
-  `AXC0033` at `/records/{i}/values/<field>`. Then all inserts and updates of
+  `AXC0033` at `/records/{i}/values/<field>`. Seed records are not run
+  through the entity's [validations](#entity-logic) yet. Then all inserts and updates of
   the folder run in one transaction, seed files in path order and records in
   file order, so a reference value must name an existing record or one
   inserted earlier in the same run. The first record that storage refuses,
@@ -484,10 +491,14 @@ is `AXC0013`.
 ## Entity logic
 
 This section adds validations, computed fields and child collections to an
-entity (D17). Child collection fields and their child tables are built.
-Validations, computed fields and the `expression` property are *(planned for
-M2)*. Expressions use the syntax of the [expression language](expressions.md),
-and diagnostic codes come with the issues that build each check.
+entity (D17). Child collection fields, their child tables and validations are
+built. Computed fields and the `expression` property are *(planned for M2)*.
+Expressions use the syntax of the [expression language](expressions.md), and
+diagnostic codes come with the issues that build each check. A validation
+cannot name a `child-collection` field in its expression yet, because only
+aggregates such as `count` read one and they are not built. The examples
+below show the target shape: their `count`, `sum` and named rule calls do not
+compile today.
 
 ```json
 {
@@ -553,10 +564,11 @@ and diagnostic codes come with the issues that build each check.
     key is the message of a failure.
   - `field`, which names a field of the same entity.
 
-  The server runs them on create and update, on the record as it will be
-  stored and after computed fields are calculated. A validation fails when its
-  condition is `false` or `null`. The validations of a child entity run on
-  each row. See
+  The expression reads the entity's own fields by name. The server runs the
+  validations on create and update, on the record as it will be stored and
+  after computed fields are calculated. A validation fails when its condition
+  is `false` or `null`, or stops with a run-time error. The validations of a
+  child entity run on each row the body sends. See
   [the record API](record-api.md#child-rows-computed-fields-and-validations).
 - **Computed fields.** A field with an `expression` is a computed field.
   - The expression type must match the field's type.

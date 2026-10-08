@@ -13,5 +13,10 @@
     { "name": "status", "type": "enum", "values": ["open", "closed"] },
     { "name": "parts", "type": "child-collection", "target": "ItemPart" },
     { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "item.department" } }
+  ],
+  "validations": [
+    { "expression": "quantity is null or quantity > 0", "message": { "textKey": "item.quantityPositive" }, "field": "quantity" },
+    { "expression": "price is null or price >= 0", "message": { "textKey": "item.priceNotNegative" }, "field": "price" },
+    { "expression": "status != 'closed' or active != true", "message": { "textKey": "item.closedInactive" }, "field": "status" }
   ]
 }

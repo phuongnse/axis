@@ -153,8 +153,8 @@ fixed and never contain text from the request.
 A request is checked in this order, and the first failure is the response:
 the path (`404`), the content type (`415`), the body (`400`), then storage
 (`400`, `404` or `409`). A request with the wrong content type is answered
-before its body is read. Validations *(planned for M2)* are a step between the
-body and storage: see
+before its body is read. Validations are a step between the body and
+storage: see
 [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations). A delete has no body, so it is checked for the path
 and then in storage (`404` or `409`).
 
@@ -169,6 +169,9 @@ and then in storage (`404` or `409`).
   values") is a validation problem whose `errors` is keyed by JSON Pointer. A
   `reference` value that names no record of the target entity is an error at
   `/values/<field>`.
+- **`400` for a validation.** A record that breaks one of its entity's
+  validations is a validation problem keyed at the validation's field. See
+  [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
 - **`415`.** A `POST` or `PATCH` without `Content-Type` or with any type other
   than `application/json` with an optional `utf-8` charset.
 - **`409` for a unique value.** A value that repeats the value of a `unique`
@@ -256,18 +259,18 @@ response. The keys are `""` for the body, `/<property>` for a body property,
 `/values`, `/values/<field>`, `/values/<collection>/<index>`,
 `/values/<collection>/<index>/<field>` and `/version`. Pointers escape `~` as `~0` and
 `/` as `~1`; declared names never need it, but unknown names can. Each key has
-one fixed English message for the first problem found there, except that the
-message of a failed validation is its text key *(planned for M2)*, such as
-"Unknown property." or "Must be at most 200 characters.". Messages may use
+one fixed English message for the first problem found there, such as
+"Unknown property." or "Must be at most 200 characters.". The message of a
+failed validation is its text key instead. Messages may use
 field type names and limits from the model. They never contain a table,
 column, constraint or schema name, a PostgreSQL type name, exception text, or
 text from the request; the key already says where the problem is.
 
 ## Child rows, computed fields and validations
 
-Child rows are built: the record shape and the bodies described above include
-them. Computed fields and validations are *(planned for M2)* (D17). They change
-the bodies and the order of checks described above.
+Child rows and validations are built: the record shape and the bodies
+described above include them. Computed fields are *(planned for M2)* (D17).
+They change the bodies described above.
 
 A record with a child collection holds its rows inside `values`:
 
@@ -312,15 +315,18 @@ A record with a child collection holds its rows inside `values`:
   owner.
 - **Delete.** Deleting the owner deletes its rows.
 
-**Validations** *(planned for M2)*. The order for a write is:
+**Validations.** The order for a write is:
 
 1. Validations run only on a body that parsed cleanly. A body with parse
    errors is answered with those errors alone.
 2. On update, the stored record is read first. An unknown record is still a
    `404`, never a validation `400`. The server then builds the record as it
    will be stored: the stored values, the changes from the body and the
-   computed fields.
-3. The validations of the entity and of each row run. Any failure is a `400`.
+   computed fields. So a change to one field can break a validation
+   reported on another.
+3. The validations of the entity and of each row the body sends run. Rows
+   an update leaves out are unchanged and are not checked again. Any failure
+   is a `400`.
 4. Storage runs. It answers as described above, for example `409` for a stale
    `version`.
 
@@ -333,7 +339,11 @@ the client as the user types comes in M3.
 
 A run-time error in an expression, or a computed value that does not fit its
 field, such as one with more fraction digits than `scale`, rejects the write
-with a `400` at that field's pointer. Values are never rounded.
+with a `400` at that field's pointer. Values are never rounded. So on an entity
+with validations, a `decimal` value that the interpreter cannot hold exactly
+(see [expression types](expressions.md#types)) is a `400` at its own
+pointer, with the message "Cannot be evaluated exactly.", and no validation
+of that record runs.
 
 For example, a create or update with `quantity` `0` in the second row is
 answered with `400`:
