@@ -19,7 +19,8 @@ public sealed class DataSourceSortTests
         "entities/order.json",
         Field("name", FieldType.Text),
         Field("count", FieldType.Integer),
-        Field("customer", FieldType.Reference, target: _customer));
+        Field("customer", FieldType.Reference, target: _customer),
+        Field("lines", FieldType.ChildCollection, target: _customer));
 
     private static readonly DataSourceModel _dataSource = new()
     {
@@ -31,6 +32,9 @@ public sealed class DataSourceSortTests
         [
             new DataSourceFieldModel("title", _order.Fields[0]),
             new DataSourceFieldModel("customer", _order.Fields[2]),
+
+            // The compiler rejects a projected child collection; the parser does not rely on it.
+            new DataSourceFieldModel("lines", _order.Fields[3]),
         ],
         Sort = new DataSourceSortModel("title", Descending: true),
     };
@@ -52,10 +56,11 @@ public sealed class DataSourceSortTests
     [InlineData("count")]
     [InlineData("customer")]
     [InlineData("-customer")]
+    [InlineData("lines")]
     [InlineData("")]
     [InlineData("-")]
     [InlineData("--title")]
-    public void Unprojected_reference_or_other_text_does_not_parse(string text)
+    public void Unprojected_reference_child_collection_or_other_text_does_not_parse(string text)
     {
         Assert.False(DataSourceSort.TryParse(text, _dataSource, out var sort));
 

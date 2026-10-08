@@ -93,8 +93,9 @@ flowchart LR
      fields and sort are not checked further. A name whose entity file was
      not loaded because of its own errors is not reported again. Each `path`
      must name a field of that entity, ignoring letter case, otherwise it is
-     `AXC0043` at `/fields/{i}/path`. A dotted path through a reference is
-     `AXC0043` too until relations are built. Projected names compare
+     `AXC0043` at `/fields/{i}/path`. A path naming a `child-collection`
+     field is `AXC0043` too, because that field has no column. So is a
+     dotted path through a reference, until relations are built. Projected names compare
      exactly: a name that an earlier entry of `fields` already uses is
      `AXC0044` at `/fields/{i}/name`. The `sort`, without its leading `-`,
      must exactly match a projected name whose field is not a `reference`,
@@ -245,7 +246,7 @@ sorted by file and then path.
 | `AXC0040` | A reference field's target is a child entity. Reported at `/fields/{i}/target`, naming the owner. |
 | `AXC0041` | A child entity has a `reference` or `child-collection` field. Reported at `/fields/{i}/type` of that field, naming the owner. |
 | `AXC0042` | A data source's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
-| `AXC0043` | A data source field's `path` names no field of the data source's entity, or goes through a reference, which is not supported yet. Reported at `/fields/{i}/path`. |
+| `AXC0043` | A data source field's `path` names no field of the data source's entity, names a `child-collection` field, which has no column, or goes through a reference, which is not supported yet. Reported at `/fields/{i}/path`. |
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
 | `AXC0045` | A data source's `sort` names no projected field, or names a projected `reference` field. Reported at `/sort`. |
 

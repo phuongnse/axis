@@ -8,7 +8,7 @@ public sealed record DataSourceSort(DataSourceFieldModel Field, bool Descending)
 {
     /// <summary>
     /// Parses a projected field name, optionally preceded by one <c>-</c> for descending order.
-    /// The name is matched exactly. A projected reference field cannot be sorted by.
+    /// The name is matched exactly. A projected reference or child collection field cannot be sorted by.
     /// </summary>
     public static bool TryParse(string text, DataSourceModel dataSource, [NotNullWhen(true)] out DataSourceSort? sort)
     {
@@ -17,7 +17,7 @@ public sealed record DataSourceSort(DataSourceFieldModel Field, bool Descending)
 
         var descending = text.StartsWith('-');
         var name = descending ? text[1..] : text;
-        sort = dataSource.TryGetField(name, out var field) && field.Field.Type != FieldType.Reference
+        sort = dataSource.TryGetField(name, out var field) && field.Field.HasColumn && field.Field.Type != FieldType.Reference
             ? new DataSourceSort(field, descending)
             : null;
         return sort is not null;

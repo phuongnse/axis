@@ -450,9 +450,9 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// Checks the data sources: each names a loaded entity, each projected <c>path</c> is a single
-    /// field of that entity, projected names are unique, and the default <c>sort</c> names a
-    /// projected field that is not a reference. Entity and field names resolve ignoring letter
-    /// case; projected names compare exactly, as the query <c>sort</c> does.
+    /// field of that entity that is not a child collection, projected names are unique, and the
+    /// default <c>sort</c> names a projected field that is not a reference. Entity and field names
+    /// resolve ignoring letter case; projected names compare exactly, as the query <c>sort</c> does.
     /// </summary>
     private static void CheckDataSources(ApplicationLoadResult loaded, Func<string, EntityResource?> findEntity, List<Diagnostic> diagnostics)
     {
@@ -482,7 +482,10 @@ public static class ApplicationCompiler
             {
                 var projected = dataSource.Fields[index];
                 var field = projected.Path.Contains('.', StringComparison.Ordinal) ? null : FindField(entity, projected.Path);
-                if (!fieldsByName.TryAdd(projected.Name, field))
+                var isChildCollection = field is not null && FieldTypes.Parse(field.Type) == FieldType.ChildCollection;
+
+                // A child collection has no column, so it is stored as an invalid path for the sort check.
+                if (!fieldsByName.TryAdd(projected.Name, isChildCollection ? null : field))
                 {
                     Report(
                         DiagnosticCodes.DuplicateDataSourceFieldName,
@@ -495,6 +498,13 @@ public static class ApplicationCompiler
                     Report(
                         DiagnosticCodes.InvalidDataSourceFieldPath,
                         $"The path '{projected.Path}' must name a field of the entity '{entity.Name}'. Paths through references are not supported yet.",
+                        $"/fields/{index}/path");
+                }
+                else if (isChildCollection)
+                {
+                    Report(
+                        DiagnosticCodes.InvalidDataSourceFieldPath,
+                        $"The path '{projected.Path}' names the child collection '{field.Name}'. A data source cannot project a child collection.",
                         $"/fields/{index}/path");
                 }
             }

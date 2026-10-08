@@ -80,7 +80,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`entity`.** The root entity. In M2 it cannot be a child entity.
 - **`fields`.** The projection, in order. Each entry has a `name`, which is
   the key in a row, and a `path` to a value of the root entity.
-- **`path`.** A field name of the root entity, ignoring letter case.
+- **`path`.** A field name of the root entity, ignoring letter case. It
+  cannot name a `child-collection` field.
   *(Planned for M2)*: a dotted path through `reference` fields, with at most 3 hops,
   as in [expressions.md](expressions.md#names-and-references). A path cannot
   go through or end at a `child-collection`. A `null` reference along the
@@ -134,8 +135,9 @@ see the Data sources bullet of the Resolve step in
 [configuration.md](configuration.md):
 
 - `entity` names a loaded entity (`AXC0042`).
-- Each `path` names a field of the root entity (`AXC0043`). A dotted path is
-  `AXC0043` until paths through references are built.
+- Each `path` names a field of the root entity that is not a
+  `child-collection` (`AXC0043`). A dotted path is `AXC0043` until paths
+  through references are built.
 - Field names are unique, compared exactly (`AXC0044`).
 - `sort` names a projected field that is not a `reference` (`AXC0045`).
 - `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
@@ -145,7 +147,7 @@ diagnostic codes. The codes come with the issue that builds them.
 
 - `entity` is not a child entity.
 - Each `path` resolves through `reference` fields only, takes at most 3 hops,
-  and never goes through or ends at a `child-collection`.
+  and never goes through a `child-collection`.
 - Parameter names are unique, and measure names are
   unique. A measure name also differs from every group field, because both
   are keys of one row.

@@ -22,6 +22,19 @@ public sealed class DataSourceCompilerTests
           "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
         """;
 
+    private const string LineItem = """
+        { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "LineItem", "formatVersion": 1,
+          "fields": [ { "name": "description", "type": "text" } ] }
+        """;
+
+    private const string Invoice = """
+        { "id": "44444444-4444-4444-8444-444444444444", "kind": "entity", "name": "Invoice", "formatVersion": 1,
+          "fields": [
+            { "name": "number", "type": "text", "required": true },
+            { "name": "lines", "type": "child-collection", "target": "LineItem" }
+          ] }
+        """;
+
     [Fact]
     public void Valid_data_source_is_in_the_model_with_its_entity_fields_sort_and_page_size_and_changes_the_content_hash()
     {
@@ -118,6 +131,30 @@ public sealed class DataSourceCompilerTests
         Assert.Contains("'total'", result.Diagnostics[0].Message, StringComparison.Ordinal);
         Assert.Contains("not supported yet", result.Diagnostics[1].Message, StringComparison.Ordinal);
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Path_naming_a_child_collection_is_reported_at_that_path_and_its_sort_is_not_reported_again()
+    {
+        // A child collection has no column on the owner table, so it cannot be projected or sorted by.
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/line-item.json", LineItem)
+            .With("entities/invoice.json", Invoice)
+            .With("data-sources/invoices.json", DataSource(
+                "Invoice",
+                """[{ "name": "number", "path": "number" }, { "name": "lines", "path": "Lines" }]""",
+                """, "sort": "lines" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDataSourceFieldPath, "data-sources/invoices.json", "/fields/1/path"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("child collection 'lines'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
         Assert.Null(result.Model);
     }
 
