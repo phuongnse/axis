@@ -89,7 +89,7 @@ public static class RecordQueries
     internal static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
 
     /// <summary>
-    /// The id, the version, then every field in declaration order, all of the row named
+    /// The id, the version, then every column field in declaration order, all of the row named
     /// <paramref name="alias"/>; decimals as text so no digit is lost. Then the display field of
     /// each reference's target, joined by <see cref="LabelJoins"/>.
     /// </summary>
@@ -99,7 +99,7 @@ public static class RecordQueries
         return string.Join(", ", [
             row + EntityNaming.Quote(EntityNaming.IdColumn),
             row + EntityNaming.Quote(EntityNaming.VersionColumn),
-            .. entity.Fields.Select(field =>
+            .. Columns(entity).Select(field =>
                 row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")),
             .. References(entity).Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"),
@@ -121,21 +121,29 @@ public static class RecordQueries
     private static string LabelAlias(int index) => $"l{index}";
 
     private static IEnumerable<FieldModel> References(EntityModel entity) =>
-        entity.Fields.Where(field => field.Type == FieldType.Reference);
+        Columns(entity).Where(field => field.Type == FieldType.Reference);
+
+    /// <summary>
+    /// The fields stored in a column of the entity table, in declaration order. A child collection
+    /// has none, so it is left out of every read and write.
+    /// </summary>
+    internal static IReadOnlyList<FieldModel> Columns(EntityModel entity) =>
+        [.. entity.Fields.Where(field => field.HasColumn)];
 
     internal static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity)
     {
-        var values = new Dictionary<string, JsonValue?>(entity.Fields.Count, StringComparer.Ordinal);
-        for (var index = 0; index < entity.Fields.Count; index++)
+        var columns = Columns(entity);
+        var values = new Dictionary<string, JsonValue?>(columns.Count, StringComparer.Ordinal);
+        for (var index = 0; index < columns.Count; index++)
         {
-            var field = entity.Fields[index];
+            var field = columns[index];
             var ordinal = index + 2;
             values[field.Name] = reader.IsDBNull(ordinal) ? null : ReadValue(reader, ordinal, field);
         }
 
         // A null reference, or a target whose display column is NULL, has no label.
         var labels = new Dictionary<string, string>(StringComparer.Ordinal);
-        var labelOrdinal = entity.Fields.Count + 2;
+        var labelOrdinal = columns.Count + 2;
         foreach (var field in References(entity))
         {
             if (!reader.IsDBNull(labelOrdinal))

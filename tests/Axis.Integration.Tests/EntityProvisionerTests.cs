@@ -21,6 +21,7 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
     private readonly Guid _customerId = Guid.NewGuid();
     private readonly Guid _orderId = Guid.NewGuid();
     private readonly Guid _supplierId = Guid.NewGuid();
+    private readonly Guid _lineId = Guid.NewGuid();
 
     private const string NumberField = """{ "name": "number", "type": "text", "required": true, "maxLength": 20 }""";
 
@@ -73,6 +74,48 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
 
         Assert.Empty(result.Diagnostics);
         Assert.Equal([$"""ALTER TABLE "entities"."{EntityNaming.Table(_customerId)}" ADD COLUMN "f_phone" character varying(30)"""], result.Statements);
+        await AssertCatalogMatchesAsync(changed, hasRows: false, tablesWithRows: _customerId);
+        Assert.Equal([rowId], await ReadIdsAsync(_customerId));
+    }
+
+    [Fact]
+    public async Task Child_table_has_owner_and_position_and_its_rows_are_deleted_with_their_owner()
+    {
+        var model = ChildModel(BaseModel());
+
+        var result = await ProvisionAsync(model);
+
+        Assert.Empty(result.Diagnostics);
+        await AssertCatalogMatchesAsync(model, hasRows: false);
+        var ownerId = await InsertCustomerAsync();
+        var otherOwnerId = await InsertCustomerAsync();
+        await InsertLineAsync(ownerId, 0);
+        await InsertLineAsync(ownerId, 1);
+        var otherLineId = await InsertLineAsync(otherOwnerId, 0);
+
+        await ExecuteAsync($"""DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_customerId))} WHERE "id" = @id""", ownerId);
+
+        Assert.Equal([otherLineId], await ReadIdsAsync(_lineId));
+    }
+
+    [Fact]
+    public async Task Added_child_collection_creates_only_the_child_table_and_keeps_the_owner_rows()
+    {
+        var model = BaseModel();
+        await ProvisionAsync(model);
+        var rowId = await InsertCustomerAsync();
+        var changed = ChildModel(model);
+
+        var result = await ProvisionAsync(changed);
+
+        Assert.Empty(result.Diagnostics);
+        var lineTable = EntityNaming.Table(_lineId);
+        Assert.Equal(
+            [
+                $"""CREATE TABLE "entities"."{lineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" character varying(200), CONSTRAINT "pk_{lineTable}" PRIMARY KEY ("id"))""",
+                $"""ALTER TABLE "entities"."{lineTable}" ADD CONSTRAINT "{EntityNaming.ForeignKey(lineTable, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{EntityNaming.Table(_customerId)}" ("id") ON DELETE CASCADE""",
+            ],
+            result.Statements);
         await AssertCatalogMatchesAsync(changed, hasRows: false, tablesWithRows: _customerId);
         Assert.Equal([rowId], await ReadIdsAsync(_customerId));
     }
@@ -336,6 +379,14 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         return WithApplicationId(Application(customer, order, supplier), _applicationId);
     }
 
+    // Customer owns Line through a child collection between its other fields.
+    private ApplicationModel ChildModel(ApplicationModel model)
+    {
+        var line = Entity(_lineId, "Line", "entities/line.json", Field("description", FieldType.Text, maxLength: 200));
+        var changed = ChangeEntity(model, _customerId, fields => [fields[0], Field("lines", FieldType.ChildCollection, target: line), .. fields.Skip(1)]);
+        return changed with { Entities = [.. changed.Entities, line] };
+    }
+
     private static ApplicationModel WithApplicationId(ApplicationModel model, Guid applicationId) =>
         model with { Manifest = model.Manifest with { Id = applicationId } };
 
@@ -365,6 +416,27 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         command.Parameters.AddWithValue("id", id);
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
+    }
+
+    private async Task<Guid> InsertLineAsync(Guid ownerId, int position)
+    {
+        var id = Guid.NewGuid();
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand(
+            $"""INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(_lineId))} ("id", "owner_id", "position", "f_description") VALUES (@id, @owner, @position, 'Desk')""");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("owner", ownerId);
+        command.Parameters.AddWithValue("position", position);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+        return id;
+    }
+
+    private async Task ExecuteAsync(string sql, Guid id)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("id", id);
+        await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
     private async Task<List<Guid>> ReadIdsAsync(Guid entityId)

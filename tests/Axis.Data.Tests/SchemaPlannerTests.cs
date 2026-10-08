@@ -11,10 +11,12 @@ public sealed class SchemaPlannerTests
 {
     private const string CustomerTable = "e_22222222222242228222222222222222";
     private const string OrderTable = "e_11111111111141118111111111111111";
+    private const string LineTable = "e_44444444444444448444444444444444";
 
     private static readonly Guid _customerId = Guid.Parse("22222222-2222-4222-8222-222222222222");
     private static readonly Guid _orderId = Guid.Parse("11111111-1111-4111-8111-111111111111");
     private static readonly Guid _supplierId = Guid.Parse("33333333-3333-4333-8333-333333333333");
+    private static readonly Guid _lineId = Guid.Parse("44444444-4444-4444-8444-444444444444");
 
     [Fact]
     public void Empty_catalog_creates_every_table_before_any_foreign_key_and_records_entities_and_enum_values()
@@ -361,6 +363,154 @@ public sealed class SchemaPlannerTests
         AssertNothingPlanned(plan);
     }
 
+    [Fact]
+    public void Empty_catalog_creates_a_child_table_with_owner_and_position_and_a_cascading_foreign_key_last()
+    {
+        var model = ChildModel();
+
+        var plan = SchemaPlanner.Plan(model, CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "f_title" character varying(100) NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE TABLE "entities"."{LineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" text, "f_quantity" bigint NOT NULL, CONSTRAINT "pk_{LineTable}" PRIMARY KEY ("id"))""",
+                OwnerForeignKey(LineTable, OrderTable),
+            ],
+            plan.Statements);
+        Assert.Equal(
+            [new ProvisionedEntity(_orderId, Models.ApplicationId, OrderTable), new ProvisionedEntity(_lineId, Models.ApplicationId, LineTable)],
+            plan.NewEntities);
+    }
+
+    [Fact]
+    public void Child_collection_added_to_a_table_with_rows_creates_only_the_child_table_and_its_foreign_key()
+    {
+        var model = BaseModel();
+        var line = Line();
+        var changed = ChangeOrder(model, fields => [.. fields, Field("lines", FieldType.ChildCollection, target: line)]);
+        changed = changed with { Entities = [.. changed.Entities, line] };
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""CREATE TABLE "entities"."{LineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" text, "f_quantity" bigint NOT NULL, CONSTRAINT "pk_{LineTable}" PRIMARY KEY ("id"))""",
+                OwnerForeignKey(LineTable, OrderTable),
+            ],
+            plan.Statements);
+        Assert.Equal([new ProvisionedEntity(_lineId, Models.ApplicationId, LineTable)], plan.NewEntities);
+    }
+
+    [Fact]
+    public void Unchanged_child_table_plans_nothing()
+    {
+        var model = ChildModel();
+
+        var plan = SchemaPlanner.Plan(model, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Child_table_whose_owner_column_has_no_foreign_key_gets_one()
+    {
+        var model = ChildModel();
+        var catalog = ChangeColumns(
+            Catalog(model, hasRows: true),
+            LineTable,
+            columns => columns.Select(column => column.Name == EntityNaming.OwnerColumn ? column with { ReferencedTable = null } : column));
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([OwnerForeignKey(LineTable, OrderTable)], plan.Statements);
+    }
+
+    [Fact]
+    public void Existing_table_that_becomes_a_child_table_is_reported_at_the_owner_target()
+    {
+        // Supplier already has a table, so it has no owner column.
+        var model = BaseModel();
+        var changed = ChangeOrder(model, fields => [.. fields, Field("suppliers", FieldType.ChildCollection, target: Supplier())]);
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: false), Models.Records(model));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/6/target", _orderId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'Supplier'", diagnostic.Message, StringComparison.Ordinal);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Child_table_that_changes_its_owner_is_reported_at_the_new_owner_target()
+    {
+        var model = ChildModel();
+        var customer = Customer();
+        var changed = model with
+        {
+            Entities =
+            [
+                Order(customer) with { Fields = [Field("title", FieldType.Text, required: true, maxLength: 100)] },
+                customer with { Fields = [.. customer.Fields, Field("lines", FieldType.ChildCollection, target: Line())] },
+                Line(),
+            ],
+        };
+        var catalog = new CatalogSnapshot([.. Catalog(model, hasRows: true).Tables, .. Catalog(Application(customer), hasRows: true).Tables]);
+        var records = new ProvisioningRecords([.. Models.Records(model).Entities, .. Models.Records(Application(customer)).Entities], []);
+
+        var plan = SchemaPlanner.Plan(changed, catalog, records);
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.IncompatibleFieldChange, "entities/customer.json", "/fields/1/target", _customerId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'Customer'", diagnostic.Message, StringComparison.Ordinal);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Entity_that_stops_being_a_child_reports_its_owner_and_position_columns_as_removed_fields()
+    {
+        var model = ChildModel();
+        var changed = model with
+        {
+            Entities = [.. model.Entities.Select(entity => entity.Id == _orderId ? entity with { Fields = [entity.Fields[1]] } : entity)],
+        };
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Equal(
+            [(DiagnosticCodes.RemovedField, "entities/line.json"), (DiagnosticCodes.RemovedField, "entities/line.json")],
+            plan.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File)));
+        Assert.Contains("'owner_id'", plan.Diagnostics[0].Message + plan.Diagnostics[1].Message, StringComparison.Ordinal);
+        Assert.Contains("'position'", plan.Diagnostics[0].Message + plan.Diagnostics[1].Message, StringComparison.Ordinal);
+        AssertNothingPlanned(plan);
+    }
+
+    private static EntityModel Line() =>
+        Entity(
+            _lineId,
+            "Line",
+            "entities/line.json",
+            Field("description", FieldType.Text),
+            Field("quantity", FieldType.Integer, required: true));
+
+    // Order owns Line through the child collection between its two column fields.
+    private static ApplicationModel ChildModel() =>
+        Application(
+            Entity(
+                _orderId,
+                "Order",
+                "entities/order.json",
+                Field("lines", FieldType.ChildCollection, target: Line()),
+                Field("title", FieldType.Text, required: true, maxLength: 100)),
+            Line());
+
     private static EntityModel Customer() =>
         Entity(_customerId, "Customer", "entities/customer.json", Field("name", FieldType.Text, required: true));
 
@@ -388,7 +538,13 @@ public sealed class SchemaPlannerTests
         ChangeOrder(model, fields => [.. fields.Select((field, i) => i == index ? change(field) : field)]);
 
     private static CatalogSnapshot ChangeOrderColumns(CatalogSnapshot catalog, Func<IEnumerable<CatalogColumn>, IEnumerable<CatalogColumn>> change) =>
-        new([.. catalog.Tables.Select(table => table.Name == OrderTable ? table with { Columns = [.. change(table.Columns)] } : table)]);
+        ChangeColumns(catalog, OrderTable, change);
+
+    private static CatalogSnapshot ChangeColumns(CatalogSnapshot catalog, string tableName, Func<IEnumerable<CatalogColumn>, IEnumerable<CatalogColumn>> change) =>
+        new([.. catalog.Tables.Select(table => table.Name == tableName ? table with { Columns = [.. change(table.Columns)] } : table)]);
+
+    private static string OwnerForeignKey(string table, string ownerTable) =>
+        $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{ownerTable}" ("id") ON DELETE CASCADE""";
 
     private static string ForeignKey(string table, string column, string targetTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "entities"."{targetTable}" ("id")""";

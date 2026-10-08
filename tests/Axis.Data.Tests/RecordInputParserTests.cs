@@ -26,7 +26,8 @@ public sealed class RecordInputParserTests
         Field("day", FieldType.Date),
         Field("at", FieldType.DateTime),
         Field("status", FieldType.Enum, values: ["Open", "Closed"]),
-        Field("dept", FieldType.Reference, target: _target));
+        Field("dept", FieldType.Reference, target: _target),
+        Field("lines", FieldType.ChildCollection, target: _target));
 
     private static readonly string[] _forbidden =
     [
@@ -64,6 +65,7 @@ public sealed class RecordInputParserTests
         { """{ "values": { "title": "Hi", "Count": 1 } }""", RecordOperation.Create, "/values/Count", "Count" },
         { """{ "values": { "title": "Hi", "a/b~c": 1 } }""", RecordOperation.Create, "/values/a~1b~0c", "a/b~c" },
         { """{ "values": { "title": "Hi", "count": 1, "count": 2 } }""", RecordOperation.Create, "/values/count", "count" },
+        { """{ "values": { "title": "Hi", "lines": [] } }""", RecordOperation.Create, "/values/lines", "lines" },
 
         // Required fields.
         { """{ "values": {} }""", RecordOperation.Create, "/values/title", null },
@@ -240,7 +242,7 @@ public sealed class RecordInputParserTests
         Assert.Null(result.Errors);
         Assert.NotNull(result.Input);
         Assert.Null(result.Input.Version);
-        Assert.Equal(_entity.Fields, result.Input.Values.Select(value => value.Field));
+        Assert.Equal(_entity.Fields.Where(field => field.HasColumn), result.Input.Values.Select(value => value.Field));
 
         var values = result.Input.Values.Select(value => value.Value).ToList();
         Assert.Equal("😀😀😀😀😀", Assert.IsType<string>(values[0]));
