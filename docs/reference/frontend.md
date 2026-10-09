@@ -206,9 +206,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Parameters.** A parameter's `labelKey` is the text key of its label, or
       `null` when it has none. `values` and `target` are `null` when the type
       has none.
-    - **Columns.** There is one column per projected field, in order. The
-      header is the label of the field the path ends at, else the projected
-      name. A measure's header is its name *(planned for M2)*. Sorting,
+    - **Columns.** There is one column per projected field, in order. For a
+      grouped data source, the columns are the group fields in `groupBy`
+      order, then the measures. The header is the label of the field the
+      path ends at, else the projected name. A measure has no `labelKey`, so
+      its header is its name. A `count` is an `integer` column, a `sum` is a
+      `decimal` column, and a `min` or `max` has its field's type. Sorting,
       values and labels follow the rules below, by the column's type.
     - **Page size.** The data source's `pageSize` is the table's default page
       size. It is offered with 10, 20, 50 and 100 when it is not one of them,
@@ -243,7 +246,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       failures.
     - **Rows.** The table requests its rows from `rowsPath`. A row carries
       the id of its root record, so its open link and the create button go
-      to the `formPage` as for an entity table.
+      to the `formPage` as for an entity table. A group row of a grouped data
+      source has `id: null`. A table over a grouped data source has no form
+      page, so it has no open link and no create button.
   - **Changes.** A new sort or page size starts again at page 1, because the
     old page number means nothing under a new order or size. Only the
     pagination control moves between pages. Each change adds a history entry.

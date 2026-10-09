@@ -12,9 +12,9 @@ the read endpoint, the response and the errors. Parts of this file are built:
 - the `table` widget binding, with the data source's schema in page metadata,
   its columns, paging and sorting
 - the filter inputs of a bound table, with their values in the URL
+- the table binding of grouped data sources
 
-The rest is marked *(planned for M2)*: a table bound to a grouped data
-source. Dn refers to
+Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -349,8 +349,8 @@ The `errors` keys repeat the request's parameter names by design.
 
 ## Widget binding
 
-The table binding and its filter inputs are built. Grouped data sources are
-*(planned for M2)*.
+The table binding and its filter inputs are built, for plain and grouped
+data sources.
 
 - **Widgets.** Only the `table` widget binds to a data source. A `form` that
   names a `dataSource` is `AXC0060`. A widget names an `entity` or a
@@ -361,14 +361,14 @@ The table binding and its filter inputs are built. Grouped data sources are
   optional, otherwise it is `AXC0060`. It shows one filter input per
   parameter and sends their values from the URL. See
   [Table widget](frontend.md) for the details.
-- **Grouped data sources.** A table cannot bind a data source with an
-  `aggregate` yet (`AXC0060`). The table builds its columns from `fields`
-  and opens records by `id`, and a group row has neither *(planned for
-  M2)*.
+- **Grouped data sources.** A table may bind a data source with an
+  `aggregate`. Each row is a group. Its columns are the group fields in
+  `groupBy` order, then the measures. A group row has `id: null`, so it has
+  no open link.
 - **Form page.** A `formPage` must be a form over the root entity
-  (`AXC0022`), because each row carries the id of its root record. It is not
-  allowed with an `aggregate`, because a group is not a record *(planned for
-  M2)*.
+  (`AXC0022`), because each row carries the id of its root record. A
+  `formPage` on a table over a data source with an `aggregate` is also
+  `AXC0022`, because a group is not a record.
 - **Page parameters.** Values that come from navigation wait for the
   navigation bullet of
   [D15](../decisions.md#d15-presentation-model--agreed), which is still

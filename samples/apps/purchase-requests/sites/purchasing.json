@@ -8,6 +8,7 @@
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
     { "page": "PurchaseRequests", "label": { "textKey": "nav.purchaseRequests" } },
+    { "page": "RequestsByDepartment", "label": { "textKey": "nav.requestsByDepartment" } },
     { "page": "Departments", "label": { "textKey": "nav.departments" } },
     { "page": "Suppliers", "label": { "textKey": "nav.suppliers" } }
   ]

@@ -29,7 +29,9 @@ public sealed record EntityMetadata(string Name, string? LabelKey, string? Displ
 
 /// <summary>
 /// The data source a table widget shows: the path of its rows endpoint, its root entity, its
-/// parameters, its default page size and its projected columns in declaration order.
+/// parameters, its default page size and its columns. The columns are the projected fields in
+/// declaration order or, for a grouped data source, the group fields in <c>groupBy</c> order and then
+/// the measures.
 /// </summary>
 public sealed record DataSourceMetadata(
     string Name,
@@ -53,8 +55,10 @@ public sealed record DataSourceParameterMetadata(
     ReferenceTarget? Target);
 
 /// <summary>
-/// One projected column of a data source. Its type, label key, values and target are those of the
-/// field its path ends at. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference.
+/// One column of a data source: a projected field or, for a grouped data source, a group field or a
+/// measure. A field column's type, label key, values and target are those of the field its path ends
+/// at. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference. A measure column
+/// has the type of its result and no label key, values or target, so its header is its name.
 /// </summary>
 /// <param name="Name">The projected name: the column's key in a row.</param>
 public sealed record DataSourceColumnMetadata(

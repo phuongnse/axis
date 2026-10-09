@@ -19,4 +19,8 @@
     <ProjectReference Include="..\..\src\Axis.Server\Axis.Server.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\samples\apps\purchase-requests\**\*" Link="Samples\purchase-requests\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

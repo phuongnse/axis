@@ -271,6 +271,52 @@ describe('TableWidget', () => {
     expect(screen.queryByRole('link', { name: 'Open' })).not.toBeInTheDocument()
   })
 
+  it('shows the groups of a grouped data source with measure names as headers and no open link or create button', async () => {
+    const departmentTarget = {
+      entity: 'Department',
+      displayField: 'name',
+      recordsPath: '/api/apps/E2eApp/entities/Department/records',
+    }
+    const groupedWidget: WidgetMetadata = {
+      type: 'table',
+      formPage: null,
+      entity: null,
+      dataSource: {
+        name: 'NotesByDepartment',
+        rowsPath,
+        entity: 'Note',
+        parameters: [],
+        pageSize: 10,
+        columns: [
+          { name: 'department', type: 'reference', labelKey: 'note.category', values: null, target: departmentTarget },
+          { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
+          { name: 'total', type: 'decimal', labelKey: null, values: null, target: null },
+        ],
+      },
+    }
+    stubRecords(
+      `{"items":[{"id":null,"values":{"department":"${categoryId}","requests":2,"total":10.50},"labels":{"department":"Finance"}},{"id":null,"values":{"department":"${noteId}","requests":1,"total":3.00},"labels":{"department":"Sales"}}],"page":1,"pageSize":10,"totalCount":2}`,
+    )
+    const errors = vi.spyOn(console, 'error')
+
+    renderWidget('', groupedWidget)
+
+    const finance = await screen.findByRole('row', { name: /Finance/ })
+    const sales = screen.getByRole('row', { name: /Sales/ })
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Category',
+      'requests',
+      'total',
+    ])
+    expect(within(finance).getByText('10.50')).toBeInTheDocument()
+    expect(within(sales).getByText('3.00')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'New' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Open' })).not.toBeInTheDocument()
+    // Group rows have no id, so each needs a key of its own.
+    expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+    errors.mockRestore()
+  })
+
   it('sorts from page 1 and keeps parameters it does not own', async () => {
     const requests = stubRecords()
     renderWidget('?page=2&x=1')

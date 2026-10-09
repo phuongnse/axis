@@ -168,9 +168,8 @@ public sealed class PresentationCompilerTests
     }
 
     [Fact]
-    public void Table_over_a_grouped_data_source_is_reported_at_its_data_source()
+    public void Table_bound_to_a_grouped_data_source_compiles()
     {
-        // A table builds its columns from the projected fields and opens rows by id, which a group lacks.
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList(
                 """, "aggregate": { "groupBy": ["number"], "measures": [{ "name": "orders", "function": "count" }] } """))
@@ -178,9 +177,24 @@ public sealed class PresentationCompilerTests
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void Table_bound_to_a_grouped_data_source_with_a_form_page_is_reported_at_its_form_page()
+    {
+        // A group is not a record, so there is no record for a form to open.
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList(
+                """, "aggregate": { "groupBy": ["number"], "measures": [{ "name": "orders", "function": "count" }] } """))
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList", "formPage": "OrderForm" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.InvalidWidgetBinding, "pages/orders.json", "/widgets/0/dataSource"),
+            (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("grouped", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);

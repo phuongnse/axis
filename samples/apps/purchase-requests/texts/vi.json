@@ -7,10 +7,12 @@
   "texts": {
     "site.title": "Mua hàng",
     "nav.purchaseRequests": "Yêu cầu mua hàng",
+    "nav.requestsByDepartment": "Theo phòng ban",
     "nav.departments": "Phòng ban",
     "nav.suppliers": "Nhà cung cấp",
     "pages.purchaseRequests.title": "Yêu cầu mua hàng",
     "pages.purchaseRequestForm.title": "Yêu cầu mua hàng",
+    "pages.requestsByDepartment.title": "Tổng yêu cầu mua hàng theo phòng ban",
     "pages.departments.title": "Phòng ban",
     "pages.suppliers.title": "Nhà cung cấp",
     "department.label": "Phòng ban",
