@@ -138,13 +138,13 @@ internal static class RecordEndpoints
         }
 
         var input = parsed.Input!;
-        var computed = RecordComputer.ComputeCreate(model, input.Values, input.Rows);
+        var computed = RecordComputer.ComputeCreate(application!, model, input.Values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
             return Results.ValidationProblem(computeErrors);
         }
 
-        if (RecordValidator.ValidateCreate(model, computed.Values, computed.Rows) is { } failures)
+        if (RecordValidator.ValidateCreate(application!, model, computed.Values, computed.Rows) is { } failures)
         {
             return Results.ValidationProblem(failures);
         }
@@ -210,13 +210,13 @@ internal static class RecordEndpoints
             }
         }
 
-        var computed = RecordComputer.ComputeUpdate(model, stored, input.Values, input.Rows);
+        var computed = RecordComputer.ComputeUpdate(application!, model, stored, input.Values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
             return Results.ValidationProblem(computeErrors);
         }
 
-        if (RecordValidator.ValidateUpdate(model, stored, computed.Values, computed.Rows) is { } failures)
+        if (RecordValidator.ValidateUpdate(application!, model, stored, computed.Values, computed.Rows) is { } failures)
         {
             return Results.ValidationProblem(failures);
         }

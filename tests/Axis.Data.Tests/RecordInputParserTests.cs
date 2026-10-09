@@ -457,14 +457,14 @@ public sealed class RecordInputParserTests
             "Part",
             "entities/part.json",
             name,
-            Computed(Field("code", FieldType.Text), "upper(name)", name));
+            Computed(Field("code", FieldType.Text), "upper(name)", [name]));
         var qty = Field("qty", FieldType.Integer);
         var owner = Entity(
             Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e04"),
             "Kit",
             "entities/kit.json",
             qty,
-            Computed(Field("total", FieldType.Integer), "qty * 2", qty),
+            Computed(Field("total", FieldType.Integer), "qty * 2", [qty]),
             Field("parts", FieldType.ChildCollection, target: part));
         return (owner, Application(owner, part));
     }

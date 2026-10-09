@@ -94,6 +94,43 @@ public sealed class DocumentationTests
     }
 
     [Fact]
+    public void Aggregate_table_matches_ExpressionFunctions()
+    {
+        var tables = new List<List<string>>();
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Function\s*\|\s*Result\s*\|\s*Empty list\s*\|"))
+                {
+                    continue;
+                }
+
+                var names = new List<string>();
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var match = Regex.Match(lines[j], @"^\|\s*`([A-Za-z]+)\(");
+                    if (match.Success)
+                    {
+                        names.Add(match.Groups[1].Value);
+                    }
+                }
+
+                tables.Add(names);
+            }
+        }
+
+        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Function | Result | Empty list |' under docs/, found {tables.Count}.");
+
+        // count has a row with a condition and one without.
+        var documented = tables[0].Distinct().ToList();
+        var declared = ExpressionFunctions.AggregateNames;
+
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
+        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}.");
+    }
+
+    [Fact]
     public void Load_step_kinds_match_ResourceKinds_and_schema_files()
     {
         var loadSteps = new List<string>();

@@ -115,10 +115,11 @@ flowchart LR
      fields, with no rules, and translated to SQL. Its first problem is
      reported at `/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
-     outside the SQL subset is `AXC0053`. An enum parameter with a value the
-     compared enum field lacks is `AXC0047`, and so is a `.` after a field
-     that is not a `reference` or after a parameter. A path with more than 3
-     hops is `AXC0058`. The filter of a data source
+     outside the SQL subset is `AXC0053`, including an aggregate over a
+     child collection. An enum parameter with a value the compared enum field
+     lacks is `AXC0047`, and so is a `.` after a field that is not a
+     `reference` or after a parameter. A path with more than 3 hops is
+     `AXC0058`. The filter of a data source
      whose entity is unknown, or that has a parameter with a diagnostic, is
      not checked. See
      [data sources](data-sources.md#compile-checks).
@@ -130,12 +131,15 @@ flowchart LR
    resolved and their filter checked. No model
    is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
-   type-checked against the entity's own fields, and must be boolean. A
+   type-checked against the entity's own fields and its child collections,
+   which only [aggregates](expressions.md#aggregates) accept, and must be
+   boolean. A
    problem in the expression is reported with its
    [expression diagnostic](expressions.md#diagnostics) code at
    `/validations/{i}/expression`. The expression of each
    [computed field](#entity-logic) is parsed and type-checked against the
-   entity's fields that are not computed, and must give the field's type.
+   entity's fields that are not computed and its child collections, and
+   must give the field's type.
    A problem in it is reported the same way at `/fields/{i}/expression`. A `field` that names no field of the
    entity, ignoring letter case, is `AXC0052` at `/validations/{i}/field`,
    and the `message` joins the `AXC0028` check. A validation with an error
@@ -157,8 +161,9 @@ flowchart LR
      case, is `AXC0057` at `/name`. A rule whose own expression has an
      error, or that is in a cycle, is still known by its parameters and
      result type, so a call to it gets no further diagnostic. Only
-     validations can call rules for now. In a computed field or a data
-     source filter, a rule call is still `AXC0050`.
+     validations can call rules for now, and only outside an aggregate's
+     item expression. In a computed field, a data source filter or an item
+     expression, a rule call is still `AXC0050`.
 4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
    - **Content hash.** Every resource file is canonicalized as in RFC 8785
@@ -297,13 +302,13 @@ sorted by file and then path.
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
 | `AXC0045` | A data source's `sort` names no projected field, or names a projected field whose path ends at a `reference`. Reported at `/sort`. |
 | `AXC0046` | An expression names a field that is not in its scope, including an unknown field after a `.`. Outside a data source filter, every `.` path is reported this way. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
-| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. In a data source filter this includes a `.` after a field that is not a `reference`, such as `name.x`, or after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
+| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. This includes a child collection used anywhere but as the first argument of an aggregate, such as `lineItems == null`, and an aggregate over a field that is not a child collection, such as `sum(title, amount)`. In a data source filter it also includes a `.` after a field that is not a `reference`, such as `name.x`, or after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
 | `AXC0050` | An expression calls a function or rule that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
-| `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
+| `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)`, `sum(lineItems)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
 | `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
-| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)` or a `date('…')` text that is not valid. Reported at `/filter`, with the character position of the operator or the call in the message. See [SQL subset](expressions.md#sql-subset). |
+| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)`, an aggregate such as `count(lines)` or a `date('…')` text that is not valid. Reported at `/filter`, with the character position of the operator or the call in the message. See [SQL subset](expressions.md#sql-subset). |
 | `AXC0054` | A data source parameter's `name` is also a field of the data source's entity, is `page`, `pageSize` or `sort`, or is already used by an earlier parameter of the same data source, all ignoring letter case. Reported at `/parameters/{i}/name`. |
 | `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
@@ -557,14 +562,12 @@ is `AXC0013`.
 
 This section adds validations, computed fields and child collections to an
 entity (D17). Child collection fields, their child tables, validations and
-computed fields over the record's own fields are built.
+computed fields are built, including
+[aggregates](expressions.md#aggregates) over child rows.
 Expressions use the syntax of the [expression language](expressions.md), and
 diagnostic codes come with the issues that build each check. A validation
 can call a named [rule](#resource-file-shape), such as `IsPositive(quantity)`
-below. A validation
-cannot name a `child-collection` field in its expression yet, because only
-aggregates such as `count` read one and they are not built. The examples
-below show the target shape: their `count` and `sum` do not compile today.
+below. Both examples below compile, given that rule.
 
 ```json
 {
@@ -631,7 +634,10 @@ below show the target shape: their `count` and `sum` do not compile today.
   - `field`, which names a field of the same entity.
 
   The expression reads the entity's own fields by name, and can call named
-  rules. The server runs the
+  rules. It can also aggregate over the entity's child collections, such as
+  `count(lineItems) >= 1`. An aggregate reads the rows as they will be
+  stored, so `count(lineItems) >= 1` refuses a create without rows and an
+  update that removes the last row. The server runs the
   validations on create and update, on the record as it will be stored and
   after computed fields are calculated. A validation fails when its condition
   is `false` or `null`, or stops with a run-time error. The validations of a
@@ -646,10 +652,15 @@ below show the target shape: their `count` and `sum` do not compile today.
     `values` keep their usual meaning, because they describe the column that
     stores the value.
   - It reads only the record's own fields and its child rows, never a
-    reference path. For now it reads only the entity's own fields that are
-    not computed. Naming a computed field, itself included, is `AXC0046`.
-    Reading child rows needs aggregates, which come later.
-  - The rows of a child collection are computed before the owner.
+    reference path. It reads the entity's own fields that are not computed.
+    Naming a computed field, itself included, is `AXC0046`.
+  - It reads child rows only through an
+    [aggregate](expressions.md#aggregates), such as `sum(lineItems, amount)`.
+    Inside the item expression, names are the child row's fields, computed
+    ones included, and nothing else.
+  - The rows of a child collection are computed before the owner, so the
+    owner's aggregates read the rows' computed values. An update that leaves
+    a collection out aggregates its stored rows.
   - Clients cannot write it. A body that sets it, even to `null`, is a `400`
     at its pointer with the message "Cannot be set.". A run-time error is a
     `400` at its pointer with "Could not be computed.". A value that does not

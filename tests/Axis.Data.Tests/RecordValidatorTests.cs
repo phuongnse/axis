@@ -40,10 +40,17 @@ public sealed class RecordValidatorTests
         ("status != 'closed' or active != true", "order.closedInactive", "status"),
         ("quantity is null or quantity < 100", "order.quantitySmall", "quantity"));
 
+    private static readonly EntityModel _lineOrder = Validated(
+        _plainOrder,
+        ("count(lines) >= 1", "order.needsLine", "lines"),
+        ("sum(lines, qty) <= 10", "order.smallTotal", "lines"));
+
+    private static readonly ApplicationModel _application = Models.Application(_order, _line, _supplier);
+
     [Fact]
     public void Create_that_breaks_rules_fails_on_each_rule_field_with_its_text_key()
     {
-        var failures = RecordValidator.ValidateCreate(_order, Values(_order, ("quantity", 0L), ("price", "-1")), []);
+        var failures = RecordValidator.ValidateCreate(_application, _order, Values(_order, ("quantity", 0L), ("price", "-1")), []);
 
         Assert.NotNull(failures);
         Assert.Equal(["/values/price", "/values/quantity"], failures.Keys);
@@ -54,7 +61,7 @@ public sealed class RecordValidatorTests
     [Fact]
     public void First_failing_rule_in_declaration_order_wins_its_key()
     {
-        var failures = RecordValidator.ValidateCreate(_order, Values(_order, ("quantity", 100L)), []);
+        var failures = RecordValidator.ValidateCreate(_application, _order, Values(_order, ("quantity", 100L)), []);
 
         // quantity > 0 passes, so the later rule on the same field is reported.
         Assert.NotNull(failures);
@@ -64,7 +71,7 @@ public sealed class RecordValidatorTests
     [Fact]
     public void Field_the_create_leaves_out_is_null_and_a_null_condition_fails()
     {
-        var failures = RecordValidator.ValidateCreate(_order, [], []);
+        var failures = RecordValidator.ValidateCreate(_application, _order, [], []);
 
         Assert.NotNull(failures);
         Assert.Equal(["order.quantityPositive"], Assert.Single(failures, pair => pair.Key == "/values/quantity").Value);
@@ -76,7 +83,7 @@ public sealed class RecordValidatorTests
     {
         var entity = Validated(_plainOrder, ("1 / quantity > 0", "order.quantityPositive", "quantity"));
 
-        var failures = RecordValidator.ValidateCreate(entity, Values(entity, ("quantity", 0L)), []);
+        var failures = RecordValidator.ValidateCreate(_application, entity, Values(entity, ("quantity", 0L)), []);
 
         Assert.NotNull(failures);
         Assert.Equal(["order.quantityPositive"], failures["/values/quantity"]);
@@ -87,7 +94,7 @@ public sealed class RecordValidatorTests
     {
         var values = Values(_order, ("quantity", 3L), ("price", "1250.50"), ("status", "closed"), ("active", false));
 
-        Assert.Null(RecordValidator.ValidateCreate(_order, values, []));
+        Assert.Null(RecordValidator.ValidateCreate(_application, _order, values, []));
     }
 
     [Fact]
@@ -96,7 +103,7 @@ public sealed class RecordValidatorTests
         var lines = _order.Fields.Single(field => field.Name == "lines");
         var rows = new RecordRows(lines, _line, [Row(("qty", 1L)), Row(("qty", 0L)), Row(("qty", null))]);
 
-        var failures = RecordValidator.ValidateCreate(_order, Values(_order, ("quantity", 1L)), [rows]);
+        var failures = RecordValidator.ValidateCreate(_application, _order, Values(_order, ("quantity", 1L)), [rows]);
 
         Assert.NotNull(failures);
         Assert.Equal(["line.qtyPositive"], Assert.Single(failures, pair => pair.Key == "/values/lines/1/qty").Value);
@@ -110,7 +117,7 @@ public sealed class RecordValidatorTests
         var lines = _plainOrder.Fields.Single(field => field.Name == "lines");
         var rows = new RecordRows(lines, _line, [Row(("qty", 2L)), Row(("qty", 0L))]);
 
-        var failures = RecordValidator.ValidateUpdate(_plainOrder, null, Values(_plainOrder, ("quantity", 0L)), [rows]);
+        var failures = RecordValidator.ValidateUpdate(_application, _plainOrder, null, Values(_plainOrder, ("quantity", 0L)), [rows]);
 
         Assert.NotNull(failures);
         var failure = Assert.Single(failures);
@@ -138,10 +145,10 @@ public sealed class RecordValidatorTests
             ["lines"] = new JsonArray(),
         });
 
-        Assert.Null(RecordValidator.ValidateUpdate(entity, stored, Values(entity, ("quantity", 5L)), []));
+        Assert.Null(RecordValidator.ValidateUpdate(_application, entity, stored, Values(entity, ("quantity", 5L)), []));
 
         // Only active changes, but the rule on status reads the merged record.
-        var failures = RecordValidator.ValidateUpdate(entity, stored, Values(entity, ("active", true)), []);
+        var failures = RecordValidator.ValidateUpdate(_application, entity, stored, Values(entity, ("active", true)), []);
 
         Assert.NotNull(failures);
         Assert.Equal(["order.closedInactive"], Assert.Single(failures).Value);
@@ -151,7 +158,7 @@ public sealed class RecordValidatorTests
     [Fact]
     public void Update_of_an_entity_with_validations_needs_the_stored_record()
     {
-        Assert.Throws<ArgumentException>(() => RecordValidator.ValidateUpdate(_order, null, [], []));
+        Assert.Throws<ArgumentException>(() => RecordValidator.ValidateUpdate(_application, _order, null, [], []));
     }
 
     [Theory]
@@ -159,7 +166,7 @@ public sealed class RecordValidatorTests
     [InlineData("100000000000000000000000000000000")]
     public void Decimal_that_cannot_be_held_exactly_fails_at_its_field_and_skips_the_rules(string price)
     {
-        var failures = RecordValidator.ValidateCreate(_order, Values(_order, ("price", price)), []);
+        var failures = RecordValidator.ValidateCreate(_application, _order, Values(_order, ("price", price)), []);
 
         // quantity is null and would fail, but no rule runs on a record that cannot be evaluated.
         Assert.NotNull(failures);
@@ -173,14 +180,64 @@ public sealed class RecordValidatorTests
     {
         var values = Values(_order, ("quantity", 1L), ("price", "-0.000000000000000000000000000000000"));
 
-        Assert.Null(RecordValidator.ValidateCreate(_order, values, []));
+        Assert.Null(RecordValidator.ValidateCreate(_application, _order, values, []));
     }
 
     [Fact]
     public void Entity_without_validations_has_no_failures()
     {
-        Assert.Null(RecordValidator.ValidateCreate(_supplier, [], []));
-        Assert.Null(RecordValidator.ValidateUpdate(_supplier, null, [], []));
+        Assert.Null(RecordValidator.ValidateCreate(_application, _supplier, [], []));
+        Assert.Null(RecordValidator.ValidateUpdate(_application, _supplier, null, [], []));
+    }
+
+    [Fact]
+    public void Count_of_lines_fails_a_create_without_rows_at_the_collection()
+    {
+        var failures = RecordValidator.ValidateCreate(_application, _lineOrder, [], []);
+
+        Assert.NotNull(failures);
+        var failure = Assert.Single(failures);
+        Assert.Equal(("/values/lines", "order.needsLine"), (failure.Key, Assert.Single(failure.Value)));
+        Assert.Null(RecordValidator.ValidateCreate(_application, _lineOrder, [], [Lines(1L)]));
+    }
+
+    [Fact]
+    public void Aggregate_reads_the_body_rows()
+    {
+        Assert.Null(RecordValidator.ValidateCreate(_application, _lineOrder, [], [Lines(4L, 6L)]));
+
+        var failures = RecordValidator.ValidateCreate(_application, _lineOrder, [], [Lines(4L, null, 7L)]);
+
+        Assert.NotNull(failures);
+        Assert.Equal(["order.smallTotal"], Assert.Single(failures).Value);
+    }
+
+    [Fact]
+    public void Update_that_sends_no_rows_fails_the_count()
+    {
+        var stored = Stored(new Dictionary<string, JsonNode?> { ["lines"] = new JsonArray(StoredLine(1L)) });
+
+        var failures = RecordValidator.ValidateUpdate(_application, _lineOrder, stored, [], [Lines()]);
+
+        Assert.NotNull(failures);
+        Assert.Equal(["order.needsLine"], Assert.Single(failures, pair => pair.Key == "/values/lines").Value);
+    }
+
+    [Fact]
+    public void Update_that_leaves_the_rows_out_reads_the_stored_rows()
+    {
+        var withLine = Stored(new Dictionary<string, JsonNode?> { ["lines"] = new JsonArray(StoredLine(1L)) });
+        var withoutLines = Stored(new Dictionary<string, JsonNode?> { ["lines"] = new JsonArray() });
+        var tooLarge = Stored(new Dictionary<string, JsonNode?> { ["lines"] = new JsonArray(StoredLine(6L), StoredLine(5L)) });
+
+        Assert.Null(RecordValidator.ValidateUpdate(_application, _lineOrder, withLine, Values(_lineOrder, ("quantity", 2L)), []));
+        var empty = RecordValidator.ValidateUpdate(_application, _lineOrder, withoutLines, [], []);
+        var large = RecordValidator.ValidateUpdate(_application, _lineOrder, tooLarge, [], []);
+
+        Assert.NotNull(empty);
+        Assert.Equal(("/values/lines", "order.needsLine"), (Assert.Single(empty).Key, Assert.Single(Assert.Single(empty).Value)));
+        Assert.NotNull(large);
+        Assert.Equal(("/values/lines", "order.smallTotal"), (Assert.Single(large).Key, Assert.Single(Assert.Single(large).Value)));
     }
 
     private static EntityModel Validated(EntityModel entity, params (string Expression, string TextKey, string Field)[] rules) =>
@@ -190,7 +247,10 @@ public sealed class RecordValidatorTests
             [
                 .. entity.Validations,
                 .. rules.Select(rule => ValidationModel.Compile(
-                    rule.Expression, ExpressionScopes.ForEntity(entity.Fields), new TextReference(rule.TextKey), rule.Field)),
+                    rule.Expression,
+                    ExpressionScopes.ForEntity(entity.Fields, childOf: field => field.Target?.Id == _line.Id ? _line : null),
+                    new TextReference(rule.TextKey),
+                    rule.Field)),
             ],
         };
 
@@ -198,6 +258,13 @@ public sealed class RecordValidatorTests
         [.. values.Select(value => new RecordValue(entity.Fields.Single(field => field.Name == value.Name), value.Value))];
 
     private static List<RecordValue> Row(params (string Name, object? Value)[] values) => Values(_line, values);
+
+    /// <summary>The lines a body sends, one row per quantity.</summary>
+    private static RecordRows Lines(params long?[] quantities) =>
+        new(_plainOrder.Fields.Single(field => field.Name == "lines"), _line, [.. quantities.Select(qty => Row(("qty", qty)))]);
+
+    /// <summary>A line row as <see cref="RecordQueries"/> reads it.</summary>
+    private static JsonObject StoredLine(long qty) => new() { ["qty"] = JsonValue.Create(qty) };
 
     private static Record Stored(Dictionary<string, JsonNode?> values) =>
         new(Guid.Parse("6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f8"), 1, values, new Dictionary<string, string>());

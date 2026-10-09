@@ -64,7 +64,8 @@ public static class ApplicationCompiler
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
         }
 
-        // Only validations call rules for now. Computed fields and filters see no rules.
+        // Only validations call rules for now, at their top level. Computed fields, aggregate item
+        // expressions and filters see no rules.
         var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
         foreach (var entity in loaded.Entities)
         {
@@ -278,24 +279,26 @@ public static class ApplicationCompiler
             }
         }
 
-        CheckComputedFields(entity, Report);
-        CheckValidations(entity, textKeys, rules, diagnostics, Report);
+        CheckComputedFields(entity, findEntity, Report);
+        CheckValidations(entity, findEntity, textKeys, rules, diagnostics, Report);
     }
 
     /// <summary>
     /// Checks the expression of each computed field of a scalar type: it parses and type-checks to
-    /// the field's type over the entity's fields that are not computed. A computed field is not in
-    /// the scope, so naming one, itself included, is an unknown name. An expression problem is
-    /// reported at the expression with its own code.
+    /// the field's type over the entity's fields that are not computed and its child collections,
+    /// which only aggregates accept. A computed field is not in the scope, so naming one, itself
+    /// included, is an unknown name. An aggregate's item expression sees the child row's fields,
+    /// computed ones included. An expression problem is reported at the expression with its own code.
     /// </summary>
-    private static void CheckComputedFields(EntityResource entity, Action<string, string, string> report)
+    private static void CheckComputedFields(
+        EntityResource entity, Func<string, EntityResource?> findEntity, Action<string, string, string> report)
     {
         if (entity.Fields.All(field => field.Expression is null))
         {
             return;
         }
 
-        var scope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: findEntity);
         for (var index = 0; index < entity.Fields.Count; index++)
         {
             var field = entity.Fields[index];
@@ -322,11 +325,14 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// Checks each validation: its message is a known text key, its <c>field</c> names a field of
-    /// the entity, and its expression parses and type-checks as a boolean over the entity's fields
-    /// and the named rules. An expression problem is reported at the expression with its own code.
+    /// the entity, and its expression parses and type-checks as a boolean over the entity's fields,
+    /// its child collections, which only aggregates accept, and the named rules. An aggregate's
+    /// item expression sees only the child row's fields. An expression problem is reported at the
+    /// expression with its own code.
     /// </summary>
     private static void CheckValidations(
         EntityResource entity,
+        Func<string, EntityResource?> findEntity,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics,
@@ -337,7 +343,7 @@ public static class ApplicationCompiler
             return;
         }
 
-        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity);
         for (var index = 0; index < entity.Validations.Count; index++)
         {
             var validation = entity.Validations[index];
@@ -571,7 +577,8 @@ public static class ApplicationCompiler
     /// <c>sort</c> and from earlier parameters, ignoring letter case. Its type properties and label
     /// are checked as an entity field's. The <c>filter</c> parses, type-checks as a boolean over the
     /// entity's fields, the parameters and paths through reference fields, with no rules, and
-    /// translates to SQL. Its first problem
+    /// translates to SQL. Its child collections are in the type check's scope, so an aggregate
+    /// type-checks and is then reported as outside the SQL subset. Its first problem
     /// is reported at <c>/filter</c> with its expression code. It is not checked while a parameter
     /// has a diagnostic.
     /// </summary>
@@ -696,7 +703,8 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// The first problem of a data source filter: in parsing, in type checking over the entity's
-    /// fields, the parameters and paths through reference fields, with no rules, or outside the SQL subset.
+    /// fields, its child collections, the parameters and paths through reference fields, with no
+    /// rules, or outside the SQL subset.
     /// </summary>
     private static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope)
     {
@@ -771,9 +779,11 @@ public static class ApplicationCompiler
     private static EntityModel BuildEntity(
         EntityResource entity, Dictionary<string, EntityResource> entitiesByName, IEnumerable<ExpressionRule> rules)
     {
-        var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false);
+        // The child models are not built yet, so both scopes come from the definitions.
+        EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
+        var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
         var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName)).ToList();
-        var scope = ExpressionScopes.ForEntity(fields, rules: rules);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity);
         return new EntityModel
         {
             Id = entity.Id,

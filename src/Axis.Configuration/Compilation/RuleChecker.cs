@@ -35,7 +35,7 @@ internal static class RuleChecker
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, rule.File, path, rule.Id));
 
-            if (ExpressionFunctions.Names.Contains(rule.Name, StringComparer.OrdinalIgnoreCase))
+            if (ExpressionFunctions.IsFunction(rule.Name))
             {
                 Report(
                     DiagnosticCodes.RuleNameIsFunction,
@@ -188,7 +188,7 @@ internal static class RuleChecker
                 switch (node)
                 {
                     case CallNode call:
-                        if (!ExpressionFunctions.Names.Contains(call.Name, StringComparer.OrdinalIgnoreCase)
+                        if (!ExpressionFunctions.IsFunction(call.Name)
                             && resources.ContainsKey(call.Name))
                         {
                             callees.Add(call.Name);

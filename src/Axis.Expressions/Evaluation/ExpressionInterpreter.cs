@@ -8,9 +8,10 @@ namespace Axis.Expressions.Evaluation;
 /// <summary>
 /// Evaluates a checked expression against one record's field values, following the null rules and
 /// run-time errors in docs/reference/expressions.md. It covers literals, bare field names, every
-/// operator, every function in <see cref="ExpressionFunctions"/> and calls to named rules. It does
-/// no I/O. Arithmetic is exact, and an evaluation stops after <see cref="ExpressionLimits.MaxSteps"/>
-/// steps, counting the steps of the rules it calls. Values use the CLR types listed on
+/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections
+/// and calls to named rules. It does no I/O. Arithmetic is exact, and an evaluation stops after
+/// <see cref="ExpressionLimits.MaxSteps"/> steps, counting the steps of the rules it calls and of
+/// an aggregate's item expression on every row. Values use the CLR types listed on
 /// <see cref="ExpressionValues"/>.
 /// </summary>
 public static class ExpressionInterpreter
@@ -105,6 +106,11 @@ public static class ExpressionInterpreter
                 throw new InvalidOperationException($"The interpreter does not evaluate function '{call.Name}' yet.");
             }
 
+            if (signature.IsAggregate)
+            {
+                return Aggregate(call, signature.Name);
+            }
+
             var arguments = call.Arguments;
             switch (signature.Name)
             {
@@ -180,6 +186,93 @@ public static class ExpressionInterpreter
         }
 
         /// <summary>
+        /// Evaluates the item expression on every row of the collection, in order, on the same
+        /// budget. The collection argument is read, not evaluated, so it costs no step. Every row
+        /// is evaluated, even after <c>any</c> or <c>all</c> knows its result. <c>sum</c>,
+        /// <c>min</c> and <c>max</c> skip <c>null</c> items, and a <c>null</c> condition counts as
+        /// false.
+        /// </summary>
+        private object? Aggregate(CallNode call, string name)
+        {
+            var rows = Collection(call.Arguments[0]);
+            if (call.Arguments.Count == 1)
+            {
+                return (long)rows.Count;
+            }
+
+            var item = call.Arguments[1];
+            var items = new object?[rows.Count];
+            for (var i = 0; i < items.Length; i++)
+            {
+                items[i] = new Evaluator(rows[i], checkResult, budget).Eval(item);
+            }
+
+            switch (name)
+            {
+                case "count":
+                    return (long)items.Count(value => Boolean(value) == true);
+                case "any":
+                    return items.Any(value => Boolean(value) == true);
+                case "all":
+                    return items.All(value => Boolean(value) == true);
+                case "sum":
+                    return Widen(call, Sum(call, items));
+                case "min" or "max":
+                    object? best = null;
+                    foreach (var value in items)
+                    {
+                        if (value is not null
+                            && (best is null || (name == "min" ? Compare(value, best) < 0 : Compare(value, best) > 0)))
+                        {
+                            best = value;
+                        }
+                    }
+
+                    return Widen(call, best);
+                default:
+                    throw new InvalidOperationException($"The interpreter does not evaluate aggregate '{name}' yet.");
+            }
+        }
+
+        /// <summary>The rows of the collection an aggregate names.</summary>
+        private IReadOnlyList<ExpressionValues> Collection(ExpressionNode node)
+        {
+            if (node is not NameNode name || !values.TryGetValue(name.Name, out var value))
+            {
+                throw new InvalidOperationException("No rows were given for the aggregate's collection.");
+            }
+
+            return value as IReadOnlyList<ExpressionValues>
+                ?? throw new InvalidOperationException($"The value of collection '{name.Name}' is not a list of rows.");
+        }
+
+        /// <summary>The exact sum of the items that are not <c>null</c>, starting at the integer 0.</summary>
+        private static object Sum(CallNode call, object?[] items)
+        {
+            object total = 0L;
+            foreach (var value in items)
+            {
+                if (value is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    total = total is long a && value is long b ? checked(a + b) : (object)DecimalMath.Add(Number(total), Number(value));
+                }
+                catch (OverflowException)
+                {
+                    throw total is long && value is long
+                        ? Fail(ExpressionRuntimeErrorKind.IntegerOverflow, "The result of 'sum' is outside the integer range", call.Offset)
+                        : Fail(ExpressionRuntimeErrorKind.DecimalOverflow, "The result of 'sum' cannot be held exactly as a decimal", call.Offset);
+                }
+            }
+
+            return total;
+        }
+
+        /// <summary>
         /// Evaluates every argument in order, then the rule's body over them on the same budget. A
         /// <c>null</c> argument is passed on, not short-circuited. An integer given for a decimal
         /// parameter, or returned for a decimal result, becomes a decimal.
@@ -205,7 +298,7 @@ public static class ExpressionInterpreter
         private static object? WidenTo(ExpressionType type, object? value) =>
             value is long integer && type.Kind == ExpressionTypeKind.Decimal ? (decimal)integer : value;
 
-        /// <summary>An integer picked by a <c>coalesce</c> or <c>if</c> checked as decimal comes back as a decimal.</summary>
+        /// <summary>An integer given by a <c>coalesce</c>, <c>if</c> or aggregate checked as decimal comes back as a decimal.</summary>
         private object? Widen(CallNode call, object? value) =>
             value is long integer && checkResult.DecimalCalls.Contains(call) ? (decimal)integer : value;
 

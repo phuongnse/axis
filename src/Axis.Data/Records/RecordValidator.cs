@@ -9,7 +9,9 @@ namespace Axis.Data.Records;
 /// <c>null</c> or stops with a run-time error. A failure is keyed <c>/values/&lt;field&gt;</c>, or
 /// <c>/values/&lt;collection&gt;/&lt;index&gt;/&lt;field&gt;</c> for a row, and its message is the
 /// validation's text key. When several validations fail on one key, the first in declaration
-/// order is reported. Rows an update leaves out are not checked again.
+/// order is reported. The owner's aggregates read the same rows as <see cref="RecordComputer"/>:
+/// the body's rows of a collection, or the stored rows when an update leaves the collection out.
+/// Rows an update leaves out are not checked again as rows.
 /// </summary>
 public static class RecordValidator
 {
@@ -18,15 +20,17 @@ public static class RecordValidator
     /// ordinal key order, or <see langword="null"/> when every validation passes.
     /// </summary>
     public static SortedDictionary<string, string[]>? ValidateCreate(
+        ApplicationModel application,
         EntityModel entity,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows)
     {
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
 
-        return Validate(entity, [], values, rows);
+        return Validate(application, entity, null, values, rows);
     }
 
     /// <summary>
@@ -36,11 +40,13 @@ public static class RecordValidator
     /// </summary>
     /// <exception cref="ArgumentException">The entity has validations and <paramref name="stored"/> is null.</exception>
     public static SortedDictionary<string, string[]>? ValidateUpdate(
+        ApplicationModel application,
         EntityModel entity,
         Record? stored,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows)
     {
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
@@ -49,22 +55,13 @@ public static class RecordValidator
             throw new ArgumentException("An update of an entity with validations needs the stored record.", nameof(stored));
         }
 
-        var storedValues = new List<(FieldModel Field, object? Value, bool Exact)>();
-        if (stored is not null && entity.Validations.Count > 0)
-        {
-            foreach (var field in entity.Fields.Where(field => field.HasColumn))
-            {
-                var exact = RecordClrValues.TryFromStored(field, stored.Values.GetValueOrDefault(field.Name), out var value);
-                storedValues.Add((field, value, exact));
-            }
-        }
-
-        return Validate(entity, storedValues, values, rows);
+        return Validate(application, entity, stored, values, rows);
     }
 
     private static SortedDictionary<string, string[]>? Validate(
+        ApplicationModel application,
         EntityModel entity,
-        IReadOnlyList<(FieldModel Field, object? Value, bool Exact)> stored,
+        Record? stored,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows)
     {
@@ -79,9 +76,13 @@ public static class RecordValidator
                 record[field.Name] = (null, true);
             }
 
-            foreach (var (field, value, exact) in stored)
+            if (stored is not null)
             {
-                record[field.Name] = (value, exact);
+                foreach (var field in entity.Fields.Where(field => field.HasColumn))
+                {
+                    var exact = RecordClrValues.TryFromStored(field, stored.Values.GetValueOrDefault(field.Name), out var value);
+                    record[field.Name] = (value, exact);
+                }
             }
 
             foreach (var value in values)
@@ -89,7 +90,11 @@ public static class RecordValidator
                 record[value.Field.Name] = (RecordClrValues.FromInput(value, out var exact), exact);
             }
 
-            Run(entity, record, "/values", errors);
+            // A row value that cannot be held exactly stops every validation of the owner.
+            if (RecordCollections.TryAdd(application, entity, stored, rows, record, errors))
+            {
+                Run(entity, record, "/values", errors);
+            }
         }
 
         foreach (var collection in rows)

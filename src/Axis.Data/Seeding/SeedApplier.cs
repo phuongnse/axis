@@ -88,7 +88,7 @@ public static class SeedApplier
                     var stored = entity.HasComputedFields
                         ? await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken)
                         : null;
-                    var computed = RecordComputer.ComputeUpdate(entity, stored, input.Values, input.Rows);
+                    var computed = RecordComputer.ComputeUpdate(model, entity, stored, input.Values, input.Rows);
                     if (computed.Errors is { } errors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -99,7 +99,7 @@ public static class SeedApplier
                 }
                 else
                 {
-                    var computed = RecordComputer.ComputeCreate(entity, input.Values, input.Rows);
+                    var computed = RecordComputer.ComputeCreate(model, entity, input.Values, input.Rows);
                     if (computed.Errors is { } errors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -116,7 +116,7 @@ public static class SeedApplier
                     continue;
                 }
 
-                var computed = RecordComputer.ComputeCreate(entity, input.Values, input.Rows);
+                var computed = RecordComputer.ComputeCreate(model, entity, input.Values, input.Rows);
                 if (computed.Errors is { } errors)
                 {
                     await transaction.RollbackAsync(cancellationToken);

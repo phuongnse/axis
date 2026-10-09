@@ -19,7 +19,11 @@ public sealed class ValidationCompilerTests
         { """{ "expression": "quantity > 'a'", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "character" },
         { """{ "expression": "quantity + 1", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/validations/0/expression", "boolean" },
         { """{ "expression": "quantity >", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.SyntaxError, "/validations/0/expression", "character" },
-        { """{ "expression": "lines is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'lines'" },
+        { """{ "expression": "lines is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
+        { """{ "expression": "lines == null", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
+        { """{ "expression": "count(quantity) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "child collection" },
+        { """{ "expression": "sum(lines) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.WrongArgumentCount, "/validations/0/expression", "'sum'" },
+        { """{ "expression": "all(lines, quantity > 0)", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'quantity'" },
         { """{ "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "nope" }""", DiagnosticCodes.UnknownValidationField, "/validations/0/field", "'nope'" },
         { """{ "expression": "quantity > 0", "message": { "textKey": "order.missing" }, "field": "quantity" }""", DiagnosticCodes.MissingTextKey, "/validations/0/message/textKey", "'order.missing'" },
     };
@@ -87,6 +91,25 @@ public sealed class ValidationCompilerTests
         Assert.NotEqual(before.ContentHash, result.ContentHash);
     }
 
+    [Fact]
+    public void Validation_can_aggregate_over_a_child_collection_and_name_it_as_its_field()
+    {
+        using var folder = Folder("""
+            [
+              { "expression": "count(lines) >= 1", "message": { "textKey": "order.quantityPositive" }, "field": "lines" },
+              { "expression": "all(lines, amount > 0) and sum(lines, total) < 1000", "message": { "textKey": "order.quantityPositive" }, "field": "Lines" }
+            ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        Assert.Equal(["lines", "lines"], order.Validations.Select(validation => validation.Field));
+        Assert.All(order.Validations, validation => Assert.True(validation.Check.Succeeded));
+    }
+
     private static TemporaryFolder Folder(string? validations) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
@@ -101,6 +124,10 @@ public sealed class ValidationCompilerTests
                 """)
             .With("entities/order-line.json", """
                 { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
-                  "fields": [ { "name": "description", "type": "text" } ] }
+                  "fields": [
+                    { "name": "description", "type": "text" },
+                    { "name": "amount", "type": "decimal" },
+                    { "name": "total", "type": "decimal", "expression": "amount * 2" }
+                  ] }
                 """);
 }

@@ -4,8 +4,8 @@ Detailed reference for the expression language: grammar, types, operators,
 null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
-bare field names, every operator and every [function](#functions) except the
-aggregates, and the translation of the [SQL subset](#sql-subset). Sections
+bare field names, every operator, every [function](#functions) and the
+[aggregates](#aggregates), and the translation of the [SQL subset](#sql-subset). Sections
 marked *(planned for M2)* are not built yet. Entity
 [validations](configuration.md#entity-logic) and
 [computed fields](configuration.md#entity-logic) are resource file uses: the
@@ -92,7 +92,8 @@ Two more types exist only inside expressions:
 
 - **`null`.** The type of the literal `null`. It fits any type.
 - **`list<Entity>`.** The type of a child collection field. Only
-  [aggregates](#functions) accept it. *(planned for M2)*
+  [aggregates](#aggregates) accept it, as their first argument. Anywhere
+  else it is a type diagnostic.
 
 Rules:
 
@@ -237,12 +238,13 @@ and in [functions](#functions).
 ## Names and references
 
 *(planned for M2)*. Bare field names, data source parameters, paths in data
-source filters and rule calls from validations are built: the type checker
-resolves names against the fields and parameters it is given, paths against
-the reference fields' targets when it is given a way to find them, and calls
-against the rules it is given, ignoring letter case. Paths in validations
-and computed fields are not built, because the interpreter cannot read
-related records. There a path is `AXC0046`.
+source filters, child collections in aggregates and rule calls from
+validations are built: the type checker resolves names against the fields,
+parameters and collections it is given, paths against the reference fields'
+targets when it is given a way to find them, and calls against the rules it
+is given, ignoring letter case. Paths in validations and computed fields are
+not built, because the interpreter cannot read related records. There a path
+is `AXC0046`.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -255,22 +257,30 @@ related records. There a path is `AXC0046`.
   is a field, never a data source parameter, because a reference parameter
   holds an id and not a record.
 - **Child collection.** A child collection field gives a `list<Entity>`,
-  which only aggregates accept.
+  which only aggregates accept. Inside an aggregate's item expression, names
+  are the child row's fields, computed ones included, and nothing else: no
+  field of the owner, no collection and no rule.
 - **Rule call.** A named rule is called like a function, such as
   `isLargeRequest(total)`. Arguments are checked against the rule's typed
   parameters: an integer fits a decimal parameter, and `null` fits any
   parameter. A rule body sees only its declared parameters. Parameter and
   result types are the scalar field types except `enum`, which comes later
   (see [Resource file shape](configuration.md#resource-file-shape)). A rule
-  name may not reuse a built-in function name. Only validations can call
-  rules for now. Calls from computed fields and filters come later.
-- **Scope in a computed field.** The expression sees the record's own fields
-  and its child collections, and no reference path. For now it sees only the
-  entity's own fields that are not computed. Another computed field, itself
-  included, is an unknown name. Child collections come with aggregates.
+  name may not reuse a built-in function or aggregate name. Only validations
+  can call rules for now, and not inside an aggregate's item expression.
+  Calls from computed fields and filters come later.
+- **Scope in a computed field.** The expression sees the entity's own fields
+  that are not computed and its child collections through aggregates, and no
+  reference path. Another computed field, itself included, is an unknown
+  name. Inside an item expression, names are the child row's fields,
+  computed ones included, and no rules.
+- **Scope in a validation.** The expression sees the entity's fields,
+  computed ones included, its child collections through aggregates, and the
+  named rules at its top level.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
   data source parameters as plain names, and paths through reference fields.
-  It has no rules.
+  It has no rules. Its child collections type-check in aggregates, but no
+  aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
 
 ## Functions
 
@@ -310,10 +320,10 @@ because no conversion is implicit except integer to decimal.
 
 ### Aggregates
 
-*(planned for M2)*
-
-An aggregate works on a child collection. The second argument is an item
-expression. Inside it, names refer only to the child row.
+An aggregate works on a child collection. The first argument names the
+collection. The second argument is an item expression, evaluated once per
+row. Inside it, names refer only to the child row's fields, computed ones
+included. Computed fields and validations can use aggregates.
 
 | Function | Result | Empty list |
 | --- | --- | --- |
@@ -326,8 +336,19 @@ expression. Inside it, names refer only to the child row.
 | `all(list, condition)` | boolean | true |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
-- **Null items.** `sum`, `min` and `max` skip `null` items.
+- **Item types.** `sum` takes integer or decimal items. `min` and `max` take
+  integer, decimal, date and date-time items, because they order them. The
+  condition of `count`, `any` and `all` is boolean.
+- **Decimal results.** A `sum`, `min` or `max` over decimal items gives a
+  decimal, so the 0 of an empty `sum` is a decimal 0.
+- **Null items.** `sum`, `min` and `max` skip `null` items. So a list of
+  only `null` items sums to 0 and has no `min` or `max`.
 - **Condition.** A `null` condition counts as false.
+- **Every row.** `any` and `all` evaluate every row, even after the result
+  is known. So a run-time error in any row is always reported. Put guards
+  inside the item expression, where `and` and `or` short-circuit.
+- **Errors.** A `sum` past the integer range, or one that a .NET `decimal`
+  cannot hold exactly, is a [run-time error](#run-time-errors).
 - **SQL.** No aggregate is in the SQL subset.
 
 ## Cost bounds
@@ -364,8 +385,10 @@ Run-time limit:
 - **Step budget.** Each top-level evaluation has a budget of 10,000 steps.
   Each node evaluated is one step, and evaluation stops as soon as the budget
   runs out. An aggregate's item expression costs its steps once per row. The
-  steps of a called rule count against the caller's budget. The budget and
-  rule calls are built. Aggregates are *(planned for M2)*.
+  aggregate call is one step, and its collection argument costs none. So
+  `sum(lines, qty)` costs 1 step plus 1 per row, and runs out of budget at
+  10,000 rows. The steps of a called rule count against the caller's
+  budget.
 - **SQL.** The SQL translation has no step budget. The compile-time limits
   bound its size.
 
@@ -436,7 +459,9 @@ These are left out:
 - **`lower` and `upper`.** Unicode case rules differ between .NET and
   PostgreSQL.
 - **`trim`.** The two systems define whitespace differently.
-- **Aggregates.** A collection needs a scope that a filter does not have.
+- **Aggregates.** A child collection has no column in the entity's table.
+  A filter type-checks with the entity's child collections, so an aggregate
+  in it is `AXC0053`.
 
 Rules:
 
@@ -511,10 +536,14 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   lacks, a function or rule argument of the wrong
   type, `coalesce`
   arguments or `if` branches that do not fit each other, and a `date` or
-  `dateTime` call without a text literal argument. It also covers a `.`
-  after a field that is not a reference, after a data source parameter, or
-  after anything that is not a field path, at the `.`. The message names the
-  types.
+  `dateTime` call without a text literal argument. It also includes a child
+  collection used anywhere but as the first argument of an aggregate, such as
+  `lineItems == null`, reported at the name, an aggregate whose first
+  argument is not a child collection, such as `sum(title, amount)`, and an
+  item of a type the aggregate does not accept. It also covers a `.` after a
+  field that is not a reference, after a data source parameter, or after
+  anything that is not a field path, at the `.`. The message names the
+  types, and a collection as `list<Entity>`.
 - **`AXC0048`.** The expression's type does not fit the type its use needs.
   The message names the expected and the actual type.
 - **`AXC0049`.** A text literal compared with an enum, or given where an enum
@@ -522,11 +551,12 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0050`.** A call to a function or rule that does not exist, at the
   call. The message names it.
 - **`AXC0051`.** A function or rule call with the wrong number of
-  arguments, at the call. The message names the expected count, such as "needs 2 arguments" or
+  arguments, at the call. This includes an aggregate without its item
+  expression, such as `sum(lineItems)`. The message names the expected count, such as "needs 2 arguments" or
   "needs at least 1 argument", and the count found.
 - **`AXC0053`.** A data source filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
-  includes `/`, `lower`, `upper`, `trim`, and a `date('…')` or
+  includes `/`, `lower`, `upper`, `trim`, every aggregate, and a `date('…')` or
   `dateTime('…')` text that is not valid. The message names what is not
   translated. It is reported only after the filter type-checks.
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
@@ -538,5 +568,5 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   first problem and report only that one. So one expression gives at most
   one diagnostic.
 
-The cost code for rule call depth, and the type codes for aggregates, are
-added by the issues that build those checks.
+The cost code for rule call depth is added by the issue that builds that
+check.

@@ -1,8 +1,9 @@
 namespace Axis.Expressions.Functions;
 
 /// <summary>
-/// The scalar functions an expression can call, as listed in the function table of
-/// docs/reference/expressions.md. Names match ignoring letter case.
+/// The functions an expression can call: the scalar functions in the function table of
+/// docs/reference/expressions.md, and the aggregates over a child collection in its aggregates
+/// table. Names match ignoring letter case.
 /// </summary>
 public static class ExpressionFunctions
 {
@@ -31,11 +32,27 @@ public static class ExpressionFunctions
         new("dateTime", 1, 1),
     ];
 
-    private static readonly Dictionary<string, FunctionSignature> _byName =
-        _signatures.ToDictionary(signature => signature.Name, StringComparer.OrdinalIgnoreCase);
+    private static readonly FunctionSignature[] _aggregates =
+    [
+        new("count", 1, 2) { IsAggregate = true },
+        new("sum", 2, 2) { IsAggregate = true },
+        new("min", 2, 2) { IsAggregate = true },
+        new("max", 2, 2) { IsAggregate = true },
+        new("any", 2, 2) { IsAggregate = true },
+        new("all", 2, 2) { IsAggregate = true },
+    ];
 
-    /// <summary>The function names, spelled as the reference spells them.</summary>
+    private static readonly Dictionary<string, FunctionSignature> _byName =
+        _signatures.Concat(_aggregates).ToDictionary(signature => signature.Name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The scalar function names, spelled as the reference spells them.</summary>
     public static IReadOnlyList<string> Names { get; } = [.. _signatures.Select(signature => signature.Name)];
+
+    /// <summary>The aggregate names, spelled as the reference spells them.</summary>
+    public static IReadOnlyList<string> AggregateNames { get; } = [.. _aggregates.Select(signature => signature.Name)];
+
+    /// <summary>Whether <paramref name="name"/> is a scalar function or an aggregate, ignoring letter case.</summary>
+    public static bool IsFunction(string name) => _byName.ContainsKey(name);
 
     /// <summary>Finds a function by name, ignoring letter case.</summary>
     internal static bool TryGet(string name, out FunctionSignature signature) =>
@@ -46,4 +63,11 @@ public static class ExpressionFunctions
 /// A function's canonical name and how many arguments it takes. <see cref="MaxArguments"/> is
 /// <see cref="int.MaxValue"/> for a function that takes any number from <see cref="MinArguments"/>.
 /// </summary>
-internal sealed record FunctionSignature(string Name, int MinArguments, int MaxArguments);
+internal sealed record FunctionSignature(string Name, int MinArguments, int MaxArguments)
+{
+    /// <summary>
+    /// Whether the function aggregates over a child collection. Its first argument names the
+    /// collection, and its second, when there is one, is evaluated once per row.
+    /// </summary>
+    public bool IsAggregate { get; init; }
+}

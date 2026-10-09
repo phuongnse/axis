@@ -268,8 +268,9 @@ text from the request; the key already says where the problem is.
 
 ## Child rows, computed fields and validations
 
-Child rows, computed fields over the record's own fields and validations are
-built (D17): the record shape and the bodies described above include them.
+Child rows, computed fields and validations are built (D17): the record shape
+and the bodies described above include them. Computed fields and validations
+can [aggregate](expressions.md#aggregates) over the child rows.
 
 A record with a child collection holds its rows inside `values`:
 
@@ -314,6 +315,13 @@ A record with a child collection holds its rows inside `values`:
   statement as the other values. Child rows are calculated before the owner.
   A record stored before its computed field existed reads `null` until its
   next write.
+- **Aggregates.** An aggregate of the owner, such as `sum(lineItems, amount)`,
+  reads the rows the write stores. When the body sends the collection, it
+  reads the body's rows after their own computed fields. When an update
+  leaves the collection out, it reads the stored rows. A create without the
+  collection has no rows. A stored row value that cannot be evaluated
+  exactly is a `400` at the row's pointer, such as
+  `/values/lineItems/0/amount`, with "Cannot be evaluated exactly.".
 - **Delete.** Deleting the owner deletes its rows.
 
 **Validations.** The order for a write is:
@@ -321,14 +329,18 @@ A record with a child collection holds its rows inside `values`:
 1. Computed fields and validations run only on a body that parsed cleanly.
    A body with parse errors is answered with those errors alone.
 2. On update of an entity with computed fields or validations, the stored
-   record is read first. An unknown record is still a `404`, never a `400`.
+   record is read first, with its rows. An unknown record is still a `404`,
+   never a `400`.
    The server then builds the record as it will be stored: the stored values,
-   the changes from the body and the computed fields. A computed field that
+   the changes from the body, the rows it will store and the computed fields. A computed field that
    fails is a `400`, and then no validation runs. So a change to one field
    can break a validation reported on another.
-3. The validations of the entity and of each row the body sends run. Rows
-   an update leaves out are unchanged and are not checked again. Any failure
-   is a `400`.
+3. The validations of the entity and of each row the body sends run. A
+   validation's aggregates read the same rows as the computed fields, so
+   `count(lineItems) >= 1` refuses a create without rows and an update that
+   sends an empty array. Rows an update leaves out are unchanged and are not
+   checked again as rows, but the owner's aggregates still read them. Any
+   failure is a `400`.
 4. Storage runs. It answers as described above, for example `409` for a stale
    `version`.
 

@@ -5,6 +5,8 @@ namespace Axis.Expressions.Evaluation;
 /// value is <c>null</c> or has the CLR type of its field: <see cref="string"/> for text and enum,
 /// <see cref="long"/> for integer, <see cref="decimal"/>, <see cref="bool"/>, <see cref="DateOnly"/>
 /// for date, <see cref="DateTimeOffset"/> in UTC for date-time, and <see cref="Guid"/> for reference.
+/// A child collection's value is an <see cref="IReadOnlyList{T}"/> of <see cref="ExpressionValues"/>,
+/// one per row in position order, which only an aggregate reads.
 /// </summary>
 public sealed class ExpressionValues
 {

@@ -1,0 +1,11 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a0c",
+  "kind": "entity",
+  "name": "OrderLine",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "quantity", "type": "integer" },
+    { "name": "unitPrice", "type": "decimal", "precision": 20, "scale": 2 },
+    { "name": "amount", "type": "decimal", "precision": 20, "scale": 2, "expression": "quantity * unitPrice" }
+  ]
+}

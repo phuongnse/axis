@@ -90,9 +90,50 @@ public sealed class ComputedFieldCompilerTests
         Assert.NotEqual(before.ContentHash, result.ContentHash);
     }
 
+    [Fact]
+    public void Computed_field_can_aggregate_the_computed_values_of_its_child_rows()
+    {
+        using var folder = Folder(
+            """{ "name": "lines", "type": "child-collection", "target": "Line" }""",
+            """{ "name": "total", "type": "decimal", "expression": "sum(lines, amount)" }""",
+            """{ "name": "lineCount", "type": "integer", "expression": "count(lines, quantity > 0)" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        Assert.True(order.TryGetField("total", out var total));
+        Assert.Equal(ExpressionType.Decimal, total.Computed!.Check.Type);
+        Assert.True(order.TryGetField("lineCount", out var lineCount));
+        Assert.Equal(ExpressionType.Integer, lineCount.Computed!.Check.Type);
+    }
+
+    [Theory]
+    [InlineData("sum(lines, missing)", ExpressionDiagnosticCodes.UnknownName, "'missing'")]
+    // The item expression sees only the child row, not the owner's fields.
+    [InlineData("sum(lines, price)", ExpressionDiagnosticCodes.UnknownName, "'price'")]
+    [InlineData("sum(quantity, 1)", ExpressionDiagnosticCodes.TypeMismatch, "child collection")]
+    [InlineData("if(lines == null, 0, 1)", ExpressionDiagnosticCodes.TypeMismatch, "list<Line>")]
+    public void Wrong_aggregate_in_a_computed_field_is_reported_at_its_expression(string expression, string code, string messagePart)
+    {
+        using var folder = Folder(
+            """{ "name": "lines", "type": "child-collection", "target": "Line" }""",
+            $$"""{ "name": "total", "type": "decimal", "expression": "{{expression}}" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "/fields/5/expression"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
+    }
+
     private static TemporaryFolder Folder(params string[] extraFields) => Folder(extraFields, validations: null);
 
-    /// <summary>An Order entity with quantity, price, status and supplier, then <paramref name="extraFields"/> from index 4.</summary>
+    /// <summary>
+    /// An Order entity with quantity, price, status and supplier, then <paramref name="extraFields"/>
+    /// from index 4. A Line entity with a computed <c>amount</c> can be its child.
+    /// </summary>
     private static TemporaryFolder Folder(string[] extraFields, string? validations) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
@@ -109,5 +150,13 @@ public sealed class ComputedFieldCompilerTests
             .With("entities/supplier.json", """
                 { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Supplier", "formatVersion": 1,
                   "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
+                """)
+            .With("entities/line.json", """
+                { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "Line", "formatVersion": 1,
+                  "fields": [
+                    { "name": "quantity", "type": "integer" },
+                    { "name": "unitPrice", "type": "decimal", "precision": 18, "scale": 2 },
+                    { "name": "amount", "type": "decimal", "expression": "quantity * unitPrice" }
+                  ] }
                 """);
 }
