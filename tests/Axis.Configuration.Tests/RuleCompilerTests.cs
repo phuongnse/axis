@@ -103,6 +103,62 @@ public sealed class RuleCompilerTests
     }
 
     [Fact]
+    public void A_validation_that_calls_a_chain_of_8_rules_compiles()
+    {
+        using var folder = Chain(Folder("R1(quantity)"), 8);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_chain_of_9_rules_is_reported_once_at_the_first_rule_naming_the_chain()
+    {
+        using var folder = Chain(Folder("R1(quantity)"), 9);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.RuleCallTooDeep, "rules/r01.json", "/expression"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(
+            "Rules 'R1' → 'R2' → 'R3' → 'R4' → 'R5' → 'R6' → 'R7' → 'R8' → 'R9' nest calls 9 deep, past the limit of 8.",
+            diagnostic.Message);
+        Assert.Equal(Guid.Parse("66666666-6666-4666-8666-666666666701"), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_chain_of_10_rules_is_reported_once_at_the_lowest_rule_past_the_limit()
+    {
+        using var folder = Chain(Folder("R1(quantity)"), 10);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.RuleCallTooDeep, "rules/r02.json", "/expression"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.StartsWith("Rules 'R2' → 'R3'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'R9' → 'R10' nest calls 9 deep", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_long_cycle_and_a_rule_that_calls_into_it_are_only_a_cycle()
+    {
+        // R10 calls R1, so R1 to R10 are one cycle of 10 rules, and Outer calls into it.
+        using var folder = Chain(Folder("Outer(quantity)"), 10, "R1(value)")
+            .With("rules/outer.json", Rule("66666666-6666-4666-8666-666666666799", "Outer", "R1(value)"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.RuleCallCycle, diagnostic.Code));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RuleCallTooDeep);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_repeated_parameter_name_is_reported_at_the_later_parameter()
     {
         using var folder = Folder(null).With("rules/both.json", """
@@ -202,6 +258,21 @@ public sealed class RuleCompilerTests
         { "id": "{{id}}", "kind": "rule", "name": "{{name}}", "formatVersion": 1,
           "parameters": [{ "name": "value", "type": "integer" }], "resultType": "boolean", "expression": "{{expression}}" }
         """;
+
+    /// <summary>
+    /// Adds the rules <c>R1</c> to <c>R{count}</c>, where each calls the next and the last gives
+    /// <paramref name="last"/>.
+    /// </summary>
+    private static TemporaryFolder Chain(TemporaryFolder folder, int count, string last = "value > 0")
+    {
+        for (var k = 1; k <= count; k++)
+        {
+            var expression = k < count ? $"R{k + 1}(value)" : last;
+            folder.With($"rules/r{k:D2}.json", Rule($"66666666-6666-4666-8666-6666666667{k:D2}", $"R{k}", expression));
+        }
+
+        return folder;
+    }
 
     /// <summary>An application with an <c>Order</c> entity, and one validation on its <c>quantity</c> unless <paramref name="validation"/> is null.</summary>
     private static TemporaryFolder Folder(string? validation)

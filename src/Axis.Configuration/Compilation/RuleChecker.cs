@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Resources;
+using Axis.Expressions;
 using Axis.Expressions.Functions;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Syntax;
@@ -11,7 +12,8 @@ namespace Axis.Configuration.Compilation;
 /// Checks the named rules of an application and builds the rules that validations call. A rule
 /// name may not be a built-in function name, its parameter names are unique ignoring letter case,
 /// and its expression parses and type-checks to its result type over its parameters alone. Rules
-/// that call each other in a cycle are reported once per cycle. A rule with a problem in its own
+/// that call each other in a cycle are reported once per cycle. A rule call chain deeper than the
+/// limit is reported once, at the lowest rule past the limit. A rule with a problem in its own
 /// expression, or in a cycle, is kept by its signature only, so that calls to it are still checked
 /// without further diagnostics.
 /// </summary>
@@ -91,6 +93,11 @@ internal static class RuleChecker
         private readonly List<string> _stack = [];
         private readonly HashSet<string> _inCycle = new(StringComparer.OrdinalIgnoreCase);
 
+        // A rule is missing from the depths when it is in a cycle, calls into a cycle or is too deep,
+        // so the rules that call it are not measured and get no further diagnostic.
+        private readonly Dictionary<string, int> _depthByName = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _deepestCalleeByName = new(StringComparer.OrdinalIgnoreCase);
+
         public void Run()
         {
             foreach (var name in resources.Keys)
@@ -108,23 +115,22 @@ internal static class RuleChecker
 
             _doneByName[name] = false;
             _stack.Add(name);
-            if (bodies.TryGetValue(name, out var body))
+            var callees = bodies.TryGetValue(name, out var body) ? Callees(body) : [];
+            foreach (var callee in callees)
             {
-                foreach (var callee in Callees(body))
+                if (_doneByName.TryGetValue(callee, out var done) && !done)
                 {
-                    if (_doneByName.TryGetValue(callee, out var done) && !done)
-                    {
-                        ReportCycle(callee);
-                    }
-                    else
-                    {
-                        Visit(callee);
-                    }
+                    ReportCycle(callee);
+                }
+                else
+                {
+                    Visit(callee);
                 }
             }
 
             _stack.RemoveAt(_stack.Count - 1);
             _doneByName[name] = true;
+            MeasureDepth(name, callees);
             CheckBody(name, body);
         }
 
@@ -138,6 +144,65 @@ internal static class RuleChecker
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.RuleCallCycle,
                 $"Rules {names} call each other in a cycle.",
+                rule.File,
+                "/expression",
+                rule.Id));
+        }
+
+        /// <summary>
+        /// Keeps the call depth of a rule whose callees are all measured: the rule itself plus its
+        /// deepest callee. Every callee is done, or is on the stack and then the rule is in a cycle.
+        /// </summary>
+        private void MeasureDepth(string name, List<string> callees)
+        {
+            if (_inCycle.Contains(name))
+            {
+                return;
+            }
+
+            var depth = 1;
+            string? deepest = null;
+            foreach (var callee in callees)
+            {
+                if (!_depthByName.TryGetValue(callee, out var calleeDepth))
+                {
+                    return;
+                }
+
+                if (calleeDepth + 1 > depth)
+                {
+                    depth = calleeDepth + 1;
+                    deepest = callee;
+                }
+            }
+
+            if (depth > ExpressionLimits.MaxRuleCallDepth)
+            {
+                ReportTooDeep(name, deepest!, depth);
+                return;
+            }
+
+            _depthByName[name] = depth;
+            if (deepest is not null)
+            {
+                _deepestCalleeByName[name] = deepest;
+            }
+        }
+
+        /// <summary>Reports the chain from <paramref name="name"/> down its deepest callees, at the expression of <paramref name="name"/>.</summary>
+        private void ReportTooDeep(string name, string deepest, int depth)
+        {
+            var chain = new List<string> { name };
+            for (string? next = deepest; next is not null; next = _deepestCalleeByName.GetValueOrDefault(next))
+            {
+                chain.Add(next);
+            }
+
+            var rule = resources[name];
+            var names = string.Join(" → ", chain.Select(member => $"'{resources[member].Name}'"));
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.RuleCallTooDeep,
+                $"Rules {names} nest calls {depth} deep, past the limit of {ExpressionLimits.MaxRuleCallDepth}.",
                 rule.File,
                 "/expression",
                 rule.Id));
