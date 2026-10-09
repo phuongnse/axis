@@ -8,9 +8,10 @@ namespace Axis.Expressions.Evaluation;
 /// <summary>
 /// Evaluates a checked expression against one record's field values, following the null rules and
 /// run-time errors in docs/reference/expressions.md. It covers literals, bare field names, every
-/// operator and every function in <see cref="ExpressionFunctions"/>. It does no I/O. Arithmetic is exact, and an
-/// evaluation stops after <see cref="ExpressionLimits.MaxSteps"/> steps. Values use the CLR types
-/// listed on <see cref="ExpressionValues"/>.
+/// operator, every function in <see cref="ExpressionFunctions"/> and calls to named rules. It does
+/// no I/O. Arithmetic is exact, and an evaluation stops after <see cref="ExpressionLimits.MaxSteps"/>
+/// steps, counting the steps of the rules it calls. Values use the CLR types listed on
+/// <see cref="ExpressionValues"/>.
 /// </summary>
 public static class ExpressionInterpreter
 {
@@ -37,7 +38,7 @@ public static class ExpressionInterpreter
 
         try
         {
-            return new ExpressionEvaluationResult(new Evaluator(values, checkResult.DecimalCalls).Eval(expression), null);
+            return new ExpressionEvaluationResult(new Evaluator(values, checkResult, new Budget()).Eval(expression), null);
         }
         catch (EvaluationFailure failure)
         {
@@ -45,13 +46,17 @@ public static class ExpressionInterpreter
         }
     }
 
-    private sealed class Evaluator(ExpressionValues values, IReadOnlySet<CallNode> decimalCalls)
+    /// <summary>The steps one top-level evaluation has taken, shared with the rules it calls.</summary>
+    private sealed class Budget
     {
-        private int _steps;
+        public int Steps { get; set; }
+    }
 
+    private sealed class Evaluator(ExpressionValues values, ExpressionCheckResult checkResult, Budget budget)
+    {
         public object? Eval(ExpressionNode node)
         {
-            if (++_steps > ExpressionLimits.MaxSteps)
+            if (++budget.Steps > ExpressionLimits.MaxSteps)
             {
                 throw Fail(
                     ExpressionRuntimeErrorKind.StepBudgetExhausted,
@@ -90,6 +95,11 @@ public static class ExpressionInterpreter
 
         private object? Call(CallNode call)
         {
+            if (checkResult.RuleCalls.TryGetValue(call, out var rule))
+            {
+                return RuleCall(call, rule);
+            }
+
             if (!ExpressionFunctions.TryGet(call.Name, out var signature))
             {
                 throw new InvalidOperationException($"The interpreter does not evaluate function '{call.Name}' yet.");
@@ -169,9 +179,35 @@ public static class ExpressionInterpreter
             };
         }
 
+        /// <summary>
+        /// Evaluates every argument in order, then the rule's body over them on the same budget. A
+        /// <c>null</c> argument is passed on, not short-circuited. An integer given for a decimal
+        /// parameter, or returned for a decimal result, becomes a decimal.
+        /// </summary>
+        private object? RuleCall(CallNode call, ExpressionRule rule)
+        {
+            if (rule.Body is null || rule.BodyCheck is null)
+            {
+                throw new InvalidOperationException($"Rule '{rule.Name}' has no checked body to evaluate.");
+            }
+
+            var arguments = new KeyValuePair<string, object?>[call.Arguments.Count];
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                var parameter = rule.Parameters[i];
+                arguments[i] = KeyValuePair.Create(parameter.Name, WidenTo(parameter.Type, Eval(call.Arguments[i])));
+            }
+
+            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget).Eval(rule.Body);
+            return WidenTo(rule.ResultType, result);
+        }
+
+        private static object? WidenTo(ExpressionType type, object? value) =>
+            value is long integer && type.Kind == ExpressionTypeKind.Decimal ? (decimal)integer : value;
+
         /// <summary>An integer picked by a <c>coalesce</c> or <c>if</c> checked as decimal comes back as a decimal.</summary>
         private object? Widen(CallNode call, object? value) =>
-            value is long integer && decimalCalls.Contains(call) ? (decimal)integer : value;
+            value is long integer && checkResult.DecimalCalls.Contains(call) ? (decimal)integer : value;
 
         private object DateLiteral(CallNode call, bool isDate)
         {

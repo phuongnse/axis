@@ -316,6 +316,55 @@ public sealed class ExpressionTypeCheckerTests
         Assert.Equal(0, diagnostic.Offset);
     }
 
+    [Theory]
+    [InlineData("IsPositive(i)", "boolean")]
+    [InlineData("ispositive(i + 1) and b", "boolean")]
+    [InlineData("IsPositive(null)", "boolean")]
+    // An integer argument widens to a decimal parameter.
+    [InlineData("Twice(i)", "decimal")]
+    [InlineData("Twice(d) > 1", "boolean")]
+    public void A_rule_call_has_the_rule_result_type(string text, string expected)
+    {
+        var result = Check(text, ExpressionType.Null, RuleScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(expected, result.Type.ToString());
+    }
+
+    [Theory]
+    [InlineData("Nope(i)", ExpressionDiagnosticCodes.UnknownFunction, "Unknown function or rule 'Nope' at character 1.")]
+    [InlineData("IsPositive()", ExpressionDiagnosticCodes.WrongArgumentCount, "Rule 'IsPositive' needs 1 argument, found 0 at character 1.")]
+    [InlineData("b and isPositive(i, i)", ExpressionDiagnosticCodes.WrongArgumentCount, "Rule 'IsPositive' needs 1 argument, found 2 at character 7.")]
+    [InlineData("IsPositive('a')", ExpressionDiagnosticCodes.TypeMismatch, "Rule 'IsPositive' needs integer for argument 1, found text at character 1.")]
+    // A decimal never narrows to an integer parameter.
+    [InlineData("b and IsPositive(d)", ExpressionDiagnosticCodes.TypeMismatch, "Rule 'IsPositive' needs integer for argument 1, found decimal at character 7.")]
+    public void A_wrong_rule_call_is_reported_at_the_call(string text, string code, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Boolean, RuleScope());
+
+        Assert.Equal((code, message), (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_rule_is_unknown_outside_a_scope_that_has_it()
+    {
+        Assert.Equal(ExpressionDiagnosticCodes.UnknownFunction, CheckFails("IsPositive(i)", ExpressionType.Boolean).Code);
+    }
+
+    /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
+    private static ExpressionScope RuleScope() => new(
+        new Dictionary<string, ExpressionType>
+        {
+            ["t"] = ExpressionType.Text,
+            ["i"] = ExpressionType.Integer,
+            ["d"] = ExpressionType.Decimal,
+            ["b"] = ExpressionType.Boolean,
+        },
+        [
+            new ExpressionRule("IsPositive", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean),
+            new ExpressionRule("Twice", [new ExpressionRuleParameter("value", ExpressionType.Decimal)], ExpressionType.Decimal),
+        ]);
+
     private static ExpressionType Expected(string name) => name switch
     {
         "text" => ExpressionType.Text,
