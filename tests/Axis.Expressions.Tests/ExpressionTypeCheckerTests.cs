@@ -360,6 +360,93 @@ public sealed class ExpressionTypeCheckerTests
         Assert.Equal(ExpressionDiagnosticCodes.UnknownFunction, CheckFails("IsPositive(i)", ExpressionType.Boolean).Code);
     }
 
+    [Theory]
+    [InlineData("sum(lineItems, amount)", "decimal")]
+    [InlineData("SUM(LineItems, qty)", "integer")]
+    [InlineData("sum(lineItems, qty * amount)", "decimal")]
+    [InlineData("sum(lineItems, null)", "integer")]
+    [InlineData("count(lineItems)", "integer")]
+    [InlineData("count(lineItems, ok)", "integer")]
+    [InlineData("count(lineItems, qty > 1)", "integer")]
+    [InlineData("any(lineItems, ok)", "boolean")]
+    [InlineData("all(lineItems, ok or name == 'a')", "boolean")]
+    [InlineData("min(lineItems, amount)", "decimal")]
+    [InlineData("max(lineItems, due)", "date")]
+    [InlineData("count(lineItems) >= 1 and title != null", "boolean")]
+    public void An_aggregate_over_a_child_collection_has_its_result_type(string text, string expected)
+    {
+        var result = Check(text, ExpressionType.Null, CollectionScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(expected, result.Type.ToString());
+    }
+
+    [Theory]
+    [InlineData("sum(title, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a child collection for argument 1, found text at character 1.")]
+    [InlineData("count(1)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs a child collection for argument 1, found integer at character 1.")]
+    [InlineData("count(missing)", ExpressionDiagnosticCodes.UnknownName, "Unknown field 'missing' at character 7.")]
+    [InlineData("sum(lineItems)", ExpressionDiagnosticCodes.WrongArgumentCount, "Function 'sum' needs 2 arguments, found 1 at character 1.")]
+    [InlineData("count(lineItems, ok, 1)", ExpressionDiagnosticCodes.WrongArgumentCount, "Function 'count' needs 1 argument, found 3 at character 1.")]
+    [InlineData("lineItems == null", ExpressionDiagnosticCodes.TypeMismatch, "Collection 'lineItems' is list<LineItem>, which only an aggregate accepts at character 1.")]
+    [InlineData("lineItems is null", ExpressionDiagnosticCodes.TypeMismatch, "Collection 'lineItems' is list<LineItem>, which only an aggregate accepts at character 1.")]
+    [InlineData("sum(lineItems, name)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a number for argument 2, found text at character 1.")]
+    [InlineData("any(lineItems, qty)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'any' needs boolean for argument 2, found integer at character 1.")]
+    [InlineData("count(lineItems, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs boolean for argument 2, found decimal at character 1.")]
+    [InlineData("min(lineItems, name)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'min' needs a number, date or date-time for argument 2, found text at character 1.")]
+    [InlineData("max(lineItems, ok)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'max' needs a number, date or date-time for argument 2, found boolean at character 1.")]
+    // Inside the item expression, names are the child row's fields and nothing else.
+    [InlineData("sum(lineItems, title)", ExpressionDiagnosticCodes.UnknownName, "Unknown field 'title' at character 16.")]
+    [InlineData("sum(lineItems, count(lineItems))", ExpressionDiagnosticCodes.UnknownName, "Unknown field 'lineItems' at character 22.")]
+    [InlineData("any(lineItems, IsPositive(qty))", ExpressionDiagnosticCodes.UnknownFunction, "Unknown function or rule 'IsPositive' at character 16.")]
+    public void A_wrong_aggregate_or_collection_use_is_reported(string text, string code, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, CollectionScope());
+
+        Assert.Equal((code, message), (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_collection_used_as_a_value_is_reported_at_its_name()
+    {
+        var diagnostic = CheckFails("lineItems == null", ExpressionType.Boolean, CollectionScope());
+
+        Assert.Equal((ExpressionDiagnosticCodes.TypeMismatch, 0), (diagnostic.Code, diagnostic.Offset));
+    }
+
+    [Fact]
+    public void A_decimal_sum_fits_a_decimal_but_not_an_integer()
+    {
+        Assert.True(Check("sum(lineItems, amount)", ExpressionType.Decimal, CollectionScope()).Succeeded);
+        Assert.True(Check("sum(lineItems, qty)", ExpressionType.Decimal, CollectionScope()).Succeeded);
+        Assert.Equal(
+            ExpressionDiagnosticCodes.ResultTypeMismatch,
+            CheckFails("sum(lineItems, amount)", ExpressionType.Integer, CollectionScope()).Code);
+    }
+
+    [Fact]
+    public void An_aggregate_is_unknown_outside_a_scope_with_collections()
+    {
+        Assert.Equal(ExpressionDiagnosticCodes.UnknownName, CheckFails("count(lineItems) > 0", ExpressionType.Boolean).Code);
+    }
+
+    /// <summary>
+    /// A field <c>title</c>, the collection <c>lineItems</c> of <c>LineItem</c> rows and a rule. The
+    /// rule is callable at the top level only.
+    /// </summary>
+    private static ExpressionScope CollectionScope() => new(
+        new Dictionary<string, ExpressionType> { ["title"] = ExpressionType.Text },
+        [new ExpressionRule("IsPositive", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean)],
+        [
+            new ExpressionCollection("lineItems", "LineItem", new ExpressionScope(new Dictionary<string, ExpressionType>
+            {
+                ["amount"] = ExpressionType.Decimal,
+                ["qty"] = ExpressionType.Integer,
+                ["ok"] = ExpressionType.Boolean,
+                ["name"] = ExpressionType.Text,
+                ["due"] = ExpressionType.Date,
+            })),
+        ]);
+
     /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
     private static ExpressionScope RuleScope() => new(
         new Dictionary<string, ExpressionType>

@@ -18,37 +18,44 @@ public sealed record RecordComputeResult(
 /// <summary>
 /// Computes the computed fields of a record as it will be stored, and of each row a body sends.
 /// An expression reads the record's fields that are not computed. The rows are computed before
-/// the owner. A run-time error, or a value that does not fit its column, is an error at the
-/// computed field's pointer, <c>/values/&lt;field&gt;</c> or
-/// <c>/values/&lt;collection&gt;/&lt;index&gt;/&lt;field&gt;</c>. A value is never rounded. Rows
-/// an update leaves out are not computed again.
+/// the owner, so the owner's aggregates read the rows' computed values. An aggregate reads the
+/// body's rows of a collection, or the stored rows when an update leaves the collection out. A
+/// run-time error, or a value that does not fit its column, is an error at the computed field's
+/// pointer, <c>/values/&lt;field&gt;</c> or <c>/values/&lt;collection&gt;/&lt;index&gt;/&lt;field&gt;</c>.
+/// A value is never rounded. Rows an update leaves out are not computed again.
 /// </summary>
 public static class RecordComputer
 {
     /// <summary>Computes a create: every field the body leaves out is <c>null</c>.</summary>
     public static RecordComputeResult ComputeCreate(
+        ApplicationModel application,
         EntityModel entity,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows)
     {
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
 
-        return Compute(entity, null, values, rows);
+        return Compute(application, entity, null, values, rows);
     }
 
     /// <summary>
     /// Computes an update: the record is the <paramref name="stored"/> values with the changes from
     /// the body on top, and every computed field of the owner is set, even when the body is empty.
+    /// <paramref name="stored"/> also holds the stored rows that the owner's aggregates read for a
+    /// collection the body leaves out.
     /// </summary>
     /// <exception cref="ArgumentException">The entity has computed fields and <paramref name="stored"/> is null.</exception>
     public static RecordComputeResult ComputeUpdate(
+        ApplicationModel application,
         EntityModel entity,
         Record? stored,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows)
     {
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
@@ -57,10 +64,11 @@ public static class RecordComputer
             throw new ArgumentException("An update of an entity with computed fields needs the stored record.", nameof(stored));
         }
 
-        return Compute(entity, stored, values, rows);
+        return Compute(application, entity, stored, values, rows);
     }
 
     private static RecordComputeResult Compute(
+        ApplicationModel application,
         EntityModel entity,
         Record? stored,
         IReadOnlyList<RecordValue> values,
@@ -117,8 +125,12 @@ public static class RecordComputer
                 record[value.Field.Name] = (RecordClrValues.FromInput(value, out var exact), exact);
             }
 
+            // A row value that cannot be held exactly leaves every computed field of the owner out.
+            var results = RecordCollections.TryAdd(application, entity, stored, computedRows, record, errors)
+                ? Run(entity, record, "/values", errors)
+                : [];
+
             // The body never holds a computed field, so each column has one value: the body's or the computed one.
-            var results = Run(entity, record, "/values", errors);
             var byName = values.ToDictionary(value => value.Field.Name, StringComparer.Ordinal);
             computedValues = RecordQueries.Columns(entity)
                 .Select(field => byName.GetValueOrDefault(field.Name) ?? results.GetValueOrDefault(field.Name))

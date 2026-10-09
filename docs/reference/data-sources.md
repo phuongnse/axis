@@ -162,7 +162,8 @@ see the Data sources bullet of the Resolve step in
   problem is reported at `/filter` with its
   [expression diagnostic](expressions.md#diagnostics) code: for example
   `AXC0048` when it is not boolean, `AXC0046` for an unknown name and
-  `AXC0053` for anything outside the SQL subset.
+  `AXC0053` for anything outside the SQL subset, such as an
+  [aggregate](expressions.md#aggregates) over a child collection.
 - An enum parameter compares with an enum field only when every value in the
   parameter's `values` is also in the field's `values`. Otherwise the filter
   is `AXC0047`. See [Types](expressions.md#types).

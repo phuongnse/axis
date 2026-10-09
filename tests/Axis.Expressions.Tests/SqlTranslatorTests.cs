@@ -108,6 +108,8 @@ public sealed class SqlTranslatorTests
     [InlineData("i > 0 and t.x", 11, "Paths")]
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date")]
     [InlineData("ts == dateTime('2026-10-08')", 6, "'2026-10-08' is not a valid date-time")]
+    [InlineData("b and sum(lines, i) > 0", 6, "Function 'sum'")]
+    [InlineData("COUNT(lines) > 0", 0, "Function 'count'")]
     public void Construct_outside_the_subset_is_reported_at_it(string expression, int offset, string named)
     {
         var parsed = ExpressionParser.Parse(expression);

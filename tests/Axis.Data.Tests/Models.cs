@@ -58,11 +58,15 @@ internal static class Models
     /// <summary>
     /// Makes <paramref name="field"/> a computed field whose <paramref name="expression"/> reads
     /// <paramref name="inputs"/>, as the compiler does with an entity's fields that are not computed.
+    /// <paramref name="childOf"/> finds the child entity of each child collection in the inputs, so
+    /// that aggregates can name it.
     /// </summary>
-    public static FieldModel Computed(FieldModel field, string expression, params FieldModel[] inputs) =>
+    public static FieldModel Computed(
+        FieldModel field, string expression, FieldModel[] inputs, Func<FieldModel, EntityModel?>? childOf = null) =>
         field with
         {
-            Computed = ComputedFieldModel.Compile(expression, ExpressionScopes.ForEntity(inputs), ExpressionScopes.TypeOf(field)!),
+            Computed = ComputedFieldModel.Compile(
+                expression, ExpressionScopes.ForEntity(inputs, childOf: childOf), ExpressionScopes.TypeOf(field)!),
         };
 
     /// <summary>The catalog after the model's tables were created as planned.</summary>

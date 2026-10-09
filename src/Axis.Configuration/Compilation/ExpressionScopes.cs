@@ -6,33 +6,54 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Builds the scope an entity's expressions are checked against: every field that has a column,
-/// with its expression type. A child collection is left out, because only aggregates accept a list
-/// and they are not built yet. A computed field is left out when <c>includeComputed</c> is false,
+/// with its expression type. A computed field is left out when <c>includeComputed</c> is false,
 /// as for the expression of a computed field. A repeated name keeps its first field, ignoring
-/// letter case. The named <c>rules</c> are callable only where they are given, which for now is
-/// validations. A data source scope adds the data source's parameters after the fields, and has no
-/// rules.
+/// letter case. When a child lookup is given, each child collection whose child entity it finds
+/// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
+/// included, with no rules and no collections. The named <c>rules</c> are callable only where they
+/// are given, which for now is the top level of a validation. A data source scope adds the data
+/// source's parameters after the fields, and has no rules.
 /// </summary>
 public static class ExpressionScopes
 {
     public static ExpressionScope ForEntity(
-        IEnumerable<FieldModel> fields, bool includeComputed = true, IEnumerable<ExpressionRule>? rules = null)
+        IEnumerable<FieldModel> fields,
+        bool includeComputed = true,
+        IEnumerable<ExpressionRule>? rules = null,
+        Func<FieldModel, EntityModel?>? childOf = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
+        var all = fields.ToList();
         return Build(
-            fields
+            all
                 .Where(field => includeComputed || !field.IsComputed)
                 .Select(field => (field.Name, TypeOf(field))),
-            rules);
+            rules,
+            childOf is null
+                ? null
+                : all
+                    .Where(field => field.Type == FieldType.ChildCollection)
+                    .Select(field => childOf(field) is { } child
+                        ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
+                        : null)
+                    .OfType<ExpressionCollection>()
+                    .ToList());
     }
 
     internal static ExpressionScope ForEntity(
-        IEnumerable<FieldDefinition> fields, bool includeComputed = true, IEnumerable<ExpressionRule>? rules = null) =>
-        Build(
-            fields
+        IEnumerable<FieldDefinition> fields,
+        bool includeComputed = true,
+        IEnumerable<ExpressionRule>? rules = null,
+        Func<string, EntityResource?>? findEntity = null)
+    {
+        var all = fields.ToList();
+        return Build(
+            all
                 .Where(field => includeComputed || field.Expression is null)
                 .Select(field => (field.Name, TypeOf(field))),
-            rules);
+            rules,
+            findEntity is null ? null : CollectionsOf(all, findEntity));
+    }
 
     /// <summary>The scope of a data source filter: the root entity's fields, then the parameters.</summary>
     public static ExpressionScope ForDataSource(IEnumerable<FieldModel> fields, IEnumerable<DataSourceParameterModel> parameters)
@@ -48,16 +69,26 @@ public static class ExpressionScopes
             rules: null);
     }
 
-    /// <summary>The scope of a data source filter: the root entity's fields, then the parameters.</summary>
+    /// <summary>
+    /// The scope of a data source filter: the root entity's fields, then the parameters. When
+    /// <paramref name="findEntity"/> is given, the child collections are in it too, so that the SQL
+    /// translation reports an aggregate as outside the subset.
+    /// </summary>
     internal static ExpressionScope ForDataSource(
-        IEnumerable<FieldDefinition> fields, IEnumerable<DataSourceParameterDefinition> parameters) =>
-        Build(
+        IEnumerable<FieldDefinition> fields,
+        IEnumerable<DataSourceParameterDefinition> parameters,
+        Func<string, EntityResource?>? findEntity = null)
+    {
+        var all = fields.ToList();
+        return Build(
             [
-                .. fields.Select(field => (field.Name, TypeOf(field))),
+                .. all.Select(field => (field.Name, TypeOf(field))),
                 .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
                     parameter.Name, FieldTypes.Parse(parameter.Type), parameter.Values, parameter.Target))),
             ],
-            rules: null);
+            rules: null,
+            findEntity is null ? null : CollectionsOf(all, findEntity));
+    }
 
     /// <summary>The expression type of a field's value, or null for a child collection.</summary>
     public static ExpressionType? TypeOf(FieldModel field)
@@ -73,7 +104,22 @@ public static class ExpressionScopes
     /// <summary>The expression type of a scalar type name other than <c>enum</c>, as a rule parameter or result declares it.</summary>
     internal static ExpressionType TypeOf(string scalarType) => TypeOf("", FieldTypes.Parse(scalarType), null, null)!;
 
-    private static ExpressionScope Build(IEnumerable<(string Name, ExpressionType? Type)> fields, IEnumerable<ExpressionRule>? rules)
+    /// <summary>Each child collection whose child entity is found, with the child's fields, computed ones included, as its item scope.</summary>
+    private static List<ExpressionCollection> CollectionsOf(
+        IEnumerable<FieldDefinition> fields, Func<string, EntityResource?> findEntity) =>
+        [
+            .. fields
+                .Where(field => FieldTypes.Parse(field.Type) == FieldType.ChildCollection && field.Target is not null)
+                .Select(field => findEntity(field.Target!) is { } child
+                    ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
+                    : null)
+                .OfType<ExpressionCollection>(),
+        ];
+
+    private static ExpressionScope Build(
+        IEnumerable<(string Name, ExpressionType? Type)> fields,
+        IEnumerable<ExpressionRule>? rules,
+        IEnumerable<ExpressionCollection>? collections = null)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -84,7 +130,7 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules);
+        return new ExpressionScope(types, rules, collections);
     }
 
     /// <summary>A parameter's type is a field's, except that an enum parameter declares its own values.</summary>

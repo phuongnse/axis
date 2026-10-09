@@ -1,0 +1,15 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a0b",
+  "kind": "entity",
+  "name": "Order",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "lines", "type": "child-collection", "target": "OrderLine" },
+    { "name": "total", "type": "decimal", "precision": 20, "scale": 2, "expression": "sum(lines, amount)" },
+    { "name": "lineCount", "type": "integer", "expression": "count(lines)" }
+  ],
+  "validations": [
+    { "expression": "count(lines) >= 1", "message": { "textKey": "order.needsLine" }, "field": "lines" }
+  ]
+}

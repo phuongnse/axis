@@ -393,6 +393,124 @@ public sealed class ExpressionInterpreterTests
         }
     }
 
+    [Theory]
+    // count, sum, min, max, any and all on an empty list follow the reference table.
+    [InlineData("count(lines)", 0L)]
+    [InlineData("count(lines, ok)", 0L)]
+    [InlineData("sum(lines, qty)", 0L)]
+    [InlineData("min(lines, qty)", null)]
+    [InlineData("max(lines, amount)", null)]
+    [InlineData("any(lines, ok)", false)]
+    [InlineData("all(lines, ok)", true)]
+    public void An_aggregate_over_an_empty_list_gives_its_empty_value(string text, object? expected)
+    {
+        var result = EvaluateOver(text, Rows());
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public void A_decimal_sum_of_an_empty_list_is_a_decimal_zero()
+    {
+        Assert.Equal(0m, Assert.IsType<decimal>(EvaluateOver("sum(lines, amount)", Rows()).Value));
+    }
+
+    [Theory]
+    // Null items are skipped, and a null condition counts as false.
+    [InlineData("count(lines)", 4L)]
+    [InlineData("count(lines, ok)", 1L)]
+    [InlineData("count(lines, not ok)", 1L)]
+    [InlineData("sum(lines, qty)", 6L)]
+    [InlineData("min(lines, qty)", 1L)]
+    [InlineData("max(lines, qty)", 3L)]
+    [InlineData("any(lines, ok)", true)]
+    [InlineData("any(lines, qty > 5)", false)]
+    [InlineData("all(lines, qty > 0)", false)]
+    [InlineData("all(lines, qty is null or qty > 0)", true)]
+    public void An_aggregate_skips_null_items_and_null_conditions(string text, object? expected)
+    {
+        var lines = Rows((2L, 1.5m, true), (null, null, null), (3L, 0.25m, false), (1L, null, null));
+
+        var result = EvaluateOver(text, lines);
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public void A_null_condition_makes_all_false()
+    {
+        Assert.Equal(false, EvaluateOver("all(lines, ok)", Rows((1L, null, true), (2L, null, null))).Value);
+        Assert.Equal(true, EvaluateOver("all(lines, ok)", Rows((1L, null, true), (2L, null, true))).Value);
+    }
+
+    [Fact]
+    public void Sum_min_and_max_of_decimals_are_exact_and_keep_the_item_type()
+    {
+        var lines = Rows((2L, 0.1m, null), (null, 0.2m, null), (3L, null, null));
+
+        Assert.Equal(0.3m, Assert.IsType<decimal>(EvaluateOver("sum(lines, amount)", lines).Value));
+        Assert.Equal(0.1m, Assert.IsType<decimal>(EvaluateOver("min(lines, amount)", lines).Value));
+        Assert.Equal(5L, Assert.IsType<long>(EvaluateOver("sum(lines, qty)", lines).Value));
+        // An integer item widens to a decimal when the item expression is decimal.
+        Assert.Equal(2.3m, Assert.IsType<decimal>(EvaluateOver("sum(lines, coalesce(amount, 2))", lines).Value));
+    }
+
+    [Fact]
+    public void An_all_null_list_sums_to_zero_and_has_no_min_or_max()
+    {
+        var lines = Rows((null, null, null), (null, null, null));
+
+        Assert.Equal(0L, EvaluateOver("sum(lines, qty)", lines).Value);
+        Assert.Equal(0m, EvaluateOver("sum(lines, amount)", lines).Value);
+        Assert.Null(EvaluateOver("min(lines, qty)", lines).Value);
+        Assert.Null(EvaluateOver("max(lines, amount)", lines).Value);
+    }
+
+    [Fact]
+    public void Min_and_max_order_dates()
+    {
+        var lines = (IReadOnlyList<ExpressionValues>)
+        [
+            Row(null, null, null, new DateOnly(2026, 3, 1)),
+            Row(null, null, null, null),
+            Row(null, null, null, new DateOnly(2025, 12, 31)),
+        ];
+
+        Assert.Equal(new DateOnly(2025, 12, 31), EvaluateOver("min(lines, due)", lines).Value);
+        Assert.Equal(new DateOnly(2026, 3, 1), EvaluateOver("max(lines, due)", lines).Value);
+    }
+
+    [Fact]
+    public void An_integer_sum_past_the_range_is_an_overflow_at_the_call()
+    {
+        var result = EvaluateOver("1 + sum(lines, qty)", Rows((long.MaxValue, null, null), (1L, null, null)));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionRuntimeErrorKind.IntegerOverflow, result.Error.Kind);
+        Assert.Equal(4, result.Error.Offset);
+    }
+
+    [Fact]
+    public void Every_row_is_evaluated_so_a_later_error_is_reported()
+    {
+        var result = EvaluateOver("any(lines, qty / qty > 0)", Rows((1L, null, null), (0L, null, null)));
+
+        Assert.Equal(ExpressionRuntimeErrorKind.DivisionByZero, result.Error?.Kind);
+    }
+
+    [Fact]
+    public void Each_row_of_an_aggregate_counts_against_the_step_budget()
+    {
+        // The call is one step and each row's item is one more: 1 + 9,999 is the whole budget.
+        var within = EvaluateOver("sum(lines, qty)", Rows([.. Enumerable.Repeat<(long?, decimal?, bool?)>((1L, null, null), 9_999)]));
+        var over = EvaluateOver("sum(lines, qty)", Rows([.. Enumerable.Repeat<(long?, decimal?, bool?)>((1L, null, null), 10_000)]));
+
+        Assert.Equal(9_999L, within.Value);
+        Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, over.Error?.Kind);
+    }
+
     [Fact]
     public void A_value_of_an_unexpected_type_is_a_bug()
     {
@@ -477,6 +595,30 @@ public sealed class ExpressionInterpreterTests
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
         return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides));
     }
+
+    /// <summary>Evaluates <paramref name="text"/> over a record whose collection <c>lines</c> holds <paramref name="lines"/>.</summary>
+    private static ExpressionEvaluationResult EvaluateOver(string text, IReadOnlyList<ExpressionValues> lines)
+    {
+        var items = new ExpressionScope(new Dictionary<string, ExpressionType>
+        {
+            ["qty"] = ExpressionType.Integer,
+            ["amount"] = ExpressionType.Decimal,
+            ["ok"] = ExpressionType.Boolean,
+            ["due"] = ExpressionType.Date,
+        });
+        var scope = new ExpressionScope(_fields, collections: [new ExpressionCollection("lines", "Line", items)]);
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("lines", lines)]));
+    }
+
+    private static IReadOnlyList<ExpressionValues> Rows(params (long? Qty, decimal? Amount, bool? Ok)[] rows) =>
+        [.. rows.Select(row => Row(row.Qty, row.Amount, row.Ok, null))];
+
+    private static ExpressionValues Row(long? qty, decimal? amount, bool? ok, DateOnly? due) =>
+        new(new Dictionary<string, object?> { ["qty"] = qty, ["amount"] = amount, ["ok"] = ok, ["due"] = due });
 
     private static ExpressionRuntimeError EvaluateFails(string text, params (string Name, object? Value)[] overrides)
     {

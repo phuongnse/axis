@@ -26,7 +26,7 @@ public sealed class DataSourceCompilerTests
 
     private const string LineItem = """
         { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "LineItem", "formatVersion": 1,
-          "fields": [ { "name": "description", "type": "text" } ] }
+          "fields": [ { "name": "description", "type": "text" }, { "name": "amount", "type": "decimal" } ] }
         """;
 
     private const string Invoice = """
@@ -234,6 +234,30 @@ public sealed class DataSourceCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((code, "data-sources/orders.json", "/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    // A filter type-checks with the child collections, but no aggregate is in the SQL subset.
+    [InlineData("sum(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("number != 'x' and count(lines) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("sum(lines, description) > 0", ExpressionDiagnosticCodes.TypeMismatch)]
+    [InlineData("lines is null", ExpressionDiagnosticCodes.TypeMismatch)]
+    public void Filter_over_a_child_collection_is_reported_at_the_filter(string filter, string code)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/line-item.json", LineItem)
+            .With("entities/invoice.json", Invoice)
+            .With("data-sources/invoices.json", DataSource(
+                "Invoice",
+                """[{ "name": "number", "path": "number" }]""",
+                $$""", "filter": "{{filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "data-sources/invoices.json", "/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
     }
 

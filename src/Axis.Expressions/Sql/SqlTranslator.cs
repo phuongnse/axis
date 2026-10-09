@@ -104,6 +104,12 @@ public static class SqlTranslator
             }
 
             var name = signature.Name;
+            if (signature.IsAggregate)
+            {
+                // A collection has no column, so no aggregate is in the subset.
+                throw NotTranslated(name, call.Offset);
+            }
+
             switch (name)
             {
                 case "date" or "dateTime":

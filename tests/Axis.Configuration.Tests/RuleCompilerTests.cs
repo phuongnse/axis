@@ -121,15 +121,19 @@ public sealed class RuleCompilerTests
         Assert.Null(result.Model);
     }
 
-    [Fact]
-    public void A_rule_named_like_a_built_in_function_is_reported_at_its_name()
+    [Theory]
+    [InlineData("round")]
+    // An aggregate is a built-in function too.
+    [InlineData("sum")]
+    [InlineData("Count")]
+    public void A_rule_named_like_a_built_in_function_is_reported_at_its_name(string name)
     {
-        using var folder = Folder(null).With("rules/round.json", Rule("66666666-6666-4666-8666-666666666606", "round", "value > 0"));
+        using var folder = Folder(null).With($"rules/{name}.json", Rule("66666666-6666-4666-8666-666666666606", name, "value > 0"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
         var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal((DiagnosticCodes.RuleNameIsFunction, "rules/round.json", "/name"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal((DiagnosticCodes.RuleNameIsFunction, $"rules/{name}.json", "/name"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
     }
 

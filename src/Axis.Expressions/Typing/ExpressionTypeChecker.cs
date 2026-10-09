@@ -8,8 +8,11 @@ namespace Axis.Expressions.Typing;
 /// Finds the type of a parsed expression, following the typing rules in
 /// docs/reference/expressions.md, and checks it against the type the use needs. It covers
 /// literals, bare field names, every operator, every function in
-/// <see cref="ExpressionFunctions"/> and calls to the named rules in the scope. Paths are reported as unknown names until they are built. It
-/// stops at the first problem and reports only that one.
+/// <see cref="ExpressionFunctions"/>, aggregates over the child collections in the scope and calls
+/// to the named rules in the scope. A collection is accepted only as the first argument of an
+/// aggregate, and the aggregate's item expression sees only the child row's fields. Paths are
+/// reported as unknown names until they are built. It stops at the first problem and reports only
+/// that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
@@ -49,9 +52,7 @@ public static class ExpressionTypeChecker
         TextLiteral => ExpressionType.Text,
         BooleanLiteral => ExpressionType.Boolean,
         NullLiteral => ExpressionType.Null,
-        NameNode name => context.Scope.TryGetField(name.Name, out var type)
-            ? type
-            : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{name.Name}'", name.Offset),
+        NameNode name => InferName(name, context),
         MemberNode member => throw Fail(
             ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' after '.'", member.Offset),
         CallNode call => InferCall(call, context),
@@ -61,6 +62,21 @@ public static class ExpressionTypeChecker
         InNode inNode => InferIn(inNode, context),
         _ => throw new ArgumentOutOfRangeException(nameof(node), node.GetType().Name, "Unknown node type."),
     };
+
+    private static ExpressionType InferName(NameNode name, Context context)
+    {
+        if (context.Scope.TryGetField(name.Name, out var type))
+        {
+            return type;
+        }
+
+        return context.Scope.TryGetCollection(name.Name, out var collection)
+            ? throw Fail(
+                ExpressionDiagnosticCodes.TypeMismatch,
+                $"Collection '{name.Name}' is list<{collection.Entity}>, which only an aggregate accepts",
+                name.Offset)
+            : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{name.Name}'", name.Offset);
+    }
 
     private static ExpressionType InferCall(CallNode call, Context context)
     {
@@ -81,6 +97,11 @@ public static class ExpressionTypeChecker
                 ExpressionDiagnosticCodes.WrongArgumentCount,
                 $"Function '{name}' needs {needs} {noun}, found {count}",
                 call.Offset);
+        }
+
+        if (signature.IsAggregate)
+        {
+            return InferAggregate(call, name, context);
         }
 
         var types = new ExpressionType[count];
@@ -149,6 +170,68 @@ public static class ExpressionTypeChecker
             default:
                 throw new InvalidOperationException($"The type checker has no rule for function '{name}'.");
         }
+    }
+
+    /// <summary>
+    /// An aggregate: its first argument names a child collection in the scope, and its item
+    /// expression, when there is one, is checked over the child row's fields alone. A decimal
+    /// result is recorded, so that the interpreter returns an integer sum or the 0 of an empty list
+    /// as a decimal.
+    /// </summary>
+    private static ExpressionType InferAggregate(CallNode call, string name, Context context)
+    {
+        if (call.Arguments[0] is not NameNode list || !context.Scope.TryGetCollection(list.Name, out var collection))
+        {
+            var found = Infer(call.Arguments[0], context);
+            throw Fail(
+                ExpressionDiagnosticCodes.TypeMismatch,
+                $"Function '{name}' needs a child collection for argument 1, found {found}",
+                call.Offset);
+        }
+
+        if (call.Arguments.Count == 1)
+        {
+            return ExpressionType.Integer;
+        }
+
+        ExpressionType[] types = [ExpressionType.Null, Infer(call.Arguments[1], context with { Scope = collection.Items })];
+        ExpressionType result;
+        switch (name)
+        {
+            case "count":
+                Need(call, name, types, 1, type => type.Kind == ExpressionTypeKind.Boolean, "boolean");
+                return ExpressionType.Integer;
+
+            case "any" or "all":
+                Need(call, name, types, 1, type => type.Kind == ExpressionTypeKind.Boolean, "boolean");
+                return ExpressionType.Boolean;
+
+            case "sum":
+                Need(call, name, types, 1, IsNumber, "a number");
+                result = types[1].Kind == ExpressionTypeKind.Null ? ExpressionType.Integer : types[1];
+                break;
+
+            case "min" or "max":
+                Need(
+                    call,
+                    name,
+                    types,
+                    1,
+                    type => IsNumber(type) || type.Kind is ExpressionTypeKind.Date or ExpressionTypeKind.DateTime,
+                    "a number, date or date-time");
+                result = types[1];
+                break;
+
+            default:
+                throw new InvalidOperationException($"The type checker has no rule for aggregate '{name}'.");
+        }
+
+        if (result.Kind == ExpressionTypeKind.Decimal)
+        {
+            context.DecimalCalls.Add(call);
+        }
+
+        return result;
     }
 
     /// <summary>
