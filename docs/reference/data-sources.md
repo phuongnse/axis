@@ -3,14 +3,13 @@
 Detailed reference for data sources: the resource shape, the compile checks,
 the read endpoint, the response and the errors. Parts of this file are built:
 
-- the `dataSource` resource with `entity`, `fields` whose `path` is one field
-  of the root entity, `parameters`, `filter`, `sort` and `pageSize`
+- the `dataSource` resource with `entity`, `fields` whose `path` may go
+  through `reference` fields, `parameters`, `filter`, `sort` and `pageSize`
 - the read endpoint with `page`, `pageSize`, `sort` and the data source
   parameters
 - `labels` for projected `reference` fields
 
-The rest is marked *(planned for M2)*: paths through references,
-`aggregate` and the widget binding. Dn refers to
+The rest is marked *(planned for M2)*: `aggregate` and the widget binding. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -81,12 +80,12 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`entity`.** The root entity. In M2 it cannot be a child entity.
 - **`fields`.** The projection, in order. Each entry has a `name`, which is
   the key in a row, and a `path` to a value of the root entity.
-- **`path`.** A field name of the root entity, ignoring letter case. It
-  cannot name a `child-collection` field.
-  *(Planned for M2)*: a dotted path through `reference` fields, with at most 3 hops,
-  as in [expressions.md](expressions.md#names-and-references). A path cannot
-  go through or end at a `child-collection`. A `null` reference along the
-  path gives `null` and the row is kept, because each hop is a left join.
+- **`path`.** A field name of the root entity, or a dotted path through
+  `reference` fields such as `department.name`, with at most 3 hops, as in
+  [expressions.md](expressions.md#names-and-references). Each name matches
+  ignoring letter case. A path cannot go through or end at a
+  `child-collection`. A `null` reference along the path gives `null` and the
+  row is kept, because each hop is a left join.
 - **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a
   `type` and `required`, which defaults to `false`. The types are the scalar
   field types plus `enum` and `reference`. An `enum` needs `values`, and a
@@ -98,7 +97,10 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **Missing parameter.** An optional parameter that is not given is `null` in
   the filter. The idiom is `p is null or field == p`, as in the first example.
 - **`filter`.** A boolean expression. It sees the root entity's fields and
-  the parameters as plain names, ignoring letter case. It cannot call rules.
+  the parameters as plain names, ignoring letter case, and paths through
+  `reference` fields such as `department.name`, with at most 3 hops. A path
+  starts at a field, never at a parameter, because a reference parameter is
+  an id and not a row. It cannot call rules.
   It uses the syntax of
   [expressions.md](expressions.md#grammar) and only the
   [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
@@ -138,11 +140,14 @@ see the Data sources bullet of the Resolve step in
 [configuration.md](configuration.md):
 
 - `entity` names a loaded entity (`AXC0042`).
-- Each `path` names a field of the root entity that is not a
-  `child-collection` (`AXC0043`). A dotted path is `AXC0043` until paths
-  through references are built.
+- Each `path` names a field of the root entity, or goes through `reference`
+  fields only, takes at most 3 hops, and does not end at a
+  `child-collection`. A path through a field that is not a `reference`, an
+  unknown field and more than 3 hops are each `AXC0043` at
+  `/fields/{i}/path`, with a message that says which.
 - Field names are unique, compared exactly (`AXC0044`).
-- `sort` names a projected field that is not a `reference` (`AXC0045`).
+- `sort` names a projected field whose path does not end at a `reference`
+  (`AXC0045`).
 - `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
 - A parameter name differs from every field of the root entity, because the
   filter reads both as plain names. Parameter names are unique, and `page`,
@@ -158,11 +163,13 @@ see the Data sources bullet of the Resolve step in
   labels. See the Labels bullet of the Resolve step in
   [configuration.md](configuration.md).
 - The `filter` parses, is a boolean expression over the root entity's
-  fields and the parameters, and stays inside the SQL subset. Its first
-  problem is reported at `/filter` with its
+  fields, the parameters and paths through `reference` fields, and stays
+  inside the SQL subset. Its first problem is reported at `/filter` with its
   [expression diagnostic](expressions.md#diagnostics) code: for example
-  `AXC0048` when it is not boolean, `AXC0046` for an unknown name and
-  `AXC0053` for anything outside the SQL subset.
+  `AXC0048` when it is not boolean, `AXC0046` for an unknown name, also after
+  a `.`, `AXC0047` for a `.` after a field that is not a `reference` or after
+  a parameter, `AXC0058` for a path of more than 3 hops and `AXC0053` for
+  anything outside the SQL subset.
 - An enum parameter compares with an enum field only when every value in the
   parameter's `values` is also in the field's `values`. Otherwise the filter
   is `AXC0047`. See [Types](expressions.md#types).
@@ -173,8 +180,6 @@ The remaining checks are *(planned for M2)*. They are listed without
 diagnostic codes. The codes come with the issue that builds them.
 
 - `entity` is not a child entity.
-- Each `path` resolves through `reference` fields only, takes at most 3 hops,
-  and never goes through a `child-collection`.
 - Measure names are unique. A measure name also differs from every group
   field, because both are keys of one row.
 - `groupBy` names entries of `fields`.
@@ -270,6 +275,11 @@ Each item is `{ "id", "values", "labels" }`:
   `reference` maps to the display field value of the target. It is `{}`
   otherwise. Like the record API, the labels come from the same SQL statement
   as the rows.
+- **Joins.** Each distinct path through `reference` fields is one left join
+  on the target's `id`, shared by the projection, the labels, the sort and
+  the filter. A page is one SQL statement plus the count statement, whatever
+  the page size. The count statement uses the same joins, and each join
+  matches at most one row, so it counts root rows.
 
 A grouped row *(planned for M2)* has `id: null`. Its `values` holds the group fields in
 `groupBy` order, then the measures. `totalCount` counts groups.

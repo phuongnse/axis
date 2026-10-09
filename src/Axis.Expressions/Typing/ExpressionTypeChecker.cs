@@ -8,8 +8,9 @@ namespace Axis.Expressions.Typing;
 /// Finds the type of a parsed expression, following the typing rules in
 /// docs/reference/expressions.md, and checks it against the type the use needs. It covers
 /// literals, bare field names, every operator, every function in
-/// <see cref="ExpressionFunctions"/> and calls to the named rules in the scope. Paths are reported as unknown names until they are built. It
-/// stops at the first problem and reports only that one.
+/// <see cref="ExpressionFunctions"/> and calls to the named rules in the scope. A path through
+/// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
+/// other scope. It stops at the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
@@ -52,8 +53,7 @@ public static class ExpressionTypeChecker
         NameNode name => context.Scope.TryGetField(name.Name, out var type)
             ? type
             : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{name.Name}'", name.Offset),
-        MemberNode member => throw Fail(
-            ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' after '.'", member.Offset),
+        MemberNode member => InferMember(member, context),
         CallNode call => InferCall(call, context),
         UnaryNode unary => InferUnary(unary, Infer(unary.Operand, context)),
         BinaryNode binary => InferBinary(binary, Infer(binary.Left, context), Infer(binary.Right, context)),
@@ -61,6 +61,58 @@ public static class ExpressionTypeChecker
         InNode inNode => InferIn(inNode, context),
         _ => throw new ArgumentOutOfRangeException(nameof(node), node.GetType().Name, "Unknown node type."),
     };
+
+    /// <summary>
+    /// A path such as <c>department.manager.name</c>: it starts at a field of the scope, each name
+    /// before the last is a reference field, and it takes at most <see cref="ExpressionLimits.MaxHops"/>
+    /// hops. Each <c>.</c> is one hop. A reference parameter holds an id and not a row, so a path
+    /// cannot start at it.
+    /// </summary>
+    private static ExpressionType InferMember(MemberNode member, Context context)
+    {
+        if (!context.Scope.ResolvesPaths)
+        {
+            throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' after '.'", member.Offset);
+        }
+
+        if (member.Target is not (NameNode or MemberNode))
+        {
+            throw Fail(ExpressionDiagnosticCodes.TypeMismatch, "Operator '.' needs a field path", member.Offset);
+        }
+
+        var target = Infer(member.Target, context);
+        var hops = 1;
+        for (var node = member.Target; node is MemberNode inner; node = inner.Target)
+        {
+            hops++;
+        }
+
+        if (hops > ExpressionLimits.MaxHops)
+        {
+            throw Fail(
+                ExpressionDiagnosticCodes.TooManyHops,
+                $"The path takes {hops} hops, at most {ExpressionLimits.MaxHops} are allowed",
+                member.Offset);
+        }
+
+        if (target.Kind != ExpressionTypeKind.Reference)
+        {
+            throw Fail(ExpressionDiagnosticCodes.TypeMismatch, $"Operator '.' needs a reference, found {target}", member.Offset);
+        }
+
+        if (target.IsParameter)
+        {
+            // A parameter is always a bare name, because no path ends at a parameter.
+            throw Fail(
+                ExpressionDiagnosticCodes.TypeMismatch,
+                $"Operator '.' cannot follow the parameter '{((NameNode)member.Target).Name}'. A path starts at a field",
+                member.Offset);
+        }
+
+        return context.Scope.TryGetReferenceField(target, member.Name, out var type)
+            ? type
+            : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
+    }
 
     private static ExpressionType InferCall(CallNode call, Context context)
     {

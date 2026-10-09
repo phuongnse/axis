@@ -21,7 +21,11 @@ public sealed class DataSourceCompilerTests
 
     private const string Customer = """
         { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Customer", "formatVersion": 1,
-          "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
+          "displayField": "name", "fields": [
+            { "name": "name", "type": "text", "required": true },
+            { "name": "parent", "type": "reference", "target": "Customer" },
+            { "name": "since", "type": "date" }
+          ] }
         """;
 
     private const string LineItem = """
@@ -116,23 +120,68 @@ public sealed class DataSourceCompilerTests
     }
 
     [Fact]
-    public void Path_that_is_not_a_field_of_the_entity_or_goes_through_a_reference_is_reported_at_that_path()
+    public void Path_through_references_is_in_the_model_with_one_field_per_hop()
     {
+        // Each name of a path resolves ignoring letter case, and a path may take 3 hops.
         using var folder = Folder().With("data-sources/orders.json", DataSource(
             "Order",
-            """[{ "name": "number", "path": "number" }, { "name": "total", "path": "total" }, { "name": "customerName", "path": "customer.name" }]"""));
+            """[{ "name": "customerName", "path": "Customer.name" }, { "name": "grandparent", "path": "customer.parent.PARENT" }, { "name": "far", "path": "customer.parent.parent.since" }]""",
+            """, "sort": "-customerName" """));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.Equal(["customer", "name"], dataSource.Fields[0].Path.Select(field => field.Name));
+        Assert.Equal(("name", FieldType.Text), (dataSource.Fields[0].Field.Name, dataSource.Fields[0].Field.Type));
+        Assert.Equal(["customer", "parent", "parent"], dataSource.Fields[1].Path.Select(field => field.Name));
+        Assert.Equal("name", dataSource.Fields[1].Field.TargetDisplayField);
+        Assert.Equal(["customer", "parent", "parent", "since"], dataSource.Fields[2].Path.Select(field => field.Name));
+        Assert.Equal(new DataSourceSortModel("customerName", Descending: true), dataSource.Sort);
+    }
+
+    [Fact]
+    public void Path_that_is_not_a_field_of_the_entity_is_reported_at_that_path()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }, { "name": "total", "path": "total" }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            [
-                (DiagnosticCodes.InvalidDataSourceFieldPath, "data-sources/orders.json", "/fields/1/path"),
-                (DiagnosticCodes.InvalidDataSourceFieldPath, "data-sources/orders.json", "/fields/2/path"),
-            ],
-            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)));
-        Assert.Contains("'total'", result.Diagnostics[0].Message, StringComparison.Ordinal);
-        Assert.Contains("not supported yet", result.Diagnostics[1].Message, StringComparison.Ordinal);
-        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId));
+            (DiagnosticCodes.InvalidDataSourceFieldPath, "data-sources/orders.json", "/fields/1/path"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'total'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("number.name", "'number', which is not a reference field of 'Order'")]
+    [InlineData("customer.missing", "must name a field of the entity 'Customer'. 'missing' is not one")]
+    [InlineData("customer.name.x", "'name', which is not a reference field of 'Customer'")]
+    [InlineData("customer.parent.parent.parent.name", "takes 4 hops, at most 3 are allowed")]
+    [InlineData("customer.parent.parent.parent.parent", "takes 4 hops, at most 3 are allowed")]
+    public void Path_through_a_field_that_is_not_a_reference_to_an_unknown_field_or_with_too_many_hops_is_reported_at_that_path(
+        string path, string messagePart)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            $$"""[{ "name": "number", "path": "number" }, { "name": "related", "path": "{{path}}" }]""",
+            """, "sort": "related" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        // A sort naming the invalid path is not reported again.
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDataSourceFieldPath, "data-sources/orders.json", "/fields/1/path"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains($"'{path}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
 
@@ -183,11 +232,12 @@ public sealed class DataSourceCompilerTests
     [InlineData("-Number")]
     [InlineData("customer")]
     [InlineData("-customer")]
+    [InlineData("parent")]
     public void Sort_that_names_no_projected_field_or_a_projected_reference_is_reported_at_the_sort(string sort)
     {
         using var folder = Folder().With("data-sources/orders.json", DataSource(
             "Order",
-            """[{ "name": "number", "path": "number" }, { "name": "customer", "path": "customer" }]""",
+            """[{ "name": "number", "path": "number" }, { "name": "customer", "path": "customer" }, { "name": "parent", "path": "customer.parent" }]""",
             $$""", "sort": "{{sort}}" """));
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -222,6 +272,9 @@ public sealed class DataSourceCompilerTests
     [InlineData("amount > 0 and number == date('2026-02-30')", ExpressionDiagnosticCodes.TypeMismatch)]
     [InlineData("amount is null or date('2026-02-30') is null", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("number ==", ExpressionDiagnosticCodes.SyntaxError)]
+    [InlineData("customer.missing == 'a'", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData("number.name == 'a'", ExpressionDiagnosticCodes.TypeMismatch)]
+    [InlineData("customer.parent.parent.parent.name == 'a'", ExpressionDiagnosticCodes.TooManyHops)]
     public void Invalid_filter_is_reported_at_the_filter(string filter, string code)
     {
         using var folder = Folder().With("data-sources/orders.json", DataSource(
@@ -240,8 +293,8 @@ public sealed class DataSourceCompilerTests
     [Fact]
     public void Valid_filter_is_in_the_model_checked_against_the_entity_fields()
     {
-        // Field names in a filter match ignoring letter case.
-        const string Filter = "Number != 'x' and amount is null or customer is not null";
+        // Field names in a filter match ignoring letter case, also along a path through references.
+        const string Filter = "Number != 'x' and amount is null or customer is not null and Customer.parent.NAME == 'a'";
         using var folder = Folder().With("data-sources/orders.json", DataSource(
             "Order",
             """[{ "name": "number", "path": "number" }]""",
@@ -365,6 +418,25 @@ public sealed class DataSourceCompilerTests
             (customer.Name, customer.Type, customer.Required, customer.Target));
         Assert.NotNull(dataSource.Filter);
         Assert.True(dataSource.Filter.Check.Succeeded);
+    }
+
+    [Fact]
+    public void Path_that_starts_at_a_reference_parameter_is_a_type_mismatch_at_the_filter()
+    {
+        // A reference parameter is an id, not a row the query can join.
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "parameters": [{ "name": "customerFilter", "type": "reference", "target": "Customer" }], "filter": "customerFilter.name == 'a'" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("cannot follow the parameter 'customerFilter'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
     }
 
     [Theory]
