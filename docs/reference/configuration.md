@@ -174,7 +174,10 @@ flowchart LR
      codes a function call gets (`AXC0050`, `AXC0051`, `AXC0047`). Rules
      that call each other in a cycle, such as A → B → A, are `AXC0055`
      once per cycle, at `/expression` of the rule where the cycle starts,
-     naming every rule in it. Rules are walked in path order. A parameter
+     naming every rule in it. A rule whose calls nest more than 8 deep, counting
+     itself, is `AXC0065` once, at `/expression` of the lowest rule past the
+     limit, naming the rules in the chain. A cycle never also gives
+     `AXC0065`. Rules are walked in path order. A parameter
      name that an earlier parameter of the same rule already uses, ignoring
      letter case, is `AXC0056` at `/parameters/{i}/name`. A rule name that
      is a built-in [function](expressions.md#functions) name, ignoring letter
@@ -340,6 +343,7 @@ sorted by file and then path.
 | `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
 | `AXC0064` | A data source's `entity` is a child entity. Reported at `/entity`, naming the owner. |
+| `AXC0065` | Rule calls nest more than 8 deep, such as R1 → R2 → … → R9. Reported once, at `/expression` of the lowest rule past the limit, not at the rules or validations that call it. The message names the rules in the chain in call order. A rule in a cycle, or that calls into one, gets only `AXC0055`. See [cost bounds](expressions.md#cost-bounds). |
 
 ## Startup activation
 
@@ -546,7 +550,8 @@ computed fields and data source filters come later:
   An integer argument fits a `decimal` parameter, and `null` fits any
   parameter.
 - The `expression` must give the `resultType`, and sees only its parameters.
-  It may call other rules, but not in a cycle (`AXC0055`).
+  It may call other rules, but not in a cycle (`AXC0055`) or more than 8 deep
+  (`AXC0065`).
 - The server runs the rule's expression when it evaluates the calling
   validation. Every argument is evaluated, even when one is `null`, and the
   rule's steps count against the caller's
