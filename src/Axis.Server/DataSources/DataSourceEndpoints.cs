@@ -9,7 +9,9 @@ namespace Axis.Server.DataSources;
 /// The read endpoint of a data source in the active release of an application. Only <c>GET</c>
 /// is routed. A path that names no active application or data source is a 404 before the query
 /// is checked. The paging and sorting rules are those of the record list, except that the default
-/// page size and sort are the data source's own. The problem titles never contain text from the request.
+/// page size and sort are the data source's own. A database error while evaluating the filter is a
+/// 400 problem with a fixed title. The problem titles never contain text from the request, SQL or
+/// storage names.
 /// </summary>
 internal static class DataSourceEndpoints
 {
@@ -72,6 +74,13 @@ internal static class DataSourceEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await DataSourceQueries.ListAsync(connection, model, pageNumber, size, order, cancellationToken);
+        if (result is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The data source filter could not be evaluated for these rows.");
+        }
+
         return Results.Ok(new DataSourceRowsResponse(result.Items, pageNumber, size, result.TotalCount));
     }
 
@@ -82,5 +91,5 @@ internal static class DataSourceEndpoints
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
 }
 
-/// <summary>One page of data source rows and the number of rows in the whole data source.</summary>
+/// <summary>One page of data source rows and the number of rows that pass the filter.</summary>
 internal sealed record DataSourceRowsResponse(IReadOnlyList<DataSourceRow> Items, int Page, int PageSize, long TotalCount);

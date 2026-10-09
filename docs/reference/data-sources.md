@@ -4,12 +4,12 @@ Detailed reference for data sources: the resource shape, the compile checks,
 the read endpoint, the response and the errors. Parts of this file are built:
 
 - the `dataSource` resource with `entity`, `fields` whose `path` is one field
-  of the root entity, `sort` and `pageSize`
+  of the root entity, `filter`, `sort` and `pageSize`
 - the read endpoint with `page`, `pageSize` and `sort`
 - `labels` for projected `reference` fields
 
 The rest is marked *(planned for M2)*: paths through references,
-`parameters`, `filter`, `aggregate` and the widget binding. Dn refers to
+`parameters`, `aggregate` and the widget binding. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -96,19 +96,21 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   label. A table shows it on the parameter's filter input.
 - **Missing parameter** *(planned for M2)*. An optional parameter that is not given is `null` in
   the filter. The idiom is `p is null or field == p`, as in the first example.
-- **`filter`** *(planned for M2)*. A boolean expression. It sees the root entity's fields and
-  the parameters as plain names. It uses the syntax of
+- **`filter`.** A boolean expression. It sees the root entity's fields as
+  plain names, ignoring letter case. The parameters join them as plain names
+  when they are built *(planned for M2)*. It uses the syntax of
   [expressions.md](expressions.md#grammar) and only the
   [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
-  parameters and never spliced into the SQL text. Without a `filter`, every
+  parameters and never spliced into the SQL text. A row is kept only when the
+  filter is `true`, so a `null` result drops it. Without a `filter`, every
   row passes.
 - **`sort`.** The default order, in the syntax of the query `sort`: a name, or
   `-` and a name for descending order. Without it, rows are ordered by the
   tie-break below.
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
 
-Until a property is built, the JSON Schema rejects it: a `parameters`,
-`filter` or `aggregate` property is `AXC0004`.
+Until a property is built, the JSON Schema rejects it: a `parameters` or
+`aggregate` property is `AXC0004`.
 
 ### Aggregates
 
@@ -141,6 +143,11 @@ see the Data sources bullet of the Resolve step in
 - Field names are unique, compared exactly (`AXC0044`).
 - `sort` names a projected field that is not a `reference` (`AXC0045`).
 - `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
+- The `filter` parses, is a boolean expression over the root entity's
+  fields, and stays inside the SQL subset. Its first problem is reported at
+  `/filter` with its [expression diagnostic](expressions.md#diagnostics)
+  code: for example `AXC0048` when it is not boolean, `AXC0046` for an
+  unknown name and `AXC0053` for anything outside the SQL subset.
 
 The remaining checks are *(planned for M2)*. They are listed without
 diagnostic codes. The codes come with the issue that builds them.
@@ -159,8 +166,6 @@ diagnostic codes. The codes come with the issue that builds them.
 - A parameter label's text key is in some locale, as for field labels. See
   the Labels bullet of the Resolve step in
   [configuration.md](configuration.md).
-- The `filter` is a boolean expression inside the SQL subset. Anything
-  outside the subset is a compile error.
 - An enum parameter compares with an enum field only when every value in the
   parameter's `values` is also in the field's `values`. See
   [Types](expressions.md#types).
@@ -289,10 +294,11 @@ the path, then the query, then the database.
   `page`, `pageSize`, `sort` and the parameter names. It covers a bad value, a
   missing required value and a repeated parameter. Every invalid parameter is
   reported in the same response. The keys for data source parameters come
-  with the filters, *(planned for M2)*.
-- **`400` for the database** *(planned for M2)*. A database error while evaluating the filter,
-  such as an overflow or a date out of range. The title is fixed, and the
-  response holds no SQL.
+  with the parameters *(planned for M2)*.
+- **`400` for the database.** A database data exception while evaluating the
+  filter, such as an integer overflow or a date out of range from `addDays`.
+  The title is fixed, and the response holds no SQL. Any other database
+  error is a `500`.
 - **`500`.** An unexpected error is caught by the exception handler. The
   response has no exception type, message or stack trace.
 

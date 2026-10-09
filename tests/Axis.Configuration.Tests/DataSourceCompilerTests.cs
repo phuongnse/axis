@@ -1,6 +1,7 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Expressions.Diagnostics;
 
 namespace Axis.Configuration.Tests;
 
@@ -213,7 +214,64 @@ public sealed class DataSourceCompilerTests
     }
 
     [Theory]
-    [InlineData(""", "filter": "number == 'A'" """, "/filter")]
+    [InlineData("amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("missing == 1", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData("amount / 2 > 1", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("lower(number) == 'a'", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("amount > 0 and number == date('2026-02-30')", ExpressionDiagnosticCodes.TypeMismatch)]
+    [InlineData("amount is null or date('2026-02-30') is null", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("number ==", ExpressionDiagnosticCodes.SyntaxError)]
+    public void Invalid_filter_is_reported_at_the_filter(string filter, string code)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "filter": "{{filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "data-sources/orders.json", "/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Valid_filter_is_in_the_model_checked_against_the_entity_fields()
+    {
+        // Field names in a filter match ignoring letter case.
+        const string Filter = "Number != 'x' and amount is null or customer is not null";
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "filter": "{{Filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var filter = Assert.Single(result.Model.DataSources).Filter;
+        Assert.NotNull(filter);
+        Assert.Equal(Filter, filter.Expression);
+        Assert.True(filter.Check.Succeeded);
+        Assert.Equal("boolean", filter.Check.Type.ToString());
+    }
+
+    [Fact]
+    public void Filter_over_an_unknown_entity_is_not_checked()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Invoice",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "filter": "missing" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownDataSourceEntity, "/entity"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
     [InlineData(""", "parameters": [] """, "/parameters")]
     [InlineData(""", "aggregate": {} """, "/aggregate")]
     [InlineData(""", "pageSize": 101 """, "/pageSize")]

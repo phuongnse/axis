@@ -100,13 +100,19 @@ flowchart LR
      `AXC0044` at `/fields/{i}/name`. The `sort`, without its leading `-`,
      must exactly match a projected name whose field is not a `reference`,
      otherwise it is `AXC0045` at `/sort`. A sort naming an entry whose path
-     is already `AXC0043` is not reported again. See
+     is already `AXC0043` is not reported again. The `filter` is parsed,
+     type-checked as a boolean over the entity's fields and translated to
+     SQL. Its first problem is reported at `/filter` with its
+     [expression diagnostic](expressions.md#diagnostics) code, and anything
+     outside the SQL subset is `AXC0053`. The filter of a data source whose
+     entity is unknown is not checked. See
      [data sources](data-sources.md#compile-checks).
 
    The model holds the text resources, each entity's display field, the
    sites and pages with their entity and page references resolved, the
    seeds in path order with their entity resolved, and the data sources in
-   path order with their entity and projected fields resolved. No model
+   path order with their entity and projected fields resolved and their
+   filter checked. No model
    is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields, and must be boolean. A
@@ -115,8 +121,9 @@ flowchart LR
    `/validations/{i}/expression`. A `field` that names no field of the
    entity, ignoring letter case, is `AXC0052` at `/validations/{i}/field`,
    and the `message` joins the `AXC0028` check. A validation with an error
-   produces no model. [Data source](data-sources.md#compile-checks) filters,
-   form bindings and operation inputs join this step as they are built.
+   produces no model. [Data source](data-sources.md#compile-checks) filters
+   are checked in the Resolve step, with the data sources. Form bindings and
+   operation inputs join this step as they are built.
 4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
    - **Content hash.** Every resource file is canonicalized as in RFC 8785
@@ -261,6 +268,7 @@ sorted by file and then path.
 | `AXC0050` | An expression calls a function that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
 | `AXC0051` | An expression calls a function with the wrong number of arguments, such as `round(1.5)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
 | `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
+| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)` or a `date('…')` text that is not valid. Reported at `/filter`, with the character position of the operator or the call in the message. See [SQL subset](expressions.md#sql-subset). |
 
 ## Startup activation
 

@@ -2,24 +2,32 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
 using Axis.Data.Records;
+using Axis.Expressions.Sql;
+using Axis.Expressions.Typing;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Data.DataSources;
 
 /// <summary>
 /// Reads the rows of a data source over a tenant connection. Every identifier comes from
-/// <see cref="EntityNaming"/> and is quoted, and every value from the caller is a parameter.
+/// <see cref="EntityNaming"/> and is quoted, and every value from the caller or the filter is a
+/// parameter. The filter is translated by <see cref="SqlTranslator"/> into the <c>WHERE</c> clause
+/// of both the count and the page statement.
 /// </summary>
 public static class DataSourceQueries
 {
     private const string RowAlias = "r";
 
     /// <summary>
-    /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> rows, ordered by the sort
-    /// field and then by the root id ascending, or by the root id alone without a sort, and counts
-    /// every row of the data source. A page past the last one has no items.
+    /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> rows that pass the filter,
+    /// ordered by the sort field and then by the root id ascending, or by the root id alone without
+    /// a sort, and counts every row that passes. A page past the last one has no items. Returns
+    /// <see langword="null"/> when the database rejects the filter for these rows with a data
+    /// exception (SQLSTATE class 22), such as an integer overflow or a date out of range. Any other
+    /// database error is thrown.
     /// </summary>
-    public static async Task<DataSourceRowPage> ListAsync(
+    public static async Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
         DataSourceModel dataSource,
         int page,
@@ -33,31 +41,84 @@ public static class DataSourceQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
-        long totalCount;
-        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table}", connection))
-        {
-            totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
-        }
-
         var row = EntityNaming.Quote(RowAlias);
+        var (where, values) = Where(dataSource);
         var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
         var order = sort is null
             ? $"{id} ASC"
             : $"{Column(sort.Field.Field)} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
-        await using var command = new NpgsqlCommand(
-            $"SELECT {SelectList(dataSource)} FROM {table} AS {row}{LabelJoins(dataSource)} ORDER BY {order} LIMIT @limit OFFSET @offset",
-            connection);
-        command.Parameters.AddWithValue("limit", pageSize);
-        command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
-        var items = new List<DataSourceRow>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        try
         {
-            items.Add(ReadRow(reader, dataSource));
+            long totalCount;
+            await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
+            {
+                AddValues(count, values);
+                totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+            }
+
+            await using var command = new NpgsqlCommand(
+                $"SELECT {SelectList(dataSource)} FROM {table} AS {row}{LabelJoins(dataSource)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
+                connection);
+            AddValues(command, values);
+            command.Parameters.AddWithValue("limit", pageSize);
+            command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
+
+            var items = new List<DataSourceRow>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(ReadRow(reader, dataSource));
+            }
+
+            return new DataSourceRowPage(items, totalCount);
+        }
+        catch (PostgresException exception) when (exception.SqlState.StartsWith("22", StringComparison.Ordinal))
+        {
+            // Class 22 is a data exception: the filter could not be evaluated for some row.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The <c>WHERE</c> clause of the filter, with a leading space, and the values it names. Both
+    /// are empty without a filter. A bare name in the filter is a column of the root row.
+    /// </summary>
+    private static (string Where, IReadOnlyList<SqlValue> Values) Where(DataSourceModel dataSource)
+    {
+        if (dataSource.Filter is not { } filter)
+        {
+            return ("", []);
         }
 
-        return new DataSourceRowPage(items, totalCount);
+        var translated = SqlTranslator.Translate(
+            filter.Syntax,
+            name => $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.Column(name))}");
+        if (!translated.Succeeded)
+        {
+            throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
+        }
+
+        return ($" WHERE {translated.Sql}", translated.Parameters);
+    }
+
+    /// <summary>Adds each filter value as a parameter of its exact PostgreSQL type, so no value is ever inferred from text.</summary>
+    private static void AddValues(NpgsqlCommand command, IReadOnlyList<SqlValue> values)
+    {
+        foreach (var value in values)
+        {
+            var (type, parameterValue) = value.Kind switch
+            {
+                ExpressionTypeKind.Text => (NpgsqlDbType.Text, value.Value),
+                ExpressionTypeKind.Integer => (NpgsqlDbType.Bigint, value.Value),
+                ExpressionTypeKind.Decimal => (NpgsqlDbType.Numeric, value.Value),
+                ExpressionTypeKind.Boolean => (NpgsqlDbType.Boolean, value.Value),
+                ExpressionTypeKind.Date => (NpgsqlDbType.Date, value.Value),
+                ExpressionTypeKind.DateTime => (NpgsqlDbType.TimestampTz, ((DateTimeOffset)value.Value).UtcDateTime),
+                _ => throw new ArgumentOutOfRangeException(nameof(values), value.Kind, "No SQL parameter type for this kind."),
+            };
+            command.Parameters.Add(new NpgsqlParameter(value.Name, type) { Value = parameterValue });
+        }
     }
 
     /// <summary>

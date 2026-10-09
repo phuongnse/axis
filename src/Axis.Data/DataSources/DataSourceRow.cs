@@ -13,5 +13,5 @@ public sealed record DataSourceRow(
     IReadOnlyDictionary<string, JsonValue?> Values,
     IReadOnlyDictionary<string, string> Labels);
 
-/// <summary>One page of data source rows and the number of rows in the whole data source.</summary>
+/// <summary>One page of data source rows and the number of rows that pass the filter.</summary>
 public sealed record DataSourceRowPage(IReadOnlyList<DataSourceRow> Items, long TotalCount);
