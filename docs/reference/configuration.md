@@ -75,8 +75,8 @@ flowchart LR
      exactly one of `entity` and `dataSource`, otherwise it is `AXC0060` at
      `/widgets/{i}`. A widget's `entity` must name a loaded entity
      (`AXC0021`). A `dataSource` is allowed only on a `table` widget, and
-     its data source must have no required parameter (`AXC0060` at
-     `/widgets/{i}/dataSource`). It must name a loaded data source
+     its data source must have no required parameter and no `aggregate`
+     (`AXC0060` at `/widgets/{i}/dataSource`). It must name a loaded data source
      (`AXC0059`). A `formPage` is allowed only on a `table` widget and must
      name a page whose widget is a `form` over the same entity, or over the
      root entity of the table's data source (`AXC0022`). A navigation entry
@@ -109,7 +109,18 @@ flowchart LR
      `AXC0044` at `/fields/{i}/name`. The `sort`, without its leading `-`,
      must exactly match a projected name whose path does not end at a `reference`,
      otherwise it is `AXC0045` at `/sort`. A sort naming an entry whose path
-     is already `AXC0043` is not reported again. A parameter name that is
+     is already `AXC0043` is not reported again. An `aggregate` groups by
+     projected names, compared exactly: a `groupBy` entry that names no
+     projected field is `AXC0061` at `/aggregate/groupBy/{i}`. A measure name
+     that is a group field or repeats an earlier measure, compared exactly,
+     is `AXC0062` at `/aggregate/measures/{i}/name`. A `count` with a `field`,
+     or a `sum`, `min` or `max` without one, is `AXC0063` at
+     `/aggregate/measures/{i}`. A measure `field` that names no projected
+     field, or whose type the function does not take, is `AXC0063` at
+     `/aggregate/measures/{i}/field`. A measure field whose path is already
+     `AXC0043` is not reported again. When the data source is grouped, the
+     `sort` must exactly match a group field that is not a `reference`, or a
+     measure, otherwise it is `AXC0045`. A parameter name that is
      also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
      an earlier parameter, all ignoring letter case, is `AXC0054` at
      `/parameters/{i}/name`. A parameter's type properties are checked as an
@@ -306,7 +317,7 @@ sorted by file and then path.
 | `AXC0042` | A data source's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
 | `AXC0043` | A data source field's `path` names no field of the data source's entity or of a reference's target, goes through a field that is not a `reference`, takes more than 3 hops, or ends at a `child-collection` field, which has no column. The message says which. Reported at `/fields/{i}/path`. |
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
-| `AXC0045` | A data source's `sort` names no projected field, or names a projected field whose path ends at a `reference`. Reported at `/sort`. |
+| `AXC0045` | A data source's `sort` names no projected field, or names a projected field whose path ends at a `reference`. For a grouped data source, it names no group field or measure, or names a group field whose path ends at a `reference`. Reported at `/sort`. |
 | `AXC0046` | An expression names a field that is not in its scope, including an unknown field after a `.`. Outside a data source filter, every `.` path is reported this way. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. This includes a child collection used anywhere but as the first argument of an aggregate, such as `lineItems == null`, and an aggregate over a field that is not a child collection, such as `sum(title, amount)`. In a data source filter it also includes a `.` after a field that is not a `reference`, such as `name.x`, or after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
@@ -321,7 +332,10 @@ sorted by file and then path.
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 | `AXC0058` | A path in a data source filter takes more than 3 hops, such as `a.b.c.d.name`. Reported at `/filter`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
-| `AXC0060` | A widget names both `entity` and `dataSource`, or neither, reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. |
+| `AXC0060` | A widget names both `entity` and `dataSource`, or neither, reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for, or an `aggregate`, because a table cannot show group rows yet. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter or says the data source is grouped. |
+| `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |
+| `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
+| `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
 
 ## Startup activation
 

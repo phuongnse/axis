@@ -7,11 +7,13 @@ namespace Axis.Data.DataSources;
 /// holds every projected field under its projected name, in projection order; a SQL <c>NULL</c> is
 /// a <see langword="null"/> value. <see cref="Labels"/> maps each projected reference field that is
 /// not null to the display field value of the referenced record; it is empty when there is none.
+/// A grouped row has no <see cref="Id"/>. Its <see cref="Values"/> holds the group fields in
+/// <c>groupBy</c> order, then the measures, and its <see cref="Labels"/> cover the group fields.
 /// </summary>
 public sealed record DataSourceRow(
     Guid? Id,
     IReadOnlyDictionary<string, JsonValue?> Values,
     IReadOnlyDictionary<string, string> Labels);
 
-/// <summary>One page of data source rows and the number of rows that pass the filter.</summary>
+/// <summary>One page of data source rows and the number of rows that pass the filter, or of groups when the data source is grouped.</summary>
 public sealed record DataSourceRowPage(IReadOnlyList<DataSourceRow> Items, long TotalCount);

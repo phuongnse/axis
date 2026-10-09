@@ -61,6 +61,16 @@ internal static class ModelAssert
             Assert.Equal(
                 expectedDataSource.Fields.Select(field => (field.Name, field.Field.Name)),
                 actualDataSource.Fields.Select(field => (field.Name, field.Field.Name)));
+            Assert.Equal(expectedDataSource.Aggregate is null, actualDataSource.Aggregate is null);
+            if (expectedDataSource.Aggregate is { } expectedAggregate && actualDataSource.Aggregate is { } actualAggregate)
+            {
+                Assert.Equal(
+                    expectedAggregate.GroupBy.Select(field => field.Name),
+                    actualAggregate.GroupBy.Select(field => field.Name));
+                Assert.Equal(
+                    expectedAggregate.Measures.Select(measure => (measure.Name, measure.Function, measure.Field?.Name)),
+                    actualAggregate.Measures.Select(measure => (measure.Name, measure.Function, measure.Field?.Name)));
+            }
         }
     }
 }

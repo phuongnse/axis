@@ -17,7 +17,8 @@ namespace Axis.Data.DataSources;
 /// data source parameters are <c>@p0</c>, <c>@p1</c>, … in declaration order. Each distinct path
 /// through reference fields, from the projection, the labels, the sort or the filter, is one left
 /// join on the target's id, so a page is one statement plus the count whatever its size, and a
-/// null reference gives null related values without hiding the row.
+/// null reference gives null related values without hiding the row. A grouped data source groups
+/// the filtered rows by its group fields, and each row of a page is one group.
 /// </summary>
 public static class DataSourceQueries
 {
@@ -26,7 +27,9 @@ public static class DataSourceQueries
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> rows that pass the filter,
     /// ordered by the sort field and then by the root id ascending, or by the root id alone without
-    /// a sort, and counts every row that passes. <paramref name="parameters"/> holds one value per
+    /// a sort, and counts every row that passes. When the data source is grouped, a row is one group
+    /// of the rows that pass, ordered by the sort and then by each group field ascending, and the
+    /// count is the number of groups. <paramref name="parameters"/> holds one value per
     /// declared parameter, in declaration order. <paramref name="application"/> resolves the paths
     /// in the filter. A page past the last one has no items. Returns
     /// <see langword="null"/> when the database rejects the filter for these rows with a data
@@ -53,18 +56,39 @@ public static class DataSourceQueries
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
         var row = EntityNaming.Quote(RowAlias);
         var joins = new Joins();
-        var select = SelectList(dataSource, joins);
-        var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
-        var order = sort is null
-            ? $"{id} ASC"
-            : $"{joins.ColumnOf(sort.Field.Path)} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
+        string select, groupBy, order;
+        if (dataSource.Aggregate is { } aggregate)
+        {
+            (select, groupBy) = GroupedSelectList(aggregate, joins);
+
+            // Each group is unique by its group fields, so they break every tie.
+            var groupOrder = aggregate.GroupBy.Select(field => $"{joins.ColumnOf(field.Path)} ASC");
+            order = string.Join(", ", sort is null ? groupOrder : [OrderTerm(sort, joins), .. groupOrder]);
+        }
+        else
+        {
+            select = SelectList(dataSource, joins);
+            groupBy = "";
+            var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
+            order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins)}, {id} ASC";
+        }
+
         var (where, values) = Where(application, dataSource, joins);
         var from = $"{table} AS {row}{joins.Sql}{where}";
+
+        // Without a group field, the one total row has no order.
+        var orderBy = order.Length == 0 ? "" : $" ORDER BY {order}";
+
+        // A grouped count wraps the grouped statement, so it counts groups. Without a group field
+        // the inner statement is one total row even when no row passes.
+        var countSql = dataSource.Aggregate is null
+            ? $"SELECT count(*) FROM {from}"
+            : $"SELECT count(*) FROM (SELECT count(*) FROM {from}{groupBy}) AS g";
 
         try
         {
             long totalCount;
-            await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {from}", connection))
+            await using (var count = new NpgsqlCommand(countSql, connection))
             {
                 AddValues(count, values);
                 AddParameters(count, parameters);
@@ -72,7 +96,7 @@ public static class DataSourceQueries
             }
 
             await using var command = new NpgsqlCommand(
-                $"SELECT {select} FROM {from} ORDER BY {order} LIMIT @limit OFFSET @offset",
+                $"SELECT {select} FROM {from}{groupBy}{orderBy} LIMIT @limit OFFSET @offset",
                 connection);
             AddValues(command, values);
             AddParameters(command, parameters);
@@ -83,7 +107,7 @@ public static class DataSourceQueries
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(ReadRow(reader, dataSource));
+                items.Add(dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : ReadRow(reader, dataSource));
             }
 
             return new DataSourceRowPage(items, totalCount);
@@ -215,7 +239,90 @@ public static class DataSourceQueries
         ]);
 
     private static IEnumerable<DataSourceFieldModel> References(DataSourceModel dataSource) =>
-        dataSource.Fields.Where(field => field.Field.Type == FieldType.Reference);
+        References(dataSource.Fields);
+
+    private static IEnumerable<DataSourceFieldModel> References(IEnumerable<DataSourceFieldModel> fields) =>
+        fields.Where(field => field.Field.Type == FieldType.Reference);
+
+    /// <summary>The sort column, or the aggregate of the sort measure, with its direction.</summary>
+    private static string OrderTerm(DataSourceSort sort, Joins joins) =>
+        (sort.Measure is { } measure ? Aggregate(measure, joins) : joins.ColumnOf(sort.Field!.Path))
+        + (sort.Descending ? " DESC" : " ASC");
+
+    /// <summary>
+    /// The select list of a grouped data source: every group field in <c>groupBy</c> order, then
+    /// every measure, decimals and sums as text so no digit is lost. Then the display field of each
+    /// group reference's target. Also the <c>GROUP BY</c> clause with a leading space: the group
+    /// columns and those display columns, which each join matches at most once, so they never split
+    /// a group. It is empty without a group field, which gives one total row.
+    /// </summary>
+    private static (string Select, string GroupBy) GroupedSelectList(DataSourceAggregateModel aggregate, Joins joins)
+    {
+        var groupColumns = aggregate.GroupBy.Select(field => joins.ColumnOf(field.Path)).ToList();
+        var labelColumns = References(aggregate.GroupBy)
+            .Select(field => $"{joins.TargetAlias(field.Path)}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}")
+            .ToList();
+        var select = string.Join(", ", [
+            .. aggregate.GroupBy.Select((field, index) =>
+                groupColumns[index] + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
+            .. aggregate.Measures.Select(measure =>
+                Aggregate(measure, joins)
+                + (measure.Function == AggregateFunction.Sum || measure.Field?.Field.Type == FieldType.Decimal ? "::text" : "")),
+            .. labelColumns,
+        ]);
+        string[] grouping = [.. groupColumns, .. labelColumns];
+        return (select, grouping.Length == 0 ? "" : $" GROUP BY {string.Join(", ", grouping)}");
+    }
+
+    /// <summary>The aggregate of a measure. A sum, min or max over only <c>NULL</c> values is <c>NULL</c>.</summary>
+    private static string Aggregate(DataSourceMeasureModel measure, Joins joins) =>
+        measure.Function switch
+        {
+            AggregateFunction.Count => "count(*)",
+            AggregateFunction.Sum => $"sum({joins.ColumnOf(measure.Field!.Path)})",
+            AggregateFunction.Min => $"min({joins.ColumnOf(measure.Field!.Path)})",
+            AggregateFunction.Max => $"max({joins.ColumnOf(measure.Field!.Path)})",
+            _ => throw new ArgumentOutOfRangeException(nameof(measure), measure.Function, "Unknown aggregate function."),
+        };
+
+    private static DataSourceRow ReadGroupedRow(NpgsqlDataReader reader, DataSourceAggregateModel aggregate)
+    {
+        var values = new Dictionary<string, JsonValue?>(aggregate.GroupBy.Count + aggregate.Measures.Count, StringComparer.Ordinal);
+        var ordinal = 0;
+        foreach (var field in aggregate.GroupBy)
+        {
+            values[field.Name] = reader.IsDBNull(ordinal) ? null : RecordQueries.ReadValue(reader, ordinal, field.Field);
+            ordinal++;
+        }
+
+        foreach (var measure in aggregate.Measures)
+        {
+            values[measure.Name] = reader.IsDBNull(ordinal)
+                ? null
+                : measure.Function switch
+                {
+                    AggregateFunction.Count => JsonValue.Create(reader.GetInt64(ordinal)),
+                    // The sum's number text is written as is, like a decimal.
+                    AggregateFunction.Sum => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
+                    _ => RecordQueries.ReadValue(reader, ordinal, measure.Field!.Field),
+                };
+            ordinal++;
+        }
+
+        // A null reference, or a target whose display column is NULL, has no label.
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in References(aggregate.GroupBy))
+        {
+            if (!reader.IsDBNull(ordinal))
+            {
+                labels[field.Name] = reader.GetString(ordinal);
+            }
+
+            ordinal++;
+        }
+
+        return new DataSourceRow(null, values, labels);
+    }
 
     private static DataSourceRow ReadRow(NpgsqlDataReader reader, DataSourceModel dataSource)
     {

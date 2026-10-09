@@ -15,7 +15,8 @@ public sealed class DataSourceCompilerTests
             { "name": "number", "type": "text", "required": true },
             { "name": "amount", "type": "decimal" },
             { "name": "customer", "type": "reference", "target": "Customer" },
-            { "name": "status", "type": "enum", "values": ["open", "closed"] }
+            { "name": "status", "type": "enum", "values": ["open", "closed"] },
+            { "name": "paid", "type": "boolean" }
           ] }
         """;
 
@@ -353,11 +354,14 @@ public sealed class DataSourceCompilerTests
 
     [Theory]
     [InlineData(""", "parameters": [{ "name": "p", "type": "child-collection" }] """, "/parameters/0/type")]
-    [InlineData(""", "aggregate": {} """, "/aggregate")]
+    [InlineData(""", "aggregate": { "groupBy": ["number"] } """, "/aggregate")]
+    [InlineData(""", "aggregate": { "groupBy": ["number"], "measures": [] } """, "/aggregate/measures")]
+    [InlineData(""", "aggregate": { "groupBy": ["number"], "measures": [{ "name": "a", "function": "avg", "field": "number" }] } """, "/aggregate/measures/0/function")]
+    [InlineData(""", "aggregate": { "groupBy": ["number", "number"], "measures": [{ "name": "n", "function": "count" }] } """, "/aggregate/groupBy")]
     [InlineData(""", "pageSize": 101 """, "/pageSize")]
     [InlineData(""", "pageSize": 0 """, "/pageSize")]
     [InlineData(""", "sort": "--number" """, "/sort")]
-    public void Property_not_built_yet_or_out_of_range_is_a_schema_violation(string extra, string path)
+    public void Malformed_or_out_of_range_property_is_a_schema_violation(string extra, string path)
     {
         using var folder = Folder().With("data-sources/orders.json", DataSource("Order", """[{ "name": "number", "path": "number" }]""", extra));
 
@@ -530,6 +534,196 @@ public sealed class DataSourceCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.SchemaViolation, "/fields"), (diagnostic.Code, diagnostic.Path));
     }
+
+    [Fact]
+    public void Valid_aggregate_is_in_the_model_with_its_group_fields_measures_and_sort()
+    {
+        // A group field may be a reference, and a measure may read a field through a reference.
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "customer", "path": "customer" }, { "name": "status", "path": "status" }, { "name": "amount", "path": "amount" }, { "name": "since", "path": "customer.since" }]""",
+            """
+            , "aggregate": { "groupBy": ["status", "customer"], "measures": [
+                { "name": "orders", "function": "count" },
+                { "name": "amountSum", "function": "sum", "field": "amount" },
+                { "name": "firstSince", "function": "min", "field": "since" },
+                { "name": "amountMax", "function": "max", "field": "amount" }
+              ] }, "sort": "-amountSum"
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.NotNull(dataSource.Aggregate);
+        Assert.Equal([dataSource.Fields[1], dataSource.Fields[0]], dataSource.Aggregate.GroupBy);
+        Assert.Equal(
+            [
+                ("orders", AggregateFunction.Count, null),
+                ("amountSum", AggregateFunction.Sum, dataSource.Fields[2]),
+                ("firstSince", AggregateFunction.Min, dataSource.Fields[3]),
+                ("amountMax", AggregateFunction.Max, dataSource.Fields[2]),
+            ],
+            dataSource.Aggregate.Measures.Select(measure => (measure.Name, measure.Function, measure.Field)));
+        Assert.Equal(new DataSourceSortModel("amountSum", Descending: true), dataSource.Sort);
+        Assert.True(dataSource.TryGetMeasure("amountSum", out var measure));
+        Assert.Same(dataSource.Aggregate.Measures[1], measure);
+        Assert.False(dataSource.TryGetMeasure("AmountSum", out _));
+    }
+
+    [Fact]
+    public void Aggregate_with_no_group_field_and_a_sort_by_a_group_field_compiles()
+    {
+        using var folder = Folder()
+            .With("data-sources/orders.json", DataSource(
+                "Order",
+                """[{ "name": "amount", "path": "amount" }]""",
+                """, "aggregate": { "groupBy": [], "measures": [{ "name": "total", "function": "sum", "field": "amount" }] } """))
+            .With("data-sources/by-status.json", DataSource(
+                "Order",
+                """[{ "name": "status", "path": "status" }]""",
+                """, "aggregate": { "groupBy": ["status"], "measures": [{ "name": "orders", "function": "count" }] }, "sort": "-status" """)
+                .Replace(DataSourceId, "99999999-9999-4999-8999-999999999992", StringComparison.Ordinal)
+                .Replace("\"Orders\"", "\"OrdersByStatus\"", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Empty(Assert.Single(result.Model.DataSources, dataSource => dataSource.Name == "Orders").Aggregate!.GroupBy);
+        Assert.Equal(
+            new DataSourceSortModel("status", Descending: true),
+            Assert.Single(result.Model.DataSources, dataSource => dataSource.Name == "OrdersByStatus").Sort);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "m", "function": "sum", "field": "number" }""", "'sum' cannot take the text field 'number'")]
+    [InlineData("""{ "name": "m", "function": "sum", "field": "since" }""", "'sum' cannot take the date field 'since'")]
+    [InlineData("""{ "name": "m", "function": "min", "field": "paid" }""", "'min' cannot take the boolean field 'paid'")]
+    [InlineData("""{ "name": "m", "function": "max", "field": "status" }""", "'max' cannot take the enum field 'status'")]
+    [InlineData("""{ "name": "m", "function": "max", "field": "customer" }""", "'max' cannot take the reference field 'customer'")]
+    [InlineData("""{ "name": "m", "function": "sum", "field": "Amount" }""", "'Amount' must name a projected field")]
+    [InlineData("""{ "name": "m", "function": "min", "field": "missing" }""", "'missing' must name a projected field")]
+    public void Measure_field_of_the_wrong_type_or_not_projected_is_reported_at_its_field(string measure, string message)
+    {
+        using var folder = Folder().With("data-sources/orders.json", Grouped(measure));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDataSourceMeasure, "data-sources/orders.json", "/aggregate/measures/1/field"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains(message, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "m", "function": "count", "field": "amount" }""", "'count' counts rows and takes no 'field'")]
+    [InlineData("""{ "name": "m", "function": "sum" }""", "'sum' needs a 'field'")]
+    [InlineData("""{ "name": "m", "function": "max" }""", "'max' needs a 'field'")]
+    public void Count_with_a_field_or_another_function_without_one_is_reported_at_the_measure(string measure, string message)
+    {
+        using var folder = Folder().With("data-sources/orders.json", Grouped(measure));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDataSourceMeasure, "/aggregate/measures/1"),
+            (diagnostic.Code, diagnostic.Path));
+        Assert.Contains(message, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("Number")]
+    public void Group_field_that_names_no_projected_field_is_reported_at_that_group_field(string groupField)
+    {
+        // Group fields match projected names exactly. A sort that names the unknown group field is
+        // not reported again.
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "aggregate": { "groupBy": ["number", "{{groupField}}"], "measures": [{ "name": "orders", "function": "count" }] }, "sort": "{{groupField}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownDataSourceGroupField, "data-sources/orders.json", "/aggregate/groupBy/1"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains($"'{groupField}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""[{ "name": "status", "function": "count" }]""", 0)]
+    [InlineData("""[{ "name": "orders", "function": "count" }, { "name": "orders", "function": "sum", "field": "amount" }]""", 1)]
+    public void Measure_name_that_is_a_group_field_or_repeats_another_measure_is_reported_at_that_name(string measures, int index)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "status", "path": "status" }, { "name": "amount", "path": "amount" }]""",
+            $$""", "aggregate": { "groupBy": ["status"], "measures": {{measures}} } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateDataSourceMeasureName, "data-sources/orders.json", $"/aggregate/measures/{index}/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("amount", "must name a group field or a measure")]
+    [InlineData("-amount", "must name a group field or a measure")]
+    [InlineData("Orders", "must name a group field or a measure")]
+    [InlineData("customer", "names the reference field 'customer'")]
+    public void Grouped_sort_that_names_no_group_field_or_measure_or_a_group_reference_is_reported_at_the_sort(string sort, string message)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "customer", "path": "customer" }, { "name": "amount", "path": "amount" }]""",
+            $$""", "aggregate": { "groupBy": ["customer"], "measures": [{ "name": "orders", "function": "count" }] }, "sort": "{{sort}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDataSourceSort, "data-sources/orders.json", "/sort"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains(message, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Measure_over_a_projected_field_with_an_invalid_path_is_not_reported_again()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "status", "path": "status" }, { "name": "total", "path": "total" }]""",
+            """, "aggregate": { "groupBy": ["status"], "measures": [{ "name": "totalSum", "function": "sum", "field": "total" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidDataSourceFieldPath, "/fields/1/path"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    /// <summary>
+    /// A data source grouped by <c>status</c> whose measures are a count, then <paramref name="measure"/>,
+    /// over every scalar kind: text, decimal, enum, reference, boolean and date.
+    /// </summary>
+    private static string Grouped(string measure) =>
+        DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }, { "name": "amount", "path": "amount" }, { "name": "status", "path": "status" }, { "name": "customer", "path": "customer" }, { "name": "paid", "path": "paid" }, { "name": "since", "path": "customer.since" }]""",
+            $$""", "aggregate": { "groupBy": ["status"], "measures": [{ "name": "orders", "function": "count" }, {{measure}}] } """);
 
     private static TemporaryFolder Folder() =>
         new TemporaryFolder()

@@ -86,6 +86,16 @@ internal static class PresentationChecker
             {
                 recordEntity = dataSource.Entity;
 
+                // A table builds its columns from the projected fields and opens rows by id. A
+                // grouped row has neither.
+                if (dataSource.Aggregate is not null)
+                {
+                    Report(
+                        DiagnosticCodes.InvalidWidgetBinding,
+                        $"The data source '{dataSource.Name}' is grouped. A table cannot show a grouped data source yet.",
+                        $"{path}/dataSource");
+                }
+
                 // A table has no inputs for parameter values yet, so a required one would make
                 // every request for its rows fail.
                 foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))

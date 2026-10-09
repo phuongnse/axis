@@ -20,6 +20,7 @@
       "items": { "$ref": "#/$defs/parameter" }
     },
     "filter": { "type": "string" },
+    "aggregate": { "$ref": "#/$defs/aggregate" },
     "sort": {
       "type": "string",
       "pattern": "^-?[A-Za-z][A-Za-z0-9]*$"
@@ -59,6 +60,33 @@
           "type": "string",
           "pattern": "^[A-Za-z][A-Za-z0-9]*(\\.[A-Za-z][A-Za-z0-9]*)*$"
         }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groupBy", "measures"],
+      "properties": {
+        "groupBy": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/name" }
+        },
+        "measures": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/measure" }
+        }
+      }
+    },
+    "measure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "function"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "function": { "enum": ["count", "sum", "min", "max"] },
+        "field": { "$ref": "#/$defs/name" }
       }
     },
     "parameter": {
