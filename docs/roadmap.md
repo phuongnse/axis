@@ -27,8 +27,8 @@
 | --- | --- | --- | --- |
 | **M0** | Foundation | Done | The solution builds; CI runs build, lint, unit, PostgreSQL integration and Playwright E2E for real; NexKit is installed with those checks. |
 | **M1** | Walking skeleton | Done | An entity defined in a JSON file is compiled into a release, its table is created, and a user can list, create and edit records through generic pages, in light and dark mode. Two tenant databases are isolated. |
-| **M2** | Data and rules | Next | Expression language, named rules, validation and computed fields, data sources (filters, sorting, paging, relations, aggregates), seed data beyond insert-once, such as updating seeded records, and line items on the purchase request form. |
-| **M3** | Processes and tasks | Planned | Worker host. Purchase request submit → manager task → finance task above the threshold → approved, returned or rejected. Survives worker restart. One decision per task, one start per submission. Audit trail and sequence numbers. |
+| **M2** | Data and rules | Done | Expression language, named rules, validation and computed fields, data sources (filters, sorting, paging, relations, aggregates), seed data beyond insert-once, such as updating seeded records, and line items on the purchase request form. |
+| **M3** | Processes and tasks | Next | Worker host. Purchase request submit → manager task → finance task above the threshold → approved, returned or rejected. Survives worker restart. One decision per task, one start per submission. Audit trail and sequence numbers. |
 | **M4** | Identity and authorization | Planned | OIDC login through the BFF (Keycloak in tests), roles, default-deny policies at resource, record, field and action level. Denied-access E2E for the purchase request scenarios. |
 | **M5** | Events, triggers and integration | Planned | Events, data change triggers, schedules, inbound endpoints, connectors with idempotency and reconciliation, deployment bindings and secrets, extension packages. The approved request creates exactly one purchase order, even when a response is lost. |
 | **M6** | Releases and versioning | Planned | Immutable releases with full pinning, waiting instances finishing on their old release, schema evolution with migrations, separate database roles for runtime access and schema changes, text resource lifecycle, configuration test scenarios in CI. |
@@ -37,7 +37,7 @@
 | **M9** | Tenancy and deployment | Planned | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. |
 | **M10** | Hardening | Planned | Performance SLOs and load tests, FAPI 2.0 profile, security verification against an agreed ASVS level, custom widgets. |
 
-M2 is the next milestone to break down into issues.
+M3 is the next milestone to break down into issues.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4
 stay in this order.

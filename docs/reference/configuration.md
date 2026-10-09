@@ -483,7 +483,7 @@ site, and its widgets are its content:
 }
 ```
 
-- A page holds exactly one widget in M1. The widget `type` is `table` or
+- A page holds exactly one widget. The widget `type` is `table` or
   `form`. A `form` names an `entity`. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`.
 - A `table` widget may name a `formPage`: the page with the `form` widget
