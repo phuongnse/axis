@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
@@ -543,14 +544,10 @@ public sealed class DataSourceCompilerTests
     }
 
     [Fact]
-    public void Filter_that_calls_a_rule_is_an_unknown_function()
+    public void Filter_that_calls_a_rule_in_the_sql_subset_compiles()
     {
-        // Only validations can call rules for now, so a data source filter has no rules in scope.
         using var folder = Folder()
-            .With("rules/is-large.json", """
-                { "id": "66666666-6666-4666-8666-666666666601", "kind": "rule", "name": "IsLarge", "formatVersion": 1,
-                  "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 1000" }
-                """)
+            .With("rules/is-large.json", IsLarge)
             .With("data-sources/orders.json", DataSource(
                 "Order",
                 """[{ "name": "number", "path": "number" }]""",
@@ -558,10 +555,147 @@ public sealed class DataSourceCompilerTests
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var filter = Assert.Single(result.Model.DataSources).Filter;
+        Assert.NotNull(filter);
+        Assert.Equal("IsLarge", Assert.Single(filter.Check.RuleCalls).Value.Name);
+    }
+
+    [Fact]
+    public void Filter_that_calls_a_rule_outside_the_sql_subset_names_the_rule()
+    {
+        using var folder = Folder()
+            .With("rules/is-x.json", """
+                { "id": "66666666-6666-4666-8666-666666666602", "kind": "rule", "name": "IsX", "formatVersion": 1,
+                  "parameters": [{ "name": "value", "type": "text" }], "resultType": "boolean", "expression": "lower(value) == 'x'" }
+                """)
+            .With("data-sources/orders.json", DataSource(
+                "Order",
+                """[{ "name": "number", "path": "number" }]""",
+                """, "filter": "IsX(number)" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (ExpressionDiagnosticCodes.UnknownFunction, "data-sources/orders.json", "/filter"),
+            (ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/orders.json", "/filter"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'IsX'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'lower'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Filter_that_calls_a_rule_with_a_wrong_argument_is_a_type_mismatch()
+    {
+        using var folder = Folder()
+            .With("rules/is-large.json", IsLarge)
+            .With("data-sources/orders.json", DataSource(
+                "Order",
+                """[{ "name": "number", "path": "number" }]""",
+                """, "filter": "IsLarge('a')" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Filter_that_calls_a_rule_with_its_own_error_adds_no_diagnostic()
+    {
+        using var folder = Folder()
+            .With("rules/broken.json", """
+                { "id": "66666666-6666-4666-8666-666666666603", "kind": "rule", "name": "Broken", "formatVersion": 1,
+                  "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value >" }
+                """)
+            .With("data-sources/orders.json", DataSource(
+                "Order",
+                """[{ "name": "number", "path": "number" }]""",
+                """, "filter": "Broken(amount)" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.SyntaxError, "rules/broken.json", "/expression"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Filter_whose_rule_calls_inline_past_the_cap_is_outside_the_subset()
+    {
+        // L7 calls L6 four times, and so on down to L0, so inlined it is far past 2,000 nodes. The
+        // chain is 8 rules deep, the most the rule call depth limit allows.
+        using var folder = Folder().With("rules/l0.json", """
+            { "id": "77777777-7777-4777-8777-777777777700", "kind": "rule", "name": "L0", "formatVersion": 1,
+              "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 0" }
+            """);
+        for (var k = 1; k <= 7; k++)
+        {
+            var call = $"L{k - 1}(value)";
+            folder.With($"rules/l{k}.json", $$"""
+                { "id": "77777777-7777-4777-8777-7777777777{{k:00}}", "kind": "rule", "name": "L{{k}}", "formatVersion": 1,
+                  "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean",
+                  "expression": "{{call}} and {{call}} and {{call}} and {{call}}" }
+                """);
+        }
+
+        folder.With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "filter": "L7(amount)" """));
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        stopwatch.Stop();
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'L7'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public void Filter_whose_rule_calls_fan_out_wide_is_checked_in_linear_time()
+    {
+        // Each rule calls the one below it 20 times, so a walk per call would visit 20^7 bodies. The
+        // chain is 8 rules deep, the most the rule call depth limit allows.
+        using var folder = Folder().With("rules/w0.json", """
+            { "id": "77777777-7777-4777-8777-777777777800", "kind": "rule", "name": "W0", "formatVersion": 1,
+              "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 0" }
+            """);
+        for (var k = 1; k <= 7; k++)
+        {
+            var calls = string.Join(" and ", Enumerable.Repeat($"W{k - 1}(value)", 20));
+            folder.With($"rules/w{k}.json", $$"""
+                { "id": "77777777-7777-4777-8777-7777777778{{k:00}}", "kind": "rule", "name": "W{{k}}", "formatVersion": 1,
+                  "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean",
+                  "expression": "{{calls}}" }
+                """);
+        }
+
+        folder.With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "filter": "W7(amount)" """));
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        stopwatch.Stop();
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'W7'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Took {stopwatch.Elapsed}.");
     }
 
     [Fact]
@@ -764,6 +898,11 @@ public sealed class DataSourceCompilerTests
             "Order",
             """[{ "name": "number", "path": "number" }, { "name": "amount", "path": "amount" }, { "name": "status", "path": "status" }, { "name": "customer", "path": "customer" }, { "name": "paid", "path": "paid" }, { "name": "since", "path": "customer.since" }]""",
             $$""", "aggregate": { "groupBy": ["status"], "measures": [{ "name": "orders", "function": "count" }, {{measure}}] } """);
+
+    private const string IsLarge = """
+        { "id": "66666666-6666-4666-8666-666666666601", "kind": "rule", "name": "IsLarge", "formatVersion": 1,
+          "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 1000" }
+        """;
 
     private static TemporaryFolder Folder() =>
         new TemporaryFolder()

@@ -73,8 +73,8 @@ public static class ApplicationCompiler
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
         }
 
-        // Only validations call rules for now, at their top level. Computed fields, aggregate item
-        // expressions and filters see no rules.
+        // Validations, at their top level, and data source filters call rules. Computed fields and
+        // aggregate item expressions see no rules.
         var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
         foreach (var entity in loaded.Entities)
         {
@@ -83,7 +83,7 @@ public static class ApplicationCompiler
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
-        CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, diagnostics);
+        CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, rules, diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -100,7 +100,7 @@ public static class ApplicationCompiler
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
-            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities)).ToList(),
+            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
         };
         return result with
         {
@@ -586,8 +586,8 @@ public static class ApplicationCompiler
     /// Each parameter name differs from the entity's fields, from <c>page</c>, <c>pageSize</c> and
     /// <c>sort</c> and from earlier parameters, ignoring letter case. Its type properties and label
     /// are checked as an entity field's. The <c>filter</c> parses, type-checks as a boolean over the
-    /// entity's fields, the parameters and paths through reference fields, with no rules, and
-    /// translates to SQL. Its child collections are in the type check's scope, so an aggregate
+    /// entity's fields, the parameters, paths through reference fields and the named rules, and
+    /// translates to SQL, with each rule call inlined. Its child collections are in the type check's scope, so an aggregate
     /// type-checks and is then reported as outside the SQL subset. Its first problem
     /// is reported at <c>/filter</c> with its expression code. It is not checked while a parameter
     /// has a diagnostic. An <c>aggregate</c> groups by projected names, its measure names differ
@@ -600,6 +600,7 @@ public static class ApplicationCompiler
         Func<string, EntityResource?> findEntity,
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> textKeys,
+        IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
         foreach (var dataSource in loaded.DataSources)
@@ -764,7 +765,7 @@ public static class ApplicationCompiler
             // A parameter without a usable type would only add noise to the filter's diagnostics.
             if (diagnostics.Count == countBeforeParameters
                 && dataSource.Filter is { } filter
-                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity)) is { } problem)
+                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, rules)) is { } problem)
             {
                 Report(problem.Code, problem.Message, "/filter");
             }
@@ -825,8 +826,10 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// The first problem of a data source filter: in parsing, in type checking over the entity's
-    /// fields, its child collections, the parameters and paths through reference fields, with no
-    /// rules, or outside the SQL subset.
+    /// fields, its child collections, the parameters, paths through reference fields and the named
+    /// rules, or outside the SQL subset with each rule call inlined. A filter that calls a rule
+    /// without a checked expression, directly or through the rules it calls, is not translated: that
+    /// rule already has its own diagnostic, as for a validation.
     /// </summary>
     private static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope)
     {
@@ -837,10 +840,23 @@ public static class ApplicationCompiler
         }
 
         var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
-        return check.Succeeded
-            ? SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path)).Diagnostic
-            : check.Diagnostic;
+        if (!check.Succeeded)
+        {
+            return check.Diagnostic;
+        }
+
+        return CallsRuleWithoutBody(check, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
+            ? null
+            : SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path), check).Diagnostic;
     }
+
+    /// <summary>
+    /// Whether a checked expression calls a rule without a checked body, directly or through the
+    /// rules it calls. Each rule is visited once, so a rule called many times does not multiply the walk.
+    /// </summary>
+    private static bool CallsRuleWithoutBody(ExpressionCheckResult check, HashSet<ExpressionRule> visited) =>
+        check.RuleCalls.Values.Any(rule =>
+            visited.Add(rule) && (rule.BodyCheck is null || CallsRuleWithoutBody(rule.BodyCheck, visited)));
 
     /// <summary>
     /// Resolves a projected <c>path</c> from the entity <paramref name="root"/>, ignoring letter
@@ -1001,9 +1017,10 @@ public static class ApplicationCompiler
     /// <summary>
     /// Builds a checked data source over the built entities, so each projected path is a list of the
     /// entities' own field models, and its filter is compiled against the built entity's fields, the
-    /// parameters and paths through reference fields.
+    /// parameters, paths through reference fields and the named rules.
     /// </summary>
-    private static DataSourceModel BuildDataSource(DataSourceResource dataSource, IReadOnlyList<EntityModel> entities)
+    private static DataSourceModel BuildDataSource(
+        DataSourceResource dataSource, IReadOnlyList<EntityModel> entities, IEnumerable<ExpressionRule> rules)
     {
         EntityModel? Find(string name) =>
             entities.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -1048,7 +1065,7 @@ public static class ApplicationCompiler
             Fields = fields,
             Parameters = parameters,
             Filter = dataSource.Filter is { } filter
-                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find), ExpressionType.Boolean)
+                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find, rules), ExpressionType.Boolean)
                 : null,
             Aggregate = dataSource.Aggregate is { } aggregate
                 ? new DataSourceAggregateModel(

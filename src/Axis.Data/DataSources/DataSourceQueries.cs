@@ -13,8 +13,9 @@ namespace Axis.Data.DataSources;
 /// Reads the rows of a data source over a tenant connection. Every identifier comes from
 /// <see cref="EntityNaming"/> and is quoted, and every value from the caller or the filter is a
 /// parameter. The filter is translated by <see cref="SqlTranslator"/> into the <c>WHERE</c> clause
-/// of both the count and the page statement. Its literals are <c>@f0</c>, <c>@f1</c>, … and the
-/// data source parameters are <c>@p0</c>, <c>@p1</c>, … in declaration order. Each distinct path
+/// of both the count and the page statement, with the body of each rule it calls inlined. Its
+/// literals are <c>@f0</c>, <c>@f1</c>, … and the data source parameters are <c>@p0</c>,
+/// <c>@p1</c>, … in declaration order. Each distinct path
 /// through reference fields, from the projection, the labels, the sort or the filter, is one left
 /// join on the target's id, so a page is one statement plus the count whatever its size, and a
 /// null reference gives null related values without hiding the row. A grouped data source groups
@@ -148,7 +149,8 @@ public static class DataSourceQueries
                 }
 
                 return joins.ColumnOf(ResolvePath(application, dataSource, names));
-            });
+            },
+            filter.Check);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");

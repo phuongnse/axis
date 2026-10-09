@@ -1,0 +1,11 @@
+{
+  "id": "c47a1e93-0b6d-4f28-8e5c-2d9f7a3b1e64",
+  "kind": "dataSource",
+  "name": "ItemsNamed",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [{ "name": "name", "path": "name" }],
+  "parameters": [{ "name": "nameFilter", "type": "text", "required": true }],
+  "filter": "NameIs(name, nameFilter)",
+  "sort": "name"
+}

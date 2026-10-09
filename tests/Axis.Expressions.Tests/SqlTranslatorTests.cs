@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
@@ -7,7 +8,7 @@ namespace Axis.Expressions.Tests;
 
 public sealed class SqlTranslatorTests
 {
-    private static readonly ExpressionScope _scope = new(new Dictionary<string, ExpressionType>
+    private static readonly Dictionary<string, ExpressionType> _fields = new()
     {
         ["t"] = ExpressionType.Text,
         ["i"] = ExpressionType.Integer,
@@ -16,7 +17,9 @@ public sealed class SqlTranslatorTests
         ["dt"] = ExpressionType.Date,
         ["ts"] = ExpressionType.DateTime,
         ["e"] = ExpressionType.Enum("status", ["draft", "submitted"]),
-    });
+    };
+
+    private static readonly ExpressionScope _scope = new(_fields);
 
     private static readonly DateTimeOffset _instant = new(2026, 10, 8, 2, 30, 0, TimeSpan.Zero);
 
@@ -141,6 +144,200 @@ public sealed class SqlTranslatorTests
         Assert.True(result.Succeeded, result.Diagnostic?.Message);
         Assert.Equal(["department|manager|name", "i"], paths);
         Assert.Equal("((\"department.manager.name\" IS NOT DISTINCT FROM @f0) AND (\"i\" > @f1))", result.Sql);
+    }
+
+    public static TheoryData<string, string, (string, ExpressionTypeKind, object)[]> RuleCalls => new()
+    {
+        // The body replaces the call, with each parameter replaced by its argument.
+        { "IsBig(i)", "((\"i\" > @f0))", [("f0", ExpressionTypeKind.Integer, 10L)] },
+        // An argument for a decimal parameter is cast to numeric, as the interpreter widens it.
+        {
+            "AtLeast(i, 1)",
+            "(((\"i\")::numeric >= (@f0)::numeric))",
+            [("f0", ExpressionTypeKind.Integer, 1L)]
+        },
+        // A parameter used twice repeats the argument's SQL. A literal argument is one parameter.
+        { "Twice(i) > 2", "(((\"i\" + \"i\")) > @f0)", [("f0", ExpressionTypeKind.Integer, 2L)] },
+        { "Twice(5) > i", "(((@f0 + @f0)) > \"i\")", [("f0", ExpressionTypeKind.Integer, 5L)] },
+        // The parameter t shadows the field t inside the body.
+        { "Len('abc') > 2", "((char_length(@f0)) > @f1)", [("f0", ExpressionTypeKind.Text, "abc"), ("f1", ExpressionTypeKind.Integer, 2L)] },
+        // A rule that calls a rule inlines both. The arguments are rendered before the body.
+        {
+            "BothBig(i, 3)",
+            "((((\"i\" > @f1)) AND ((@f0 > @f2))))",
+            [("f0", ExpressionTypeKind.Integer, 3L), ("f1", ExpressionTypeKind.Integer, 10L), ("f2", ExpressionTypeKind.Integer, 10L)]
+        },
+        // A decimal result is cast to numeric.
+        { "Half(i) > 1", "(((((\"i\")::numeric * @f0))::numeric) > @f1)", [("f0", ExpressionTypeKind.Decimal, 0.5m), ("f1", ExpressionTypeKind.Integer, 1L)] },
+    };
+
+    [Theory]
+    [MemberData(nameof(RuleCalls))]
+    public void Rule_call_renders_the_inlined_body_with_each_parameter_replaced_by_its_argument(
+        string expression, string expectedSql, (string, ExpressionTypeKind, object)[] expectedParameters)
+    {
+        var result = TranslateWithRules(expression, SampleRules());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(expectedSql, result.Sql);
+        Assert.Equal(expectedParameters, result.Parameters.Select(parameter => (parameter.Name, parameter.Kind, parameter.Value)));
+    }
+
+    [Fact]
+    public void Rule_body_outside_the_subset_is_reported_at_the_call_naming_the_rule()
+    {
+        var isLower = Rule("IsLower", "lower(value) == value", ExpressionType.Boolean, [], ("value", ExpressionType.Text));
+
+        var result = TranslateWithRules("b and IsLower(t)", [isLower]);
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Sql);
+        Assert.Empty(result.Parameters);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 6), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("'IsLower'", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'lower'", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.EndsWith("at character 7.", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rule_known_by_its_signature_only_is_outside_the_subset()
+    {
+        var signatureOnly = new ExpressionRule("Broken", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean);
+
+        var result = TranslateWithRules("Broken(i)", [signatureOnly]);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 0), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("'Broken'", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rule_call_without_a_check_result_is_not_translated()
+    {
+        var parsed = ExpressionParser.Parse("IsBig(i)");
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 0), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.StartsWith("Function 'IsBig' is not translated to SQL", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rule_chain_past_the_inlined_node_cap_is_outside_the_subset_before_rendering()
+    {
+        var rules = Chain(8);
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = TranslateWithRules("L8(i)", rules);
+
+        stopwatch.Stop();
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Sql);
+        Assert.Empty(result.Parameters);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 0), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("'L8'", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("2,000", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Took {stopwatch.Elapsed}.");
+    }
+
+    [Theory]
+    // L3's body inlines to 423 nodes and L4's to 1,703, so L4(i) is 1,705 with its call and argument.
+    [InlineData("L3(i)")]
+    [InlineData("L4(i)")]
+    public void Rule_chain_under_the_inlined_node_cap_translates(string expression)
+    {
+        var result = TranslateWithRules(expression, Chain(4));
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Fact]
+    public void Inlined_node_cap_names_the_rule_the_filter_calls()
+    {
+        var chain = Chain(5);
+        var outer = Rule("Outer", "L5(value)", ExpressionType.Boolean, chain, ("value", ExpressionType.Integer));
+
+        var result = TranslateWithRules("b and Outer(i)", [outer]);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 6), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("'Outer'", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("'L", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Filter_nodes_after_a_large_rule_call_that_pass_the_cap_name_that_rule()
+    {
+        // L4(i) inlines to 1,705 nodes. With "and", "in" and "i" the filter reaches 1,708 before the
+        // list, and each item adds one, so item 293 passes 2,000 outside any rule body.
+        static string Filter(int items) => $"L4(i) and i in ({string.Join(", ", Enumerable.Range(1, items))})";
+
+        var result = TranslateWithRules(Filter(293), Chain(4));
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Sql);
+        Assert.Empty(result.Parameters);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 0), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("'L4'", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("2,000", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.True(TranslateWithRules(Filter(292), Chain(4)).Succeeded);
+    }
+
+    /// <summary>
+    /// <c>L0(value) = value &gt; 0</c>, and each <c>Lk(value)</c> up to <paramref name="depth"/>
+    /// calls <c>L(k-1)(value)</c> four times. The last one comes first.
+    /// </summary>
+    private static List<ExpressionRule> Chain(int depth)
+    {
+        var rules = new List<ExpressionRule> { Rule("L0", "value > 0", ExpressionType.Boolean, [], ("value", ExpressionType.Integer)) };
+        for (var k = 1; k <= depth; k++)
+        {
+            var call = $"L{k - 1}(value)";
+            rules.Insert(0, Rule($"L{k}", $"{call} and {call} and {call} and {call}", ExpressionType.Boolean, rules, ("value", ExpressionType.Integer)));
+        }
+
+        return rules;
+    }
+
+    private static List<ExpressionRule> SampleRules()
+    {
+        var isBig = Rule("IsBig", "value > 10", ExpressionType.Boolean, [], ("value", ExpressionType.Integer));
+        return
+        [
+            isBig,
+            Rule("AtLeast", "value >= min", ExpressionType.Boolean, [], ("value", ExpressionType.Decimal), ("min", ExpressionType.Decimal)),
+            Rule("Twice", "value + value", ExpressionType.Integer, [], ("value", ExpressionType.Integer)),
+            Rule("Len", "length(t)", ExpressionType.Integer, [], ("t", ExpressionType.Text)),
+            Rule("BothBig", "IsBig(a) and IsBig(b)", ExpressionType.Boolean, [isBig], ("a", ExpressionType.Integer), ("b", ExpressionType.Integer)),
+            Rule("Half", "value * 0.5", ExpressionType.Decimal, [], ("value", ExpressionType.Decimal)),
+        ];
+    }
+
+    private static ExpressionRule Rule(
+        string name, string body, ExpressionType result, IEnumerable<ExpressionRule> rules, params (string Name, ExpressionType Type)[] parameters)
+    {
+        var parsed = ExpressionParser.Parse(body);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var scope = new ExpressionScope(parameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Type), rules);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, result);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        return new ExpressionRule(name, [.. parameters.Select(parameter => new ExpressionRuleParameter(parameter.Name, parameter.Type))], result)
+        {
+            Body = parsed.Expression,
+            BodyCheck = check,
+        };
+    }
+
+    /// <summary>Parses and type-checks <paramref name="expression"/> as a boolean over the fields and <paramref name="rules"/>, then translates it.</summary>
+    private static SqlTranslationResult TranslateWithRules(string expression, IEnumerable<ExpressionRule> rules)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, new ExpressionScope(_fields, rules), ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        return SqlTranslator.Translate(parsed.Expression, Column, check);
     }
 
     /// <summary>Parses and type-checks <paramref name="expression"/> as a boolean, then translates it.</summary>

@@ -106,8 +106,10 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   the parameters as plain names, ignoring letter case, and paths through
   `reference` fields such as `department.name`, with at most 3 hops. A path
   starts at a field, never at a parameter, because a reference parameter is
-  an id and not a row. It cannot call rules.
-  It uses the syntax of
+  an id and not a row. It can call named
+  [rules](configuration.md#resource-file-shape), and its SQL inlines each
+  rule's expression in place of the call. With every rule inlined, the filter
+  may have at most 2,000 syntax nodes. It uses the syntax of
   [expressions.md](expressions.md#grammar) and only the
   [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
   parameters and never spliced into the SQL text. A row is kept only when the
@@ -176,14 +178,15 @@ see the Data sources bullet of the Resolve step in
   labels. See the Labels bullet of the Resolve step in
   [configuration.md](configuration.md).
 - The `filter` parses, is a boolean expression over the root entity's
-  fields, the parameters and paths through `reference` fields, and stays
-  inside the SQL subset. Its first problem is reported at `/filter` with its
+  fields, the parameters, paths through `reference` fields and the named
+  rules, and stays inside the SQL subset. Its first problem is reported at `/filter` with its
   [expression diagnostic](expressions.md#diagnostics) code: for example
   `AXC0048` when it is not boolean, `AXC0046` for an unknown name, also after
   a `.`, `AXC0047` for a `.` after a field that is not a `reference` or after
   a parameter, `AXC0058` for a path of more than 3 hops and `AXC0053` for
   anything outside the SQL subset, such as an
-  [aggregate](expressions.md#aggregates) over a child collection.
+  [aggregate](expressions.md#aggregates) over a child collection or a call to
+  a rule whose expression uses `lower`.
 - An enum parameter compares with an enum field only when every value in the
   parameter's `values` is also in the field's `values`. Otherwise the filter
   is `AXC0047`. See [Types](expressions.md#types).

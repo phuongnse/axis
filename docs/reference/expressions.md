@@ -14,7 +14,8 @@ can also call a named [rule](configuration.md#resource-file-shape): the
 compiler checks the call and the rule, and the interpreter runs the rule's
 expression. Data source
 [filters](data-sources.md#resource-shape) are another: the compiler checks
-and translates them, and the data source endpoint runs them as SQL. Other uses
+and translates them, and the data source endpoint runs them as SQL. A filter
+can also call a named rule: its SQL inlines the rule's expression. Other uses
 come with the issues that build them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
@@ -237,7 +238,7 @@ and in [functions](#functions).
 
 *(planned for M2)*. Bare field names, data source parameters, paths in data
 source filters, child collections in aggregates and rule calls from
-validations are built: the type checker resolves names against the fields,
+validations and data source filters are built: the type checker resolves names against the fields,
 parameters and collections it is given, paths against the reference fields'
 targets when it is given a way to find them, and calls against the rules it
 is given, ignoring letter case. Paths in validations and computed fields are
@@ -264,9 +265,10 @@ is `AXC0046`.
   parameter. A rule body sees only its declared parameters. Parameter and
   result types are the scalar field types except `enum`, which comes later
   (see [Resource file shape](configuration.md#resource-file-shape)). A rule
-  name may not reuse a built-in function or aggregate name. Only validations
-  can call rules for now, and not inside an aggregate's item expression.
-  Calls from computed fields and filters come later.
+  name may not reuse a built-in function or aggregate name. A validation and
+  a data source filter can call rules, but not inside an aggregate's item
+  expression. A filter's SQL inlines the rule's body, see
+  [SQL subset](#sql-subset). Calls from computed fields come later.
 - **Scope in a computed field.** The expression sees the entity's own fields
   that are not computed and its child collections through aggregates, and no
   reference path. Another computed field, itself included, is an unknown
@@ -277,7 +279,8 @@ is `AXC0046`.
   named rules at its top level.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
   data source parameters as plain names, and paths through reference fields.
-  It has no rules. Its child collections type-check in aggregates, but no
+  It can call the named rules, with fields, paths, parameters and literals as
+  arguments. Its child collections type-check in aggregates, but no
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
 
 ## Functions
@@ -358,6 +361,7 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | Expression length | 2,000 characters |
 | Nesting depth | 32 |
 | Syntax nodes | 500, counting each `in` item |
+| Inlined filter nodes | 2,000, counting each inlined rule body once per call |
 | Reference hops per path | 3 |
 | Rule calls nested | 8 deep |
 | Rule call cycles | None allowed |
@@ -380,6 +384,11 @@ always ends.
 - **Nodes.** Each literal, name, operator, call, `.name` path step, `is null`
   and `in` is one node. So each `in` item counts, and a `date('…')` item is two
   nodes: the call and its text. Parentheses are not nodes.
+- **Inlined nodes.** A data source filter is counted again with the body of
+  every rule it calls inlined, directly or through other rules. Each body
+  counts once per call, and a call's arguments count once, however often the
+  body uses them. The cap is checked before the SQL is built, and passing it
+  is `AXC0053`, see [SQL subset](#sql-subset).
 - **Positions.** A diagnostic's offset is a zero-based index in UTF-16
   characters, the same as a C# string index. Messages show it one-based, as
   "at character N".
@@ -397,8 +406,8 @@ Run-time limit:
   most about 10 million characters.
 - **Long text.** The cost of text functions such as `contains` or `length`
   over very long field values is not bounded.
-- **SQL.** The SQL translation has no step budget. The compile-time limits
-  bound its size.
+- **SQL.** The SQL translation has no step budget. The compile-time limits,
+  and the inlined filter cap, bound its size.
 
 ## Run-time errors
 
@@ -419,9 +428,9 @@ a compile diagnostic.
 ## SQL subset
 
 The SQL translation is built for literals, bare field names, field paths,
-data source parameters, every operator except `/`, and every function the
-list below names. Rule calls are *(planned for M2)*. Until they are built, a
-rule call is `AXC0050`, because a filter cannot call rules yet.
+data source parameters, every operator except `/`, every function the list
+below names, and rule calls. A rule call is inlined: the SQL holds the rule's
+body in place of the call, with each parameter replaced by its argument's SQL.
 
 These translate to SQL:
 
@@ -455,7 +464,13 @@ These translate to SQL:
 - `year`, `month` and `day`, through `extract`, cast to `bigint`;
 - `addDays`, as `date + integer`;
 - `daysBetween`, as `b - a`;
-- rule calls, inlined when the rule body is in the subset *(planned for M2)*.
+- rule calls, inlined when the rule body is in the subset. Each argument is
+  translated once, in the filter's context, and its SQL replaces every use of
+  the parameter. So a literal argument is one parameter however often the
+  body uses it. An argument for a `decimal` parameter, and the body of a rule
+  with a `decimal` result, are cast to `numeric`, as the interpreter widens an
+  integer to a decimal there. A rule that calls another rule is inlined the
+  same way.
 
 Every operator is wrapped in parentheses, so the SQL keeps the expression's
 precedence.
@@ -473,7 +488,16 @@ These are left out:
 Rules:
 
 - **Not in the subset.** A filter that uses something left out is a compile
-  diagnostic in the type family, `AXC0053`.
+  diagnostic in the type family, `AXC0053`. When a rule's body uses
+  something left out, such as `lower`, the filter is `AXC0053` at the call,
+  and the message names the rule the filter calls. A call to a rule whose own
+  expression has a diagnostic, or that is in a cycle, gets no further
+  diagnostic, as in a validation.
+- **Size.** The filter with every rule body inlined, counting each body once
+  per call, may have at most 2,000 syntax nodes. Past that the filter is
+  `AXC0053` at the call, naming the rule the filter calls. When the cap is
+  passed by the filter's own nodes after a call, the message names the last
+  rule the filter called.
 - **Null rows.** `WHERE` drops rows where the condition is `null`. This
   matches `null` counting as false.
 - **Parameters.** Values are always sent as parameters. They are never
@@ -563,8 +587,9 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   "needs at least 1 argument", and the count found.
 - **`AXC0053`.** A data source filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
-  includes `/`, `lower`, `upper`, `trim` and every aggregate. The message names what is not
-  translated. It is reported only after the filter type-checks.
+  includes `/`, `lower`, `upper`, `trim`, every aggregate, a call to a rule
+  whose body is outside the subset, and a filter whose rule calls inline to
+  more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks.
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
   the limit.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
