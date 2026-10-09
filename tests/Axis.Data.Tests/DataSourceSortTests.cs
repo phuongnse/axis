@@ -39,6 +39,24 @@ public sealed class DataSourceSortTests
         Sort = new DataSourceSortModel("title", Descending: true),
     };
 
+    // Grouped by title and customer, so 'count' is projected but not a group field.
+    private static readonly DataSourceModel _grouped = new()
+    {
+        Id = Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a04"),
+        Name = "OrdersByTitle",
+        File = "data-sources/orders-by-title.json",
+        Entity = new EntityReference(_order.Id, _order.Name),
+        Fields =
+        [
+            new DataSourceFieldModel("title", _order.Fields[0]),
+            new DataSourceFieldModel("customer", _order.Fields[2]),
+            new DataSourceFieldModel("count", _order.Fields[1]),
+        ],
+        Aggregate = new DataSourceAggregateModel(
+            [new DataSourceFieldModel("title", _order.Fields[0]), new DataSourceFieldModel("customer", _order.Fields[2])],
+            [new DataSourceMeasureModel("orders", AggregateFunction.Count, null)]),
+    };
+
     [Theory]
     [InlineData("title", false)]
     [InlineData("-title", true)]
@@ -65,6 +83,58 @@ public sealed class DataSourceSortTests
         Assert.False(DataSourceSort.TryParse(text, _dataSource, out var sort));
 
         Assert.Null(sort);
+    }
+
+    [Theory]
+    [InlineData("orders", false)]
+    [InlineData("-orders", true)]
+    public void Measure_of_a_grouped_data_source_parses_to_the_measure(string text, bool descending)
+    {
+        Assert.True(DataSourceSort.TryParse(text, _grouped, out var sort));
+
+        Assert.Null(sort.Field);
+        Assert.Same(_grouped.Aggregate!.Measures[0], sort.Measure);
+        Assert.Equal(descending, sort.Descending);
+    }
+
+    [Fact]
+    public void Group_field_of_a_grouped_data_source_parses_to_its_field()
+    {
+        Assert.True(DataSourceSort.TryParse("-title", _grouped, out var sort));
+
+        Assert.Same(_grouped.Aggregate!.GroupBy[0], sort.Field);
+        Assert.Null(sort.Measure);
+        Assert.True(sort.Descending);
+    }
+
+    [Theory]
+    [InlineData("count")]
+    [InlineData("customer")]
+    [InlineData("Orders")]
+    [InlineData("-Orders")]
+    public void Projected_field_that_is_not_a_group_field_group_reference_or_other_name_does_not_parse_when_grouped(string text)
+    {
+        Assert.False(DataSourceSort.TryParse(text, _grouped, out var sort));
+
+        Assert.Null(sort);
+    }
+
+    [Fact]
+    public void Measure_name_does_not_parse_for_a_data_source_that_is_not_grouped()
+    {
+        Assert.False(DataSourceSort.TryParse("orders", _dataSource, out var sort));
+
+        Assert.Null(sort);
+    }
+
+    [Fact]
+    public void Default_of_a_grouped_data_source_may_be_a_measure()
+    {
+        var sort = DataSourceSort.Default(_grouped with { Sort = new DataSourceSortModel("orders", Descending: true) });
+
+        Assert.NotNull(sort);
+        Assert.Same(_grouped.Aggregate!.Measures[0], sort.Measure);
+        Assert.True(sort.Descending);
     }
 
     [Fact]

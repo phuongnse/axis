@@ -67,7 +67,7 @@ internal static class DataSourceEndpoints
         var order = DataSourceSort.Default(model);
         if (!string.IsNullOrEmpty(sort) && !DataSourceSort.TryParse(sort, model, out order))
         {
-            errors["sort"] = ["Must be a projected field name that is not a reference, optionally preceded by '-'."];
+            errors["sort"] = ["Must be a projected field name that is not a reference, or a group field or measure name when the data source is grouped, optionally preceded by '-'."];
         }
 
         var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);

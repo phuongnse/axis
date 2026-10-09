@@ -4,15 +4,16 @@ Detailed reference for data sources: the resource shape, the compile checks,
 the read endpoint, the response and the errors. Parts of this file are built:
 
 - the `dataSource` resource with `entity`, `fields` whose `path` may go
-  through `reference` fields, `parameters`, `filter`, `sort` and `pageSize`
+  through `reference` fields, `parameters`, `filter`, `aggregate`, `sort`
+  and `pageSize`
 - the read endpoint with `page`, `pageSize`, `sort` and the data source
-  parameters
+  parameters, for plain and grouped data sources
 - `labels` for projected `reference` fields
 - the `table` widget binding, with the data source's schema in page metadata,
   its columns, paging and sorting
 
-The rest is marked *(planned for M2)*: `aggregate`, and the filter inputs of
-a bound table. Dn refers to
+The rest is marked *(planned for M2)*: a table bound to a grouped data
+source, and the filter inputs of a bound table. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -115,12 +116,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   tie-break below.
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
 
-Until a property is built, the JSON Schema rejects it: an `aggregate`
-property is `AXC0004`.
-
 ### Aggregates
-
-Aggregates are *(planned for M2)*.
 
 - **`groupBy`.** A list of names from `fields`. An empty list gives one total
   row.
@@ -132,8 +128,18 @@ Aggregates are *(planned for M2)*.
   integer, a decimal, a date or a date-time.
 - **Result types.** `count` is an integer. `sum` is written like a decimal.
   `min` and `max` keep the type of their field.
+- **`null` values.** `sum`, `min` and `max` skip `null` values. Over only
+  `null` values they are `null`, not 0, as in SQL. This tells "no values"
+  apart from a real zero. `count` counts every row, whatever its values.
+- **`null` groups.** Rows whose group field is `null`, such as items with no
+  department, form one group of their own.
 - **Row values.** A grouped row holds the group fields in `groupBy` order,
   then the measures. The other `fields` are only inputs of the measures.
+- **Names.** Group fields name entries of `fields`, and measure names are
+  keys of a grouped row. Both match exactly, so letter case matters, as for
+  projected names.
+- **Empty `groupBy`.** The data source has one total row, even when no row
+  passes the filter. Then `count` is 0 and the other measures are `null`.
 
 ## Compile checks
 
@@ -180,17 +186,25 @@ see the Data sources bullet of the Resolve step in
 - The filter is not checked while a parameter of the data source has a
   diagnostic, because that parameter may have no usable type.
 
-The remaining checks are *(planned for M2)*. They are listed without
-diagnostic codes. The codes come with the issue that builds them.
+- `groupBy` names entries of `fields`, compared exactly. An unknown name is
+  `AXC0061` at `/aggregate/groupBy/{i}`.
+- Measure names are unique. A measure name also differs from every group
+  field, because both are keys of one row. A clash is `AXC0062` at
+  `/aggregate/measures/{i}/name`.
+- `count` takes no `field`, and `sum`, `min` and `max` need one. Otherwise
+  it is `AXC0063` at `/aggregate/measures/{i}`.
+- A measure `field` names an entry of `fields`, and its type follows the
+  aggregate rules above. Otherwise it is `AXC0063` at
+  `/aggregate/measures/{i}/field`. A field whose path is already `AXC0043`
+  is not reported again.
+- When the data source is grouped, `sort` names a group field whose path
+  does not end at a `reference`, or a measure, instead of a projected field
+  (`AXC0045`).
+
+The remaining check is *(planned for M2)*. It is listed without a
+diagnostic code. The code comes with the issue that builds it.
 
 - `entity` is not a child entity.
-- Measure names are unique. A measure name also differs from every group
-  field, because both are keys of one row.
-- `groupBy` names entries of `fields`.
-- Measure fields name entries of `fields`, and their types follow the
-  aggregate rules above.
-- When the data source is grouped, `sort` names a group field or a measure
-  instead of a projected field.
 
 ## Endpoint
 
@@ -223,8 +237,9 @@ every data source query from M4 (see
 - **Unknown parameters.** They are ignored.
 - **Required parameter.** A required parameter that is not given is invalid.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
-  fields in `groupBy` order when the data source is grouped. `NULL` ordering
-  and the count statement work as in the record API.
+  fields in `groupBy` order, each ascending, when the data source is
+  grouped. `NULL` ordering and the count statement work as in the record
+  API. Without a `sort`, grouped rows are in group field order.
 
 Query strings have no JSON types, so each parameter type has a plain text
 form. A value is only ever sent as a typed SQL parameter, so no value can
@@ -285,8 +300,11 @@ Each item is `{ "id", "values", "labels" }`:
   the page size. The count statement uses the same joins, and each join
   matches at most one row, so it counts root rows.
 
-A grouped row *(planned for M2)* has `id: null`. Its `values` holds the group fields in
-`groupBy` order, then the measures. `totalCount` counts groups.
+A grouped row has `id: null`. Its `values` holds the group fields in
+`groupBy` order, then the measures. `totalCount` counts groups. A group field
+whose path ends at a non-null `reference` has its label in `labels`, as in an
+ungrouped row. The count statement wraps the grouped statement, so it counts
+groups, and it is 1 for an empty `groupBy`.
 
 ```json
 {
@@ -345,6 +363,10 @@ The table binding is built. Filter inputs and grouped data sources are
   parameter and sends their values from the URL *(planned for M2)*. Until
   then it sends no parameter values, so its rows are unfiltered by them. See
   [Table widget](frontend.md) for the details.
+- **Grouped data sources.** A table cannot bind a data source with an
+  `aggregate` yet (`AXC0060`). The table builds its columns from `fields`
+  and opens records by `id`, and a group row has neither *(planned for
+  M2)*.
 - **Form page.** A `formPage` must be a form over the root entity
   (`AXC0022`), because each row carries the id of its root record. It is not
   allowed with an `aggregate`, because a group is not a record *(planned for

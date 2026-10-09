@@ -589,7 +589,10 @@ public static class ApplicationCompiler
     /// translates to SQL. Its child collections are in the type check's scope, so an aggregate
     /// type-checks and is then reported as outside the SQL subset. Its first problem
     /// is reported at <c>/filter</c> with its expression code. It is not checked while a parameter
-    /// has a diagnostic.
+    /// has a diagnostic. An <c>aggregate</c> groups by projected names, its measure names differ
+    /// from the group fields and from each other, and each measure is valid as
+    /// <see cref="CheckMeasure"/> describes. A grouped data source's sort names a group field that
+    /// is not a reference, or a measure.
     /// </summary>
     private static void CheckDataSources(
         ApplicationLoadResult loaded,
@@ -642,17 +645,64 @@ public static class ApplicationCompiler
                 }
             }
 
+            // Group field names compare exactly, as projected names do. An unknown one is still kept,
+            // so a measure or the sort that repeats it is not reported again.
+            var groupFields = new HashSet<string>(StringComparer.Ordinal);
+            var measureNames = new HashSet<string>(StringComparer.Ordinal);
+            if (dataSource.Aggregate is { } aggregate)
+            {
+                for (var index = 0; index < aggregate.GroupBy.Count; index++)
+                {
+                    var name = aggregate.GroupBy[index];
+                    groupFields.Add(name);
+                    if (!fieldsByName.ContainsKey(name))
+                    {
+                        Report(
+                            DiagnosticCodes.UnknownDataSourceGroupField,
+                            $"The group field '{name}' must name a projected field.",
+                            $"/aggregate/groupBy/{index}");
+                    }
+                }
+
+                for (var index = 0; index < aggregate.Measures.Count; index++)
+                {
+                    var measure = aggregate.Measures[index];
+                    var path = $"/aggregate/measures/{index}";
+                    if (groupFields.Contains(measure.Name) || !measureNames.Add(measure.Name))
+                    {
+                        Report(
+                            DiagnosticCodes.DuplicateDataSourceMeasureName,
+                            $"The measure name '{measure.Name}' is already used by a group field or an earlier measure. Both are keys of one grouped row.",
+                            $"{path}/name");
+                    }
+
+                    if (CheckMeasure(measure, fieldsByName) is ({ } message, { } problemPath))
+                    {
+                        Report(DiagnosticCodes.InvalidDataSourceMeasure, message, path + problemPath);
+                    }
+                }
+            }
+
             if (dataSource.Sort is { } sort)
             {
+                // A grouped data source sorts by its group fields and measures, any other by its
+                // projected fields.
                 var name = sort.StartsWith('-') ? sort[1..] : sort;
-                if (!fieldsByName.TryGetValue(name, out var field))
+                var grouped = dataSource.Aggregate is not null;
+                var isMeasure = measureNames.Contains(name);
+                if (grouped ? !groupFields.Contains(name) && !isMeasure : !fieldsByName.ContainsKey(name))
                 {
                     Report(
                         DiagnosticCodes.InvalidDataSourceSort,
-                        $"The sort '{sort}' must name a projected field, optionally preceded by '-'.",
+                        grouped
+                            ? $"The sort '{sort}' must name a group field or a measure, optionally preceded by '-'."
+                            : $"The sort '{sort}' must name a projected field, optionally preceded by '-'.",
                         "/sort");
                 }
-                else if (field is not null && FieldTypes.Parse(field.Type) == FieldType.Reference)
+                else if (!isMeasure
+                    && fieldsByName.TryGetValue(name, out var field)
+                    && field is not null
+                    && FieldTypes.Parse(field.Type) == FieldType.Reference)
                 {
                     Report(
                         DiagnosticCodes.InvalidDataSourceSort,
@@ -709,6 +759,58 @@ public static class ApplicationCompiler
             }
         }
     }
+
+    /// <summary>
+    /// The problem of a measure and its path below the measure, or null when it is valid.
+    /// <c>count</c> takes no field. <c>sum</c>, <c>min</c> and <c>max</c> need a projected field:
+    /// <c>sum</c> of an integer or a decimal, <c>min</c> and <c>max</c> of an integer, a decimal, a
+    /// date or a date-time. A projected field with an invalid path is not reported again.
+    /// </summary>
+    private static (string Message, string Path)? CheckMeasure(
+        DataSourceMeasureDefinition measure, Dictionary<string, FieldDefinition?> fieldsByName)
+    {
+        var function = ParseAggregateFunction(measure.Function);
+        if (function == AggregateFunction.Count)
+        {
+            return measure.Field is null ? null : ("The measure function 'count' counts rows and takes no 'field'.", "");
+        }
+
+        if (measure.Field is not { } name)
+        {
+            return ($"The measure function '{measure.Function}' needs a 'field' that names a projected field.", "");
+        }
+
+        if (!fieldsByName.TryGetValue(name, out var field))
+        {
+            return ($"The measure field '{name}' must name a projected field.", "/field");
+        }
+
+        if (field is null)
+        {
+            return null;
+        }
+
+        var type = FieldTypes.Parse(field.Type);
+        var accepted = function == AggregateFunction.Sum
+            ? type is FieldType.Integer or FieldType.Decimal
+            : type is FieldType.Integer or FieldType.Decimal or FieldType.Date or FieldType.DateTime;
+        return accepted
+            ? null
+            : (
+                $"The measure function '{measure.Function}' cannot take the {field.Type} field '{name}'. "
+                    + "'sum' takes an integer or a decimal. 'min' and 'max' take an integer, a decimal, a date or a date-time.",
+                "/field");
+    }
+
+    private static AggregateFunction ParseAggregateFunction(string function) =>
+        function switch
+        {
+            "count" => AggregateFunction.Count,
+            "sum" => AggregateFunction.Sum,
+            "min" => AggregateFunction.Min,
+            "max" => AggregateFunction.Max,
+            _ => throw new ArgumentOutOfRangeException(nameof(function), function, "The JSON Schema allows only count, sum, min and max."),
+        };
 
     /// <summary>
     /// The first problem of a data source filter: in parsing, in type checking over the entity's
@@ -906,30 +1008,46 @@ public static class ApplicationCompiler
                 parameter.Values,
                 parameter.Target is not null && Find(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))
             .ToList();
+        var fields = dataSource.Fields
+            .Select(field =>
+            {
+                var path = new List<FieldModel>();
+                var current = entity;
+                foreach (var name in field.Path.Split('.'))
+                {
+                    current.TryGetField(name, out var fieldModel);
+                    path.Add(fieldModel!);
+                    current = fieldModel!.Target is { } target ? Find(target.Name)! : current;
+                }
+
+                return new DataSourceFieldModel(field.Name, path);
+            })
+            .ToList();
+
+        // A checked aggregate names projected fields by their exact names.
+        DataSourceFieldModel Projected(string name) =>
+            fields.First(field => string.Equals(field.Name, name, StringComparison.Ordinal));
+
         return new DataSourceModel
         {
             Id = dataSource.Id,
             Name = dataSource.Name,
             File = dataSource.File,
             Entity = new EntityReference(entity.Id, entity.Name),
-            Fields = dataSource.Fields
-                .Select(field =>
-                {
-                    var path = new List<FieldModel>();
-                    var current = entity;
-                    foreach (var name in field.Path.Split('.'))
-                    {
-                        current.TryGetField(name, out var fieldModel);
-                        path.Add(fieldModel!);
-                        current = fieldModel!.Target is { } target ? Find(target.Name)! : current;
-                    }
-
-                    return new DataSourceFieldModel(field.Name, path);
-                })
-                .ToList(),
+            Fields = fields,
             Parameters = parameters,
             Filter = dataSource.Filter is { } filter
                 ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find), ExpressionType.Boolean)
+                : null,
+            Aggregate = dataSource.Aggregate is { } aggregate
+                ? new DataSourceAggregateModel(
+                    aggregate.GroupBy.Select(Projected).ToList(),
+                    aggregate.Measures
+                        .Select(measure => new DataSourceMeasureModel(
+                            measure.Name,
+                            ParseAggregateFunction(measure.Function),
+                            measure.Field is null ? null : Projected(measure.Field)))
+                        .ToList())
                 : null,
             Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
             PageSize = dataSource.PageSize ?? DataSourceModel.DefaultPageSize,

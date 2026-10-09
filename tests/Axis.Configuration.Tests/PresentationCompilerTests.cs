@@ -168,6 +168,25 @@ public sealed class PresentationCompilerTests
     }
 
     [Fact]
+    public void Table_over_a_grouped_data_source_is_reported_at_its_data_source()
+    {
+        // A table builds its columns from the projected fields and opens rows by id, which a group lacks.
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList(
+                """, "aggregate": { "groupBy": ["number"], "measures": [{ "name": "orders", "function": "count" }] } """))
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "pages/orders.json", "/widgets/0/dataSource"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("grouped", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void Form_page_of_a_data_source_table_over_another_entity_than_its_root_is_reported()
     {
         using var folder = Folder()

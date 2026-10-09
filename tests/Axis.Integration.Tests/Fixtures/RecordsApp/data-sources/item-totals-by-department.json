@@ -1,0 +1,27 @@
+{
+  "id": "db96ad9c-f650-4b3b-b607-39a58900771a",
+  "kind": "dataSource",
+  "name": "ItemTotalsByDepartment",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "departmentName", "path": "department.name" },
+    { "name": "department", "path": "department" },
+    { "name": "quantity", "path": "quantity" },
+    { "name": "price", "path": "price" },
+    { "name": "neededBy", "path": "neededBy" },
+    { "name": "orderedAt", "path": "orderedAt" }
+  ],
+  "aggregate": {
+    "groupBy": ["departmentName", "department"],
+    "measures": [
+      { "name": "items", "function": "count" },
+      { "name": "quantitySum", "function": "sum", "field": "quantity" },
+      { "name": "priceMin", "function": "min", "field": "price" },
+      { "name": "priceMax", "function": "max", "field": "price" },
+      { "name": "firstNeededBy", "function": "min", "field": "neededBy" },
+      { "name": "lastOrderedAt", "function": "max", "field": "orderedAt" }
+    ]
+  },
+  "sort": "departmentName"
+}
