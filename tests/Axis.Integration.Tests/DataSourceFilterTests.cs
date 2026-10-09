@@ -28,7 +28,7 @@ public sealed class DataSourceFilterTests(RecordApiFixture fixture) : IClassFixt
         new("B", 5, 10.00m, null, new DateOnly(2026, 9, 30), Utc(2026, 10, 9, 0), "open", HasDepartment: false),
         new("Dax", 12, 7.00m, true, new DateOnly(2025, 12, 31), null, "closed", HasDepartment: true),
         new("Ex", 2, null, false, null, Utc(2026, 10, 1, 0), null, HasDepartment: false),
-        new("Fa", 4, 3.00m, true, new DateOnly(2026, 11, 20), Utc(2026, 10, 8, 5), "open", HasDepartment: true),
+        new("Fa", 4, 4.00m, true, new DateOnly(2026, 11, 20), Utc(2026, 10, 8, 5), "open", HasDepartment: true),
     ];
 
     public static TheoryData<string> Filters =>
