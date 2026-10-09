@@ -40,9 +40,27 @@ export function parseRecordJson<T>(text: string): T {
   return parse(text, (_key, value, context) => (typeof value === 'number' ? (context?.source ?? String(value)) : value))
 }
 
-/** Loads one page of records. `query` holds the record API's `page`, `pageSize` and `sort`. */
+/** A 400 answer to a records or rows request. `errors` maps a query parameter name to its messages. */
+export class RecordQueryProblem extends Error {
+  readonly errors: Record<string, string[]>
+
+  constructor(errors: Record<string, string[]>) {
+    super('The records request was rejected.')
+    this.name = 'RecordQueryProblem'
+    this.errors = errors
+  }
+}
+
+/**
+ * Loads one page of records. `query` holds the record API's `page`, `pageSize` and `sort`, and a
+ * data source's parameter values. A 400 throws a {@link RecordQueryProblem}.
+ */
 export async function fetchRecords(recordsPath: string, query: string, signal?: AbortSignal): Promise<RecordPage> {
   const response = await fetch(`${recordsPath}${query ? `?${query}` : ''}`, { signal })
+  if (response.status === 400) {
+    const problem = JSON.parse(await response.text()) as { errors?: Record<string, string[]> }
+    throw new RecordQueryProblem(problem.errors ?? {})
+  }
   if (!response.ok) {
     throw new Error(`Loading the records of '${recordsPath}' failed with status ${response.status}.`)
   }

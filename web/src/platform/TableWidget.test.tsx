@@ -1,8 +1,8 @@
 import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { EntityWidgetMetadata, FieldMetadata, FieldType, WidgetMetadata } from './site'
+import type { DataSourceParameter, EntityWidgetMetadata, FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 
@@ -70,6 +70,33 @@ const noteListWidget: WidgetMetadata = {
   },
 }
 
+const categoryTarget = {
+  entity: 'Category',
+  displayField: 'name',
+  recordsPath: '/api/apps/E2eApp/entities/Category/records',
+}
+
+function parameter(name: string, type: FieldType, labelKey: string | null): DataSourceParameter {
+  return { name, type, required: false, labelKey, values: null, target: null }
+}
+
+// One parameter of each type, labelled, but for the date-time one, which shows its name.
+const filterParameters: DataSourceParameter[] = [
+  parameter('titleFilter', 'text', 'filter.title'),
+  parameter('minCount', 'integer', 'filter.minCount'),
+  parameter('maxPrice', 'decimal', 'filter.maxPrice'),
+  parameter('doneFilter', 'boolean', 'filter.done'),
+  parameter('dueFrom', 'date', 'filter.dueFrom'),
+  parameter('createdAfter', 'date-time', null),
+  { ...parameter('statusFilter', 'enum', 'filter.status'), values: ['open', 'approved'] },
+  { ...parameter('categoryFilter', 'reference', 'filter.category'), target: categoryTarget },
+]
+
+const filteredWidget: WidgetMetadata = {
+  ...noteListWidget,
+  dataSource: { ...noteListWidget.dataSource!, parameters: filterParameters },
+}
+
 const noteId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 
@@ -88,6 +115,15 @@ const texts = {
   'note.dueAt': 'Due at',
   'note.category': 'Category',
   'note.lines': 'Lines',
+  'shell.form.choose': 'Choose',
+  'shell.form.clear': 'Clear',
+  'filter.title': 'Title contains',
+  'filter.minCount': 'Minimum count',
+  'filter.maxPrice': 'Maximum price',
+  'filter.done': 'Is done',
+  'filter.dueFrom': 'Due from',
+  'filter.status': 'State',
+  'filter.category': 'In category',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -98,14 +134,27 @@ function stubRecords(body = notePage, status = 200) {
   return () => fetchMock.mock.calls.map(([url]) => url)
 }
 
+/** Stubs `fetch` with a handler per URL and returns the requested URLs. */
+function stubFetch(handler: (url: string) => Response) {
+  const fetchMock = vi.fn(async (input: string) => handler(input))
+  vi.stubGlobal('fetch', fetchMock)
+  return () => fetchMock.mock.calls.map(([url]) => url)
+}
+
+const emptyRows = '{"items":[],"page":1,"pageSize":10,"totalCount":0}'
+
 function CurrentLocation() {
   const location = useLocation()
+  const navigate = useNavigate()
   const state = location.state as { from?: string } | null
   return (
     <>
       <output data-testid="path">{location.pathname}</output>
       <output data-testid="search">{location.search}</output>
       <output data-testid="from">{state?.from}</output>
+      <button type="button" onClick={() => navigate(-1)}>
+        Back
+      </button>
     </>
   )
 }
@@ -376,5 +425,158 @@ describe('TableWidget', () => {
     renderWidget()
 
     expect(await screen.findByTestId('records-error')).toHaveTextContent('The records could not be loaded.')
+  })
+
+  it('shows one filter input per data source parameter, by type, labelled with its label or name', async () => {
+    stubRecords(emptyRows)
+
+    renderWidget('', filteredWidget)
+
+    await screen.findByText('No records yet.')
+    for (const label of [
+      'Title contains',
+      'Minimum count',
+      'Maximum price',
+      'Due from',
+      'createdAfter',
+      'In category',
+    ]) {
+      expect(screen.getByLabelText(label)).toHaveRole('textbox')
+    }
+    for (const label of ['Is done', 'State']) {
+      expect(screen.getByLabelText(label)).toHaveRole('combobox')
+    }
+    expect(screen.getByLabelText('Minimum count')).toHaveAttribute('inputmode', 'numeric')
+    expect(screen.getByLabelText('Maximum price')).toHaveAttribute('inputmode', 'decimal')
+    expect(screen.getByLabelText('In category')).toHaveAttribute('readonly')
+    const bar = screen.getByTestId('filter-bar')
+    expect(within(bar).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(within(bar).queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
+  })
+
+  it('has no filter bar for an entity or a data source without parameters', async () => {
+    stubRecords()
+
+    renderWidget('', noteWidget)
+
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByTestId('filter-bar')).not.toBeInTheDocument()
+  })
+
+  it('writes a picked option before page, pageSize and sort, from page 1, and requests the filtered rows', async () => {
+    const requests = stubRecords('{"items":[],"page":2,"pageSize":20,"totalCount":45}')
+    renderWidget('?page=2&pageSize=20&sort=-title', filteredWidget)
+    await screen.findByText('No records yet.')
+
+    await userEvent.click(screen.getByLabelText('State'))
+    await userEvent.click(await screen.findByTitle('approved'))
+
+    await waitFor(() => expect(search()).toBe('?statusFilter=approved&pageSize=20&sort=-title'))
+    await waitFor(() => expect(requests()).toContain(`${rowsPath}?statusFilter=approved&pageSize=20&sort=-title`))
+  })
+
+  it('applies typed text on Enter or blur, not on every key, and the back button restores it', async () => {
+    const requests = stubRecords(emptyRows)
+    renderWidget('', filteredWidget)
+    await screen.findByText('No records yet.')
+    const input = screen.getByLabelText('Title contains')
+
+    await userEvent.type(input, 'paper')
+    expect(search()).toBe('')
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(search()).toBe('?titleFilter=paper'))
+    await waitFor(() => expect(requests()).toContain(`${rowsPath}?titleFilter=paper`))
+
+    await userEvent.clear(input)
+    await userEvent.type(input, 'desk')
+    await userEvent.click(screen.getByLabelText('Minimum count'))
+    await waitFor(() => expect(search()).toBe('?titleFilter=desk'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(search()).toBe('?titleFilter=paper'))
+    expect(input).toHaveValue('paper')
+  })
+
+  it('writes a yes or no filter and removes a cleared value from the URL', async () => {
+    stubRecords(emptyRows)
+    renderWidget('?titleFilter=paper&doneFilter=true', filteredWidget)
+    await screen.findByText('No records yet.')
+    expect(screen.getByTestId('filter-bar')).toHaveTextContent('Yes')
+
+    await userEvent.click(screen.getByLabelText('Is done'))
+    await userEvent.click(await screen.findByTitle('No'))
+    await waitFor(() => expect(search()).toBe('?titleFilter=paper&doneFilter=false'))
+
+    await userEvent.clear(screen.getByLabelText('Title contains'))
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(search()).toBe('?doneFilter=false'))
+  })
+
+  it('drops empty and repeated values from the URL without requesting them', async () => {
+    const requests = stubRecords(emptyRows)
+
+    renderWidget('?titleFilter=&statusFilter=open&statusFilter=approved', filteredWidget)
+
+    await waitFor(() => expect(search()).toBe('?statusFilter=open'))
+    expect(requests()).toEqual([`${rowsPath}?statusFilter=open`])
+  })
+
+  it('picks a reference filter in the lookup and shows its label again after a reload', async () => {
+    const requests = stubFetch((url) => {
+      if (url.startsWith(`${categoryTarget.recordsPath}/${categoryId}`)) {
+        return new Response(`{"id":"${categoryId}","version":1,"values":{"name":"Office"},"labels":{}}`)
+      }
+      if (url.startsWith(categoryTarget.recordsPath)) {
+        return new Response(
+          `{"items":[{"id":"${categoryId}","version":1,"values":{"name":"Office"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
+        )
+      }
+      return new Response(emptyRows)
+    })
+    const view = renderWidget('', filteredWidget)
+    await screen.findByText('No records yet.')
+
+    await userEvent.click(within(screen.getByTestId('filter-bar')).getByRole('button', { name: 'Choose' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByRole('row', { name: /Office/ }))
+
+    await waitFor(() => expect(search()).toBe(`?categoryFilter=${categoryId}`))
+    expect(screen.getByRole('textbox', { name: 'In category' })).toHaveValue('Office')
+    expect(requests()).not.toContain(`${categoryTarget.recordsPath}/${categoryId}`)
+
+    view.unmount()
+    renderWidget(`?categoryFilter=${categoryId}`, filteredWidget)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'In category' })).toHaveValue('Office'))
+    expect(requests()).toContain(`${categoryTarget.recordsPath}/${categoryId}`)
+
+    await userEvent.click(within(screen.getByTestId('filter-bar')).getByRole('button', { name: 'Clear' }))
+    await waitFor(() => expect(search()).toBe(''))
+    expect(screen.getByRole('textbox', { name: 'In category' })).toHaveValue('')
+  })
+
+  it('shows a rejected parameter value under its input, with no rows and no load error', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubRecords(
+      '{"title":"One or more validation errors occurred.","errors":{"statusFilter":["Must be one of the declared values."]}}',
+      400,
+    )
+
+    renderWidget('?statusFilter=bogus', filteredWidget)
+
+    expect(await screen.findByTestId('filter-error-statusFilter')).toHaveTextContent(
+      'Must be one of the declared values.',
+    )
+    expect(screen.queryByTestId('records-error')).not.toBeInTheDocument()
+    expect(screen.getByText('No records yet.')).toBeInTheDocument()
+    expect(search()).toBe('?statusFilter=bogus')
+  })
+
+  it('shows the load error for a 400 that names no parameter', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubRecords('{"title":"The data source filter could not be evaluated for these rows."}', 400)
+
+    renderWidget('', filteredWidget)
+
+    expect(await screen.findByTestId('records-error')).toBeInTheDocument()
+    expect(screen.queryByTestId('filter-error-statusFilter')).not.toBeInTheDocument()
   })
 })

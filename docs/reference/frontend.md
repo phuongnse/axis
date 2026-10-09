@@ -143,7 +143,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | --- | --- |
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one |
   | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values *(planned for M2)* |
+  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
 
@@ -172,8 +172,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     after every other parameter, always in the order `page`, `pageSize`,
     `sort`, and leaves out defaults (page 1, 20 a page or the data source's
     page size, no sort). It changes
-    only its own three parameters: any other parameter, such as `x=1`, stays
-    as it is.
+    only its own three parameters and, for a data source, the parameter
+    values described below: any other parameter, such as `x=1`, stays as it
+    is.
   - **Data source binding.** A table may name a
     `dataSource` instead of an `entity`. See
     [data-sources.md](data-sources.md#widget-binding). Page metadata then
@@ -212,13 +213,34 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Page size.** The data source's `pageSize` is the table's default page
       size. It is offered with 10, 20, 50 and 100 when it is not one of them,
       and the URL leaves it out.
-    - **Filter inputs** *(planned for M2)*. There is one input per parameter,
-      of the kind the form widget uses for that type. It shows the
-      parameter's label, or its name when `labelKey` is `null`. Until they
-      are built, the table sends no parameter values.
-    - **URL state** *(planned for M2)*. The parameter values live in the URL
-      under the parameter names. The widget writes them before `page`,
-      `pageSize` and `sort`.
+    - **Filter inputs.** A filter bar above the rows has one input per
+      parameter, in declaration order. It shows the parameter's label, or its
+      name when `labelKey` is `null`. Each input is the kind the form widget
+      uses for that type, with two exceptions. A `boolean` is a Yes/No
+      choice that can be cleared, because an optional parameter has three
+      states: true, false and not given. A `reference` has a choose button
+      that opens the lookup, and a clear button once it has a value. The
+      SPA does not check the values: the server does.
+    - **Applying a value.** A `text`, `integer` or `decimal` value applies on
+      Enter or when the input loses focus, so typing does not request rows
+      and add a history entry for every key. A date, a choice, a Yes/No and
+      a picked record apply at once. A cleared value is removed.
+    - **URL state.** The parameter values live in the URL under the
+      parameter names, and the table sends them to `rowsPath`. The widget
+      writes them after every other parameter and before `page`, `pageSize`
+      and `sort`, in declaration order. A new value starts again at page 1
+      and adds a history entry, so reload, sharing and the back button keep
+      the filter. An empty value is left out, and a repeated parameter keeps
+      its first value. Both are rewritten without a history entry, as for
+      paging and sorting.
+    - **Reference label.** The URL holds only the record id. After a reload
+      the table loads that record of the target entity to show its display
+      field. When the record is missing or cannot be loaded, the input shows
+      the id.
+    - **Rejected values.** When the server rejects a parameter value, such as
+      a hand-edited `?statusFilter=bogus`, its message shows under that
+      input and the table shows no rows. The load error alert is for other
+      failures.
     - **Rows.** The table requests its rows from `rowsPath`. A row carries
       the id of its root record, so its open link and the create button go
       to the `formPage` as for an entity table.
@@ -292,8 +314,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     sorted ascending by the target's display field, in one column for that
     field. It pages 20 records at a time and keeps nothing in the URL.
     Loading, empty and error states use the table's texts. Clicking a row
-    or pressing Enter on it picks the record and closes the dialog. Search
-    comes with filtering in M2.
+    or pressing Enter on it picks the record and closes the dialog. The same
+    dialog picks the record of a `reference` filter input. It has no search
+    yet.
   - **Reference label.** On edit, the label starts from the record's
     `labels`. A picked record's display field value replaces it at once. A
     changed reference is sent as the record id, and a cleared one as `null`.

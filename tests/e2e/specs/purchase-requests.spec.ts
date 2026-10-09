@@ -135,6 +135,48 @@ test('the purchase request list reads a data source, shows department names, and
   }
 })
 
+test('the purchase request list filters by status, and keeps the filter and its rows after reload', async ({
+  page,
+  request,
+}) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const finance = await departmentId(request, 'Finance')
+  for (const status of ['approved', 'rejected']) {
+    const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
+      data: {
+        values: {
+          title: `Zz Status ${run} ${status}`,
+          department: finance,
+          status,
+          lineItems: [{ description: 'Item', quantity: 1, unitPrice: 10 }],
+        },
+      },
+    })
+    expect(response.status()).toBe(201)
+  }
+
+  await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
+  const approved = page.getByRole('row', { name: new RegExp(`Zz Status ${run} approved `) })
+  const rejected = page.getByRole('row', { name: new RegExp(`Zz Status ${run} rejected `) })
+  await expect(approved).toBeVisible()
+  await expect(rejected).toBeVisible()
+
+  const filters = page.getByTestId('filter-bar')
+  await filters.getByLabel('Status', { exact: true }).click()
+  await page.locator('.ant-select-item-option[title="approved"]').click()
+
+  const filteredPath = /\/purchasing\/purchaserequests\?statusFilter=approved&pageSize=100&sort=-title$/
+  for (const reload of [false, true]) {
+    if (reload) {
+      await page.reload()
+    }
+    await expect(page).toHaveURL(filteredPath)
+    await expect(filters.locator('.ant-select-selection-item')).toHaveText('approved')
+    await expect(approved).toContainText('approved')
+    await expect(rejected).toHaveCount(0)
+  }
+})
+
 test('line rules show under the Quantity and Unit price of the line, and the total rule under Total amount, in light and dark mode', async ({
   page,
 }) => {

@@ -1,9 +1,10 @@
 import { Alert, Button, Flex, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useHref, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
-import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
-import type { DataSourceColumn, FieldMetadata, WidgetMetadata } from './site'
+import { fetchRecords, RecordQueryProblem, type RecordItem, type RecordPage, type RecordValue } from './records'
+import type { DataSourceColumn, DataSourceParameter, FieldMetadata, WidgetMetadata } from './site'
 import {
   parseTableQuery,
   recordPageSize,
@@ -29,6 +30,8 @@ interface LoadState {
   /** The last page loaded. It stays while the next page loads. */
   page?: RecordPage
   failed: boolean
+  /** The server's messages for the data source parameter values it rejected, by parameter name. */
+  parameterErrors?: Record<string, string[]>
 }
 
 // Field names start with a letter, so this key never names a field column.
@@ -45,6 +48,8 @@ interface TableSource {
   /** The record API or the data source rows endpoint. */
   path: string
   columns: readonly (FieldMetadata | DataSourceColumn)[]
+  /** The data source parameters. An entity has none. */
+  parameters: readonly DataSourceParameter[]
   defaultPageSize: number
 }
 
@@ -54,6 +59,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
       name: dataSource.name,
       path: dataSource.rowsPath,
       columns: dataSource.columns,
+      parameters: dataSource.parameters,
       defaultPageSize: dataSource.pageSize,
     }
   }
@@ -64,6 +70,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
     path: recordsPath,
     // A child collection has no column and cannot be sorted by.
     columns: fields.filter((field) => field.type !== 'child-collection'),
+    parameters: [],
     defaultPageSize: recordPageSize,
   }
 }
@@ -71,7 +78,8 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
 /**
  * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
  * carries the id of its root record, so it opens the same form. Paging and sorting live in the URL
- * as the API's `page`, `pageSize` and `sort`, so reload, sharing and the back button keep them.
+ * as the API's `page`, `pageSize` and `sort`, so reload, sharing and the back button keep them. A
+ * data source table also has a filter bar, whose values live in the URL under the parameter names.
  */
 export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const t = useText()
@@ -85,26 +93,28 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
 
-  const { name, path, columns: fields, defaultPageSize } = useMemo(() => tableSource(widget), [widget])
+  const { name, path, columns: fields, parameters, defaultPageSize } = useMemo(() => tableSource(widget), [widget])
+  const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
   const query = useMemo(
-    () => parseTableQuery(searchParams, fields, defaultPageSize),
-    [searchParams, fields, defaultPageSize],
+    () => parseTableQuery(searchParams, fields, defaultPageSize, parameterNames),
+    [searchParams, fields, defaultPageSize, parameterNames],
   )
   const requestQuery = recordQuery(query, defaultPageSize)
   const requestUrl = `${path}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
+  const parameterErrors = loading ? undefined : state.parameterErrors
   const totalCount = loading ? undefined : state.page?.totalCount
 
-  // An invalid or out-of-order parameter is rewritten without a history entry.
+  // An invalid, empty, repeated or out-of-order parameter is rewritten without a history entry.
   useEffect(() => {
-    const canonical = writeTableQuery(searchParams, query, defaultPageSize)
+    const canonical = writeTableQuery(searchParams, query, defaultPageSize, parameterNames)
     if (canonical.toString() !== searchParams.toString()) {
       setSearchParams(canonical, { replace: true })
     }
-  }, [searchParams, query, defaultPageSize, setSearchParams])
+  }, [searchParams, query, defaultPageSize, parameterNames, setSearchParams])
 
   // A page past the end becomes the last page once the total is known, so the URL and the
   // pagination agree.
@@ -114,24 +124,36 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     }
     const lastPage = Math.max(1, Math.ceil(totalCount / query.pageSize))
     if (query.page > lastPage) {
-      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }, defaultPageSize), { replace: true })
+      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }, defaultPageSize, parameterNames), {
+        replace: true,
+      })
     }
-  }, [totalCount, searchParams, query, defaultPageSize, setSearchParams])
+  }, [totalCount, searchParams, query, defaultPageSize, parameterNames, setSearchParams])
 
-  // Data source rows have the shape of records without a version, which the table never reads.
+  // Data source rows have the shape of records without a version, which the table never reads. A
+  // rejected parameter value shows under its filter input, with no rows, rather than as a failure.
   useEffect(() => {
     const controller = new AbortController()
     const url = `${path}?${requestQuery}`
     fetchRecords(path, requestQuery, controller.signal)
       .then((page) => setState({ url, page, failed: false }))
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn(`Loading the records of '${name}' failed`, error)
-          setState({ url, failed: true })
+        if (controller.signal.aborted) {
+          return
         }
+        const errors =
+          error instanceof RecordQueryProblem
+            ? Object.fromEntries(Object.entries(error.errors).filter(([key]) => parameterNames.includes(key)))
+            : {}
+        if (Object.keys(errors).length > 0) {
+          setState({ url, failed: false, parameterErrors: errors })
+          return
+        }
+        console.warn(`Loading the records of '${name}' failed`, error)
+        setState({ url, failed: true })
       })
     return () => controller.abort()
-  }, [path, name, requestQuery])
+  }, [path, name, requestQuery, parameterNames])
 
   const columns = useMemo<TableColumnsType<RecordItem>>(() => {
     const sortOrder = (field: string) =>
@@ -168,8 +190,28 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     const sort = single?.order ? { field: String(single.columnKey), descending: single.order === 'descend' } : null
     const pageSize = pagination.pageSize ?? query.pageSize
     const reset = !sameSort(sort, query.sort) || pageSize !== query.pageSize
-    const next: TableQuery = { page: reset ? 1 : (pagination.current ?? 1), pageSize, sort }
-    setSearchParams(writeTableQuery(searchParams, next, defaultPageSize))
+    const next: TableQuery = {
+      page: reset ? 1 : (pagination.current ?? 1),
+      pageSize,
+      sort,
+      parameters: query.parameters,
+    }
+    setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames))
+  }
+
+  // A new filter value starts again at page 1 and adds a history entry. The values keep the
+  // declaration order, so the URL order is stable.
+  const onFilter = (changed: string, value: string | null) => {
+    const current = { ...query.parameters, [changed]: value ?? '' }
+    const next: Record<string, string> = {}
+    for (const parameter of parameterNames) {
+      if (current[parameter]) {
+        next[parameter] = current[parameter]
+      }
+    }
+    setSearchParams(
+      writeTableQuery(searchParams, { ...query, page: 1, parameters: next }, defaultPageSize, parameterNames),
+    )
   }
 
   return (
@@ -192,19 +234,27 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
           </Button>
         </Flex>
       )}
+      {parameters.length > 0 && (
+        <FilterBar
+          parameters={parameters}
+          values={query.parameters ?? {}}
+          errors={parameterErrors ?? {}}
+          onChange={onFilter}
+        />
+      )}
       {failed ? (
         <Alert data-testid="records-error" type="error" message={t('shell.table.loadFailed')} />
       ) : (
         <Table<RecordItem>
           rowKey="id"
           columns={columns}
-          dataSource={state.page?.items}
+          dataSource={parameterErrors ? [] : state.page?.items}
           loading={loading}
           locale={{ emptyText: t('shell.table.empty') }}
           pagination={{
             current: query.page,
             pageSize: query.pageSize,
-            total: state.page?.totalCount ?? 0,
+            total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
             pageSizeOptions: sizes,
             showSizeChanger: true,
           }}
