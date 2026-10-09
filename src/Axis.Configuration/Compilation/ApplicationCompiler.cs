@@ -580,7 +580,8 @@ public static class ApplicationCompiler
     /// <summary>
     /// Checks the data sources: each names a loaded entity, each projected <c>path</c> resolves as
     /// <see cref="ResolvePath"/> describes, projected names are unique, and the default <c>sort</c>
-    /// names a projected field that does not end at a reference. Entity and field names
+    /// names a projected field that does not end at a reference. An entity that is a child entity
+    /// is reported at <c>/entity</c>, naming its owner. Entity and field names
     /// resolve ignoring letter case; projected names compare exactly, as the query <c>sort</c> does.
     /// Each parameter name differs from the entity's fields, from <c>page</c>, <c>pageSize</c> and
     /// <c>sort</c> and from earlier parameters, ignoring letter case. Its type properties and label
@@ -620,6 +621,16 @@ public static class ApplicationCompiler
 
                 // The paths and the sort cannot be checked without the entity.
                 continue;
+            }
+
+            // A child entity's rows are read only through its owner's child collection. The rest of
+            // the data source is still checked against the entity.
+            if (ownersByChildName.TryGetValue(entity.Name, out var owner))
+            {
+                Report(
+                    DiagnosticCodes.DataSourceOverChildEntity,
+                    $"The entity '{entity.Name}' is a child entity owned by '{owner}'. A data source queries a root entity. Child rows are read through the owner's child collection.",
+                    "/entity");
             }
 
             var fieldsByName = new Dictionary<string, FieldDefinition?>(StringComparer.Ordinal);

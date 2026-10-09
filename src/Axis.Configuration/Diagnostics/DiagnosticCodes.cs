@@ -52,6 +52,7 @@ public static class DiagnosticCodes
     public const string UnknownDataSourceGroupField = "AXC0061";
     public const string DuplicateDataSourceMeasureName = "AXC0062";
     public const string InvalidDataSourceMeasure = "AXC0063";
+    public const string DataSourceOverChildEntity = "AXC0064";
 
     public const string UnknownValidationField = "AXC0052";
 
