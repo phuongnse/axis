@@ -44,8 +44,8 @@ profiles, their `when` texts and their models are in NexKit's
 [`profiles` setting][nexkit-profiles]. This section holds the rules behind
 them.
 
-- **Profiles go by risk: `light`, `standard` and `hard`.** The more a mistake
-  would cost, the stronger the profile. `standard` is the default.
+- **Profiles go by risk: `standard` and `hard`.** The more a mistake would
+  cost, the stronger the profile. `standard` is the default.
 - **Plan and review are at least as strong as implement.** The plan is the
   contract and the review is the last check before the owner. In every
   profile, review runs on a different model from implement.
@@ -54,9 +54,9 @@ them.
   runs on the wrong profile.
 - **A `when` text says what a mistake would cost, not where the code is.** It
   may name concepts from [concepts.md](domain/concepts.md) as examples, but
-  never files, classes, doc sections or milestones, which go stale. `light` is
-  narrow, `hard` is broad and `standard` is the rest. When unsure, triage
-  chooses the stronger profile.
+  never files, classes, doc sections or milestones, which go stale. `hard` is
+  broad and `standard` is the rest. When unsure, triage chooses the stronger
+  profile.
 - **Triage sees only the issue and its discussion.** It does not open links.
   So an issue names the concepts it touches in its own text, even when it
   links to the docs that describe them.
