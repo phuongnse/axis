@@ -1,0 +1,32 @@
+{
+  "id": "7c1f3e52-9b4a-4d8e-a6f0-3b2d5e8c91a4",
+  "kind": "entity",
+  "name": "LineItem",
+  "formatVersion": 1,
+  "label": { "textKey": "lineItem.label" },
+  "fields": [
+    { "name": "description", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "lineItem.description" } },
+    { "name": "quantity", "type": "integer", "required": true, "label": { "textKey": "lineItem.quantity" } },
+    { "name": "unitPrice", "type": "decimal", "precision": 18, "scale": 2, "required": true, "label": { "textKey": "lineItem.unitPrice" } },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "expression": "quantity * unitPrice",
+      "label": { "textKey": "lineItem.amount" }
+    }
+  ],
+  "validations": [
+    {
+      "expression": "quantity > 0",
+      "message": { "textKey": "lineItem.quantityPositive" },
+      "field": "quantity"
+    },
+    {
+      "expression": "unitPrice >= 0",
+      "message": { "textKey": "lineItem.unitPriceNotNegative" },
+      "field": "unitPrice"
+    }
+  ]
+}

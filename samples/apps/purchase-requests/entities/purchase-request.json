@@ -10,7 +10,15 @@
     { "name": "department", "type": "reference", "target": "Department", "required": true, "label": { "textKey": "purchaseRequest.department" } },
     { "name": "supplier", "type": "reference", "target": "Supplier", "label": { "textKey": "purchaseRequest.supplier" } },
     { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"], "label": { "textKey": "purchaseRequest.currency" } },
-    { "name": "totalAmount", "type": "decimal", "precision": 18, "scale": 2, "label": { "textKey": "purchaseRequest.totalAmount" } },
+    { "name": "lineItems", "type": "child-collection", "target": "LineItem", "label": { "textKey": "purchaseRequest.lineItems" } },
+    {
+      "name": "totalAmount",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "expression": "sum(lineItems, amount)",
+      "label": { "textKey": "purchaseRequest.totalAmount" }
+    },
     {
       "name": "status",
       "type": "enum",

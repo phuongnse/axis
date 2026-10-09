@@ -25,10 +25,18 @@
     "purchaseRequest.department": "Phòng ban",
     "purchaseRequest.supplier": "Nhà cung cấp",
     "purchaseRequest.currency": "Tiền tệ",
+    "purchaseRequest.lineItems": "Dòng hàng",
     "purchaseRequest.totalAmount": "Tổng tiền",
     "purchaseRequest.status": "Trạng thái",
     "purchaseRequest.submittedAt": "Gửi lúc",
     "purchaseRequest.decisionComments": "Ý kiến phê duyệt",
-    "purchaseRequest.totalAmountPositive": "Tổng tiền phải lớn hơn không."
+    "purchaseRequest.totalAmountPositive": "Tổng tiền phải lớn hơn không.",
+    "lineItem.label": "Dòng hàng",
+    "lineItem.description": "Mô tả",
+    "lineItem.quantity": "Số lượng",
+    "lineItem.unitPrice": "Đơn giá",
+    "lineItem.amount": "Thành tiền",
+    "lineItem.quantityPositive": "Số lượng phải lớn hơn không.",
+    "lineItem.unitPriceNotNegative": "Đơn giá không được âm."
   }
 }
