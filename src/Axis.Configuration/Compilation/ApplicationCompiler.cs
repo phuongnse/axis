@@ -845,14 +845,18 @@ public static class ApplicationCompiler
             return check.Diagnostic;
         }
 
-        return CallsRuleWithoutBody(check)
+        return CallsRuleWithoutBody(check, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
             ? null
             : SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path), check).Diagnostic;
     }
 
-    /// <summary>Whether a checked expression calls a rule without a checked body, directly or through the rules it calls.</summary>
-    private static bool CallsRuleWithoutBody(ExpressionCheckResult check) =>
-        check.RuleCalls.Values.Any(rule => rule.BodyCheck is null || CallsRuleWithoutBody(rule.BodyCheck));
+    /// <summary>
+    /// Whether a checked expression calls a rule without a checked body, directly or through the
+    /// rules it calls. Each rule is visited once, so a rule called many times does not multiply the walk.
+    /// </summary>
+    private static bool CallsRuleWithoutBody(ExpressionCheckResult check, HashSet<ExpressionRule> visited) =>
+        check.RuleCalls.Values.Any(rule =>
+            visited.Add(rule) && (rule.BodyCheck is null || CallsRuleWithoutBody(rule.BodyCheck, visited)));
 
     /// <summary>
     /// Resolves a projected <c>path</c> from the entity <paramref name="root"/>, ignoring letter

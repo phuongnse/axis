@@ -661,6 +661,42 @@ public sealed class DataSourceCompilerTests
     }
 
     [Fact]
+    public void Filter_whose_rule_calls_fan_out_wide_is_checked_in_linear_time()
+    {
+        // Each rule calls the one below it 20 times, so a walk per call would visit 20^8 bodies.
+        using var folder = Folder().With("rules/w0.json", """
+            { "id": "77777777-7777-4777-8777-777777777800", "kind": "rule", "name": "W0", "formatVersion": 1,
+              "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 0" }
+            """);
+        for (var k = 1; k <= 8; k++)
+        {
+            var calls = string.Join(" and ", Enumerable.Repeat($"W{k - 1}(value)", 20));
+            folder.With($"rules/w{k}.json", $$"""
+                { "id": "77777777-7777-4777-8777-7777777778{{k:00}}", "kind": "rule", "name": "W{{k}}", "formatVersion": 1,
+                  "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean",
+                  "expression": "{{calls}}" }
+                """);
+        }
+
+        folder.With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "filter": "W8(amount)" """));
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        stopwatch.Stop();
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'W8'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
     public void Data_source_without_fields_is_a_schema_violation()
     {
         using var folder = Folder().With("data-sources/orders.json", DataSource("Order", "[]"));
