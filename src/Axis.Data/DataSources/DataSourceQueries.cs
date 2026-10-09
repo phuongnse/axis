@@ -13,7 +13,8 @@ namespace Axis.Data.DataSources;
 /// Reads the rows of a data source over a tenant connection. Every identifier comes from
 /// <see cref="EntityNaming"/> and is quoted, and every value from the caller or the filter is a
 /// parameter. The filter is translated by <see cref="SqlTranslator"/> into the <c>WHERE</c> clause
-/// of both the count and the page statement.
+/// of both the count and the page statement. Its literals are <c>@f0</c>, <c>@f1</c>, … and the
+/// data source parameters are <c>@p0</c>, <c>@p1</c>, … in declaration order.
 /// </summary>
 public static class DataSourceQueries
 {
@@ -22,7 +23,8 @@ public static class DataSourceQueries
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> rows that pass the filter,
     /// ordered by the sort field and then by the root id ascending, or by the root id alone without
-    /// a sort, and counts every row that passes. A page past the last one has no items. Returns
+    /// a sort, and counts every row that passes. <paramref name="parameters"/> holds one value per
+    /// declared parameter, in declaration order. A page past the last one has no items. Returns
     /// <see langword="null"/> when the database rejects the filter for these rows with a data
     /// exception (SQLSTATE class 22), such as an integer overflow or a date out of range. Any other
     /// database error is thrown.
@@ -33,10 +35,12 @@ public static class DataSourceQueries
         int page,
         int pageSize,
         DataSourceSort? sort,
+        IReadOnlyList<DataSourceParameterValue> parameters,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentNullException.ThrowIfNull(parameters);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
@@ -54,6 +58,7 @@ public static class DataSourceQueries
             await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
             {
                 AddValues(count, values);
+                AddParameters(count, parameters);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
             }
 
@@ -61,6 +66,7 @@ public static class DataSourceQueries
                 $"SELECT {SelectList(dataSource)} FROM {table} AS {row}{LabelJoins(dataSource)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
                 connection);
             AddValues(command, values);
+            AddParameters(command, parameters);
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -82,7 +88,8 @@ public static class DataSourceQueries
 
     /// <summary>
     /// The <c>WHERE</c> clause of the filter, with a leading space, and the values it names. Both
-    /// are empty without a filter. A bare name in the filter is a column of the root row.
+    /// are empty without a filter. A bare name in the filter is a parameter, matched ignoring letter
+    /// case, or else a column of the root row.
     /// </summary>
     private static (string Where, IReadOnlyList<SqlValue> Values) Where(DataSourceModel dataSource)
     {
@@ -93,7 +100,18 @@ public static class DataSourceQueries
 
         var translated = SqlTranslator.Translate(
             filter.Syntax,
-            name => $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.Column(name))}");
+            name =>
+            {
+                for (var index = 0; index < dataSource.Parameters.Count; index++)
+                {
+                    if (string.Equals(dataSource.Parameters[index].Name, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return $"@{ParameterName(index)}";
+                    }
+                }
+
+                return $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.Column(name))}";
+            });
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
@@ -120,6 +138,33 @@ public static class DataSourceQueries
             command.Parameters.Add(new NpgsqlParameter(value.Name, type) { Value = parameterValue });
         }
     }
+
+    /// <summary>
+    /// Adds each data source parameter as <c>@p0</c>, <c>@p1</c>, … with the PostgreSQL type of the
+    /// parameter, so a parameter that was not given is a typed NULL that compares with its column.
+    /// </summary>
+    private static void AddParameters(NpgsqlCommand command, IReadOnlyList<DataSourceParameterValue> parameters)
+    {
+        for (var index = 0; index < parameters.Count; index++)
+        {
+            var (parameter, value) = parameters[index];
+            var type = parameter.Type switch
+            {
+                FieldType.Text or FieldType.Enum => NpgsqlDbType.Text,
+                FieldType.Integer => NpgsqlDbType.Bigint,
+                FieldType.Decimal => NpgsqlDbType.Numeric,
+                FieldType.Boolean => NpgsqlDbType.Boolean,
+                FieldType.Date => NpgsqlDbType.Date,
+                FieldType.DateTime => NpgsqlDbType.TimestampTz,
+                FieldType.Reference => NpgsqlDbType.Uuid,
+                _ => throw new ArgumentOutOfRangeException(nameof(parameters), parameter.Type, "No SQL parameter type for this parameter."),
+            };
+            var parameterValue = value is DateTimeOffset dateTime ? dateTime.UtcDateTime : value;
+            command.Parameters.Add(new NpgsqlParameter(ParameterName(index), type) { Value = parameterValue ?? DBNull.Value });
+        }
+    }
+
+    private static string ParameterName(int index) => $"p{index}";
 
     /// <summary>
     /// The root id, then every projected field in projection order, decimals as text so no digit is

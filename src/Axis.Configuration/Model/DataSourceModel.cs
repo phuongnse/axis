@@ -1,10 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled data source: a projection of its root entity's fields, with an optional filter, its
-/// default sort and page size.
+/// A compiled data source: a projection of its root entity's fields, with typed parameters, an
+/// optional filter, its default sort and page size.
 /// </summary>
 public sealed record DataSourceModel
 {
@@ -24,9 +25,12 @@ public sealed record DataSourceModel
     /// <summary>The projected fields, in declaration order.</summary>
     public required IReadOnlyList<DataSourceFieldModel> Fields { get; init; }
 
+    /// <summary>The typed inputs of the filter, in declaration order.</summary>
+    public IReadOnlyList<DataSourceParameterModel> Parameters { get; init; } = [];
+
     /// <summary>
-    /// The boolean filter over the root entity's fields, inside the SQL subset, or null when every
-    /// row passes.
+    /// The boolean filter over the root entity's fields and the parameters, inside the SQL subset,
+    /// or null when every row passes.
     /// </summary>
     public ExpressionModel? Filter { get; init; }
 
@@ -45,6 +49,13 @@ public sealed record DataSourceModel
 
 /// <summary>A projected field: its key in a row and the root entity's field it reads.</summary>
 public sealed record DataSourceFieldModel(string Name, FieldModel Field);
+
+/// <summary>
+/// A typed input of the filter. The rows endpoint reads it from the query string under its exact
+/// name. When it is not given, it is null in the filter.
+/// </summary>
+public sealed record DataSourceParameterModel(
+    string Name, FieldType Type, bool Required, TextReference? Label, IReadOnlyList<string>? Values, EntityReference? Target);
 
 /// <summary>The default order of a data source: a projected field name, ascending or descending.</summary>
 public sealed record DataSourceSortModel(string FieldName, bool Descending);

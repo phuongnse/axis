@@ -324,9 +324,9 @@ public static class ExpressionTypeChecker
 
     /// <summary>
     /// Whether a value of <paramref name="type"/>, computed by <paramref name="node"/>, fits
-    /// <paramref name="target"/>. <c>null</c> fits any type and an integer widens to a decimal. A
-    /// text literal fits an enum only when it is one of the enum's values. When it is not, that is
-    /// reported here.
+    /// <paramref name="target"/>. <c>null</c> fits any type and an integer widens to a decimal. An
+    /// enum parameter fits an enum when all of its values are in the enum's values. A text literal
+    /// fits an enum only when it is one of the enum's values. When it is not, that is reported here.
     /// </summary>
     private static bool Fits(ExpressionNode node, ExpressionType type, ExpressionType target)
     {
@@ -338,6 +338,11 @@ public static class ExpressionTypeChecker
         if (type.Kind == ExpressionTypeKind.Integer && target.Kind == ExpressionTypeKind.Decimal)
         {
             return true;
+        }
+
+        if (type.Kind == ExpressionTypeKind.Enum && target.Kind == ExpressionTypeKind.Enum && type.IsParameter)
+        {
+            return type.Values.All(value => target.Values.Contains(value, StringComparer.Ordinal));
         }
 
         if (target.Kind == ExpressionTypeKind.Enum && node is TextLiteral literal)

@@ -4,12 +4,13 @@ Detailed reference for data sources: the resource shape, the compile checks,
 the read endpoint, the response and the errors. Parts of this file are built:
 
 - the `dataSource` resource with `entity`, `fields` whose `path` is one field
-  of the root entity, `filter`, `sort` and `pageSize`
-- the read endpoint with `page`, `pageSize` and `sort`
+  of the root entity, `parameters`, `filter`, `sort` and `pageSize`
+- the read endpoint with `page`, `pageSize`, `sort` and the data source
+  parameters
 - `labels` for projected `reference` fields
 
 The rest is marked *(planned for M2)*: paths through references,
-`parameters`, `aggregate` and the widget binding. Dn refers to
+`aggregate` and the widget binding. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -86,19 +87,19 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   as in [expressions.md](expressions.md#names-and-references). A path cannot
   go through or end at a `child-collection`. A `null` reference along the
   path gives `null` and the row is kept, because each hop is a left join.
-- **`parameters`** *(planned for M2)*. Typed inputs of the filter. A parameter has a `name`, a
+- **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a
   `type` and `required`, which defaults to `false`. The types are the scalar
   field types plus `enum` and `reference`. An `enum` needs `values`, and a
   `reference` needs `target`. They are checked by the same rules as entity
   fields, see
   [Entity field types and constraints](configuration.md#entity-field-types-and-constraints).
-- **Parameter `label`** *(planned for M2)*. Optional, with the `{ "textKey" }` shape of a field
+- **Parameter `label`.** Optional, with the `{ "textKey" }` shape of a field
   label. A table shows it on the parameter's filter input.
-- **Missing parameter** *(planned for M2)*. An optional parameter that is not given is `null` in
+- **Missing parameter.** An optional parameter that is not given is `null` in
   the filter. The idiom is `p is null or field == p`, as in the first example.
-- **`filter`.** A boolean expression. It sees the root entity's fields as
-  plain names, ignoring letter case. The parameters join them as plain names
-  when they are built *(planned for M2)*. It uses the syntax of
+- **`filter`.** A boolean expression. It sees the root entity's fields and
+  the parameters as plain names, ignoring letter case. It cannot call rules.
+  It uses the syntax of
   [expressions.md](expressions.md#grammar) and only the
   [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
   parameters and never spliced into the SQL text. A row is kept only when the
@@ -109,8 +110,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   tie-break below.
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
 
-Until a property is built, the JSON Schema rejects it: a `parameters` or
-`aggregate` property is `AXC0004`.
+Until a property is built, the JSON Schema rejects it: an `aggregate`
+property is `AXC0004`.
 
 ### Aggregates
 
@@ -143,11 +144,30 @@ see the Data sources bullet of the Resolve step in
 - Field names are unique, compared exactly (`AXC0044`).
 - `sort` names a projected field that is not a `reference` (`AXC0045`).
 - `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
+- A parameter name differs from every field of the root entity, because the
+  filter reads both as plain names. Parameter names are unique, and `page`,
+  `pageSize` and `sort` are reserved. All three compare ignoring letter case,
+  so `Page` and `SORT` are reserved too. A bad name is `AXC0054` at
+  `/parameters/{i}/name`.
+- A parameter's type is valid for its properties, as for entity fields, with
+  the same codes at `/parameters/{i}/...`: `AXC0013` for a property its type
+  does not take, `AXC0014` for an `enum` without `values` or a `reference`
+  without `target`, `AXC0012` for an unknown target, `AXC0040` for a child
+  entity target and `AXC0030` for a target without a display field.
+- A parameter label's text key is in some locale (`AXC0028`), as for field
+  labels. See the Labels bullet of the Resolve step in
+  [configuration.md](configuration.md).
 - The `filter` parses, is a boolean expression over the root entity's
-  fields, and stays inside the SQL subset. Its first problem is reported at
-  `/filter` with its [expression diagnostic](expressions.md#diagnostics)
-  code: for example `AXC0048` when it is not boolean, `AXC0046` for an
-  unknown name and `AXC0053` for anything outside the SQL subset.
+  fields and the parameters, and stays inside the SQL subset. Its first
+  problem is reported at `/filter` with its
+  [expression diagnostic](expressions.md#diagnostics) code: for example
+  `AXC0048` when it is not boolean, `AXC0046` for an unknown name and
+  `AXC0053` for anything outside the SQL subset.
+- An enum parameter compares with an enum field only when every value in the
+  parameter's `values` is also in the field's `values`. Otherwise the filter
+  is `AXC0047`. See [Types](expressions.md#types).
+- The filter is not checked while a parameter of the data source has a
+  diagnostic, because that parameter may have no usable type.
 
 The remaining checks are *(planned for M2)*. They are listed without
 diagnostic codes. The codes come with the issue that builds them.
@@ -155,20 +175,8 @@ diagnostic codes. The codes come with the issue that builds them.
 - `entity` is not a child entity.
 - Each `path` resolves through `reference` fields only, takes at most 3 hops,
   and never goes through a `child-collection`.
-- Parameter names are unique, and measure names are
-  unique. A measure name also differs from every group field, because both
-  are keys of one row.
-- A parameter name differs from every field of the root entity, because the
-  filter reads both as plain names.
-- `page`, `pageSize` and `sort` are reserved parameter names. They are matched
-  ignoring letter case, so `Page` and `SORT` are reserved too.
-- A parameter's type is valid for its properties, as for entity fields.
-- A parameter label's text key is in some locale, as for field labels. See
-  the Labels bullet of the Resolve step in
-  [configuration.md](configuration.md).
-- An enum parameter compares with an enum field only when every value in the
-  parameter's `values` is also in the field's `values`. See
-  [Types](expressions.md#types).
+- Measure names are unique. A measure name also differs from every group
+  field, because both are keys of one row.
 - `groupBy` names entries of `fields`.
 - Measure fields name entries of `fields`, and their types follow the
   aggregate rules above.
@@ -197,23 +205,25 @@ every data source query from M4 (see
   `fields`, or a group field or measure when the data source is grouped. It
   matches exactly, so letter case matters. A `sort` cannot name a projected
   field whose path ends at a `reference`.
-- **Data source parameters** *(planned for M2)*. They are query parameters under their declared
-  names. The names match exactly.
+- **Data source parameters.** They are query parameters under their declared
+  names. The names match exactly, so a declared name in another letter case
+  is an unknown parameter.
 - **Empty value.** An empty value means the parameter was not given.
 - **Repeated parameter.** A parameter given twice, such as `page=1&page=2`, is
   invalid.
 - **Unknown parameters.** They are ignored.
-- **Required parameter** *(planned for M2)*. A required parameter that is not given is invalid.
+- **Required parameter.** A required parameter that is not given is invalid.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
   fields in `groupBy` order when the data source is grouped. `NULL` ordering
   and the count statement work as in the record API.
 
 Query strings have no JSON types, so each parameter type has a plain text
-form *(planned for M2)*:
+form. A value is only ever sent as a typed SQL parameter, so no value can
+change the query:
 
 | Parameter type | Query value |
 | --- | --- |
-| `text` | The text as it is |
+| `text` | The text as it is, with no U+0000 |
 | `integer` | An optional `-` and digits, within 64 bits |
 | `decimal` | Plain number text with no exponent, such as `1250.50` |
 | `boolean` | `true` or `false` |
@@ -293,8 +303,7 @@ the path, then the query, then the database.
 - **`400` for the query.** A validation problem whose `errors` is keyed
   `page`, `pageSize`, `sort` and the parameter names. It covers a bad value, a
   missing required value and a repeated parameter. Every invalid parameter is
-  reported in the same response. The keys for data source parameters come
-  with the parameters *(planned for M2)*.
+  reported in the same response.
 - **`400` for the database.** A database data exception while evaluating the
   filter, such as an integer overflow or a date out of range from `addDays`.
   The title is fixed, and the response holds no SQL. Any other database

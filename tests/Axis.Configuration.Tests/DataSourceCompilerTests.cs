@@ -14,7 +14,8 @@ public sealed class DataSourceCompilerTests
           "fields": [
             { "name": "number", "type": "text", "required": true },
             { "name": "amount", "type": "decimal" },
-            { "name": "customer", "type": "reference", "target": "Customer" }
+            { "name": "customer", "type": "reference", "target": "Customer" },
+            { "name": "status", "type": "enum", "values": ["open", "closed"] }
           ] }
         """;
 
@@ -272,7 +273,7 @@ public sealed class DataSourceCompilerTests
     }
 
     [Theory]
-    [InlineData(""", "parameters": [] """, "/parameters")]
+    [InlineData(""", "parameters": [{ "name": "p", "type": "child-collection" }] """, "/parameters/0/type")]
     [InlineData(""", "aggregate": {} """, "/aggregate")]
     [InlineData(""", "pageSize": 101 """, "/pageSize")]
     [InlineData(""", "pageSize": 0 """, "/pageSize")]
@@ -288,6 +289,137 @@ public sealed class DataSourceCompilerTests
             (DiagnosticCodes.SchemaViolation, "data-sources/orders.json", path),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""[{ "name": "a", "type": "text" }, { "name": "A", "type": "integer" }]""", 1, "'A'")]
+    [InlineData("""[{ "name": "Page", "type": "integer" }]""", 0, "'Page'")]
+    [InlineData("""[{ "name": "SORT", "type": "text" }]""", 0, "'SORT'")]
+    [InlineData("""[{ "name": "pagesize", "type": "integer" }]""", 0, "'pagesize'")]
+    [InlineData("""[{ "name": "Amount", "type": "decimal" }]""", 0, "field of the entity 'Order'")]
+    public void Parameter_name_that_repeats_another_is_reserved_or_is_a_field_is_reported_at_that_name(
+        string parameters, int index, string messagePart)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "parameters": {{parameters}} """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidDataSourceParameterName, "data-sources/orders.json", $"/parameters/{index}/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "p", "type": "text", "values": ["x"] }""", DiagnosticCodes.InvalidConstraint, "/parameters/0/values")]
+    [InlineData("""{ "name": "p", "type": "enum" }""", DiagnosticCodes.MissingTypeProperty, "/parameters/0")]
+    [InlineData("""{ "name": "p", "type": "reference" }""", DiagnosticCodes.MissingTypeProperty, "/parameters/0")]
+    [InlineData("""{ "name": "p", "type": "reference", "target": "Missing" }""", DiagnosticCodes.UnknownReferenceTarget, "/parameters/0/target")]
+    [InlineData("""{ "name": "p", "type": "reference", "target": "Order" }""", DiagnosticCodes.ReferenceTargetWithoutDisplayField, "/parameters/0/target")]
+    [InlineData("""{ "name": "p", "type": "text", "label": { "textKey": "orders.missing" } }""", DiagnosticCodes.MissingTextKey, "/parameters/0/label/textKey")]
+    public void Parameter_type_properties_and_label_are_checked_as_for_entity_fields(string parameter, string code, string path)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "parameters": [{{parameter}}] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "data-sources/orders.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Parameters_are_in_the_model_and_the_filter_sees_them_as_plain_names()
+    {
+        // The enum parameter's values are a subset of the field's, and the reference target resolves ignoring letter case.
+        const string StatusFilter = """{ "name": "statusFilter", "type": "enum", "values": ["open"] }""";
+        const string CustomerFilter = """{ "name": "customerFilter", "type": "reference", "target": "customer", "required": true }""";
+        const string Filter = "(StatusFilter is null or status == statusFilter) and (customerFilter is null or customerFilter == customer)";
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "parameters": [{{StatusFilter}}, {{CustomerFilter}}], "filter": "{{Filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.Equal(2, dataSource.Parameters.Count);
+        var status = dataSource.Parameters[0];
+        Assert.Equal(("statusFilter", FieldType.Enum, false, null), (status.Name, status.Type, status.Required, status.Target));
+        Assert.Equal(["open"], status.Values);
+        var customer = dataSource.Parameters[1];
+        Assert.Equal(
+            ("customerFilter", FieldType.Reference, true, new EntityReference(Guid.Parse("22222222-2222-4222-8222-222222222222"), "Customer")),
+            (customer.Name, customer.Type, customer.Required, customer.Target));
+        Assert.NotNull(dataSource.Filter);
+        Assert.True(dataSource.Filter.Check.Succeeded);
+    }
+
+    [Theory]
+    [InlineData("status == statusFilter")]
+    [InlineData("statusFilter != status")]
+    public void Enum_parameter_with_a_value_the_field_lacks_is_a_type_mismatch_at_the_filter(string filter)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "parameters": [{ "name": "statusFilter", "type": "enum", "values": ["open", "archived"] }], "filter": "{{filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Filter_is_not_checked_while_a_parameter_has_a_diagnostic()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "parameters": [{ "name": "statusFilter", "type": "enum" }], "filter": "missing == statusFilter" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTypeProperty, "/parameters/0"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Filter_that_calls_a_rule_is_an_unknown_function()
+    {
+        // Only validations can call rules for now, so a data source filter has no rules in scope.
+        using var folder = Folder()
+            .With("rules/is-large.json", """
+                { "id": "66666666-6666-4666-8666-666666666601", "kind": "rule", "name": "IsLarge", "formatVersion": 1,
+                  "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 1000" }
+                """)
+            .With("data-sources/orders.json", DataSource(
+                "Order",
+                """[{ "name": "number", "path": "number" }]""",
+                """, "filter": "isLarge(amount)" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownFunction, "data-sources/orders.json", "/filter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
     }
 
     [Fact]

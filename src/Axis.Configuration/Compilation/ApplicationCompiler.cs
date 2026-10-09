@@ -72,7 +72,7 @@ public static class ApplicationCompiler
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
-        CheckDataSources(loaded, FindEntity, diagnostics);
+        CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -566,10 +566,19 @@ public static class ApplicationCompiler
     /// field of that entity that is not a child collection, projected names are unique, and the
     /// default <c>sort</c> names a projected field that is not a reference. Entity and field names
     /// resolve ignoring letter case; projected names compare exactly, as the query <c>sort</c> does.
-    /// The <c>filter</c> parses, type-checks as a boolean over the entity's fields and translates to
-    /// SQL. Its first problem is reported at <c>/filter</c> with its expression code.
+    /// Each parameter name differs from the entity's fields, from <c>page</c>, <c>pageSize</c> and
+    /// <c>sort</c> and from earlier parameters, ignoring letter case. Its type properties and label
+    /// are checked as an entity field's. The <c>filter</c> parses, type-checks as a boolean over the
+    /// entity's fields and the parameters, with no rules, and translates to SQL. Its first problem
+    /// is reported at <c>/filter</c> with its expression code. It is not checked while a parameter
+    /// has a diagnostic.
     /// </summary>
-    private static void CheckDataSources(ApplicationLoadResult loaded, Func<string, EntityResource?> findEntity, List<Diagnostic> diagnostics)
+    private static void CheckDataSources(
+        ApplicationLoadResult loaded,
+        Func<string, EntityResource?> findEntity,
+        IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
+        IReadOnlySet<string> textKeys,
+        List<Diagnostic> diagnostics)
     {
         foreach (var dataSource in loaded.DataSources)
         {
@@ -643,15 +652,60 @@ public static class ApplicationCompiler
                 }
             }
 
-            if (dataSource.Filter is { } filter && CheckFilter(filter, entity) is { } problem)
+            var countBeforeParameters = diagnostics.Count;
+            var parameterNames = new HashSet<string>(["page", "pageSize", "sort"], StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < dataSource.Parameters.Count; index++)
+            {
+                var parameter = dataSource.Parameters[index];
+                var path = $"/parameters/{index}";
+                if (FindField(entity, parameter.Name) is not null)
+                {
+                    Report(
+                        DiagnosticCodes.InvalidDataSourceParameterName,
+                        $"The parameter name '{parameter.Name}' is also a field of the entity '{entity.Name}'. The filter reads both as plain names.",
+                        $"{path}/name");
+                }
+                else if (!parameterNames.Add(parameter.Name))
+                {
+                    Report(
+                        DiagnosticCodes.InvalidDataSourceParameterName,
+                        $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize' and 'sort' are reserved, ignoring letter case.",
+                        $"{path}/name");
+                }
+
+                CheckTextKey(parameter.Label, dataSource.File, dataSource.Id, $"{path}/label", textKeys, diagnostics);
+                CheckField(
+                    new FieldDefinition
+                    {
+                        Name = parameter.Name,
+                        Type = parameter.Type,
+                        Required = parameter.Required,
+                        Label = parameter.Label,
+                        Values = parameter.Values,
+                        Target = parameter.Target,
+                    },
+                    path,
+                    findEntity,
+                    ownersByChildName,
+                    loaded.UnloadedEntityNames,
+                    Report);
+            }
+
+            // A parameter without a usable type would only add noise to the filter's diagnostics.
+            if (diagnostics.Count == countBeforeParameters
+                && dataSource.Filter is { } filter
+                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters)) is { } problem)
             {
                 Report(problem.Code, problem.Message, "/filter");
             }
         }
     }
 
-    /// <summary>The first problem of a data source filter: in parsing, in type checking, or outside the SQL subset.</summary>
-    private static ExpressionDiagnostic? CheckFilter(string filter, EntityResource entity)
+    /// <summary>
+    /// The first problem of a data source filter: in parsing, in type checking over the entity's
+    /// fields and the parameters, with no rules, or outside the SQL subset.
+    /// </summary>
+    private static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope)
     {
         var parsed = ExpressionParser.Parse(filter);
         if (!parsed.Succeeded)
@@ -659,7 +713,7 @@ public static class ApplicationCompiler
             return parsed.Diagnostic;
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, ExpressionScopes.ForEntity(entity.Fields), ExpressionType.Boolean);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
         return check.Succeeded ? SqlTranslator.Translate(parsed.Expression, name => name).Diagnostic : check.Diagnostic;
     }
 
@@ -759,12 +813,24 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// Builds a checked data source over the built entities, so each projected field is the entity's
-    /// own field model, and its filter is checked against the built entity's fields.
+    /// own field model, and its filter is checked against the built entity's fields and the parameters.
     /// </summary>
     private static DataSourceModel BuildDataSource(DataSourceResource dataSource, IReadOnlyList<EntityModel> entities)
     {
-        var entity = entities.First(candidate => string.Equals(candidate.Name, dataSource.Entity, StringComparison.OrdinalIgnoreCase));
+        EntityModel? Find(string name) =>
+            entities.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        var entity = Find(dataSource.Entity)!;
         var descending = dataSource.Sort?.StartsWith('-') == true;
+        var parameters = dataSource.Parameters
+            .Select(parameter => new DataSourceParameterModel(
+                parameter.Name,
+                FieldTypes.Parse(parameter.Type),
+                parameter.Required ?? false,
+                parameter.Label,
+                parameter.Values,
+                parameter.Target is not null && Find(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))
+            .ToList();
         return new DataSourceModel
         {
             Id = dataSource.Id,
@@ -778,8 +844,9 @@ public static class ApplicationCompiler
                     return new DataSourceFieldModel(field.Name, fieldModel!);
                 })
                 .ToList(),
+            Parameters = parameters,
             Filter = dataSource.Filter is { } filter
-                ? ExpressionModel.Compile(filter, ExpressionScopes.ForEntity(entity.Fields), ExpressionType.Boolean)
+                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters), ExpressionType.Boolean)
                 : null,
             Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
             PageSize = dataSource.PageSize ?? DataSourceModel.DefaultPageSize,
