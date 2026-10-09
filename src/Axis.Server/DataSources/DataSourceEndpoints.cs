@@ -9,7 +9,8 @@ namespace Axis.Server.DataSources;
 /// The read endpoint of a data source in the active release of an application. Only <c>GET</c>
 /// is routed. A path that names no active application or data source is a 404 before the query
 /// is checked. The paging and sorting rules are those of the record list, except that the default
-/// page size and sort are the data source's own. A database error while evaluating the filter is a
+/// page size and sort are the data source's own. The data source parameters are read by
+/// <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter is a
 /// 400 problem with a fixed title. The problem titles never contain text from the request, SQL or
 /// storage names.
 /// </summary>
@@ -27,8 +28,10 @@ internal static class DataSourceEndpoints
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
     // A repeated parameter binds as its values joined by commas, which never parses. An empty
-    // value means the parameter was not given.
+    // value means the parameter was not given. The data source parameters are read from the raw
+    // query string instead, because their names match exactly.
     private static async Task<IResult> ListAsync(
+        HttpContext context,
         string app,
         string dataSource,
         string? page,
@@ -67,13 +70,15 @@ internal static class DataSourceEndpoints
             errors["sort"] = ["Must be a projected field name that is not a reference, optionally preceded by '-'."];
         }
 
+        var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
+
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await DataSourceQueries.ListAsync(connection, model, pageNumber, size, order, cancellationToken);
+        var result = await DataSourceQueries.ListAsync(connection, model, pageNumber, size, order, parameters, cancellationToken);
         if (result is null)
         {
             return Results.Problem(

@@ -10,7 +10,8 @@ namespace Axis.Configuration.Compilation;
 /// and they are not built yet. A computed field is left out when <c>includeComputed</c> is false,
 /// as for the expression of a computed field. A repeated name keeps its first field, ignoring
 /// letter case. The named <c>rules</c> are callable only where they are given, which for now is
-/// validations.
+/// validations. A data source scope adds the data source's parameters after the fields, and has no
+/// rules.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -32,6 +33,31 @@ public static class ExpressionScopes
                 .Where(field => includeComputed || field.Expression is null)
                 .Select(field => (field.Name, TypeOf(field))),
             rules);
+
+    /// <summary>The scope of a data source filter: the root entity's fields, then the parameters.</summary>
+    public static ExpressionScope ForDataSource(IEnumerable<FieldModel> fields, IEnumerable<DataSourceParameterModel> parameters)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        ArgumentNullException.ThrowIfNull(parameters);
+        return Build(
+            [
+                .. fields.Select(field => (field.Name, TypeOf(field))),
+                .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
+                    parameter.Name, parameter.Type, parameter.Values, parameter.Target?.Name))),
+            ],
+            rules: null);
+    }
+
+    /// <summary>The scope of a data source filter: the root entity's fields, then the parameters.</summary>
+    internal static ExpressionScope ForDataSource(
+        IEnumerable<FieldDefinition> fields, IEnumerable<DataSourceParameterDefinition> parameters) =>
+        Build(
+            [
+                .. fields.Select(field => (field.Name, TypeOf(field))),
+                .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
+                    parameter.Name, FieldTypes.Parse(parameter.Type), parameter.Values, parameter.Target))),
+            ],
+            rules: null);
 
     /// <summary>The expression type of a field's value, or null for a child collection.</summary>
     public static ExpressionType? TypeOf(FieldModel field)
@@ -60,6 +86,10 @@ public static class ExpressionScopes
 
         return new ExpressionScope(types, rules);
     }
+
+    /// <summary>A parameter's type is a field's, except that an enum parameter declares its own values.</summary>
+    private static ExpressionType? ParameterTypeOf(string name, FieldType type, IReadOnlyList<string>? values, string? target) =>
+        type == FieldType.Enum ? ExpressionType.EnumParameter(name, values ?? []) : TypeOf(name, type, values, target);
 
     private static ExpressionType? TypeOf(string name, FieldType type, IReadOnlyList<string>? values, string? target) =>
         type switch

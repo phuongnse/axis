@@ -101,8 +101,7 @@ Rules:
 - **Enums.** Two enum values compare only when both come from the same
   field's value set, or when one side is a text literal. A data source
   parameter of type `enum` also compares with an enum field when every value
-  in the parameter's `values` is one of the field's `values` *(planned for
-  M2, with data source parameters)*. A text literal
+  in the parameter's `values` is one of the field's `values`. A text literal
   compared with an enum must be one of the field's `values`, compared
   ordinally. Otherwise it is a type error at compile time.
 - **Result type.** Each use sets the type its expression must have.
@@ -237,15 +236,16 @@ and in [functions](#functions).
 
 ## Names and references
 
-*(planned for M2)*. Only bare field names and rule calls from validations
-are built: the type checker resolves names against the fields it is given,
-and calls against the rules it is given, ignoring letter case.
+*(planned for M2)*. Only bare field names, data source parameters and rule
+calls from validations are built: the type checker resolves names against
+the fields and parameters it is given, and calls against the rules it is
+given, ignoring letter case.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
 - **Bare name.** A bare name is a field of the current record. In a data
-  source filter it can also be a data source parameter *(planned for M2)*.
-  When a parameter and a field share a name, the data source check reports it.
+  source filter it can also be a data source parameter. When a parameter and
+  a field share a name, the data source check reports it.
 - **Path.** A path such as `department.name` follows a reference field to a
   field of the target record. A path may take at most 3 hops. A `null`
   reference along the path makes the result `null`.
@@ -264,7 +264,7 @@ and calls against the rules it is given, ignoring letter case.
   entity's own fields that are not computed. Another computed field, itself
   included, is an unknown name. Child collections come with aggregates.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
-  data source parameters as plain names. Parameters are *(planned for M2)*.
+  data source parameters as plain names. It has no rules.
 
 ## Functions
 
@@ -381,8 +381,9 @@ a compile diagnostic.
 
 ## SQL subset
 
-The SQL translation is built for literals, bare field names, every operator
-except `/`, and every function the list below names. Field paths and rule
+The SQL translation is built for literals, bare field names, data source
+parameters, every operator except `/`, and every function the list below
+names. Field paths and rule
 calls are *(planned for M2)*. Until they are built, a path is `AXC0046` and a
 rule call is `AXC0050`, because a filter cannot call rules yet.
 
@@ -392,6 +393,10 @@ These translate to SQL:
   PostgreSQL type of its literal. `date('…')` and `dateTime('…')` are
   parsed at compile time and sent as a `date` and a `timestamptz`. The
   literal `null` is written as the keyword `NULL`, which is not a value;
+- data source parameters, sent as named parameters `@p0`, `@p1`, … in
+  declaration order, each with the PostgreSQL type of the parameter. A
+  parameter that is not given is a typed `NULL` parameter, so it still
+  compares with its column;
 - field paths, where each hop becomes a join *(planned for M2)*;
 - `==` and `!=`, as `IS NOT DISTINCT FROM` and `IS DISTINCT FROM`;
 - `<`, `<=`, `>` and `>=`;
@@ -493,7 +498,8 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   they are built, `.` paths are reported this way too.
 - **`AXC0047`.** Operand types an operator, function or rule does not
   accept, at the operator or the call. This includes an `in` item that does
-  not fit, two different enums, a function or rule argument of the wrong
+  not fit, two different enums, an enum parameter with a value the field
+  lacks, a function or rule argument of the wrong
   type, `coalesce`
   arguments or `if` branches that do not fit each other, and a `date` or
   `dateTime` call without a text literal argument. The message names the

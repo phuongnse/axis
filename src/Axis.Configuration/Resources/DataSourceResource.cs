@@ -2,8 +2,8 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A <c>dataSource</c> resource: a read-only projection of one root entity's fields, with an
-/// optional filter, a default sort and page size. Its entity, field paths, filter and sort are
-/// checked by <see cref="Compilation.ApplicationCompiler"/>.
+/// optional filter, typed parameters, a default sort and page size. Its entity, field paths,
+/// parameters, filter and sort are checked by <see cref="Compilation.ApplicationCompiler"/>.
 /// </summary>
 public sealed record DataSourceResource : Resource
 {
@@ -12,7 +12,13 @@ public sealed record DataSourceResource : Resource
     /// <summary>The projection, in file order.</summary>
     public required IReadOnlyList<DataSourceFieldDefinition> Fields { get; init; }
 
-    /// <summary>A boolean expression over the root entity's fields. Rows where it is not true are left out.</summary>
+    /// <summary>The typed inputs of the filter, in file order.</summary>
+    public IReadOnlyList<DataSourceParameterDefinition> Parameters { get; init; } = [];
+
+    /// <summary>
+    /// A boolean expression over the root entity's fields and the parameters. Rows where it is not
+    /// true are left out.
+    /// </summary>
     public string? Filter { get; init; }
 
     /// <summary>The default order: a projected name, optionally preceded by <c>-</c> for descending order.</summary>

@@ -16,6 +16,8 @@ public sealed class ExpressionTypeCheckerTests
         ["ts"] = ExpressionType.DateTime,
         ["e"] = ExpressionType.Enum("status", ["draft", "submitted"]),
         ["e2"] = ExpressionType.Enum("priority", ["low"]),
+        ["pe"] = ExpressionType.EnumParameter("statusFilter", ["draft"]),
+        ["pe2"] = ExpressionType.EnumParameter("other", ["draft", "archived"]),
         ["r"] = ExpressionType.Reference("department"),
         ["r2"] = ExpressionType.Reference("supplier"),
     });
@@ -63,6 +65,10 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("e == e", "boolean")]
     [InlineData("e == 'draft'", "boolean")]
     [InlineData("'submitted' != e", "boolean")]
+    // An enum parameter compares with an enum field whose values hold all of its own.
+    [InlineData("e == pe", "boolean")]
+    [InlineData("pe != e", "boolean")]
+    [InlineData("pe == 'draft'", "boolean")]
     [InlineData("r == r", "boolean")]
     // Booleans.
     [InlineData("b and b", "boolean")]
@@ -106,6 +112,9 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("i == t", 2)]
     [InlineData("b != 1", 2)]
     [InlineData("e == e2", 2)]
+    [InlineData("e == pe2", 2)]
+    [InlineData("pe2 == e", 4)]
+    [InlineData("pe == e2", 3)]
     [InlineData("e == t", 2)]
     [InlineData("t == e", 2)]
     [InlineData("e == 1", 2)]

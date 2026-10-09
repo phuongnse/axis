@@ -10,11 +10,12 @@ namespace Axis.Expressions.Typing;
 [SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "The names are the expression types of the language.")]
 public sealed class ExpressionType : IEquatable<ExpressionType>
 {
-    private ExpressionType(ExpressionTypeKind kind, string? source, IReadOnlyList<string> values)
+    private ExpressionType(ExpressionTypeKind kind, string? source, IReadOnlyList<string> values, bool isParameter = false)
     {
         Kind = kind;
         Source = source;
         Values = values;
+        IsParameter = isParameter;
     }
 
     public static ExpressionType Null { get; } = new(ExpressionTypeKind.Null, null, []);
@@ -39,11 +40,25 @@ public sealed class ExpressionType : IEquatable<ExpressionType>
     /// <summary>The values of an enum, compared ordinally. Empty for other kinds.</summary>
     public IReadOnlyList<string> Values { get; }
 
+    /// <summary>
+    /// Whether this enum belongs to a data source parameter. Such an enum compares with another
+    /// enum when all of its values are in the other's values.
+    /// </summary>
+    public bool IsParameter { get; }
+
     public static ExpressionType Enum(string field, IReadOnlyList<string> values)
     {
         ArgumentNullException.ThrowIfNull(field);
         ArgumentNullException.ThrowIfNull(values);
         return new ExpressionType(ExpressionTypeKind.Enum, field, [.. values]);
+    }
+
+    /// <summary>The enum of a data source parameter, which declares its own values.</summary>
+    public static ExpressionType EnumParameter(string parameter, IReadOnlyList<string> values)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+        ArgumentNullException.ThrowIfNull(values);
+        return new ExpressionType(ExpressionTypeKind.Enum, parameter, [.. values], isParameter: true);
     }
 
     public static ExpressionType Reference(string targetEntity)

@@ -4,11 +4,12 @@ using System.Text.RegularExpressions;
 namespace Axis.Expressions.Evaluation;
 
 /// <summary>
-/// Reads the text of <c>date('…')</c> and <c>dateTime('…')</c>. The rules are the record API's: a
+/// Reads the text of <c>date('…')</c> and <c>dateTime('…')</c>, and of date and date-time data
+/// source parameters in a query string. The rules are the record API's: a
 /// date is <c>yyyy-MM-dd</c>, and a date-time is RFC 3339 with an offset, up to 6 fraction digits,
 /// no leap second, an offset of at most 14 hours, and an instant inside 0001 to 9999 in UTC.
 /// </summary>
-internal static partial class DateLiterals
+public static partial class DateLiterals
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const int TickDigits = 7;

@@ -101,19 +101,27 @@ flowchart LR
      `AXC0044` at `/fields/{i}/name`. The `sort`, without its leading `-`,
      must exactly match a projected name whose field is not a `reference`,
      otherwise it is `AXC0045` at `/sort`. A sort naming an entry whose path
-     is already `AXC0043` is not reported again. The `filter` is parsed,
-     type-checked as a boolean over the entity's fields and translated to
-     SQL. Its first problem is reported at `/filter` with its
+     is already `AXC0043` is not reported again. A parameter name that is
+     also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
+     an earlier parameter, all ignoring letter case, is `AXC0054` at
+     `/parameters/{i}/name`. A parameter's type properties are checked as an
+     entity field's, with the same codes (`AXC0012`, `AXC0013`, `AXC0014`,
+     `AXC0030`, `AXC0040`) at `/parameters/{i}/...`, and its label joins the
+     `AXC0028` check. The `filter` is parsed, type-checked as a boolean over
+     the entity's fields and the parameters, with no rules, and translated
+     to SQL. Its first problem is reported at `/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
-     outside the SQL subset is `AXC0053`. The filter of a data source whose
-     entity is unknown is not checked. See
+     outside the SQL subset is `AXC0053`. An enum parameter with a value the
+     compared enum field lacks is `AXC0047`. The filter of a data source
+     whose entity is unknown, or that has a parameter with a diagnostic, is
+     not checked. See
      [data sources](data-sources.md#compile-checks).
 
    The model holds the text resources, each entity's display field, the
    sites and pages with their entity and page references resolved, the
    seeds in path order with their entity resolved, and the data sources in
-   path order with their entity and projected fields resolved and their
-   filter checked. No model
+   path order with their entity, projected fields and parameter targets
+   resolved and their filter checked. No model
    is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields, and must be boolean. A
@@ -290,6 +298,7 @@ sorted by file and then path.
 | `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
 | `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
 | `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)` or a `date('…')` text that is not valid. Reported at `/filter`, with the character position of the operator or the call in the message. See [SQL subset](expressions.md#sql-subset). |
+| `AXC0054` | A data source parameter's `name` is also a field of the data source's entity, is `page`, `pageSize` or `sort`, or is already used by an earlier parameter of the same data source, all ignoring letter case. Reported at `/parameters/{i}/name`. |
 | `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |

@@ -1,0 +1,23 @@
+{
+  "id": "3b8f0d6e-2c4a-4e71-9f15-7a9c2e4b6d18",
+  "kind": "dataSource",
+  "name": "ItemsMatching",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "quantity", "path": "quantity" }
+  ],
+  "parameters": [
+    { "name": "nameFilter", "type": "text", "required": true },
+    { "name": "minQuantity", "type": "integer" },
+    { "name": "maxPrice", "type": "decimal" },
+    { "name": "activeFilter", "type": "boolean" },
+    { "name": "neededFrom", "type": "date" },
+    { "name": "orderedAfter", "type": "date-time" },
+    { "name": "statusFilter", "type": "enum", "values": ["open"] },
+    { "name": "departmentFilter", "type": "reference", "target": "Department" }
+  ],
+  "filter": "name == nameFilter and (minQuantity is null or quantity >= minQuantity) and (maxPrice is null or price <= maxPrice) and (activeFilter is null or active == activeFilter) and (neededFrom is null or neededBy >= neededFrom) and (orderedAfter is null or orderedAt > orderedAfter) and (statusFilter is null or status == statusFilter) and (departmentFilter is null or department == departmentFilter)",
+  "sort": "name"
+}
