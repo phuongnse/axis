@@ -372,5 +372,5 @@ internal static class RecordEndpoints
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
 }
 
-/// <summary>One page of a record list and the number of records in the whole entity.</summary>
+/// <summary>One page of a record list and the number of records that match the search, or of every record without one.</summary>
 internal sealed record RecordListResponse(IReadOnlyList<Record> Items, int Page, int PageSize, long TotalCount);
