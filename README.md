@@ -12,8 +12,8 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Milestone **M1, Walking skeleton**, is complete. The current milestone is
-**M2, Data and rules**. The [roadmap](docs/roadmap.md) says what each
+Milestone **M2, Data and rules**, is complete. The current milestone is
+**M3, Processes and tasks**. The [roadmap](docs/roadmap.md) says what each
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 

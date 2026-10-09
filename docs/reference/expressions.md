@@ -6,7 +6,7 @@ diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
 bare field names, every operator, every [function](#functions) and the
 [aggregates](#aggregates), and the translation of the [SQL subset](#sql-subset). Sections
-marked *(planned for M2)* are not built yet. Entity
+marked *(planned for Mx)* are not built yet. Entity
 [validations](configuration.md#entity-logic) and
 [computed fields](configuration.md#entity-logic) are resource file uses: the
 compiler type-checks them and the record API evaluates them. A validation
@@ -236,7 +236,7 @@ and in [functions](#functions).
 
 ## Names and references
 
-*(planned for M2)*. Bare field names, data source parameters, paths in data
+Bare field names, data source parameters, paths in data
 source filters, child collections in aggregates and rule calls from
 validations and data source filters are built: the type checker resolves names against the fields,
 parameters and collections it is given, paths against the reference fields'
@@ -514,7 +514,7 @@ Rules:
 ## Writing expressions in resource files
 
 Entity validations, computed fields, rules and data source filters are written this
-way. The other uses are *(planned for M2)*.
+way. Process conditions and routing *(planned for M3)* and policy filters *(planned for M4)* will be written the same way.
 
 An expression is one JSON string:
 

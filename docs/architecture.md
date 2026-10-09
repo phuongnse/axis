@@ -38,7 +38,7 @@ src/
   Axis.Worker/            background host (M3)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
-  Axis.Expressions/       expression parser, type checker, interpreter (M2)
+  Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
   Axis.Processes/         process engine, tasks, outbox, timers (M3)
   Axis.Policy/            roles, policies, evaluation (M4)
@@ -57,7 +57,7 @@ samples/
 Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
-checker and interpreter so far), `Axis.Presentation` (the platform site, its texts and the
+checker, interpreter and SQL translation), `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Tenancy`, the test projects and
 `web/`. `Axis.Worker`,
 `Axis.Processes` and `Axis.Policy` do not exist yet.
@@ -172,7 +172,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     protected fields.
 - **Before M4.** M1 has no authentication: every endpoint is open. A
   development-only authentication handler with a fixed set of test users
-  arrives in M2 or M3, before M4. It must be impossible to enable it outside
+  arrives before M4 *(planned for M3)*. It must be impossible to enable it outside
   the `Development` and test environments.
 
 ## Process engine (D11, planned for M3)

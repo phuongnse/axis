@@ -15,8 +15,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   templates. Those components and a single token-based theme with light and
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
-- **How pages and widgets grow.** M1 has one widget per page and binds it to
-  an entity. Container widgets such as tabs, sections and columns will hold
+- **How pages and widgets grow.** A page has one widget. A form binds an entity,
+  and a table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold
   other widgets. Data sources are agreed in
   [D18](../decisions.md#d18-data-sources--agreed) and described in
   [data-sources.md](data-sources.md). Navigate actions and shared `form`

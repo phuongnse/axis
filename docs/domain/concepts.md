@@ -71,7 +71,7 @@ Later constraints:
 | Concept | Meaning | From |
 | --- | --- | --- |
 | **Expression** | A typed, side-effect-free formula in Axis's [expression language](../reference/expressions.md), checked at compile time. | M2 |
-| **Rule** | A named, reusable expression with declared typed parameters and a result type. Rules are used for validation, routing, conditions and policy filters. | M2 |
+| **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations and data source filters call rules today. Routing and conditions follow with processes (M3), and policy filters with policies (M4). | M2 |
 | **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. | M3 |
 | **Extension package** | Versioned C# code, and later React components, that adds operations and widgets under declared capabilities. | M5 |
 
@@ -118,7 +118,7 @@ Later constraints:
 | --- | --- | --- |
 | **Site** | An entry point of one application, with its own path, title, locales (default, fallback and available) and navigation. Theme, identity provider binding and domain come later. | M1 |
 | **Page** | A route in a site. It has a title, and its content is its widgets: exactly one in M1. A page has no entity or template of its own. | M1 |
-| **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, and a table may name a `formPage` that opens its records. More types (list, detail, task inbox, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
+| **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, a `table` may bind a data source instead of an entity (M2), and a table may name a `formPage` that opens its records. More types (list, detail, task inbox, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
 | **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. | M1 (basic), M3 (full) |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M1 only has the table's `formPage` link; navigate actions are still **Proposed** in [D15](../decisions.md#d15-presentation-model--agreed). | M3 |
 | **Theme** | Design tokens for light and dark mode, shared by every site. M1 has the shared tokens. A site will be able to adjust tokens later, but never add per-page styling. | M1 (shared tokens), later (site adjustments) |
