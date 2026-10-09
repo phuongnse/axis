@@ -1,11 +1,19 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach, vi } from 'vitest'
+import { afterAll, afterEach, vi } from 'vitest'
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
+})
+
+// Components can leave timers pending when they unmount: the ProLayout menu starts a 400 ms one
+// and never clears it. Let them fire while jsdom still provides `window`. Switch back to real
+// timers first, so a file that leaves fake timers on cannot stall the wait.
+afterAll(() => {
+  vi.useRealTimers()
+  return new Promise((resolve) => setTimeout(resolve, 500))
 })
 
 // jsdom does not implement matchMedia, which Ant Design and the theme provider use.
