@@ -211,6 +211,45 @@ public sealed class DataSourceCompilerTests
     }
 
     [Fact]
+    public void Data_source_over_a_child_entity_is_reported_at_its_entity_naming_the_owner()
+    {
+        // A child entity's rows are read only through its owner's child collection.
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/line-item.json", LineItem)
+            .With("entities/invoice.json", Invoice)
+            .With("data-sources/orders.json", DataSource("LineItem", """[{ "name": "description", "path": "description" }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DataSourceOverChildEntity, "data-sources/orders.json", "/entity"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Contains("'LineItem'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'Invoice.lines'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Data_source_over_the_owner_of_a_child_entity_compiles()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/line-item.json", LineItem)
+            .With("entities/invoice.json", Invoice)
+            .With("data-sources/orders.json", DataSource("Invoice", """[{ "name": "number", "path": "number" }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.Equal("Invoice", dataSource.Entity.Name);
+    }
+
+    [Fact]
     public void Repeated_projected_name_is_reported_at_the_later_name()
     {
         // Projected names compare exactly, so 'Number' is a name of its own.

@@ -81,7 +81,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 }
 ```
 
-- **`entity`.** The root entity. In M2 it cannot be a child entity.
+- **`entity`.** The root entity. In M2 it cannot be a child entity
+  (`AXC0064`).
 - **`fields`.** The projection, in order. Each entry has a `name`, which is
   the key in a row, and a `path` to a value of the root entity.
 - **`path`.** A field name of the root entity, or a dotted path through
@@ -149,6 +150,8 @@ see the Data sources bullet of the Resolve step in
 [configuration.md](configuration.md):
 
 - `entity` names a loaded entity (`AXC0042`).
+- `entity` is not a child entity (`AXC0064`). A child entity's rows are read
+  only through its owner's child collection.
 - Each `path` names a field of the root entity, or goes through `reference`
   fields only, takes at most 3 hops, and does not end at a
   `child-collection`. A path through a field that is not a `reference`, an
@@ -200,11 +203,6 @@ see the Data sources bullet of the Resolve step in
 - When the data source is grouped, `sort` names a group field whose path
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).
-
-The remaining check is *(planned for M2)*. It is listed without a
-diagnostic code. The code comes with the issue that builds it.
-
-- `entity` is not a child entity.
 
 ## Endpoint
 

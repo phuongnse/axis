@@ -97,10 +97,11 @@ flowchart LR
    - **Data sources.** A data source's `entity` must name a loaded entity,
      ignoring letter case, otherwise it is `AXC0042` at `/entity`, and its
      fields and sort are not checked further. A name whose entity file was
-     not loaded because of its own errors is not reported again. Each `path`
-     must name a field of that entity, or go through `reference` fields with
-     at most 3 hops, each name ignoring letter case, otherwise it is
-     `AXC0043` at `/fields/{i}/path`. A path through a field that is not a
+     not loaded because of its own errors is not reported again. An
+     `entity` that is a child entity is `AXC0064` at `/entity`, naming the
+     owner. Each `path` must name a field of that entity, or go through
+     `reference` fields with at most 3 hops, each name ignoring letter case,
+     otherwise it is `AXC0043` at `/fields/{i}/path`. A path through a field that is not a
      `reference`, to an unknown field or with more than 3 hops is `AXC0043`,
      with a message that says which. A path ending at a `child-collection`
      field is `AXC0043` too, because that field has no column. A path that
@@ -336,6 +337,7 @@ sorted by file and then path.
 | `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |
 | `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
+| `AXC0064` | A data source's `entity` is a child entity. Reported at `/entity`, naming the owner. |
 
 ## Startup activation
 
@@ -702,5 +704,6 @@ below. Both examples below compile, given that rule.
   expected to lift the last one. A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
+  - is never the `entity` of a data source (`AXC0064`);
   - has no record routes of its own;
   - has no `reference` or `child-collection` fields (`AXC0041`).
