@@ -34,5 +34,6 @@
   "shell.form.choose": "Chọn",
   "shell.form.clear": "Xóa",
   "shell.form.addRow": "Thêm dòng",
-  "shell.form.removeRow": "Xóa dòng"
+  "shell.form.removeRow": "Xóa dòng",
+  "shell.lookup.search": "Tìm kiếm"
 }

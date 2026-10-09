@@ -28,6 +28,8 @@ internal static class RecordEndpoints
 
     private const int MaxPageSize = 100;
 
+    private const int MaxSearchLength = 200;
+
     public static void MapRecordEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var records = endpoints.MapGroup("/api/apps/{app}/entities/{entity}/records");
@@ -39,13 +41,16 @@ internal static class RecordEndpoints
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
-    // A repeated parameter binds as its values joined by commas, which never parses.
+    // A repeated parameter binds as its values joined by commas, which never parses. That text
+    // is a valid search, so a repeated search is found on the request instead.
     private static async Task<IResult> ListAsync(
         string app,
         string entity,
         string? page,
         string? pageSize,
         string? sort,
+        string? search,
+        HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken)
@@ -75,13 +80,29 @@ internal static class RecordEndpoints
             errors["sort"] = ["Must be a declared field name, optionally preceded by '-'."];
         }
 
+        if (request.Query["search"].Count > 1)
+        {
+            errors["search"] = ["Must be given at most once."];
+        }
+        else if (!string.IsNullOrEmpty(search))
+        {
+            if (model.DisplayField is null)
+            {
+                errors["search"] = ["The entity has no display field to search."];
+            }
+            else if (search.Length > MaxSearchLength || search.Contains('\0', StringComparison.Ordinal))
+            {
+                errors["search"] = [$"Must be at most {MaxSearchLength} characters with no U+0000."];
+            }
+        }
+
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordQueries.ListAsync(connection, model, pageNumber, size, order, cancellationToken);
+        var result = await RecordQueries.ListAsync(connection, model, pageNumber, size, order, search, cancellationToken);
         return Results.Ok(new RecordListResponse(result.Items, pageNumber, size, result.TotalCount));
     }
 

@@ -315,8 +315,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     field. It pages 20 records at a time and keeps nothing in the URL.
     Loading, empty and error states use the table's texts. Clicking a row
     or pressing Enter on it picks the record and closes the dialog. The same
-    dialog picks the record of a `reference` filter input. It has no search
-    yet.
+    dialog picks the record of a `reference` filter input.
+  - **Lookup search.** A search box above the list filters the records to
+    those whose display field contains the typed text, ignoring letter case.
+    The search applies 300 ms after typing stops, so typing does not request
+    records for every key. The SPA trims the text and sends it as the record
+    API's `search` parameter, and leaves `search` out when the text is empty.
+    A new search starts again at page 1. Like paging, the search stays out
+    of the URL and is empty each time the dialog opens.
   - **Reference label.** On edit, the label starts from the record's
     `labels`. A picked record's display field value replaces it at once. A
     changed reference is sent as the record id, and a cleared one as `null`.

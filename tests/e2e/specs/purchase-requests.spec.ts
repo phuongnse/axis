@@ -220,6 +220,27 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   await expect(page.getByRole('row', { name: new RegExp(`${title} `) })).toContainText('10.00')
 })
 
+test('searching in the supplier lookup filters the suppliers by name, and picking one sets the field', async ({
+  page,
+}) => {
+  await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
+  await page.getByRole('link', { name: 'New' }).click()
+  await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
+
+  const field = page.locator('.ant-form-item', { has: page.getByLabel('Supplier', { exact: true }) })
+  await field.getByRole('button', { name: 'Choose' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toBeVisible()
+  await dialog.getByLabel('Search').fill('glob')
+
+  // The search ignores case, so `glob` finds Globex.
+  await expect(dialog.getByRole('row', { name: /Globex/ })).toBeVisible()
+  await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toHaveCount(0)
+  await dialog.getByRole('row', { name: /Globex/ }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByLabel('Supplier', { exact: true })).toHaveValue('Globex')
+})
+
 test('switching the locale to Vietnamese shows the Vietnamese navigation', async ({ page }) => {
   await page.goto('/purchasing/purchaserequests')
   await expect(page.getByRole('menuitem', { name: 'Purchase requests' })).toBeVisible()

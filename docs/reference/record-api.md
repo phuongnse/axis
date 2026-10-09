@@ -18,7 +18,7 @@ endpoint from M4 (see [Authentication and authorization](../architecture.md#auth
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=` | `200` with one page of records |
+| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=&search=` | `200` with one page of records |
 | `GET /api/apps/{app}/entities/{entity}/records/{id}` | `200` with one record |
 | `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
 | `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
@@ -72,7 +72,8 @@ see the label of a record it cannot read.
 A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
 "totalCount": 42 }`. `items` holds records in the shape above, including
 `labels`. `page` and `pageSize` are the values used, and `totalCount` counts
-every record of the entity.
+the records of the entity that match the `search`, or every record without
+one.
 
 ## Reading values
 
@@ -94,6 +95,15 @@ every record of the entity.
 - **`sort`.** A declared field name, or `-` and the name for descending
   order. The name matches exactly, so letter case matters. A
   `child-collection` field is not a valid `sort`.
+- **`search`.** Keeps only the records whose display field contains the text,
+  ignoring letter case. Both sides go through PostgreSQL `lower()`, so case
+  folding follows the tenant database. The text has no wildcards: `%`, `_`,
+  quotes and backslashes match as plain characters. The text is a parameter
+  and never part of the SQL. It matches exactly as given, spaces included,
+  and an empty `search` means no filter. It is invalid on an entity without a
+  display field, when repeated, when longer than 200 characters, or when it
+  contains U+0000. The filter cannot use an index, so it reads the whole
+  table.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -105,7 +115,7 @@ every record of the entity.
   without a transaction. Under concurrent writes it can differ from the items
   by a few rows.
 
-The parameters are digits only: a sign, a space or a repeated parameter
+The paging parameters are digits only: a sign, a space or a repeated parameter
 (`page=1&page=2`) is invalid.
 
 ## Create, update and delete
@@ -162,8 +172,8 @@ and then in storage (`404` or `409`).
   an unknown entity, an unknown record and an `{id}` that is not a UUID in the
   hyphenated form. The path is resolved before the query is checked, so a
   path that names nothing is a 404 whatever its query.
-- **`400`.** An invalid `page`, `pageSize` or `sort` is a validation problem
-  whose `errors` is keyed `page`, `pageSize` and `sort`. Every invalid
+- **`400`.** An invalid `page`, `pageSize`, `sort` or `search` is a
+  validation problem whose `errors` is keyed by the parameter's name. Every invalid
   parameter is reported in the same response.
 - **`400` for a body.** A body the parser rejects (see "Request bodies and
   values") is a validation problem whose `errors` is keyed by JSON Pointer. A

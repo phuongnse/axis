@@ -34,5 +34,6 @@
   "shell.form.choose": "Choose",
   "shell.form.clear": "Clear",
   "shell.form.addRow": "Add row",
-  "shell.form.removeRow": "Remove"
+  "shell.form.removeRow": "Remove",
+  "shell.lookup.search": "Search"
 }

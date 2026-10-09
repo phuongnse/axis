@@ -121,6 +121,7 @@ const texts = {
   'shell.form.clear': 'Clear',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Remove',
+  'shell.lookup.search': 'Search',
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
@@ -353,6 +354,30 @@ describe('FormWidget', () => {
     expect(requests()[2].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
   })
 
+  it('reloads the lookup from page 1 when the search changes', async () => {
+    const longCategoryPageJson = categoryPageJson.replace('"totalCount":1', '"totalCount":45')
+    const requests = stubFetch(
+      { status: 200, body: longCategoryPageJson },
+      { status: 200, body: longCategoryPageJson },
+      { status: 200, body: longCategoryPageJson },
+    )
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Office')
+    await userEvent.click(within(dialog).getByTitle('2'))
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    await userEvent.type(within(dialog).getByLabelText('Search'), 'off')
+
+    // The search applies once typing pauses, so the three key presses send one request.
+    await waitFor(() => expect(requests()).toHaveLength(3))
+    expect(requests()[1].url).toMatch(/\?page=2&sort=name$/)
+    expect(requests()[2].url).toBe('/api/apps/E2eApp/entities/Category/records?search=off&sort=name')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(requests()).toHaveLength(3)
+  })
+
   it('shows the lookup error when the target records cannot be loaded', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubFetch({ status: 500, body: '{}' })
@@ -406,10 +431,11 @@ describe('FormWidget', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
   })
 
-  it('has the choose and clear texts in every platform locale', () => {
+  it('has the choose, clear and lookup search texts in every platform locale', () => {
     for (const catalog of [platformEnglish, platformVietnamese]) {
       expect(catalog).toHaveProperty(['shell.form.choose'])
       expect(catalog).toHaveProperty(['shell.form.clear'])
+      expect(catalog).toHaveProperty(['shell.lookup.search'])
     }
   })
 

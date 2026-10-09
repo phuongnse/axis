@@ -128,6 +128,34 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
         Assert.Equal((1, 20, 3L), Paging(withoutSort));
     }
 
+    [Fact]
+    public async Task List_filters_by_display_field_ignoring_case_with_wildcards_and_quotes_as_plain_text()
+    {
+        await fixture.ResetAsync();
+        var ids = new Dictionary<string, Guid>();
+        foreach (var name in new[] { "Finance", "FINAL", "Sales", "50% off", "5000 off", "a_b", "axb", "O'Brien", "OBrien" })
+        {
+            ids[name] = await InsertDepartmentAsync(TenantA, name);
+        }
+
+        using var fin = await GetJsonAsync($"{Departments}?search=fin&sort=name", HostA);
+        using var percent = await GetJsonAsync($"{Departments}?search=%25", HostA);
+        using var underscore = await GetJsonAsync($"{Departments}?search=_", HostA);
+        using var quote = await GetJsonAsync($"{Departments}?search={Uri.EscapeDataString("O'B")}", HostA);
+        using var empty = await GetJsonAsync($"{Departments}?search=", HostA);
+
+        Assert.Equal([ids["FINAL"], ids["Finance"]], ItemIds(fin));
+        Assert.Equal(2L, Paging(fin).TotalCount);
+        Assert.Equal([ids["50% off"]], ItemIds(percent));
+        Assert.Equal(1L, Paging(percent).TotalCount);
+        Assert.Equal([ids["a_b"]], ItemIds(underscore));
+        Assert.Equal(1L, Paging(underscore).TotalCount);
+        Assert.Equal([ids["O'Brien"]], ItemIds(quote));
+        Assert.Equal(1L, Paging(quote).TotalCount);
+        Assert.Equal(ids.Values.Order().ToList(), ItemIds(empty).Order().ToList());
+        Assert.Equal(9L, Paging(empty).TotalCount);
+    }
+
     public static TheoryData<string> MissingPaths => new()
     {
         "/api/apps/Unknown/entities/Item/records",
@@ -171,15 +199,32 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
     [InlineData("pageSize=%2B5", "pageSize")]
     [InlineData("sort=Name", "sort")]
     [InlineData("sort=--name", "sort")]
-    public async Task Repeated_signed_or_wrong_case_parameter_is_a_400_problem(string query, string key)
+    [InlineData("search=x", "search")]
+    [InlineData("search=a&search=b", "search", Departments)]
+    [InlineData("search=a%00", "search", Departments)]
+    public async Task Repeated_signed_wrong_case_or_unsearchable_parameter_is_a_400_problem(string query, string key, string path = Items)
     {
         await fixture.ResetAsync();
-        using var request = Request($"{Items}?{query}", HostA);
+        using var request = Request($"{path}?{query}", HostA);
 
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
 
         using var body = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal([key], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+    }
+
+    [Fact]
+    public async Task Search_longer_than_200_characters_is_a_400_problem()
+    {
+        await fixture.ResetAsync();
+        using var longest = await GetJsonAsync($"{Departments}?search={new string('a', 200)}", HostA);
+        using var request = Request($"{Departments}?search={new string('a', 201)}", HostA);
+
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(0L, Paging(longest).TotalCount);
+        using var body = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        Assert.Equal(["search"], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
     }
 
     [Fact]
