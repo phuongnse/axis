@@ -550,7 +550,8 @@ computed fields and data source filters come later:
   An integer argument fits a `decimal` parameter, and `null` fits any
   parameter.
 - The `expression` must give the `resultType`, and sees only its parameters.
-  It may call other rules, but not in a cycle (`AXC0055`).
+  It may call other rules, but not in a cycle (`AXC0055`) or more than 8 deep
+  (`AXC0065`).
 - The server runs the rule's expression when it evaluates the calling
   validation. Every argument is evaluated, even when one is `null`, and the
   rule's steps count against the caller's
