@@ -55,6 +55,7 @@ public static class ApplicationLoader
                 [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
 
@@ -104,6 +105,7 @@ public static class ApplicationLoader
         var firstFileByKindAndName = new Dictionary<(string Kind, string Name), string>();
         var unloadedEntityNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedPageNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedDataSourceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Set when the root application.json is already reported as unreadable or as the wrong kind,
         // so the folder is not also told that its manifest is missing.
@@ -147,6 +149,11 @@ public static class ApplicationLoader
             if (kind == ResourceKinds.Page && !schemaValid && ReadName(root) is { } unloadedPageName)
             {
                 unloadedPageNames.Add(unloadedPageName);
+            }
+
+            if (kind == ResourceKinds.DataSource && !schemaValid && ReadName(root) is { } unloadedDataSourceName)
+            {
+                unloadedDataSourceNames.Add(unloadedDataSourceName);
             }
 
             if (schemaValid)
@@ -198,7 +205,8 @@ public static class ApplicationLoader
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames,
-            unloadedPageNames);
+            unloadedPageNames,
+            unloadedDataSourceNames);
     }
 
     /// <summary>

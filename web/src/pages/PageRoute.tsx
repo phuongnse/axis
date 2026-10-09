@@ -2,7 +2,7 @@ import { PageContainer } from '@ant-design/pro-components'
 import { useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
-import { fetchPage, type PageMetadata } from '../platform/site'
+import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { useText } from '../platform/texts'
 import { useApplicationSite, useSiteLocale } from './context'
@@ -14,6 +14,11 @@ type FormMode = 'new' | 'edit'
 
 // A record id in the hyphenated 8-4-4-4-12 hex form, as the record API accepts it.
 const recordIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// The compiler binds a form widget to an entity, never to a data source.
+function hasEntity(widget: WidgetMetadata): widget is EntityWidgetMetadata {
+  return widget.entity !== null
+}
 
 /** Shows the page named by the `:page` segment inside the site shell. */
 export function PageRoute({ form }: { form?: FormMode }) {
@@ -84,7 +89,7 @@ function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePage
   return (
     <PageContainer title={t(page.titleKey)}>
       {widget?.type === 'table' && <TableWidget sitePath={sitePath} widget={widget} locale={locale} />}
-      {widget?.type === 'form' && (
+      {widget?.type === 'form' && hasEntity(widget) && (
         <FormWidget widget={widget} recordId={recordId} returnTo={returnTo} locale={locale} />
       )}
     </PageContainer>

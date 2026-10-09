@@ -9,6 +9,7 @@
     "nav.items": "Items",
     "nav.departments": "Departments",
     "items.title": "Items",
+    "itemsByDepartment.title": "Items by department",
     "itemForm.title": "Item",
     "departments.title": "Departments",
     "item.department": "Department",

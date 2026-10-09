@@ -57,23 +57,68 @@ public static class ApplicationSites
     private static TextResource? FindText(ApplicationModel application, string locale) =>
         application.Texts.FirstOrDefault(text => string.Equals(text.Locale, locale, StringComparison.OrdinalIgnoreCase));
 
-    private static WidgetMetadata Widget(ApplicationModel application, WidgetModel widget)
-    {
-        // The compiler resolves every widget entity, so the lookup always succeeds.
-        if (!application.TryGetEntity(widget.Entity.Name, out var entity))
-        {
-            throw new InvalidOperationException($"The widget entity '{widget.Entity.Name}' is not in the model.");
-        }
-
-        return new WidgetMetadata(
+    private static WidgetMetadata Widget(ApplicationModel application, WidgetModel widget) =>
+        new(
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
-            new EntityMetadata(
-                entity.Name,
-                entity.Label?.TextKey,
-                entity.DisplayField,
-                RecordsPath(application, entity.Name),
-                [.. entity.Fields.Select(field => Field(application, field))]));
+            widget.Entity is { } entity ? Entity(application, entity.Name) : null,
+            widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null);
+
+    private static EntityMetadata Entity(ApplicationModel application, string name)
+    {
+        // The compiler resolves every widget entity, so the lookup always succeeds.
+        if (!application.TryGetEntity(name, out var entity))
+        {
+            throw new InvalidOperationException($"The widget entity '{name}' is not in the model.");
+        }
+
+        return new EntityMetadata(
+            entity.Name,
+            entity.Label?.TextKey,
+            entity.DisplayField,
+            RecordsPath(application, entity.Name),
+            [.. entity.Fields.Select(field => Field(application, field))]);
+    }
+
+    private static DataSourceMetadata DataSource(ApplicationModel application, string name)
+    {
+        // The compiler resolves every widget data source, so the lookup always succeeds.
+        if (!application.TryGetDataSource(name, out var dataSource))
+        {
+            throw new InvalidOperationException($"The widget data source '{name}' is not in the model.");
+        }
+
+        return new DataSourceMetadata(
+            dataSource.Name,
+            $"/api/apps/{application.Manifest.Name}/data-sources/{dataSource.Name}/rows",
+            dataSource.Entity.Name,
+            [.. dataSource.Parameters.Select(parameter => new DataSourceParameterMetadata(
+                parameter.Name,
+                FieldTypes.Name(parameter.Type),
+                parameter.Required,
+                parameter.Label?.TextKey,
+                parameter.Values,
+                parameter.Target is { } target ? Target(application, target.Name) : null))],
+            dataSource.PageSize,
+            [.. dataSource.Fields.Select(column => new DataSourceColumnMetadata(
+                column.Name,
+                FieldTypes.Name(column.Field.Type),
+                column.Field.Label?.TextKey,
+                column.Field.Values,
+                column.Field.Type == FieldType.Reference
+                    ? new ReferenceTarget(column.Field.Target!.Name, column.Field.TargetDisplayField, RecordsPath(application, column.Field.Target.Name))
+                    : null))]);
+    }
+
+    // A parameter's model holds only its target entity, so the display field comes from that entity.
+    private static ReferenceTarget Target(ApplicationModel application, string entityName)
+    {
+        if (!application.TryGetEntity(entityName, out var entity))
+        {
+            throw new InvalidOperationException($"The parameter target '{entityName}' is not in the model.");
+        }
+
+        return new ReferenceTarget(entity.Name, entity.DisplayField, RecordsPath(application, entity.Name));
     }
 
     private static FieldMetadata Field(ApplicationModel application, FieldModel field) =>

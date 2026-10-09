@@ -8,8 +8,11 @@ the read endpoint, the response and the errors. Parts of this file are built:
 - the read endpoint with `page`, `pageSize`, `sort` and the data source
   parameters
 - `labels` for projected `reference` fields
+- the `table` widget binding, with the data source's schema in page metadata,
+  its columns, paging and sorting
 
-The rest is marked *(planned for M2)*: `aggregate` and the widget binding. Dn refers to
+The rest is marked *(planned for M2)*: `aggregate`, and the filter inputs of
+a bound table. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -329,16 +332,23 @@ The `errors` keys repeat the request's parameter names by design.
 
 ## Widget binding
 
-The widget binding is *(planned for M2)*.
+The table binding is built. Filter inputs and grouped data sources are
+*(planned for M2)*.
 
-- **Widgets.** In M2 only the `table` widget binds to a data source. A widget
-  names an `entity` or a `dataSource`, never both. `entity` stays as shorthand
-  for all records of an entity.
+- **Widgets.** Only the `table` widget binds to a data source. A `form` that
+  names a `dataSource` is `AXC0060`. A widget names an `entity` or a
+  `dataSource`, never both and never neither (`AXC0060`). `entity` stays as
+  shorthand for all records of an entity. A `dataSource` that names no
+  loaded data source is `AXC0059`.
 - **Parameters.** A bound table needs every parameter of its data source to be
-  optional. It shows one filter input per parameter and sends their values
-  from the URL. See [Table widget](frontend.md) for the details.
-- **Form page.** A `formPage` must be a form over the root entity. It is not
-  allowed with an `aggregate`, because a group is not a record.
+  optional, otherwise it is `AXC0060`. It shows one filter input per
+  parameter and sends their values from the URL *(planned for M2)*. Until
+  then it sends no parameter values, so its rows are unfiltered by them. See
+  [Table widget](frontend.md) for the details.
+- **Form page.** A `formPage` must be a form over the root entity
+  (`AXC0022`), because each row carries the id of its root record. It is not
+  allowed with an `aggregate`, because a group is not a record *(planned for
+  M2)*.
 - **Page parameters.** Values that come from navigation wait for the
   navigation bullet of
   [D15](../decisions.md#d15-presentation-model--agreed), which is still

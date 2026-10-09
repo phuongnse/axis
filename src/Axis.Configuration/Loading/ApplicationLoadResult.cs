@@ -27,6 +27,10 @@ namespace Axis.Configuration.Loading;
 /// The <c>name</c> of every <c>page</c> file that was not loaded because of its own errors,
 /// compared ignoring letter case. A reference to one of these names is not reported again either.
 /// </param>
+/// <param name="UnloadedDataSourceNames">
+/// The <c>name</c> of every <c>dataSource</c> file that was not loaded because of its own errors,
+/// compared ignoring letter case. A reference to one of these names is not reported again either.
+/// </param>
 public sealed record ApplicationLoadResult(
     ApplicationManifest? Application,
     IReadOnlyList<EntityResource> Entities,
@@ -39,7 +43,8 @@ public sealed record ApplicationLoadResult(
     IReadOnlyList<ResourceContent> Resources,
     IReadOnlyList<Diagnostic> Diagnostics,
     IReadOnlySet<string> UnloadedEntityNames,
-    IReadOnlySet<string> UnloadedPageNames)
+    IReadOnlySet<string> UnloadedPageNames,
+    IReadOnlySet<string> UnloadedDataSourceNames)
 {
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 }

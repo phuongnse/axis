@@ -27,6 +27,8 @@ public static class DiagnosticCodes
     public const string UnknownWidgetEntity = "AXC0021";
     public const string InvalidFormPage = "AXC0022";
     public const string UnknownNavigationPage = "AXC0023";
+    public const string UnknownWidgetDataSource = "AXC0059";
+    public const string InvalidWidgetBinding = "AXC0060";
     public const string InvalidSitePath = "AXC0024";
     public const string InvalidSiteLocale = "AXC0025";
     public const string DuplicateLocale = "AXC0026";

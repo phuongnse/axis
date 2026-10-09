@@ -71,13 +71,18 @@ flowchart LR
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in
      `available`, and every available locale needs a `text` resource,
-     ignoring letter case, otherwise it is `AXC0025`. A widget's `entity`
-     must name a loaded entity (`AXC0021`). A `formPage` is allowed only on
-     a `table` widget and must name a page whose widget is a `form` over the
-     same entity (`AXC0022`). A navigation entry must name a loaded page
-     (`AXC0023`). Entity and page names resolve ignoring letter case, and a
-     name whose file was not loaded because of its own errors is not
-     reported again. Site titles, navigation labels and page titles join the
+     ignoring letter case, otherwise it is `AXC0025`. A widget names
+     exactly one of `entity` and `dataSource`, otherwise it is `AXC0060` at
+     `/widgets/{i}`. A widget's `entity` must name a loaded entity
+     (`AXC0021`). A `dataSource` is allowed only on a `table` widget, and
+     its data source must have no required parameter (`AXC0060` at
+     `/widgets/{i}/dataSource`). It must name a loaded data source
+     (`AXC0059`). A `formPage` is allowed only on a `table` widget and must
+     name a page whose widget is a `form` over the same entity, or over the
+     root entity of the table's data source (`AXC0022`). A navigation entry
+     must name a loaded page (`AXC0023`). Entity, page and data source names
+     resolve ignoring letter case, and a name whose file was not loaded
+     because of its own errors is not reported again. Site titles, navigation labels and page titles join the
      `AXC0028` check.
    - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
      case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
@@ -125,7 +130,8 @@ flowchart LR
      [data sources](data-sources.md#compile-checks).
 
    The model holds the text resources, each entity's display field, the
-   sites and pages with their entity and page references resolved, the
+   sites and pages with their entity, data source and page references
+   resolved, the
    seeds in path order with their entity resolved, and the data sources in
    path order with their entity, projected fields and parameter targets
    resolved and their filter checked. No model
@@ -277,7 +283,7 @@ sorted by file and then path.
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 | `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
-| `AXC0022` | A widget's `formPage` is set on a `form` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity. Reported at `/widgets/{i}/formPage`. |
+| `AXC0022` | A widget's `formPage` is set on a `form` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source. Reported at `/widgets/{i}/formPage`. |
 | `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
 | `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
 | `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |
@@ -314,6 +320,8 @@ sorted by file and then path.
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 | `AXC0058` | A path in a data source filter takes more than 3 hops, such as `a.b.c.d.name`. Reported at `/filter`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
+| `AXC0060` | A widget names both `entity` and `dataSource`, or neither, reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. |
 
 ## Startup activation
 
@@ -453,14 +461,16 @@ site, and its widgets are its content:
 ```
 
 - A page holds exactly one widget in M1. The widget `type` is `table` or
-  `form`, and both name an `entity`.
+  `form`. A `form` names an `entity`. A `table` names an `entity`, as
+  shorthand for all records of that entity, or a `dataSource`.
 - A `table` widget may name a `formPage`: the page with the `form` widget
   that opens one of its records.
 - The page has no entity or template of its own, so more widgets and a
   layout can be added later without a format change.
-- A `table` widget may name a `dataSource` instead of an `entity`
-  *(planned for M2)*. See [data sources](data-sources.md). The `dataSource`
-  kind is built, but no widget can name one yet.
+- A `table` widget may name a `dataSource` instead of an `entity`, such as
+  `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
+  Its columns are the data source's projected fields. See
+  [widget binding](data-sources.md#widget-binding).
 
 A `seed` holds records with fixed ids for one entity:
 

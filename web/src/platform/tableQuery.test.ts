@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldMetadata } from './site'
-import { parseTableQuery, recordQuery, writeTableQuery } from './tableQuery'
+import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 
 const fields = [
   { name: 'title', type: 'text' },
@@ -25,6 +25,23 @@ describe('parseTableQuery', () => {
     ]) {
       expect(parseTableQuery(new URLSearchParams(search), fields)).toEqual({ page: 1, pageSize: 20, sort: null })
     }
+  })
+})
+
+describe('a table with its own default page size', () => {
+  it('offers that size among the standard ones, in order', () => {
+    expect(tablePageSizes()).toEqual([10, 20, 50, 100])
+    expect(tablePageSizes(10)).toEqual([10, 20, 50, 100])
+    expect(tablePageSizes(25)).toEqual([10, 20, 25, 50, 100])
+  })
+
+  it('reads, falls back to and leaves out that size as the default', () => {
+    expect(parseTableQuery(new URLSearchParams('pageSize=25'), fields, 25).pageSize).toBe(25)
+    expect(parseTableQuery(new URLSearchParams('pageSize=7'), fields, 25).pageSize).toBe(25)
+    expect(recordQuery({ page: 1, pageSize: 25, sort: null }, 25)).toBe('')
+    expect(writeTableQuery(new URLSearchParams(), { page: 1, pageSize: 20, sort: null }, 25).toString()).toBe(
+      'pageSize=20',
+    )
   })
 })
 

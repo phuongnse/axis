@@ -71,6 +71,8 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("table", widget.GetProperty("type").GetString());
         Assert.Equal("ItemForm", widget.GetProperty("formPage").GetString());
 
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
+
         var entity = widget.GetProperty("entity");
         Assert.Equal("Item", entity.GetProperty("name").GetString());
         Assert.Equal(JsonValueKind.Null, entity.GetProperty("labelKey").ValueKind);
@@ -115,6 +117,40 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             fields["parts"].GetRawText());
         Assert.All(fieldList.Where(field => field.GetProperty("name").GetString() != "parts"), field =>
             Assert.Equal(JsonValueKind.Null, field.GetProperty("fields").ValueKind));
+    }
+
+    [Fact]
+    public async Task Page_with_a_table_over_a_data_source_returns_its_schema_and_no_entity()
+    {
+        using var page = await GetJsonAsync("/api/sites/records/pages/itemsbydepartment", HostA);
+
+        var root = page.RootElement;
+        Assert.Equal("ItemsByDepartment", root.GetProperty("name").GetString());
+        var widget = Assert.Single(root.GetProperty("widgets").EnumerateArray().ToList());
+        Assert.Equal("table", widget.GetProperty("type").GetString());
+        Assert.Equal("ItemForm", widget.GetProperty("formPage").GetString());
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("entity").ValueKind);
+
+        var dataSource = widget.GetProperty("dataSource");
+        Assert.Equal("ItemsByDepartment", dataSource.GetProperty("name").GetString());
+        Assert.Equal("/api/apps/RecordsApp/data-sources/ItemsByDepartment/rows", dataSource.GetProperty("rowsPath").GetString());
+        Assert.Equal("Item", dataSource.GetProperty("entity").GetString());
+        Assert.Equal(10, dataSource.GetProperty("pageSize").GetInt32());
+
+        var parameter = Assert.Single(dataSource.GetProperty("parameters").EnumerateArray().ToList());
+        Assert.Equal(
+            """{"name":"nameFilter","type":"text","required":false,"labelKey":null,"values":null,"target":null}""",
+            parameter.GetRawText());
+
+        // Each column has the type and label of the field its path ends at.
+        var columns = dataSource.GetProperty("columns").EnumerateArray().ToList();
+        Assert.Equal(["name", "departmentName", "department"], columns.Select(column => column.GetProperty("name").GetString()));
+        Assert.Equal(
+            """{"name":"departmentName","type":"text","labelKey":null,"values":null,"target":null}""",
+            columns[1].GetRawText());
+        Assert.Equal(
+            """{"name":"department","type":"reference","labelKey":"item.department","values":null,"target":{"entity":"Department","displayField":"name","recordsPath":"/api/apps/RecordsApp/entities/Department/records"}}""",
+            columns[2].GetRawText());
     }
 
     [Fact]

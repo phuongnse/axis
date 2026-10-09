@@ -2,7 +2,7 @@ import { createEvent, fireEvent, render, screen, waitFor, within } from '@testin
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
+import type { EntityWidgetMetadata, FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 
@@ -25,9 +25,10 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
 
 const recordsPath = '/api/apps/E2eApp/entities/Note/records'
 
-const noteWidget: WidgetMetadata = {
+const noteWidget: EntityWidgetMetadata = {
   type: 'table',
   formPage: 'NoteForm',
+  dataSource: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -45,6 +46,26 @@ const noteWidget: WidgetMetadata = {
           recordsPath: '/api/apps/E2eApp/entities/Category/records',
         },
       },
+    ],
+  },
+}
+
+const rowsPath = '/api/apps/E2eApp/data-sources/NoteList/rows'
+
+// A table over a data source whose default page size is 10, which is also offered by default.
+const noteListWidget: WidgetMetadata = {
+  type: 'table',
+  formPage: 'NoteForm',
+  entity: null,
+  dataSource: {
+    name: 'NoteList',
+    rowsPath,
+    entity: 'Note',
+    parameters: [],
+    pageSize: 10,
+    columns: [
+      { name: 'title', type: 'text', labelKey: 'note.title', values: null, target: null },
+      { name: 'departmentName', type: 'text', labelKey: null, values: null, target: null },
     ],
   },
 }
@@ -93,7 +114,7 @@ function search() {
   return screen.getByTestId('search').textContent
 }
 
-function renderWidget(search = '', widget = noteWidget) {
+function renderWidget(search = '', widget: WidgetMetadata = noteWidget) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/notes${search}`]}>
       <TextProvider catalogs={catalogs} development={false}>
@@ -302,11 +323,42 @@ describe('TableWidget', () => {
       type: 'table',
       formPage: null,
       entity: { ...noteWidget.entity, fields: [field('price', 'decimal', null)] },
+      dataSource: null,
     })
 
     const cell = await screen.findByRole('cell', { name: '1250.50' })
     expect(cell).toHaveStyle({ textAlign: 'right' })
     expect(screen.getByRole('columnheader', { name: 'price' })).toBeInTheDocument()
+  })
+
+  it('heads a data source table with its column labels or names and requests its rows path', async () => {
+    const requests = stubRecords(
+      `{"items":[{"id":"${noteId}","values":{"title":"Buy paper","departmentName":"Finance"},"labels":{}}],"page":1,"pageSize":10,"totalCount":1}`,
+    )
+
+    renderWidget('?pageSize=10', noteListWidget)
+
+    const row = await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Title',
+      'departmentName',
+      '',
+    ])
+    expect(within(row).getByText('Finance')).toBeInTheDocument()
+    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+    // The data source's own page size is the default, so the URL and the request leave it out.
+    await waitFor(() => expect(search()).toBe(''))
+    expect(requests()).toEqual([rowsPath])
+  })
+
+  it('keeps a page size other than the data source default in the URL and the rows request', async () => {
+    const requests = stubRecords('{"items":[],"page":2,"pageSize":20,"totalCount":45}')
+
+    renderWidget('?page=2&pageSize=20&sort=-title', noteListWidget)
+
+    await screen.findByText('No records yet.')
+    expect(search()).toBe('?page=2&pageSize=20&sort=-title')
+    expect(requests()).toEqual([`${rowsPath}?page=2&pageSize=20&sort=-title`])
   })
 
   it('shows the empty state when there are no records', async () => {

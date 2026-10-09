@@ -3,8 +3,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useHref, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { formatValue } from './formatValue'
 import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
-import type { WidgetMetadata } from './site'
-import { pageSizes, parseTableQuery, recordQuery, writeTableQuery, type TableQuery, type TableSort } from './tableQuery'
+import type { DataSourceColumn, FieldMetadata, WidgetMetadata } from './site'
+import {
+  parseTableQuery,
+  recordPageSize,
+  recordQuery,
+  tablePageSizes,
+  writeTableQuery,
+  type TableQuery,
+  type TableSort,
+} from './tableQuery'
 import { useText } from './texts'
 
 interface TableWidgetProps {
@@ -30,15 +38,46 @@ function sameSort(a: TableSort | null, b: TableSort | null): boolean {
   return a?.field === b?.field && a?.descending === b?.descending
 }
 
+/** What a table reads, from its entity or its data source. */
+interface TableSource {
+  /** The entity or data source name, for messages. */
+  name: string
+  /** The record API or the data source rows endpoint. */
+  path: string
+  columns: readonly (FieldMetadata | DataSourceColumn)[]
+  defaultPageSize: number
+}
+
+function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
+  if (dataSource) {
+    return {
+      name: dataSource.name,
+      path: dataSource.rowsPath,
+      columns: dataSource.columns,
+      defaultPageSize: dataSource.pageSize,
+    }
+  }
+  // The server sets exactly one of the two.
+  const { name, recordsPath, fields } = entity!
+  return {
+    name,
+    path: recordsPath,
+    // A child collection has no column and cannot be sorted by.
+    columns: fields.filter((field) => field.type !== 'child-collection'),
+    defaultPageSize: recordPageSize,
+  }
+}
+
 /**
- * Shows the records of the widget's entity. Paging and sorting live in the URL as the record API's
- * `page`, `pageSize` and `sort`, so reload, sharing and the back button keep them.
+ * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
+ * carries the id of its root record, so it opens the same form. Paging and sorting live in the URL
+ * as the API's `page`, `pageSize` and `sort`, so reload, sharing and the back button keep them.
  */
 export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { entity, formPage } = widget
+  const { formPage } = widget
   const formPath = formPage && `/${sitePath}/${formPage.toLowerCase()}`
   const createPath = formPath ? `${formPath}/new` : ''
   const createHref = useHref(createPath)
@@ -46,11 +85,14 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
 
-  // A child collection has no column and cannot be sorted by.
-  const fields = useMemo(() => entity.fields.filter((field) => field.type !== 'child-collection'), [entity.fields])
-  const query = useMemo(() => parseTableQuery(searchParams, fields), [searchParams, fields])
-  const requestQuery = recordQuery(query)
-  const requestUrl = `${entity.recordsPath}?${requestQuery}`
+  const { name, path, columns: fields, defaultPageSize } = useMemo(() => tableSource(widget), [widget])
+  const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
+  const query = useMemo(
+    () => parseTableQuery(searchParams, fields, defaultPageSize),
+    [searchParams, fields, defaultPageSize],
+  )
+  const requestQuery = recordQuery(query, defaultPageSize)
+  const requestUrl = `${path}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
@@ -58,11 +100,11 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
 
   // An invalid or out-of-order parameter is rewritten without a history entry.
   useEffect(() => {
-    const canonical = writeTableQuery(searchParams, query)
+    const canonical = writeTableQuery(searchParams, query, defaultPageSize)
     if (canonical.toString() !== searchParams.toString()) {
       setSearchParams(canonical, { replace: true })
     }
-  }, [searchParams, query, setSearchParams])
+  }, [searchParams, query, defaultPageSize, setSearchParams])
 
   // A page past the end becomes the last page once the total is known, so the URL and the
   // pagination agree.
@@ -72,23 +114,24 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     }
     const lastPage = Math.max(1, Math.ceil(totalCount / query.pageSize))
     if (query.page > lastPage) {
-      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }), { replace: true })
+      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }, defaultPageSize), { replace: true })
     }
-  }, [totalCount, searchParams, query, setSearchParams])
+  }, [totalCount, searchParams, query, defaultPageSize, setSearchParams])
 
+  // Data source rows have the shape of records without a version, which the table never reads.
   useEffect(() => {
     const controller = new AbortController()
-    const url = `${entity.recordsPath}?${requestQuery}`
-    fetchRecords(entity.recordsPath, requestQuery, controller.signal)
+    const url = `${path}?${requestQuery}`
+    fetchRecords(path, requestQuery, controller.signal)
       .then((page) => setState({ url, page, failed: false }))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
-          console.warn(`Loading the records of '${entity.name}' failed`, error)
+          console.warn(`Loading the records of '${name}' failed`, error)
           setState({ url, failed: true })
         }
       })
     return () => controller.abort()
-  }, [entity.recordsPath, entity.name, requestQuery])
+  }, [path, name, requestQuery])
 
   const columns = useMemo<TableColumnsType<RecordItem>>(() => {
     const sortOrder = (field: string) =>
@@ -126,7 +169,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     const pageSize = pagination.pageSize ?? query.pageSize
     const reset = !sameSort(sort, query.sort) || pageSize !== query.pageSize
     const next: TableQuery = { page: reset ? 1 : (pagination.current ?? 1), pageSize, sort }
-    setSearchParams(writeTableQuery(searchParams, next))
+    setSearchParams(writeTableQuery(searchParams, next, defaultPageSize))
   }
 
   return (
@@ -162,7 +205,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
             current: query.page,
             pageSize: query.pageSize,
             total: state.page?.totalCount ?? 0,
-            pageSizeOptions: pageSizes,
+            pageSizeOptions: sizes,
             showSizeChanger: true,
           }}
           onChange={onChange}

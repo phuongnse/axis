@@ -25,6 +25,8 @@ public sealed class PresentationCompilerTests
           "texts": { "site.title": "Sales", "nav.orders": "Orders", "orders.title": "Orders", "orderForm.title": "Order", "customerForm.title": "Customer" } }
         """;
 
+    private const string OrderListId = "77777777-7777-4777-8777-777777777771";
+
     private const string OrdersWidget = """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""";
 
     [Fact]
@@ -75,6 +77,110 @@ public sealed class PresentationCompilerTests
         Assert.Equal(
             (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Table_bound_to_a_data_source_compiles_to_a_widget_with_the_data_source_and_no_entity()
+    {
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList())
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "orderList", "formPage": "OrderForm" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var orders = Assert.Single(result.Model.Pages, page => page.Name == "Orders");
+        Assert.Equal(
+            new WidgetModel(
+                WidgetType.Table,
+                null,
+                new PageReference(Guid.Parse("55555555-5555-4555-8555-555555555552"), "OrderForm"),
+                new DataSourceReference(Guid.Parse(OrderListId), "OrderList")),
+            Assert.Single(orders.Widgets));
+    }
+
+    [Fact]
+    public void Widget_over_an_unknown_data_source_is_reported_at_its_data_source()
+    {
+        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "Missing" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownWidgetDataSource, "pages/orders.json", "/widgets/0/dataSource"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'Missing'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Widget_over_a_data_source_file_that_failed_its_schema_reports_only_that_file()
+    {
+        using var folder = Folder()
+            .With("data-sources/order-list.json", $$"""{ "id": "{{OrderListId}}", "kind": "dataSource", "name": "OrderList", "formatVersion": 1, "entity": "Order" }""")
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "data-sources/order-list.json"), (diagnostic.Code, diagnostic.File));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "type": "table", "entity": "Order", "dataSource": "OrderList" }""", "/widgets/0")]
+    [InlineData("""{ "type": "table" }""", "/widgets/0")]
+    [InlineData("""{ "type": "form", "dataSource": "OrderList" }""", "/widgets/0/dataSource")]
+    public void Widget_naming_both_or_neither_of_entity_and_data_source_or_a_form_over_a_data_source_is_reported(string widget, string path)
+    {
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList())
+            .With("pages/orders.json", Page("Orders", widget));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "pages/orders.json", path),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Table_over_a_data_source_with_a_required_parameter_is_reported_naming_the_parameter()
+    {
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList(
+                """, "parameters": [{ "name": "numberFilter", "type": "text", "required": true }, { "name": "optional", "type": "text" }] """))
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "pages/orders.json", "/widgets/0/dataSource"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'numberFilter'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Form_page_of_a_data_source_table_over_another_entity_than_its_root_is_reported()
+    {
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList())
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList", "formPage": "CustomerForm" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'Order'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
 
@@ -233,5 +339,11 @@ public sealed class PresentationCompilerTests
         $$"""
         { "id": "{{id}}", "kind": "page", "name": "{{name}}", "formatVersion": 1,
           "title": { "textKey": "{{titleKey}}" }, "widgets": [ {{widget}} ] }
+        """;
+
+    private static string OrderList(string extra = "") =>
+        $$"""
+        { "id": "{{OrderListId}}", "kind": "dataSource", "name": "OrderList", "formatVersion": 1, "entity": "Order",
+          "fields": [ { "name": "number", "path": "number" } ]{{extra}} }
         """;
 }

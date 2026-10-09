@@ -18,13 +18,51 @@ public sealed record SiteNavigationItem(string Page, string LabelKey);
 public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<WidgetMetadata> Widgets);
 
 /// <summary>
-/// One widget. <see cref="FormPage"/> is set only on a table widget that names the page holding the
-/// form for its records.
+/// One widget. Exactly one of <see cref="Entity"/> and <see cref="DataSource"/> is set: the widget
+/// shows all records of an entity, or the rows of a data source. <see cref="FormPage"/> is set only
+/// on a table widget that names the page holding the form for its records.
 /// </summary>
-public sealed record WidgetMetadata(string Type, string? FormPage, EntityMetadata Entity);
+public sealed record WidgetMetadata(string Type, string? FormPage, EntityMetadata? Entity, DataSourceMetadata? DataSource);
 
 /// <summary>The entity a widget shows, with its fields and the path of its record API.</summary>
 public sealed record EntityMetadata(string Name, string? LabelKey, string? DisplayField, string RecordsPath, IReadOnlyList<FieldMetadata> Fields);
+
+/// <summary>
+/// The data source a table widget shows: the path of its rows endpoint, its root entity, its
+/// parameters, its default page size and its projected columns in declaration order.
+/// </summary>
+public sealed record DataSourceMetadata(
+    string Name,
+    string RowsPath,
+    string Entity,
+    IReadOnlyList<DataSourceParameterMetadata> Parameters,
+    int PageSize,
+    IReadOnlyList<DataSourceColumnMetadata> Columns);
+
+/// <summary>
+/// One typed input of a data source's filter. <see cref="Values"/> is set for enum and
+/// <see cref="Target"/> for reference.
+/// </summary>
+/// <param name="Type">The type name as written in data source files, such as <c>date-time</c>.</param>
+public sealed record DataSourceParameterMetadata(
+    string Name,
+    string Type,
+    bool Required,
+    string? LabelKey,
+    IReadOnlyList<string>? Values,
+    ReferenceTarget? Target);
+
+/// <summary>
+/// One projected column of a data source. Its type, label key, values and target are those of the
+/// field its path ends at. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference.
+/// </summary>
+/// <param name="Name">The projected name: the column's key in a row.</param>
+public sealed record DataSourceColumnMetadata(
+    string Name,
+    string Type,
+    string? LabelKey,
+    IReadOnlyList<string>? Values,
+    ReferenceTarget? Target);
 
 /// <summary>
 /// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> is for
