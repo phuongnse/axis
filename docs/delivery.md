@@ -46,10 +46,6 @@ them.
 
 - **Profiles go by risk: `standard` and `hard`.** The more a mistake would
   cost, the stronger the profile. `standard` is the default.
-- **Docs changes are not a lighter class.** Docs are the source of truth, and
-  every plan, implement and review round reads them. A wrong statement in a
-  doc spreads into the work that relies on it, so a docs change runs on
-  `standard` at least.
 - **Plan and review are at least as strong as implement.** The plan is the
   contract and the review is the last check before the owner. In every
   profile, review runs on a different model from implement.

@@ -49,7 +49,7 @@
   "default_profile": "standard",
   "profiles": {
     "standard": {
-      "when": "Anything that is not hard, including documentation and delivery process changes, because every plan, implement and review round relies on the docs: a clear request that follows a pattern the platform already has.",
+      "when": "Anything that is not hard: a clear request that follows a pattern the platform already has.",
       "stages": {
         "plan": {
           "model": "claude-opus-5-5"
