@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Data.Records;
 
@@ -22,8 +23,10 @@ public static class RecordQueries
 
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> records, ordered by the
-    /// sort field and then by id ascending, or by id alone without a sort, and counts every record
-    /// of the entity. A page past the last one has no items.
+    /// sort field and then by id ascending, or by id alone without a sort, and counts the records
+    /// that match. A page past the last one has no items. A non-empty <paramref name="search"/>
+    /// keeps only the records whose display field contains it, ignoring case, with no wildcard
+    /// characters; the text is a parameter. An entity without a display field ignores it.
     /// </summary>
     public static async Task<RecordPage> ListAsync(
         NpgsqlConnection connection,
@@ -31,6 +34,7 @@ public static class RecordQueries
         int page,
         int pageSize,
         RecordSort? sort,
+        string? search,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -39,20 +43,34 @@ public static class RecordQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
         var table = Table(entity);
+        var row = EntityNaming.Quote(RowAlias);
+        var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
+        var where = filtered
+            ? $" WHERE strpos(lower({row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}), lower(@search)) > 0"
+            : "";
         long totalCount;
-        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table}", connection))
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
         {
+            if (filtered)
+            {
+                count.Parameters.Add(SearchParameter(search!));
+            }
+
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        var row = EntityNaming.Quote(RowAlias);
         var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
         var order = sort is null
             ? $"{id} ASC"
             : $"{row}.{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
         await using var command = new NpgsqlCommand(
-            $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)} ORDER BY {order} LIMIT @limit OFFSET @offset",
+            $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
             connection);
+        if (filtered)
+        {
+            command.Parameters.Add(SearchParameter(search!));
+        }
+
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -65,6 +83,9 @@ public static class RecordQueries
 
         return new RecordPage(items, totalCount);
     }
+
+    private static NpgsqlParameter SearchParameter(string search) =>
+        new("search", NpgsqlDbType.Text) { Value = search };
 
     /// <summary>
     /// Reads the record with <paramref name="id"/> and the rows of its child collections, or
