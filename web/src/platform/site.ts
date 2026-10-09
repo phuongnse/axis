@@ -56,6 +56,8 @@ export interface FieldMetadata {
   labelKey: string | null
   required: boolean
   unique: boolean
+  /** The server computes the value on every write. The form shows it read-only and never sends it. */
+  computed: boolean
   maxLength: number | null
   precision: number | null
   scale: number | null

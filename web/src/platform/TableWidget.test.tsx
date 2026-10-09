@@ -13,6 +13,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     labelKey,
     required: false,
     unique: false,
+    computed: false,
     maxLength: null,
     precision: null,
     scale: null,

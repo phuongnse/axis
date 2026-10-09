@@ -7,9 +7,10 @@ diagnostics and the length, depth and node limits are built in
 bare field names, every operator and every [function](#functions) except the
 aggregates, and the translation of the [SQL subset](#sql-subset). Sections
 marked *(planned for M2)* are not built yet. Entity
-[validations](configuration.md#entity-logic) are the first resource file use:
-the compiler type-checks them and the record API evaluates them. Data source
-[filters](data-sources.md#resource-shape) are the second: the compiler checks
+[validations](configuration.md#entity-logic) and
+[computed fields](configuration.md#entity-logic) are resource file uses: the
+compiler type-checks them and the record API evaluates them. Data source
+[filters](data-sources.md#resource-shape) are another: the compiler checks
 and translates them, and the data source endpoint runs them as SQL. Other uses
 come with the issues that build them. Dn
 refers to
@@ -239,8 +240,8 @@ resolves them against the fields it is given, ignoring letter case.
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
 - **Bare name.** A bare name is a field of the current record. In a data
-  source filter it can also be a data source parameter. When a parameter and a
-  field share a name, the data source check reports it.
+  source filter it can also be a data source parameter *(planned for M2)*.
+  When a parameter and a field share a name, the data source check reports it.
 - **Path.** A path such as `department.name` follows a reference field to a
   field of the target record. A path may take at most 3 hops. A `null`
   reference along the path makes the result `null`.
@@ -253,9 +254,11 @@ resolves them against the fields it is given, ignoring letter case.
   [Resource file shape](configuration.md#resource-file-shape)). A rule name
   may not reuse a built-in function name.
 - **Scope in a computed field.** The expression sees the record's own fields
-  and its child collections, and no reference path.
+  and its child collections, and no reference path. For now it sees only the
+  entity's own fields that are not computed. Another computed field, itself
+  included, is an unknown name. Child collections come with aggregates.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
-  data source parameters as plain names.
+  data source parameters as plain names. Parameters are *(planned for M2)*.
 
 ## Functions
 
@@ -435,8 +438,8 @@ Rules:
 
 ## Writing expressions in resource files
 
-Entity validations and data source filters are written this way. The other
-uses are *(planned for M2)*.
+Entity validations, computed fields and data source filters are written this
+way. The other uses are *(planned for M2)*.
 
 An expression is one JSON string:
 

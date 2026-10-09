@@ -167,9 +167,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
 
 ## Child tables and computed columns
 
-Child tables are built, and their planning rules are in
-[Schema planning](#schema-planning). Computed columns are *(planned for M2)*
-(D17).
+Child tables and computed columns are built (D17). The planning rules of
+child tables are in [Schema planning](#schema-planning).
 
 - **Child table.** The entity that a `child-collection` field names has a
   table with the usual names. Besides `id` (`uuid`) and its field columns, it
@@ -184,10 +183,12 @@ Child tables are built, and their planning rules are in
 - **No version.** A child table has no `version` column. Its rows live under
   the owner's version, and a write to the rows increments the owner's
   `version`.
-- **Computed column** *(planned for M2)*. A computed field is an ordinary
+- **Computed column.** A computed field is an ordinary
   column of its type. It is never `NOT NULL`, because a computed field cannot
   be `required`. It is written in the same transaction as the record, and for
   a child row before the owner's computed fields.
-- **Existing rows** *(planned for M2)*. A computed field added to a table that
+- **Existing rows.** A computed field added to a table that
   has rows leaves them `NULL`. Each record gets its value the next time it is
-  written.
+  written, and an update with no values is enough. Activation does not
+  backfill the rows: it would evaluate every row inside the provisioning
+  transaction, and one run-time error would stop the activation.

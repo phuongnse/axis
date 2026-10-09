@@ -9,6 +9,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     labelKey: null,
     required: false,
     unique: false,
+    computed: false,
     maxLength: null,
     precision: null,
     scale: null,

@@ -47,9 +47,10 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
 
         Assert.Equal(id, read.RootElement.GetProperty("id").GetString());
         Assert.Equal(1, read.RootElement.GetProperty("version").GetInt64());
+        // The read adds the computed total after the fields the body set.
         using var expected = JsonDocument.Parse(values);
         Assert.Equal(
-            expected.RootElement.EnumerateObject().Select(property => (property.Name, property.Value.GetRawText())),
+            [.. expected.RootElement.EnumerateObject().Select(property => (property.Name, property.Value.GetRawText())), ("total", "3751.50")],
             read.RootElement.GetProperty("values").EnumerateObject().Select(property => (property.Name, property.Value.GetRawText())));
     }
 

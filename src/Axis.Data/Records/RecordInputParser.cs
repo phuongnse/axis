@@ -195,6 +195,13 @@ public static partial class RecordInputParser
                 continue;
             }
 
+            // The server computes the value on every write, so a body never sets it, not even to null.
+            if (field.IsComputed)
+            {
+                AddError(errors, propertyPointer, Messages.Computed);
+                continue;
+            }
+
             if (field.Type == FieldType.ChildCollection)
             {
                 if (!ReadRows(property.Value, propertyPointer, field, application, rows!, errors))
@@ -342,12 +349,30 @@ public static partial class RecordInputParser
             return Messages.Decimal;
         }
 
+        // Values are never rounded, and the limits are checked before any text is built.
+        var number = JsonNumberText.Parse(element.GetRawText());
+        if (CheckDigits(field, number) is { } message)
+        {
+            return message;
+        }
+
+        value = JsonNumberText.Render(number);
+        return null;
+    }
+
+    /// <summary>
+    /// Checks that a decimal number fits the field's precision and scale. Returns the error
+    /// message, or null when it fits. <paramref name="rawNumber"/> is a JSON number.
+    /// </summary>
+    internal static string? CheckDecimalText(FieldModel field, string rawNumber) =>
+        CheckDigits(field, JsonNumberText.Parse(rawNumber));
+
+    private static string? CheckDigits(FieldModel field, JsonNumber number)
+    {
         var (maxIntegerDigits, maxFractionDigits) = field.Precision is { } precision
             ? (precision - (field.Scale ?? 0), field.Scale ?? 0)
             : (UnboundedIntegerDigits, UnboundedFractionDigits);
 
-        // Values are never rounded, and the limits are checked before any text is built.
-        var number = JsonNumberText.Parse(element.GetRawText());
         if (number.IntegerDigits > maxIntegerDigits)
         {
             return Messages.IntegerDigits(maxIntegerDigits);
@@ -358,7 +383,6 @@ public static partial class RecordInputParser
             return Messages.FractionDigits(maxFractionDigits);
         }
 
-        value = JsonNumberText.Render(number);
         return null;
     }
 

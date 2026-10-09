@@ -118,7 +118,10 @@ flowchart LR
    type-checked against the entity's own fields, and must be boolean. A
    problem in the expression is reported with its
    [expression diagnostic](expressions.md#diagnostics) code at
-   `/validations/{i}/expression`. A `field` that names no field of the
+   `/validations/{i}/expression`. The expression of each
+   [computed field](#entity-logic) is parsed and type-checked against the
+   entity's fields that are not computed, and must give the field's type.
+   A problem in it is reported the same way at `/fields/{i}/expression`. A `field` that names no field of the
    entity, ignoring letter case, is `AXC0052` at `/validations/{i}/field`,
    and the `message` joins the `AXC0028` check. A validation with an error
    produces no model. [Data source](data-sources.md#compile-checks) filters
@@ -228,7 +231,7 @@ sorted by file and then path.
 | `AXC0010` | The file could not be read, for example because access is denied. |
 | `AXC0011` | Another field of the same entity already uses this `name`, ignoring letter case. |
 | `AXC0012` | A reference or child collection field's `target` names no loaded entity. Not reported when the target names an entity file in the folder that was not loaded because of its own errors. |
-| `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. |
+| `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. This includes `required` on a computed field, and an `expression` on a `reference` or `child-collection` field. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference or child collection, `values` on an enum. |
 | `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
 | `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
@@ -307,16 +310,21 @@ development or E2E server serves a real application without a separate step.
     A record that is identical is not written, and its version stays the
     same. Fields the seed does not declare keep their stored values, and a
     record removed from the seed file stays in the table. A `null` value
-    clears the stored field.
+    clears the stored field. Only declared values are compared, so a
+    computed value alone never causes a write.
 
   Each record goes through the record input parser as a create body, so the
   record API's rules apply, and a synced seed still needs every required
   field. Every record is parsed before any write, and every invalid value is
-  `AXC0033` at `/records/{i}/values/<field>`. Seed records are not run
+  `AXC0033` at `/records/{i}/values/<field>`, as is a value for a
+  [computed field](#entity-logic). Seed records are not run
   through the entity's [validations](#entity-logic) yet. Then all inserts and updates of
   the folder run in one transaction, seed files in path order and records in
   file order, so a reference value must name an existing record or one
-  inserted earlier in the same run. The first record that storage refuses,
+  inserted earlier in the same run. Each write computes the record's
+  computed fields, an update from the stored record with the declared
+  values on top. A value that cannot be computed is `AXC0033` at
+  `/records/{i}/values/<field>`, and the transaction is rolled back. The first record that storage refuses,
   for a missing reference, a duplicate unique value or a schema conflict, is
   reported as `AXC0033`, and the transaction is rolled back. Any `AXC0033`
   stops the start like any other diagnostic, and the release stays active.
@@ -473,7 +481,7 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` *(planned for M2)* |
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `text` | yes | yes | 1..10485760 | | | | | yes |
 | `integer` | yes | yes | | | | | | yes |
@@ -493,14 +501,16 @@ is `AXC0013`.
   allows no other type-specific property. It has no `required`, because a
   missing collection means no rows, and no `unique`. Setting either, even to
   `false`, is `AXC0013`.
-- `expression` *(planned for M2)* makes the field a computed field. It is not
-  allowed with `required`. See [Entity logic](#entity-logic).
+- `expression` makes the field a computed field. `required` on a computed
+  field is `AXC0013` at `/fields/{i}/required`, and an `expression` on a
+  `reference` or `child-collection` field is `AXC0013` at
+  `/fields/{i}/expression`. See [Entity logic](#entity-logic).
 
 ## Entity logic
 
 This section adds validations, computed fields and child collections to an
-entity (D17). Child collection fields, their child tables and validations are
-built. Computed fields and the `expression` property are *(planned for M2)*.
+entity (D17). Child collection fields, their child tables, validations and
+computed fields over the record's own fields are built.
 Expressions use the syntax of the [expression language](expressions.md), and
 diagnostic codes come with the issues that build each check. A validation
 cannot name a `child-collection` field in its expression yet, because only
@@ -579,16 +589,24 @@ compile today.
   child entity run on each row the body sends. See
   [the record API](record-api.md#child-rows-computed-fields-and-validations).
 - **Computed fields.** A field with an `expression` is a computed field.
-  - The expression type must match the field's type.
+  - The expression type must match the field's type, under the
+    [result type rule](expressions.md#types).
   - The type must be a scalar type. A `reference` or a `child-collection`
     cannot be computed.
   - `required` is not allowed. `unique`, `maxLength`, `precision`, `scale` and
     `values` keep their usual meaning, because they describe the column that
     stores the value.
   - It reads only the record's own fields and its child rows, never a
-    reference path.
+    reference path. For now it reads only the entity's own fields that are
+    not computed. Naming a computed field, itself included, is `AXC0046`.
+    Reading child rows needs aggregates, which come later.
   - The rows of a child collection are computed before the owner.
-  - Clients cannot write it. See
+  - Clients cannot write it. A body that sets it, even to `null`, is a `400`
+    at its pointer with the message "Cannot be set.". A run-time error is a
+    `400` at its pointer with "Could not be computed.". A value that does not
+    fit the column gets the message a body value would get. See
+    [the record API](record-api.md#child-rows-computed-fields-and-validations)
+    and
     [Child tables and computed columns](storage.md#child-tables-and-computed-columns).
 - **Child collections.** The field type `child-collection` needs a `target`
   that names the child entity. Its rows are read and written only through the

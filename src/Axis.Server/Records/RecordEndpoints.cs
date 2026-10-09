@@ -13,9 +13,10 @@ namespace Axis.Server.Records;
 /// names no active application, entity or record is a 404 before the query or body is checked; a
 /// child entity is no entity here. A create or update writes the record and its child rows in one
 /// transaction.
-/// A body is checked in order: content type (415), then body (400), then the entity's
-/// validations on the record as it will be stored (400), then storage (404, 409). An update of an
-/// entity with validations reads the stored record first, so an unknown record is a 404 there.
+/// A body is checked in order: content type (415), then body (400), then the computed fields of
+/// the record as it will be stored and of its rows (400), then the entity's validations on that
+/// record (400), then storage (404, 409). An update of an entity with computed fields or
+/// validations reads the stored record first, so an unknown record is a 404 there.
 /// A delete is 204, or 404 or 409 from storage. The problem titles never contain text from the
 /// request.
 /// </summary>
@@ -137,7 +138,13 @@ internal static class RecordEndpoints
         }
 
         var input = parsed.Input!;
-        if (RecordValidator.ValidateCreate(model, input.Values, input.Rows) is { } failures)
+        var computed = RecordComputer.ComputeCreate(model, input.Values, input.Rows);
+        if (computed.Errors is { } computeErrors)
+        {
+            return Results.ValidationProblem(computeErrors);
+        }
+
+        if (RecordValidator.ValidateCreate(model, computed.Values, computed.Rows) is { } failures)
         {
             return Results.ValidationProblem(failures);
         }
@@ -146,7 +153,7 @@ internal static class RecordEndpoints
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
-            result = await RecordCommands.CreateAsync(connection, application!, model, input.Values, input.Rows, cancellationToken: cancellationToken);
+            result = await RecordCommands.CreateAsync(connection, application!, model, computed.Values, computed.Rows, cancellationToken: cancellationToken);
             await CompleteAsync(transaction, result, cancellationToken);
         }
 
@@ -191,9 +198,10 @@ internal static class RecordEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
 
         // The stored record is read outside the write transaction. The client read its version
-        // earlier, so a write that passes the version check finds the record as validated here.
+        // earlier, so a write that passes the version check finds the record as computed and
+        // validated here.
         Record? stored = null;
-        if (model.Validations.Count > 0)
+        if (model.Validations.Count > 0 || model.HasComputedFields)
         {
             stored = await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken);
             if (stored is null)
@@ -202,7 +210,13 @@ internal static class RecordEndpoints
             }
         }
 
-        if (RecordValidator.ValidateUpdate(model, stored, input.Values, input.Rows) is { } failures)
+        var computed = RecordComputer.ComputeUpdate(model, stored, input.Values, input.Rows);
+        if (computed.Errors is { } computeErrors)
+        {
+            return Results.ValidationProblem(computeErrors);
+        }
+
+        if (RecordValidator.ValidateUpdate(model, stored, computed.Values, computed.Rows) is { } failures)
         {
             return Results.ValidationProblem(failures);
         }
@@ -210,7 +224,7 @@ internal static class RecordEndpoints
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
-            result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, input.Values, input.Rows, cancellationToken);
+            result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
             await CompleteAsync(transaction, result, cancellationToken);
         }
 

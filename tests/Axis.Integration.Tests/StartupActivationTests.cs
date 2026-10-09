@@ -223,6 +223,58 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Synced_seed_computes_its_computed_field_from_the_declared_and_the_stored_values()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        const string SummaryField = """{ "name": "summary", "type": "text", "expression": "if(done == true, concat(title, ' (done)'), title)" }""";
+        using var folder = ApplicationFolder(TitleField, DoneField, SummaryField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First" }""", """{ "title": "Second" }""", sync: true));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
+        {
+            using var client = factory.CreateClient();
+            Assert.Equal("First", await GetSummaryAsync(client, _firstSeedId));
+
+            using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}")
+            {
+                Content = JsonContent.Create(new { version = 1, values = new { done = true } }),
+            };
+            request.Headers.Host = HostA;
+            using var response = await client.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("First (done)", await GetSummaryAsync(client, _firstSeedId));
+        }
+
+        // The seed does not declare done, so the update computes the summary from the stored value.
+        folder.With("seeds/notes.json", SeedFile("""{ "title": "Renamed" }""", """{ "title": "Second" }""", sync: true));
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
+        {
+            using var client = factory.CreateClient();
+            Assert.Equal("Renamed (done)", await GetSummaryAsync(client, _firstSeedId));
+            Assert.Equal("Second", await GetSummaryAsync(client, _secondSeedId));
+        }
+    }
+
+    [Fact]
+    public async Task Seed_value_that_cannot_be_computed_stops_the_start_at_the_computed_field_and_inserts_no_seed_record()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        const string SizeField = """{ "name": "size", "type": "integer", "expression": "length(title) * 1000000000000000000" }""";
+        using var folder = ApplicationFolder(TitleField, DoneField, SizeField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "A" }""", """{ "title": "Much too long" }"""));
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(a, b, folder.Path, logs);
+
+        Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.InvalidSeedValue, StringComparison.Ordinal)
+            && entry.Contains("seeds/notes.json", StringComparison.Ordinal)
+            && entry.Contains("/records/1/values/size", StringComparison.Ordinal));
+        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_noteId))}"));
+    }
+
+    [Fact]
     public async Task Seed_without_sync_ignores_a_changed_file_value()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
@@ -339,6 +391,17 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         var values = record.GetProperty("values");
         bool? done = values.TryGetProperty("done", out var value) && value.ValueKind != JsonValueKind.Null ? value.GetBoolean() : null;
         return (values.GetProperty("title").GetString(), done, record.GetProperty("version").GetInt64());
+    }
+
+    /// <summary>Reads the computed <c>summary</c> of a <c>Note</c> record in tenant A.</summary>
+    private async Task<string?> GetSummaryAsync(HttpClient client, Guid id)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/apps/{_name}/entities/Note/records/{id}");
+        request.Headers.Host = HostA;
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var record = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return record.GetProperty("values").GetProperty("summary").GetString();
     }
 
     private async Task<ActiveRelease?> ActiveAsync(string connectionString)

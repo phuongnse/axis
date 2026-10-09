@@ -46,6 +46,10 @@ internal static class RecordInputMessages
 
     public const string NotEvaluable = "Cannot be evaluated exactly.";
 
+    public const string Computed = "Cannot be set.";
+
+    public const string NotComputable = "Could not be computed.";
+
     public static string MaxLength(int maxLength) =>
         string.Create(CultureInfo.InvariantCulture, $"Must be at most {maxLength} characters.");
 

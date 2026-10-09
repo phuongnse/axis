@@ -12,7 +12,8 @@
     { "name": "orderedAt", "type": "date-time" },
     { "name": "status", "type": "enum", "values": ["open", "closed"] },
     { "name": "parts", "type": "child-collection", "target": "ItemPart" },
-    { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "item.department" } }
+    { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "item.department" } },
+    { "name": "total", "type": "decimal", "precision": 20, "scale": 2, "expression": "quantity * price" }
   ],
   "validations": [
     { "expression": "quantity is null or quantity > 0", "message": { "textKey": "item.quantityPositive" }, "field": "quantity" },

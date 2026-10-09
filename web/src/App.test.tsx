@@ -93,6 +93,7 @@ const noteEntity: EntityMetadata = {
       labelKey: null,
       required: true,
       unique: false,
+      computed: false,
       maxLength: 200,
       precision: null,
       scale: null,
