@@ -16,6 +16,12 @@ public static class ExpressionLimits
     public const int MaxNodes = 500;
 
     /// <summary>
+    /// The most syntax nodes a data source filter may have once every rule body it calls is
+    /// inlined, counting each body once per call.
+    /// </summary>
+    public const int MaxInlinedNodes = 2000;
+
+    /// <summary>
     /// The most reference fields a path may go through. In <c>department.manager.name</c> each
     /// <c>.</c> is one hop, so that path takes 2.
     /// </summary>

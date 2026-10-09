@@ -130,8 +130,8 @@ flowchart LR
      entity field's, with the same codes (`AXC0012`, `AXC0013`, `AXC0014`,
      `AXC0030`, `AXC0040`) at `/parameters/{i}/...`, and its label joins the
      `AXC0028` check. The `filter` is parsed, type-checked as a boolean over
-     the entity's fields, the parameters and paths through `reference`
-     fields, with no rules, and translated to SQL. Its first problem is
+     the entity's fields, the parameters, paths through `reference`
+     fields and the named rules, and translated to SQL. Its first problem is
      reported at `/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
      outside the SQL subset is `AXC0053`, including an aggregate over a
@@ -169,7 +169,8 @@ flowchart LR
    - **Rules.** Each [rule](#resource-file-shape)'s expression is parsed and
      type-checked against its own parameters, and must give its
      `resultType`. A problem in it is reported at `/expression` of the rule
-     file. A validation may call a rule, and each call is checked for the
+     file. A validation or a data source filter may call a rule, and each
+     call is checked for the
      rule's name, its argument count and each argument's type, with the
      codes a function call gets (`AXC0050`, `AXC0051`, `AXC0047`). Rules
      that call each other in a cycle, such as A → B → A, are `AXC0055`
@@ -180,9 +181,9 @@ flowchart LR
      is a built-in [function](expressions.md#functions) name, ignoring letter
      case, is `AXC0057` at `/name`. A rule whose own expression has an
      error, or that is in a cycle, is still known by its parameters and
-     result type, so a call to it gets no further diagnostic. Only
-     validations can call rules for now, and only outside an aggregate's
-     item expression. In a computed field, a data source filter or an item
+     result type, so a call to it gets no further diagnostic. Validations
+     and data source filters can call rules, but only outside an
+     aggregate's item expression. In a computed field or an item
      expression, a rule call is still `AXC0050`.
 4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
@@ -328,7 +329,7 @@ sorted by file and then path.
 | `AXC0050` | An expression calls a function or rule that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
 | `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)`, `sum(lineItems)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
 | `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
-| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)`, an aggregate such as `count(lines)` or a `date('…')` text that is not valid. Reported at `/filter`, with the character position of the operator or the call in the message. See [SQL subset](expressions.md#sql-subset). |
+| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)`, an aggregate such as `count(lines)`, a `date('…')` text that is not valid, or a call to a rule whose expression uses `lower`. So does a filter whose rule calls inline to more than 2,000 syntax nodes. Reported at `/filter`, with the character position of the operator or the call in the message. A message about a rule call names the rule the filter calls. See [SQL subset](expressions.md#sql-subset). |
 | `AXC0054` | A data source parameter's `name` is also a field of the data source's entity, is `page`, `pageSize` or `sort`, or is already used by an earlier parameter of the same data source, all ignoring letter case. Reported at `/parameters/{i}/name`. |
 | `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
@@ -519,9 +520,9 @@ A `seed` holds records with fixed ids for one entity:
   another seed's records sorts after it.
 
 A `rule` resource holds a named expression with typed parameters and a
-result type. A validation can call it (see
+result type. A validation or a data source filter can call it (see
 [Expression language](expressions.md#names-and-references)). Calls from
-computed fields and data source filters come later:
+computed fields come later:
 
 ```json
 {
@@ -551,6 +552,9 @@ computed fields and data source filters come later:
   validation. Every argument is evaluated, even when one is `null`, and the
   rule's steps count against the caller's
   [step budget](expressions.md#cost-bounds).
+- A data source filter's SQL inlines the rule's expression in place of the
+  call, instead of running it. The expression must then be in the
+  [SQL subset](expressions.md#sql-subset).
 
 ## Entity field types and constraints
 

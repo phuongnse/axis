@@ -11,9 +11,10 @@ namespace Axis.Configuration.Compilation;
 /// letter case. When a child lookup is given, each child collection whose child entity it finds
 /// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
-/// are given, which for now is the top level of a validation. A data source scope adds the data
-/// source's parameters after the fields, has no rules, and resolves paths through reference fields
-/// to the target entity's fields. No other scope resolves paths.
+/// are given, which for now is the top level of a validation and a data source filter. A data
+/// source scope adds the data source's parameters after the fields, has the named rules it is
+/// given, and resolves paths through reference fields to the target entity's fields. No other
+/// scope resolves paths.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -61,10 +62,13 @@ public static class ExpressionScopes
     /// <summary>
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path
     /// through a reference field resolves to a field of the entity <paramref name="findEntity"/>
-    /// returns for the target's name.
+    /// returns for the target's name. The filter can call the named <paramref name="rules"/>.
     /// </summary>
     public static ExpressionScope ForDataSource(
-        IEnumerable<FieldModel> fields, IEnumerable<DataSourceParameterModel> parameters, Func<string, EntityModel?> findEntity)
+        IEnumerable<FieldModel> fields,
+        IEnumerable<DataSourceParameterModel> parameters,
+        Func<string, EntityModel?> findEntity,
+        IEnumerable<ExpressionRule>? rules = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(parameters);
@@ -75,7 +79,7 @@ public static class ExpressionScopes
                 .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
                     parameter.Name, parameter.Type, parameter.Values, parameter.Target?.Name))),
             ],
-            rules: null,
+            rules,
             collections: null,
             (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null);
     }
@@ -84,12 +88,14 @@ public static class ExpressionScopes
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path
     /// through a reference field resolves to a field of the entity <paramref name="findEntity"/>
     /// returns for the target's name. The child collections are in it too, so that the SQL
-    /// translation reports an aggregate as outside the subset.
+    /// translation reports an aggregate as outside the subset. The filter can call the named
+    /// <paramref name="rules"/>.
     /// </summary>
     internal static ExpressionScope ForDataSource(
         IEnumerable<FieldDefinition> fields,
         IEnumerable<DataSourceParameterDefinition> parameters,
-        Func<string, EntityResource?> findEntity)
+        Func<string, EntityResource?> findEntity,
+        IEnumerable<ExpressionRule>? rules = null)
     {
         var all = fields.ToList();
         return Build(
@@ -98,7 +104,7 @@ public static class ExpressionScopes
                 .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
                     parameter.Name, FieldTypes.Parse(parameter.Type), parameter.Values, parameter.Target))),
             ],
-            rules: null,
+            rules,
             CollectionsOf(all, findEntity),
             (target, name) => findEntity(target)?.Fields
                 .FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)) is { } field

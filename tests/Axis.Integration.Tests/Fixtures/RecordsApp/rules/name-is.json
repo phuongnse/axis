@@ -1,0 +1,12 @@
+{
+  "id": "8d2f6b14-5e7a-4c93-a1d8-6f0b3e9c2a57",
+  "kind": "rule",
+  "name": "NameIs",
+  "formatVersion": 1,
+  "parameters": [
+    { "name": "value", "type": "text" },
+    { "name": "expected", "type": "text" }
+  ],
+  "resultType": "boolean",
+  "expression": "value == expected"
+}

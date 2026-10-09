@@ -8,10 +8,10 @@ using Axis.Expressions.Typing;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Checks the named rules of an application and builds the rules that validations call. A rule
-/// name may not be a built-in function name, its parameter names are unique ignoring letter case,
-/// and its expression parses and type-checks to its result type over its parameters alone. Rules
-/// that call each other in a cycle are reported once per cycle. A rule with a problem in its own
+/// Checks the named rules of an application and builds the rules that validations and data source
+/// filters call. A rule name may not be a built-in function name, its parameter names are unique
+/// ignoring letter case, and its expression parses and type-checks to its result type over its
+/// parameters alone. Rules that call each other in a cycle are reported once per cycle. A rule with a problem in its own
 /// expression, or in a cycle, is kept by its signature only, so that calls to it are still checked
 /// without further diagnostics.
 /// </summary>
