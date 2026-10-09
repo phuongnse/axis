@@ -1,0 +1,18 @@
+{
+  "id": "3eb3d7ba-f87e-492a-825c-916f7a5ae7a4",
+  "kind": "dataSource",
+  "name": "RequestsByDepartment",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "fields": [
+    { "name": "department", "path": "department" },
+    { "name": "totalAmount", "path": "totalAmount" }
+  ],
+  "aggregate": {
+    "groupBy": ["department"],
+    "measures": [
+      { "name": "requests", "function": "count" },
+      { "name": "total", "function": "sum", "field": "totalAmount" }
+    ]
+  }
+}

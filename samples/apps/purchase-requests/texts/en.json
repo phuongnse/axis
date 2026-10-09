@@ -7,10 +7,12 @@
   "texts": {
     "site.title": "Purchasing",
     "nav.purchaseRequests": "Purchase requests",
+    "nav.requestsByDepartment": "By department",
     "nav.departments": "Departments",
     "nav.suppliers": "Suppliers",
     "pages.purchaseRequests.title": "Purchase requests",
     "pages.purchaseRequestForm.title": "Purchase request",
+    "pages.requestsByDepartment.title": "Purchase request totals by department",
     "pages.departments.title": "Departments",
     "pages.suppliers.title": "Suppliers",
     "department.label": "Department",

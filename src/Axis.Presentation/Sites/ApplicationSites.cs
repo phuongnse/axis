@@ -100,15 +100,36 @@ public static class ApplicationSites
                 parameter.Values,
                 parameter.Target is { } target ? Target(application, target.Name) : null))],
             dataSource.PageSize,
-            [.. dataSource.Fields.Select(column => new DataSourceColumnMetadata(
-                column.Name,
-                FieldTypes.Name(column.Field.Type),
-                column.Field.Label?.TextKey,
-                column.Field.Values,
-                column.Field.Type == FieldType.Reference
-                    ? new ReferenceTarget(column.Field.Target!.Name, column.Field.TargetDisplayField, RecordsPath(application, column.Field.Target.Name))
-                    : null))]);
+            // A grouped row holds the group fields, then the measures, not the projected fields.
+            dataSource.Aggregate is { } aggregate
+                ? [.. aggregate.GroupBy.Select(field => Column(application, field)), .. aggregate.Measures.Select(Measure)]
+                : [.. dataSource.Fields.Select(field => Column(application, field))]);
     }
+
+    private static DataSourceColumnMetadata Column(ApplicationModel application, DataSourceFieldModel column) =>
+        new(
+            column.Name,
+            FieldTypes.Name(column.Field.Type),
+            column.Field.Label?.TextKey,
+            column.Field.Values,
+            column.Field.Type == FieldType.Reference
+                ? new ReferenceTarget(column.Field.Target!.Name, column.Field.TargetDisplayField, RecordsPath(application, column.Field.Target.Name))
+                : null);
+
+    // A measure has no label, so its header is its name. A count is an integer and a sum is
+    // written like a decimal. A min or max keeps the type of its field.
+    private static DataSourceColumnMetadata Measure(DataSourceMeasureModel measure) =>
+        new(
+            measure.Name,
+            measure.Function switch
+            {
+                AggregateFunction.Count => FieldTypes.Name(FieldType.Integer),
+                AggregateFunction.Sum => FieldTypes.Name(FieldType.Decimal),
+                _ => FieldTypes.Name(measure.Field!.Field.Type),
+            },
+            null,
+            null,
+            null);
 
     // A parameter's model holds only its target entity, so the display field comes from that entity.
     private static ReferenceTarget Target(ApplicationModel application, string entityName)

@@ -1,0 +1,8 @@
+{
+  "id": "3b501ea6-096a-4a2a-ba23-39b062150983",
+  "kind": "page",
+  "name": "RequestsByDepartment",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.requestsByDepartment.title" },
+  "widgets": [{ "type": "table", "dataSource": "RequestsByDepartment" }]
+}

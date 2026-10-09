@@ -66,6 +66,9 @@ internal static class PresentationChecker
             // The entity the widget's records belong to: its own, or the root entity of its data
             // source. Null when the data source is unknown.
             string? recordEntity = widget.Entity;
+
+            // Whether the widget shows the groups of a data source rather than records.
+            var grouped = false;
             if (widget.Entity is { } entityName)
             {
                 if (findEntity(entityName) is null && !loaded.UnloadedEntityNames.Contains(entityName))
@@ -85,16 +88,7 @@ internal static class PresentationChecker
             else if (findDataSource(widget.DataSource!) is { } dataSource)
             {
                 recordEntity = dataSource.Entity;
-
-                // A table builds its columns from the projected fields and opens rows by id. A
-                // grouped row has neither.
-                if (dataSource.Aggregate is not null)
-                {
-                    Report(
-                        DiagnosticCodes.InvalidWidgetBinding,
-                        $"The data source '{dataSource.Name}' is grouped. A table cannot show a grouped data source yet.",
-                        $"{path}/dataSource");
-                }
+                grouped = dataSource.Aggregate is not null;
 
                 // A table has no inputs for parameter values yet, so a required one would make
                 // every request for its rows fail.
@@ -122,6 +116,13 @@ internal static class PresentationChecker
             if (isForm)
             {
                 Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
+            }
+            else if (grouped)
+            {
+                Report(
+                    DiagnosticCodes.InvalidFormPage,
+                    $"The data source '{widget.DataSource}' is grouped. A group is not a record, so the table cannot name a form page.",
+                    $"{path}/formPage");
             }
             else if (findPage(formPage) is { } target)
             {

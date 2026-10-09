@@ -34,6 +34,9 @@ interface LoadState {
   parameterErrors?: Record<string, string[]>
 }
 
+/** A table row: a record, a data source row, or a group of a grouped data source, which has no id. */
+type TableRow = Omit<RecordItem, 'id'> & { id: string | null }
+
 // Field names start with a letter, so this key never names a field column.
 const openColumnKey = '$open'
 
@@ -77,9 +80,11 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
 
 /**
  * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
- * carries the id of its root record, so it opens the same form. Paging and sorting live in the URL
- * as the API's `page`, `pageSize` and `sort`, so reload, sharing and the back button keep them. A
- * data source table also has a filter bar, whose values live in the URL under the parameter names.
+ * carries the id of its root record, so it opens the same form. A row of a grouped data source is a
+ * group with no id, and its table has no form page, so it has no open link or create button. Paging
+ * and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing and the
+ * back button keep them. A data source table also has a filter bar, whose values live in the URL
+ * under the parameter names.
  */
 export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const t = useText()
@@ -155,10 +160,10 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     return () => controller.abort()
   }, [path, name, requestQuery, parameterNames])
 
-  const columns = useMemo<TableColumnsType<RecordItem>>(() => {
+  const columns = useMemo<TableColumnsType<TableRow>>(() => {
     const sortOrder = (field: string) =>
       query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
-    const fieldColumns: TableColumnsType<RecordItem> = fields.map((field) => ({
+    const fieldColumns: TableColumnsType<TableRow> = fields.map((field) => ({
       key: field.name,
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
@@ -166,7 +171,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
       sorter: field.type !== 'reference',
       sortOrder: field.type === 'reference' ? undefined : sortOrder(field.name),
       align: field.type === 'integer' || field.type === 'decimal' ? 'right' : undefined,
-      render: (value: RecordValue, record: RecordItem) => formatValue(field, value, record.labels, { locale, text: t }),
+      render: (value: RecordValue, record: TableRow) => formatValue(field, value, record.labels, { locale, text: t }),
     }))
     if (!formPath) {
       return fieldColumns
@@ -175,7 +180,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
       ...fieldColumns,
       {
         key: openColumnKey,
-        render: (_value: unknown, record: RecordItem) => (
+        render: (_value: unknown, record: TableRow) => (
           <Link to={`${formPath}/${record.id}`} state={{ from }}>
             {t('shell.table.open')}
           </Link>
@@ -185,7 +190,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   }, [fields, formPath, from, locale, query.sort, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
-  const onChange: TableProps<RecordItem>['onChange'] = (pagination, _filters, sorter) => {
+  const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
     const single = Array.isArray(sorter) ? sorter[0] : sorter
     const sort = single?.order ? { field: String(single.columnKey), descending: single.order === 'descend' } : null
     const pageSize = pagination.pageSize ?? query.pageSize
@@ -245,8 +250,9 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
       {failed ? (
         <Alert data-testid="records-error" type="error" message={t('shell.table.loadFailed')} />
       ) : (
-        <Table<RecordItem>
-          rowKey="id"
+        <Table<TableRow>
+          // The group values are unique per group row.
+          rowKey={(row) => row.id ?? JSON.stringify(row.values)}
           columns={columns}
           dataSource={parameterErrors ? [] : state.page?.items}
           loading={loading}

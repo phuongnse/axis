@@ -177,6 +177,66 @@ test('the purchase request list filters by status, and keeps the filter and its 
   }
 })
 
+test('the per-department page shows one row per department with its total, sorts by the total, and keeps the sort after reload', async ({
+  page,
+  request,
+}) => {
+  // Engineering < Finance < Operations by total, even with retries and other tests adding Finance
+  // requests in parallel.
+  const prices = { Engineering: 1, Finance: 100, Operations: 9000000 }
+  for (const [name, unitPrice] of Object.entries(prices)) {
+    const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
+      data: {
+        values: {
+          title: `Zz Group ${Date.now()}-${test.info().retry} ${name}`,
+          department: await departmentId(request, name),
+          lineItems: [{ description: 'Item', quantity: 1, unitPrice }],
+        },
+      },
+    })
+    expect(response.status()).toBe(201)
+  }
+
+  // Only this test writes Engineering and Operations requests, so their totals stay fixed during the run.
+  const groups = await request.get(`${appPath}/data-sources/RequestsByDepartment/rows?pageSize=100`)
+  expect(groups.status()).toBe(200)
+  const body = (await groups.json()) as {
+    items: { id: null; values: { total: number }; labels: { department: string } }[]
+  }
+  const total = (name: string) => {
+    const group = body.items.find((item) => item.labels.department === name)
+    expect(group).toBeDefined()
+    return Number(group!.values.total).toFixed(2)
+  }
+  const expected = { Engineering: total('Engineering'), Operations: total('Operations') }
+
+  await page.goto('/purchasing/requestsbydepartment')
+  const rows = page.locator('.ant-table-tbody tr.ant-table-row')
+  await expect(rows).toHaveCount(3)
+  const row = (name: string) => page.getByRole('row', { name: new RegExp(`^${name} `) })
+  await expect(row('Engineering')).toContainText(expected.Engineering)
+  await expect(row('Operations')).toContainText(expected.Operations)
+  await expect(row('Finance')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'New' })).toHaveCount(0)
+
+  const order = async (names: string[]) => {
+    for (const [index, name] of names.entries()) {
+      await expect(rows.nth(index)).toContainText(name)
+    }
+  }
+  await page.getByRole('columnheader', { name: 'total' }).click()
+  await expect(page).toHaveURL(/\/purchasing\/requestsbydepartment\?sort=total$/)
+  await order(['Engineering', 'Finance', 'Operations'])
+
+  await page.getByRole('columnheader', { name: 'total' }).click()
+  await expect(page).toHaveURL(/\/purchasing\/requestsbydepartment\?sort=-total$/)
+  await order(['Operations', 'Finance', 'Engineering'])
+  await page.reload()
+  await expect(page.getByRole('columnheader', { name: 'total' })).toHaveAttribute('aria-sort', 'descending')
+  await order(['Operations', 'Finance', 'Engineering'])
+})
+
 test('line rules show under the Quantity and Unit price of the line, and the total rule under Total amount, in light and dark mode', async ({
   page,
 }) => {
@@ -227,7 +287,8 @@ test('switching the locale to Vietnamese shows the Vietnamese navigation', async
   // The radio input itself takes no pointer events: people click its label.
   await page.getByRole('radiogroup', { name: 'Language' }).getByText('Tiếng Việt').click()
 
-  for (const item of ['Yêu cầu mua hàng', 'Phòng ban', 'Nhà cung cấp']) {
-    await expect(page.getByRole('menuitem', { name: item })).toBeVisible()
+  // Exact names, because "Theo phòng ban" also holds "Phòng ban".
+  for (const item of ['Yêu cầu mua hàng', 'Theo phòng ban', 'Phòng ban', 'Nhà cung cấp']) {
+    await expect(page.getByRole('menuitem', { name: item, exact: true })).toBeVisible()
   }
 })
