@@ -28,6 +28,12 @@ public static class ExpressionLimits
     public const int MaxHops = 3;
 
     /// <summary>
+    /// The most rule calls that may nest. A rule that calls no rule has depth 1, and each rule adds
+    /// one level above its deepest callee.
+    /// </summary>
+    public const int MaxRuleCallDepth = 8;
+
+    /// <summary>
     /// The most steps one evaluation may take. This is a run-time bound: each node evaluated is one
     /// step, a <c>concat</c> also pays for the text it builds (see <see cref="CharactersPerStep"/>), and
     /// evaluation stops with an error as soon as it is used up.

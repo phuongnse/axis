@@ -366,15 +366,21 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | Rule calls nested | 8 deep |
 | Rule call cycles | None allowed |
 
-The first four, the inlined filter cap and the cycle check are built. More than 3 hops is
-`AXC0058` in a data source filter and `AXC0043` in a projected `path`. The
-rule call depth limit is *(planned for M2)*, because it needs deeper rule
-use. A cycle is `AXC0055`, so evaluation of a rule call always ends.
+Every compile-time limit is built. More than 3 hops is `AXC0058` in a data
+source filter and `AXC0043` in a projected `path`. Rule calls nested more
+than 8 deep are `AXC0065`. A cycle is `AXC0055`, so evaluation of a rule call
+always ends.
 
 - **Depth.** Depth is the height of the syntax tree. A name or literal has
   depth 1. Each operator, call, path step, `is null` and `in` adds one level
   above its highest operand. Each pair of parentheses also adds one level. So
   `-1` has depth 2, and `(a + b)` has depth 3.
+- **Rule call depth.** A rule that calls no rule has depth 1. Each rule adds
+  one level above its deepest callee. Only calls inside a rule body nest. A
+  call given as an argument, such as `R(R(x))`, does not, because the inner
+  call ends before the outer one starts. Every rule is measured, even one
+  that nothing calls, so a validation is always within the limit. A chain
+  past 8 is reported once, at the lowest rule past the limit.
 - **Nodes.** Each literal, name, operator, call, `.name` path step, `is null`
   and `in` is one node. So each `in` item counts, and a `date('…')` item is two
   nodes: the call and its text. Parentheses are not nodes.
@@ -589,9 +595,10 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).
+- **`AXC0065`.** Rule calls nest more than 8 deep. It is reported once, at
+  the rule file of the lowest rule past the limit, not at its callers. The
+  message names the rules in the chain in call order. A rule in a cycle, or
+  that calls into one, gets only `AXC0055`.
 - **First problem only.** The parser and the type checker each stop at the
   first problem and report only that one. So one expression gives at most
   one diagnostic.
-
-The cost code for rule call depth is added by the issue that builds that
-check.

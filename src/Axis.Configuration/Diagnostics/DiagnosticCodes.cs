@@ -57,6 +57,7 @@ public static class DiagnosticCodes
     public const string UnknownValidationField = "AXC0052";
 
     public const string RuleCallCycle = "AXC0055";
+    public const string RuleCallTooDeep = "AXC0065";
     public const string DuplicateRuleParameter = "AXC0056";
     public const string RuleNameIsFunction = "AXC0057";
 }

@@ -627,12 +627,13 @@ public sealed class DataSourceCompilerTests
     [Fact]
     public void Filter_whose_rule_calls_inline_past_the_cap_is_outside_the_subset()
     {
-        // L8 calls L7 four times, and so on down to L0, so inlined it is far past 2,000 nodes.
+        // L7 calls L6 four times, and so on down to L0, so inlined it is far past 2,000 nodes. The
+        // chain is 8 rules deep, the most the rule call depth limit allows.
         using var folder = Folder().With("rules/l0.json", """
             { "id": "77777777-7777-4777-8777-777777777700", "kind": "rule", "name": "L0", "formatVersion": 1,
               "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 0" }
             """);
-        for (var k = 1; k <= 8; k++)
+        for (var k = 1; k <= 7; k++)
         {
             var call = $"L{k - 1}(value)";
             folder.With($"rules/l{k}.json", $$"""
@@ -645,7 +646,7 @@ public sealed class DataSourceCompilerTests
         folder.With("data-sources/orders.json", DataSource(
             "Order",
             """[{ "name": "number", "path": "number" }]""",
-            """, "filter": "L8(amount)" """));
+            """, "filter": "L7(amount)" """));
         var stopwatch = Stopwatch.StartNew();
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -655,7 +656,7 @@ public sealed class DataSourceCompilerTests
         Assert.Equal(
             (ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/orders.json", "/filter"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("'L8'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'L7'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Took {stopwatch.Elapsed}.");
     }
@@ -663,12 +664,13 @@ public sealed class DataSourceCompilerTests
     [Fact]
     public void Filter_whose_rule_calls_fan_out_wide_is_checked_in_linear_time()
     {
-        // Each rule calls the one below it 20 times, so a walk per call would visit 20^8 bodies.
+        // Each rule calls the one below it 20 times, so a walk per call would visit 20^7 bodies. The
+        // chain is 8 rules deep, the most the rule call depth limit allows.
         using var folder = Folder().With("rules/w0.json", """
             { "id": "77777777-7777-4777-8777-777777777800", "kind": "rule", "name": "W0", "formatVersion": 1,
               "parameters": [{ "name": "value", "type": "decimal" }], "resultType": "boolean", "expression": "value > 0" }
             """);
-        for (var k = 1; k <= 8; k++)
+        for (var k = 1; k <= 7; k++)
         {
             var calls = string.Join(" and ", Enumerable.Repeat($"W{k - 1}(value)", 20));
             folder.With($"rules/w{k}.json", $$"""
@@ -681,7 +683,7 @@ public sealed class DataSourceCompilerTests
         folder.With("data-sources/orders.json", DataSource(
             "Order",
             """[{ "name": "number", "path": "number" }]""",
-            """, "filter": "W8(amount)" """));
+            """, "filter": "W7(amount)" """));
         var stopwatch = Stopwatch.StartNew();
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -691,7 +693,7 @@ public sealed class DataSourceCompilerTests
         Assert.Equal(
             (ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/orders.json", "/filter"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("'W8'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'W7'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Took {stopwatch.Elapsed}.");
     }
