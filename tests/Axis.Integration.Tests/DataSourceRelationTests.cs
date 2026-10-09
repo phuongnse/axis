@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Data.DataSources;
+using Axis.Data.Naming;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
@@ -16,6 +17,8 @@ public sealed class DataSourceRelationTests(RecordApiFixture fixture) : IClassFi
     // ItemsByDepartment projects name, department.name as departmentName and department, keeps items
     // whose department is not Archive and matches the optional nameFilter, sorted by departmentName.
     private const string Rows = "/api/apps/RecordsApp/data-sources/ItemsByDepartment/rows";
+
+    private const int LargeTableRows = 100_000;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -84,6 +87,46 @@ public sealed class DataSourceRelationTests(RecordApiFixture fixture) : IClassFi
             });
         }
 
+        var page = await ListFirstPageAsync(pageSize);
+
+        Assert.Equal(Math.Min(pageSize, 30), page.Items.Count);
+        Assert.Equal(30, page.TotalCount);
+        Assert.All(page.Items, row => Assert.NotNull(row.Values["departmentName"]));
+    }
+
+    [Fact]
+    public async Task A_page_over_a_large_table_runs_as_one_statement_plus_the_count()
+    {
+        await fixture.ResetAsync();
+        var departments = new List<Guid>();
+        foreach (var name in Enumerable.Range(0, 99).Select(index => $"Dept {index:D2}").Append("Archive"))
+        {
+            departments.Add(await fixture.InsertAsync(TenantA, "Department", new Dictionary<string, string?> { ["name"] = name }));
+        }
+
+        // One statement inserts every item. Item n goes to department n % 100, so Archive gets 1 in 100.
+        Assert.True(fixture.Model.TryGetEntity("Item", out var item));
+        var ids = $"'{{{string.Join(',', departments)}}}'::uuid[]";
+        await fixture.ExecuteAsync(TenantA, $"""
+            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(item.Id))}
+                ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("name"))}, {EntityNaming.Quote(EntityNaming.Column("department"))})
+            SELECT gen_random_uuid(), 'Item ' || n, ({ids})[1 + n % 100]
+            FROM generate_series(0, {LargeTableRows - 1}) AS n
+            """);
+
+        var page = await ListFirstPageAsync(pageSize: 100);
+
+        Assert.Equal(100, page.Items.Count);
+        Assert.Equal(LargeTableRows - (LargeTableRows / 100), page.TotalCount);
+        Assert.All(page.Items, row => Assert.NotNull(row.Values["departmentName"]));
+    }
+
+    /// <summary>
+    /// Lists the first page of ItemsByDepartment in tenant A with no name filter, and checks that it
+    /// ran as exactly 2 database commands: the page statement and the count.
+    /// </summary>
+    private async Task<DataSourceRowPage> ListFirstPageAsync(int pageSize)
+    {
         Assert.True(fixture.Model.TryGetDataSource("ItemsByDepartment", out var dataSource));
         var log = new CapturingLoggerFactory();
         await using var npgsql = new NpgsqlDataSourceBuilder(fixture.ConnectionString(TenantA)).UseLoggerFactory(log).Build();
@@ -94,15 +137,13 @@ public sealed class DataSourceRelationTests(RecordApiFixture fixture) : IClassFi
             connection, fixture.Model, dataSource, 1, pageSize, DataSourceSort.Default(dataSource), [new(dataSource.Parameters[0], null)], CancellationToken);
 
         Assert.NotNull(page);
-        Assert.Equal(Math.Min(pageSize, 30), page.Items.Count);
-        Assert.Equal(30, page.TotalCount);
-        Assert.All(page.Items, row => Assert.NotNull(row.Values["departmentName"]));
         // Npgsql logs one entry per executed command. Matching on the message alone keeps the test
         // independent of the log category.
         var commands = log.Entries.Count(entry => entry.Message.StartsWith("Command execution completed", StringComparison.Ordinal));
         Assert.True(
             commands == 2,
             $"Expected 2 commands, found {commands}:\n{string.Join('\n', log.Entries.Select(entry => $"{entry.Category}: {entry.Message}"))}");
+        return page;
     }
 
     /// <summary>

@@ -23,7 +23,14 @@ public static class ExpressionLimits
 
     /// <summary>
     /// The most steps one evaluation may take. This is a run-time bound: each node evaluated is one
-    /// step, and evaluation stops with an error as soon as it is used up.
+    /// step, a <c>concat</c> also pays for the text it builds (see <see cref="CharactersPerStep"/>), and
+    /// evaluation stops with an error as soon as it is used up.
     /// </summary>
     public const int MaxSteps = 10_000;
+
+    /// <summary>
+    /// The characters one extra step pays for: a <c>concat</c> costs one more step for each full
+    /// 1,000 characters of its result.
+    /// </summary>
+    public const int CharactersPerStep = 1000;
 }

@@ -388,7 +388,11 @@ Run-time limit:
   aggregate call is one step, and its collection argument costs none. So
   `sum(lines, qty)` costs 1 step plus 1 per row, and runs out of budget at
   10,000 rows. The steps of a called rule count against the caller's
-  budget.
+  budget. A `concat` also costs one step for every full 1,000 characters of
+  its result, counted before the text is built. So one evaluation builds at
+  most about 10 million characters.
+- **Long text.** The cost of text functions such as `contains` or `length`
+  over very long field values is not bounded.
 - **SQL.** The SQL translation has no step budget. The compile-time limits
   bound its size.
 
