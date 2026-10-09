@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Axis.Expressions.Evaluation;
 using Axis.Expressions.Parsing;
@@ -22,6 +23,9 @@ public sealed class ExpressionInterpreterTests
     };
 
     private static readonly ExpressionScope _scope = new(_fields);
+
+    /// <summary>The time a worst-case expression may take to finish or run out of steps.</summary>
+    private static readonly TimeSpan _worstCaseTime = TimeSpan.FromSeconds(2);
 
     /// <summary>A value for every field, so that no result is <c>null</c> unless the expression makes it so.</summary>
     private static readonly Dictionary<string, object?> _setValues = new()
@@ -327,6 +331,62 @@ public sealed class ExpressionInterpreterTests
         Assert.Equal(5_000L, EvaluateWithRules("Big()", [big]).Value);
         var over = EvaluateWithRules("-Big()", [big]);
         Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, over.Error?.Kind);
+    }
+
+    [Fact]
+    public void A_validation_that_fans_out_through_rule_calls_stops_within_the_time_limit()
+    {
+        // F0 adds one, and each level above calls the one below 4 times: 8 nested levels and 4^7 leaf calls.
+        var rule = Rule("F0", "x + 1", ExpressionType.Integer, ("x", ExpressionType.Integer));
+        for (var k = 1; k <= 7; k++)
+        {
+            var below = $"F{k - 1}(x)";
+            rule = Rule($"F{k}", $"{below} + {below} + {below} + {below}", ExpressionType.Integer, [rule], ("x", ExpressionType.Integer));
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        var result = EvaluateWithRules("F7(i) > 0", [rule]);
+        stopwatch.Stop();
+
+        Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error?.Kind);
+        Assert.True(stopwatch.Elapsed < _worstCaseTime, $"The evaluation took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public void Text_doubled_through_rule_calls_stops_within_the_time_limit()
+    {
+        // D1 doubles its text, and each level above applies the one below twice, so D8 would double it 2^7 times.
+        var rule = Rule("D1", "concat(s, s)", ExpressionType.Text, ("s", ExpressionType.Text));
+        for (var k = 2; k <= 8; k++)
+        {
+            rule = Rule($"D{k}", $"D{k - 1}(D{k - 1}(s))", ExpressionType.Text, [rule], ("s", ExpressionType.Text));
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        var result = EvaluateWithRules("length(D8(t)) > 0", [rule]);
+        stopwatch.Stop();
+
+        Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error?.Kind);
+        Assert.True(stopwatch.Elapsed < _worstCaseTime, $"The evaluation took {stopwatch.Elapsed}.");
+    }
+
+    [Theory]
+    // The call and its 10 names are 11 steps. 10 × 998,900 characters add 9,989 more, which makes exactly 10,000.
+    [InlineData(998_900, true)]
+    [InlineData(999_000, false)]
+    public void A_concat_costs_one_step_for_every_full_thousand_characters_it_builds(int length, bool succeeds)
+    {
+        var result = Evaluate("concat(t, t, t, t, t, t, t, t, t, t)", ("t", new string('a', length)));
+
+        if (succeeds)
+        {
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(10 * length, Assert.IsType<string>(result.Value).Length);
+        }
+        else
+        {
+            Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error?.Kind);
+        }
     }
 
     [Fact]

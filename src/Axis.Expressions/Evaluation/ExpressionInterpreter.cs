@@ -1,4 +1,3 @@
-using System.Text;
 using Axis.Expressions.Functions;
 using Axis.Expressions.Syntax;
 using Axis.Expressions.Typing;
@@ -11,7 +10,9 @@ namespace Axis.Expressions.Evaluation;
 /// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections
 /// and calls to named rules. It does no I/O. Arithmetic is exact, and an evaluation stops after
 /// <see cref="ExpressionLimits.MaxSteps"/> steps, counting the steps of the rules it calls and of
-/// an aggregate's item expression on every row. Values use the CLR types listed on
+/// an aggregate's item expression on every row. Each node evaluated is one step, and a
+/// <c>concat</c> also costs one step for each full <see cref="ExpressionLimits.CharactersPerStep"/>
+/// characters of its result. Values use the CLR types listed on
 /// <see cref="ExpressionValues"/>.
 /// </summary>
 public static class ExpressionInterpreter
@@ -57,14 +58,7 @@ public static class ExpressionInterpreter
     {
         public object? Eval(ExpressionNode node)
         {
-            if (++budget.Steps > ExpressionLimits.MaxSteps)
-            {
-                throw Fail(
-                    ExpressionRuntimeErrorKind.StepBudgetExhausted,
-                    $"The expression ran past its budget of {ExpressionLimits.MaxSteps} steps",
-                    node.Offset);
-            }
-
+            Charge(1, node);
             return node switch
             {
                 IntegerLiteral literal => literal.Value,
@@ -80,6 +74,23 @@ public static class ExpressionInterpreter
                 InNode inNode => In(inNode),
                 _ => throw new InvalidOperationException($"The interpreter does not evaluate {node.GetType().Name} yet."),
             };
+        }
+
+        /// <summary>
+        /// Takes <paramref name="steps"/> from the budget, or stops with an error when that would
+        /// use it up. The check comes before the addition, so a large charge cannot overflow.
+        /// </summary>
+        private void Charge(long steps, ExpressionNode node)
+        {
+            if (steps > ExpressionLimits.MaxSteps - budget.Steps)
+            {
+                throw Fail(
+                    ExpressionRuntimeErrorKind.StepBudgetExhausted,
+                    $"The expression ran past its budget of {ExpressionLimits.MaxSteps} steps",
+                    node.Offset);
+            }
+
+            budget.Steps += (int)steps;
         }
 
         private object? Name(NameNode name)
@@ -131,13 +142,18 @@ public static class ExpressionInterpreter
                     return null;
 
                 case "concat":
-                    var builder = new StringBuilder();
-                    foreach (var argument in arguments)
+                    // The result's length is charged before the text is built, so a result past
+                    // the budget is never allocated.
+                    var parts = new string[arguments.Count];
+                    var length = 0L;
+                    for (var i = 0; i < parts.Length; i++)
                     {
-                        builder.Append(Eval(argument) is { } value ? Text(value) : string.Empty);
+                        parts[i] = Eval(arguments[i]) is { } value ? Text(value) : string.Empty;
+                        length += parts[i].Length;
                     }
 
-                    return builder.ToString();
+                    Charge(length / ExpressionLimits.CharactersPerStep, call);
+                    return string.Concat(parts);
 
                 case "date" or "dateTime":
                     return DateLiteral(call, signature.Name == "date");
