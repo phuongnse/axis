@@ -93,13 +93,16 @@ flowchart LR
      ignoring letter case, otherwise it is `AXC0042` at `/entity`, and its
      fields and sort are not checked further. A name whose entity file was
      not loaded because of its own errors is not reported again. Each `path`
-     must name a field of that entity, ignoring letter case, otherwise it is
-     `AXC0043` at `/fields/{i}/path`. A path naming a `child-collection`
-     field is `AXC0043` too, because that field has no column. So is a
-     dotted path through a reference, until relations are built. Projected names compare
+     must name a field of that entity, or go through `reference` fields with
+     at most 3 hops, each name ignoring letter case, otherwise it is
+     `AXC0043` at `/fields/{i}/path`. A path through a field that is not a
+     `reference`, to an unknown field or with more than 3 hops is `AXC0043`,
+     with a message that says which. A path ending at a `child-collection`
+     field is `AXC0043` too, because that field has no column. A path that
+     reaches an entity whose file was not loaded is not reported again. Projected names compare
      exactly: a name that an earlier entry of `fields` already uses is
      `AXC0044` at `/fields/{i}/name`. The `sort`, without its leading `-`,
-     must exactly match a projected name whose field is not a `reference`,
+     must exactly match a projected name whose path does not end at a `reference`,
      otherwise it is `AXC0045` at `/sort`. A sort naming an entry whose path
      is already `AXC0043` is not reported again. A parameter name that is
      also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
@@ -108,11 +111,14 @@ flowchart LR
      entity field's, with the same codes (`AXC0012`, `AXC0013`, `AXC0014`,
      `AXC0030`, `AXC0040`) at `/parameters/{i}/...`, and its label joins the
      `AXC0028` check. The `filter` is parsed, type-checked as a boolean over
-     the entity's fields and the parameters, with no rules, and translated
-     to SQL. Its first problem is reported at `/filter` with its
+     the entity's fields, the parameters and paths through `reference`
+     fields, with no rules, and translated to SQL. Its first problem is
+     reported at `/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
      outside the SQL subset is `AXC0053`. An enum parameter with a value the
-     compared enum field lacks is `AXC0047`. The filter of a data source
+     compared enum field lacks is `AXC0047`, and so is a `.` after a field
+     that is not a `reference` or after a parameter. A path with more than 3
+     hops is `AXC0058`. The filter of a data source
      whose entity is unknown, or that has a parameter with a diagnostic, is
      not checked. See
      [data sources](data-sources.md#compile-checks).
@@ -287,11 +293,11 @@ sorted by file and then path.
 | `AXC0040` | A reference field's target is a child entity. Reported at `/fields/{i}/target`, naming the owner. |
 | `AXC0041` | A child entity has a `reference` or `child-collection` field. Reported at `/fields/{i}/type` of that field, naming the owner. |
 | `AXC0042` | A data source's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
-| `AXC0043` | A data source field's `path` names no field of the data source's entity, names a `child-collection` field, which has no column, or goes through a reference, which is not supported yet. Reported at `/fields/{i}/path`. |
+| `AXC0043` | A data source field's `path` names no field of the data source's entity or of a reference's target, goes through a field that is not a `reference`, takes more than 3 hops, or ends at a `child-collection` field, which has no column. The message says which. Reported at `/fields/{i}/path`. |
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
-| `AXC0045` | A data source's `sort` names no projected field, or names a projected `reference` field. Reported at `/sort`. |
-| `AXC0046` | An expression names a field that is not in its scope. `.` paths are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
-| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
+| `AXC0045` | A data source's `sort` names no projected field, or names a projected field whose path ends at a `reference`. Reported at `/sort`. |
+| `AXC0046` | An expression names a field that is not in its scope, including an unknown field after a `.`. Outside a data source filter, every `.` path is reported this way. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. In a data source filter this includes a `.` after a field that is not a `reference`, such as `name.x`, or after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
 | `AXC0050` | An expression calls a function or rule that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
@@ -302,6 +308,7 @@ sorted by file and then path.
 | `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
+| `AXC0058` | A path in a data source filter takes more than 3 hops, such as `a.b.c.d.name`. Reported at `/filter`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 
 ## Startup activation
 

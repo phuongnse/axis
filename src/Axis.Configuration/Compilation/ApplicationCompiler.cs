@@ -3,6 +3,7 @@ using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
+using Axis.Expressions;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
@@ -562,14 +563,15 @@ public static class ApplicationCompiler
     }
 
     /// <summary>
-    /// Checks the data sources: each names a loaded entity, each projected <c>path</c> is a single
-    /// field of that entity that is not a child collection, projected names are unique, and the
-    /// default <c>sort</c> names a projected field that is not a reference. Entity and field names
+    /// Checks the data sources: each names a loaded entity, each projected <c>path</c> resolves as
+    /// <see cref="ResolvePath"/> describes, projected names are unique, and the default <c>sort</c>
+    /// names a projected field that does not end at a reference. Entity and field names
     /// resolve ignoring letter case; projected names compare exactly, as the query <c>sort</c> does.
     /// Each parameter name differs from the entity's fields, from <c>page</c>, <c>pageSize</c> and
     /// <c>sort</c> and from earlier parameters, ignoring letter case. Its type properties and label
     /// are checked as an entity field's. The <c>filter</c> parses, type-checks as a boolean over the
-    /// entity's fields and the parameters, with no rules, and translates to SQL. Its first problem
+    /// entity's fields, the parameters and paths through reference fields, with no rules, and
+    /// translates to SQL. Its first problem
     /// is reported at <c>/filter</c> with its expression code. It is not checked while a parameter
     /// has a diagnostic.
     /// </summary>
@@ -605,11 +607,12 @@ public static class ApplicationCompiler
             for (var index = 0; index < dataSource.Fields.Count; index++)
             {
                 var projected = dataSource.Fields[index];
-                var field = projected.Path.Contains('.', StringComparison.Ordinal) ? null : FindField(entity, projected.Path);
-                var isChildCollection = field is not null && FieldTypes.Parse(field.Type) == FieldType.ChildCollection;
+                var pathProblem = ResolvePath(entity, projected.Path, findEntity, out var hops);
 
-                // A child collection has no column, so it is stored as an invalid path for the sort check.
-                if (!fieldsByName.TryAdd(projected.Name, isChildCollection ? null : field))
+                // A path that does not resolve, or ends at a child collection, has no column. It is
+                // stored as an invalid path for the sort check.
+                var field = pathProblem is null && hops.Count > 0 ? hops[^1] : null;
+                if (!fieldsByName.TryAdd(projected.Name, field))
                 {
                     Report(
                         DiagnosticCodes.DuplicateDataSourceFieldName,
@@ -617,19 +620,9 @@ public static class ApplicationCompiler
                         $"/fields/{index}/name");
                 }
 
-                if (field is null)
+                if (pathProblem is not null)
                 {
-                    Report(
-                        DiagnosticCodes.InvalidDataSourceFieldPath,
-                        $"The path '{projected.Path}' must name a field of the entity '{entity.Name}'. Paths through references are not supported yet.",
-                        $"/fields/{index}/path");
-                }
-                else if (isChildCollection)
-                {
-                    Report(
-                        DiagnosticCodes.InvalidDataSourceFieldPath,
-                        $"The path '{projected.Path}' names the child collection '{field.Name}'. A data source cannot project a child collection.",
-                        $"/fields/{index}/path");
+                    Report(DiagnosticCodes.InvalidDataSourceFieldPath, pathProblem, $"/fields/{index}/path");
                 }
             }
 
@@ -694,7 +687,7 @@ public static class ApplicationCompiler
             // A parameter without a usable type would only add noise to the filter's diagnostics.
             if (diagnostics.Count == countBeforeParameters
                 && dataSource.Filter is { } filter
-                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters)) is { } problem)
+                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity)) is { } problem)
             {
                 Report(problem.Code, problem.Message, "/filter");
             }
@@ -703,7 +696,7 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// The first problem of a data source filter: in parsing, in type checking over the entity's
-    /// fields and the parameters, with no rules, or outside the SQL subset.
+    /// fields, the parameters and paths through reference fields, with no rules, or outside the SQL subset.
     /// </summary>
     private static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope)
     {
@@ -714,7 +707,65 @@ public static class ApplicationCompiler
         }
 
         var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
-        return check.Succeeded ? SqlTranslator.Translate(parsed.Expression, name => name).Diagnostic : check.Diagnostic;
+        return check.Succeeded
+            ? SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path)).Diagnostic
+            : check.Diagnostic;
+    }
+
+    /// <summary>
+    /// Resolves a projected <c>path</c> from the entity <paramref name="root"/>, ignoring letter
+    /// case. Every name before the last is a reference field, the path takes at most
+    /// <see cref="ExpressionLimits.MaxHops"/> hops, and the last name is a field that is not a child
+    /// collection. Returns the problem's message, or null when the path resolves or reaches an
+    /// entity that was not loaded, which is reported at that entity's own file. When the path
+    /// resolves, <paramref name="hops"/> holds one field per name. It is empty when an entity was
+    /// not loaded.
+    /// </summary>
+    private static string? ResolvePath(
+        EntityResource root, string path, Func<string, EntityResource?> findEntity, out IReadOnlyList<FieldDefinition> hops)
+    {
+        var found = new List<FieldDefinition>();
+        hops = found;
+        var names = path.Split('.');
+        if (names.Length - 1 > ExpressionLimits.MaxHops)
+        {
+            return $"The path '{path}' takes {names.Length - 1} hops, at most {ExpressionLimits.MaxHops} are allowed.";
+        }
+
+        var entity = root;
+        for (var index = 0; index < names.Length; index++)
+        {
+            var field = FindField(entity, names[index]);
+            if (field is null)
+            {
+                return $"The path '{path}' must name a field of the entity '{entity.Name}'. '{names[index]}' is not one.";
+            }
+
+            found.Add(field);
+            var type = FieldTypes.Parse(field.Type);
+            if (index == names.Length - 1)
+            {
+                return type == FieldType.ChildCollection
+                    ? $"The path '{path}' names the child collection '{field.Name}'. A data source cannot project a child collection."
+                    : null;
+            }
+
+            if (type != FieldType.Reference)
+            {
+                return $"The path '{path}' goes through '{field.Name}', which is not a reference field of '{entity.Name}'. A path can only go through reference fields.";
+            }
+
+            // A target that was not loaded because of its own errors is not reported again.
+            if (field.Target is null || findEntity(field.Target) is not { } target)
+            {
+                hops = [];
+                return null;
+            }
+
+            entity = target;
+        }
+
+        return null;
     }
 
     private static EntityModel BuildEntity(
@@ -812,8 +863,9 @@ public static class ApplicationCompiler
     }
 
     /// <summary>
-    /// Builds a checked data source over the built entities, so each projected field is the entity's
-    /// own field model, and its filter is checked against the built entity's fields and the parameters.
+    /// Builds a checked data source over the built entities, so each projected path is a list of the
+    /// entities' own field models, and its filter is compiled against the built entity's fields, the
+    /// parameters and paths through reference fields.
     /// </summary>
     private static DataSourceModel BuildDataSource(DataSourceResource dataSource, IReadOnlyList<EntityModel> entities)
     {
@@ -840,13 +892,21 @@ public static class ApplicationCompiler
             Fields = dataSource.Fields
                 .Select(field =>
                 {
-                    entity.TryGetField(field.Path, out var fieldModel);
-                    return new DataSourceFieldModel(field.Name, fieldModel!);
+                    var path = new List<FieldModel>();
+                    var current = entity;
+                    foreach (var name in field.Path.Split('.'))
+                    {
+                        current.TryGetField(name, out var fieldModel);
+                        path.Add(fieldModel!);
+                        current = fieldModel!.Target is { } target ? Find(target.Name)! : current;
+                    }
+
+                    return new DataSourceFieldModel(field.Name, path);
                 })
                 .ToList(),
             Parameters = parameters,
             Filter = dataSource.Filter is { } filter
-                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters), ExpressionType.Boolean)
+                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find), ExpressionType.Boolean)
                 : null,
             Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
             PageSize = dataSource.PageSize ?? DataSourceModel.DefaultPageSize,

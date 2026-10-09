@@ -78,7 +78,7 @@ internal static class DataSourceEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await DataSourceQueries.ListAsync(connection, model, pageNumber, size, order, parameters, cancellationToken);
+        var result = await DataSourceQueries.ListAsync(connection, application, model, pageNumber, size, order, parameters, cancellationToken);
         if (result is null)
         {
             return Results.Problem(

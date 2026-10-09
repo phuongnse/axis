@@ -1,0 +1,16 @@
+{
+  "id": "7a839fcf-8c17-4ab6-9c8c-475b15d70db4",
+  "kind": "dataSource",
+  "name": "ItemsByDepartment",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "departmentName", "path": "department.name" },
+    { "name": "department", "path": "department" }
+  ],
+  "parameters": [{ "name": "nameFilter", "type": "text" }],
+  "filter": "department.name != 'Archive' and (nameFilter is null or name == nameFilter)",
+  "sort": "departmentName",
+  "pageSize": 10
+}
