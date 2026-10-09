@@ -117,7 +117,7 @@ Later constraints:
 | Concept | Meaning | From |
 | --- | --- | --- |
 | **Site** | An entry point of one application, with its own path, title, locales (default, fallback and available) and navigation. Theme, identity provider binding and domain come later. | M1 |
-| **Page** | A route in a site. It has a title, and its content is its widgets: exactly one in M1. A page has no entity or template of its own. | M1 |
+| **Page** | A route in a site. It has a title, and its content is its widgets: exactly one. A page has no entity or template of its own. | M1 |
 | **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, a `table` may bind a data source instead of an entity (M2), and a table may name a `formPage` that opens its records. More types (list, detail, task inbox, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
 | **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. | M1 (basic), M3 (full) |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M1 only has the table's `formPage` link; navigate actions are still **Proposed** in [D15](../decisions.md#d15-presentation-model--agreed). | M3 |

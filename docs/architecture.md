@@ -170,7 +170,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Record filters from policies are added to every data source query.
   - Field policies remove or mask fields from results and reject writes to
     protected fields.
-- **Before M4.** M1 has no authentication: every endpoint is open. A
+- **Before M4.** There is no authentication yet: every endpoint is open. A
   development-only authentication handler with a fixed set of test users
   arrives before M4 *(planned for M3)*. It must be impossible to enable it outside
   the `Development` and test environments.
