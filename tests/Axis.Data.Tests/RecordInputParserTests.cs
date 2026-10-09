@@ -412,6 +412,63 @@ public sealed class RecordInputParserTests
         Assert.Equal(expected, value.ToString("O", CultureInfo.InvariantCulture));
     }
 
+    [Theory]
+    [InlineData("""{ "values": { "qty": 2, "total": 4 } }""", "/values/total")]
+    [InlineData("""{ "values": { "qty": 2, "total": null } }""", "/values/total")]
+    [InlineData("""{ "values": { "parts": [{ "name": "a" }, { "name": "b", "code": "B" }] } }""", "/values/parts/1/code")]
+    [InlineData("""{ "values": { "parts": [{ "name": "a", "code": null }] } }""", "/values/parts/0/code")]
+    public void Computed_field_set_by_the_body_or_a_row_is_an_error_at_its_pointer(string json, string key)
+    {
+        var (entity, application) = ComputedModels();
+
+        foreach (var operation in new[] { RecordOperation.Create, RecordOperation.Update })
+        {
+            var body = operation == RecordOperation.Update ? json.Replace("{ \"values\"", "{ \"version\": 1, \"values\"", StringComparison.Ordinal) : json;
+            var result = RecordInputParser.Parse(Encoding.UTF8.GetBytes(body), entity, application, operation);
+
+            Assert.Null(result.Input);
+            Assert.NotNull(result.Errors);
+            Assert.Equal([key], result.Errors.Keys);
+            Assert.Equal(["Cannot be set."], result.Errors[key]);
+        }
+    }
+
+    [Fact]
+    public void Body_without_computed_fields_parses_and_each_row_holds_its_computed_field_as_null()
+    {
+        var (entity, application) = ComputedModels();
+
+        var result = RecordInputParser.Parse(
+            """{ "values": { "qty": 2, "parts": [{ "name": "a" }] } }"""u8.ToArray(), entity, application, RecordOperation.Create);
+
+        Assert.Null(result.Errors);
+        Assert.NotNull(result.Input);
+        Assert.Equal(["qty"], result.Input.Values.Select(value => value.Field.Name));
+        var row = Assert.Single(Assert.Single(result.Input.Rows).Rows);
+        Assert.Equal([("name", (object?)"a"), ("code", null)], row.Select(value => (value.Field.Name, value.Value)));
+    }
+
+    /// <summary>An owner whose <c>total</c> is computed, with rows whose <c>code</c> is computed.</summary>
+    private static (EntityModel Entity, ApplicationModel Application) ComputedModels()
+    {
+        var name = Field("name", FieldType.Text);
+        var part = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e03"),
+            "Part",
+            "entities/part.json",
+            name,
+            Computed(Field("code", FieldType.Text), "upper(name)", name));
+        var qty = Field("qty", FieldType.Integer);
+        var owner = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e04"),
+            "Kit",
+            "entities/kit.json",
+            qty,
+            Computed(Field("total", FieldType.Integer), "qty * 2", qty),
+            Field("parts", FieldType.ChildCollection, target: part));
+        return (owner, Application(owner, part));
+    }
+
     private static object? ParseValue(string field, string json)
     {
         var result = Parse($$"""{ "values": { "title": "Hi", "{{field}}": {{json}} } }""", RecordOperation.Create);

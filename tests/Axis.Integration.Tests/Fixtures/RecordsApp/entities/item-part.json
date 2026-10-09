@@ -3,7 +3,10 @@
   "kind": "entity",
   "name": "ItemPart",
   "formatVersion": 1,
-  "fields": [{ "name": "name", "type": "text", "unique": true, "maxLength": 100 }],
+  "fields": [
+    { "name": "name", "type": "text", "unique": true, "maxLength": 100 },
+    { "name": "code", "type": "text", "maxLength": 100, "expression": "upper(name)" }
+  ],
   "validations": [
     { "expression": "name is null or not startsWith(name, ' ')", "message": { "textKey": "itemPart.noLeadingSpace" }, "field": "name" }
   ]

@@ -268,9 +268,8 @@ text from the request; the key already says where the problem is.
 
 ## Child rows, computed fields and validations
 
-Child rows and validations are built: the record shape and the bodies
-described above include them. Computed fields are *(planned for M2)* (D17).
-They change the bodies described above.
+Child rows, computed fields over the record's own fields and validations are
+built (D17): the record shape and the bodies described above include them.
 
 A record with a child collection holds its rows inside `values`:
 
@@ -292,8 +291,7 @@ A record with a child collection holds its rows inside `values`:
 
 - **Rows.** A row is a flat object of the child entity's fields, in
   declaration order. It has no id. Rows are ordered by `position`, and the
-  array index is the position. Computed values will be included
-  *(planned for M2)*.
+  array index is the position. A row includes its computed values.
 - **Reads.** A single read and the response of a create or update include the
   collections. List responses leave them out.
 - **Create.** A missing collection means no rows. `null` is an error at
@@ -309,21 +307,25 @@ A record with a child collection holds its rows inside `values`:
   child entity must be present in every row. An array element that is not an
   object is an error at its index. A row error is keyed
   `/values/<collection>/<index>/<field>`, with a zero-based index.
-- **Computed fields** *(planned for M2)*. A body that sets a computed field,
-  of the owner or of a row, is an error at its pointer. The server calculates
-  the value on every write of the record. Child rows are calculated before the
-  owner.
+- **Computed fields.** A body that sets a computed field, of the owner or of
+  a row, even to `null`, is an error at its pointer with the message "Cannot
+  be set.". The server calculates the value on every create and update of the
+  record, including an update with no values, and stores it in the same
+  statement as the other values. Child rows are calculated before the owner.
+  A record stored before its computed field existed reads `null` until its
+  next write.
 - **Delete.** Deleting the owner deletes its rows.
 
 **Validations.** The order for a write is:
 
-1. Validations run only on a body that parsed cleanly. A body with parse
-   errors is answered with those errors alone.
-2. On update, the stored record is read first. An unknown record is still a
-   `404`, never a validation `400`. The server then builds the record as it
-   will be stored: the stored values, the changes from the body and the
-   computed fields. So a change to one field can break a validation
-   reported on another.
+1. Computed fields and validations run only on a body that parsed cleanly.
+   A body with parse errors is answered with those errors alone.
+2. On update of an entity with computed fields or validations, the stored
+   record is read first. An unknown record is still a `404`, never a `400`.
+   The server then builds the record as it will be stored: the stored values,
+   the changes from the body and the computed fields. A computed field that
+   fails is a `400`, and then no validation runs. So a change to one field
+   can break a validation reported on another.
 3. The validations of the entity and of each row the body sends run. Rows
    an update leaves out are unchanged and are not checked again. Any failure
    is a `400`.
@@ -339,8 +341,11 @@ the client as the user types comes in M3.
 
 A run-time error in an expression, or a computed value that does not fit its
 field, such as one with more fraction digits than `scale`, rejects the write
-with a `400` at that field's pointer. Values are never rounded. So on an entity
-with validations, a `decimal` value that the interpreter cannot hold exactly
+with a `400` at that field's pointer. A run-time error in a computed field has
+the message "Could not be computed.". A value that does not fit gets the
+message a body value would get, such as "Must have at most 2 fraction
+digits.". Values are never rounded. So on an entity with computed fields or
+validations, a `decimal` value that the interpreter cannot hold exactly
 (see [expression types](expressions.md#types)) is a `400` at its own
 pointer, with the message "Cannot be evaluated exactly.", and no validation
 of that record runs.

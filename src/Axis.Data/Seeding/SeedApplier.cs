@@ -13,6 +13,8 @@ namespace Axis.Data.Seeding;
 /// <see cref="RecordCommands.UpdateAsync"/>, so its version grows by one; an identical record is not
 /// written, undeclared fields keep their values, and no record is deleted. Only the owner's column
 /// values are compared, so a synced record whose only change is in its child rows is not written.
+/// Every write sets the record's computed fields, from the stored record and the declared values
+/// on an update. A value that cannot be computed rolls back every write.
 /// Seed values follow the
 /// record API's rules: each record goes through <see cref="RecordInputParser"/> as a create body
 /// and is inserted by <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any
@@ -72,6 +74,7 @@ public static class SeedApplier
             var updating = false;
             if (seed.Sync)
             {
+                // Only the declared values are compared, so a computed value alone never causes a write.
                 var found = await RecordCommands.FindVersionAsync(connection, entity, id, input.Values, cancellationToken);
                 if (found is { Differs: false })
                 {
@@ -79,9 +82,32 @@ public static class SeedApplier
                 }
 
                 updating = found is not null;
-                result = found is { } stored
-                    ? await RecordCommands.UpdateAsync(connection, model, entity, id, stored.Version, input.Values, input.Rows, cancellationToken)
-                    : await RecordCommands.CreateAsync(connection, model, entity, input.Values, input.Rows, id, cancellationToken);
+                if (found is { } existing)
+                {
+                    // The seed declares only some values, so the others come from the stored record.
+                    var stored = entity.HasComputedFields
+                        ? await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken)
+                        : null;
+                    var computed = RecordComputer.ComputeUpdate(entity, stored, input.Values, input.Rows);
+                    if (computed.Errors is { } errors)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return NotComputed(seed, index, errors);
+                    }
+
+                    result = await RecordCommands.UpdateAsync(connection, model, entity, id, existing.Version, computed.Values, computed.Rows, cancellationToken);
+                }
+                else
+                {
+                    var computed = RecordComputer.ComputeCreate(entity, input.Values, input.Rows);
+                    if (computed.Errors is { } errors)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return NotComputed(seed, index, errors);
+                    }
+
+                    result = await RecordCommands.CreateAsync(connection, model, entity, computed.Values, computed.Rows, id, cancellationToken);
+                }
             }
             else
             {
@@ -90,7 +116,14 @@ public static class SeedApplier
                     continue;
                 }
 
-                result = await RecordCommands.CreateAsync(connection, model, entity, input.Values, input.Rows, id, cancellationToken);
+                var computed = RecordComputer.ComputeCreate(entity, input.Values, input.Rows);
+                if (computed.Errors is { } errors)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return NotComputed(seed, index, errors);
+                }
+
+                result = await RecordCommands.CreateAsync(connection, model, entity, computed.Values, computed.Rows, id, cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)
@@ -124,6 +157,10 @@ public static class SeedApplier
             0,
             0);
     }
+
+    /// <summary>Reports a record whose computed fields could not be computed, at the pointers of its errors.</summary>
+    private static SeedResult NotComputed(SeedModel seed, int index, SortedDictionary<string, string[]> errors) =>
+        new(DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, $"/records/{index}{error.Key}", error.Value[0]))), 0, 0);
 
     private static Diagnostic Invalid(SeedModel seed, string path, string message) =>
         new(DiagnosticCodes.InvalidSeedValue, message, seed.File, path, seed.Id);

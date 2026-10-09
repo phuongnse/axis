@@ -12,7 +12,7 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
 /// of every locale, checks every entity's fields against the field type rules and type-checks its
-/// validations, checks sites,
+/// computed fields and validations, checks sites,
 /// pages and seeds, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -273,7 +273,46 @@ public static class ApplicationCompiler
             }
         }
 
+        CheckComputedFields(entity, Report);
         CheckValidations(entity, textKeys, diagnostics, Report);
+    }
+
+    /// <summary>
+    /// Checks the expression of each computed field of a scalar type: it parses and type-checks to
+    /// the field's type over the entity's fields that are not computed. A computed field is not in
+    /// the scope, so naming one, itself included, is an unknown name. An expression problem is
+    /// reported at the expression with its own code.
+    /// </summary>
+    private static void CheckComputedFields(EntityResource entity, Action<string, string, string> report)
+    {
+        if (entity.Fields.All(field => field.Expression is null))
+        {
+            return;
+        }
+
+        var scope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false);
+        for (var index = 0; index < entity.Fields.Count; index++)
+        {
+            var field = entity.Fields[index];
+
+            // A reference or child collection is reported by CheckField, and so is an enum without values.
+            var type = FieldTypes.Parse(field.Type);
+            if (field.Expression is null
+                || type is FieldType.Reference or FieldType.ChildCollection
+                || (type == FieldType.Enum && field.Values is null))
+            {
+                continue;
+            }
+
+            var parsed = ExpressionParser.Parse(field.Expression);
+            ExpressionDiagnostic? problem = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!).Diagnostic
+                : parsed.Diagnostic;
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, $"/fields/{index}/expression");
+            }
+        }
     }
 
     /// <summary>
@@ -458,6 +497,26 @@ public static class ApplicationCompiler
         {
             report(DiagnosticCodes.MissingTypeProperty, "An enum field must list its 'values'.", path);
         }
+
+        // The expression itself is checked by CheckComputedFields, against the other fields.
+        if (field.Expression is not null)
+        {
+            Fits(
+                "expression",
+                "text, integer, decimal, boolean, date, date-time and enum",
+                FieldType.Text,
+                FieldType.Integer,
+                FieldType.Decimal,
+                FieldType.Boolean,
+                FieldType.Date,
+                FieldType.DateTime,
+                FieldType.Enum);
+
+            if (field.Required == true)
+            {
+                report(DiagnosticCodes.InvalidConstraint, "'required' cannot be set on a computed field.", $"{path}/required");
+            }
+        }
     }
 
     /// <summary>
@@ -581,7 +640,8 @@ public static class ApplicationCompiler
 
     private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName)
     {
-        var fields = entity.Fields.Select(field => BuildField(field, entitiesByName)).ToList();
+        var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false);
+        var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName)).ToList();
         var scope = ExpressionScopes.ForEntity(fields);
         return new EntityModel
         {
@@ -598,7 +658,7 @@ public static class ApplicationCompiler
         };
     }
 
-    private static FieldModel BuildField(FieldDefinition field, Dictionary<string, EntityResource> entitiesByName)
+    private static FieldModel BuildField(FieldDefinition field, ExpressionScope inputScope, Dictionary<string, EntityResource> entitiesByName)
     {
         var type = FieldTypes.Parse(field.Type);
         var target = field.Target is null ? null : entitiesByName[field.Target];
@@ -615,6 +675,9 @@ public static class ApplicationCompiler
             Values = field.Values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
             TargetDisplayField = type == FieldType.Reference && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
+            Computed = field.Expression is null
+                ? null
+                : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
         };
     }
 

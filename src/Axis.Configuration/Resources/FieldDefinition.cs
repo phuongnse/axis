@@ -26,4 +26,7 @@ public sealed record FieldDefinition
     public string? Target { get; init; }
 
     public IReadOnlyList<string>? Values { get; init; }
+
+    /// <summary>The expression of a computed field, or null for a field that clients write.</summary>
+    public string? Expression { get; init; }
 }

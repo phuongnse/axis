@@ -9,6 +9,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     labelKey: null,
     required: false,
     unique: false,
+    computed: false,
     maxLength: null,
     precision: null,
     scale: null,
@@ -93,5 +94,22 @@ describe('buildRecordBody', () => {
         }),
       ).toBe('{"values":{"lines":[{"quantity":3},{"description":"Ink"}]}}')
     })
+
+    it('leaves a computed row field out even when it holds a value', () => {
+      const computedLines = {
+        ...lines,
+        fields: [field('description', 'text'), { ...field('code', 'text'), computed: true }],
+      }
+      expect(buildRecordBody([computedLines], { lines: [{ description: 'Pens', code: 'PENS' }] })).toBe(
+        '{"values":{"lines":[{"description":"Pens"}]}}',
+      )
+    })
+  })
+
+  it('leaves a computed field out even when it holds a value', () => {
+    const withTotal = [...fields, { ...field('total', 'decimal'), computed: true }]
+    expect(buildRecordBody(withTotal, { amount: '1.50', total: '3.00' }, 2)).toBe(
+      '{"version":2,"values":{"amount":1.50}}',
+    )
   })
 })

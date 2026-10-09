@@ -7,27 +7,44 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Builds the scope an entity's expressions are checked against: every field that has a column,
 /// with its expression type. A child collection is left out, because only aggregates accept a list
-/// and they are not built yet. A repeated name keeps its first field, ignoring letter case.
+/// and they are not built yet. A computed field is left out when <c>includeComputed</c> is false,
+/// as for the expression of a computed field. A repeated name keeps its first field, ignoring
+/// letter case.
 /// </summary>
 public static class ExpressionScopes
 {
-    public static ExpressionScope ForEntity(IEnumerable<FieldModel> fields)
+    public static ExpressionScope ForEntity(IEnumerable<FieldModel> fields, bool includeComputed = true)
     {
         ArgumentNullException.ThrowIfNull(fields);
-        return Build(fields.Select(field => (field.Name, field.Type, field.Values, field.Target?.Name)));
+        return Build(fields
+            .Where(field => includeComputed || !field.IsComputed)
+            .Select(field => (field.Name, TypeOf(field))));
     }
 
-    internal static ExpressionScope ForEntity(IEnumerable<FieldDefinition> fields) =>
-        Build(fields.Select(field => (field.Name, FieldTypes.Parse(field.Type), field.Values, field.Target)));
+    internal static ExpressionScope ForEntity(IEnumerable<FieldDefinition> fields, bool includeComputed = true) =>
+        Build(fields
+            .Where(field => includeComputed || field.Expression is null)
+            .Select(field => (field.Name, TypeOf(field))));
 
-    private static ExpressionScope Build(IEnumerable<(string Name, FieldType Type, IReadOnlyList<string>? Values, string? Target)> fields)
+    /// <summary>The expression type of a field's value, or null for a child collection.</summary>
+    public static ExpressionType? TypeOf(FieldModel field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        return TypeOf(field.Name, field.Type, field.Values, field.Target?.Name);
+    }
+
+    /// <summary>The expression type of a field's value, or null for a child collection.</summary>
+    internal static ExpressionType? TypeOf(FieldDefinition field) =>
+        TypeOf(field.Name, FieldTypes.Parse(field.Type), field.Values, field.Target);
+
+    private static ExpressionScope Build(IEnumerable<(string Name, ExpressionType? Type)> fields)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, type, values, target) in fields)
+        foreach (var (name, type) in fields)
         {
-            if (TypeOf(name, type, values, target) is { } expressionType)
+            if (type is not null)
             {
-                types.TryAdd(name, expressionType);
+                types.TryAdd(name, type);
             }
         }
 
