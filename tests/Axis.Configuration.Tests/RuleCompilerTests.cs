@@ -154,6 +154,20 @@ public sealed class RuleCompilerTests
     }
 
     [Fact]
+    public void An_invalid_date_literal_in_a_rule_body_is_reported_at_its_position()
+    {
+        using var folder = Folder("Check(quantity)").With(
+            "rules/check.json", Rule("66666666-6666-4666-8666-666666666607", "Check", "value > 0 and date('2026-13-45') is null"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.TypeMismatch, "rules/check.json", "/expression"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'2026-13-45' is not a valid date at character 15.", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void An_enum_parameter_type_is_a_schema_violation()
     {
         using var folder = Folder(null).With("rules/status.json", """

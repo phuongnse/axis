@@ -36,6 +36,8 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("r", "reference to 'department'")]
     [InlineData("date('2026-10-08')", "date")]
     [InlineData("DATETIME('2026-10-08T09:30:00Z')", "date-time")]
+    [InlineData("date('2026-02-28')", "date")]
+    [InlineData("dateTime('2026-10-08T09:30:00+07:00')", "date-time")]
     // Arithmetic: integers stay integers, a decimal on either side gives a decimal.
     [InlineData("i + i", "integer")]
     [InlineData("i - 1", "integer")]
@@ -167,6 +169,21 @@ public sealed class ExpressionTypeCheckerTests
         var diagnostic = CheckFails(text, ExpressionType.Null);
 
         Assert.Equal(ExpressionDiagnosticCodes.WrongArgumentCount, diagnostic.Code);
+        Assert.Equal(message, diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date at character 7.")]
+    [InlineData("dt == date('2026-02-29')", 6, "'2026-02-29' is not a valid date at character 7.")]
+    [InlineData("ts == dateTime('2026-10-08T09:30:00')", 6, "'2026-10-08T09:30:00' is not a valid date-time at character 7.")]
+    [InlineData("ts == dateTime('2026-10-08T09:30:00.1234567Z')", 6, "'2026-10-08T09:30:00.1234567Z' is not a valid date-time at character 7.")]
+    [InlineData("dt in (date('2026-13-45'))", 7, "'2026-13-45' is not a valid date at character 8.")]
+    public void A_date_literal_whose_text_is_not_valid_is_reported_at_the_call(string text, int offset, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null);
+
+        Assert.Equal(ExpressionDiagnosticCodes.TypeMismatch, diagnostic.Code);
+        Assert.Equal(offset, diagnostic.Offset);
         Assert.Equal(message, diagnostic.Message);
     }
 

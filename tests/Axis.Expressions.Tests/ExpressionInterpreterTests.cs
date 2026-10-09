@@ -144,7 +144,12 @@ public sealed class ExpressionInterpreterTests
     [InlineData("ts == dateTime('0001-01-01T00:00:00+01:00')", "'0001-01-01T00:00:00+01:00' is not a valid date-time at character 7.")]
     public void A_date_literal_that_is_not_a_valid_date_is_a_run_time_error(string text, string message)
     {
-        var error = EvaluateFails(text);
+        // The type checker rejects these literals, so only a tree that skipped it reaches this guard.
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var result = ExpressionInterpreter.Evaluate(parsed.Expression, new ExpressionCheckResult(ExpressionType.Boolean, null), Values([]));
+        Assert.False(result.Succeeded, $"Expected a run-time error for '{text}', got {result.Value}.");
+        var error = result.Error;
 
         Assert.Equal(ExpressionRuntimeErrorKind.InvalidDateLiteral, error.Kind);
         Assert.Equal(message, error.Message);

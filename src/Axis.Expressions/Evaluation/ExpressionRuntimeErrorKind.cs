@@ -9,7 +9,10 @@ public enum ExpressionRuntimeErrorKind
     /// <summary>A decimal result that <see cref="decimal"/> cannot hold exactly.</summary>
     DecimalOverflow,
 
-    /// <summary>A <c>date</c> or <c>dateTime</c> literal whose text is not a valid date or instant.</summary>
+    /// <summary>
+    /// A <c>date</c> or <c>dateTime</c> literal whose text is not a valid date or instant. The type
+    /// checker rejects such a literal, so only a tree that skipped it gets this error.
+    /// </summary>
     InvalidDateLiteral,
 
     /// <summary>An <c>addDays</c> result before 0001-01-01 or after 9999-12-31.</summary>

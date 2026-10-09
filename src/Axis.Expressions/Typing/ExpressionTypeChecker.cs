@@ -1,4 +1,5 @@
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Evaluation;
 using Axis.Expressions.Functions;
 using Axis.Expressions.Syntax;
 
@@ -12,7 +13,8 @@ namespace Axis.Expressions.Typing;
 /// to the named rules in the scope. A collection is accepted only as the first argument of an
 /// aggregate, and the aggregate's item expression sees only the child row's fields. A path through
 /// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
-/// other scope. It stops at the first problem and reports only that one.
+/// other scope. The text of a <c>date</c> or <c>dateTime</c> literal must be a valid date or
+/// date-time under <see cref="DateLiterals"/>. It stops at the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
@@ -211,12 +213,21 @@ public static class ExpressionTypeChecker
                 return Combine(call, name, types, 1, context);
 
             case "date" or "dateTime":
-                if (call.Arguments is not [TextLiteral])
+                if (call.Arguments is not [TextLiteral { Value: var text }])
                 {
                     throw Fail(ExpressionDiagnosticCodes.TypeMismatch, $"Function '{name}' needs one text literal", call.Offset);
                 }
 
-                return name == "date" ? ExpressionType.Date : ExpressionType.DateTime;
+                if (name == "date")
+                {
+                    return DateLiterals.TryParseDate(text, out _)
+                        ? ExpressionType.Date
+                        : throw Fail(ExpressionDiagnosticCodes.TypeMismatch, $"'{text}' is not a valid date", call.Offset);
+                }
+
+                return DateLiterals.TryParseDateTime(text, out _)
+                    ? ExpressionType.DateTime
+                    : throw Fail(ExpressionDiagnosticCodes.TypeMismatch, $"'{text}' is not a valid date-time", call.Offset);
 
             default:
                 throw new InvalidOperationException($"The type checker has no rule for function '{name}'.");

@@ -222,12 +222,10 @@ and in [functions](#functions).
 | Date-time | `dateTime('2026-10-08T09:30:00Z')` | Same RFC 3339 rules as the record API: an offset is required, and the fraction has up to 6 digits. See [request bodies and values](record-api.md#request-bodies-and-values). |
 
 - **Date and date-time.** The argument of `date` and `dateTime` must be one
-  text literal. The type checker enforces this, but it does not check the
-  text. In a data source filter, the SQL translation parses the text, so
-  `date('2026-13-45')` is `AXC0053` at compile time. Elsewhere, such as in a
-  validation, it passes the compiler and is a
-  [run-time error](#run-time-errors) when it is evaluated. Checking the text
-  at compile time for every use is *(planned for M2)*.
+  text literal. The type checker also parses the text with the rules in the
+  table above. So `date('2026-13-45')` is `AXC0047` at compile time in every
+  use, reported at the call, such as
+  `'2026-13-45' is not a valid date at character 7.`
 - **Enum values.** An enum value is a text literal, checked against the
   field's `values`. See [Types](#types).
 - **Negative numbers.** A negative number is unary minus applied to a
@@ -403,7 +401,6 @@ These are errors:
 - division by zero;
 - integer overflow;
 - a decimal result that a .NET `decimal` cannot hold exactly;
-- a `date` or `dateTime` literal that is not a valid date or date-time;
 - a date outside 0001 to 9999 from `addDays`;
 - a `round` digit count outside 0 to 28;
 - an exhausted step budget.
@@ -470,8 +467,7 @@ These are left out:
 Rules:
 
 - **Not in the subset.** A filter that uses something left out is a compile
-  diagnostic in the type family, `AXC0053`. So is a `date('…')` or
-  `dateTime('…')` text that is not valid.
+  diagnostic in the type family, `AXC0053`.
 - **Null rows.** `WHERE` drops rows where the condition is `null`. This
   matches `null` counting as false.
 - **Parameters.** Values are always sent as parameters. They are never
@@ -540,7 +536,8 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   lacks, a function or rule argument of the wrong
   type, `coalesce`
   arguments or `if` branches that do not fit each other, and a `date` or
-  `dateTime` call without a text literal argument. It also includes a child
+  `dateTime` call without a text literal argument or with a text that is
+  not a valid date or date-time. It also includes a child
   collection used anywhere but as the first argument of an aggregate, such as
   `lineItems == null`, reported at the name, an aggregate whose first
   argument is not a child collection, such as `sum(title, amount)`, and an
@@ -560,8 +557,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   "needs at least 1 argument", and the count found.
 - **`AXC0053`.** A data source filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
-  includes `/`, `lower`, `upper`, `trim`, every aggregate, and a `date('…')` or
-  `dateTime('…')` text that is not valid. The message names what is not
+  includes `/`, `lower`, `upper`, `trim` and every aggregate. The message names what is not
   translated. It is reported only after the filter type-checks.
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
   the limit.
