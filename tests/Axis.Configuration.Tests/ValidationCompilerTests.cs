@@ -17,6 +17,7 @@ public sealed class ValidationCompilerTests
     public static TheoryData<string, string, string, string> InvalidValidations => new()
     {
         { """{ "expression": "quantity > 'a'", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "character" },
+        { """{ "expression": "quantity > 0 and date('2026-13-45') is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "'2026-13-45' is not a valid date at character 18." },
         { """{ "expression": "quantity + 1", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/validations/0/expression", "boolean" },
         { """{ "expression": "quantity >", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.SyntaxError, "/validations/0/expression", "character" },
         { """{ "expression": "lines is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
