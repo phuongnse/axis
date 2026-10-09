@@ -1,8 +1,21 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Specs run in parallel against one database, so these tests rely only on the seeded departments and
 // suppliers of the purchase request sample, and on the requests they create.
 const tablePath = /\/purchasing\/purchaserequests\?pageSize=100&sort=-title$/
+
+const appPath = '/api/apps/PurchaseRequests'
+const rowsPath = `${appPath}/data-sources/PurchaseRequestList/rows`
+
+/** The id of the seeded department named `name`, read from the record API. */
+async function departmentId(request: APIRequestContext, name: string) {
+  const response = await request.get(`${appPath}/entities/Department/records?pageSize=100`)
+  expect(response.status()).toBe(200)
+  const body = (await response.json()) as { items: { id: string; values: { name: string } }[] }
+  const department = body.items.find((item) => item.values.name === name)
+  expect(department).toBeDefined()
+  return department!.id
+}
 
 /** Opens the lookup of the reference field labelled `label` and picks the row named `name`. */
 async function choose(page: Page, label: string, name: string) {
@@ -63,6 +76,42 @@ test('a purchase request is created with a seeded department and supplier, edite
   await expect(dark.getByLabel('Department', { exact: true })).toHaveValue('Finance')
   await dark.getByRole('button', { name: 'Cancel' }).click()
   await expect(page).toHaveURL(tablePath)
+})
+
+test('the purchase request list reads a data source, shows department names, and keeps paging and sorting after reload, in light and dark mode', async ({
+  page,
+  request,
+}) => {
+  // Titles of this run sort after those of the other tests and of earlier retries, so with
+  // sort=-title the first ten are on page 1 and the eleventh opens page 2.
+  const run = `${Date.now()}-${test.info().retry}`
+  const finance = await departmentId(request, 'Finance')
+  for (let index = 1; index <= 11; index++) {
+    const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
+      data: { values: { title: `Zz List ${run} ${String(index).padStart(2, '0')}`, department: finance } },
+    })
+    expect(response.status()).toBe(201)
+  }
+
+  const rowsLoad = page.waitForResponse((response) => response.url().includes(rowsPath))
+  await page.goto('/purchasing/purchaserequests?page=2&pageSize=10&sort=-title')
+  expect((await rowsLoad).status()).toBe(200)
+
+  const listPath = /\/purchasing\/purchaserequests\?page=2&pageSize=10&sort=-title$/
+  const first = page.getByRole('row', { name: new RegExp(`Zz List ${run} 01 `) })
+  for (const mode of ['light', 'dark']) {
+    if (mode === 'dark') {
+      await page.getByRole('switch', { name: 'Dark mode' }).click()
+    }
+    await page.reload()
+
+    await expect(page.locator(`[data-theme-mode="${mode}"]`)).toBeVisible()
+    await expect(page).toHaveURL(listPath)
+    await expect(page.locator('.ant-pagination-item-active')).toHaveText('2')
+    await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
+    await expect(page.getByRole('columnheader', { name: 'Department' })).toBeVisible()
+    await expect(first).toContainText('Finance')
+  }
 })
 
 test('a total amount of zero or less shows the sample rule under Total amount, in light and dark mode', async ({ page }) => {

@@ -4,5 +4,5 @@
   "name": "PurchaseRequests",
   "formatVersion": 1,
   "title": { "textKey": "pages.purchaseRequests.title" },
-  "widgets": [{ "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }]
+  "widgets": [{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }]
 }

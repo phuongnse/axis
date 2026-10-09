@@ -9,6 +9,7 @@
     "nav.items": "Mặt hàng",
     "nav.departments": "Phòng ban",
     "items.title": "Mặt hàng",
+    "itemsByDepartment.title": "Mặt hàng theo phòng ban",
     "itemForm.title": "Mặt hàng",
     "departments.title": "Phòng ban",
     "item.department": "Phòng ban",

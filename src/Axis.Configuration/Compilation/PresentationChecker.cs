@@ -6,7 +6,7 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Checks the sites and pages of an application against its entities, pages and texts. A name
+/// Checks the sites and pages of an application against its entities, pages, data sources and texts. A name
 /// that belongs to a file which was not loaded because of its own errors is not reported again.
 /// </summary>
 internal static class PresentationChecker
@@ -15,12 +15,13 @@ internal static class PresentationChecker
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
         Func<string, PageResource?> findPage,
+        Func<string, DataSourceResource?> findDataSource,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, textKeys, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, textKeys, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -37,6 +38,7 @@ internal static class PresentationChecker
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
         Func<string, PageResource?> findPage,
+        Func<string, DataSourceResource?> findDataSource,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
@@ -49,13 +51,57 @@ internal static class PresentationChecker
         {
             var widget = page.Widgets[index];
             var path = $"/widgets/{index}";
+            var isForm = WidgetTypes.Parse(widget.Type) == WidgetType.Form;
 
-            if (findEntity(widget.Entity) is null && !loaded.UnloadedEntityNames.Contains(widget.Entity))
+            // A widget shows all records of an entity or the rows of a data source, never both.
+            if ((widget.Entity is null) == (widget.DataSource is null))
             {
                 Report(
-                    DiagnosticCodes.UnknownWidgetEntity,
-                    $"The entity '{widget.Entity}' was not found. No loaded entity has that name.",
-                    $"{path}/entity");
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    "A widget must name exactly one of 'entity' and 'dataSource'.",
+                    path);
+                continue;
+            }
+
+            // The entity the widget's records belong to: its own, or the root entity of its data
+            // source. Null when the data source is unknown.
+            string? recordEntity = widget.Entity;
+            if (widget.Entity is { } entityName)
+            {
+                if (findEntity(entityName) is null && !loaded.UnloadedEntityNames.Contains(entityName))
+                {
+                    Report(
+                        DiagnosticCodes.UnknownWidgetEntity,
+                        $"The entity '{entityName}' was not found. No loaded entity has that name.",
+                        $"{path}/entity");
+                }
+            }
+            else if (isForm)
+            {
+                // A form edits one record of an entity, which a projection of rows cannot.
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'dataSource' applies only to table widgets.", $"{path}/dataSource");
+                continue;
+            }
+            else if (findDataSource(widget.DataSource!) is { } dataSource)
+            {
+                recordEntity = dataSource.Entity;
+
+                // A table has no inputs for parameter values yet, so a required one would make
+                // every request for its rows fail.
+                foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
+                {
+                    Report(
+                        DiagnosticCodes.InvalidWidgetBinding,
+                        $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A table can only show a data source whose parameters are all optional.",
+                        $"{path}/dataSource");
+                }
+            }
+            else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!))
+            {
+                Report(
+                    DiagnosticCodes.UnknownWidgetDataSource,
+                    $"The data source '{widget.DataSource}' was not found. No loaded data source has that name.",
+                    $"{path}/dataSource");
             }
 
             if (widget.FormPage is not { } formPage)
@@ -63,19 +109,22 @@ internal static class PresentationChecker
                 continue;
             }
 
-            if (WidgetTypes.Parse(widget.Type) == WidgetType.Form)
+            if (isForm)
             {
                 Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
             }
             else if (findPage(formPage) is { } target)
             {
+                // Rows of a data source carry the id of their root record, so the form must be over
+                // that root entity.
                 var targetWidget = target.Widgets[0];
                 if (WidgetTypes.Parse(targetWidget.Type) != WidgetType.Form
-                    || !string.Equals(targetWidget.Entity, widget.Entity, StringComparison.OrdinalIgnoreCase))
+                    || (recordEntity is not null && !string.Equals(targetWidget.Entity, recordEntity, StringComparison.OrdinalIgnoreCase)))
                 {
+                    var expected = recordEntity is null ? "a form widget" : $"a form widget over '{recordEntity}'";
                     Report(
                         DiagnosticCodes.InvalidFormPage,
-                        $"The page '{target.Name}' must hold a form widget over '{widget.Entity}', but holds a {targetWidget.Type} widget over '{targetWidget.Entity}'.",
+                        $"The page '{target.Name}' must hold {expected}, but holds a {targetWidget.Type} widget over '{targetWidget.Entity ?? targetWidget.DataSource}'.",
                         $"{path}/formPage");
                 }
             }

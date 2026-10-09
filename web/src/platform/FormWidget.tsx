@@ -8,11 +8,11 @@ import { formatValue } from './formatValue'
 import { buildRecordBody } from './recordBody'
 import { fetchRecord, saveRecord, type FieldValue, type RecordItem, type RecordRow, type RecordValue } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
-import type { FieldMetadata, WidgetMetadata } from './site'
+import type { EntityWidgetMetadata, FieldMetadata } from './site'
 import { useText } from './texts'
 
 interface FormWidgetProps {
-  widget: WidgetMetadata
+  widget: EntityWidgetMetadata
   /** The record to edit, or `null` to create one. */
   recordId: string | null
   /** Where save and cancel go: the table page the user came from. */

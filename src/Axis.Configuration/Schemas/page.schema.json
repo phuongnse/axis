@@ -39,10 +39,11 @@
     "widget": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "entity"],
+      "required": ["type"],
       "properties": {
         "type": { "enum": ["table", "form"] },
         "entity": { "$ref": "#/$defs/name" },
+        "dataSource": { "$ref": "#/$defs/name" },
         "formPage": { "$ref": "#/$defs/name" }
       }
     }

@@ -1,0 +1,8 @@
+{
+  "id": "b8d04a80-4026-4982-b0f7-965597172976",
+  "kind": "page",
+  "name": "ItemsByDepartment",
+  "formatVersion": 1,
+  "title": { "textKey": "itemsByDepartment.title" },
+  "widgets": [{ "type": "table", "dataSource": "ItemsByDepartment", "formPage": "ItemForm" }]
+}

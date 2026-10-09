@@ -15,7 +15,7 @@ export interface FormatOptions {
  * the API wrote them, and a reference shows the label of the record it points to.
  */
 export function formatValue(
-  field: FieldMetadata,
+  field: Pick<FieldMetadata, 'name' | 'type'>,
   value: RecordValue,
   labels: Record<string, string>,
   options: FormatOptions,

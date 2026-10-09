@@ -1,0 +1,17 @@
+{
+  "id": "cf3831ca-5fcf-4d28-8d13-507454ea11d3",
+  "kind": "dataSource",
+  "name": "PurchaseRequestList",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "requester", "path": "requester" },
+    { "name": "department", "path": "department" },
+    { "name": "supplier", "path": "supplier" },
+    { "name": "currency", "path": "currency" },
+    { "name": "totalAmount", "path": "totalAmount" },
+    { "name": "status", "path": "status" },
+    { "name": "submittedAt", "path": "submittedAt" }
+  ]
+}

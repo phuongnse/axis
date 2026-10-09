@@ -7,7 +7,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 - **One SPA for all applications.** The SPA renders from metadata served by
   the server: site navigation, pages and their widgets, data source schemas
-  *(planned for M2)* and text resources. Publishing an application never
+  and text resources. Publishing an application never
   rebuilds the frontend.
 - **Shared look and feel.** A page is a route in a site, and its widgets are
   its content. Each widget type, such as `table` and `form`, has one shared
@@ -86,7 +86,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
               "fields": null
             }
           ]
-        }
+        },
+        "dataSource": null
       }
     ]
   }
@@ -96,7 +97,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
   - `type` of a widget is `table` or `form`. `formPage` is the page holding
-    the form for a table's records, and `null` otherwise.
+    the form for a table's records, and `null` otherwise. Exactly one of
+    `entity` and `dataSource` is set, and the other is `null`. The data source
+    binding of the table widget below describes `dataSource`.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -158,7 +161,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     The theme toggle and the locale switch work as they do on the platform
     site.
 - **Table widget.** A page whose widget is a `table` lists the records of its
-  entity through the record API, in the shared Ant Design table.
+  entity through the record API, or the rows of its data source, in the
+  shared Ant Design table.
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection has no column.
@@ -166,10 +170,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `page`, `pageSize` and `sort` (`-` and the field name for descending), so
     reload, sharing and the back button keep them. The widget writes them
     after every other parameter, always in the order `page`, `pageSize`,
-    `sort`, and leaves out defaults (page 1, 20 a page, no sort). It changes
+    `sort`, and leaves out defaults (page 1, 20 a page or the data source's
+    page size, no sort). It changes
     only its own three parameters: any other parameter, such as `x=1`, stays
     as it is.
-  - **Data source binding** *(planned for M2)*. A table may name a
+  - **Data source binding.** A table may name a
     `dataSource` instead of an `entity`. See
     [data-sources.md](data-sources.md#widget-binding). Page metadata then
     gives the widget `"entity": null` and a `dataSource` object. An entity
@@ -202,18 +207,26 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       has none.
     - **Columns.** There is one column per projected field, in order. The
       header is the label of the field the path ends at, else the projected
-      name. A measure's header is its name.
-    - **Filter inputs.** There is one input per parameter, of the kind the form
-      widget uses for that type. It shows the parameter's label, or its name
-      when `labelKey` is `null`.
-    - **URL state.** The parameter values live in the URL under the parameter
-      names. The widget writes them before `page`, `pageSize` and `sort`.
-    - **Rows.** The table requests its rows from `rowsPath`.
+      name. A measure's header is its name *(planned for M2)*. Sorting,
+      values and labels follow the rules below, by the column's type.
+    - **Page size.** The data source's `pageSize` is the table's default page
+      size. It is offered with 10, 20, 50 and 100 when it is not one of them,
+      and the URL leaves it out.
+    - **Filter inputs** *(planned for M2)*. There is one input per parameter,
+      of the kind the form widget uses for that type. It shows the
+      parameter's label, or its name when `labelKey` is `null`. Until they
+      are built, the table sends no parameter values.
+    - **URL state** *(planned for M2)*. The parameter values live in the URL
+      under the parameter names. The widget writes them before `page`,
+      `pageSize` and `sort`.
+    - **Rows.** The table requests its rows from `rowsPath`. A row carries
+      the id of its root record, so its open link and the create button go
+      to the `formPage` as for an entity table.
   - **Changes.** A new sort or page size starts again at page 1, because the
     old page number means nothing under a new order or size. Only the
     pagination control moves between pages. Each change adds a history entry.
   - **Invalid values.** A `page` that is not a positive integer, a `pageSize`
-    other than the offered 10, 20, 50 and 100, and a `sort` that names no
+    other than the offered sizes, and a `sort` that names no
     field, a reference field or a child collection field are ignored. The default is requested instead,
     and the URL is rewritten without them and without a history entry. Once
     the total is known, a `page` past the last page (at least 1) becomes the

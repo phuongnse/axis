@@ -58,6 +58,15 @@ public static class ApplicationCompiler
 
         PageResource? FindPage(string name) => pagesByName.GetValueOrDefault(name);
 
+        // Data source names follow the same rule too.
+        var dataSourcesByName = new Dictionary<string, DataSourceResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dataSource in loaded.DataSources)
+        {
+            dataSourcesByName.TryAdd(dataSource.Name, dataSource);
+        }
+
+        DataSourceResource? FindDataSource(string name) => dataSourcesByName.GetValueOrDefault(name);
+
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
@@ -72,7 +81,7 @@ public static class ApplicationCompiler
             CheckEntity(entity, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, textKeys, rules, diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
+        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, diagnostics);
 
@@ -88,7 +97,7 @@ public static class ApplicationCompiler
             Manifest = loaded.Application,
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
-            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName)).ToList(),
+            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities)).ToList(),
@@ -839,7 +848,8 @@ public static class ApplicationCompiler
     private static PageModel BuildPage(
         PageResource page,
         Dictionary<string, EntityResource> entitiesByName,
-        Dictionary<string, PageResource> pagesByName) =>
+        Dictionary<string, PageResource> pagesByName,
+        Dictionary<string, DataSourceResource> dataSourcesByName) =>
         new()
         {
             Id = page.Id,
@@ -849,11 +859,14 @@ public static class ApplicationCompiler
             Widgets = page.Widgets
                 .Select(widget =>
                 {
-                    var entity = entitiesByName[widget.Entity];
+                    // A checked widget names exactly one of an entity and a data source.
+                    var entity = widget.Entity is null ? null : entitiesByName[widget.Entity];
+                    var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
                     return new WidgetModel(
                         WidgetTypes.Parse(widget.Type),
-                        new EntityReference(entity.Id, entity.Name),
-                        widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]));
+                        entity is null ? null : new EntityReference(entity.Id, entity.Name),
+                        widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
+                        dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name));
                 })
                 .ToList(),
         };

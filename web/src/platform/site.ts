@@ -75,12 +75,55 @@ export interface EntityMetadata {
   fields: FieldMetadata[]
 }
 
-/** One widget of a page. `formPage` is set only on a table that names the page holding its form. */
+/** One typed input of a data source's filter. `values` is for an enum and `target` for a reference. */
+export interface DataSourceParameter {
+  name: string
+  type: FieldType
+  required: boolean
+  labelKey: string | null
+  values: string[] | null
+  target: ReferenceTarget | null
+}
+
+/**
+ * One projected column of a data source: its key in a row, and the type and label of the field its
+ * path ends at. `values` is for an enum and `target` for a reference.
+ */
+export interface DataSourceColumn {
+  name: string
+  type: FieldType
+  labelKey: string | null
+  values: string[] | null
+  target: ReferenceTarget | null
+}
+
+/**
+ * The data source a table shows: the path of its rows endpoint, its root entity, its parameters,
+ * its default page size and its columns in declaration order.
+ */
+export interface DataSourceMetadata {
+  name: string
+  rowsPath: string
+  entity: string
+  parameters: DataSourceParameter[]
+  pageSize: number
+  columns: DataSourceColumn[]
+}
+
+/**
+ * One widget of a page. Exactly one of `entity` and `dataSource` is set: the widget shows all
+ * records of an entity, or the rows of a data source. `formPage` is set only on a table that names
+ * the page holding its form.
+ */
 export interface WidgetMetadata {
   type: 'table' | 'form'
   formPage: string | null
-  entity: EntityMetadata
+  entity: EntityMetadata | null
+  dataSource: DataSourceMetadata | null
 }
+
+/** A widget over an entity. A form widget is always one: it is never bound to a data source. */
+export type EntityWidgetMetadata = WidgetMetadata & { entity: EntityMetadata }
 
 /** A page of an application site, as served by `GET /api/sites/{path}/pages/{page}`. */
 export interface PageMetadata {

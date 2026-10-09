@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { FormWidget } from './FormWidget'
-import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
+import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
@@ -31,9 +31,10 @@ const recordsPath = '/api/apps/E2eApp/entities/Note/records'
 const noteId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 
-const noteWidget: WidgetMetadata = {
+const noteWidget: EntityWidgetMetadata = {
   type: 'form',
   formPage: null,
+  dataSource: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -57,7 +58,7 @@ const noteWidget: WidgetMetadata = {
 }
 
 // A note with only a title and its lines, a child collection.
-const linesWidget: WidgetMetadata = {
+const linesWidget: EntityWidgetMetadata = {
   ...noteWidget,
   entity: {
     ...noteWidget.entity,
@@ -75,7 +76,7 @@ const linesWidget: WidgetMetadata = {
 }
 
 // A note whose total and each line's code the server computes.
-const computedWidget: WidgetMetadata = {
+const computedWidget: EntityWidgetMetadata = {
   ...noteWidget,
   entity: {
     ...noteWidget.entity,
@@ -158,7 +159,7 @@ function CurrentLocation() {
   return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
 }
 
-function renderForm(recordId: string | null = null, widget: WidgetMetadata = noteWidget) {
+function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
   return render(
     <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
@@ -386,7 +387,7 @@ describe('FormWidget', () => {
 
   it('shows no clear button for a required reference or an empty one', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
-    const requiredWidget: WidgetMetadata = {
+    const requiredWidget: EntityWidgetMetadata = {
       ...noteWidget,
       entity: {
         ...noteWidget.entity,
