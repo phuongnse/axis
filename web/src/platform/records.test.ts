@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchRecord, fetchRecords, parseRecordJson, saveRecord } from './records'
+import { fetchRecord, fetchRecords, parseRecordJson, RecordQueryProblem, saveRecord } from './records'
 
 describe('parseRecordJson', () => {
   it('keeps the source text of numbers and leaves strings unchanged', () => {
@@ -32,6 +32,25 @@ describe('fetchRecords', () => {
       pageSize: 10,
       totalCount: 45,
     })
+  })
+
+  it('throws the errors of a 400 problem by parameter name', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('{"title":"One or more validation errors occurred.","errors":{"statusFilter":["Bad."]}}', {
+            status: 400,
+          }),
+      ),
+    )
+
+    const error: unknown = await fetchRecords('/api/apps/E2eApp/data-sources/NoteList/rows', 'statusFilter=x').catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(error).toBeInstanceOf(RecordQueryProblem)
+    expect((error as RecordQueryProblem).errors).toEqual({ statusFilter: ['Bad.'] })
   })
 })
 

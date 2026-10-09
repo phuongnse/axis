@@ -11,9 +11,10 @@ the read endpoint, the response and the errors. Parts of this file are built:
 - `labels` for projected `reference` fields
 - the `table` widget binding, with the data source's schema in page metadata,
   its columns, paging and sorting
+- the filter inputs of a bound table, with their values in the URL
 
 The rest is marked *(planned for M2)*: a table bound to a grouped data
-source, and the filter inputs of a bound table. Dn refers to
+source. Dn refers to
 [decisions.md](../decisions.md). The design follows
 [D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
 of denormalize is in
@@ -348,7 +349,7 @@ The `errors` keys repeat the request's parameter names by design.
 
 ## Widget binding
 
-The table binding is built. Filter inputs and grouped data sources are
+The table binding and its filter inputs are built. Grouped data sources are
 *(planned for M2)*.
 
 - **Widgets.** Only the `table` widget binds to a data source. A `form` that
@@ -358,8 +359,7 @@ The table binding is built. Filter inputs and grouped data sources are
   loaded data source is `AXC0059`.
 - **Parameters.** A bound table needs every parameter of its data source to be
   optional, otherwise it is `AXC0060`. It shows one filter input per
-  parameter and sends their values from the URL *(planned for M2)*. Until
-  then it sends no parameter values, so its rows are unfiltered by them. See
+  parameter and sends their values from the URL. See
   [Table widget](frontend.md) for the details.
 - **Grouped data sources.** A table cannot bind a data source with an
   `aggregate` yet (`AXC0060`). The table builds its columns from `fields`

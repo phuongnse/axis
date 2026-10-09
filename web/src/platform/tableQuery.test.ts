@@ -13,6 +13,7 @@ describe('parseTableQuery', () => {
       page: 3,
       pageSize: 50,
       sort: { field: 'title', descending: true },
+      parameters: {},
     })
   })
 
@@ -23,8 +24,69 @@ describe('parseTableQuery', () => {
       'page=1.5&pageSize=10.0&sort=category',
       'page=+2&pageSize=%2010&sort=--title',
     ]) {
-      expect(parseTableQuery(new URLSearchParams(search), fields)).toEqual({ page: 1, pageSize: 20, sort: null })
+      expect(parseTableQuery(new URLSearchParams(search), fields)).toEqual({
+        page: 1,
+        pageSize: 20,
+        sort: null,
+        parameters: {},
+      })
     }
+  })
+})
+
+describe('data source parameters', () => {
+  const names = ['statusFilter', 'minTotal']
+
+  it('reads the values of the named parameters by exact name', () => {
+    const query = parseTableQuery(
+      new URLSearchParams('minTotal=10&statusfilter=draft&statusFilter=approved'),
+      fields,
+      20,
+      names,
+    )
+
+    expect(query.parameters).toEqual({ statusFilter: 'approved', minTotal: '10' })
+  })
+
+  it('drops empty values and keeps only the first of repeated values', () => {
+    expect(
+      parseTableQuery(new URLSearchParams('statusFilter=&minTotal=5&minTotal=7'), fields, 20, names).parameters,
+    ).toEqual({
+      minTotal: '5',
+    })
+  })
+
+  it('writes the values before page, pageSize and sort, after other parameters', () => {
+    const current = new URLSearchParams('page=2&minTotal=5&x=1&statusFilter=draft&statusFilter=approved')
+    const query = {
+      page: 2,
+      pageSize: 10,
+      sort: { field: 'title', descending: true },
+      parameters: { statusFilter: 'approved', minTotal: '5' },
+    }
+
+    expect(writeTableQuery(current, query, 20, names).toString()).toBe(
+      'x=1&statusFilter=approved&minTotal=5&page=2&pageSize=10&sort=-title',
+    )
+  })
+
+  it('removes a cleared value from the URL', () => {
+    const current = new URLSearchParams('statusFilter=draft&minTotal=5')
+
+    expect(
+      writeTableQuery(
+        current,
+        { page: 1, pageSize: 20, sort: null, parameters: { minTotal: '5' } },
+        20,
+        names,
+      ).toString(),
+    ).toBe('minTotal=5')
+  })
+
+  it('sends the values first in the request and leaves out empty ones', () => {
+    expect(
+      recordQuery({ page: 3, pageSize: 20, sort: null, parameters: { statusFilter: 'approved', minTotal: '' } }),
+    ).toBe('statusFilter=approved&page=3')
   })
 })
 

@@ -13,5 +13,14 @@
     { "name": "totalAmount", "path": "totalAmount" },
     { "name": "status", "path": "status" },
     { "name": "submittedAt", "path": "submittedAt" }
-  ]
+  ],
+  "parameters": [
+    {
+      "name": "statusFilter",
+      "type": "enum",
+      "values": ["draft", "submitted", "approved", "returned", "rejected"],
+      "label": { "textKey": "purchaseRequest.status" }
+    }
+  ],
+  "filter": "statusFilter is null or status == statusFilter"
 }

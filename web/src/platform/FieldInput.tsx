@@ -1,6 +1,6 @@
 import { Checkbox, DatePicker, Input, Select } from 'antd'
 import dayjs from 'dayjs'
-import type { KeyboardEvent } from 'react'
+import type { CSSProperties, KeyboardEvent } from 'react'
 import type { RecordValue } from './records'
 import type { FieldMetadata } from './site'
 
@@ -12,6 +12,8 @@ interface FieldInputProps {
   id?: string
   /** The accessible name, for an input that has no label element of its own. */
   ariaLabel?: string
+  /** The input's style, such as a fixed width where the layout gives it none. */
+  style?: CSSProperties
 }
 
 // Enter in a picker only confirms the picked value. The picker handles it first, so stopping the
@@ -28,7 +30,7 @@ function dateTimeValue(value: RecordValue) {
 }
 
 /** The input for one value of a field, the same in the form and in a child collection's cells. */
-export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInputProps) {
+export function FieldInput({ field, value, onChange, id, ariaLabel, style }: FieldInputProps) {
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
     case 'text':
@@ -36,6 +38,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInput
         <Input
           id={id}
           aria-label={ariaLabel}
+          style={style}
           value={value === null ? '' : String(value)}
           maxLength={field.maxLength ?? undefined}
           onChange={text}
@@ -48,6 +51,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInput
         <Input
           id={id}
           aria-label={ariaLabel}
+          style={style}
           inputMode={field.type === 'integer' ? 'numeric' : 'decimal'}
           value={value === null ? '' : String(value)}
           onChange={text}
@@ -58,6 +62,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInput
         <Checkbox
           id={id}
           aria-label={ariaLabel}
+          style={style}
           checked={value === true}
           onChange={(event) => onChange(event.target.checked)}
         />
@@ -67,6 +72,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInput
         <DatePicker
           id={id}
           aria-label={ariaLabel}
+          style={style}
           value={value === null ? null : dayjs(String(value))}
           onChange={(date) => onChange(date ? date.format('YYYY-MM-DD') : null)}
           onKeyDown={confirmOnly}
@@ -77,6 +83,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInput
         <DatePicker
           id={id}
           aria-label={ariaLabel}
+          style={style}
           showTime
           format="YYYY-MM-DD HH:mm:ss"
           value={dateTimeValue(value)}
@@ -90,6 +97,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel }: FieldInput
         <Select
           id={id}
           aria-label={ariaLabel}
+          style={style}
           allowClear
           value={value === null ? null : String(value)}
           options={(field.values ?? []).map((option) => ({ value: option, label: option }))}
