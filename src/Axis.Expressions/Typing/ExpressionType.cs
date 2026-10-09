@@ -41,8 +41,9 @@ public sealed class ExpressionType : IEquatable<ExpressionType>
     public IReadOnlyList<string> Values { get; }
 
     /// <summary>
-    /// Whether this enum belongs to a data source parameter. Such an enum compares with another
-    /// enum when all of its values are in the other's values.
+    /// Whether this enum or reference belongs to a data source parameter. Such an enum compares
+    /// with another enum when all of its values are in the other's values. Such a reference is a
+    /// value, not a row, so a path cannot start at it. The flag is not part of equality.
     /// </summary>
     public bool IsParameter { get; }
 
@@ -65,6 +66,13 @@ public sealed class ExpressionType : IEquatable<ExpressionType>
     {
         ArgumentNullException.ThrowIfNull(targetEntity);
         return new ExpressionType(ExpressionTypeKind.Reference, targetEntity, []);
+    }
+
+    /// <summary>The reference of a data source parameter, which holds a target id but no row.</summary>
+    public static ExpressionType ReferenceParameter(string targetEntity)
+    {
+        ArgumentNullException.ThrowIfNull(targetEntity);
+        return new ExpressionType(ExpressionTypeKind.Reference, targetEntity, [], isParameter: true);
     }
 
     public bool Equals(ExpressionType? other) =>

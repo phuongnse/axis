@@ -20,10 +20,11 @@ public static class SqlTranslator
 {
     /// <summary>
     /// Translates <paramref name="expression"/>, which must have passed
-    /// <see cref="ExpressionTypeChecker"/>. <paramref name="column"/> maps a bare name, as written,
-    /// to the SQL text of its column.
+    /// <see cref="ExpressionTypeChecker"/>. <paramref name="column"/> maps a field path to the SQL
+    /// text of its column. The path is the names as written, so a bare name is a one-item list and
+    /// <c>department.name</c> is <c>["department", "name"]</c>.
     /// </summary>
-    public static SqlTranslationResult Translate(ExpressionNode expression, Func<string, string> column)
+    public static SqlTranslationResult Translate(ExpressionNode expression, Func<IReadOnlyList<string>, string> column)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(column);
@@ -40,7 +41,7 @@ public static class SqlTranslator
         }
     }
 
-    private sealed class Translation(Func<string, string> column, List<SqlValue> parameters)
+    private sealed class Translation(Func<IReadOnlyList<string>, string> column, List<SqlValue> parameters)
     {
         public string Render(ExpressionNode node) => node switch
         {
@@ -49,8 +50,8 @@ public static class SqlTranslator
             TextLiteral literal => Parameter(ExpressionTypeKind.Text, literal.Value),
             BooleanLiteral literal => Parameter(ExpressionTypeKind.Boolean, literal.Value),
             NullLiteral => "NULL",
-            NameNode name => column(name.Name),
-            MemberNode member => throw Fail("Paths are not translated to SQL", member.Offset),
+            NameNode name => column([name.Name]),
+            MemberNode member => column(Path(member)),
             CallNode call => Call(call),
             UnaryNode unary => unary.Operator == UnaryOperator.Not
                 ? $"(NOT {Render(unary.Operand)})"
@@ -60,6 +61,27 @@ public static class SqlTranslator
             InNode inNode => In(inNode),
             _ => throw new ArgumentOutOfRangeException(nameof(node), node.GetType().Name, "Unknown node type."),
         };
+
+        /// <summary>The names of a path, first to last. A path must start at a name.</summary>
+        private static List<string> Path(MemberNode member)
+        {
+            var names = new List<string>();
+            ExpressionNode node = member;
+            while (node is MemberNode inner)
+            {
+                names.Add(inner.Name);
+                node = inner.Target;
+            }
+
+            if (node is not NameNode first)
+            {
+                throw Fail("Paths that do not start at a field are not translated to SQL", member.Offset);
+            }
+
+            names.Add(first.Name);
+            names.Reverse();
+            return names;
+        }
 
         private string Binary(BinaryNode binary)
         {

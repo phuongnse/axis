@@ -14,7 +14,10 @@ namespace Axis.Data.DataSources;
 /// <see cref="EntityNaming"/> and is quoted, and every value from the caller or the filter is a
 /// parameter. The filter is translated by <see cref="SqlTranslator"/> into the <c>WHERE</c> clause
 /// of both the count and the page statement. Its literals are <c>@f0</c>, <c>@f1</c>, … and the
-/// data source parameters are <c>@p0</c>, <c>@p1</c>, … in declaration order.
+/// data source parameters are <c>@p0</c>, <c>@p1</c>, … in declaration order. Each distinct path
+/// through reference fields, from the projection, the labels, the sort or the filter, is one left
+/// join on the target's id, so a page is one statement plus the count whatever its size, and a
+/// null reference gives null related values without hiding the row.
 /// </summary>
 public static class DataSourceQueries
 {
@@ -24,13 +27,15 @@ public static class DataSourceQueries
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> rows that pass the filter,
     /// ordered by the sort field and then by the root id ascending, or by the root id alone without
     /// a sort, and counts every row that passes. <paramref name="parameters"/> holds one value per
-    /// declared parameter, in declaration order. A page past the last one has no items. Returns
+    /// declared parameter, in declaration order. <paramref name="application"/> resolves the paths
+    /// in the filter. A page past the last one has no items. Returns
     /// <see langword="null"/> when the database rejects the filter for these rows with a data
     /// exception (SQLSTATE class 22), such as an integer overflow or a date out of range. Any other
     /// database error is thrown.
     /// </summary>
     public static async Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
+        ApplicationModel application,
         DataSourceModel dataSource,
         int page,
         int pageSize,
@@ -39,6 +44,7 @@ public static class DataSourceQueries
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(dataSource);
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
@@ -46,16 +52,19 @@ public static class DataSourceQueries
 
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
         var row = EntityNaming.Quote(RowAlias);
-        var (where, values) = Where(dataSource);
+        var joins = new Joins();
+        var select = SelectList(dataSource, joins);
         var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
         var order = sort is null
             ? $"{id} ASC"
-            : $"{Column(sort.Field.Field)} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
+            : $"{joins.ColumnOf(sort.Field.Path)} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
+        var (where, values) = Where(application, dataSource, joins);
+        var from = $"{table} AS {row}{joins.Sql}{where}";
 
         try
         {
             long totalCount;
-            await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
+            await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {from}", connection))
             {
                 AddValues(count, values);
                 AddParameters(count, parameters);
@@ -63,7 +72,7 @@ public static class DataSourceQueries
             }
 
             await using var command = new NpgsqlCommand(
-                $"SELECT {SelectList(dataSource)} FROM {table} AS {row}{LabelJoins(dataSource)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
+                $"SELECT {select} FROM {from} ORDER BY {order} LIMIT @limit OFFSET @offset",
                 connection);
             AddValues(command, values);
             AddParameters(command, parameters);
@@ -89,9 +98,10 @@ public static class DataSourceQueries
     /// <summary>
     /// The <c>WHERE</c> clause of the filter, with a leading space, and the values it names. Both
     /// are empty without a filter. A bare name in the filter is a parameter, matched ignoring letter
-    /// case, or else a column of the root row.
+    /// case, or else a column of the root row. A longer path is a column of a joined target.
     /// </summary>
-    private static (string Where, IReadOnlyList<SqlValue> Values) Where(DataSourceModel dataSource)
+    private static (string Where, IReadOnlyList<SqlValue> Values) Where(
+        ApplicationModel application, DataSourceModel dataSource, Joins joins)
     {
         if (dataSource.Filter is not { } filter)
         {
@@ -100,17 +110,20 @@ public static class DataSourceQueries
 
         var translated = SqlTranslator.Translate(
             filter.Syntax,
-            name =>
+            names =>
             {
-                for (var index = 0; index < dataSource.Parameters.Count; index++)
+                if (names.Count == 1)
                 {
-                    if (string.Equals(dataSource.Parameters[index].Name, name, StringComparison.OrdinalIgnoreCase))
+                    for (var index = 0; index < dataSource.Parameters.Count; index++)
                     {
-                        return $"@{ParameterName(index)}";
+                        if (string.Equals(dataSource.Parameters[index].Name, names[0], StringComparison.OrdinalIgnoreCase))
+                        {
+                            return $"@{ParameterName(index)}";
+                        }
                     }
                 }
 
-                return $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.Column(name))}";
+                return joins.ColumnOf(ResolvePath(application, dataSource, names));
             });
         if (!translated.Succeeded)
         {
@@ -118,6 +131,28 @@ public static class DataSourceQueries
         }
 
         return ($" WHERE {translated.Sql}", translated.Parameters);
+    }
+
+    /// <summary>The fields a filter path names, from the root entity through each reference's target, ignoring letter case.</summary>
+    private static List<FieldModel> ResolvePath(ApplicationModel application, DataSourceModel dataSource, IReadOnlyList<string> names)
+    {
+        var path = new List<FieldModel>(names.Count);
+        var entityName = dataSource.Entity.Name;
+        foreach (var name in names)
+        {
+            if (entityName is null
+                || !application.TryGetEntity(entityName, out var entity)
+                || !entity.TryGetField(name, out var field))
+            {
+                throw new InvalidOperationException(
+                    $"The compiler let through the filter path '{string.Join('.', names)}' that does not resolve.");
+            }
+
+            path.Add(field);
+            entityName = field.Target?.Name;
+        }
+
+        return path;
     }
 
     /// <summary>Adds each filter value as a parameter of its exact PostgreSQL type, so no value is ever inferred from text.</summary>
@@ -168,32 +203,16 @@ public static class DataSourceQueries
 
     /// <summary>
     /// The root id, then every projected field in projection order, decimals as text so no digit is
-    /// lost. Then the display field of each projected reference's target, joined by <see cref="LabelJoins"/>.
+    /// lost. Then the display field of each projected reference's target, from its join.
     /// </summary>
-    private static string SelectList(DataSourceModel dataSource) =>
+    private static string SelectList(DataSourceModel dataSource, Joins joins) =>
         string.Join(", ", [
             $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
-            .. dataSource.Fields.Select(field => Column(field.Field) + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
-            .. References(dataSource).Select((field, index) =>
-                $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}"),
+            .. dataSource.Fields.Select(field =>
+                joins.ColumnOf(field.Path) + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
+            .. References(dataSource).Select(field =>
+                $"{joins.TargetAlias(field.Path)}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}"),
         ]);
-
-    /// <summary>
-    /// One left join per projected reference field to the target table, aliased by the reference's
-    /// position, so each row's labels come from the same statement. Empty without a projected reference.
-    /// </summary>
-    private static string LabelJoins(DataSourceModel dataSource) =>
-        string.Concat(References(dataSource).Select((field, index) =>
-        {
-            var target = EntityNaming.Quote(LabelAlias(index));
-            return $" LEFT JOIN {EntityNaming.QualifiedTable(EntityNaming.Table(field.Field.Target!.Id))} AS {target}"
-                + $" ON {target}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {Column(field.Field)}";
-        }));
-
-    private static string Column(FieldModel field) =>
-        $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}";
-
-    private static string LabelAlias(int index) => $"l{index}";
 
     private static IEnumerable<DataSourceFieldModel> References(DataSourceModel dataSource) =>
         dataSource.Fields.Where(field => field.Field.Type == FieldType.Reference);
@@ -222,5 +241,56 @@ public static class DataSourceQueries
         }
 
         return new DataSourceRow(reader.GetGuid(0), values, labels);
+    }
+
+    /// <summary>
+    /// The left joins of one statement, one per distinct path through reference fields, keyed by
+    /// the path's field names ignoring letter case. Joins are aliased <c>j0</c>, <c>j1</c>, … in the
+    /// order they are first needed, so a join always follows the join it starts from.
+    /// </summary>
+    private sealed class Joins
+    {
+        private readonly Dictionary<string, Join> _joins = new(StringComparer.Ordinal);
+        private readonly List<Join> _ordered = [];
+
+        /// <summary>The joins as SQL, each with a leading space. Empty without a join.</summary>
+        public string Sql => string.Concat(_ordered.Select(join =>
+        {
+            var alias = EntityNaming.Quote(join.Alias);
+            return $" LEFT JOIN {EntityNaming.QualifiedTable(EntityNaming.Table(join.Target.Id))} AS {alias}"
+                + $" ON {alias}.{EntityNaming.Quote(EntityNaming.IdColumn)}"
+                + $" = {EntityNaming.Quote(join.ParentAlias)}.{EntityNaming.Quote(EntityNaming.Column(join.Reference.Name))}";
+        }));
+
+        /// <summary>The column of the field <paramref name="path"/> ends at, joining each reference before it.</summary>
+        public string ColumnOf(IReadOnlyList<FieldModel> path) =>
+            $"{EntityNaming.Quote(AliasOf(path, path.Count - 1))}.{EntityNaming.Quote(EntityNaming.Column(path[^1].Name))}";
+
+        /// <summary>The alias of the target of the reference field <paramref name="path"/> ends at, joining every reference of the path.</summary>
+        public string TargetAlias(IReadOnlyList<FieldModel> path) => EntityNaming.Quote(AliasOf(path, path.Count));
+
+        /// <summary>The alias of the row reached through the first <paramref name="count"/> references of <paramref name="path"/>.</summary>
+        private string AliasOf(IReadOnlyList<FieldModel> path, int count)
+        {
+            var alias = RowAlias;
+            var key = "";
+            for (var index = 0; index < count; index++)
+            {
+                var reference = path[index];
+                key += (index == 0 ? "" : ".") + reference.Name.ToLowerInvariant();
+                if (!_joins.TryGetValue(key, out var join))
+                {
+                    join = new Join($"j{_ordered.Count}", reference.Target!, alias, reference);
+                    _joins.Add(key, join);
+                    _ordered.Add(join);
+                }
+
+                alias = join.Alias;
+            }
+
+            return alias;
+        }
+
+        private sealed record Join(string Alias, EntityReference Target, string ParentAlias, FieldModel Reference);
     }
 }

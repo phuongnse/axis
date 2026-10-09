@@ -105,7 +105,7 @@ public sealed class SqlTranslatorTests
     [InlineData("UPPER(t) == 'a'", 0, "Function 'upper'")]
     [InlineData("b and trim(t) == 'a'", 6, "Function 'trim'")]
     [InlineData("i / 2 > 1", 2, "Operator '/'")]
-    [InlineData("i > 0 and t.x", 11, "Paths")]
+    [InlineData("i > 0 and lower(t).x", 18, "Paths")]
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date")]
     [InlineData("ts == dateTime('2026-10-08')", 6, "'2026-10-08' is not a valid date-time")]
     [InlineData("b and sum(lines, i) > 0", 6, "Function 'sum'")]
@@ -125,6 +125,24 @@ public sealed class SqlTranslatorTests
         Assert.EndsWith($"at character {offset + 1}.", result.Diagnostic.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Path_is_given_to_the_column_callback_as_its_names()
+    {
+        var parsed = ExpressionParser.Parse("department.manager.name == 'a' and i > 0");
+        Assert.True(parsed.Succeeded);
+        var paths = new List<string>();
+
+        var result = SqlTranslator.Translate(parsed.Expression, path =>
+        {
+            paths.Add(string.Join('|', path));
+            return Column(path);
+        });
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(["department|manager|name", "i"], paths);
+        Assert.Equal("((\"department.manager.name\" IS NOT DISTINCT FROM @f0) AND (\"i\" > @f1))", result.Sql);
+    }
+
     /// <summary>Parses and type-checks <paramref name="expression"/> as a boolean, then translates it.</summary>
     private static SqlTranslationResult Translate(string expression)
     {
@@ -135,5 +153,5 @@ public sealed class SqlTranslatorTests
         return SqlTranslator.Translate(parsed.Expression, Column);
     }
 
-    private static string Column(string name) => $"\"{name}\"";
+    private static string Column(IReadOnlyList<string> path) => $"\"{string.Join('.', path)}\"";
 }

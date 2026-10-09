@@ -173,13 +173,44 @@ public sealed class ExpressionTypeCheckerTests
     [Theory]
     [InlineData("r.name == 'x'", 1, "'name'")]
     [InlineData("i + missing", 4, "'missing'")]
-    public void Paths_that_are_not_built_are_unknown_names(string text, int offset, string name)
+    public void Paths_are_unknown_names_in_a_scope_without_a_reference_resolver(string text, int offset, string name)
     {
         var diagnostic = CheckFails(text, ExpressionType.Boolean);
 
         Assert.Equal(ExpressionDiagnosticCodes.UnknownName, diagnostic.Code);
         Assert.Equal(offset, diagnostic.Offset);
         Assert.Contains(name, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("r.name == 'x'")]
+    [InlineData("R.Manager.NAME == 'x'")]
+    [InlineData("r.manager.department.name == 'x'")]
+    [InlineData("r.manager.department == r")]
+    [InlineData("pr == r and r.manager.name is not null")]
+    [InlineData("pr is null or t == r.name")]
+    public void Paths_through_references_type_check_in_a_scope_with_a_resolver(string text)
+    {
+        var result = Check(text, ExpressionType.Boolean, PathScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Theory]
+    [InlineData("r.manager.department.manager.name == 'x'", "AXC0058", 28, "The path takes 4 hops, at most 3 are allowed")]
+    [InlineData("t.name == 'x'", "AXC0047", 1, "Operator '.' needs a reference, found text")]
+    [InlineData("r.name.x == 'x'", "AXC0047", 6, "Operator '.' needs a reference, found text")]
+    [InlineData("lower(t).name == 'x'", "AXC0047", 8, "Operator '.' needs a field path")]
+    [InlineData("pr.name == 'x'", "AXC0047", 2, "Operator '.' cannot follow the parameter 'pr'. A path starts at a field")]
+    [InlineData("r.missing == 'x'", "AXC0046", 1, "Unknown field 'missing' of 'department'")]
+    [InlineData("r.manager.parts is null", "AXC0046", 9, "Unknown field 'parts' of 'employee'")]
+    [InlineData("missing.name == 'x'", "AXC0046", 0, "Unknown field 'missing'")]
+    public void Invalid_paths_are_reported_at_the_dot(string text, string code, int offset, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Boolean, PathScope());
+
+        Assert.Equal((code, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal($"{message} at character {offset + 1}.", diagnostic.Message);
     }
 
     [Fact]
@@ -446,6 +477,27 @@ public sealed class ExpressionTypeCheckerTests
                 ["due"] = ExpressionType.Date,
             })),
         ]);
+
+    /// <summary>
+    /// A scope that resolves paths: <c>r</c> is a department with a name and a manager, and a
+    /// manager is an employee with a name, a department and a child collection <c>parts</c>, which
+    /// has no type. <c>pr</c> is a reference parameter.
+    /// </summary>
+    private static ExpressionScope PathScope() => new(
+        new Dictionary<string, ExpressionType>
+        {
+            ["t"] = ExpressionType.Text,
+            ["r"] = ExpressionType.Reference("department"),
+            ["pr"] = ExpressionType.ReferenceParameter("department"),
+        },
+        referenceFields: (entity, field) => (entity.ToLowerInvariant(), field.ToLowerInvariant()) switch
+        {
+            ("department", "name") => ExpressionType.Text,
+            ("department", "manager") => ExpressionType.Reference("employee"),
+            ("employee", "name") => ExpressionType.Text,
+            ("employee", "department") => ExpressionType.Reference("department"),
+            _ => null,
+        });
 
     /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
     private static ExpressionScope RuleScope() => new(

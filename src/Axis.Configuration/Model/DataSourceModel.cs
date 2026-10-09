@@ -4,8 +4,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled data source: a projection of its root entity's fields, with typed parameters, an
-/// optional filter, its default sort and page size.
+/// A compiled data source: a projection of its root entity's fields and of fields reached through
+/// reference fields, with typed parameters, an optional filter, its default sort and page size.
 /// </summary>
 public sealed record DataSourceModel
 {
@@ -29,8 +29,8 @@ public sealed record DataSourceModel
     public IReadOnlyList<DataSourceParameterModel> Parameters { get; init; } = [];
 
     /// <summary>
-    /// The boolean filter over the root entity's fields and the parameters, inside the SQL subset,
-    /// or null when every row passes.
+    /// The boolean filter over the root entity's fields, the parameters and paths through reference
+    /// fields, inside the SQL subset, or null when every row passes.
     /// </summary>
     public ExpressionModel? Filter { get; init; }
 
@@ -47,8 +47,21 @@ public sealed record DataSourceModel
     }
 }
 
-/// <summary>A projected field: its key in a row and the root entity's field it reads.</summary>
-public sealed record DataSourceFieldModel(string Name, FieldModel Field);
+/// <summary>
+/// A projected field: its key in a row and the path of fields it reads, starting at a field of the
+/// root entity. Every field of the path before the last is a reference field.
+/// </summary>
+public sealed record DataSourceFieldModel(string Name, IReadOnlyList<FieldModel> Path)
+{
+    /// <summary>A projected field that reads a field of the root entity.</summary>
+    public DataSourceFieldModel(string name, FieldModel field)
+        : this(name, [field])
+    {
+    }
+
+    /// <summary>The field the path ends at.</summary>
+    public FieldModel Field => Path[^1];
+}
 
 /// <summary>
 /// A typed input of the filter. The rows endpoint reads it from the query string under its exact

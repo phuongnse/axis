@@ -237,10 +237,14 @@ and in [functions](#functions).
 
 ## Names and references
 
-*(planned for M2)*. Only bare field names, data source parameters, child
-collections in aggregates and rule calls from validations are built: the type
-checker resolves names against the fields, parameters and collections it is
-given, and calls against the rules it is given, ignoring letter case.
+*(planned for M2)*. Bare field names, data source parameters, paths in data
+source filters, child collections in aggregates and rule calls from
+validations are built: the type checker resolves names against the fields,
+parameters and collections it is given, paths against the reference fields'
+targets when it is given a way to find them, and calls against the rules it
+is given, ignoring letter case. Paths in validations and computed fields are
+not built, because the interpreter cannot read related records. There a path
+is `AXC0046`.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -249,7 +253,9 @@ given, and calls against the rules it is given, ignoring letter case.
   a field share a name, the data source check reports it.
 - **Path.** A path such as `department.name` follows a reference field to a
   field of the target record. A path may take at most 3 hops. A `null`
-  reference along the path makes the result `null`.
+  reference along the path makes the result `null`. The first name of a path
+  is a field, never a data source parameter, because a reference parameter
+  holds an id and not a record.
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names
   are the child row's fields, computed ones included, and nothing else: no
@@ -272,9 +278,9 @@ given, and calls against the rules it is given, ignoring letter case.
   computed ones included, its child collections through aggregates, and the
   named rules at its top level.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
-  data source parameters as plain names. It has no rules. Its child
-  collections type-check in aggregates, but no aggregate is in the
-  [SQL subset](#sql-subset), so one is `AXC0053`.
+  data source parameters as plain names, and paths through reference fields.
+  It has no rules. Its child collections type-check in aggregates, but no
+  aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
 
 ## Functions
 
@@ -358,9 +364,10 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | Rule calls nested | 8 deep |
 | Rule call cycles | None allowed |
 
-The first three and the cycle check are built. The hop and rule call depth
-limits are *(planned for M2)*, because they need paths and deeper rule use.
-A cycle is `AXC0055`, so evaluation of a rule call always ends.
+The first four and the cycle check are built. More than 3 hops is
+`AXC0058` in a data source filter and `AXC0043` in a projected `path`. The
+rule call depth limit is *(planned for M2)*, because it needs deeper rule
+use. A cycle is `AXC0055`, so evaluation of a rule call always ends.
 
 - **Depth.** Depth is the height of the syntax tree. A name or literal has
   depth 1. Each operator, call, path step, `is null` and `in` adds one level
@@ -404,10 +411,9 @@ a compile diagnostic.
 
 ## SQL subset
 
-The SQL translation is built for literals, bare field names, data source
-parameters, every operator except `/`, and every function the list below
-names. Field paths and rule
-calls are *(planned for M2)*. Until they are built, a path is `AXC0046` and a
+The SQL translation is built for literals, bare field names, field paths,
+data source parameters, every operator except `/`, and every function the
+list below names. Rule calls are *(planned for M2)*. Until they are built, a
 rule call is `AXC0050`, because a filter cannot call rules yet.
 
 These translate to SQL:
@@ -420,7 +426,9 @@ These translate to SQL:
   declaration order, each with the PostgreSQL type of the parameter. A
   parameter that is not given is a typed `NULL` parameter, so it still
   compares with its column;
-- field paths, where each hop becomes a join *(planned for M2)*;
+- field paths, as a column of a left-joined target table. Each distinct path
+  is one left join on the target's `id`, so a `null` reference gives `NULL`
+  and keeps the row;
 - `==` and `!=`, as `IS NOT DISTINCT FROM` and `IS DISTINCT FROM`;
 - `<`, `<=`, `>` and `>=`;
 - `+`, `-`, `*` and unary `-`;
@@ -519,8 +527,9 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   parsed.
 - **`AXC0037`.** The expression is deeper than 32 levels.
 - **`AXC0038`.** The expression has more than 500 syntax nodes.
-- **`AXC0046`.** A name that is not in scope, named in the message. Until
-  they are built, `.` paths are reported this way too.
+- **`AXC0046`.** A name that is not in scope, named in the message. This
+  includes an unknown field after a `.`, and any `.` path outside a data
+  source filter.
 - **`AXC0047`.** Operand types an operator, function or rule does not
   accept, at the operator or the call. This includes an `in` item that does
   not fit, two different enums, an enum parameter with a value the field
@@ -531,7 +540,9 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   collection used anywhere but as the first argument of an aggregate, such as
   `lineItems == null`, reported at the name, an aggregate whose first
   argument is not a child collection, such as `sum(title, amount)`, and an
-  item of a type the aggregate does not accept. The message names the
+  item of a type the aggregate does not accept. It also covers a `.` after a
+  field that is not a reference, after a data source parameter, or after
+  anything that is not a field path, at the `.`. The message names the
   types, and a collection as `list<Entity>`.
 - **`AXC0048`.** The expression's type does not fit the type its use needs.
   The message names the expected and the actual type.
@@ -548,6 +559,8 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   includes `/`, `lower`, `upper`, `trim`, every aggregate, and a `date('…')` or
   `dateTime('…')` text that is not valid. The message names what is not
   translated. It is reported only after the filter type-checks.
+- **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
+  the limit.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).
@@ -555,5 +568,5 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   first problem and report only that one. So one expression gives at most
   one diagnostic.
 
-The cost codes for hops and rule call depth are added by the issues that
-build those checks.
+The cost code for rule call depth is added by the issue that builds that
+check.

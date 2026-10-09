@@ -12,7 +12,8 @@ namespace Axis.Configuration.Compilation;
 /// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
 /// are given, which for now is the top level of a validation. A data source scope adds the data
-/// source's parameters after the fields, and has no rules.
+/// source's parameters after the fields, has no rules, and resolves paths through reference fields
+/// to the target entity's fields. No other scope resolves paths.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -37,7 +38,8 @@ public static class ExpressionScopes
                         ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
                         : null)
                     .OfType<ExpressionCollection>()
-                    .ToList());
+                    .ToList(),
+            referenceFields: null);
     }
 
     internal static ExpressionScope ForEntity(
@@ -52,32 +54,42 @@ public static class ExpressionScopes
                 .Where(field => includeComputed || field.Expression is null)
                 .Select(field => (field.Name, TypeOf(field))),
             rules,
-            findEntity is null ? null : CollectionsOf(all, findEntity));
+            findEntity is null ? null : CollectionsOf(all, findEntity),
+            referenceFields: null);
     }
 
-    /// <summary>The scope of a data source filter: the root entity's fields, then the parameters.</summary>
-    public static ExpressionScope ForDataSource(IEnumerable<FieldModel> fields, IEnumerable<DataSourceParameterModel> parameters)
+    /// <summary>
+    /// The scope of a data source filter: the root entity's fields, then the parameters. A path
+    /// through a reference field resolves to a field of the entity <paramref name="findEntity"/>
+    /// returns for the target's name.
+    /// </summary>
+    public static ExpressionScope ForDataSource(
+        IEnumerable<FieldModel> fields, IEnumerable<DataSourceParameterModel> parameters, Func<string, EntityModel?> findEntity)
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(findEntity);
         return Build(
             [
                 .. fields.Select(field => (field.Name, TypeOf(field))),
                 .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
                     parameter.Name, parameter.Type, parameter.Values, parameter.Target?.Name))),
             ],
-            rules: null);
+            rules: null,
+            collections: null,
+            (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null);
     }
 
     /// <summary>
-    /// The scope of a data source filter: the root entity's fields, then the parameters. When
-    /// <paramref name="findEntity"/> is given, the child collections are in it too, so that the SQL
+    /// The scope of a data source filter: the root entity's fields, then the parameters. A path
+    /// through a reference field resolves to a field of the entity <paramref name="findEntity"/>
+    /// returns for the target's name. The child collections are in it too, so that the SQL
     /// translation reports an aggregate as outside the subset.
     /// </summary>
     internal static ExpressionScope ForDataSource(
         IEnumerable<FieldDefinition> fields,
         IEnumerable<DataSourceParameterDefinition> parameters,
-        Func<string, EntityResource?>? findEntity = null)
+        Func<string, EntityResource?> findEntity)
     {
         var all = fields.ToList();
         return Build(
@@ -87,7 +99,11 @@ public static class ExpressionScopes
                     parameter.Name, FieldTypes.Parse(parameter.Type), parameter.Values, parameter.Target))),
             ],
             rules: null,
-            findEntity is null ? null : CollectionsOf(all, findEntity));
+            CollectionsOf(all, findEntity),
+            (target, name) => findEntity(target)?.Fields
+                .FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)) is { } field
+                ? TypeOf(field)
+                : null);
     }
 
     /// <summary>The expression type of a field's value, or null for a child collection.</summary>
@@ -119,7 +135,8 @@ public static class ExpressionScopes
     private static ExpressionScope Build(
         IEnumerable<(string Name, ExpressionType? Type)> fields,
         IEnumerable<ExpressionRule>? rules,
-        IEnumerable<ExpressionCollection>? collections = null)
+        IEnumerable<ExpressionCollection>? collections,
+        ReferenceFieldResolver? referenceFields)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -130,12 +147,20 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections);
+        return new ExpressionScope(types, rules, collections, referenceFields);
     }
 
-    /// <summary>A parameter's type is a field's, except that an enum parameter declares its own values.</summary>
+    /// <summary>
+    /// A parameter's type is a field's, except that an enum parameter declares its own values and a
+    /// reference parameter is marked as one, so a path cannot start at it.
+    /// </summary>
     private static ExpressionType? ParameterTypeOf(string name, FieldType type, IReadOnlyList<string>? values, string? target) =>
-        type == FieldType.Enum ? ExpressionType.EnumParameter(name, values ?? []) : TypeOf(name, type, values, target);
+        type switch
+        {
+            FieldType.Enum => ExpressionType.EnumParameter(name, values ?? []),
+            FieldType.Reference => ExpressionType.ReferenceParameter(target ?? ""),
+            _ => TypeOf(name, type, values, target),
+        };
 
     private static ExpressionType? TypeOf(string name, FieldType type, IReadOnlyList<string>? values, string? target) =>
         type switch

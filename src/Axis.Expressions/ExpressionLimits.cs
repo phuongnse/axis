@@ -16,6 +16,12 @@ public static class ExpressionLimits
     public const int MaxNodes = 500;
 
     /// <summary>
+    /// The most reference fields a path may go through. In <c>department.manager.name</c> each
+    /// <c>.</c> is one hop, so that path takes 2.
+    /// </summary>
+    public const int MaxHops = 3;
+
+    /// <summary>
     /// The most steps one evaluation may take. This is a run-time bound: each node evaluated is one
     /// step, and evaluation stops with an error as soon as it is used up.
     /// </summary>
