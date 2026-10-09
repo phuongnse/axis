@@ -11,7 +11,7 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["Department", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
+        Assert.Equal(["Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
         Assert.Equal(2, result.Model.Seeds.Count);
         Assert.Equal("purchasing", Assert.Single(result.Model.Sites).Path);
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
