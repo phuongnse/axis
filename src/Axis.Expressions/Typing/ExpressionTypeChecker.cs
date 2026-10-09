@@ -7,8 +7,8 @@ namespace Axis.Expressions.Typing;
 /// <summary>
 /// Finds the type of a parsed expression, following the typing rules in
 /// docs/reference/expressions.md, and checks it against the type the use needs. It covers
-/// literals, bare field names, every operator and every function in
-/// <see cref="ExpressionFunctions"/>. Paths are reported as unknown names until they are built. It
+/// literals, bare field names, every operator, every function in
+/// <see cref="ExpressionFunctions"/> and calls to the named rules in the scope. Paths are reported as unknown names until they are built. It
 /// stops at the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
@@ -21,7 +21,10 @@ public static class ExpressionTypeChecker
 
         try
         {
-            var context = new Context(scope, new HashSet<CallNode>(ReferenceEqualityComparer.Instance));
+            var context = new Context(
+                scope,
+                new HashSet<CallNode>(ReferenceEqualityComparer.Instance),
+                new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance));
             var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
@@ -31,7 +34,7 @@ public static class ExpressionTypeChecker
                     0));
             }
 
-            return new ExpressionCheckResult(actual, null) { DecimalCalls = context.DecimalCalls };
+            return new ExpressionCheckResult(actual, null) { DecimalCalls = context.DecimalCalls, RuleCalls = context.RuleCalls };
         }
         catch (CheckFailure failure)
         {
@@ -63,7 +66,9 @@ public static class ExpressionTypeChecker
     {
         if (!ExpressionFunctions.TryGet(call.Name, out var signature))
         {
-            throw Fail(ExpressionDiagnosticCodes.UnknownFunction, $"Unknown function '{call.Name}'", call.Offset);
+            return context.Scope.TryGetRule(call.Name, out var rule)
+                ? InferRuleCall(call, rule, context)
+                : throw Fail(ExpressionDiagnosticCodes.UnknownFunction, $"Unknown function or rule '{call.Name}'", call.Offset);
         }
 
         var name = signature.Name;
@@ -144,6 +149,40 @@ public static class ExpressionTypeChecker
             default:
                 throw new InvalidOperationException($"The type checker has no rule for function '{name}'.");
         }
+    }
+
+    /// <summary>
+    /// A call to a named rule: it takes exactly one argument per parameter, and each argument must
+    /// fit its parameter's type. The call is recorded, so that the interpreter runs the rule's body.
+    /// </summary>
+    private static ExpressionType InferRuleCall(CallNode call, ExpressionRule rule, Context context)
+    {
+        var count = call.Arguments.Count;
+        var parameters = rule.Parameters;
+        if (count != parameters.Count)
+        {
+            var noun = parameters.Count == 1 ? "argument" : "arguments";
+            throw Fail(
+                ExpressionDiagnosticCodes.WrongArgumentCount,
+                $"Rule '{rule.Name}' needs {parameters.Count} {noun}, found {count}",
+                call.Offset);
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var argument = call.Arguments[i];
+            var type = Infer(argument, context);
+            if (!Fits(argument, type, parameters[i].Type))
+            {
+                throw Fail(
+                    ExpressionDiagnosticCodes.TypeMismatch,
+                    $"Rule '{rule.Name}' needs {parameters[i].Type} for argument {i + 1}, found {type}",
+                    call.Offset);
+            }
+        }
+
+        context.RuleCalls[call] = rule;
+        return rule.ResultType;
     }
 
     /// <summary>Argument <paramref name="index"/> must be <c>null</c> or a type <paramref name="accepts"/> allows.</summary>
@@ -365,8 +404,9 @@ public static class ExpressionTypeChecker
         _ => op.ToString(),
     };
 
-    /// <summary>What one check carries down the tree: the fields in scope, and the decimal calls found so far.</summary>
-    private sealed record Context(ExpressionScope Scope, HashSet<CallNode> DecimalCalls);
+    /// <summary>What one check carries down the tree: the scope, and the decimal and rule calls found so far.</summary>
+    private sealed record Context(
+        ExpressionScope Scope, HashSet<CallNode> DecimalCalls, Dictionary<CallNode, ExpressionRule> RuleCalls);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)

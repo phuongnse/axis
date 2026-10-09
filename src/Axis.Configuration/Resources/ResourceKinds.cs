@@ -9,4 +9,5 @@ public static class ResourceKinds
     public const string Text = "text";
     public const string Seed = "seed";
     public const string DataSource = "dataSource";
+    public const string Rule = "rule";
 }

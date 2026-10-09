@@ -9,7 +9,10 @@ aggregates, and the translation of the [SQL subset](#sql-subset). Sections
 marked *(planned for M2)* are not built yet. Entity
 [validations](configuration.md#entity-logic) and
 [computed fields](configuration.md#entity-logic) are resource file uses: the
-compiler type-checks them and the record API evaluates them. Data source
+compiler type-checks them and the record API evaluates them. A validation
+can also call a named [rule](configuration.md#resource-file-shape): the
+compiler checks the call and the rule, and the interpreter runs the rule's
+expression. Data source
 [filters](data-sources.md#resource-shape) are another: the compiler checks
 and translates them, and the data source endpoint runs them as SQL. Other uses
 come with the issues that build them. Dn
@@ -234,8 +237,9 @@ and in [functions](#functions).
 
 ## Names and references
 
-*(planned for M2)*. Only bare field names are built: the type checker
-resolves them against the fields it is given, ignoring letter case.
+*(planned for M2)*. Only bare field names and rule calls from validations
+are built: the type checker resolves names against the fields it is given,
+and calls against the rules it is given, ignoring letter case.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -249,10 +253,12 @@ resolves them against the fields it is given, ignoring letter case.
   which only aggregates accept.
 - **Rule call.** A named rule is called like a function, such as
   `isLargeRequest(total)`. Arguments are checked against the rule's typed
-  parameters. A rule body sees only its declared parameters. Parameter and
-  result types are the scalar field types (see
-  [Resource file shape](configuration.md#resource-file-shape)). A rule name
-  may not reuse a built-in function name.
+  parameters: an integer fits a decimal parameter, and `null` fits any
+  parameter. A rule body sees only its declared parameters. Parameter and
+  result types are the scalar field types except `enum`, which comes later
+  (see [Resource file shape](configuration.md#resource-file-shape)). A rule
+  name may not reuse a built-in function name. Only validations can call
+  rules for now. Calls from computed fields and filters come later.
 - **Scope in a computed field.** The expression sees the record's own fields
   and its child collections, and no reference path. For now it sees only the
   entity's own fields that are not computed. Another computed field, itself
@@ -331,8 +337,9 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | Rule calls nested | 8 deep |
 | Rule call cycles | None allowed |
 
-The first three are built. The hop, rule call depth and cycle limits are
-*(planned for M2)*, because they need names to be resolved.
+The first three and the cycle check are built. The hop and rule call depth
+limits are *(planned for M2)*, because they need paths and deeper rule use.
+A cycle is `AXC0055`, so evaluation of a rule call always ends.
 
 - **Depth.** Depth is the height of the syntax tree. A name or literal has
   depth 1. Each operator, call, path step, `is null` and `in` adds one level
@@ -350,8 +357,8 @@ Run-time limit:
 - **Step budget.** Each top-level evaluation has a budget of 10,000 steps.
   Each node evaluated is one step, and evaluation stops as soon as the budget
   runs out. An aggregate's item expression costs its steps once per row. The
-  steps of a called rule count against the caller's budget. The budget is
-  built. Aggregates and rule calls are *(planned for M2)*.
+  steps of a called rule count against the caller's budget. The budget and
+  rule calls are built. Aggregates are *(planned for M2)*.
 - **SQL.** The SQL translation has no step budget. The compile-time limits
   bound its size.
 
@@ -377,7 +384,7 @@ a compile diagnostic.
 The SQL translation is built for literals, bare field names, every operator
 except `/`, and every function the list below names. Field paths and rule
 calls are *(planned for M2)*. Until they are built, a path is `AXC0046` and a
-rule call is `AXC0050`, as in any expression.
+rule call is `AXC0050`, because a filter cannot call rules yet.
 
 These translate to SQL:
 
@@ -438,7 +445,7 @@ Rules:
 
 ## Writing expressions in resource files
 
-Entity validations, computed fields and data source filters are written this
+Entity validations, computed fields, rules and data source filters are written this
 way. The other uses are *(planned for M2)*.
 
 An expression is one JSON string:
@@ -468,7 +475,7 @@ There are three families:
 - **Type.** Unknown names, type mismatches, unknown enum values, wrong
   argument counts, and use of something outside the SQL subset in a filter.
 - **Cost.** The limits on length, depth, nodes, hops, rule call depth and
-  cycles.
+  rule call cycles.
 
 Each diagnostic points at the JSON Pointer of the expression string. Its
 message gives the character position inside the expression. The `AXCnnnn`
@@ -484,9 +491,10 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0038`.** The expression has more than 500 syntax nodes.
 - **`AXC0046`.** A name that is not in scope, named in the message. Until
   they are built, `.` paths are reported this way too.
-- **`AXC0047`.** Operand types an operator or function does not accept, at
-  the operator or the call. This includes an `in` item that does not fit, two
-  different enums, a function argument of the wrong type, `coalesce`
+- **`AXC0047`.** Operand types an operator, function or rule does not
+  accept, at the operator or the call. This includes an `in` item that does
+  not fit, two different enums, a function or rule argument of the wrong
+  type, `coalesce`
   arguments or `if` branches that do not fit each other, and a `date` or
   `dateTime` call without a text literal argument. The message names the
   types.
@@ -494,19 +502,22 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   The message names the expected and the actual type.
 - **`AXC0049`.** A text literal compared with an enum, or given where an enum
   is needed, is not one of the field's `values`. Reported at the literal.
-- **`AXC0050`.** A call to a function that does not exist, at the call. The
-  message names the function.
-- **`AXC0051`.** A function call with the wrong number of arguments, at the
-  call. The message names the expected count, such as "needs 2 arguments" or
+- **`AXC0050`.** A call to a function or rule that does not exist, at the
+  call. The message names it.
+- **`AXC0051`.** A function or rule call with the wrong number of
+  arguments, at the call. The message names the expected count, such as "needs 2 arguments" or
   "needs at least 1 argument", and the count found.
 - **`AXC0053`.** A data source filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
   includes `/`, `lower`, `upper`, `trim`, and a `date('…')` or
   `dateTime('…')` text that is not valid. The message names what is not
   translated. It is reported only after the filter type-checks.
+- **`AXC0055`.** Rules call each other in a cycle. It is reported on the
+  rule file, not at a call, and names every rule in the cycle. See
+  [the Check step](configuration.md#configuration-pipeline).
 - **First problem only.** The parser and the type checker each stop at the
   first problem and report only that one. So one expression gives at most
   one diagnostic.
 
-The cost codes for hops, rule call depth and cycles, and the type codes for
-rule calls and aggregates, are added by the issues that build those checks.
+The cost codes for hops and rule call depth, and the type codes for
+aggregates, are added by the issues that build those checks.

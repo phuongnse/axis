@@ -17,7 +17,8 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application`, `entity`, `site`, `page`, `text`, `seed` or `dataSource`). The manifest is the single `application`
+   (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource` or
+   `rule`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -127,6 +128,23 @@ flowchart LR
    produces no model. [Data source](data-sources.md#compile-checks) filters
    are checked in the Resolve step, with the data sources. Form bindings and
    operation inputs join this step as they are built.
+   - **Rules.** Each [rule](#resource-file-shape)'s expression is parsed and
+     type-checked against its own parameters, and must give its
+     `resultType`. A problem in it is reported at `/expression` of the rule
+     file. A validation may call a rule, and each call is checked for the
+     rule's name, its argument count and each argument's type, with the
+     codes a function call gets (`AXC0050`, `AXC0051`, `AXC0047`). Rules
+     that call each other in a cycle, such as A → B → A, are `AXC0055`
+     once per cycle, at `/expression` of the rule where the cycle starts,
+     naming every rule in it. Rules are walked in path order. A parameter
+     name that an earlier parameter of the same rule already uses, ignoring
+     letter case, is `AXC0056` at `/parameters/{i}/name`. A rule name that
+     is a built-in [function](expressions.md#functions) name, ignoring letter
+     case, is `AXC0057` at `/name`. A rule whose own expression has an
+     error, or that is in a cycle, is still known by its parameters and
+     result type, so a call to it gets no further diagnostic. Only
+     validations can call rules for now. In a computed field or a data
+     source filter, a rule call is still `AXC0050`.
 4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
    - **Content hash.** Every resource file is canonicalized as in RFC 8785
@@ -265,13 +283,16 @@ sorted by file and then path.
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
 | `AXC0045` | A data source's `sort` names no projected field, or names a projected `reference` field. Reported at `/sort`. |
 | `AXC0046` | An expression names a field that is not in its scope. `.` paths are reported this way too until they are built. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
-| `AXC0047` | An expression gives an operator or function operands of types it does not accept, such as `'a' < 'b'`, `quantity and true` or `length(1)`. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
+| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
-| `AXC0050` | An expression calls a function that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
-| `AXC0051` | An expression calls a function with the wrong number of arguments, such as `round(1.5)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
+| `AXC0050` | An expression calls a function or rule that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
+| `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
 | `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
 | `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)` or a `date('…')` text that is not valid. Reported at `/filter`, with the character position of the operator or the call in the message. See [SQL subset](expressions.md#sql-subset). |
+| `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
+| `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
+| `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 
 ## Startup activation
 
@@ -448,9 +469,10 @@ A `seed` holds records with fixed ids for one entity:
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
-A `rule` resource *(planned for M2)* holds a named expression with typed
-parameters and a result type. Any expression can call it (see
-[Expression language](expressions.md#names-and-references)):
+A `rule` resource holds a named expression with typed parameters and a
+result type. A validation can call it (see
+[Expression language](expressions.md#names-and-references)). Calls from
+computed fields and data source filters come later:
 
 ```json
 {
@@ -464,13 +486,22 @@ parameters and a result type. Any expression can call it (see
 }
 ```
 
-- `parameters` is a list of `name` and `type`. Parameter and result types are
-  the scalar field types: `text`, `integer`, `decimal`, `boolean`, `date`,
-  `date-time` and `enum`. A parameter is never a record.
+- `parameters` is a list of `name` and `type`, and may be empty. Parameter
+  and result types are `text`, `integer`, `decimal`, `boolean`, `date` and
+  `date-time`. Any other type, `enum` included, is `AXC0004`. An `enum`
+  parameter would need its own `values` to be compared with an enum field,
+  so it comes later. A parameter is never a record.
+- Parameter names are unique within the rule, ignoring letter case
+  (`AXC0056`). A rule name may not be a built-in function name (`AXC0057`).
 - A rule is called by name, ignoring letter case, such as `IsPositive(quantity)`.
+  An integer argument fits a `decimal` parameter, and `null` fits any
+  parameter.
 - The `expression` must give the `resultType`, and sees only its parameters.
-- The `rule` kind is not in the Load step's list of kinds yet. It is added by
-  the issue that builds it.
+  It may call other rules, but not in a cycle (`AXC0055`).
+- The server runs the rule's expression when it evaluates the calling
+  validation. Every argument is evaluated, even when one is `null`, and the
+  rule's steps count against the caller's
+  [step budget](expressions.md#cost-bounds).
 
 ## Entity field types and constraints
 
@@ -513,10 +544,11 @@ entity (D17). Child collection fields, their child tables, validations and
 computed fields over the record's own fields are built.
 Expressions use the syntax of the [expression language](expressions.md), and
 diagnostic codes come with the issues that build each check. A validation
+can call a named [rule](#resource-file-shape), such as `IsPositive(quantity)`
+below. A validation
 cannot name a `child-collection` field in its expression yet, because only
 aggregates such as `count` read one and they are not built. The examples
-below show the target shape: their `count`, `sum` and named rule calls do not
-compile today.
+below show the target shape: their `count` and `sum` do not compile today.
 
 ```json
 {
@@ -582,7 +614,8 @@ compile today.
     key is the message of a failure.
   - `field`, which names a field of the same entity.
 
-  The expression reads the entity's own fields by name. The server runs the
+  The expression reads the entity's own fields by name, and can call named
+  rules. The server runs the
   validations on create and update, on the record as it will be stored and
   after computed fields are calculated. A validation fails when its condition
   is `false` or `null`, or stops with a run-time error. The validations of a

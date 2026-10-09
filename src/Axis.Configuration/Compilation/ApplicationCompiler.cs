@@ -12,8 +12,8 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
-/// of every locale, checks every entity's fields against the field type rules and type-checks its
-/// computed fields and validations, checks sites,
+/// of every locale, checks the named rules and their calls, checks every entity's fields against
+/// the field type rules and type-checks its computed fields and validations, checks sites,
 /// pages and seeds, checks data sources and their filters, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -63,9 +63,11 @@ public static class ApplicationCompiler
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
         }
 
+        // Only validations call rules for now. Computed fields and filters see no rules.
+        var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
         foreach (var entity in loaded.Entities)
         {
-            CheckEntity(entity, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, textKeys, diagnostics);
+            CheckEntity(entity, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, textKeys, rules, diagnostics);
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, textKeys, diagnostics);
@@ -78,7 +80,7 @@ public static class ApplicationCompiler
             return result;
         }
 
-        var entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName)).ToList();
+        var entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName, rules)).ToList();
         var model = new ApplicationModel
         {
             Manifest = loaded.Application,
@@ -216,6 +218,7 @@ public static class ApplicationCompiler
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> unloadedEntityNames,
         IReadOnlySet<string> textKeys,
+        IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
@@ -275,7 +278,7 @@ public static class ApplicationCompiler
         }
 
         CheckComputedFields(entity, Report);
-        CheckValidations(entity, textKeys, diagnostics, Report);
+        CheckValidations(entity, textKeys, rules, diagnostics, Report);
     }
 
     /// <summary>
@@ -318,12 +321,13 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// Checks each validation: its message is a known text key, its <c>field</c> names a field of
-    /// the entity, and its expression parses and type-checks as a boolean over the entity's fields.
-    /// An expression problem is reported at the expression with its own code.
+    /// the entity, and its expression parses and type-checks as a boolean over the entity's fields
+    /// and the named rules. An expression problem is reported at the expression with its own code.
     /// </summary>
     private static void CheckValidations(
         EntityResource entity,
         IReadOnlySet<string> textKeys,
+        IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics,
         Action<string, string, string> report)
     {
@@ -332,7 +336,7 @@ public static class ApplicationCompiler
             return;
         }
 
-        var scope = ExpressionScopes.ForEntity(entity.Fields);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules);
         for (var index = 0; index < entity.Validations.Count; index++)
         {
             var validation = entity.Validations[index];
@@ -659,11 +663,12 @@ public static class ApplicationCompiler
         return check.Succeeded ? SqlTranslator.Translate(parsed.Expression, name => name).Diagnostic : check.Diagnostic;
     }
 
-    private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName)
+    private static EntityModel BuildEntity(
+        EntityResource entity, Dictionary<string, EntityResource> entitiesByName, IEnumerable<ExpressionRule> rules)
     {
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false);
         var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName)).ToList();
-        var scope = ExpressionScopes.ForEntity(fields);
+        var scope = ExpressionScopes.ForEntity(fields, rules: rules);
         return new EntityModel
         {
             Id = entity.Id,

@@ -52,6 +52,7 @@ public static class ApplicationLoader
                 [],
                 [],
                 [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
@@ -96,6 +97,7 @@ public static class ApplicationLoader
         var texts = new List<TextResource>();
         var seeds = new List<SeedResource>();
         var dataSources = new List<DataSourceResource>();
+        var rules = new List<RuleResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -175,6 +177,9 @@ public static class ApplicationLoader
                     case ResourceKinds.DataSource:
                         dataSources.Add(root.Deserialize<DataSourceResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Rule:
+                        rules.Add(root.Deserialize<RuleResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -189,6 +194,7 @@ public static class ApplicationLoader
             texts,
             seeds,
             dataSources,
+            rules,
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames,
@@ -355,7 +361,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}' or '{ResourceKinds.DataSource}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}' or '{ResourceKinds.Rule}'.",
                 file,
                 "/kind",
                 resourceId));

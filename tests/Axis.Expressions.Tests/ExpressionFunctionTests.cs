@@ -213,10 +213,10 @@ public sealed class ExpressionFunctionTests
     }
 
     [Theory]
-    [InlineData("foo(1)", 0, "Unknown function 'foo' at character 1.")]
-    [InlineData("i + bar()", 4, "Unknown function 'bar' at character 5.")]
+    [InlineData("foo(1)", 0, "Unknown function or rule 'foo' at character 1.")]
+    [InlineData("i + bar()", 4, "Unknown function or rule 'bar' at character 5.")]
     // The name is looked up before the arguments are checked.
-    [InlineData("foo(missing)", 0, "Unknown function 'foo' at character 1.")]
+    [InlineData("foo(missing)", 0, "Unknown function or rule 'foo' at character 1.")]
     public void An_unknown_function_is_reported_at_the_call(string text, int offset, string message)
     {
         var diagnostic = CheckFails(text);

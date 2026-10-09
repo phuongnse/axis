@@ -275,6 +275,68 @@ public sealed class ExpressionInterpreterTests
             ExpressionInterpreter.Evaluate(over, checkedType, Values([])).Error?.Kind);
     }
 
+    [Theory]
+    [InlineData(3L, true)]
+    [InlineData(0L, false)]
+    [InlineData(null, null)]
+    public void A_rule_call_gives_the_result_of_the_rule_body(long? i, bool? expected)
+    {
+        var isPositive = Rule("IsPositive", "value > 0", ExpressionType.Boolean, ("value", ExpressionType.Integer));
+
+        var result = EvaluateWithRules("IsPositive(i)", [isPositive], ("i", i));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public void A_rule_body_can_call_another_rule()
+    {
+        var isPositive = Rule("IsPositive", "value > 0", ExpressionType.Boolean, ("value", ExpressionType.Integer));
+        var bothPositive = Rule(
+            "BothPositive", "isPositive(a) and IsPositive(b)", ExpressionType.Boolean, [isPositive], ("a", ExpressionType.Integer), ("b", ExpressionType.Integer));
+
+        Assert.Equal(true, EvaluateWithRules("BothPositive(i, 1)", [bothPositive]).Value);
+        Assert.Equal(false, EvaluateWithRules("BothPositive(i, -1)", [bothPositive]).Value);
+    }
+
+    [Fact]
+    public void An_integer_becomes_a_decimal_for_a_decimal_parameter_or_result()
+    {
+        // The parameter is a decimal, so value / 2 sees 3 as 3.0 and the result is a decimal.
+        var half = Rule("Half", "value / 2", ExpressionType.Decimal, ("value", ExpressionType.Decimal));
+        var three = Rule("Three", "3", ExpressionType.Decimal);
+        var same = Rule("Same", "value", ExpressionType.Decimal, ("value", ExpressionType.Decimal));
+
+        Assert.Equal(1.5m, Assert.IsType<decimal>(EvaluateWithRules("Half(i)", [half]).Value));
+        Assert.Equal(3m, Assert.IsType<decimal>(EvaluateWithRules("Three()", [three]).Value));
+        Assert.Equal(3m, Assert.IsType<decimal>(EvaluateWithRules("Same(i)", [same]).Value));
+    }
+
+    [Fact]
+    public void The_steps_of_a_rule_body_count_against_the_caller_budget()
+    {
+        // 5,000 leaves make 9,999 nodes in the body, and the call makes 10,000.
+        var body = Sum(5_000, new IntegerLiteral(0, 1));
+        var big = new ExpressionRule("Big", [], ExpressionType.Integer)
+        {
+            Body = body,
+            BodyCheck = new ExpressionCheckResult(ExpressionType.Integer, null),
+        };
+
+        Assert.Equal(5_000L, EvaluateWithRules("Big()", [big]).Value);
+        var over = EvaluateWithRules("-Big()", [big]);
+        Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, over.Error?.Kind);
+    }
+
+    [Fact]
+    public void A_rule_known_only_by_its_signature_is_a_bug_to_evaluate()
+    {
+        var signature = new ExpressionRule("IsPositive", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean);
+
+        Assert.Throws<InvalidOperationException>(() => EvaluateWithRules("IsPositive(i)", [signature]));
+    }
+
     public static TheoryData<string, bool> Corpus
     {
         get
@@ -383,6 +445,35 @@ public sealed class ExpressionInterpreterTests
         var parsed = ExpressionParser.Parse(text);
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
         var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides));
+    }
+
+    /// <summary>A rule whose body is parsed and checked over its parameters and <paramref name="rules"/>.</summary>
+    private static ExpressionRule Rule(
+        string name, string body, ExpressionType result, IEnumerable<ExpressionRule> rules, params (string Name, ExpressionType Type)[] parameters)
+    {
+        var parsed = ExpressionParser.Parse(body);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var scope = new ExpressionScope(parameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Type), rules);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, result);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        return new ExpressionRule(name, [.. parameters.Select(parameter => new ExpressionRuleParameter(parameter.Name, parameter.Type))], result)
+        {
+            Body = parsed.Expression,
+            BodyCheck = check,
+        };
+    }
+
+    private static ExpressionRule Rule(string name, string body, ExpressionType result, params (string Name, ExpressionType Type)[] parameters) =>
+        Rule(name, body, result, [], parameters);
+
+    private static ExpressionEvaluationResult EvaluateWithRules(
+        string text, IEnumerable<ExpressionRule> rules, params (string Name, object? Value)[] overrides)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, new ExpressionScope(_fields, rules), ExpressionType.Null);
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
         return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides));
     }

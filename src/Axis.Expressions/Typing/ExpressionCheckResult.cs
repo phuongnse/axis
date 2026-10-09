@@ -16,4 +16,8 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     /// interpreter returns an integer one of them picks as a decimal, so the run-time type matches.
     /// </summary>
     internal IReadOnlySet<CallNode> DecimalCalls { get; init; } = new HashSet<CallNode>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The rule each rule call resolved to, keyed by the call and compared by reference.</summary>
+    internal IReadOnlyDictionary<CallNode, ExpressionRule> RuleCalls { get; init; } =
+        new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
 }
