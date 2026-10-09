@@ -1,0 +1,13 @@
+{
+  "id": "14f35f88-fd66-46a6-a679-d538bd398fe3",
+  "kind": "dataSource",
+  "name": "ActiveItems",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "quantity", "path": "quantity" }
+  ],
+  "filter": "active == true and quantity > 1",
+  "sort": "name"
+}

@@ -5,11 +5,14 @@ null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
 bare field names, every operator and every [function](#functions) except the
-aggregates. Sections marked *(planned for M2)* are not built yet. Entity
+aggregates, and the translation of the [SQL subset](#sql-subset). Sections
+marked *(planned for M2)* are not built yet. Entity
 [validations](configuration.md#entity-logic) and
-[computed fields](configuration.md#entity-logic) are the resource file uses
-built so far: the compiler type-checks them and the record API evaluates
-them. Other uses come with the issues that build them. Dn
+[computed fields](configuration.md#entity-logic) are resource file uses: the
+compiler type-checks them and the record API evaluates them. Data source
+[filters](data-sources.md#resource-shape) are another: the compiler checks
+and translates them, and the data source endpoint runs them as SQL. Other uses
+come with the issues that build them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
@@ -216,10 +219,12 @@ and in [functions](#functions).
 | Date-time | `dateTime('2026-10-08T09:30:00Z')` | Same RFC 3339 rules as the record API: an offset is required, and the fraction has up to 6 digits. See [request bodies and values](record-api.md#request-bodies-and-values). |
 
 - **Date and date-time.** The argument of `date` and `dateTime` must be one
-  text literal. The type checker enforces this. Checking the text itself at
-  compile time is *(planned for M2)*. Until then, `date('2026-13-45')` passes
-  the checker and is a [run-time error](#run-time-errors) when it is
-  evaluated.
+  text literal. The type checker enforces this, but it does not check the
+  text. In a data source filter, the SQL translation parses the text, so
+  `date('2026-13-45')` is `AXC0053` at compile time. Elsewhere, such as in a
+  validation, it passes the compiler and is a
+  [run-time error](#run-time-errors) when it is evaluated. Checking the text
+  at compile time for every use is *(planned for M2)*.
 - **Enum values.** An enum value is a text literal, checked against the
   field's `values`. See [Types](#types).
 - **Negative numbers.** A negative number is unary minus applied to a
@@ -235,8 +240,8 @@ resolves them against the fields it is given, ignoring letter case.
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
 - **Bare name.** A bare name is a field of the current record. In a data
-  source filter it can also be a data source parameter. When a parameter and a
-  field share a name, the data source check reports it.
+  source filter it can also be a data source parameter *(planned for M2)*.
+  When a parameter and a field share a name, the data source check reports it.
 - **Path.** A path such as `department.name` follows a reference field to a
   field of the target record. A path may take at most 3 hops. A `null`
   reference along the path makes the result `null`.
@@ -253,7 +258,7 @@ resolves them against the fields it is given, ignoring letter case.
   entity's own fields that are not computed. Another computed field, itself
   included, is an unknown name. Child collections come with aggregates.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
-  data source parameters as plain names.
+  data source parameters as plain names. Parameters are *(planned for M2)*.
 
 ## Functions
 
@@ -363,34 +368,47 @@ These are errors:
 - an exhausted step budget.
 
 A `null` operand gives `null` before any error is checked. An error stops the evaluation and counts as a failure. A validation fails, a
-policy denies, and a computed field rejects the write. A run-time error is not
+policy denies, and a computed field rejects the write. In a data source
+filter, the error is raised by PostgreSQL and the endpoint answers `400`. A run-time error is not
 a compile diagnostic.
 
 ## SQL subset
 
-*(planned for M2)*
+The SQL translation is built for literals, bare field names, every operator
+except `/`, and every function the list below names. Field paths and rule
+calls are *(planned for M2)*. Until they are built, a path is `AXC0046` and a
+rule call is `AXC0050`, as in any expression.
 
 These translate to SQL:
 
-- literals, sent as parameters;
-- field paths, where each hop becomes a join;
+- literals, sent as named parameters `@f0`, `@f1`, … in order, each with the
+  PostgreSQL type of its literal. `date('…')` and `dateTime('…')` are
+  parsed at compile time and sent as a `date` and a `timestamptz`. The
+  literal `null` is written as the keyword `NULL`, which is not a value;
+- field paths, where each hop becomes a join *(planned for M2)*;
 - `==` and `!=`, as `IS NOT DISTINCT FROM` and `IS DISTINCT FROM`;
 - `<`, `<=`, `>` and `>=`;
 - `+`, `-`, `*` and unary `-`;
 - `and`, `or` and `not`, because PostgreSQL is also three-valued;
 - `is null` and `is not null`;
-- `in`, as `(x IS NOT NULL AND x IN ($1, $2, …))`, with every item sent as a
-  parameter;
+- `in`, as `(x IS NOT NULL AND x IN (@f0, @f1, …))`, with every item sent as
+  a parameter;
 - `if`, as `CASE WHEN … THEN … ELSE … END`;
 - `coalesce` and `concat`;
 - `length`, as `char_length`;
 - `contains`, as `strpos(a, b) > 0`;
-- `startsWith`, as `starts_with`, and `endsWith`;
-- `abs`, `round`, `floor` and `ceiling`;
-- `year`, `month` and `day`, through `extract`;
+- `startsWith`, as `starts_with(a, b)`, and `endsWith`, as
+  `right(a, char_length(b)) = b`, because PostgreSQL has no `ends_with`;
+- `abs`;
+- `floor`, `ceiling` and `round`, with the argument cast to `numeric` first,
+  because PostgreSQL takes `floor` of a `bigint` as a floating-point number;
+- `year`, `month` and `day`, through `extract`, cast to `bigint`;
 - `addDays`, as `date + integer`;
 - `daysBetween`, as `b - a`;
-- rule calls, inlined when the rule body is in the subset.
+- rule calls, inlined when the rule body is in the subset *(planned for M2)*.
+
+Every operator is wrapped in parentheses, so the SQL keeps the expression's
+precedence.
 
 These are left out:
 
@@ -403,16 +421,25 @@ These are left out:
 Rules:
 
 - **Not in the subset.** A filter that uses something left out is a compile
-  diagnostic in the type family.
+  diagnostic in the type family, `AXC0053`. So is a `date('…')` or
+  `dateTime('…')` text that is not valid.
 - **Null rows.** `WHERE` drops rows where the condition is `null`. This
   matches `null` counting as false.
 - **Parameters.** Values are always sent as parameters. They are never
   spliced into the SQL text.
+- **Errors.** A [run-time error](#run-time-errors) in SQL, such as an
+  integer overflow, fails the whole query. The data source endpoint answers
+  `400`. PostgreSQL does not short-circuit `and` and `or`, so a guard such as
+  `quantity == 0 or quantity * 9223372036854775807 > 0` can still fail in SQL
+  when it would not in the interpreter. The two back ends may differ only in
+  such errors.
+- **`round` digits.** A digit count outside 0 to 28 is a run-time error in
+  the interpreter, but PostgreSQL accepts it.
 
 ## Writing expressions in resource files
 
-Entity validations and computed fields are written this way. The other uses
-are *(planned for M2)*.
+Entity validations, computed fields and data source filters are written this
+way. The other uses are *(planned for M2)*.
 
 An expression is one JSON string:
 
@@ -424,7 +451,8 @@ An expression is one JSON string:
 
 The property name above is illustrative. The issue for each feature defines
 the real property names. For `expression` on a field, on a validation and on a
-rule, see [Entity logic](configuration.md#entity-logic).
+rule, see [Entity logic](configuration.md#entity-logic). For `filter` on a
+data source, see [data sources](data-sources.md#resource-shape).
 
 - **Quotes.** Text literals use single quotes, so they need no JSON escaping.
 - **Long expressions.** A long expression can hold `\n` line breaks, because
@@ -471,10 +499,14 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0051`.** A function call with the wrong number of arguments, at the
   call. The message names the expected count, such as "needs 2 arguments" or
   "needs at least 1 argument", and the count found.
+- **`AXC0053`.** A data source filter uses something outside the
+  [SQL subset](#sql-subset), at the operator, call or path step. This
+  includes `/`, `lower`, `upper`, `trim`, and a `date('…')` or
+  `dateTime('…')` text that is not valid. The message names what is not
+  translated. It is reported only after the filter type-checks.
 - **First problem only.** The parser and the type checker each stop at the
   first problem and report only that one. So one expression gives at most
   one diagnostic.
 
 The cost codes for hops, rule call depth and cycles, and the type codes for
-rule calls, aggregates and the SQL subset, are added by the issues that build
-those checks.
+rule calls and aggregates, are added by the issues that build those checks.

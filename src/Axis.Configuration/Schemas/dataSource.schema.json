@@ -15,6 +15,7 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/field" }
     },
+    "filter": { "type": "string" },
     "sort": {
       "type": "string",
       "pattern": "^-?[A-Za-z][A-Za-z0-9]*$"

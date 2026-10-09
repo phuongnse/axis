@@ -5,6 +5,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
+using Axis.Expressions.Sql;
 using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
@@ -13,7 +14,7 @@ namespace Axis.Configuration.Compilation;
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
 /// of every locale, checks every entity's fields against the field type rules and type-checks its
 /// computed fields and validations, checks sites,
-/// pages and seeds, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
+/// pages and seeds, checks data sources and their filters, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
 /// </summary>
@@ -561,6 +562,8 @@ public static class ApplicationCompiler
     /// field of that entity that is not a child collection, projected names are unique, and the
     /// default <c>sort</c> names a projected field that is not a reference. Entity and field names
     /// resolve ignoring letter case; projected names compare exactly, as the query <c>sort</c> does.
+    /// The <c>filter</c> parses, type-checks as a boolean over the entity's fields and translates to
+    /// SQL. Its first problem is reported at <c>/filter</c> with its expression code.
     /// </summary>
     private static void CheckDataSources(ApplicationLoadResult loaded, Func<string, EntityResource?> findEntity, List<Diagnostic> diagnostics)
     {
@@ -635,7 +638,25 @@ public static class ApplicationCompiler
                         "/sort");
                 }
             }
+
+            if (dataSource.Filter is { } filter && CheckFilter(filter, entity) is { } problem)
+            {
+                Report(problem.Code, problem.Message, "/filter");
+            }
         }
+    }
+
+    /// <summary>The first problem of a data source filter: in parsing, in type checking, or outside the SQL subset.</summary>
+    private static ExpressionDiagnostic? CheckFilter(string filter, EntityResource entity)
+    {
+        var parsed = ExpressionParser.Parse(filter);
+        if (!parsed.Succeeded)
+        {
+            return parsed.Diagnostic;
+        }
+
+        var check = ExpressionTypeChecker.Check(parsed.Expression, ExpressionScopes.ForEntity(entity.Fields), ExpressionType.Boolean);
+        return check.Succeeded ? SqlTranslator.Translate(parsed.Expression, name => name).Diagnostic : check.Diagnostic;
     }
 
     private static EntityModel BuildEntity(EntityResource entity, Dictionary<string, EntityResource> entitiesByName)
@@ -731,7 +752,10 @@ public static class ApplicationCompiler
         };
     }
 
-    /// <summary>Builds a checked data source over the built entities, so each projected field is the entity's own field model.</summary>
+    /// <summary>
+    /// Builds a checked data source over the built entities, so each projected field is the entity's
+    /// own field model, and its filter is checked against the built entity's fields.
+    /// </summary>
     private static DataSourceModel BuildDataSource(DataSourceResource dataSource, IReadOnlyList<EntityModel> entities)
     {
         var entity = entities.First(candidate => string.Equals(candidate.Name, dataSource.Entity, StringComparison.OrdinalIgnoreCase));
@@ -749,6 +773,9 @@ public static class ApplicationCompiler
                     return new DataSourceFieldModel(field.Name, fieldModel!);
                 })
                 .ToList(),
+            Filter = dataSource.Filter is { } filter
+                ? ExpressionModel.Compile(filter, ExpressionScopes.ForEntity(entity.Fields), ExpressionType.Boolean)
+                : null,
             Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
             PageSize = dataSource.PageSize ?? DataSourceModel.DefaultPageSize,
         };

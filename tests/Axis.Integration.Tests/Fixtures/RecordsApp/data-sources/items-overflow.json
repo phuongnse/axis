@@ -1,0 +1,9 @@
+{
+  "id": "a5e50100-c9f5-4656-9242-e6d7d11dced0",
+  "kind": "dataSource",
+  "name": "ItemsOverflow",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [{ "name": "name", "path": "name" }],
+  "filter": "quantity * 9223372036854775807 > 0"
+}

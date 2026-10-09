@@ -16,4 +16,5 @@ public static class ExpressionDiagnosticCodes
     public const string UnknownEnumValue = "AXC0049";
     public const string UnknownFunction = "AXC0050";
     public const string WrongArgumentCount = "AXC0051";
+    public const string OutsideSqlSubset = "AXC0053";
 }

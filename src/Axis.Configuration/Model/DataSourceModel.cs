@@ -2,7 +2,10 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Axis.Configuration.Model;
 
-/// <summary>A compiled data source: a projection of its root entity's fields, with its default sort and page size.</summary>
+/// <summary>
+/// A compiled data source: a projection of its root entity's fields, with an optional filter, its
+/// default sort and page size.
+/// </summary>
 public sealed record DataSourceModel
 {
     /// <summary>The page size when the data source declares none.</summary>
@@ -20,6 +23,12 @@ public sealed record DataSourceModel
 
     /// <summary>The projected fields, in declaration order.</summary>
     public required IReadOnlyList<DataSourceFieldModel> Fields { get; init; }
+
+    /// <summary>
+    /// The boolean filter over the root entity's fields, inside the SQL subset, or null when every
+    /// row passes.
+    /// </summary>
+    public ExpressionModel? Filter { get; init; }
 
     /// <summary>The default order, or null when rows are ordered by id alone.</summary>
     public DataSourceSortModel? Sort { get; init; }

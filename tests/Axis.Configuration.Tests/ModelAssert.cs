@@ -56,8 +56,8 @@ internal static class ModelAssert
         foreach (var (expectedDataSource, actualDataSource) in expected.DataSources.Zip(actual.DataSources))
         {
             Assert.Equal(
-                (expectedDataSource.Id, expectedDataSource.Name, expectedDataSource.File, expectedDataSource.Entity, expectedDataSource.Sort, expectedDataSource.PageSize),
-                (actualDataSource.Id, actualDataSource.Name, actualDataSource.File, actualDataSource.Entity, actualDataSource.Sort, actualDataSource.PageSize));
+                (expectedDataSource.Id, expectedDataSource.Name, expectedDataSource.File, expectedDataSource.Entity, expectedDataSource.Filter?.Expression, expectedDataSource.Sort, expectedDataSource.PageSize),
+                (actualDataSource.Id, actualDataSource.Name, actualDataSource.File, actualDataSource.Entity, actualDataSource.Filter?.Expression, actualDataSource.Sort, actualDataSource.PageSize));
             Assert.Equal(
                 expectedDataSource.Fields.Select(field => (field.Name, field.Field.Name)),
                 actualDataSource.Fields.Select(field => (field.Name, field.Field.Name)));
