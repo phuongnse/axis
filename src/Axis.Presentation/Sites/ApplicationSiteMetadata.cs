@@ -32,6 +32,7 @@ public sealed record EntityMetadata(string Name, string? LabelKey, string? Displ
 /// <see cref="Target"/> for reference and <see cref="Fields"/> for child collection.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
+/// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
 /// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
 public sealed record FieldMetadata(
     string Name,
@@ -39,6 +40,7 @@ public sealed record FieldMetadata(
     string? LabelKey,
     bool Required,
     bool Unique,
+    bool Computed,
     int? MaxLength,
     int? Precision,
     int? Scale,

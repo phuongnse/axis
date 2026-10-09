@@ -83,6 +83,7 @@ public static class ApplicationSites
             field.Label?.TextKey,
             field.Required,
             field.Unique,
+            field.IsComputed,
             field.MaxLength,
             field.Precision,
             field.Scale,

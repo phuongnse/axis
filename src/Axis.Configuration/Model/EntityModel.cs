@@ -23,6 +23,9 @@ public sealed record EntityModel
     /// <summary>The validation rules, in declaration order. Each names its field by the field's declared name.</summary>
     public IReadOnlyList<ValidationModel> Validations { get; init; } = [];
 
+    /// <summary>Whether any field of the entity is computed.</summary>
+    public bool HasComputedFields => Fields.Any(candidate => candidate.IsComputed);
+
     /// <summary>Finds a field by name, ignoring letter case.</summary>
     public bool TryGetField(string name, [NotNullWhen(true)] out FieldModel? field)
     {

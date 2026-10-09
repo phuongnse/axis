@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
+import { formatValue } from './formatValue'
 import { buildRecordBody } from './recordBody'
 import { fetchRecord, saveRecord, type FieldValue, type RecordItem, type RecordRow, type RecordValue } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
@@ -16,6 +17,8 @@ interface FormWidgetProps {
   recordId: string | null
   /** Where save and cancel go: the table page the user came from. */
   returnTo: string
+  /** The UI locale, for showing computed values. */
+  locale: string
 }
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
@@ -64,9 +67,10 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * Creates or edits one record of the widget's entity. The form sends only the fields that differ
  * from the values it started from, plus `version` on edit, and adds no rules of its own: the server
  * validates, and its errors appear on the fields their JSON Pointer names. A child collection that
- * changed is sent as its whole row list, and a row's errors appear on its cells.
+ * changed is sent as its whole row list, and a row's errors appear on its cells. A computed field,
+ * of the record or of a row, is shown read-only with the value the server returned, and never sent.
  */
-export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
+export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const { entity } = widget
@@ -152,7 +156,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
     }
     const changed = Object.fromEntries(
       entity.fields
-        .filter((field) => !sameValue(field, values[field.name], snapshot.initial[field.name]))
+        .filter((field) => !field.computed && !sameValue(field, values[field.name], snapshot.initial[field.name]))
         .map((field) => [field.name, values[field.name]]),
     )
     const body = buildRecordBody(entity.fields, changed, recordId === null ? undefined : snapshot.version)
@@ -252,6 +256,10 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
   const input = (field: FieldMetadata): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
+    if (field.computed) {
+      // The server computes the value on save, so it is shown as a table cell shows it.
+      return <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t })} />
+    }
     switch (field.type) {
       case 'reference':
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
@@ -269,6 +277,7 @@ export function FormWidget({ widget, recordId, returnTo }: FormWidgetProps) {
             rows={rowsOf(value)}
             onChange={(rows) => setRows(field, rows)}
             errors={cellErrors[field.name] ?? {}}
+            locale={locale}
           />
         )
       default:

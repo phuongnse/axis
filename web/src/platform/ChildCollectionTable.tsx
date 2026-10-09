@@ -1,6 +1,7 @@
-import { Button, ConfigProvider, Flex, Form, Table, type TableColumnsType } from 'antd'
+import { Button, ConfigProvider, Flex, Form, Input, Table, type TableColumnsType } from 'antd'
 import { useMemo, useRef } from 'react'
 import { FieldInput } from './FieldInput'
+import { formatValue } from './formatValue'
 import type { RecordRow, RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -12,6 +13,8 @@ interface ChildCollectionTableProps {
   onChange: (rows: RecordRow[]) => void
   /** The messages of each cell, keyed `<index>/<field>`. */
   errors: Record<string, string[]>
+  /** The UI locale, for showing computed values. */
+  locale: string
 }
 
 // Field names start with a letter, so this key never names a field column.
@@ -19,9 +22,10 @@ const removeColumnKey = '$remove'
 
 /**
  * Edits the rows of a child collection as a table: one column per child field, each cell the same
- * input the form uses for that field type, a remove button per row and an add button below.
+ * input the form uses for that field type, a remove button per row and an add button below. A
+ * computed cell is read-only and shows the value the server returned.
  */
-export function ChildCollectionTable({ field, rows, onChange, errors }: ChildCollectionTableProps) {
+export function ChildCollectionTable({ field, rows, onChange, errors, locale }: ChildCollectionTableProps) {
   const t = useText()
   const childFields = useMemo(() => field.fields ?? [], [field.fields])
   // A client key per row object, carried over when a row is edited, so React keeps each row's inputs.
@@ -61,12 +65,20 @@ export function ChildCollectionTable({ field, rows, onChange, errors }: ChildCol
                 )
               }
             >
-              <FieldInput
-                field={child}
-                value={row[child.name] ?? null}
-                onChange={(value) => edit(index, child.name, value)}
-                ariaLabel={`${label} ${index + 1}`}
-              />
+              {child.computed ? (
+                <Input
+                  readOnly
+                  aria-label={`${label} ${index + 1}`}
+                  value={formatValue(child, row[child.name] ?? null, {}, { locale, text: t })}
+                />
+              ) : (
+                <FieldInput
+                  field={child}
+                  value={row[child.name] ?? null}
+                  onChange={(value) => edit(index, child.name, value)}
+                  ariaLabel={`${label} ${index + 1}`}
+                />
+              )}
             </Form.Item>
           )
         },

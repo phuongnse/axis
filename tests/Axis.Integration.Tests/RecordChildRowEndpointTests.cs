@@ -28,9 +28,9 @@ public sealed class RecordChildRowEndpointTests(RecordApiFixture fixture) : ICla
             Assert.Equal(1, record.RootElement.GetProperty("version").GetInt64());
             var values = record.RootElement.GetProperty("values");
             Assert.Equal(
-                ["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "parts", "department"],
+                ["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "parts", "department", "total"],
                 values.EnumerateObject().Select(property => property.Name));
-            Assert.Equal("""[{"name":"Leg"},{"name":"Top"}]""", values.GetProperty("parts").GetRawText());
+            Assert.Equal("""[{"name":"Leg","code":"LEG"},{"name":"Top","code":"TOP"}]""", values.GetProperty("parts").GetRawText());
         }
 
         Assert.Equal(2, (await fixture.TableShapeAsync(TenantA, "ItemPart")).RowCount);
@@ -80,21 +80,21 @@ public sealed class RecordChildRowEndpointTests(RecordApiFixture fixture) : ICla
         using var updated = await PatchAsync(id, """{ "version": 1, "values": { "parts": [{ "name": "A" }, { "name": "B" }] } }""", HttpStatusCode.OK);
 
         Assert.Equal(2, updated.RootElement.GetProperty("version").GetInt64());
-        Assert.Equal("""[{"name":"A"},{"name":"B"}]""", updated.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
+        Assert.Equal("""[{"name":"A","code":"A"},{"name":"B","code":"B"}]""", updated.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
 
         using var stale = await PatchAsync(id, """{ "version": 1, "values": { "parts": [{ "name": "C" }] } }""", HttpStatusCode.Conflict);
 
         Assert.Equal("The record has changed since this version was read.", stale.RootElement.GetProperty("title").GetString());
         using var afterStale = await GetJsonAsync($"{Items}/{id}");
         Assert.Equal(2, afterStale.RootElement.GetProperty("version").GetInt64());
-        Assert.Equal("""[{"name":"A"},{"name":"B"}]""", afterStale.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
+        Assert.Equal("""[{"name":"A","code":"A"},{"name":"B","code":"B"}]""", afterStale.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
 
         // A body that leaves the collection out keeps its rows.
         using var kept = await PatchAsync(id, """{ "version": 2, "values": { "quantity": 4 } }""", HttpStatusCode.OK);
 
         Assert.Equal(3, kept.RootElement.GetProperty("version").GetInt64());
         Assert.Equal("4", kept.RootElement.GetProperty("values").GetProperty("quantity").GetRawText());
-        Assert.Equal("""[{"name":"A"},{"name":"B"}]""", kept.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
+        Assert.Equal("""[{"name":"A","code":"A"},{"name":"B","code":"B"}]""", kept.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
 
         using var emptied = await PatchAsync(id, """{ "version": 3, "values": { "parts": [] } }""", HttpStatusCode.OK);
 
@@ -136,7 +136,7 @@ public sealed class RecordChildRowEndpointTests(RecordApiFixture fixture) : ICla
         using var record = await GetJsonAsync($"{Items}/{id}");
         Assert.Equal(1, record.RootElement.GetProperty("version").GetInt64());
         Assert.Equal("\"Table\"", record.RootElement.GetProperty("values").GetProperty("name").GetRawText());
-        Assert.Equal("""[{"name":"Leg"}]""", record.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
+        Assert.Equal("""[{"name":"Leg","code":"LEG"}]""", record.RootElement.GetProperty("values").GetProperty("parts").GetRawText());
     }
 
     [Fact]

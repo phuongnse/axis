@@ -6,9 +6,10 @@ diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
 bare field names, every operator and every [function](#functions) except the
 aggregates. Sections marked *(planned for M2)* are not built yet. Entity
-[validations](configuration.md#entity-logic) are the first resource file use:
-the compiler type-checks them and the record API evaluates them. Other uses
-come with the issues that build them. Dn
+[validations](configuration.md#entity-logic) and
+[computed fields](configuration.md#entity-logic) are the resource file uses
+built so far: the compiler type-checks them and the record API evaluates
+them. Other uses come with the issues that build them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
@@ -248,7 +249,9 @@ resolves them against the fields it is given, ignoring letter case.
   [Resource file shape](configuration.md#resource-file-shape)). A rule name
   may not reuse a built-in function name.
 - **Scope in a computed field.** The expression sees the record's own fields
-  and its child collections, and no reference path.
+  and its child collections, and no reference path. For now it sees only the
+  entity's own fields that are not computed. Another computed field, itself
+  included, is an unknown name. Child collections come with aggregates.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
   data source parameters as plain names.
 
@@ -408,8 +411,8 @@ Rules:
 
 ## Writing expressions in resource files
 
-Entity validations are written this way. The other uses are *(planned for
-M2)*.
+Entity validations and computed fields are written this way. The other uses
+are *(planned for M2)*.
 
 An expression is one JSON string:
 

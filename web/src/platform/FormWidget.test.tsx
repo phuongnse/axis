@@ -17,6 +17,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     labelKey,
     required: false,
     unique: false,
+    computed: false,
     maxLength: null,
     precision: null,
     scale: null,
@@ -73,6 +74,31 @@ const linesWidget: WidgetMetadata = {
   },
 }
 
+// A note whose total and each line's code the server computes.
+const computedWidget: WidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      field('priority', 'integer', 'note.priority'),
+      { ...field('amount', 'decimal', 'note.amount'), precision: 18, scale: 2 },
+      { ...field('total', 'decimal', 'note.total'), precision: 18, scale: 2, computed: true },
+      {
+        ...field('lines', 'child-collection', 'note.lines'),
+        fields: [
+          { ...field('description', 'text', 'noteLine.description'), maxLength: 100 },
+          { ...field('code', 'text', 'noteLine.code'), computed: true },
+        ],
+      },
+    ],
+  },
+}
+
+function computedJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"amount":1.50,"total":3.00,"lines":[{"description":"Pens","code":"PENS"}]},"labels":{}}`
+}
+
 function linesJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","lines":[{"description":"Pens","quantity":2},{"description":"Ink","quantity":1}]},"labels":{}}`
 }
@@ -109,6 +135,8 @@ const texts = {
   'note.lines': 'Lines',
   'noteLine.description': 'Description',
   'noteLine.quantity': 'Quantity',
+  'noteLine.code': 'Line code',
+  'note.total': 'Total',
   'note.amountPositive': 'Amount must be positive.',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
@@ -137,7 +165,7 @@ function renderForm(recordId: string | null = null, widget: WidgetMetadata = not
       {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
       <ConfigProvider theme={{ token: { motion: false } }}>
         <TextProvider catalogs={catalogs} development={false}>
-          <FormWidget widget={widget} recordId={recordId} returnTo="/e2e/notes?pageSize=10" />
+          <FormWidget widget={widget} recordId={recordId} returnTo="/e2e/notes?pageSize=10" locale="en" />
         </TextProvider>
       </ConfigProvider>
       <CurrentLocation />
@@ -460,6 +488,50 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
 
     expect(screen.queryByTestId('field-error-lines-1-quantity')).not.toBeInTheDocument()
+  })
+
+  it('shows a computed field and a computed cell read-only with the loaded value, and never sends them', async () => {
+    const requests = stubFetch({ status: 200, body: computedJson(1) }, { status: 200, body: computedJson(2) })
+    renderForm(noteId, computedWidget)
+
+    const total = await screen.findByLabelText('Total')
+    expect(total).toHaveValue('3.00')
+    expect(total).toHaveAttribute('readonly')
+    expect(screen.getByLabelText('Line code 1')).toHaveValue('PENS')
+    expect(screen.getByLabelText('Line code 1')).toHaveAttribute('readonly')
+
+    await userEvent.type(total, '9')
+    const priority = screen.getByLabelText('Priority')
+    await userEvent.clear(priority)
+    await userEvent.type(priority, '3')
+    await userEvent.type(screen.getByLabelText('Description 1'), '!')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"priority":3,"lines":[{"description":"Pens!"}]}}',
+    })
+  })
+
+  it('leaves computed fields out of a create body', async () => {
+    const requests = stubFetch({ status: 201, body: computedJson(1) })
+    renderForm(null, computedWidget)
+
+    expect(screen.getByLabelText('Total')).toHaveValue('')
+    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(screen.getByLabelText('Amount'), '1.50')
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+    await userEvent.type(screen.getByLabelText('Description 1'), 'Pens')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(1))
+    expect(requests()[0]).toEqual({
+      url: recordsPath,
+      method: 'POST',
+      body: '{"values":{"title":"Buy paper","amount":1.50,"lines":[{"description":"Pens"}]}}',
+    })
   })
 
   it('has the add-row and remove-row texts in every platform locale', () => {

@@ -1,3 +1,4 @@
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Data.Naming;
@@ -52,6 +53,16 @@ internal static class Models
             Values = values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
             TargetDisplayField = target?.DisplayField,
+        };
+
+    /// <summary>
+    /// Makes <paramref name="field"/> a computed field whose <paramref name="expression"/> reads
+    /// <paramref name="inputs"/>, as the compiler does with an entity's fields that are not computed.
+    /// </summary>
+    public static FieldModel Computed(FieldModel field, string expression, params FieldModel[] inputs) =>
+        field with
+        {
+            Computed = ComputedFieldModel.Compile(expression, ExpressionScopes.ForEntity(inputs), ExpressionScopes.TypeOf(field)!),
         };
 
     /// <summary>The catalog after the model's tables were created as planned.</summary>

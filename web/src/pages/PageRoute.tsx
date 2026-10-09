@@ -84,7 +84,9 @@ function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePage
   return (
     <PageContainer title={t(page.titleKey)}>
       {widget?.type === 'table' && <TableWidget sitePath={sitePath} widget={widget} locale={locale} />}
-      {widget?.type === 'form' && <FormWidget widget={widget} recordId={recordId} returnTo={returnTo} />}
+      {widget?.type === 'form' && (
+        <FormWidget widget={widget} recordId={recordId} returnTo={returnTo} locale={locale} />
+      )}
     </PageContainer>
   )
 }

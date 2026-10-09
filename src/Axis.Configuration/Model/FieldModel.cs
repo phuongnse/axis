@@ -33,6 +33,12 @@ public sealed record FieldModel
     /// <summary>The declared name of the target entity's display field, set only for reference fields.</summary>
     public string? TargetDisplayField { get; init; }
 
+    /// <summary>The expression of a computed field, or null for a field that clients write.</summary>
+    public ComputedFieldModel? Computed { get; init; }
+
+    /// <summary>Whether the server computes the field's value on every write. Clients cannot set it.</summary>
+    public bool IsComputed => Computed is not null;
+
     /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no
     /// column: its rows live in the child entity's table.
