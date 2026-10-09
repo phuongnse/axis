@@ -48,22 +48,8 @@
   },
   "default_profile": "standard",
   "profiles": {
-    "light": {
-      "when": "The change is only to documentation, the delivery process or the docs checks. No platform behaviour, configuration format, API or application test changes. If any of those change, it is not light.",
-      "stages": {
-        "plan": {
-          "model": "claude-sonnet-5-5"
-        },
-        "implement": {
-          "model": "claude-sonnet-5-5"
-        },
-        "review": {
-          "model": "claude-opus-5-5"
-        }
-      }
-    },
     "standard": {
-      "when": "Anything that is neither light nor hard: a clear request that follows a pattern the platform already has.",
+      "when": "Anything that is not hard, including documentation and delivery process changes, because every plan, implement and review round relies on the docs: a clear request that follows a pattern the platform already has.",
       "stages": {
         "plan": {
           "model": "claude-opus-5-5"
