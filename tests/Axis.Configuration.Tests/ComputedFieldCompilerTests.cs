@@ -16,6 +16,7 @@ public sealed class ComputedFieldCompilerTests
         { """{ "name": "other", "type": "reference", "target": "Supplier", "expression": "supplier" }""", DiagnosticCodes.InvalidConstraint, "/fields/4/expression", "reference" },
         { """{ "name": "twice", "type": "integer", "expression": "twice + 1" }""", ExpressionDiagnosticCodes.UnknownName, "/fields/4/expression", "'twice'" },
         { """{ "name": "total", "type": "decimal", "expression": "quantity *" }""", ExpressionDiagnosticCodes.SyntaxError, "/fields/4/expression", "character" },
+        { """{ "name": "due", "type": "date", "expression": "addDays(date('2026-13-45'), quantity)" }""", ExpressionDiagnosticCodes.TypeMismatch, "/fields/4/expression", "'2026-13-45' is not a valid date at character 9." },
         { """{ "name": "state", "type": "enum", "values": ["a", "b"], "expression": "status" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/fields/4/expression", "enum" },
     };
 

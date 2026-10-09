@@ -308,6 +308,9 @@ public static class SqlTranslator
     {
         private int _count;
 
+        /// <summary>The last rule call the filter makes itself whose body was counted.</summary>
+        private (CallNode Call, ExpressionRule Rule)? _lastOuter;
+
         public static void Check(ExpressionNode node, IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls) =>
             new InlinedSize().Walk(node, ruleCalls, outer: null);
 
@@ -317,12 +320,17 @@ public static class SqlTranslator
         {
             if (++_count > ExpressionLimits.MaxInlinedNodes)
             {
-                // A filter alone is at most ExpressionLimits.MaxNodes, so the cap is passed inside a body.
-                var (call, rule) = outer ?? throw new InvalidOperationException("The filter passed the inlined node cap outside any rule.");
-                throw Fail(
-                    $"Rule '{rule.Name}' inlines more than {ExpressionLimits.MaxInlinedNodes.ToString("N0", CultureInfo.InvariantCulture)} syntax nodes",
-                    call.Offset,
-                    "Simplify the rule");
+                var cap = ExpressionLimits.MaxInlinedNodes.ToString("N0", CultureInfo.InvariantCulture);
+
+                // The count is cumulative, so the cap can be passed by a node of the filter itself after
+                // a large body. Then the last rule the filter called is the one to simplify.
+                if ((outer ?? _lastOuter) is var (call, rule))
+                {
+                    throw Fail($"Rule '{rule.Name}' inlines more than {cap} syntax nodes", call.Offset, "Simplify the rule");
+                }
+
+                // A filter alone is at most ExpressionLimits.MaxNodes, so this needs a hand-built tree.
+                throw Fail($"The filter has more than {cap} syntax nodes", node.Offset, "Simplify the filter");
             }
 
             switch (node)
@@ -338,6 +346,11 @@ public static class SqlTranslator
 
                     if (ruleCalls.TryGetValue(call, out var rule) && rule.Body is not null && rule.BodyCheck is not null)
                     {
+                        if (outer is null)
+                        {
+                            _lastOuter = (call, rule);
+                        }
+
                         Walk(rule.Body, rule.BodyCheck.RuleCalls, outer ?? (call, rule));
                     }
 

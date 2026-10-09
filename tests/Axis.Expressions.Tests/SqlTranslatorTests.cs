@@ -267,6 +267,24 @@ public sealed class SqlTranslatorTests
         Assert.DoesNotContain("'L", result.Diagnostic.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Filter_nodes_after_a_large_rule_call_that_pass_the_cap_name_that_rule()
+    {
+        // L4(i) inlines to 1,705 nodes. With "and", "in" and "i" the filter reaches 1,708 before the
+        // list, and each item adds one, so item 293 passes 2,000 outside any rule body.
+        static string Filter(int items) => $"L4(i) and i in ({string.Join(", ", Enumerable.Range(1, items))})";
+
+        var result = TranslateWithRules(Filter(293), Chain(4));
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Sql);
+        Assert.Empty(result.Parameters);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 0), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("'L4'", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("2,000", result.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.True(TranslateWithRules(Filter(292), Chain(4)).Succeeded);
+    }
+
     /// <summary>
     /// <c>L0(value) = value &gt; 0</c>, and each <c>Lk(value)</c> up to <paramref name="depth"/>
     /// calls <c>L(k-1)(value)</c> four times. The last one comes first.
