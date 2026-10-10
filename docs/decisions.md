@@ -311,8 +311,8 @@ M3)*.
 - **Sequences:** a `sequence` resource has a format, such as
   `PR-{yyyy}-{n:5}`. See
   [configuration](reference/configuration.md#sequences).
-  - The counter restarts each year. The year is UTC until applications have
-    a time zone.
+  - The counter restarts each UTC year, but only when the format has
+    `{yyyy}`. The year is UTC until applications have a time zone.
   - An entity `text` field names a `sequence`. Its value is assigned on
     create, and clients cannot write it.
   - The counter row is locked and updated in the caller's transaction, so a
