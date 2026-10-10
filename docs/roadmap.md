@@ -7,8 +7,12 @@
 - **Rolling wave.** Only the current milestone is broken into issues. The next
   milestone is broken down when the current one is nearly done, using what was
   learned.
-- **Issue size.** One issue is one behaviour, with 2–5 acceptance criteria that
-  a test or command can verify. It must fit in a single NexKit agent session.
+- **Issue size.** One issue is one behaviour, aiming for 2–5 acceptance
+  criteria that a test or command can verify. More than five is a signal to
+  check whether the issue holds more than one behaviour. If it does, split it.
+  If every criterion checks the same behaviour, more are fine. A plan is not
+  revised only to cut the number of criteria. It must fit in a single NexKit
+  agent session.
   If a NexKit plan reports `too_large`, split the issue into parts and add each
   as a sub-issue of the parent, in order and in the parent's milestone. See
   [delivery.md](delivery.md).

@@ -82,8 +82,11 @@ them.
 
 ## The life of an issue
 
-1. **Write the issue.** One issue is one behaviour, with 2–5 acceptance
-   criteria that a test or command can check. It links to the doc sections it
+1. **Write the issue.** One issue is one behaviour, aiming for 2–5 acceptance
+   criteria that a test or command can check. More than five is a signal to
+   check whether the issue holds more than one behaviour. If it does, split it.
+   If every criterion checks the same behaviour, more are fine. A plan is not
+   revised only to cut the number of criteria. It links to the doc sections it
    implements and is in the current milestone. Its text names the concepts it
    touches, so triage can choose the [profile](#profiles).
 2. **Plan.** Comment `/nexkit plan` on the issue. NexKit's plan agent posts a

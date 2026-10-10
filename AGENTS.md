@@ -29,9 +29,12 @@ Vietnamese.
 - Keep the [decisions](docs/decisions.md) status words exact: **Agreed**
   means agreed, and **Proposed** means still open. Never present a proposal as
   agreed.
-- Each issue is one behaviour. It has 2–5 acceptance criteria that a test or
-  command can verify, and it fits in a single agent session. Split anything
-  larger before starting. Its text names the concepts it touches, because
+- Each issue is one behaviour and fits in a single agent session. Aim for 2–5
+  acceptance criteria that a test or command can verify. More than five is a
+  signal to check whether the issue holds more than one behaviour. If it does,
+  split it. If every criterion checks the same behaviour, more are fine. A plan
+  is not revised only to cut the number of criteria. Split anything larger than
+  one session before starting. Its text names the concepts it touches, because
   NexKit chooses the issue's [profile](docs/delivery.md#profiles) from the
   issue text alone.
 - Build in vertical slices. Every milestone ends with something that runs
