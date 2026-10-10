@@ -52,7 +52,7 @@ Vietnamese.
   [docs/delivery.md](docs/delivery.md). The exception is changes in paths
   NexKit may not change: those are hand-made pull requests.
 - NexKit merges its pull request once the checks pass and the AI review
-  approves, while its `auto_merge` setting is on. With it off, only the owner
+  approves, while its `merge.auto` setting is on. With it off, only the owner
   merges.
 
 Writing on GitHub, for issues, plans, pull request descriptions and reviews:
