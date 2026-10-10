@@ -18,7 +18,15 @@ internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenant
     /// case, or <see langword="null"/> when no release is active under that name.
     /// </summary>
     /// <exception cref="InvalidOperationException">No tenant context is set.</exception>
-    public async Task<ApplicationModel?> ResolveAsync(string appName, CancellationToken cancellationToken = default)
+    public async Task<ApplicationModel?> ResolveAsync(string appName, CancellationToken cancellationToken = default) =>
+        (await ResolveReleaseAsync(appName, cancellationToken))?.Model;
+
+    /// <summary>
+    /// Returns the release active under <paramref name="appName"/>, ignoring letter case, with its
+    /// model, or <see langword="null"/> when no release is active under that name.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No tenant context is set.</exception>
+    public async Task<ActiveApplication?> ResolveReleaseAsync(string appName, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(appName);
         var tenantId = CurrentTenantId();
@@ -32,7 +40,7 @@ internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenant
 
         var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
         var active = await store.FindByNameAsync(appName, cancellationToken);
-        return active is null ? null : await LoadAsync(store, tenantId, active, cancellationToken);
+        return active is null ? null : new ActiveApplication(active.ReleaseId, await LoadAsync(store, tenantId, active, cancellationToken));
     }
 
     /// <summary>Returns the models of every release active in the current tenant, in name order.</summary>

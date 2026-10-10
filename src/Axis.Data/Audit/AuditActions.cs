@@ -8,4 +8,6 @@ public static class AuditActions
     public const string RecordUpdated = "record.updated";
 
     public const string RecordDeleted = "record.deleted";
+
+    public const string ProcessStarted = "process.started";
 }

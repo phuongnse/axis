@@ -4,6 +4,7 @@ using Axis.Server.Applications;
 using Axis.Server.DataSources;
 using Axis.Server.Health;
 using Axis.Server.Presentation;
+using Axis.Server.Processes;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -86,6 +87,7 @@ app.MapHealthEndpoints();
 app.MapPresentationEndpoints();
 app.MapSiteEndpoints();
 app.MapRecordEndpoints();
+app.MapProcessEndpoints();
 app.MapDataSourceEndpoints();
 app.MapUserEndpoints();
 
