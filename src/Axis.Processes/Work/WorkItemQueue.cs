@@ -40,7 +40,7 @@ public static class WorkItemQueue
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("tenant", tenantId);
         command.Parameters.AddWithValue("kind", kind);
-        command.Parameters.AddWithValue("due", dueAt);
+        command.Parameters.AddWithValue("due", dueAt.ToUniversalTime());
         await command.ExecuteNonQueryAsync(cancellationToken);
         return id;
     }

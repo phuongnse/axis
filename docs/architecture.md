@@ -40,7 +40,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         process engine, tasks, outbox, timers (M3)
+  Axis.Processes/         work items (built); process engine, tasks, outbox, timers (M3)
   Axis.Policy/            roles, policies, evaluation (M4)
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
