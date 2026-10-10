@@ -61,16 +61,23 @@ public static class ApplicationSites
         new(
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
-            widget.Entity is { } entity ? Entity(application, entity.Name) : null,
+            widget.Entity is { } entity ? DescribeEntity(application, entity.Name) : null,
             widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
-            widget.Form is { } form ? Form(application, form.Name) : null);
+            widget.Form is { } form ? DescribeForm(application, form.Name) : null);
 
-    private static FormMetadata Form(ApplicationModel application, string name)
+    /// <summary>
+    /// The metadata of the form named <paramref name="formName"/>, as a form widget's page metadata
+    /// gives it. The name must be one the model resolved, such as a widget's or a task step's form.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The model has no form with this name.</exception>
+    public static FormMetadata DescribeForm(ApplicationModel application, string formName)
     {
-        // The compiler resolves every widget form and every form field, so the lookups always succeed.
-        if (!application.TryGetForm(name, out var form))
+        ArgumentNullException.ThrowIfNull(application);
+
+        // The compiler resolves every widget form, every task form and every form field, so the lookups always succeed.
+        if (!application.TryGetForm(formName, out var form))
         {
-            throw new InvalidOperationException($"The widget form '{name}' is not in the model.");
+            throw new InvalidOperationException($"The form '{formName}' is not in the model.");
         }
 
         var entity = application.FindEntity(form.Entity.Id)
@@ -86,12 +93,19 @@ public static class ApplicationSites
                 })]))]);
     }
 
-    private static EntityMetadata Entity(ApplicationModel application, string name)
+    /// <summary>
+    /// The metadata of the entity named <paramref name="entityName"/>, as a widget's page metadata
+    /// gives it. The name must be one the model resolved, such as a widget's or a form's entity.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The model has no entity with this name.</exception>
+    public static EntityMetadata DescribeEntity(ApplicationModel application, string entityName)
     {
-        // The compiler resolves every widget entity, so the lookup always succeeds.
-        if (!application.TryGetEntity(name, out var entity))
+        ArgumentNullException.ThrowIfNull(application);
+
+        // The compiler resolves every widget entity and every form entity, so the lookup always succeeds.
+        if (!application.TryGetEntity(entityName, out var entity))
         {
-            throw new InvalidOperationException($"The widget entity '{name}' is not in the model.");
+            throw new InvalidOperationException($"The entity '{entityName}' is not in the model.");
         }
 
         return new EntityMetadata(
