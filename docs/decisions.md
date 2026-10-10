@@ -328,7 +328,7 @@ work.
 ## D21. Development test users, audit records and sequences — Agreed
 
 M3 adds three platform pieces before processes run. Test users, their
-sign-in and the current user are built. The SPA user picker, audit records,
+sign-in, the current user and the SPA user picker are built. Audit records,
 record history and sequences are *(planned for M3)*.
 
 - **Test users:** server configuration holds a fixed list, `TestUsers`, with
