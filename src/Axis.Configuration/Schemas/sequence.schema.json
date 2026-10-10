@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis sequence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "format"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "sequence" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "format": {
+      "type": "string",
+      "pattern": "^(?:[^{}]|\\{yyyy\\})*\\{n(?::(?:[1-9]|1[0-8]))?\\}(?:[^{}]|\\{yyyy\\})*$"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    }
+  }
+}

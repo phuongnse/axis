@@ -53,7 +53,9 @@ public static class ApplicationLoader
                 [],
                 [],
                 [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
@@ -99,6 +101,7 @@ public static class ApplicationLoader
         var seeds = new List<SeedResource>();
         var dataSources = new List<DataSourceResource>();
         var rules = new List<RuleResource>();
+        var sequences = new List<SequenceResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -106,6 +109,7 @@ public static class ApplicationLoader
         var unloadedEntityNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedPageNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedDataSourceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedSequenceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Set when the root application.json is already reported as unreadable or as the wrong kind,
         // so the folder is not also told that its manifest is missing.
@@ -156,6 +160,11 @@ public static class ApplicationLoader
                 unloadedDataSourceNames.Add(unloadedDataSourceName);
             }
 
+            if (kind == ResourceKinds.Sequence && !schemaValid && ReadName(root) is { } unloadedSequenceName)
+            {
+                unloadedSequenceNames.Add(unloadedSequenceName);
+            }
+
             if (schemaValid)
             {
                 // Sources come in path order, so the contents do too. A file that fails
@@ -187,6 +196,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Rule:
                         rules.Add(root.Deserialize<RuleResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Sequence:
+                        sequences.Add(root.Deserialize<SequenceResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -202,11 +214,13 @@ public static class ApplicationLoader
             seeds,
             dataSources,
             rules,
+            sequences,
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames,
             unloadedPageNames,
-            unloadedDataSourceNames);
+            unloadedDataSourceNames,
+            unloadedSequenceNames);
     }
 
     /// <summary>
@@ -369,7 +383,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}' or '{ResourceKinds.Rule}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}' or '{ResourceKinds.Sequence}'.",
                 file,
                 "/kind",
                 resourceId));

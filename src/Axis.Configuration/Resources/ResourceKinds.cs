@@ -10,4 +10,5 @@ public static class ResourceKinds
     public const string Seed = "seed";
     public const string DataSource = "dataSource";
     public const string Rule = "rule";
+    public const string Sequence = "sequence";
 }
