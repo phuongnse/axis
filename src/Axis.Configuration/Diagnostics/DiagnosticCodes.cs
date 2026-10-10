@@ -60,4 +60,6 @@ public static class DiagnosticCodes
     public const string RuleCallTooDeep = "AXC0065";
     public const string DuplicateRuleParameter = "AXC0056";
     public const string RuleNameIsFunction = "AXC0057";
+
+    public const string UnknownSequence = "AXC0066";
 }

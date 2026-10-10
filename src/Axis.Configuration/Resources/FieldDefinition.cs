@@ -29,4 +29,7 @@ public sealed record FieldDefinition
 
     /// <summary>The expression of a computed field, or null for a field that clients write.</summary>
     public string? Expression { get; init; }
+
+    /// <summary>The name of the sequence that numbers the field, or null when it has none.</summary>
+    public string? Sequence { get; init; }
 }

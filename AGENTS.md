@@ -68,7 +68,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers, and a smoke test of `scripts/dev.sh` | Docker |
-| `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium, then runs the Compose smoke test | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. Each
 suite writes a JUnit file to `artifacts/test-results/`, and the E2E server output
@@ -77,7 +77,13 @@ summary per suite and the failed tests with their `file:line`. On GitHub Actions
 the summary goes to the job summary and each failed test becomes an error
 annotation.
 
-For local development, run `scripts/dev.sh`. It needs Docker, .NET and Node, and
+To run Axis, run `docker compose up --build`. It builds Axis from source and starts
+PostgreSQL and the server with the purchase request sample at http://localhost:5206. It needs
+only Docker. `docker compose logs server` shows the activation diagnostics. Set
+`AXIS_SERVER_PORT` and `AXIS_POSTGRES_PORT` to change the host ports (5206 and 5432). Both
+ports are published on `127.0.0.1` only.
+
+For local development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and Node, and
 works on a fresh clone:
 
 - It installs the SPA packages when `web/node_modules` is missing or

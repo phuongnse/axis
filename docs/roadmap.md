@@ -37,7 +37,8 @@
 | **M9** | Tenancy and deployment | Planned | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. |
 | **M10** | Hardening | Planned | Performance SLOs and load tests, FAPI 2.0 profile, security verification against an agreed ASVS level, custom widgets. |
 
-M3 is the next milestone to break down into issues.
+M3 is broken down into issues in the
+[M3 milestone](https://github.com/phuongnse/axis/milestone/3) on GitHub.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4
 stay in this order.

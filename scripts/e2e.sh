@@ -2,6 +2,7 @@
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 # The server starts with two applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
+# A Compose smoke test then builds the image and runs the stack on free ports.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -65,5 +66,8 @@ if [ "$status" -ne 0 ]; then
     echo "::endgroup::"
   fi
 fi
+
+run_suite compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
+  --test-reporter=junit --test-reporter-destination="$results_dir/compose.xml" scripts/compose.test.mjs
 
 finish_report

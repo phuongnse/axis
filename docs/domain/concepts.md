@@ -86,13 +86,15 @@ Later constraints:
 
 **Step kinds:**
 
-- operation
-- decision
-- human task
-- wait for event
-- timer
-- sub-process
-- end
+- operation (M3)
+- decision (M3)
+- human task (M3)
+- end (M3)
+- wait for event (later)
+- timer (later)
+- sub-process (later)
+
+See [processes](../reference/processes.md#steps).
 
 ## Triggers and integration
 
@@ -133,5 +135,5 @@ Later constraints:
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. | M5 |
 | **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
-| **Test user** | A development-only stand-in for a signed-in user, from a fixed list in server configuration. It works only in the `Development` and `Testing` environments, and OIDC replaces it in M4. See [architecture](../architecture.md#development-test-users-planned-for-m3). | M3 |
+| **Test user** | A development-only stand-in for a signed-in user, from a fixed list in server configuration. It works only in the `Development` and `Testing` environments, and OIDC replaces it in M4. See [architecture](../architecture.md#development-test-users). | M3 |
 | **Test scenario** | A configuration-level test that runs against a temporary tenant: it seeds data, runs actions or processes as given users and asserts the outcomes. | M6 |
