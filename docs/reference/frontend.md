@@ -167,6 +167,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     id that is not in the hyphenated 8-4-4-4-12 hex form, and an id the
     entity has no record for show the not-found page inside the site shell.
     An id in the wrong form is not requested.
+  - *(planned for M3)* `new` on a task inbox page, and a task id that is not
+    in the hyphenated 8-4-4-4-12 hex form, show the not-found page inside the
+    site shell. A task id in the wrong form is not requested.
   - Inside a site, the shell shows the site's title, navigation and locales.
     The theme toggle and the locale switch work as they do on the platform
     site.

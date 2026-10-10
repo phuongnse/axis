@@ -394,12 +394,11 @@ Content-Type: application/json
 Errors are problem details, as in the [record API](record-api.md#errors).
 The titles are fixed and never contain text from the request. The content
 type follows the record API's
-[rules](record-api.md#create-update-and-delete), so a wrong one is a `415`,
-checked just before the body.
+[rules](record-api.md#create-update-and-delete), so a wrong one is a `415`.
 
 A request is checked in this order, and the first failure is the response:
-`401`, then `404`, then `403`, then `409`, then `400`. So a user who may not
-act on a task never learns its state.
+`401`, then `404`, then `403`, then `409`, then `415`, then `400`. So a user
+who may not act on a task never learns its state.
 
 - **`401`.** No test user is signed in. Every task route needs one.
 

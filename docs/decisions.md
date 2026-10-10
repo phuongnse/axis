@@ -330,8 +330,10 @@ work.
 Human work arrives in M3. See [processes](reference/processes.md#steps) and
 [the frontend](reference/frontend.md). All of it is *(planned for M3)*.
 
-- **Task step:** a `task` step has an assignee, a `form`, an optional `dueIn`
-  and its outcomes.
+- **Task step:** a `task` step has a `label`, an assignee, a `form`, an
+  optional `dueIn` and its outcomes.
+  - `label` is a required text key. The task inbox and the task page show
+    it, because every UI string comes from text resources.
   - The assignee is either `user`, an expression that gives a user id, such
     as `department.manager`, or `role`, a role name. Queues come later.
   - `dueIn` is an ISO 8601 duration. It is stored as the task's due date and
