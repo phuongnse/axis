@@ -86,13 +86,15 @@ Later constraints:
 
 **Step kinds:**
 
-- operation
-- decision
-- human task
-- wait for event
-- timer
-- sub-process
-- end
+- operation (M3)
+- decision (M3)
+- human task (M3)
+- end (M3)
+- wait for event (later)
+- timer (later)
+- sub-process (later)
+
+See [processes](../reference/processes.md#steps).
 
 ## Triggers and integration
 

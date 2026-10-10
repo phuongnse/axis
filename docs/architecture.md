@@ -196,6 +196,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - **History.** Every attempt, input, output, decision and error is recorded
   for inspection.
 
+The process resource, the start endpoint, the instance states, the worker
+settings and the tables are in [reference/processes.md](reference/processes.md).
+
 ## Frontend
 
 Moved to [reference/frontend.md](reference/frontend.md).
