@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRecordBody, isJsonNumber } from './recordBody'
+import { buildCompleteBody, buildRecordBody, isJsonNumber } from './recordBody'
 import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType): FieldMetadata {
@@ -119,5 +119,17 @@ describe('buildRecordBody', () => {
     expect(buildRecordBody(withNumber, { number: 'PR-2026-00042', amount: '1.50' }, 2)).toBe(
       '{"version":2,"values":{"amount":1.50}}',
     )
+  })
+})
+
+describe('buildCompleteBody', () => {
+  it('writes the outcome, the version and the changed values with numbers as typed', () => {
+    expect(buildCompleteBody('approve', fields, { priority: '5', title: 'Fine' }, 3)).toBe(
+      '{"outcome":"approve","version":3,"values":{"title":"Fine","priority":5}}',
+    )
+  })
+
+  it('writes the version with empty values when nothing changed', () => {
+    expect(buildCompleteBody('reject', fields, {}, 3)).toBe('{"outcome":"reject","version":3,"values":{}}')
   })
 })

@@ -332,8 +332,8 @@ work.
 
 Human work arrives in M3. See [processes](reference/processes.md#steps) and
 [the frontend](reference/frontend.md). The `form` resource, the `form`
-widget that names one and the task inbox widget are built. The rest is
-*(planned for M3)*.
+widget that names one, the task inbox widget and the task page are built.
+The rest is *(planned for M3)*.
 
 - **Task step:** a `task` step has a `label`, an assignee, a `form`, an
   optional `dueIn` and its outcomes.

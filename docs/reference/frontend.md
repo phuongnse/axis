@@ -23,7 +23,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
   and the `startProcess` action are agreed in
   [D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed). The
-  `form` resource and the task inbox are built. The `startProcess` action is
+  `form` resource, the task inbox and the task page are built. The `startProcess` action is
   *(planned for M3)*. Navigate actions are expected to replace the table's
   `formPage` link; see
   [D15](../decisions.md#d15-presentation-model--agreed), where that part is
@@ -167,7 +167,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
-  | `/{site}/{inboxpage}/{taskId}` | *(planned for M3)* the task page of the task with that id, under the page of a task inbox |
+  | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
 
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
@@ -179,7 +179,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     id that is not in the hyphenated 8-4-4-4-12 hex form, and an id the
     entity has no record for show the not-found page inside the site shell.
     An id in the wrong form is not requested.
-  - *(planned for M3)* `new` on a task inbox page, and a task id that is not
+  - `new` on a task inbox page, and a task id that is not
     in the hyphenated 8-4-4-4-12 hex form, show the not-found page inside the
     site shell. A task id in the wrong form is not requested. A well-formed
     task id that the task API answers `404` for shows the not-found page
@@ -565,13 +565,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     is no sort.
   - **Links.** Each row opens the task page at
     `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
-    Until the task page is built, that address shows the not-found page
-    inside the site shell.
   - **Signed out.** With nobody signed in, the task API answers `401`, and
     the widget shows a sign-in prompt in place of the rows. The platform
     texts `shell.tasks.*` hold the column headers, the empty text, the load
     error and the sign-in prompt.
-- **Task page** *(planned for M3)*. The address `/{site}/{inboxpage}/{taskId}`
+- **Task page**. The address `/{site}/{inboxpage}/{taskId}`
   shows one task, under the page of its task inbox.
   - It shows the step's label, the subject's label, the due date and the
     form's sections over the subject record. The layout and the field types
@@ -585,6 +583,22 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     completed, and loads the task again.
   - A `400` maps its keys as the form widget does: `/values/<field>` under
     that field, and every other key, such as `/outcome`, above the form.
+  - A `409` that names keys, such as a stale `/version` or a duplicate
+    unique value, is mapped the same way. There is no reload button.
+  - A task that is not `open`, when the page loads or after a `409` loads it
+    again, shows only the already completed message, with no form or
+    outcome buttons. So nobody retries a decision that cannot succeed.
+  - With nobody signed in, the task read answers `401`, and the page shows
+    the task inbox's sign-in prompt.
+  - Any other failure to load the task or its subject record, or to
+    complete it, shows a generic error message.
+  - On success the page goes to the inbox page's plain address, without the
+    paging the person came from.
+  - The `version` is sent even when no field changed. The task API ignores
+    it then.
+  - The task page has no history panel.
+  - The platform texts `shell.task.*` hold the assigned elsewhere and
+    already completed messages, and the load and complete errors.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

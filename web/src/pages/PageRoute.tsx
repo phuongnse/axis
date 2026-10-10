@@ -5,6 +5,7 @@ import { FormWidget } from '../platform/FormWidget'
 import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
+import { TaskPage } from '../platform/TaskPage'
 import { useText } from '../platform/texts'
 import { useApplicationSite, useSiteLocale } from './context'
 import { ShellError } from './LocaleLoadFailed'
@@ -81,8 +82,19 @@ function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePage
     return <ShellError />
   }
 
-  // A table page has no record segment, and a form page always has one.
   const widget = page.widgets[0]
+  // A task's address is under its inbox page. `new` and an id in the wrong form are no task.
+  if (widget?.type === 'taskInbox' && form !== undefined) {
+    if (recordId === null || !recordIdPattern.test(recordId)) {
+      return <NotFoundPage />
+    }
+    return (
+      <PageContainer title={t(page.titleKey)}>
+        <TaskPage sitePath={sitePath} pageName={page.name} widget={widget} taskId={recordId} locale={locale} />
+      </PageContainer>
+    )
+  }
+  // A table page has no record segment, and a form page always has one.
   const isForm = widget?.type === 'form'
   if (isForm !== (form !== undefined) || (recordId !== null && !recordIdPattern.test(recordId))) {
     return <NotFoundPage />

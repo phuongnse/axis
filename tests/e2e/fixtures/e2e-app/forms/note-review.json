@@ -7,7 +7,7 @@
   "sections": [
     {
       "title": { "textKey": "noteReview.main" },
-      "fields": [{ "field": "title", "readOnly": true }]
+      "fields": [{ "field": "title", "readOnly": true }, { "field": "priority" }]
     }
   ]
 }

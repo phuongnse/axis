@@ -50,3 +50,16 @@ function valueText(field: FieldMetadata, value: RecordValue): string {
   }
   return JSON.stringify(value)
 }
+
+/**
+ * Writes a complete body for the task API: the outcome, the subject record's `version` and the
+ * changed values, written as {@link buildRecordBody} writes them.
+ */
+export function buildCompleteBody(
+  outcome: string,
+  fields: readonly FieldMetadata[],
+  values: Record<string, FieldValue>,
+  version: number,
+): string {
+  return `{"outcome":${JSON.stringify(outcome)},${buildRecordBody(fields, values, version).slice(1)}`
+}
