@@ -5,7 +5,7 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, the receipts of starts that carried an <c>Idempotency-Key</c>, and the work that
+/// their steps, their human tasks, the receipts of starts that carried an <c>Idempotency-Key</c>, and the work that
 /// workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
@@ -21,6 +21,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ProcessInstanceRow> Instances => Set<ProcessInstanceRow>();
 
     public DbSet<ProcessStepHistoryRow> StepHistory => Set<ProcessStepHistoryRow>();
+
+    public DbSet<ProcessTaskRow> Tasks => Set<ProcessTaskRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
@@ -75,6 +77,39 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .WithMany()
                 .HasForeignKey(h => h.ProcessInstanceId)
                 .HasConstraintName("fk_process_step_history_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProcessTaskRow>(task =>
+        {
+            task.ToTable("process_tasks");
+            task.HasKey(t => t.Id).HasName("pk_process_tasks");
+            task.Property(t => t.Id).HasColumnName("id").ValueGeneratedNever();
+            task.Property(t => t.ProcessInstanceId).HasColumnName("process_instance_id");
+            task.Property(t => t.ProcessId).HasColumnName("process_id");
+            task.Property(t => t.ReleaseId).HasColumnName("release_id");
+            task.Property(t => t.ApplicationId).HasColumnName("application_id");
+            task.Property(t => t.Step).HasColumnName("step");
+            task.Property(t => t.SubjectEntityId).HasColumnName("subject_entity_id");
+            task.Property(t => t.SubjectId).HasColumnName("subject_id");
+            task.Property(t => t.AssigneeKind).HasColumnName("assignee_kind");
+            task.Property(t => t.Assignee).HasColumnName("assignee");
+            task.Property(t => t.FormId).HasColumnName("form_id");
+            task.Property(t => t.DueAt).HasColumnName("due_at");
+            task.Property(t => t.State).HasColumnName("state");
+            task.Property(t => t.Outcome).HasColumnName("outcome");
+            task.Property(t => t.CompletedBy).HasColumnName("completed_by");
+            task.Property(t => t.CompletedAt).HasColumnName("completed_at");
+            task.Property(t => t.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            task.HasIndex(t => t.ProcessInstanceId).HasDatabaseName("ix_process_tasks_process_instance_id");
+
+            // The task inbox finds a user's open tasks by their id or by any role they hold.
+            task.HasIndex(t => new { t.ApplicationId, t.State, t.AssigneeKind, t.Assignee })
+                .HasDatabaseName("ix_process_tasks_application_id_state_assignee");
+            task.HasOne<ProcessInstanceRow>()
+                .WithMany()
+                .HasForeignKey(t => t.ProcessInstanceId)
+                .HasConstraintName("fk_process_tasks_process_instances_process_instance_id")
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

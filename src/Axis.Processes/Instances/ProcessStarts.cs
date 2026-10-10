@@ -17,6 +17,9 @@ public static class ProcessStarts
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 
+    /// <summary>The state of an instance that waits for a human task to be completed.</summary>
+    public const string Waiting = "waiting";
+
     /// <summary>The state of an instance that reached an <c>end</c> step.</summary>
     public const string Completed = "completed";
 

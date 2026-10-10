@@ -10,9 +10,10 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Runs the current step of a process instance on the release the instance is pinned to. The step
-/// commits in the work item's transaction: an operation's record write, the new instance state and
-/// revision, a step history row, its <c>system</c> audit records and the next work item. A step
-/// that finds the instance at another revision than it loaded writes nothing. A step that throws is
+/// commits in the work item's transaction: an operation's record write, a task step's open human
+/// task, the new instance state and revision, a step history row, its <c>system</c> audit records
+/// and the next work item. A task step leaves the instance <c>waiting</c>, with no next work item.
+/// A step that finds the instance at another revision than it loaded writes nothing. A step that throws is
 /// rolled back, and the failure callback then records the error in the history and marks the
 /// instance <c>failed</c>.
 /// </summary>
@@ -116,6 +117,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         JsonObject details;
         string action;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
+        NewTask? task = null;
         switch (step)
         {
             case DecisionStepModel decisionStep:
@@ -153,6 +155,28 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 details = new JsonObject { ["step"] = step.Name };
                 action = AuditActions.ProcessCompleted;
                 break;
+            case TaskStepModel taskStep:
+                var (assigneeKind, assignee) = await AssignAsync(context, model, entity, record, taskStep, instance, input, cancellationToken);
+                task = new NewTask(
+                    Guid.CreateVersion7(),
+                    instance.Id,
+                    instance.ProcessId,
+                    instance.ReleaseId,
+                    instance.ApplicationId,
+                    step.Name,
+                    instance.SubjectEntityId,
+                    instance.SubjectId,
+                    assigneeKind,
+                    assignee,
+                    taskStep.Form.Id,
+                    taskStep.DueIn is { } dueIn ? instance.Now + dueIn : null);
+                state = ProcessStarts.Waiting;
+                nextStep = step.Name;
+                decision = null;
+                output = new JsonObject { ["state"] = ProcessStarts.Waiting, ["taskId"] = task.Id };
+                details = new JsonObject { ["step"] = step.Name, ["taskId"] = task.Id };
+                action = AuditActions.TaskCreated;
+                break;
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
@@ -188,6 +212,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                     ["version"] = written.Version,
                     ["fields"] = new JsonArray([.. assignments.Select(assignment => JsonValue.Create(assignment.Key.Name))]),
                 });
+        }
+
+        if (task is not null)
+        {
+            await ProcessTasks.InsertAsync(context.Transaction, task, cancellationToken);
         }
 
         await ProcessSteps.InsertHistoryAsync(
@@ -280,6 +309,39 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         }
 
         return values;
+    }
+
+    /// <summary>
+    /// Resolves the assignee of a task step: the user id its <c>user</c> expression gives, or its role
+    /// name. A <c>user</c> expression that fails at run time, or gives no non-blank text, fails the step.
+    /// </summary>
+    private static async Task<(string Kind, string Assignee)> AssignAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        EntityModel entity,
+        Record record,
+        TaskStepModel step,
+        LoadedInstance instance,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        if (step.Assignee.User is not { } user)
+        {
+            return (ProcessTasks.RoleAssignee, step.Assignee.Role!);
+        }
+
+        var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, user, cancellationToken);
+        if (result.Error is { } error)
+        {
+            throw Failure(error.Message, instance, input);
+        }
+
+        if (result.Value is not string id || string.IsNullOrWhiteSpace(id))
+        {
+            throw Failure($"The assignee of the task step '{step.Name}' gave no user.", instance, input);
+        }
+
+        return (ProcessTasks.UserAssignee, id);
     }
 
     /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
