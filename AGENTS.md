@@ -89,6 +89,10 @@ For local development with hot reload:
   `AXIS_POSTGRES_PORT`, also override `ConnectionStrings__Platform` and
   `Tenants__default__ConnectionString` for `dotnet run`.
 - Run `dotnet run --project src/Axis.Server` to start the server on port 5206.
+- Run `dotnet run --project src/Axis.Worker` to start the worker. It runs the
+  due work items of every tenant in its `Tenants` section. Start the server
+  first, because the server migrates the tenant databases and the worker
+  does not.
 - Run `npm run dev --prefix web` to start the SPA with hot reload. It proxies
   `/api` and `/health` to the server.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request

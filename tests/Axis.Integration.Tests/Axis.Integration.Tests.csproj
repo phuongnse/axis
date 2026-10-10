@@ -19,7 +19,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Axis.Configuration\Axis.Configuration.csproj" />
     <ProjectReference Include="..\..\src\Axis.Data\Axis.Data.csproj" />
+    <ProjectReference Include="..\..\src\Axis.Processes\Axis.Processes.csproj" />
     <ProjectReference Include="..\..\src\Axis.Server\Axis.Server.csproj" />
+    <ProjectReference Include="..\..\src\Axis.Worker\Axis.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

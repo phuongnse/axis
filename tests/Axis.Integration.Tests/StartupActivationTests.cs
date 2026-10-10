@@ -68,6 +68,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
 
         Assert.Equal(1L, await ScalarAsync(a, "SELECT count(*) FROM axis.releases"));
         Assert.Equal(1L, await ScalarAsync(b, "SELECT count(*) FROM axis.releases"));
+        Assert.Equal(0L, await ScalarAsync(a, "SELECT count(*) FROM axis.process_work_items"));
+        Assert.Equal(0L, await ScalarAsync(b, "SELECT count(*) FROM axis.process_work_items"));
     }
 
     [Fact]
