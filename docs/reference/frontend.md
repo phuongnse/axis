@@ -462,10 +462,25 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Keys.** Enter in a date or date-time picker only confirms the picked
     value and never sends the form. Enter in a text input sends the form, as
     in any form.
-  - **History** *(planned for M3)*. The form page of an existing record shows
-    the record's history from the
-    [history endpoint](record-api.md#audit-records-and-history), newest
-    first.
+  - **History**. The form page of a saved record shows the record's history
+    from the [history endpoint](record-api.md#audit-records-and-history) in a
+    panel below the form, newest first. A new record has no history panel.
+    - Each entry shows its action, who did it, its time and a short summary.
+      The action is a platform text, such as "Updated" or "Task decided". An
+      action without a text shows as it is.
+    - Who did it is the test user's display name. Without one, it is
+      "System" for `system`, "Anonymous" for `anonymous`, or else the raw
+      user id.
+    - The time uses the user's locale, with the medium date and time styles.
+    - The summary is built from the details. It lists the labels of the
+      fields it names, then the task outcome, then the step, joined by " · ".
+      An entry whose details name none of them has no summary. Outcome and
+      step names show as declared, such as `approve`. Comments and other
+      field values are never shown, because audit records never hold them.
+    - The panel shows 20 entries per page, with a paging control when there
+      are more. The page is the panel's own and stays out of the URL.
+    - When the history fails to load, an error shows inside the panel, and
+      the form still works.
   - **Sequence fields**. Page metadata marks a field that
     names a [sequence](configuration.md#sequences), so the form shows it
     read-only. It is empty on a new record, and the form never sends it.

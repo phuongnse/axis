@@ -381,10 +381,9 @@ Moving the richer form features out keeps M3 on processes.
 ## D21. Development test users, audit records and sequences — Agreed
 
 M3 adds three platform pieces before processes run. Test users, their
-sign-in, the current user, the SPA user picker, sequences and the audit
-records of record API writes and process starts are built. The audit records
-of process steps and task decisions, and record history, are
-*(planned for M3)*.
+sign-in, the current user, the SPA user picker, sequences, the audit records
+of record API writes, process starts, process steps and task decisions, and
+record history are built.
 
 - **Test users:** server configuration holds a fixed list, `TestUsers`, with
   an id, a display name and role names for each user. The SPA lets the person

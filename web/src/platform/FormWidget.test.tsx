@@ -177,6 +177,10 @@ const texts = {
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
+  'shell.history.title': 'History',
+  'shell.history.empty': 'No history yet.',
+  'shell.history.fields': 'Changed',
+  'shell.history.action.record.updated': 'Updated',
   'note.number': 'Number',
   'note.title': 'Title',
   'note.code': 'Code',
@@ -200,14 +204,35 @@ const catalogs = [{ texts, fallbackTexts: texts }]
 
 type Answer = { status: number; body: string }
 
-/** Stubs `fetch` with answers in order, and returns the requests made. */
+const historyPath = `${recordsPath}/${noteId}/history?page=1&pageSize=20`
+
+const historyJson = `{"items":[{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d","occurredAt":"2026-10-06T02:05:00.123456Z","actor":"anna","actorName":"Anna Admin","action":"record.updated","processInstanceId":null,"details":{"version":2,"fields":["title"]}}],"page":1,"pageSize":20,"totalCount":1}`
+
+/**
+ * Stubs `fetch` with answers in order, and returns the requests made. The history panel loads on
+ * its own, so a history request takes no answer and is not listed: it gets one entry.
+ */
 function stubFetch(...answers: Answer[]) {
-  const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => {
+  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+    if (input.includes('/history?')) {
+      return new Response(historyJson, { status: 200 })
+    }
     const answer = answers.shift() ?? { status: 500, body: '{}' }
     return new Response(answer.body, { status: answer.status })
   })
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url, init]) => ({ url, method: init?.method ?? 'GET', body: init?.body }))
+  return () =>
+    fetchMock.mock.calls
+      .filter(([url]) => !url.includes('/history?'))
+      .map(([url, init]) => ({ url, method: init?.method ?? 'GET', body: init?.body }))
+}
+
+/** The URLs of the history requests made. */
+function historyRequests() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.map(([url]) => String(url))
+    .filter((url) => url.includes('/history?'))
 }
 
 function CurrentLocation() {
@@ -246,6 +271,28 @@ describe('FormWidget', () => {
     expect(screen.getByLabelText('Due at')).toHaveValue(dayjs('2026-10-06T02:00:00Z').format('YYYY-MM-DD HH:mm:ss'))
     expect(screen.getByLabelText('Category')).toHaveValue('Office')
     expect(screen.getByLabelText('Category')).toHaveAttribute('readonly')
+  })
+
+  it('shows the history of a saved record below the form', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+
+    renderForm(noteId)
+
+    const entry = await screen.findByTestId('history-entry')
+    expect(screen.getByTestId('record-history')).toHaveTextContent('History')
+    expect(entry).toHaveTextContent('Updated')
+    expect(entry).toHaveTextContent('Anna Admin')
+    expect(entry).toHaveTextContent('Changed: Title')
+    expect(historyRequests()).toEqual([historyPath])
+  })
+
+  it('shows no history for a new record', async () => {
+    stubFetch()
+    renderForm()
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('')
+    expect(screen.queryByTestId('record-history')).toBeNull()
+    expect(historyRequests()).toEqual([])
   })
 
   it('marks required fields without blocking submit', async () => {

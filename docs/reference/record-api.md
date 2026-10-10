@@ -23,7 +23,7 @@ endpoint from M4 (see [Authentication and authorization](../architecture.md#auth
 | `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
 | `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
 | `DELETE /api/apps/{app}/entities/{entity}/records/{id}` | `204` with no body |
-| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=` *(planned for M3)* | `200` with one page of the record's audit records. See [Audit records and history](#audit-records-and-history) |
+| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=` | `200` with one page of the record's audit records. See [Audit records and history](#audit-records-and-history) |
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
@@ -404,8 +404,7 @@ answered with `400`:
 ## Audit records and history
 
 Every record write leaves an audit record, and one record's audit records
-can be read as its history (D21). The writes are built. The history endpoint
-is *(planned for M3)*.
+can be read as its history (D21).
 
 - **Writes.** A create, update or delete writes one audit record in the
   write's transaction. When the write fails, no audit record is written. For
@@ -429,12 +428,28 @@ is *(planned for M3)*.
     its stored value is listed too. Computed fields are never listed.
   - Field values are never included, so the audit holds no sensitive data
     before field masking exists.
-- **History** *(planned for M3)*. `GET /api/apps/{app}/entities/{entity}/records/{id}/history`
+- **History**. `GET /api/apps/{app}/entities/{entity}/records/{id}/history`
   returns the audit records of one record.
-  - The path follows the 404 rules of a single read.
+  - It lists every audit record that names the record. That covers the
+    record API's writes, and the [process start](processes.md#start-endpoint),
+    each step and each [task decision](processes.md#completing-a-task) on it,
+    including those whose actor is `system`.
+  - The path follows the 404 rules of a single read. An unknown record, a
+    deleted record, or an id from another tenant is a `404`.
   - `page` and `pageSize` follow the [paging rules](#paging-and-sorting).
-    There is no `sort` or `search`.
+    An invalid one is a `400` keyed by its name. There is no `sort` or
+    `search`. The path is checked first, then the paging, then whether the
+    record exists.
   - Items are ordered by `occurredAt` descending, then by `id` descending.
+    The audit records of one transaction share one time, so their order
+    among themselves follows their ids. That order may differ from the order
+    they were written in.
+  - Each item has its `id`, `occurredAt`, `actor`, `action`,
+    `processInstanceId` and `details`, as stored. `actorName` is the test
+    user's display name. It is `null` for `system`, `anonymous` or a user id
+    that is no longer configured.
+  - The history is not filtered by access before M4. Anyone who can read the
+    record can read its history.
 
 For example:
 
@@ -445,6 +460,7 @@ For example:
       "id": "01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d",
       "occurredAt": "2026-10-06T02:05:00.123456Z",
       "actor": "anna",
+      "actorName": "Anna Employee",
       "action": "record.updated",
       "processInstanceId": null,
       "details": { "version": 2, "fields": ["title"] }
@@ -453,6 +469,7 @@ For example:
       "id": "01926b3a-1c20-7b4d-8e6f-7a8b9c0d1e2f",
       "occurredAt": "2026-10-06T02:00:00.123456Z",
       "actor": "anna",
+      "actorName": "Anna Employee",
       "action": "record.created",
       "processInstanceId": null,
       "details": { "version": 1 }
