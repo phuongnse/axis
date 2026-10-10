@@ -47,14 +47,21 @@ server=""
 web=""
 
 # Prefixes each line with the process name. It ignores SIGINT so it keeps draining output
-# while the processes stop. It marks the server exit: when the app exits, dotnet watch
-# waits for a file change instead of exiting.
+# while the processes stop. It marks the server exit. When the app exits, dotnet watch
+# prints "Exited" and then waits for a file change instead of exiting. When it restarts the
+# app after an edit that hot reload cannot apply, it prints "Exited" too, and then builds.
+# So only an "Exited" line that the waiting line follows at once counts as an exit.
 prefix() {
   trap '' INT
+  local exited=0
   while IFS= read -r line || [ -n "$line" ]; do
     printf '[%s] %s\n' "$1" "$line"
-    if [ "$1" = server ] && [[ $line == *"dotnet watch"*Exited* ]]; then
-      : >"$state/server-exited"
+    if [ "$1" = server ]; then
+      if [ "$exited" -eq 1 ] && [[ $line == *"Waiting for a file to change before restarting"* ]]; then
+        : >"$state/server-exited"
+      fi
+      exited=0
+      if [[ $line == *"dotnet watch"*Exited* ]]; then exited=1; fi
     fi
   done
 }

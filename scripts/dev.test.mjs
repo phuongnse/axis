@@ -183,6 +183,35 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     await exitsWithin(run, 60_000)
   })
 
+  it('keeps running when an edit that hot reload cannot apply restarts the server', async () => {
+    // Making a sealed class unsealed is a rude edit: dotnet watch stops the app, builds and
+    // starts it again. It prints "Exited" on the way, which must not end the session.
+    const file = path.join(copy, 'src/Axis.Server/Health/DatabaseHealthCheck.cs')
+    const original = fs.readFileSync(file, 'utf8')
+    const listening = () => run.stdout.split('Now listening on').length - 1
+    const run = startDev()
+    try {
+      await waitReady(run)
+      assert.equal(listening(), 1)
+      fs.writeFileSync(file, original.replace('internal sealed class', 'internal class'))
+
+      const deadline = Date.now() + 300_000
+      while (listening() < 2 && Date.now() < deadline) {
+        assert.equal(run.exitCode, undefined, `dev.sh exited during the restart.\n${run.stdout}\n${run.stderr}`)
+        await sleep(1000)
+      }
+      assert.equal(listening(), 2, `The server did not restart.\n${run.stdout}\n${run.stderr}`)
+      assert.match(run.stdout, /Restart is needed/)
+      assert.match(run.stdout, /\[server\] dotnet watch .* Exited/)
+      assert.doesNotMatch(run.stdout, /\[dev\] The server exited/)
+      await waitReady(run)
+    } finally {
+      fs.writeFileSync(file, original)
+    }
+    interrupt(run)
+    assert.equal(await exitsWithin(run, 60_000), 130)
+  })
+
   it('exits non-zero and stops the SPA when the server exits on its own', async () => {
     const empty = fs.mkdtempSync(path.join(scratch, 'empty-app-'))
     const run = startDev({ ActivateOnStartup__0: empty })
