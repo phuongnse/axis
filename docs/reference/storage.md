@@ -26,7 +26,8 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     recorded enum value) and `axis.sequence_counters` (the last number of
     each sequence and period), with history in `axis.__data_migrations`.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
-    instance), `axis.process_start_receipts` (the stored response of each
+    instance), `axis.process_step_history` (one row per step occurrence),
+    `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start) and `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.
     The other process tables are *(planned for M3)*, see
@@ -34,9 +35,8 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `Axis.Data` also owns `axis.audit_records`, with history in
     `axis.__data_migrations`. Other modules append audit records only
     through its contract, `AuditRecords.AppendAsync`, which takes the
-    caller's open transaction. A process start writes its audit record this
-    way, inside its own transaction, and process steps *(planned for M3)*
-    will too. See
+    caller's open transaction. A process start and each process step write
+    their audit records this way, inside their own transaction. See
     [Audit records and sequence counters](#audit-records-and-sequence-counters).
   - Releases are immutable, enforced through the context's change tracking:
     a release and its resources are only inserted together. Saving fails when
@@ -214,8 +214,9 @@ schema of the tenant database.
 
 - **Audit records.** `axis.audit_records` is append-only. Each row is
   written in the same transaction as the action it records. The record API
-  and the process [start endpoint](processes.md#start-endpoint) write them.
-  The audit records of process steps and tasks are *(planned for M3)*.
+  and the process [start endpoint](processes.md#start-endpoint) write them,
+  and so do [process steps](processes.md#running-a-step). The audit records of
+  tasks are *(planned for M3)*.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

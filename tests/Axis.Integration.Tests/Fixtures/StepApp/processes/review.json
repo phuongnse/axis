@@ -1,0 +1,18 @@
+{
+  "id": "87df0d06-82a2-4db3-a4e6-3a1b442ef9f7",
+  "kind": "process",
+  "name": "Review",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "check",
+  "steps": [
+    {
+      "name": "check",
+      "type": "decision",
+      "branches": [{ "when": "NeedsReview(amount)", "next": "reviewed" }],
+      "otherwise": "skipped"
+    },
+    { "name": "reviewed", "type": "end" },
+    { "name": "skipped", "type": "end" }
+  ]
+}

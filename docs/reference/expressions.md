@@ -19,7 +19,8 @@ can also call a named rule: its SQL inlines the rule's expression. A
 [process](processes.md#compile-checks) start condition and decision `when`
 are type-checked by the compiler too, can call named rules and can follow
 paths through reference fields. The data module can evaluate them against a
-stored record. The engine that runs them comes later. Other uses come with the issues that build
+stored record. The start endpoint runs the start condition, and the worker runs
+each decision `when`. Other uses come with the issues that build
 them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows

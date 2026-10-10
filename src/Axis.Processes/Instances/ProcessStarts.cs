@@ -17,6 +17,12 @@ public static class ProcessStarts
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 
+    /// <summary>The state of an instance that reached an <c>end</c> step.</summary>
+    public const string Completed = "completed";
+
+    /// <summary>The state of an instance whose step failed. The error is in its history.</summary>
+    public const string Failed = "failed";
+
     /// <summary>The partial unique index that allows one running or waiting instance per process and record.</summary>
     internal const string ActiveSubjectIndex = "ux_process_instances_active_subject";
 

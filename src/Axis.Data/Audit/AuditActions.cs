@@ -10,4 +10,10 @@ public static class AuditActions
     public const string RecordDeleted = "record.deleted";
 
     public const string ProcessStarted = "process.started";
+
+    public const string ProcessStepCompleted = "process.stepCompleted";
+
+    public const string ProcessCompleted = "process.completed";
+
+    public const string ProcessFailed = "process.failed";
 }

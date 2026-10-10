@@ -1,0 +1,12 @@
+{
+  "id": "e8df48a6-6a9e-40a3-b5ae-6254334dbd47",
+  "kind": "entity",
+  "name": "Request",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true },
+    { "name": "amount", "type": "decimal", "precision": 20, "scale": 2 },
+    { "name": "divisor", "type": "integer" }
+  ]
+}

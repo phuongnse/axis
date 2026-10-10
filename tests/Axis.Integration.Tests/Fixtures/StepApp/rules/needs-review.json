@@ -1,0 +1,9 @@
+{
+  "id": "dc7edd3b-7e09-489a-b076-0ba3771b9e1d",
+  "kind": "rule",
+  "name": "NeedsReview",
+  "formatVersion": 1,
+  "parameters": [{ "name": "total", "type": "decimal" }],
+  "resultType": "boolean",
+  "expression": "total >= 1000"
+}

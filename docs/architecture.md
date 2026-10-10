@@ -21,9 +21,10 @@ flowchart LR
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
   It becomes the BFF (OIDC client and cookie session) *(planned for M4)*.
-- **Axis.Worker** executes durable work. So far it runs work items. Process
-  steps, timers, outbox delivery, triggers and schedules come later *(planned
-  for M3 and later)*. It loads the same modules as the server.
+- **Axis.Worker** executes durable work. So far it runs work items, and
+  through them the `decision` and `end` steps of process instances. Other
+  process steps, timers, outbox delivery, triggers and schedules come later
+  *(planned for M3 and later)*. It loads the same modules as the server.
 - **Platform database** stores installation-level data: the tenant directory
   and platform settings *(tenant directory planned for M9; tenants come from
   server configuration until then)*.
@@ -40,7 +41,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items (built); process engine, tasks, outbox, timers (M3)
+  Axis.Processes/         work items, decision and end steps (built); other steps, tasks, outbox, timers (M3)
   Axis.Policy/            roles, policies, evaluation (M4)
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
@@ -58,8 +59,8 @@ Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
 checker, interpreter and SQL translation), `Axis.Presentation` (the platform site, its texts and the
-shapes of application site metadata), `Axis.Processes` (work items only so
-far), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
+shapes of application site metadata), `Axis.Processes` (work items and the
+`decision` and `end` steps so far), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
 `Axis.Policy` does not exist yet.
 
 ## Module rules
@@ -253,6 +254,9 @@ They exist only in development and tests, never in Production.
 - **History.** Every attempt, input, output, decision and error is recorded
   for inspection.
 
+The step transactions, the revision check and the history are built for
+`decision` and `end` steps, see
+[Running a step](reference/processes.md#running-a-step).
 The process resource, the start endpoint, the instance and task states, the
 task API, the worker settings and the tables are in
 [reference/processes.md](reference/processes.md).

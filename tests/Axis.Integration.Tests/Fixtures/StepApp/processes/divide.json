@@ -1,0 +1,17 @@
+{
+  "id": "6db6012b-15e7-48f2-92d9-359f4c648459",
+  "kind": "process",
+  "name": "Divide",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "check",
+  "steps": [
+    {
+      "name": "check",
+      "type": "decision",
+      "branches": [{ "when": "amount / divisor > 1", "next": "done" }],
+      "otherwise": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
