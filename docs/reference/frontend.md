@@ -384,6 +384,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Keys.** Enter in a date or date-time picker only confirms the picked
     value and never sends the form. Enter in a text input sends the form, as
     in any form.
+  - **History** *(planned for M3)*. The form page of an existing record shows
+    the record's history from the
+    [history endpoint](record-api.md#audit-records-and-history), newest
+    first.
+  - **Sequence fields** *(planned for M3)*. Page metadata marks a field that
+    names a [sequence](configuration.md#sequences), so the form shows it
+    read-only. It is empty on a new record, and the form never sends it.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

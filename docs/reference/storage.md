@@ -24,6 +24,11 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity
     with its application and table) and `axis.provisioned_enum_values` (each
     recorded enum value), with history in `axis.__data_migrations`.
+  - `Axis.Data` also owns `axis.audit_records` and
+    `axis.sequence_counters`, with history in `axis.__data_migrations`
+    *(planned for M3)*. Processes write audit records through its contract,
+    inside their own transaction. See
+    [Audit records and sequence counters](#audit-records-and-sequence-counters).
   - Releases are immutable, enforced through the context's change tracking:
     a release and its resources are only inserted together. Saving fails when
     a stored release or resource is modified or deleted, or when a resource is
@@ -192,3 +197,47 @@ child tables are in [Schema planning](#schema-planning).
   written, and an update with no values is enough. Activation does not
   backfill the rows: it would evaluate every row inside the provisioning
   transaction, and one run-time error would stop the activation.
+
+## Audit records and sequence counters
+
+*(planned for M3)* `Axis.Data` owns both tables (D21). They are system tables
+in the `axis` schema of the tenant database.
+
+- **Audit records.** `axis.audit_records` is append-only. Each row is
+  written in the same transaction as the action it records.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID |
+  | `occurred_at` | `timestamptz` | When the action happened |
+  | `actor` | `text` | A user id, `system` for the worker, or `anonymous` before M4 when nobody is signed in |
+  | `action` | `text` | The action, such as `record.created` |
+  | `application_id` | `uuid` | The application `id` |
+  | `entity_id` | `uuid`, null | The entity `id`, when the action concerns a record |
+  | `record_id` | `uuid`, null | The record id |
+  | `process_instance_id` | `uuid`, null | The process instance id |
+  | `details` | `jsonb` | An object that depends on the action |
+
+  - Application and entity are stored by their stable resource ids, never by
+    name, so a rename keeps the history.
+  - An index on `(entity_id, record_id, occurred_at desc, id desc)` serves
+    the [record history](record-api.md#audit-records-and-history).
+  - A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE`
+    statement trigger raise an exception, so no row can be changed or
+    removed.
+- **Sequence counters.** `axis.sequence_counters` holds one row per
+  [sequence](configuration.md#sequences) and period.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `sequence_id` | `uuid` | The `sequence` resource `id` |
+  | `application_id` | `uuid` | The application `id` |
+  | `period` | `integer` | The UTC year, or 0 when the format has no `{yyyy}` |
+  | `last_value` | `bigint` | The last number handed out |
+
+  - The primary key is `(sequence_id, period)`.
+  - Taking a number is one
+    `INSERT ... ON CONFLICT DO UPDATE SET last_value = last_value + 1 RETURNING last_value`
+    in the caller's transaction.
+  - Its row lock makes concurrent creates of the same sequence wait for each
+    other. A create that rolls back uses no number, so there are no gaps.
