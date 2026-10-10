@@ -241,6 +241,49 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.equal(await exitsWithin(run, 60_000), 130)
   })
 
+  it('restarts only the server when application configuration changes', async () => {
+    const appCopy = path.join(scratch, 'app-copy')
+    fs.cpSync(path.join(repoRoot, 'samples/apps/purchase-requests'), appCopy, { recursive: true })
+    const texts = path.join(appCopy, 'texts/en.json')
+    const activations = () => run.stdout.split('Activated application').length - 1
+    const workerPids = () =>
+      runProcs(run.child.pid)
+        .filter((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))
+        .map((p) => p.pid)
+
+    const run = startDev({ ActivateOnStartup__0: appCopy })
+    await waitReady(run)
+    await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
+    assert.equal(activations(), 1, run.stdout)
+    const workersBefore = workerPids()
+    assert.ok(workersBefore.length > 0, `No worker process in:\n${JSON.stringify(runProcs(run.child.pid))}`)
+
+    const content = JSON.parse(fs.readFileSync(texts, 'utf8'))
+    content.texts['site.title'] = 'Purchasing, edited'
+    fs.writeFileSync(texts, JSON.stringify(content, null, 2))
+
+    const deadline = Date.now() + 300_000
+    while (activations() < 2 && Date.now() < deadline) {
+      assert.equal(run.exitCode, undefined, `dev.sh exited during the restart.\n${run.stdout}\n${run.stderr}`)
+      await sleep(1000)
+    }
+    assert.equal(activations(), 2, `The server did not activate again.\n${run.stdout}\n${run.stderr}`)
+    assert.match(run.stdout, /\[dev\] Application configuration changed/)
+    assert.doesNotMatch(run.stdout, /\[dev\] The server exited/)
+    await waitReady(run)
+
+    const workersAfter = workerPids()
+    assert.deepEqual(workersAfter, workersBefore)
+    for (const pid of workersAfter) assert.equal(isAlive(pid), true, `The worker ${pid} stopped`)
+
+    // A configuration that does not activate stops the script, as it does at startup.
+    fs.writeFileSync(texts, '{')
+    assert.notEqual(await exitsWithin(run, 300_000), 0)
+    assert.match(run.stdout, /\[dev\] The server exited/)
+    await sleep(500)
+    assert.deepEqual(leftoverProcs(), [])
+  })
+
   it('exits non-zero and stops the SPA when the server exits on its own', async () => {
     const empty = fs.mkdtempSync(path.join(scratch, 'empty-app-'))
     const run = startDev({ ActivateOnStartup__0: empty })
