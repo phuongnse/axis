@@ -6,8 +6,8 @@ issue, and `/nexkit fix` and `/nexkit review` on its pull request.
 
 Three roles take part:
 
-- **The owner** decides. The owner approves plans, pull requests and waiting
-  CI runs, and merges.
+- **The owner** decides. The owner approves plans, and chooses whether NexKit
+  merges its own pull requests or the owner merges each one.
 - **The local agent session** drives NexKit for the owner. It posts commands,
   reads plans and triages pull requests.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
@@ -23,17 +23,30 @@ models, are not copied here. Look them up where they live.
 - **The local agent may post `/nexkit plan`, `/nexkit fix` and
   `/nexkit review` itself.** It posts `/nexkit go` only when the owner says so
   explicitly.
-- **Only the owner approves pull requests, approves CI runs that wait for
-  approval, and merges.** The local agent reminds the owner when a CI run
-  needs approval.
+- **NexKit merges a pull request once it passes, while `auto_merge` is on.**
+  With NexKit's [`auto_merge` setting][nexkit-auto-merge] on, NexKit
+  squash-merges a pull request as soon as every check passes and the AI review
+  approves. The owner turns it off to decide each merge again, and then only
+  the owner merges. The switch is in `.nexkit/`, so changing it is a hand-made
+  pull request.
+- **The rules on `main` let NexKit merge.** They require NexKit's own checks
+  and no approval from a person. They do not require the CI workflow on pull
+  requests: NexKit opens its pull requests with the Actions token, so GitHub
+  holds that workflow for a person's approval. NexKit's checks run the same
+  scripts.
+- **CI runs on `main` after every merge.** A merge by NexKit starts no `push`
+  workflow, so NexKit starts the CI workflow on `main` itself, through its
+  `after_merge_workflows` setting. Two pull requests that pass on their own
+  can still break `main` together. When CI on `main` fails, the local agent
+  runs it once more if the failure looks flaky. Otherwise it tells the owner
+  and opens a bug issue with the failure, which goes before other issues.
 - **Everything goes through NexKit, except changes in paths NexKit may not
   change.** Those paths are set by NexKit's
   [`protected_paths` setting][nexkit-config].
   Such changes are hand-made pull requests on any branch name, for example a
-  NexKit version bump. The owner opens them from their own account, and
-  GitHub does not let an author approve their own pull request. So the owner
-  merges them with an admin bypass of the rules on `main`, after the required
-  checks pass.
+  NexKit version bump. The owner opens them from their own account. NexKit's
+  checks do not run on them, so the owner merges them with an admin bypass of
+  the rules on `main`, after the CI workflow passes.
 
 ## Profiles
 
@@ -105,9 +118,8 @@ them.
    closes when all parts are done.
 4. **Implement.** The owner says go on the latest plan, and `/nexkit go` is
    posted. NexKit implements that plan and opens a pull request.
-5. **Pull request.** If the CI run waits as `action_required`, the owner
-   approves it. Merging needs the required checks on `main` to be green, plus
-   the owner's approval.
+5. **Pull request.** Every round runs NexKit's checks and the AI review on the
+   new commit. Merging needs both to pass.
 6. **Fix.** Comment `/nexkit fix <instructions>` for another round. This also
    handles merge conflicts: NexKit merges `main` into the branch, it does not
    rebase. When a conflict needs a choice, the round stops as `blocked` with a
@@ -116,7 +128,8 @@ them.
    `/nexkit review` retries it. If the review requests changes, NexKit starts
    automatic fix rounds up to the limit in its configuration. After that, a
    person decides on `/nexkit fix`.
-7. **Merge.** The owner squash-merges.
+7. **Merge.** NexKit squash-merges and starts CI on `main`. With `auto_merge`
+   off, the owner squash-merges instead.
 8. **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
    are hand-made pull requests, as described under Decisions. A conflict in
    those paths, or a merge that brings workflow changes, is different: merge
@@ -176,3 +189,4 @@ These rules apply to issues, plans, pull request descriptions and reviews.
 
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
+[nexkit-auto-merge]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#automatic-merge

@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # NexKit starts CI on main after it merges, because its merge starts no push workflow.
+  workflow_dispatch:
 
 permissions:
   contents: read

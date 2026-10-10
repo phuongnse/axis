@@ -79,5 +79,8 @@
     }
   },
   "max_auto_fixes": 2,
-  "auto_merge": false
+  "auto_merge": true,
+  "after_merge_workflows": [
+    "ci.yml"
+  ]
 }
