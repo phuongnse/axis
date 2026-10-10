@@ -24,15 +24,25 @@ public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<Wi
 /// for its records. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
 /// is then the form's entity, with every field, so a client knows the type of each field the form
 /// shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
+/// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
+/// <param name="Actions">The buttons a form widget shows on a saved record, in page file order.</param>
 public sealed record WidgetMetadata(
     string Type,
     string? FormPage,
     EntityMetadata? Entity,
     DataSourceMetadata? DataSource,
     FormMetadata? Form,
-    string? TasksPath);
+    string? TasksPath,
+    IReadOnlyList<ActionMetadata> Actions);
+
+/// <summary>A <c>startProcess</c> action of a form widget, which starts a process for the form's record.</summary>
+/// <param name="Type">The kind of action: always <c>startProcess</c>.</param>
+/// <param name="Process">The process, by its declared name.</param>
+/// <param name="LabelKey">The text key of the button's label.</param>
+/// <param name="InstancesPath">The path of the process start endpoint, so a client never builds it.</param>
+public sealed record ActionMetadata(string Type, string Process, string LabelKey, string InstancesPath);
 
 /// <summary>The form a form widget lays its entity's fields out with: its sections in display order.</summary>
 public sealed record FormMetadata(string Name, IReadOnlyList<FormSectionMetadata> Sections);

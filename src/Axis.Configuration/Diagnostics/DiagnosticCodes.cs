@@ -83,4 +83,6 @@ public static class DiagnosticCodes
     public const string UnknownFormField = "AXC0075";
     public const string DuplicateFormField = "AXC0076";
     public const string UnknownWidgetForm = "AXC0077";
+    public const string UnknownActionProcess = "AXC0087";
+    public const string ActionProcessOverOtherEntity = "AXC0088";
 }

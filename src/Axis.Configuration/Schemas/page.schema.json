@@ -45,7 +45,21 @@
         "entity": { "$ref": "#/$defs/name" },
         "dataSource": { "$ref": "#/$defs/name" },
         "form": { "$ref": "#/$defs/name" },
-        "formPage": { "$ref": "#/$defs/name" }
+        "formPage": { "$ref": "#/$defs/name" },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "process", "label"],
+      "properties": {
+        "type": { "enum": ["startProcess"] },
+        "process": { "$ref": "#/$defs/name" },
+        "label": { "$ref": "#/$defs/textReference" }
       }
     }
   }

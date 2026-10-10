@@ -7,7 +7,7 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the forms, sites and pages of an application against its entities, pages, data sources,
-/// forms and texts. A name that belongs to a file which was not loaded because of its own errors is
+/// forms, processes and texts. A name that belongs to a file which was not loaded because of its own errors is
 /// not reported again.
 /// </summary>
 internal static class PresentationChecker
@@ -18,6 +18,7 @@ internal static class PresentationChecker
         Func<string, PageResource?> findPage,
         Func<string, DataSourceResource?> findDataSource,
         Func<string, FormResource?> findForm,
+        Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
@@ -28,7 +29,7 @@ internal static class PresentationChecker
 
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, textKeys, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, textKeys, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -104,6 +105,7 @@ internal static class PresentationChecker
         Func<string, PageResource?> findPage,
         Func<string, DataSourceResource?> findDataSource,
         Func<string, FormResource?> findForm,
+        Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
@@ -135,7 +137,18 @@ internal static class PresentationChecker
                     Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
                 }
 
+                if (widget.Actions is not null)
+                {
+                    Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+                }
+
                 continue;
+            }
+
+            if (!isForm && widget.Actions is not null)
+            {
+                // An action starts a process for one record, which only a form shows.
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
             }
 
             if (isForm && widget.DataSource is not null)
@@ -221,6 +234,11 @@ internal static class PresentationChecker
                     $"{path}/dataSource");
             }
 
+            if (isForm)
+            {
+                CheckActions(widget, page, path, recordEntity, loaded, findProcess, textKeys, diagnostics);
+            }
+
             if (widget.FormPage is not { } formPage)
             {
                 continue;
@@ -260,6 +278,52 @@ internal static class PresentationChecker
                     DiagnosticCodes.InvalidFormPage,
                     $"The page '{formPage}' was not found. No loaded page has that name.",
                     $"{path}/formPage");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks the actions of a form widget: each label has a text key, and each process exists and
+    /// is over the entity of the form's records, ignoring letter case.
+    /// </summary>
+    private static void CheckActions(
+        WidgetDefinition widget,
+        PageResource page,
+        string path,
+        string? recordEntity,
+        ApplicationLoadResult loaded,
+        Func<string, ProcessResource?> findProcess,
+        IReadOnlySet<string> textKeys,
+        List<Diagnostic> diagnostics)
+    {
+        var actions = widget.Actions ?? [];
+        for (var index = 0; index < actions.Count; index++)
+        {
+            var action = actions[index];
+            var actionPath = $"{path}/actions/{index}";
+            ApplicationCompiler.CheckTextKey(action.Label, page.File, page.Id, $"{actionPath}/label", textKeys, diagnostics);
+
+            if (findProcess(action.Process) is not { } process)
+            {
+                if (!loaded.UnloadedProcessNames.Contains(action.Process))
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.UnknownActionProcess,
+                        $"The process '{action.Process}' was not found. No loaded process has that name.",
+                        page.File,
+                        $"{actionPath}/process",
+                        page.Id));
+                }
+            }
+            else if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
+            {
+                // The action starts the process for the form's record, so it must be its subject.
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ActionProcessOverOtherEntity,
+                    $"The process '{process.Name}' is over the entity '{process.Entity}', but the form shows records of '{recordEntity}'.",
+                    page.File,
+                    $"{actionPath}/process",
+                    page.Id));
             }
         }
     }

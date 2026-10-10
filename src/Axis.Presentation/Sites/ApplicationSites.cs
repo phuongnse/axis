@@ -64,7 +64,12 @@ public static class ApplicationSites
             widget.Entity is { } entity ? DescribeEntity(application, entity.Name) : null,
             widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
             widget.Form is { } form ? DescribeForm(application, form.Name) : null,
-            widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null);
+            widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
+            [.. widget.Actions.Select(action => new ActionMetadata(
+                "startProcess",
+                action.Process.Name,
+                action.Label.TextKey,
+                $"/api/apps/{application.Manifest.Name}/processes/{action.Process.Name}/instances"))]);
 
     /// <summary>
     /// The metadata of the form named <paramref name="formName"/>, as a form widget's page metadata

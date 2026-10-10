@@ -61,6 +61,7 @@ public static class ApplicationLoader
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
 
@@ -116,6 +117,7 @@ public static class ApplicationLoader
         var unloadedDataSourceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedSequenceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedFormNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Set when the root application.json is already reported as unreadable or as the wrong kind,
         // so the folder is not also told that its manifest is missing.
@@ -174,6 +176,11 @@ public static class ApplicationLoader
             if (kind == ResourceKinds.Form && !schemaValid && ReadName(root) is { } unloadedFormName)
             {
                 unloadedFormNames.Add(unloadedFormName);
+            }
+
+            if (kind == ResourceKinds.Process && !schemaValid && ReadName(root) is { } unloadedProcessName)
+            {
+                unloadedProcessNames.Add(unloadedProcessName);
             }
 
             if (schemaValid)
@@ -240,7 +247,8 @@ public static class ApplicationLoader
             unloadedPageNames,
             unloadedDataSourceNames,
             unloadedSequenceNames,
-            unloadedFormNames);
+            unloadedFormNames,
+            unloadedProcessNames);
     }
 
     /// <summary>

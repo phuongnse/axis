@@ -32,6 +32,8 @@
     "noteReview.main": "Note",
     "noteReview.approve": "Approve",
     "noteReview.reject": "Reject",
+    "noteClose.action": "Close note",
+    "noteClose.cannotClose": "Only an open note can be closed.",
     "category.label": "Category",
     "category.name": "Name"
   }

@@ -38,6 +38,7 @@ const noteWidget: EntityWidgetMetadata = {
   dataSource: null,
   form: null,
   tasksPath: null,
+  actions: [],
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -141,6 +142,16 @@ const sectionsWidget: EntityWidgetMetadata = {
   },
 }
 
+const instancesPath = '/api/apps/E2eApp/processes/NoteClose/instances'
+
+// A note form with an action that starts the NoteClose process.
+const actionWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  actions: [{ type: 'startProcess', process: 'NoteClose', labelKey: 'noteClose.action', instancesPath }],
+}
+
+const instanceJson = `{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7e","process":"NoteClose","subjectId":"${noteId}","releaseId":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7f","state":"running"}`
+
 function sectionsJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","code":"N-1","priority":7,"done":true,"category":"${categoryId}","lines":[{"description":"Pens","quantity":2}]},"labels":{"category":"Office"}}`
 }
@@ -200,10 +211,18 @@ const texts = {
   'note.amountPositive': 'Amount must be positive.',
   'noteSections.main': 'Main',
   'noteSections.details': 'Details',
+  'shell.form.processStarted': 'The process has started.',
+  'shell.form.processRunning': 'This record is already in a running process.',
+  'shell.form.startFailed': 'The process could not be started.',
+  'noteClose.action': 'Close note',
+  'noteClose.cannotClose': 'Only an open note can be closed.',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
-type Answer = { status: number; body: string }
+/** An answer that never arrives: `fetch` rejects as on a lost connection. */
+const networkError = 'networkError'
+
+type Answer = { status: number; body: string } | typeof networkError
 
 const historyPath = `${recordsPath}/${noteId}/history?page=1&pageSize=20`
 
@@ -219,6 +238,9 @@ function stubFetch(...answers: Answer[]) {
       return new Response(historyJson, { status: 200 })
     }
     const answer = answers.shift() ?? { status: 500, body: '{}' }
+    if (answer === networkError) {
+      throw new TypeError('Failed to fetch')
+    }
     return new Response(answer.body, { status: answer.status })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -226,6 +248,14 @@ function stubFetch(...answers: Answer[]) {
     fetchMock.mock.calls
       .filter(([url]) => !url.includes('/history?'))
       .map(([url, init]) => ({ url, method: init?.method ?? 'GET', body: init?.body }))
+}
+
+/** The `Idempotency-Key` of each start request made, in order. */
+function startKeys() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => String(url) === instancesPath)
+    .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
 }
 
 /** The URLs of the history requests made. */
@@ -796,5 +826,127 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
+  })
+
+  describe('start process action', () => {
+    it('shows the action on a saved record and none on a new one', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      const { unmount } = renderForm(noteId, actionWidget)
+      expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
+      unmount()
+
+      stubFetch()
+      renderForm(null, actionWidget)
+      expect(await screen.findByLabelText('Title')).toHaveValue('')
+      expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
+    })
+
+    it('starts the process without a save when nothing changed, then shows a message and reloads', async () => {
+      const requests = stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        { status: 201, body: instanceJson },
+        { status: 200, body: noteJson('Closed by the process', 2) },
+      )
+      renderForm(noteId, actionWidget)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Close note' }))
+
+      expect(await screen.findByTestId('form-started')).toHaveTextContent('The process has started.')
+      await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Closed by the process'))
+      expect(requests()).toEqual([
+        { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
+        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+        { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
+      ])
+      expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+    })
+
+    it('saves the changed fields first, then starts the process', async () => {
+      const requests = stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        { status: 200, body: noteJson('New', 2) },
+        { status: 201, body: instanceJson },
+        { status: 200, body: noteJson('New', 3) },
+      )
+      renderForm(noteId, actionWidget)
+      const title = await screen.findByLabelText('Title')
+      await userEvent.clear(title)
+      await userEvent.type(title, 'New')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Close note' }))
+
+      expect(await screen.findByTestId('form-started')).toBeInTheDocument()
+      await waitFor(() => expect(requests()).toHaveLength(4))
+      expect(requests().slice(1, 3)).toEqual([
+        { url: `${recordsPath}/${noteId}`, method: 'PATCH', body: '{"version":1,"values":{"title":"New"}}' },
+        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+      ])
+    })
+
+    it('starts nothing when the save fails', async () => {
+      const requests = stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        { status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' },
+      )
+      renderForm(noteId, actionWidget)
+      await userEvent.clear(await screen.findByLabelText('Title'))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Close note' }))
+
+      expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
+      expect(requests().map(({ url, method }) => `${method} ${url}`)).toEqual([
+        `GET ${recordsPath}/${noteId}`,
+        `PATCH ${recordsPath}/${noteId}`,
+      ])
+      expect(screen.queryByTestId('form-started')).toBeNull()
+    })
+
+    it('sends the same Idempotency-Key after a start got no answer, and a new one after a 201', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        networkError,
+        { status: 201, body: instanceJson },
+        { status: 200, body: noteJson('Buy paper', 2) },
+        { status: 409, body: '{"title":"Conflict","status":409}' },
+      )
+      renderForm(noteId, actionWidget)
+      const action = await screen.findByRole('button', { name: 'Close note' })
+
+      await userEvent.click(action)
+      expect(await screen.findByTestId('form-error')).toHaveTextContent('The process could not be started.')
+      await waitFor(() => expect(action).toBeEnabled())
+      await userEvent.click(action)
+      expect(await screen.findByTestId('form-started')).toBeInTheDocument()
+      await waitFor(() => expect(action).toBeEnabled())
+      await userEvent.click(action)
+      expect(await screen.findByTestId('form-error')).toHaveTextContent('This record is already in a running process.')
+
+      const [first, second, third] = startKeys()
+      expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+      expect(second).toBe(first)
+      expect(third).not.toBe(first)
+    })
+
+    it('shows a failed start condition as its text, looked up in the site texts', async () => {
+      stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        { status: 400, body: '{"title":"Invalid","status":400,"errors":{"/subjectId":["noteClose.cannotClose"]}}' },
+      )
+      renderForm(noteId, actionWidget)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Close note' }))
+
+      expect(await screen.findByTestId('form-error')).toHaveTextContent('Only an open note can be closed.')
+      expect(screen.queryByTestId('form-started')).toBeNull()
+    })
+
+    it('has the start texts in every platform locale', () => {
+      for (const catalog of [platformEnglish, platformVietnamese]) {
+        expect(catalog).toHaveProperty(['shell.form.processStarted'])
+        expect(catalog).toHaveProperty(['shell.form.processRunning'])
+        expect(catalog).toHaveProperty(['shell.form.startFailed'])
+      }
+    })
   })
 })

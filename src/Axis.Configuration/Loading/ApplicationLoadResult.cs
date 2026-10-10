@@ -39,6 +39,10 @@ namespace Axis.Configuration.Loading;
 /// The <c>name</c> of every <c>form</c> file that was not loaded because of its own errors,
 /// compared ignoring letter case. A reference to one of these names is not reported again either.
 /// </param>
+/// <param name="UnloadedProcessNames">
+/// The <c>name</c> of every <c>process</c> file that was not loaded because of its own errors,
+/// compared ignoring letter case. A reference to one of these names is not reported again either.
+/// </param>
 public sealed record ApplicationLoadResult(
     ApplicationManifest? Application,
     IReadOnlyList<EntityResource> Entities,
@@ -57,7 +61,8 @@ public sealed record ApplicationLoadResult(
     IReadOnlySet<string> UnloadedPageNames,
     IReadOnlySet<string> UnloadedDataSourceNames,
     IReadOnlySet<string> UnloadedSequenceNames,
-    IReadOnlySet<string> UnloadedFormNames)
+    IReadOnlySet<string> UnloadedFormNames,
+    IReadOnlySet<string> UnloadedProcessNames)
 {
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 }

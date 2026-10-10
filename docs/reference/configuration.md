@@ -87,10 +87,13 @@ flowchart LR
      allowed when the table's data source has an `aggregate`, because a group
      is not a record (`AXC0022`). A `taskInbox` widget names none of
      `entity`, `dataSource` and `form` (`AXC0060` at that property), and no
-     `formPage` (`AXC0022`). A navigation entry
-     must name a loaded page (`AXC0023`). Entity, page, data source and form names
+     `formPage` (`AXC0022`). `actions` are allowed only on a `form` widget
+     (`AXC0060` at `/widgets/{i}/actions`). An action's `process` must name a
+     loaded process (`AXC0087`) over the entity of the form's records
+     (`AXC0088`), both at `/widgets/{i}/actions/{j}/process`. A navigation entry
+     must name a loaded page (`AXC0023`). Entity, page, data source, form and process names
      resolve ignoring letter case, and a name whose file was not loaded
-     because of its own errors is not reported again. Site titles, navigation labels and page titles join the
+     because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
      `AXC0028` check.
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
@@ -419,7 +422,7 @@ sorted by file and then path.
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 | `AXC0058` | A path in a data source filter or a process condition takes more than 3 hops, such as `a.b.c.d.name`. Reported at the JSON Pointer of the expression string, such as `/filter` or `/steps/0/branches/0/when`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
-| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. Or a `taskInbox` widget names an `entity`, `dataSource` or `form`, reported at that property. |
+| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. Or a `taskInbox` widget names an `entity`, `dataSource` or `form`, reported at that property. Or a `table` or `taskInbox` widget has `actions`, reported at `/widgets/{i}/actions`. |
 | `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |
 | `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
@@ -446,6 +449,8 @@ sorted by file and then path.
 | `AXC0084` | A process task step's `dueIn` is not a positive ISO 8601 duration in the accepted form: whole-number weeks (`W`), or days (`D`) with an optional `T` part of hours (`H`), minutes (`M`) and seconds (`S`), such as `P2W`, `P3D`, `PT4H` or `P1DT12H`. Years and months are `AXC0084` until calendar durations come with the [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed), because they have no fixed length. Reported at `/steps/{i}/dueIn`. |
 | `AXC0085` | An earlier outcome of the same task step already uses this `name`, ignoring letter case. Reported at `/steps/{i}/outcomes/{j}/name` of the later outcome, naming the first one. |
 | `AXC0086` | A computed field calls `now()`, also inside an aggregate's item expression, such as `count(lines, dueAt < now())`. A stored value cannot depend on the current time. Reported at `/fields/{i}/expression`, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0087` | A `form` widget action's `process` names no loaded process. Reported at `/widgets/{i}/actions/{j}/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
+| `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 
 ## Startup activation
 
@@ -593,6 +598,10 @@ site, and its widgets are its content:
   shorthand for all records of that entity, or a `dataSource`.
 - A `table` widget may name a `formPage`: the page with the `form` widget
   that opens one of its records.
+- A `form` widget may list `actions`. Each is
+  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
+  a button that starts the process for the form's record. See
+  [frontend.md](frontend.md).
 - The page has no entity or template of its own, so more widgets and a
   layout can be added later without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
