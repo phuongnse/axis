@@ -25,6 +25,10 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     with its application and table), `axis.provisioned_enum_values` (each
     recorded enum value) and `axis.sequence_counters` (the last number of
     each sequence and period), with history in `axis.__data_migrations`.
+  - `Axis.Processes` owns `axis.process_work_items` (the work that workers
+    claim and run), with history in `axis.__processes_migrations`. The other
+    process tables are *(planned for M3)*, see
+    [processes](processes.md#tables).
   - `Axis.Data` also owns `axis.audit_records`, with history in
     `axis.__data_migrations` *(planned for M3)*. Processes write audit
     records through its contract, inside their own transaction. See

@@ -17,6 +17,13 @@ Milestone **M2, Data and rules**, is complete. The current milestone is
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 
+## Run Axis
+
+Run `docker compose up --build`. It needs only Docker. It builds Axis from source
+and starts PostgreSQL and the server with the purchase request sample at
+http://localhost:5206. See [AGENTS.md](AGENTS.md#commands) for the port variables
+and for development with hot reload.
+
 ## Documentation
 
 | Document | Purpose |

@@ -327,7 +327,9 @@ work.
 
 ## D21. Development test users, audit records and sequences — Agreed
 
-M3 adds three platform pieces before processes run.
+M3 adds three platform pieces before processes run. Test users, their
+sign-in, the current user and sequences are built. The SPA user picker,
+audit records and record history are *(planned for M3)*.
 
 - **Test users:** server configuration holds a fixed list, `TestUsers`, with
   an id, a display name and role names for each user. The SPA lets the person
@@ -335,12 +337,11 @@ M3 adds three platform pieces before processes run.
   the `Development` environment and in tests, which run as `Testing`. When
   `TestUsers` is set in any other environment, startup fails. OIDC replaces
   them in M4 (D9). See
-  [architecture](architecture.md#development-test-users-planned-for-m3).
+  [architecture](architecture.md#development-test-users).
 - **Current user:** `GET /api/me` returns the signed-in test user, or `401`
   when there is none. Before M4, record writes stay open with no signed-in
   user, and the actor is then `anonymous`.
-- **Audit records** *(planned for M3)*: rows in `axis.audit_records` are
-  append-only.
+- **Audit records:** rows in `axis.audit_records` are append-only.
   - Each one commits in the same transaction as its action.
   - M3 records these actions: record create, update and delete through the
     record API, process start, each process step and each task decision.
