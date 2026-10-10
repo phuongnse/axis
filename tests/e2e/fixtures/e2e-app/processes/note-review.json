@@ -1,0 +1,20 @@
+{
+  "id": "7f57929a-2533-43a6-a079-921788110a7c",
+  "kind": "process",
+  "name": "NoteReview",
+  "formatVersion": 1,
+  "entity": "Note",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "noteReview.task" },
+      "assignee": { "user": "'binh'" },
+      "form": "NoteReview",
+      "dueIn": "P3D",
+      "outcomes": [{ "name": "done", "label": { "textKey": "noteReview.done" }, "next": "end" }]
+    },
+    { "name": "end", "type": "end" }
+  ]
+}

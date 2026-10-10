@@ -8,9 +8,11 @@
     "site.title": "Ghi chú E2E",
     "nav.notes": "Ghi chú",
     "nav.categories": "Danh mục",
+    "nav.tasks": "Công việc",
     "pages.notes.title": "Ghi chú",
     "pages.noteForm.title": "Ghi chú",
     "pages.categories.title": "Danh mục",
+    "pages.tasks.title": "Công việc của tôi",
     "note.label": "Ghi chú",
     "note.title": "Tiêu đề",
     "note.code": "Mã",
@@ -26,6 +28,9 @@
     "noteLine.quantity": "Số lượng",
     "noteSections.main": "Chính",
     "noteSections.details": "Chi tiết",
+    "noteReview.task": "Xem xét ghi chú",
+    "noteReview.main": "Ghi chú",
+    "noteReview.done": "Xong",
     "category.label": "Danh mục",
     "category.name": "Tên"
   }

@@ -116,7 +116,27 @@ internal static class PresentationChecker
         {
             var widget = page.Widgets[index];
             var path = $"/widgets/{index}";
-            var isForm = WidgetTypes.Parse(widget.Type) == WidgetType.Form;
+            var type = WidgetTypes.Parse(widget.Type);
+            var isForm = type == WidgetType.Form;
+
+            if (type == WidgetType.TaskInbox)
+            {
+                // An inbox lists the signed-in user's tasks, so it binds no records and opens no form page.
+                foreach (var (property, value) in new[] { ("entity", widget.Entity), ("dataSource", widget.DataSource), ("form", widget.Form) })
+                {
+                    if (value is not null)
+                    {
+                        Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to task inbox widgets.", $"{path}/{property}");
+                    }
+                }
+
+                if (widget.FormPage is not null)
+                {
+                    Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
+                }
+
+                continue;
+            }
 
             if (isForm && widget.DataSource is not null)
             {

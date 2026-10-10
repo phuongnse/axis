@@ -131,17 +131,20 @@ export interface FormMetadata {
 }
 
 /**
- * One widget of a page. Exactly one of `entity` and `dataSource` is set: the widget shows all
- * records of an entity, or the rows of a data source. `formPage` is set only on a table that names
- * the page holding its form. `form` is set only on a form widget that names a form, and `entity` is
- * then the form's entity with every field.
+ * One widget of a page. On a table or form, exactly one of `entity` and `dataSource` is set: the
+ * widget shows all records of an entity, or the rows of a data source. `formPage` is set only on a
+ * table that names the page holding its form. `form` is set only on a form widget that names a form,
+ * and `entity` is then the form's entity with every field. A task inbox has neither an entity nor a
+ * data source, and lists the signed-in user's tasks from `tasksPath`.
  */
 export interface WidgetMetadata {
-  type: 'table' | 'form'
+  type: 'table' | 'form' | 'taskInbox'
   formPage: string | null
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null
+  /** The task API path on a task inbox, and `null` on every other widget. */
+  tasksPath: string | null
 }
 
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */

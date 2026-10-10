@@ -150,6 +150,38 @@ public sealed class PresentationCompilerTests
     }
 
     [Fact]
+    public void Task_inbox_with_no_binding_compiles_to_a_widget_with_no_references()
+    {
+        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "taskInbox" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var orders = Assert.Single(result.Model.Pages, page => page.Name == "Orders");
+        Assert.Equal(new WidgetModel(WidgetType.TaskInbox, null, null), Assert.Single(orders.Widgets));
+    }
+
+    [Theory]
+    [InlineData("entity", "\"Order\"", DiagnosticCodes.InvalidWidgetBinding)]
+    [InlineData("dataSource", "\"OrderList\"", DiagnosticCodes.InvalidWidgetBinding)]
+    [InlineData("form", "\"OrderEdit\"", DiagnosticCodes.InvalidWidgetBinding)]
+    [InlineData("formPage", "\"OrderForm\"", DiagnosticCodes.InvalidFormPage)]
+    public void Task_inbox_naming_a_binding_or_a_form_page_is_reported_at_that_property(string property, string value, string code)
+    {
+        using var folder = Folder()
+            .With("data-sources/order-list.json", OrderList())
+            .With("pages/orders.json", Page("Orders", $$"""{ "type": "taskInbox", "{{property}}": {{value}} }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "pages/orders.json", $"/widgets/0/{property}"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains($"'{property}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void Table_over_a_data_source_with_a_required_parameter_is_reported_naming_the_parameter()
     {
         using var folder = Folder()

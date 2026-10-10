@@ -63,7 +63,8 @@ public static class ApplicationSites
             widget.FormPage?.Name,
             widget.Entity is { } entity ? DescribeEntity(application, entity.Name) : null,
             widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
-            widget.Form is { } form ? DescribeForm(application, form.Name) : null);
+            widget.Form is { } form ? DescribeForm(application, form.Name) : null,
+            widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null);
 
     /// <summary>
     /// The metadata of the form named <paramref name="formName"/>, as a form widget's page metadata

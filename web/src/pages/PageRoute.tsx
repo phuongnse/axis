@@ -4,6 +4,7 @@ import { useLocation, useParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
 import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
+import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { useText } from '../platform/texts'
 import { useApplicationSite, useSiteLocale } from './context'
 import { ShellError } from './LocaleLoadFailed'
@@ -91,6 +92,9 @@ function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePage
       {widget?.type === 'table' && <TableWidget sitePath={sitePath} widget={widget} locale={locale} />}
       {widget?.type === 'form' && hasEntity(widget) && (
         <FormWidget widget={widget} recordId={recordId} returnTo={returnTo} locale={locale} />
+      )}
+      {widget?.type === 'taskInbox' && (
+        <TaskInboxWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
       )}
     </PageContainer>
   )

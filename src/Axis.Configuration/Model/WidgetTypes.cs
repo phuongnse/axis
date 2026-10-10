@@ -7,6 +7,7 @@ public static class WidgetTypes
     {
         ["table"] = WidgetType.Table,
         ["form"] = WidgetType.Form,
+        ["taskInbox"] = WidgetType.TaskInbox,
     };
 
     private static readonly Dictionary<WidgetType, string> _namesByType = _typesByName.ToDictionary(pair => pair.Value, pair => pair.Key);

@@ -109,12 +109,14 @@ const pages: Record<string, PageMetadata> = {
   notes: {
     name: 'Notes',
     titleKey: 'pages.notes.title',
-    widgets: [{ type: 'table', formPage: 'NoteForm', entity: noteEntity, dataSource: null, form: null }],
+    widgets: [
+      { type: 'table', formPage: 'NoteForm', entity: noteEntity, dataSource: null, form: null, tasksPath: null },
+    ],
   },
   noteform: {
     name: 'NoteForm',
     titleKey: 'pages.noteForm.title',
-    widgets: [{ type: 'form', formPage: null, entity: noteEntity, dataSource: null, form: null }],
+    widgets: [{ type: 'form', formPage: null, entity: noteEntity, dataSource: null, form: null, tasksPath: null }],
   },
 }
 

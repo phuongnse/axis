@@ -8,9 +8,11 @@
     "site.title": "E2E notes",
     "nav.notes": "Notes",
     "nav.categories": "Categories",
+    "nav.tasks": "Tasks",
     "pages.notes.title": "Notes",
     "pages.noteForm.title": "Note",
     "pages.categories.title": "Categories",
+    "pages.tasks.title": "My tasks",
     "note.label": "Note",
     "note.title": "Title",
     "note.code": "Code",
@@ -26,6 +28,9 @@
     "noteLine.quantity": "Quantity",
     "noteSections.main": "Main",
     "noteSections.details": "Details",
+    "noteReview.task": "Review the note",
+    "noteReview.main": "Note",
+    "noteReview.done": "Done",
     "category.label": "Category",
     "category.name": "Name"
   }
