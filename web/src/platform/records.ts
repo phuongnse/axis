@@ -136,3 +136,44 @@ export async function saveRecord(
   }
   throw new Error(`Saving a record of '${recordsPath}' failed with status ${response.status}.`)
 }
+
+/**
+ * One audit record of a record's history. `actorName` is the test user's display name, or `null`
+ * for `system`, `anonymous` or an id that is no longer configured. `details` depends on the action
+ * and never holds a field value.
+ */
+export interface HistoryItem {
+  id: string
+  occurredAt: string
+  actor: string
+  actorName: string | null
+  action: string
+  processInstanceId: string | null
+  details: Record<string, unknown>
+}
+
+/** One page of a record's history, newest first. */
+export interface HistoryPage {
+  items: HistoryItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** The number of history entries on one page. */
+export const historyPageSize = 20
+
+/** Loads one page of a record's history. Any answer but a `200` throws. */
+export async function fetchHistory(
+  recordsPath: string,
+  id: string,
+  page: number,
+  signal?: AbortSignal,
+): Promise<HistoryPage> {
+  const response = await fetch(`${recordsPath}/${id}/history?page=${page}&pageSize=${historyPageSize}`, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading the history of '${id}' of '${recordsPath}' failed with status ${response.status}.`)
+  }
+  // The history holds no field values, so plain numbers are safe.
+  return JSON.parse(await response.text()) as HistoryPage
+}

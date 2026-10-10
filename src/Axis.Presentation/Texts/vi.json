@@ -38,5 +38,22 @@
   "shell.form.clear": "Xóa",
   "shell.form.addRow": "Thêm dòng",
   "shell.form.removeRow": "Xóa dòng",
-  "shell.lookup.search": "Tìm kiếm"
+  "shell.lookup.search": "Tìm kiếm",
+  "shell.history.title": "Lịch sử",
+  "shell.history.empty": "Chưa có lịch sử.",
+  "shell.history.loadFailed": "Không thể tải lịch sử.",
+  "shell.history.system": "Hệ thống",
+  "shell.history.anonymous": "Ẩn danh",
+  "shell.history.fields": "Đã thay đổi",
+  "shell.history.outcome": "Kết quả",
+  "shell.history.step": "Bước",
+  "shell.history.action.record.created": "Đã tạo",
+  "shell.history.action.record.updated": "Đã cập nhật",
+  "shell.history.action.record.deleted": "Đã xóa",
+  "shell.history.action.process.started": "Đã bắt đầu quy trình",
+  "shell.history.action.process.stepCompleted": "Đã hoàn thành bước",
+  "shell.history.action.process.completed": "Đã hoàn thành quy trình",
+  "shell.history.action.process.failed": "Quy trình thất bại",
+  "shell.history.action.task.created": "Đã tạo nhiệm vụ",
+  "shell.history.action.task.completed": "Đã quyết định nhiệm vụ"
 }
