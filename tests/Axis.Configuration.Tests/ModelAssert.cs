@@ -72,5 +72,26 @@ internal static class ModelAssert
                     actualAggregate.Measures.Select(measure => (measure.Name, measure.Function, measure.Field?.Name)));
             }
         }
+
+        Assert.Equal(expected.Processes.Count, actual.Processes.Count);
+        foreach (var (expectedProcess, actualProcess) in expected.Processes.Zip(actual.Processes))
+        {
+            Assert.Equal(
+                (expectedProcess.Id, expectedProcess.Name, expectedProcess.File, expectedProcess.Entity, expectedProcess.Start),
+                (actualProcess.Id, actualProcess.Name, actualProcess.File, actualProcess.Entity, actualProcess.Start));
+            Assert.Equal(
+                (expectedProcess.StartCondition?.Expression.Expression, expectedProcess.StartCondition?.Message),
+                (actualProcess.StartCondition?.Expression.Expression, actualProcess.StartCondition?.Message));
+            Assert.Equal(expectedProcess.Steps.Select(Describe), actualProcess.Steps.Select(Describe));
+        }
     }
+
+    /// <summary>A step's name, its type, and for a decision each branch's condition and target, then its <c>otherwise</c>.</summary>
+    private static string Describe(ProcessStepModel step) =>
+        step switch
+        {
+            DecisionStepModel decision =>
+                $"{decision.Name} decision [{string.Join(", ", decision.Branches.Select(branch => $"{branch.When.Expression} → {branch.Next}"))}] otherwise {decision.Otherwise}",
+            _ => $"{step.Name} {step.GetType().Name}",
+        };
 }

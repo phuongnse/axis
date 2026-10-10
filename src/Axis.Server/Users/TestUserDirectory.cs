@@ -13,11 +13,15 @@ internal sealed class TestUserDirectory
     private TestUserDirectory(bool enabled, IEnumerable<TestUser> users)
     {
         Enabled = enabled;
-        _users = users.ToDictionary(user => user.Id, StringComparer.Ordinal);
+        Users = [.. users];
+        _users = Users.ToDictionary(user => user.Id, StringComparer.Ordinal);
     }
 
     /// <summary>Whether the environment allows test users, so the sign-in endpoints exist.</summary>
     public bool Enabled { get; }
+
+    /// <summary>The test users in configuration order.</summary>
+    public IReadOnlyList<TestUser> Users { get; }
 
     public TestUser? Find(string id) => _users.GetValueOrDefault(id);
 

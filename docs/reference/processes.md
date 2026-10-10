@@ -2,10 +2,15 @@
 
 Detailed reference for processes: the resource shape, the steps, the compile
 checks, the start endpoint, the instance and task states, the task API,
-execution, the worker settings and the tables. The worker host, its claims
-(see [Execution](#execution)), the [worker settings](#worker-settings) and the
-`axis.process_work_items` table are built. Everything else here is *(planned
-for M3)*.
+execution, the worker settings and the tables. The `process` resource kind is
+built with `decision` and `end` steps, and so are their
+[compile checks](#compile-checks). A compiled process is part of the release
+model. The worker host, its claims (see [Execution](#execution)), the
+[worker settings](#worker-settings) and the `axis.process_work_items` table are
+built too. Everything else here is *(planned for M3)*: `task` and `operation`
+steps, the start endpoint, the task API, the engine and the other tables.
+Until `task` and `operation` are built, a step of either type is `AXC0004`, so
+the purchase request example below does not compile yet.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -180,29 +185,43 @@ M3 has four step types. Wait for event, timer and sub-process come later.
 
 ## Compile checks
 
-The compiler reports these as diagnostics. Their codes are assigned when the
-checks are built.
+The compiler reports these as diagnostics. The checks for `decision` and
+`end` steps are built. The rest come with `task` and `operation` steps
+*(planned for M3)*. Every problem of a process is reported in one pass. See
+[the Resolve step](configuration.md#configuration-pipeline) for the details.
 
-- `entity` names a loaded entity that is not a child entity.
-- Step names are unique within the process, ignoring letter case.
-- `start`, every `next`, every branch `next`, `otherwise` and every outcome
-  `next` name a step of the process.
-- Every step is reachable from `start`.
-- The steps form no cycle. See [Limits in M3](#limits-in-m3).
-- A decision has at least one branch.
-- Each `when` and the `startCondition` expression give a boolean.
-- The fields in an `updateRecord` `set` are fields of the subject entity.
-  None is computed or a child collection. Each expression fits its field's
-  type.
-- An `end` step has no `next`.
-- A task's `assignee` has exactly one of `user` and `role`. A `user`
-  expression gives `text`. A `role` is a non-empty name.
-- A task's `form` names a loaded form whose entity is the subject entity.
-- A task's `dueIn`, when set, parses as a positive ISO 8601 duration.
-- A task has at least one outcome. Outcome names are unique within the step,
-  ignoring letter case.
-- The `startCondition` message text key exists, checked like other labels.
-  So do the text keys of each task `label` and each outcome `label`.
+- `entity` names a loaded entity (`AXC0067`) that is not a child entity
+  (`AXC0068`).
+- Step names are unique within the process, ignoring letter case
+  (`AXC0069`).
+- `start`, every branch `next` and `otherwise` name a step of the process,
+  ignoring letter case (`AXC0070`). Outcome targets and `next` of an
+  operation join this check *(planned for M3)*.
+- Every step is reachable from `start` (`AXC0071`).
+- Every step has a path to an `end` step (`AXC0072`).
+- The steps form no cycle (`AXC0073`). See [Limits in M3](#limits-in-m3).
+- A decision has at least one branch (`AXC0004`).
+- Each `when` and the `startCondition` expression give a boolean. They see
+  the subject entity's fields, computed ones included, its child collections
+  through aggregates, and the named rules. Reference paths are not resolved
+  yet, so a path is `AXC0046` *(paths planned for M3)*. See
+  [Scope in a process expression](expressions.md#names-and-references).
+- *(planned for M3)* The fields in an `updateRecord` `set` are fields of the
+  subject entity. None is computed or a child collection. Each expression
+  fits its field's type.
+- An `end` step has no `next`, `branches` or `otherwise` (`AXC0004`).
+- *(planned for M3)* A task's `assignee` has exactly one of `user` and
+  `role`. A `user` expression gives `text`. A `role` is a non-empty name.
+- *(planned for M3)* A task's `form` names a loaded form whose entity is the
+  subject entity.
+- *(planned for M3)* A task's `dueIn`, when set, parses as a positive ISO 8601
+  duration.
+- *(planned for M3)* A task has at least one outcome. Outcome names are
+  unique within the step, ignoring letter case.
+- The `startCondition` message text key exists, checked like other labels
+  (`AXC0028`).
+  *(planned for M3)* So do the text keys of each task `label` and each
+  outcome `label`.
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 

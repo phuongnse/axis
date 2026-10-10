@@ -87,9 +87,9 @@ app.MapPresentationEndpoints();
 app.MapSiteEndpoints();
 app.MapRecordEndpoints();
 app.MapDataSourceEndpoints();
-app.MapCurrentUserEndpoint();
+app.MapUserEndpoints();
 
-// The sign-in endpoints exist only in Development and Testing.
+// The sign-in endpoints exist only in Development and Testing. The test user list answers 404 elsewhere.
 if (testUsers.Enabled)
 {
     app.MapTestUserEndpoints();

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis process",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "entity", "start", "steps"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "process" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "entity": { "$ref": "#/$defs/name" },
+    "startCondition": { "$ref": "#/$defs/startCondition" },
+    "start": { "$ref": "#/$defs/name" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "startCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expression", "message"],
+      "properties": {
+        "expression": { "type": "string", "minLength": 1 },
+        "message": { "$ref": "#/$defs/textReference" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": { "enum": ["decision", "end"] },
+        "branches": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/branch" }
+        },
+        "otherwise": { "$ref": "#/$defs/name" }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "decision" } } },
+          "then": { "required": ["branches", "otherwise"] }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "end" } } },
+          "then": { "properties": { "branches": false, "otherwise": false } }
+        }
+      ]
+    },
+    "branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when", "next"],
+      "properties": {
+        "when": { "type": "string", "minLength": 1 },
+        "next": { "$ref": "#/$defs/name" }
+      }
+    }
+  }
+}

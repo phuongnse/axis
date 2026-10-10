@@ -544,6 +544,22 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     letter case, and any other locale uses `en_US`. dayjs, which the pickers
     use, follows the same locale. The shell sets both through a nested
     `ConfigProvider` that inherits the theme tokens.
+- **Test user picker.** In `Development` and `Testing`, the shell header of
+  every site shows a [test user](../architecture.md#development-test-users)
+  picker before the locale switch. Its button shows the signed-in user's
+  display name, or a sign-in prompt when nobody is signed in.
+  - The button opens a menu of the test users in configuration order. Each
+    entry is a `menuitemradio`, and the current user has
+    `aria-checked="true"`. With someone signed in, the menu ends with a sign
+    out entry.
+  - Picking a user signs in as that user and reloads the page. Signing out
+    also reloads, so every view follows the new user.
+  - The picker loads `GET /api/test-users` and `GET /api/me` each time a shell
+    mounts. When the list is not available, as in Production, it shows
+    nothing. When a sign-in or sign-out request fails, it logs a warning and
+    changes nothing.
+  - Its texts are the platform texts `shell.user.label`, `shell.user.signIn`
+    and `shell.user.signOut`.
 - **Text resolution.** The SPA resolves each key through catalogs in order.
   On the platform site the only catalog is the platform texts. Inside an
   application site, the site texts come first and the platform texts second,
