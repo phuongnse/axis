@@ -1,0 +1,13 @@
+# Keep files built or generated on the host out of the image build.
+.git
+**/bin
+**/obj
+**/node_modules
+artifacts
+src/Axis.Server/wwwroot
+**/playwright-report
+**/test-results
+**/TestResults
+.env
+.env.*
+*.log
