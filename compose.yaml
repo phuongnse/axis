@@ -1,6 +1,7 @@
 # Runs the whole Axis stack from source: PostgreSQL and the server with the purchase request
-# sample, at http://localhost:5206. `docker compose up -d postgres` starts only PostgreSQL for
-# development with `dotnet run`, whose settings are in src/Axis.Server/appsettings.Development.json.
+# sample, at http://localhost:5206. For development, scripts/dev.sh starts only PostgreSQL from
+# here and runs the server and the SPA with hot reload. The development settings are in
+# src/Axis.Server/appsettings.Development.json.
 # Both ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206) and
 # AXIS_POSTGRES_PORT (default 5432) change the host ports.
 services:

@@ -67,7 +67,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution | |
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
-| `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers | Docker |
+| `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers, and a smoke test of `scripts/dev.sh` | Docker |
 | `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium, then runs the Compose smoke test | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. Each
@@ -83,21 +83,34 @@ only Docker. `docker compose logs server` shows the activation diagnostics. Set
 `AXIS_SERVER_PORT` and `AXIS_POSTGRES_PORT` to change the host ports (5206 and 5432). Both
 ports are published on `127.0.0.1` only.
 
-For local development with hot reload:
+For local development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and Node, and
+works on a fresh clone:
 
-- Run `docker compose up -d postgres` to start only PostgreSQL. If you moved it with
-  `AXIS_POSTGRES_PORT`, also override `ConnectionStrings__Platform` and
-  `Tenants__default__ConnectionString` for `dotnet run`.
-- Run `dotnet run --project src/Axis.Server` to start the server on port 5206.
-- Run `dotnet run --project src/Axis.Worker` to start the worker. It runs the
-  due work items of every tenant in its `Tenants` section. Start the server
-  first, because the server migrates the tenant databases and the worker
-  does not.
-- Run `npm run dev --prefix web` to start the SPA with hot reload. It proxies
-  `/api` and `/health` to the server.
+- It installs the SPA packages when `web/node_modules` is missing or
+  `web/package-lock.json` changed since the last install. It installs no
+  Playwright browser.
+- It starts PostgreSQL with Docker Compose and waits until it accepts
+  connections.
+- It runs the server under `dotnet watch` and the SPA on Vite in one terminal.
+  Each line starts with `[server]` or `[web]`, and the script's own messages
+  start with `[dev]`. The SPA proxies `/api` and `/health` to the server.
+- `dotnet watch` applies C# changes, or restarts the server without a prompt
+  when it cannot. Vite applies SPA changes.
+- `AXIS_POSTGRES_PORT`, `AXIS_SERVER_PORT` and `AXIS_WEB_PORT` move the three
+  ports. The defaults are 5432, 5206 and 5173. When `AXIS_POSTGRES_PORT` is set,
+  the script points the server's connection strings at that port.
+- Ctrl+C stops the server and the SPA. PostgreSQL keeps running with its data.
+  Run `docker compose down` to stop it. If the server or the SPA exits on its
+  own, the other one stops too and the script exits non-zero.
+- `scripts/dev.sh` does not start the worker. To run it, start `scripts/dev.sh`
+  first, because the server migrates the tenant databases and the worker does
+  not. Then run `dotnet run --project src/Axis.Worker` in another terminal. It
+  runs the due work items of every tenant in its `Tenants` section. If you moved
+  PostgreSQL with `AXIS_POSTGRES_PORT`, also override `ConnectionStrings__Platform`
+  and `Tenants__default__ConnectionString` for the worker.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request
   sample, `../../samples/apps/purchase-requests`, in `ActivateOnStartup`. So
-  `dotnet run` migrates every tenant database, then compiles and activates the
+  `scripts/dev.sh` migrates every tenant database, then compiles and activates the
   sample before it listens, and stops on any diagnostic.
 - To activate another application folder, add it to that list, or set
   `ActivateOnStartup__0=<folder>` to activate it in place of the sample.
