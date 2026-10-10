@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 namespace Axis.Server.Users;
 
 /// <summary>
@@ -24,6 +26,13 @@ internal sealed class TestUserDirectory
     public IReadOnlyList<TestUser> Users { get; }
 
     public TestUser? Find(string id) => _users.GetValueOrDefault(id);
+
+    /// <summary>
+    /// The id of the user the sign-in cookie names, or null when nobody is signed in. An id that
+    /// is no longer configured is nobody signed in.
+    /// </summary>
+    public string? FindSignedIn(ClaimsPrincipal principal) =>
+        principal.FindFirstValue(ClaimTypes.NameIdentifier) is { } id && Find(id) is { } user ? user.Id : null;
 
     /// <summary>Reads the test users from configuration and checks them against the environment.</summary>
     /// <exception cref="InvalidOperationException">

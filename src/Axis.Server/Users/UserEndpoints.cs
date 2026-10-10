@@ -31,7 +31,7 @@ internal static class UserEndpoints
     }
 
     private static IResult GetCurrentUser(HttpContext httpContext, TestUserDirectory directory) =>
-        httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } id && directory.Find(id) is { } user
+        directory.FindSignedIn(httpContext.User) is { } id && directory.Find(id) is { } user
             ? Results.Ok(ToResponse(user))
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
 

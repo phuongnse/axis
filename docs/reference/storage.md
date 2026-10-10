@@ -30,8 +30,10 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     process tables are *(planned for M3)*, see
     [processes](processes.md#tables).
   - `Axis.Data` also owns `axis.audit_records`, with history in
-    `axis.__data_migrations` *(planned for M3)*. Processes write audit
-    records through its contract, inside their own transaction. See
+    `axis.__data_migrations`. Other modules append audit records only
+    through its contract, `AuditRecords.AppendAsync`, which takes the
+    caller's open transaction. Processes *(planned for M3)* will write
+    audit records this way, inside their own transaction. See
     [Audit records and sequence counters](#audit-records-and-sequence-counters).
   - Releases are immutable, enforced through the context's change tracking:
     a release and its resources are only inserted together. Saving fails when
@@ -207,14 +209,14 @@ child tables are in [Schema planning](#schema-planning).
 `Axis.Data` owns both tables (D21). They are system tables in the `axis`
 schema of the tenant database.
 
-- **Audit records** *(planned for M3)*. `axis.audit_records` is
-  append-only. Each row is written in the same transaction as the action it
-  records.
+- **Audit records.** `axis.audit_records` is append-only. Each row is
+  written in the same transaction as the action it records. The record API
+  writes them. Process and task audit records are *(planned for M3)*.
 
   | Column | Type | Meaning |
   | --- | --- | --- |
   | `id` | `uuid` | A version 7 UUID |
-  | `occurred_at` | `timestamptz` | When the action happened |
+  | `occurred_at` | `timestamptz` | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it |
   | `actor` | `text` | A user id, `system` for the worker, or `anonymous` before M4 when nobody is signed in |
   | `action` | `text` | The action, such as `record.created` |
   | `application_id` | `uuid` | The application `id` |
@@ -228,8 +230,9 @@ schema of the tenant database.
   - An index on `(entity_id, record_id, occurred_at desc, id desc)` serves
     the [record history](record-api.md#audit-records-and-history).
   - A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE`
-    statement trigger raise an exception, so no row can be changed or
-    removed.
+    statement trigger raise an exception with SQLSTATE `23001`
+    (`restrict_violation`), so no row can be changed or removed, even by
+    raw SQL.
 - **Sequence counters.** `axis.sequence_counters` holds one row per
   [sequence](configuration.md#sequences) and period. The row is created by
   the first number of the period.

@@ -142,7 +142,9 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   M4 CSRF protection stay the main defence.
 - **One transaction.** A create or update writes the record and the rows of
   its child collections in one transaction. When any write fails, nothing is
-  written, neither the owner nor any row.
+  written, neither the owner nor any row. A delete also runs in a
+  transaction. Each write commits its
+  [audit record](#audit-records-and-history) in the same transaction.
 - **References.** Before the write, each non-null `reference` value is looked
   up in the target table by id, in the write's transaction. The check does not
   lock the target. The foreign key is the backstop: a target removed in
@@ -397,21 +399,29 @@ answered with `400`:
 
 ## Audit records and history
 
-*(planned for M3)* Every record write leaves an audit record, and one record's
-audit records can be read as its history (D21).
+Every record write leaves an audit record, and one record's audit records
+can be read as its history (D21). The writes are built. The history endpoint
+is *(planned for M3)*.
 
 - **Writes.** A create, update or delete writes one audit record in the
-  write's transaction. When the write fails, no audit record is written.
+  write's transaction. When the write fails, no audit record is written. For
+  example, a stale version, a missing reference, a unique violation or a
+  delete of a referenced record leaves none. When the audit record cannot be
+  written, the write rolls back and the response is a `500`. Seed records
+  applied during activation write no audit record.
 - **Actions.** The actions are `record.created`, `record.updated` and
   `record.deleted`.
 - **Actor.** The actor is the signed-in
   [test user](../architecture.md#development-test-users), or
   `anonymous` when nobody is signed in.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
-  On update it also has `"fields"`, the names of the changed fields. Field
-  values are never included, so the audit holds no sensitive data before
-  field masking exists.
-- **History.** `GET /api/apps/{app}/entities/{entity}/records/{id}/history`
+  A delete holds the version the record had when it was deleted.
+  - On update it also has `"fields"`: the declared names of the fields and
+    child collections the body sets, in declaration order. A field sent with
+    its stored value is listed too. Computed fields are never listed.
+  - Field values are never included, so the audit holds no sensitive data
+    before field masking exists.
+- **History** *(planned for M3)*. `GET /api/apps/{app}/entities/{entity}/records/{id}/history`
   returns the audit records of one record.
   - The path follows the 404 rules of a single read.
   - `page` and `pageSize` follow the [paging rules](#paging-and-sorting).

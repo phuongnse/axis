@@ -21,7 +21,8 @@ namespace Axis.Integration.Tests;
 /// Two tenant databases in one PostgreSQL container, each with both migrations applied and the
 /// RecordsApp fixture application activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp fixture
-/// activated, and a compiled release of an application that was never activated.
+/// activated, and a compiled release of an application that was never activated. The server
+/// knows the test users <c>anna</c> and <c>binh</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
 {
@@ -53,6 +54,13 @@ public sealed class RecordApiFixture : IAsyncLifetime
     public string DormantApp { get; } = $"Dormant{Guid.NewGuid():N}";
 
     public string ConnectionString(string tenant) => _connectionStrings[tenant];
+
+    /// <summary>
+    /// A new client of the server with its own cookies, so signing in on it leaves
+    /// <see cref="Client"/> signed out. The caller disposes it.
+    /// </summary>
+    public HttpClient CreateClient() =>
+        (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient();
 
     public async ValueTask InitializeAsync()
     {
@@ -99,6 +107,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:ConnectionString", ConnectionString(TenantA));
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", ConnectionString(TenantB));
+            builder.UseSetting("TestUsers:0:Id", "anna");
+            builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");
+            builder.UseSetting("TestUsers:0:Roles:0", "employee");
+            builder.UseSetting("TestUsers:1:Id", "binh");
+            builder.UseSetting("TestUsers:1:DisplayName", "Binh Manager");
         });
         _client = _factory.CreateClient();
     }
@@ -168,6 +181,34 @@ public sealed class RecordApiFixture : IAsyncLifetime
     {
         await using var command = _dataSources[tenant].CreateCommand(sql);
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// The audit records of <paramref name="recordId"/> in the database of <paramref name="tenant"/>,
+    /// oldest first. Audit records cannot be deleted, so tests read them by record id.
+    /// </summary>
+    public async Task<IReadOnlyList<AuditRecord>> AuditRecordsAsync(string tenant, Guid recordId)
+    {
+        var records = new List<AuditRecord>();
+        await using var command = _dataSources[tenant].CreateCommand(
+            """
+            SELECT actor, action, application_id, entity_id, record_id, details::text
+            FROM axis.audit_records WHERE record_id = @record ORDER BY occurred_at, id
+            """);
+        command.Parameters.AddWithValue("record", recordId);
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            records.Add(new AuditRecord(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetGuid(2),
+                reader.IsDBNull(3) ? null : reader.GetGuid(3),
+                reader.IsDBNull(4) ? null : reader.GetGuid(4),
+                reader.GetString(5)));
+        }
+
+        return records;
     }
 
     /// <summary>The catalog columns of the table of <paramref name="entityName"/> in order, and its row count.</summary>
@@ -304,3 +345,6 @@ public sealed class RecordApiFixture : IAsyncLifetime
     private static DataDbContext CreateDataContext(string connectionString) =>
         new(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options);
 }
+
+/// <summary>An audit record as stored, with its details as the text PostgreSQL renders for <c>jsonb</c>.</summary>
+public sealed record AuditRecord(string Actor, string Action, Guid ApplicationId, Guid? EntityId, Guid? RecordId, string Details);
