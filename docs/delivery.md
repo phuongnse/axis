@@ -30,10 +30,9 @@ models, are not copied here. Look them up where they live.
   the owner merges. The switch is in `.nexkit/`, so changing it is a hand-made
   pull request.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks
-  and no approval from a person. They do not require the CI workflow on pull
-  requests: NexKit opens its pull requests with the Actions token, so GitHub
-  holds that workflow for a person's approval. NexKit's checks run the same
-  scripts.
+  and no approval from a person. They do not require the CI workflow, which
+  runs on pushes to `main` and to hand-made branches but not on NexKit's
+  branches. NexKit's checks run the same scripts there.
 - **CI runs on `main` after every merge.** A merge by NexKit starts no `push`
   workflow, so NexKit starts the CI workflow on `main` itself, through its
   `after_merge_workflows` setting. Two pull requests that pass on their own
