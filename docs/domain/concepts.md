@@ -81,7 +81,7 @@ Later constraints:
 | --- | --- | --- |
 | **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. | M3 |
 | **Process instance** | One run of a process. It is pinned to its release and records every step, attempt, input, output and decision. | M3 |
-| **Human task** | A step that waits for a person. It has an assignee (user, role or queue), a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. | M3 |
+| **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. In M3 the assignee is a user or a role, and the due date is only shown. Queues and escalation come later. See [processes](../reference/processes.md#task-api). | M3 |
 | **Retry policy** | Declared per operation step: attempts, backoff, which errors are retryable, and what happens when attempts run out (alert, manual retry, compensation). | M5 |
 
 **Step kinds:**
@@ -120,9 +120,9 @@ See [processes](../reference/processes.md#steps).
 | --- | --- | --- |
 | **Site** | An entry point of one application, with its own path, title, locales (default, fallback and available) and navigation. Theme, identity provider binding and domain come later. | M1 |
 | **Page** | A route in a site. It has a title, and its content is its widgets: exactly one. A page has no entity or template of its own. | M1 |
-| **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, a `table` may bind a data source instead of an entity (M2), and a table may name a `formPage` that opens its records. More types (list, detail, task inbox, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
-| **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. | M1 (basic), M3 (full) |
-| **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M1 only has the table's `formPage` link; navigate actions are still **Proposed** in [D15](../decisions.md#d15-presentation-model--agreed). | M3 |
+| **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, a `table` may bind a data source instead of an entity (M2), and a table may name a `formPage` that opens its records. M3 adds the `taskInbox` widget, which lists the user's open tasks. More types (list, detail, process inspector), container widgets for layout (tabs, sections, columns) and custom widgets come later. | M1 |
+| **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. M1 has a basic form over all of an entity's fields. M3 builds the `form` resource: sections of fields, any of them read-only, used by both pages and tasks. Wizard steps, conditional states, validation as the user types and file upload come later. See [frontend](../reference/frontend.md). | M1 (basic), M3 (form resource), later |
+| **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M1 only has the table's `formPage` link. M3 builds the `startProcess` action on a form widget and the outcomes of a task. Run operation comes later, and navigate actions are still **Proposed** in [D15](../decisions.md#d15-presentation-model--agreed). | M3 |
 | **Theme** | Design tokens for light and dark mode, shared by every site. M1 has the shared tokens. A site will be able to adjust tokens later, but never add per-page styling. | M1 (shared tokens), later (site adjustments) |
 | **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Releases pin text versions, and a key that is still in use cannot be deleted. | M1 (basic), M6 (full) |
 

@@ -366,7 +366,8 @@ A failure is keyed `/values/<field>` or by a row path such as
 validations fail on one key, it reports the first in declaration order. Every
 other key is reported in the same response. The message is the validation's
 text key, and the client shows the text in the user's locale. Validation on
-the client as the user types comes in M3.
+the client as the user types comes later
+([D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed)).
 
 A run-time error in an expression, or a computed value that does not fit its
 field, such as one with more fraction digits than `scale`, rejects the write

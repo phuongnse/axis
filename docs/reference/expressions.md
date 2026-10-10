@@ -283,7 +283,8 @@ is `AXC0046`.
   arguments. Its child collections type-check in aggregates, but no
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
 - **Scope in a process expression.** *(planned for M3)* A `startCondition`,
-  a decision `when` and an `updateRecord` value see the subject record's
+  a decision `when`, an `updateRecord` value and a task's `assignee.user`
+  see the subject record's
   fields, computed ones included, its child collections through aggregates,
   paths through reference fields of up to 3 hops, and the named rules. The
   interpreter reads the referenced records along a path. Validations and
