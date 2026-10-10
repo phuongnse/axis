@@ -15,16 +15,19 @@ compiler checks the call and the rule, and the interpreter runs the rule's
 expression. Data source
 [filters](data-sources.md#resource-shape) are another: the compiler checks
 and translates them, and the data source endpoint runs them as SQL. A filter
-can also call a named rule: its SQL inlines the rule's expression. Other uses
-come with the issues that build them. Dn
+can also call a named rule: its SQL inlines the rule's expression. A
+[process](processes.md#compile-checks) start condition and decision `when`
+are type-checked by the compiler too, and can call named rules. The engine
+that evaluates them comes later. Other uses come with the issues that build
+them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
 [D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
 and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
 [knowledge](../domain/knowledge.md#logic-in-configuration).
 
-One language holds the logic of validation, named rules, computed fields and
-data source filters. Later it also holds conditions, routing and policy
+One language holds the logic of validation, named rules, computed fields,
+data source filters and process conditions. Later it also holds policy
 filters. It has two back ends:
 
 - **Interpreter.** It evaluates an expression against one record, in the
@@ -238,12 +241,12 @@ and in [functions](#functions).
 
 Bare field names, data source parameters, paths in data
 source filters, child collections in aggregates and rule calls from
-validations and data source filters are built: the type checker resolves names against the fields,
+validations, data source filters and process conditions are built: the type checker resolves names against the fields,
 parameters and collections it is given, paths against the reference fields'
 targets when it is given a way to find them, and calls against the rules it
-is given, ignoring letter case. Paths in validations and computed fields are
-not built, because the interpreter cannot read related records. There a path
-is `AXC0046`.
+is given, ignoring letter case. Paths in validations, computed fields and
+process conditions are not built, because the interpreter cannot read
+related records. There a path is `AXC0046`.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -265,9 +268,9 @@ is `AXC0046`.
   parameter. A rule body sees only its declared parameters. Parameter and
   result types are the scalar field types except `enum`, which comes later
   (see [Resource file shape](configuration.md#resource-file-shape)). A rule
-  name may not reuse a built-in function or aggregate name. A validation and
-  a data source filter can call rules, but not inside an aggregate's item
-  expression. A filter's SQL inlines the rule's body, see
+  name may not reuse a built-in function or aggregate name. A validation, a
+  data source filter and a process condition can call rules, but not inside
+  an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
 - **Scope in a computed field.** The expression sees the entity's own fields
   that are not computed and its child collections through aggregates, and no
@@ -282,12 +285,14 @@ is `AXC0046`.
   It can call the named rules, with fields, paths, parameters and literals as
   arguments. Its child collections type-check in aggregates, but no
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
-- **Scope in a process expression.** *(planned for M3)* A `startCondition`,
-  a decision `when` and an `updateRecord` value see the subject record's
-  fields, computed ones included, its child collections through aggregates,
-  paths through reference fields of up to 3 hops, and the named rules. The
-  interpreter reads the referenced records along a path. Validations and
-  computed fields keep their scope. See [processes](processes.md#steps).
+- **Scope in a process expression.** A `startCondition` and a decision
+  `when` see the subject record's fields, computed ones included, its child
+  collections through aggregates, and the named rules. The compiler
+  type-checks them as booleans. *(planned for M3)* They and an `updateRecord`
+  value will also see paths through reference fields of up to 3 hops, and
+  the interpreter will read the referenced records along a path. Until then
+  a path is `AXC0046`. Validations and computed fields keep their scope. See
+  [processes](processes.md#steps).
 
 ## Functions
 
@@ -519,8 +524,9 @@ Rules:
 
 ## Writing expressions in resource files
 
-Entity validations, computed fields, rules and data source filters are written this
-way. Process conditions and routing *(planned for M3, see [processes](processes.md#resource-shape))* and policy filters *(planned for M4)* will be written the same way.
+Entity validations, computed fields, rules, data source filters and
+[process](processes.md#resource-shape) conditions are written this way.
+Policy filters *(planned for M4)* will be written the same way.
 
 An expression is one JSON string:
 

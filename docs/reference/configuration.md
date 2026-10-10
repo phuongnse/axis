@@ -17,8 +17,8 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource` or
-   `rule`). The manifest is the single `application`
+   (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
+   `rule` or `process`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -142,13 +142,43 @@ flowchart LR
      whose entity is unknown, or that has a parameter with a diagnostic, is
      not checked. See
      [data sources](data-sources.md#compile-checks).
+   - **Processes.** A [process](processes.md#resource-shape)'s `entity` must
+     name a loaded entity, ignoring letter case, otherwise it is `AXC0067` at
+     `/entity`, and its conditions are not checked. A name whose entity file
+     was not loaded because of its own errors is not reported again. An
+     `entity` that is a child entity is `AXC0068` at `/entity`, naming the
+     owner. Step names are unique ignoring letter case: a later step with a
+     name already used is `AXC0069` at `/steps/{i}/name`, naming the first
+     step. `start`, each branch `next` and each `otherwise` must name a step,
+     ignoring letter case, otherwise it is `AXC0070` at that property. A
+     transition goes to the first step with its name. A step that cannot be
+     reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
+     when `start` is unknown. A step with no path to an `end` step is
+     `AXC0072` at `/steps/{i}`. A step with a transition to an unknown step
+     is not also `AXC0072`. A transition that closes a cycle is `AXC0073` at
+     that transition, naming the steps in the cycle. The steps are walked in
+     file order, with the branches before `otherwise`. A step whose name is
+     already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
+     `startCondition` expression and each decision `when` are parsed and
+     type-checked as a boolean over the entity's fields, computed ones
+     included, its child collections, which only aggregates accept, and the
+     named rules. A problem is reported at `/startCondition/expression` or
+     `/steps/{i}/branches/{j}/when` with its
+     [expression diagnostic](expressions.md#diagnostics) code. The
+     `startCondition` message joins the `AXC0028` check. A decision with no
+     branches, and an `end` step with `branches`, `otherwise` or any other
+     property, are `AXC0004`. Only `decision` and `end` steps are built: any
+     other step `type` is `AXC0004`. See
+     [processes](processes.md#compile-checks).
 
    The model holds the text resources, each entity's display field, the
    sites and pages with their entity, data source and page references
    resolved, the
    seeds in path order with their entity resolved, and the data sources in
    path order with their entity, projected fields and parameter targets
-   resolved and their filter checked. No model
+   resolved and their filter checked. It also holds the processes in path
+   order, with their entity resolved, each transition resolved to the
+   declared name of its step and their conditions checked. No model
    is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
@@ -169,8 +199,8 @@ flowchart LR
    - **Rules.** Each [rule](#resource-file-shape)'s expression is parsed and
      type-checked against its own parameters, and must give its
      `resultType`. A problem in it is reported at `/expression` of the rule
-     file. A validation or a data source filter may call a rule, and each
-     call is checked for the
+     file. A validation, a data source filter or a process condition may
+     call a rule, and each call is checked for the
      rule's name, its argument count and each argument's type, with the
      codes a function call gets (`AXC0050`, `AXC0051`, `AXC0047`). Rules
      that call each other in a cycle, such as A → B → A, are `AXC0055`
@@ -184,9 +214,9 @@ flowchart LR
      is a built-in [function](expressions.md#functions) name, ignoring letter
      case, is `AXC0057` at `/name`. A rule whose own expression has an
      error, or that is in a cycle, is still known by its parameters and
-     result type, so a call to it gets no further diagnostic. Validations
-     and data source filters can call rules, but only outside an
-     aggregate's item expression. In a computed field or an item
+     result type, so a call to it gets no further diagnostic. Validations,
+     data source filters and process conditions can call rules, but only
+     outside an aggregate's item expression. In a computed field or an item
      expression, a rule call is still `AXC0050`.
 4. **Release.** The compiled application is stored as a release with a
    content hash. It is immutable.
@@ -345,6 +375,13 @@ sorted by file and then path.
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
 | `AXC0064` | A data source's `entity` is a child entity. Reported at `/entity`, naming the owner. |
 | `AXC0065` | Rule calls nest more than 8 deep, such as R1 → R2 → … → R9. Reported once, at `/expression` of the lowest rule past the limit, not at the rules or validations that call it. The message names the rules in the chain in call order. A rule in a cycle, or that calls into one, gets only `AXC0055`. See [cost bounds](expressions.md#cost-bounds). |
+| `AXC0067` | A process's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
+| `AXC0068` | A process's `entity` is a child entity. Reported at `/entity`, naming the owner. |
+| `AXC0069` | An earlier step of the same process already uses this `name`, ignoring letter case. Reported at `/steps/{i}/name` of the later step, naming the first one. The later step is left out of `AXC0071`, `AXC0072` and `AXC0073`. |
+| `AXC0070` | A process's `start`, a branch `next` or an `otherwise` names no step of the process, ignoring letter case. Reported at that property, such as `/start` or `/steps/{i}/branches/{j}/next`. |
+| `AXC0071` | A process step cannot be reached from `start`. Reported at `/steps/{i}`. Not checked when `start` names no step. |
+| `AXC0072` | A process step has no path to an `end` step. Reported at `/steps/{i}`. Not reported for a step with a transition to an unknown step, which is already `AXC0070`. |
+| `AXC0073` | Process steps form a cycle, such as a → b → a. Reported at the transition that closes the cycle, walking the steps in file order and each step's branches before its `otherwise`. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3). |
 
 ## Startup activation
 
@@ -524,7 +561,8 @@ A `seed` holds records with fixed ids for one entity:
   another seed's records sorts after it.
 
 A `rule` resource holds a named expression with typed parameters and a
-result type. A validation or a data source filter can call it (see
+result type. A validation, a data source filter or a process condition can
+call it (see
 [Expression language](expressions.md#names-and-references)). Calls from
 computed fields come later:
 
@@ -766,6 +804,7 @@ below. Both examples below compile, given that rule.
   expected to lift the last one. A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
-  - is never the `entity` of a data source (`AXC0064`);
+  - is never the `entity` of a data source (`AXC0064`) or of a process
+    (`AXC0068`);
   - has no record routes of its own;
   - has no `reference` or `child-collection` fields (`AXC0041`).

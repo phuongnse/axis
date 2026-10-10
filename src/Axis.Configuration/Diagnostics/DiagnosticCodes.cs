@@ -60,4 +60,12 @@ public static class DiagnosticCodes
     public const string RuleCallTooDeep = "AXC0065";
     public const string DuplicateRuleParameter = "AXC0056";
     public const string RuleNameIsFunction = "AXC0057";
+
+    public const string UnknownProcessEntity = "AXC0067";
+    public const string ProcessOverChildEntity = "AXC0068";
+    public const string DuplicateStepName = "AXC0069";
+    public const string UnknownStep = "AXC0070";
+    public const string UnreachableStep = "AXC0071";
+    public const string StepWithoutEnd = "AXC0072";
+    public const string ProcessStepCycle = "AXC0073";
 }

@@ -53,6 +53,7 @@ public static class ApplicationLoader
                 [],
                 [],
                 [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -99,6 +100,7 @@ public static class ApplicationLoader
         var seeds = new List<SeedResource>();
         var dataSources = new List<DataSourceResource>();
         var rules = new List<RuleResource>();
+        var processes = new List<ProcessResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -187,6 +189,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Rule:
                         rules.Add(root.Deserialize<RuleResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Process:
+                        processes.Add(root.Deserialize<ProcessResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -202,6 +207,7 @@ public static class ApplicationLoader
             seeds,
             dataSources,
             rules,
+            processes,
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames,
@@ -369,7 +375,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}' or '{ResourceKinds.Rule}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}' or '{ResourceKinds.Process}'.",
                 file,
                 "/kind",
                 resourceId));
@@ -407,7 +413,8 @@ public static class ApplicationLoader
         var reported = new HashSet<(string Path, string Message)>();
         foreach (var node in results.Details ?? [])
         {
-            if (node.IsValid || node.Errors is null)
+            // An "if" that fails only chooses which branch applies, so its errors are not problems.
+            if (node.IsValid || node.Errors is null || IsUnderIf(node.EvaluationPath.ToString()))
             {
                 continue;
             }
@@ -428,15 +435,40 @@ public static class ApplicationLoader
 
     private static string DescribeSchemaError(EvaluationResults node, string path, string keyword, string error)
     {
-        // A property rejected by "additionalProperties": false fails against the false schema,
-        // whose own message does not say which property is the problem.
-        if (node.EvaluationPath.ToString().EndsWith("/additionalProperties", StringComparison.Ordinal))
+        // A property rejected by "additionalProperties": false, or by a false schema under
+        // "properties", fails against the false schema, whose own message does not say which
+        // property is the problem. Only a false schema fails without a keyword.
+        var evaluationPath = node.EvaluationPath.ToString();
+        if (evaluationPath.EndsWith("/additionalProperties", StringComparison.Ordinal)
+            || (string.IsNullOrEmpty(keyword) && ParentSegment(evaluationPath) == "properties"))
         {
             var property = path[(path.LastIndexOf('/') + 1)..].Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal);
             return $"Property '{property}' is not allowed here.";
         }
 
         return string.IsNullOrEmpty(keyword) ? error : $"{error} ({keyword})";
+    }
+
+    /// <summary>Whether a schema evaluation path goes through an <c>if</c> keyword, and not a property named <c>if</c>.</summary>
+    private static bool IsUnderIf(string evaluationPath)
+    {
+        var segments = evaluationPath.Split('/');
+        for (var index = 1; index < segments.Length; index++)
+        {
+            if (segments[index] == "if" && segments[index - 1] != "properties")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The segment before the last one of a JSON Pointer, or an empty string when there is none.</summary>
+    private static string ParentSegment(string pointer)
+    {
+        var segments = pointer.Split('/');
+        return segments.Length >= 3 ? segments[^2] : "";
     }
 
     private static void CheckDuplicates(

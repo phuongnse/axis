@@ -71,7 +71,7 @@ Later constraints:
 | Concept | Meaning | From |
 | --- | --- | --- |
 | **Expression** | A typed, side-effect-free formula in Axis's [expression language](../reference/expressions.md), checked at compile time. | M2 |
-| **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations and data source filters call rules today. Routing and conditions follow with processes (M3), and policy filters with policies (M4). | M2 |
+| **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations, data source filters and process conditions call rules today. Policy filters follow with policies (M4). | M2 |
 | **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. | M3 |
 | **Extension package** | Versioned C# code, and later React components, that adds operations and widgets under declared capabilities. | M5 |
 

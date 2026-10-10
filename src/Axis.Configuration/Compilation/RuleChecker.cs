@@ -9,8 +9,8 @@ using Axis.Expressions.Typing;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Checks the named rules of an application and builds the rules that validations and data source
-/// filters call. A rule name may not be a built-in function name, its parameter names are unique
+/// Checks the named rules of an application and builds the rules that validations, data source
+/// filters and process conditions call. A rule name may not be a built-in function name, its parameter names are unique
 /// ignoring letter case, and its expression parses and type-checks to its result type over its
 /// parameters alone. Rules that call each other in a cycle are reported once per cycle. A rule call
 /// chain deeper than the limit is reported once, at the lowest rule past the limit. A rule with a
