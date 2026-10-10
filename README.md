@@ -20,11 +20,13 @@ the commands.
 ## Run Axis
 
 Run `docker compose up --build`. It needs only Docker. It builds Axis from source
-and starts PostgreSQL and the server with the purchase request sample at
-http://localhost:5206. See [AGENTS.md](AGENTS.md#commands) for the port variables.
+and starts PostgreSQL, the server with the purchase request sample at
+http://localhost:5206, and the worker. See [AGENTS.md](AGENTS.md#commands) for the
+port variables.
 
 For development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and
-Node. See [AGENTS.md](AGENTS.md#commands) for details.
+Node. It runs the server, the worker and the SPA with hot reload. See
+[AGENTS.md](AGENTS.md#commands) for details.
 
 ## Documentation
 

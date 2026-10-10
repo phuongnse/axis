@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'artifacts', 'wwwroot', 'playwright-report', 'test-results'])
 const project = `axis-dev-test-${process.pid}`
-const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|vite/
+const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|vite/
 
 let copy
 let scratch
@@ -88,7 +88,29 @@ async function waitReady(run, timeoutMs = 600_000) {
   assert.fail(`Not ready after ${timeoutMs} ms.\n${run.stdout}\n${run.stderr}`)
 }
 
-/** The server, dotnet watch and Vite processes below the dev.sh process. */
+/** Waits until the output matches the pattern. Fails if dev.sh exits first. */
+async function waitForOutput(run, pattern, timeoutMs = 300_000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (pattern.test(run.stdout)) return
+    assert.equal(run.exitCode, undefined, `dev.sh exited early with ${run.exitCode}.\n${run.stdout}\n${run.stderr}`)
+    await sleep(1000)
+  }
+  assert.fail(`No output matching ${pattern} after ${timeoutMs} ms.\n${run.stdout}\n${run.stderr}`)
+}
+
+/** The leftover processes of a finished run: its Vite by its port, and the server and worker of this copy. */
+function leftoverProcs() {
+  return execFileSync('ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' })
+    .split('\n')
+    .filter(
+      (line) =>
+        (/vite/.test(line) && line.includes(`--port ${ports.web}`)) ||
+        (/Axis\.(Server|Worker)/.test(line) && line.includes(copy)),
+    )
+}
+
+/** The server, worker, dotnet watch and Vite processes below the dev.sh process. */
 function runProcs(rootPid) {
   const rows = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
     .split('\n')
@@ -150,10 +172,16 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true })
   })
 
-  it('installs the SPA packages, serves the app through Vite and stops cleanly on SIGINT', async () => {
+  it('installs the SPA packages, serves the app through Vite, starts the worker and stops cleanly on SIGINT', async () => {
     const run = startDev()
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
+
+    // The worker starts only after the server has migrated the tenant databases.
+    await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
+    const listening = run.stdout.indexOf('Now listening on')
+    assert.ok(listening >= 0, run.stdout)
+    assert.ok(run.stdout.indexOf('[worker]') > listening, `Worker output before the server listened:\n${run.stdout}`)
 
     const page = await fetch(`http://localhost:${ports.web}/`)
     assert.equal(page.status, 200)
@@ -162,6 +190,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const procs = runProcs(run.child.pid)
     assert.ok(procs.some((p) => /vite/.test(p.command)), `No Vite process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Server/.test(p.command)), `No server process in:\n${JSON.stringify(procs)}`)
+    assert.ok(procs.some((p) => /Axis\.Worker/.test(p.command)), `No worker process in:\n${JSON.stringify(procs)}`)
 
     interrupt(run)
     assert.equal(await exitsWithin(run, 60_000), 130)
@@ -219,11 +248,19 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.notEqual(code, 0)
     assert.match(run.stdout, /\[dev\] The server exited/)
     await sleep(500)
-    // dev.sh is gone, so find the run's Vite process by its port.
-    const leftovers = execFileSync('ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' })
-      .split('\n')
-      .filter((line) => /vite/.test(line) && line.includes(`--port ${ports.web}`))
-    assert.deepEqual(leftovers, [])
+    // dev.sh is gone, so find the run's processes by the port and the copy's path.
+    assert.deepEqual(leftoverProcs(), [])
+  })
+
+  it('exits non-zero and stops the server and the SPA when the worker exits on its own', async () => {
+    // The worker does not start with a zero poll interval. The server ignores the setting.
+    const run = startDev({ Worker__PollInterval: '00:00:00' })
+    const code = await exitsWithin(run, 300_000)
+    assert.notEqual(code, 0)
+    assert.match(run.stdout, /\[dev\] The worker exited/)
+    assert.match(run.stdout, /Now listening on/)
+    await sleep(500)
+    assert.deepEqual(leftoverProcs(), [])
   })
 
   it('exits non-zero at once when Docker is not running', async () => {

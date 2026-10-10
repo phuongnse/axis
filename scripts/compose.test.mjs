@@ -55,6 +55,7 @@ test('the stack runs from source', { timeout }, async () => {
   const up = compose(['up', '-d', '--build', '--wait'], { stdio: 'inherit' })
   if (up.status !== 0) {
     compose(['logs', 'server'], { stdio: 'inherit' })
+    compose(['logs', 'worker'], { stdio: 'inherit' })
     assert.fail(`docker compose up exited with ${up.status}`)
   }
 
@@ -70,6 +71,16 @@ test('the stack runs from source', { timeout }, async () => {
   const records = await fetch(`${baseUrl}/api/apps/PurchaseRequests/entities/PurchaseRequest/records`)
   assert.equal(records.status, 200)
   assert.ok(Array.isArray((await records.json()).items))
+
+  const services = compose(['ps', '--status', 'running', '--services'])
+  assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
+  // The worker polls once a second, so it finds the migrated database soon after the server is up.
+  let logs = ''
+  for (let i = 0; i < 30 && !logs.includes('Tenant default is ready for work'); i++) {
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1000))
+    logs = compose(['logs', 'worker']).stdout
+  }
+  assert.match(logs, /Tenant default is ready for work/, logs)
 })
 
 test('a broken application folder stops the server', { timeout }, () => {

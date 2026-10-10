@@ -544,6 +544,12 @@ configuration (see
 As environment variables they are `Worker__LeaseDuration` and
 `Worker__PollInterval`.
 
+The server migrates the tenant databases, and the worker does not. Before it
+claims work for a tenant, the worker checks that the processes migrations are
+applied to the tenant database. Until they are, it skips the tenant and logs
+once that it is waiting. Once they are, it logs that the tenant is ready for
+work and starts claiming. So the worker can start before the server.
+
 ## Tables
 
 `Axis.Processes` owns these tables in the `axis` schema of each tenant
