@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Processes.Storage;
 
 /// <summary>
-/// The processes module's tables in a tenant database: the process instances, the receipts of
-/// starts that carried an <c>Idempotency-Key</c>, and the work that workers claim and run. The
-/// caller supplies the connection to the tenant database.
+/// The processes module's tables in a tenant database: the process instances, the history of
+/// their steps, the receipts of starts that carried an <c>Idempotency-Key</c>, and the work that
+/// workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
 {
@@ -19,6 +19,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public const string MigrationsHistoryTable = "__processes_migrations";
 
     public DbSet<ProcessInstanceRow> Instances => Set<ProcessInstanceRow>();
+
+    public DbSet<ProcessStepHistoryRow> StepHistory => Set<ProcessStepHistoryRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
@@ -45,12 +47,35 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
             instance.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            instance.Property(i => i.EndedAt).HasColumnName("ended_at");
 
             // One start per submission: a record has at most one running or waiting instance of a process.
             instance.HasIndex(i => new { i.ApplicationId, i.ProcessId, i.SubjectId })
                 .IsUnique()
                 .HasFilter("state IN ('running', 'waiting')")
                 .HasDatabaseName(ProcessStarts.ActiveSubjectIndex);
+        });
+
+        modelBuilder.Entity<ProcessStepHistoryRow>(history =>
+        {
+            history.ToTable("process_step_history");
+            history.HasKey(h => h.Id).HasName("pk_process_step_history");
+            history.Property(h => h.Id).HasColumnName("id").ValueGeneratedNever();
+            history.Property(h => h.ProcessInstanceId).HasColumnName("process_instance_id");
+            history.Property(h => h.Step).HasColumnName("step");
+            history.Property(h => h.Revision).HasColumnName("revision");
+            history.Property(h => h.Input).HasColumnName("input").HasColumnType("jsonb");
+            history.Property(h => h.Output).HasColumnName("output").HasColumnType("jsonb");
+            history.Property(h => h.Decision).HasColumnName("decision");
+            history.Property(h => h.Error).HasColumnName("error");
+            history.Property(h => h.StartedAt).HasColumnName("started_at");
+            history.Property(h => h.FinishedAt).HasColumnName("finished_at");
+            history.HasIndex(h => h.ProcessInstanceId).HasDatabaseName("ix_process_step_history_process_instance_id");
+            history.HasOne<ProcessInstanceRow>()
+                .WithMany()
+                .HasForeignKey(h => h.ProcessInstanceId)
+                .HasConstraintName("fk_process_step_history_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ProcessStartReceiptRow>(receipt =>

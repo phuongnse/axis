@@ -7,10 +7,12 @@ built with `decision` and `end` steps, and so are their
 [compile checks](#compile-checks). A compiled process is part of the release
 model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
-the `axis.process_instances`, `axis.process_start_receipts` and
-`axis.process_work_items` tables are built too. Everything else here is
-*(planned for M3)*: `task` and `operation` steps, the task API, the engine
-that runs the steps and the other tables.
+the `axis.process_instances`, `axis.process_step_history`,
+`axis.process_start_receipts` and `axis.process_work_items` tables are built
+too. So is the engine that runs `decision` and `end` steps, see
+[Running a step](#running-a-step). Everything else here is
+*(planned for M3)*: `task` and `operation` steps, the task API and the other
+tables.
 Until `task` and `operation` are built, a step of either type is `AXC0004`, so
 the purchase request example below does not compile yet.
 
@@ -552,6 +554,9 @@ as usual.
 - **Failure.** A failing step rolls back. A following transaction records the
   error in the history and sets the instance to `failed`. Retry policies come
   in M5, and operator retry in M7.
+- **Revision.** An instance's revision is a counter that starts at 1 and goes
+  up each time the instance changes. A step changes the instance only at the
+  revision it loaded.
 - **Work item errors.** When a work item's handler throws, its writes roll
   back. A following transaction, still checked against the claim token,
   deletes the item and calls the handler's failure callback with the error.
@@ -560,6 +565,39 @@ as usual.
   expires.
 - **History.** Every step occurrence records its input, its output, the
   decision taken and any error.
+
+### Running a step
+
+The worker runs the `decision` and `end` steps. A `task` or `operation` step
+fails the instance until those types are built *(planned for M3)*. Each work
+item of kind `process.step` runs the current step of its instance in one
+transaction:
+
+1. It loads the instance. An instance that is missing or not `running` is
+   skipped, and the item is deleted with no other write.
+2. It reads the release the instance is pinned to, so an instance keeps the
+   step graph it started with after a new release is activated.
+3. It reads the subject record and runs the step:
+   - A **decision** evaluates its branches in order and takes the first `when`
+     that is true. A `when` that gives `null` counts as false. When no branch
+     is true, it takes `otherwise`. The instance stays `running` on the next
+     step.
+   - An **end** step sets the instance to `completed` with its `ended_at` time.
+4. It sets the new state and step, with the next revision, only if the
+   instance is still `running` at the revision it loaded. Otherwise another
+   transaction changed the instance first. The step then writes nothing else,
+   and its work item is deleted, so it never runs again.
+5. It writes the step's history row and one audit record with the actor
+   `system`: `process.stepCompleted` with details `{ "step", "next" }` for a
+   decision, or `process.completed` with details `{ "step" }` for an end step.
+6. A decision inserts the work item of the next step.
+
+Any exception in the step, such as a `when` that divides by zero or a missing
+subject record, rolls all of it back. A following transaction then sets the
+instance to `failed` with its `ended_at` time and the next revision, writes a
+history row with the error, and writes the audit record `process.failed` with
+details `{ "step" }` and the actor `system`. It does nothing when the instance
+has changed since the step loaded it. No step is retried.
 
 ## Worker settings
 
@@ -588,12 +626,26 @@ database, with history in `axis.__processes_migrations` (see
 [storage](storage.md)):
 
 - `axis.process_instances`: one row per instance, with its process, subject
-  record, release, state, revision and `step`, the step it runs next. A
-  partial unique index on
+  record, release, state, revision and `step`, the step it runs next. Its
+  `ended_at` is the time it became `completed` or `failed`, and is null before.
+  A partial unique index on
   application, process and subject record, where the state is `running` or
   `waiting`, enforces one start per submission.
-- `axis.process_step_history`: one row per step occurrence, with its input,
-  output, decision and error.
+- `axis.process_step_history`: one row per step occurrence. Times use the
+  database clock.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID |
+  | `process_instance_id` | `uuid` | The instance |
+  | `step` | `text` | The declared name of the step |
+  | `revision` | `bigint` | The instance revision the step ran at |
+  | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. It holds no field values |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "state": "completed" }` for an end step, null for a failed step |
+  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. Null for other steps and failed steps |
+  | `error` | `text`, null | The error of a failed step |
+  | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
+  | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
 - `axis.process_work_items`: the ready work. Each item has an `id`, its
   `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
   `claim_token` of its current claim. A step's item also has the

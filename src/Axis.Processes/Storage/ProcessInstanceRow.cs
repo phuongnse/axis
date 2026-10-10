@@ -31,4 +31,7 @@ public sealed class ProcessInstanceRow
     public required string Step { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>When the instance became <c>completed</c> or <c>failed</c>, or <see langword="null"/> while it has not ended.</summary>
+    public DateTimeOffset? EndedAt { get; init; }
 }
