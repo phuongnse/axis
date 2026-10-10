@@ -18,13 +18,21 @@ public sealed record SiteNavigationItem(string Page, string LabelKey);
 public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<WidgetMetadata> Widgets);
 
 /// <summary>
-/// One widget. Exactly one of <see cref="Entity"/> and <see cref="DataSource"/> is set: the widget
-/// shows all records of an entity, or the rows of a data source. <see cref="FormPage"/> is set only
-/// on a table widget that names the page holding the form for its records. <see cref="Form"/> is set
-/// only on a form widget that names a form; <see cref="Entity"/> is then the form's entity, with
-/// every field, so a client knows the type of each field the form shows.
+/// One widget. On a table or form widget, exactly one of <see cref="Entity"/> and
+/// <see cref="DataSource"/> is set: the widget shows all records of an entity, or the rows of a data
+/// source. <see cref="FormPage"/> is set only on a table widget that names the page holding the form
+/// for its records. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
+/// is then the form's entity, with every field, so a client knows the type of each field the form
+/// shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
 /// </summary>
-public sealed record WidgetMetadata(string Type, string? FormPage, EntityMetadata? Entity, DataSourceMetadata? DataSource, FormMetadata? Form);
+/// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
+public sealed record WidgetMetadata(
+    string Type,
+    string? FormPage,
+    EntityMetadata? Entity,
+    DataSourceMetadata? DataSource,
+    FormMetadata? Form,
+    string? TasksPath);
 
 /// <summary>The form a form widget lays its entity's fields out with: its sections in display order.</summary>
 public sealed record FormMetadata(string Name, IReadOnlyList<FormSectionMetadata> Sections);

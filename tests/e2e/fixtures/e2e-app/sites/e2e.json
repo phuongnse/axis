@@ -8,6 +8,7 @@
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
     { "page": "Notes", "label": { "textKey": "nav.notes" } },
-    { "page": "Categories", "label": { "textKey": "nav.categories" } }
+    { "page": "Categories", "label": { "textKey": "nav.categories" } },
+    { "page": "Tasks", "label": { "textKey": "nav.tasks" } }
   ]
 }

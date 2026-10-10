@@ -1,0 +1,13 @@
+{
+  "id": "89d4b0a4-469e-4806-ac8f-db6e1723b09d",
+  "kind": "form",
+  "name": "NoteReview",
+  "formatVersion": 1,
+  "entity": "Note",
+  "sections": [
+    {
+      "title": { "textKey": "noteReview.main" },
+      "fields": [{ "field": "title", "readOnly": true }]
+    }
+  ]
+}

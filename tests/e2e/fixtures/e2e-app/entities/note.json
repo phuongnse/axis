@@ -4,6 +4,7 @@
   "name": "Note",
   "formatVersion": 1,
   "label": { "textKey": "note.label" },
+  "displayField": "title",
   "fields": [
     { "name": "title", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "note.title" } },
     { "name": "code", "type": "text", "unique": true, "maxLength": 50, "label": { "textKey": "note.code" } },

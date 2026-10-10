@@ -23,7 +23,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
   and the `startProcess` action are agreed in
   [D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed). The
-  `form` resource is built. The task inbox and the `startProcess` action are
+  `form` resource and the task inbox are built. The `startProcess` action is
   *(planned for M3)*. Navigate actions are expected to replace the table's
   `formPage` link; see
   [D15](../decisions.md#d15-presentation-model--agreed), where that part is
@@ -95,7 +95,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
           ]
         },
         "dataSource": null,
-        "form": null
+        "form": null,
+        "tasksPath": null
       }
     ]
   }
@@ -104,19 +105,19 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `titles` in the site list has one entry per available locale of the site,
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
-  - `type` of a widget is `table` or `form`, and `taskInbox` *(planned for
-    M3)*. `formPage` is the page holding the form for a table's records, and
-    `null` otherwise. On a `table` or `form`, exactly one of `entity` and
-    `dataSource` is set, and the other is `null`. A `taskInbox` has both
-    `null`. The data source binding of the table widget below describes
-    `dataSource`.
+  - `type` of a widget is `table`, `form` or `taskInbox`. `formPage` is the
+    page holding the form for a table's records, and `null` otherwise. On a
+    `table` or `form`, exactly one of `entity` and `dataSource` is set, and
+    the other is `null`. A `taskInbox` has both `null`. The data source
+    binding of the table widget below describes `dataSource`.
   - Every widget also has `form`, never left out. It is the widget's form
     resource on a `form` widget that names one, and `null` otherwise. It is
     described under **Form metadata** of the form widget.
-  - *(planned for M3)* Every widget also has `actions` and `tasksPath`, never
-    left out. `actions` is described under the form widget, and `tasksPath`
-    under the task inbox widget. On a widget they do not apply to, they are
-    `[]` and `null`.
+  - Every widget also has `tasksPath`, never left out. It is described under
+    the task inbox widget, and is `null` on every other widget.
+  - *(planned for M3)* Every widget also has `actions`, never left out. It
+    is described under the form widget, and is `[]` on a widget it does not
+    apply to.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -533,7 +534,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.
-- **Task inbox widget** *(planned for M3)*. A page whose widget is a
+- **Task inbox widget**. A page whose widget is a
   `taskInbox` lists the signed-in user's open tasks in the application,
   through the [task API](processes.md#task-api).
 
@@ -548,17 +549,28 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   }
   ```
 
-  - **Metadata.** The widget has `"entity": null`, `"dataSource": null` and
-    a `tasksPath`, such as `"/api/apps/PurchasingApp/tasks"`. `tasksPath` is
-    `null` on every other widget and never left out.
-  - **Columns.** The task's label, the subject's label and the due date,
-    formatted as a `date-time` cell. An empty due date is an empty cell.
+  - **Compile.** A `taskInbox` names no `entity`, `dataSource` or `form`,
+    otherwise it is `AXC0060` at that property. It names no `formPage`,
+    otherwise it is `AXC0022` at `/widgets/{i}/formPage`.
+  - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
+    `"form": null`, `"formPage": null` and a `tasksPath`, such as
+    `"/api/apps/PurchasingApp/tasks"`. `tasksPath` is `null` on every other
+    widget and never left out.
+  - **Order.** Rows keep the task API's order: the earliest due date first,
+    and tasks with no due date last. The SPA does not sort them again.
+  - **Columns.** The task's label, from the step's label text key, the
+    subject's label and the due date, formatted as a `date-time` cell. An
+    empty subject label or due date is an empty cell.
   - **Paging.** `page` and `pageSize` live in the URL, as for a table. There
     is no sort.
   - **Links.** Each row opens the task page at
     `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
+    Until the task page is built, that address shows the not-found page
+    inside the site shell.
   - **Signed out.** With nobody signed in, the task API answers `401`, and
-    the widget shows a sign-in prompt in place of the rows.
+    the widget shows a sign-in prompt in place of the rows. The platform
+    texts `shell.tasks.*` hold the column headers, the empty text, the load
+    error and the sign-in prompt.
 - **Task page** *(planned for M3)*. The address `/{site}/{inboxpage}/{taskId}`
   shows one task, under the page of its task inbox.
   - It shows the step's label, the subject's label, the due date and the

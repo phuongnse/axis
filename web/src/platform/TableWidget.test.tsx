@@ -31,6 +31,7 @@ const noteWidget: EntityWidgetMetadata = {
   formPage: 'NoteForm',
   dataSource: null,
   form: null,
+  tasksPath: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -60,6 +61,7 @@ const noteListWidget: WidgetMetadata = {
   formPage: 'NoteForm',
   entity: null,
   form: null,
+  tasksPath: null,
   dataSource: {
     name: 'NoteList',
     rowsPath,
@@ -285,6 +287,7 @@ describe('TableWidget', () => {
       formPage: null,
       entity: null,
       form: null,
+      tasksPath: null,
       dataSource: {
         name: 'NotesByDepartment',
         rowsPath,
@@ -424,6 +427,7 @@ describe('TableWidget', () => {
       entity: { ...noteWidget.entity, fields: [field('price', 'decimal', null)] },
       dataSource: null,
       form: null,
+      tasksPath: null,
     })
 
     const cell = await screen.findByRole('cell', { name: '1250.50' })

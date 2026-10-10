@@ -1,0 +1,8 @@
+{
+  "id": "edcf8fef-5f21-4e8c-86d6-67e509ed547c",
+  "kind": "page",
+  "name": "MyTasks",
+  "formatVersion": 1,
+  "title": { "textKey": "myTasks.title" },
+  "widgets": [{ "type": "taskInbox" }]
+}

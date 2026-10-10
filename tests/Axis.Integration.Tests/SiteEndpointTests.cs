@@ -73,6 +73,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("tasksPath").ValueKind);
 
         var entity = widget.GetProperty("entity");
         Assert.Equal("Item", entity.GetProperty("name").GetString());
@@ -165,6 +166,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
         Assert.Equal("Item", widget.GetProperty("entity").GetProperty("name").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("tasksPath").ValueKind);
     }
 
     [Fact]
@@ -175,11 +177,12 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemSections", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            ["type", "formPage", "entity", "dataSource", "form"],
+            ["type", "formPage", "entity", "dataSource", "form", "tasksPath"],
             widget.EnumerateObject().Select(property => property.Name));
         Assert.Equal("form", widget.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("tasksPath").ValueKind);
 
         // The total is computed, so it is read-only though the form does not say so.
         Assert.Equal(
@@ -190,6 +193,18 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         var entity = widget.GetProperty("entity");
         Assert.Equal("Item", entity.GetProperty("name").GetString());
         Assert.Equal(10, entity.GetProperty("fields").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Task_inbox_page_has_the_task_api_path_and_no_binding()
+    {
+        using var page = await GetJsonAsync("/api/sites/records/pages/mytasks", HostA);
+
+        Assert.Equal("MyTasks", page.RootElement.GetProperty("name").GetString());
+        var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
+        Assert.Equal(
+            """{"type":"taskInbox","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks"}""",
+            widget.GetRawText());
     }
 
     [Theory]

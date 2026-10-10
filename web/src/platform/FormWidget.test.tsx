@@ -37,6 +37,7 @@ const noteWidget: EntityWidgetMetadata = {
   formPage: null,
   dataSource: null,
   form: null,
+  tasksPath: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',

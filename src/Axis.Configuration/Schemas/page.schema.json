@@ -41,7 +41,7 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["table", "form"] },
+        "type": { "enum": ["table", "form", "taskInbox"] },
         "entity": { "$ref": "#/$defs/name" },
         "dataSource": { "$ref": "#/$defs/name" },
         "form": { "$ref": "#/$defs/name" },
