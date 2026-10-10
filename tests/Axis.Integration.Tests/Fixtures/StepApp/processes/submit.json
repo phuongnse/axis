@@ -1,0 +1,18 @@
+{
+  "id": "3c9a7e52-1b4d-4f6a-8e2c-5d7b9f1a3e64",
+  "kind": "process",
+  "name": "Submit",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'submitted'", "submittedAt": "dateTime('2026-10-10T09:30:00Z')" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

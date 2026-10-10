@@ -52,22 +52,42 @@
       "required": ["name", "type"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "type": { "enum": ["decision", "end"] },
+        "type": { "enum": ["decision", "operation", "end"] },
         "branches": {
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/branch" }
         },
-        "otherwise": { "$ref": "#/$defs/name" }
+        "otherwise": { "$ref": "#/$defs/name" },
+        "operation": { "$ref": "#/$defs/name" },
+        "set": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "next": { "$ref": "#/$defs/name" }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "decision" } } },
-          "then": { "required": ["branches", "otherwise"] }
+          "then": {
+            "required": ["branches", "otherwise"],
+            "properties": { "operation": false, "set": false, "next": false }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "operation" } } },
+          "then": {
+            "required": ["operation", "set", "next"],
+            "properties": { "branches": false, "otherwise": false }
+          }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "end" } } },
-          "then": { "properties": { "branches": false, "otherwise": false } }
+          "then": {
+            "properties": { "branches": false, "otherwise": false, "operation": false, "set": false, "next": false }
+          }
         }
       ]
     },

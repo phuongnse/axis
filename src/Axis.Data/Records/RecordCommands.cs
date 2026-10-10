@@ -126,6 +126,86 @@ public static class RecordCommands
     }
 
     /// <summary>
+    /// Sets fields of the <paramref name="stored"/> record to values an expression gave, as a
+    /// record update does, and writes it at the stored version. Each value must fit its field's
+    /// column, and a <c>null</c> for a required field is refused. Then the computed fields are
+    /// recomputed over the stored record with the values on top, and the validations run. A value
+    /// that does not fit, a computed field that cannot be computed and a failed validation are
+    /// <see cref="RecordWriteOutcome.Invalid"/>, keyed <c>/values/&lt;field&gt;</c>, and write
+    /// nothing. Read <paramref name="stored"/> with its rows, inside the caller's transaction, and
+    /// lock it first with <see cref="LockAsync"/> so it is the latest version. Roll the
+    /// transaction back unless the record is <see cref="RecordWriteOutcome.Written"/>.
+    /// </summary>
+    /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
+    public static async Task<RecordWriteResult> SetAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        Record stored,
+        IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(stored);
+        ArgumentNullException.ThrowIfNull(values);
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var converted = new List<RecordValue>();
+        foreach (var (field, value) in values)
+        {
+            RecordValue? recordValue = null;
+            var message = value is null && field.Required
+                ? Messages.Required
+                : RecordComputer.ToRecordValue(field, value, out recordValue);
+            if (message is not null)
+            {
+                errors[ValuesPointer + field.Name] = [message];
+            }
+            else
+            {
+                converted.Add(recordValue!);
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors);
+        }
+
+        var computed = RecordComputer.ComputeUpdate(application, entity, stored, converted, []);
+        if (computed.Errors is { } computeErrors)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: computeErrors);
+        }
+
+        if (RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows) is { } failures)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
+        }
+
+        return await UpdateAsync(connection, application, entity, stored.Id, stored.Version, computed.Values, computed.Rows, cancellationToken);
+    }
+
+    /// <summary>
+    /// Locks the row of the record with <paramref name="id"/> until the caller's transaction ends,
+    /// so a read after it sees the latest version and a concurrent write waits. Returns
+    /// <see langword="false"/> when there is no such record.
+    /// </summary>
+    public static async Task<bool> LockAsync(NpgsqlConnection connection, EntityModel entity, Guid id, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT 1 FROM {RecordQueries.Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id FOR UPDATE",
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
+
+    /// <summary>
     /// Deletes the record with <paramref name="id"/> and returns the version it had. A record that
     /// another record references is kept and is <see cref="RecordDeleteOutcome.Referenced"/>.
     /// </summary>

@@ -14,7 +14,10 @@ namespace Axis.Configuration.Compilation;
 /// <c>end</c> step and is in no cycle. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
-/// of at most 3 hops. Every problem of a process is
+/// of at most 3 hops. An operation step runs <c>updateRecord</c>, and each field its <c>set</c>
+/// names is a field of the subject entity, named once, that is not computed, numbered by a
+/// sequence or a child collection. Each <c>set</c> expression type-checks against its field's type
+/// over the same scope as a condition. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, and a step with a transition to an
 /// unknown step is not also reported as having no path to an end.
@@ -66,7 +69,9 @@ internal static class ProcessChecker
             // The expressions cannot be checked without the entity.
             if (entity is not null)
             {
-                CheckConditions(process, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity), Report);
+                var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
+                CheckConditions(process, scope, Report);
+                CheckOperations(process, entity, scope, Report);
             }
 
             if (process.StartCondition is { } startCondition)
@@ -79,7 +84,8 @@ internal static class ProcessChecker
     /// <summary>
     /// Builds a checked process. Each transition is the declared name of the step it names, and each
     /// condition is compiled over the subject entity's fields, its child collections, the named rules
-    /// and paths through reference fields.
+    /// and paths through reference fields. The fields an operation sets are in the entity's
+    /// declaration order, so a release rebuilt from its stored files has the same model.
     /// </summary>
     public static ProcessModel Build(ProcessResource process, Func<string, EntityResource?> findEntity, IEnumerable<ExpressionRule> rules)
     {
@@ -91,6 +97,20 @@ internal static class ProcessChecker
         // A checked process has unique step names, so a transition names exactly one step.
         string Resolve(string name) =>
             process.Steps.First(step => string.Equals(step.Name, name, StringComparison.OrdinalIgnoreCase)).Name;
+
+        // A checked set names each field once, ignoring letter case.
+        List<RecordAssignmentModel> Assign(IReadOnlyDictionary<string, string> set)
+        {
+            var values = new Dictionary<string, string>(set, StringComparer.OrdinalIgnoreCase);
+            return
+            [
+                .. entity.Fields
+                    .Where(field => values.ContainsKey(field.Name))
+                    .Select(field => new RecordAssignmentModel(
+                        field.Name,
+                        ExpressionModel.Compile(values[field.Name], scope, ExpressionScopes.TypeOf(field)!))),
+            ];
+        }
 
         return new ProcessModel
         {
@@ -109,8 +129,13 @@ internal static class ProcessChecker
                         step.Name,
                         step.Branches!.Select(branch => new DecisionBranchModel(Compile(branch.When), Resolve(branch.Next))).ToList(),
                         Resolve(step.Otherwise!)),
+                    ProcessStepDefinition.OperationStep => new OperationStepModel(
+                        step.Name,
+                        step.Operation!,
+                        Assign(step.Set!),
+                        Resolve(step.Next!)),
                     ProcessStepDefinition.End => new EndStepModel(step.Name),
-                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision and end steps."),
+                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, operation and end steps."),
                 })
                 .ToList(),
         };
@@ -168,6 +193,11 @@ internal static class ProcessChecker
             if (step.Otherwise is { } otherwise)
             {
                 transitions[index].Add(new Transition(Resolve(otherwise, $"{path}/otherwise"), $"{path}/otherwise"));
+            }
+
+            if (step.Next is { } next)
+            {
+                transitions[index].Add(new Transition(Resolve(next, $"{path}/next"), $"{path}/next"));
             }
         }
 
@@ -251,7 +281,7 @@ internal static class ProcessChecker
     /// <summary>
     /// Reports each transition that closes a cycle, at that transition, naming the steps in the
     /// cycle. The steps are walked depth-first in file order, each step's transitions in order: the
-    /// branches, then <c>otherwise</c>. A step with two transitions to the same step is reported once.
+    /// branches, then <c>otherwise</c>, then <c>next</c>. A step with two transitions to the same step is reported once.
     /// </summary>
     private static void CheckCycles(
         IReadOnlyList<ProcessStepDefinition> steps, List<Transition>[] transitions, bool[] duplicate, Action<string, string, string> report)
@@ -330,6 +360,78 @@ internal static class ProcessChecker
             for (var branch = 0; branch < branches.Count; branch++)
             {
                 CheckCondition(branches[branch].When, $"/steps/{index}/branches/{branch}/when");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks each operation step: its operation is <c>updateRecord</c>, matched exactly as a step
+    /// <c>type</c> is, and each <c>set</c> key names a field of <paramref name="entity"/>, ignoring
+    /// letter case, that no earlier key of the step names and that can be set. Its expression then
+    /// fits the field's type over <paramref name="scope"/>. The <c>set</c> of an unknown operation
+    /// is not checked, as its meaning depends on the operation.
+    /// </summary>
+    private static void CheckOperations(ProcessResource process, EntityResource entity, ExpressionScope scope, Action<string, string, string> report)
+    {
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type != ProcessStepDefinition.OperationStep)
+            {
+                continue;
+            }
+
+            if (!string.Equals(step.Operation, ProcessStepDefinition.UpdateRecord, StringComparison.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.UnknownOperation,
+                    $"The operation '{step.Operation}' was not found. The built-in operation is '{ProcessStepDefinition.UpdateRecord}'.",
+                    $"/steps/{index}/operation");
+                continue;
+            }
+
+            // The key that first set each field, by the field's declared name.
+            var setBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, expression) in step.Set ?? new Dictionary<string, string>())
+            {
+                var path = $"/steps/{index}/set/{key}";
+                var field = entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+                if (field is null)
+                {
+                    report(
+                        DiagnosticCodes.UnknownSetField,
+                        $"The field '{key}' was not found. The entity '{entity.Name}' has no field with that name.",
+                        path);
+                    continue;
+                }
+
+                if (!setBy.TryAdd(field.Name, key))
+                {
+                    report(
+                        DiagnosticCodes.UnknownSetField,
+                        $"The field '{field.Name}' is already set by '{setBy[field.Name]}' in this step.",
+                        path);
+                    continue;
+                }
+
+                var reason = field.Expression is not null ? "is computed"
+                    : field.Sequence is not null ? "is numbered by a sequence"
+                    : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"
+                    : null;
+                if (reason is not null)
+                {
+                    report(DiagnosticCodes.ReadOnlySetField, $"The field '{field.Name}' {reason}, so an operation cannot set it.", path);
+                    continue;
+                }
+
+                var parsed = ExpressionParser.Parse(expression);
+                ExpressionDiagnostic? problem = parsed.Succeeded
+                    ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!).Diagnostic
+                    : parsed.Diagnostic;
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, path);
+                }
             }
         }
     }

@@ -5,8 +5,9 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled process: its subject entity, its optional start condition, its first step and its
-/// steps. Every transition names a step of the process by its declared name, and every condition
-/// is a boolean expression checked over the subject entity's fields and the named rules.
+/// steps. Every transition names a step of the process by its declared name, every condition
+/// is a boolean expression checked over the subject entity's fields and the named rules, and every
+/// value an operation sets is checked against its field's type over the same scope.
 /// </summary>
 public sealed record ProcessModel
 {
@@ -51,6 +52,19 @@ public sealed record DecisionStepModel(string Name, IReadOnlyList<DecisionBranch
 
 /// <summary>A branch of a decision: its boolean condition and the declared name of the step it leads to.</summary>
 public sealed record DecisionBranchModel(ExpressionModel When, string Next);
+
+/// <summary>
+/// An operation step. M3 has one operation, <c>updateRecord</c>: it sets each field in
+/// <see cref="Set"/> on the subject record through the record update rules, then moves to
+/// <see cref="Next"/>.
+/// </summary>
+public sealed record OperationStepModel(string Name, string Operation, IReadOnlyList<RecordAssignmentModel> Set, string Next) : ProcessStepModel(Name);
+
+/// <summary>
+/// A field an <c>updateRecord</c> operation sets: the field's declared name, and the expression
+/// over the subject record that gives its value, checked against the field's type.
+/// </summary>
+public sealed record RecordAssignmentModel(string Field, ExpressionModel Value);
 
 /// <summary>An end step. An instance that reaches it is completed.</summary>
 public sealed record EndStepModel(string Name) : ProcessStepModel(Name);

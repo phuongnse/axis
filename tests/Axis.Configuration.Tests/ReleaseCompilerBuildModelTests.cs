@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 
@@ -118,6 +119,38 @@ public sealed class ReleaseCompilerBuildModelTests
         ModelAssert.Equal(compiled.Model, model);
         Assert.True(model.TryGetProcess("review", out var process));
         Assert.Equal(["check", "long", "short"], process.Steps.Select(step => step.Name));
+    }
+
+    [Fact]
+    public void Stored_release_compiles_an_operation_step_back_with_its_fields_in_declaration_order()
+    {
+        // The stored file sorts the set keys, so the model lists them in declaration order instead.
+        var compiled = ApplicationCompiler.Compile(
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("entities/ticket.json", """
+                { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [ { "name": "title", "type": "text" }, { "name": "code", "type": "text" } ] }
+                """),
+            new ResourceContent("processes/close.json", """
+                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "Close", "formatVersion": 1, "entity": "Ticket",
+                  "start": "close",
+                  "steps": [
+                    { "name": "close", "type": "operation", "operation": "updateRecord", "set": { "title": "'Closed'", "code": "'C'" }, "next": "done" },
+                    { "name": "done", "type": "end" }
+                  ] }
+                """),
+        ]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.True(model.TryGetProcess("close", out var process));
+        var close = Assert.IsType<OperationStepModel>(process.Steps[0]);
+        Assert.Equal(["title", "code"], close.Set.Select(assignment => assignment.Field));
     }
 
     [Fact]
