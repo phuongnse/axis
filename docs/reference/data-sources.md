@@ -356,7 +356,7 @@ The table binding and its filter inputs are built, for plain and grouped
 data sources.
 
 - **Widgets.** Only the `table` widget binds to a data source. A `form` that
-  names a `dataSource` is `AXC0060`. A widget names an `entity` or a
+  names a `dataSource` is `AXC0060`. A table names an `entity` or a
   `dataSource`, never both and never neither (`AXC0060`). `entity` stays as
   shorthand for all records of an entity. A `dataSource` that names no
   loaded data source is `AXC0059`.

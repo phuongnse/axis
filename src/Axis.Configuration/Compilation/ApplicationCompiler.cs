@@ -14,9 +14,9 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
 /// of every locale, checks the named rules and their calls, checks every entity's fields against
-/// the field type rules and type-checks its computed fields and validations, checks sites,
+/// the field type rules and type-checks its computed fields and validations, checks forms, sites,
 /// pages and seeds, checks data sources and their filters, checks processes, their step graphs and
-/// their conditions, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
+/// their conditions, and resolves references between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
 /// </summary>
@@ -77,6 +77,15 @@ public static class ApplicationCompiler
 
         SequenceResource? FindSequence(string name) => sequencesByName.GetValueOrDefault(name);
 
+        // Form names follow the same rule too.
+        var formsByName = new Dictionary<string, FormResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var form in loaded.Forms)
+        {
+            formsByName.TryAdd(form.Name, form);
+        }
+
+        FormResource? FindForm(string name) => formsByName.GetValueOrDefault(name);
+
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
@@ -100,7 +109,7 @@ public static class ApplicationCompiler
                 diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, textKeys, diagnostics);
+        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, rules, diagnostics);
         ProcessChecker.Check(
@@ -124,11 +133,12 @@ public static class ApplicationCompiler
             Manifest = loaded.Application,
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
-            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName)).ToList(),
+            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, rules)).ToList(),
+            Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
         };
         return result with
         {
@@ -452,7 +462,7 @@ public static class ApplicationCompiler
     }
 
     /// <summary>Finds a field by name, ignoring letter case, as the model does.</summary>
-    private static FieldDefinition? FindField(EntityResource entity, string name) =>
+    internal static FieldDefinition? FindField(EntityResource entity, string name) =>
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
 
     private static void CheckField(
@@ -1059,7 +1069,8 @@ public static class ApplicationCompiler
         PageResource page,
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, PageResource> pagesByName,
-        Dictionary<string, DataSourceResource> dataSourcesByName) =>
+        Dictionary<string, DataSourceResource> dataSourcesByName,
+        Dictionary<string, FormResource> formsByName) =>
         new()
         {
             Id = page.Id,
@@ -1069,17 +1080,41 @@ public static class ApplicationCompiler
             Widgets = page.Widgets
                 .Select(widget =>
                 {
-                    // A checked widget names exactly one of an entity and a data source.
-                    var entity = widget.Entity is null ? null : entitiesByName[widget.Entity];
+                    // A checked widget names exactly one of an entity, a data source and a form. A
+                    // form widget over a form shows the form's entity.
+                    var form = widget.Form is null ? null : formsByName[widget.Form];
+                    var entityName = widget.Entity ?? form?.Entity;
+                    var entity = entityName is null ? null : entitiesByName[entityName];
                     var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
                     return new WidgetModel(
                         WidgetTypes.Parse(widget.Type),
                         entity is null ? null : new EntityReference(entity.Id, entity.Name),
                         widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
-                        dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name));
+                        dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
+                        form is null ? null : new FormReference(form.Id, form.Name));
                 })
                 .ToList(),
         };
+
+    /// <summary>Builds a checked form, with each field named as its entity declares it.</summary>
+    private static FormModel BuildForm(FormResource form, Dictionary<string, EntityResource> entitiesByName)
+    {
+        var entity = entitiesByName[form.Entity];
+        return new FormModel
+        {
+            Id = form.Id,
+            Name = form.Name,
+            File = form.File,
+            Entity = new EntityReference(entity.Id, entity.Name),
+            Sections = form.Sections
+                .Select(section => new FormSectionModel(
+                    section.Title,
+                    section.Fields
+                        .Select(field => new FormFieldModel(FindField(entity, field.Field)!.Name, field.ReadOnly ?? false))
+                        .ToList()))
+                .ToList(),
+        };
+    }
 
     private static SeedModel BuildSeed(SeedResource seed, Dictionary<string, EntityResource> entitiesByName)
     {

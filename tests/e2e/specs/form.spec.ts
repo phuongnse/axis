@@ -186,3 +186,28 @@ test('a category is picked in the lookup and shows on the saved note', async ({ 
   await expect(page).toHaveURL(tablePath)
   await expect(page.getByRole('row', { name: new RegExp(`Lookup ${run} `) })).toContainText(category)
 })
+
+test('a form in two sections shows both titles, and saving keeps its read-only field', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const note = await createRecord(request, 'Note', { title: `Sections ${run}`, code: `S-${run}` })
+
+  await page.goto(`/e2e/notesections/${note.id}`)
+  await expect(page.getByRole('heading', { name: 'Main' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(`Sections ${run}`)
+  const code = page.getByLabel('Code', { exact: true })
+  await expect(code).toHaveValue(`S-${run}`)
+  await expect(code).not.toBeEditable()
+  // A field the form does not list is not shown.
+  await expect(page.getByLabel('Done', { exact: true })).toBeHidden()
+
+  await page.getByLabel('Priority', { exact: true }).fill('4')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page).toHaveURL(/\/e2e\/notes$/)
+
+  const read = await request.get(`${notesPath}/${note.id}`)
+  const record = await read.json()
+  expect(record.version).toBe(2)
+  expect(record.values.code).toBe(`S-${run}`)
+  expect(record.values.priority).toBe(4)
+})

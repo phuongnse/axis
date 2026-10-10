@@ -24,6 +24,8 @@
     "note.lines": "Lines",
     "noteLine.description": "Description",
     "noteLine.quantity": "Quantity",
+    "noteSections.main": "Main",
+    "noteSections.details": "Details",
     "category.label": "Category",
     "category.name": "Name"
   }

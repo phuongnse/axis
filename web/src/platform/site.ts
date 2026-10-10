@@ -112,16 +112,36 @@ export interface DataSourceMetadata {
   columns: DataSourceColumn[]
 }
 
+/** One field of a form section, by its declared name. A read-only field is shown and never sent. */
+export interface FormFieldMetadata {
+  name: string
+  readOnly: boolean
+}
+
+/** One section of a form: the text key of its title and its fields in display order. */
+export interface FormSectionMetadata {
+  titleKey: string
+  fields: FormFieldMetadata[]
+}
+
+/** The form a form widget lays its entity's fields out with: its sections in display order. */
+export interface FormMetadata {
+  name: string
+  sections: FormSectionMetadata[]
+}
+
 /**
  * One widget of a page. Exactly one of `entity` and `dataSource` is set: the widget shows all
  * records of an entity, or the rows of a data source. `formPage` is set only on a table that names
- * the page holding its form.
+ * the page holding its form. `form` is set only on a form widget that names a form, and `entity` is
+ * then the form's entity with every field.
  */
 export interface WidgetMetadata {
   type: 'table' | 'form'
   formPage: string | null
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
+  form: FormMetadata | null
 }
 
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */

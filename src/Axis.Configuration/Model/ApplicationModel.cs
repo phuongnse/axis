@@ -4,8 +4,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled application: its manifest, every entity, site, page, seed, data source and process
-/// with references resolved, and its texts.
+/// A compiled application: its manifest, every entity, site, page, seed, data source, process and
+/// form with references resolved, and its texts.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -30,6 +30,9 @@ public sealed record ApplicationModel
 
     /// <summary>The application's processes, in path order.</summary>
     public IReadOnlyList<ProcessModel> Processes { get; init; } = [];
+
+    /// <summary>The application's forms, in path order.</summary>
+    public IReadOnlyList<FormModel> Forms { get; init; } = [];
 
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)
@@ -60,5 +63,12 @@ public sealed record ApplicationModel
     {
         process = Processes.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
         return process is not null;
+    }
+
+    /// <summary>Finds a form by name, ignoring letter case.</summary>
+    public bool TryGetForm(string name, [NotNullWhen(true)] out FormModel? form)
+    {
+        form = Forms.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        return form is not null;
     }
 }

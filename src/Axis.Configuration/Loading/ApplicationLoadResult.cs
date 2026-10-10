@@ -12,10 +12,10 @@ namespace Axis.Configuration.Loading;
 /// <remarks>
 /// When <see cref="HasErrors"/> is true, <see cref="Application"/>, <see cref="Entities"/>,
 /// <see cref="Sites"/>, <see cref="Pages"/>, <see cref="Texts"/>, <see cref="Seeds"/>,
-/// <see cref="DataSources"/>, <see cref="Rules"/>, <see cref="Sequences"/> and <see cref="Processes"/> hold only
+/// <see cref="DataSources"/>, <see cref="Rules"/>, <see cref="Sequences"/>, <see cref="Processes"/> and <see cref="Forms"/> hold only
 /// the files that passed schema validation. They may be used to find further diagnostics, but never
 /// to build a model or a release. When the folder could not be listed, the result has no
-/// application, entities, sites, pages, texts, seeds, data sources, rules, sequences, processes or resources and a single <see cref="DiagnosticCodes.UnlistableFolder"/>
+/// application, entities, sites, pages, texts, seeds, data sources, rules, sequences, processes, forms or resources and a single <see cref="DiagnosticCodes.UnlistableFolder"/>
 /// diagnostic.
 /// </remarks>
 /// <param name="UnloadedEntityNames">
@@ -35,6 +35,10 @@ namespace Axis.Configuration.Loading;
 /// The <c>name</c> of every <c>sequence</c> file that was not loaded because of its own errors,
 /// compared ignoring letter case. A reference to one of these names is not reported again either.
 /// </param>
+/// <param name="UnloadedFormNames">
+/// The <c>name</c> of every <c>form</c> file that was not loaded because of its own errors,
+/// compared ignoring letter case. A reference to one of these names is not reported again either.
+/// </param>
 public sealed record ApplicationLoadResult(
     ApplicationManifest? Application,
     IReadOnlyList<EntityResource> Entities,
@@ -46,12 +50,14 @@ public sealed record ApplicationLoadResult(
     IReadOnlyList<RuleResource> Rules,
     IReadOnlyList<SequenceResource> Sequences,
     IReadOnlyList<ProcessResource> Processes,
+    IReadOnlyList<FormResource> Forms,
     IReadOnlyList<ResourceContent> Resources,
     IReadOnlyList<Diagnostic> Diagnostics,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedPageNames,
     IReadOnlySet<string> UnloadedDataSourceNames,
-    IReadOnlySet<string> UnloadedSequenceNames)
+    IReadOnlySet<string> UnloadedSequenceNames,
+    IReadOnlySet<string> UnloadedFormNames)
 {
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 }

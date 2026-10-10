@@ -1,5 +1,5 @@
-import { Alert, Button, Flex, Form, Input, Space } from 'antd'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Alert, Button, Flex, Form, Input, Space, Typography } from 'antd'
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ChildCollectionTable } from './ChildCollectionTable'
@@ -29,6 +29,34 @@ interface Snapshot {
 }
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
+
+/** A field the form shows, and whether it is shown without letting it be changed. */
+interface ShownField {
+  field: FieldMetadata
+  readOnly: boolean
+}
+
+/** A titled group of shown fields. The entity shorthand has one section without a title. */
+interface Section {
+  titleKey: string | null
+  fields: ShownField[]
+}
+
+// A computed or sequence field is set by the server, so it is read-only in any form.
+function sectionsOf({ entity, form }: EntityWidgetMetadata): Section[] {
+  if (form === null) {
+    return [
+      { titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: field.computed || field.sequence })) },
+    ]
+  }
+  return form.sections.map((section) => ({
+    titleKey: section.titleKey,
+    fields: section.fields.flatMap((entry) => {
+      const field = entity.fields.find((candidate) => candidate.name === entry.name)
+      return field ? [{ field, readOnly: entry.readOnly || field.computed || field.sequence }] : []
+    }),
+  }))
+}
 
 const fieldPointer = '/values/'
 
@@ -64,17 +92,22 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
 }
 
 /**
- * Creates or edits one record of the widget's entity. The form sends only the fields that differ
- * from the values it started from, plus `version` on edit, and adds no rules of its own: the server
- * validates, and its errors appear on the fields their JSON Pointer names. A child collection that
- * changed is sent as its whole row list, and a row's errors appear on its cells. A computed field,
- * of the record or of a row, is shown read-only with the value the server returned, and never sent.
- * So is a sequence field, which is empty on a new record because the server numbers it on create.
+ * Creates or edits one record of the widget's entity. A widget that names a form shows the form's
+ * sections under their titles, with only the fields they list. Otherwise it shows every field in
+ * one section without a title. The form sends only the editable shown fields that differ from the
+ * values it started from, plus `version` on edit, and adds no rules of its own: the server
+ * validates, and its errors appear on the shown fields their JSON Pointer names, or above the form.
+ * A child collection that changed is sent as its whole row list, and a row's errors appear on its
+ * cells. A computed field, of the record or of a row, is shown read-only with the value the server
+ * returned, and never sent. So is a sequence field, which is empty on a new record because the
+ * server numbers it on create, and so is a field the form marks read-only.
  */
 export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const { entity } = widget
+  const sections = useMemo(() => sectionsOf(widget), [widget])
+  const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
@@ -138,7 +171,7 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
   // field all exist.
   const cellOf = (name: string) => {
     const [collection, index, child, ...rest] = name.split('/')
-    const field = entity.fields.find((candidate) => candidate.name === collection)
+    const field = shown.find((candidate) => candidate.field.name === collection)?.field
     if (
       rest.length > 0 ||
       field?.type !== 'child-collection' ||
@@ -155,8 +188,11 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
     if (saving) {
       return
     }
+    // A read-only field is shown but never sent, so a hand edit of its input changes nothing.
     const changed = Object.fromEntries(
-      entity.fields
+      shown
+        .filter(({ readOnly }) => !readOnly)
+        .map(({ field }) => field)
         .filter(
           (field) =>
             !field.computed && !field.sequence && !sameValue(field, values[field.name], snapshot.initial[field.name]),
@@ -196,7 +232,7 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
         const messages = problem.errors[pointer].map((message) => t(message))
         if (cell) {
           onCells[cell.collection] = { ...onCells[cell.collection], [cell.key]: messages }
-        } else if (name !== null && entity.fields.some((field) => field.name === name)) {
+        } else if (name !== null && shown.some(({ field }) => field.name === name)) {
           onFields[name] = messages
         } else {
           onForm.push(...messages)
@@ -257,10 +293,10 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
     })
   }
 
-  const input = (field: FieldMetadata): ReactNode => {
+  const input = (field: FieldMetadata, readOnly: boolean): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
-    if (field.computed || field.sequence) {
+    if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence)) {
       // The server sets the value on save, so it is shown as a table cell shows it.
       return <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t })} />
     }
@@ -277,6 +313,7 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
       case 'child-collection':
         return (
           <ChildCollectionTable
+            readOnly={readOnly}
             field={field}
             rows={rowsOf(value)}
             onChange={(rows) => setRows(field, rows)}
@@ -303,22 +340,27 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
       )}
       {formErrors.length > 0 && <Alert data-testid="form-error" type="error" message={formErrors.join(' ')} />}
       <Form layout="vertical" onFinish={save}>
-        {entity.fields.map((field) => {
-          const errors = fieldErrors[field.name]
-          return (
-            <Form.Item
-              key={field.name}
-              label={labelOf(field)}
-              // A child collection is a table, with no single input for the label to point to.
-              htmlFor={field.type === 'child-collection' ? undefined : field.name}
-              required={field.required}
-              validateStatus={errors ? 'error' : undefined}
-              help={errors && <span data-testid={`field-error-${field.name}`}>{errors.join(' ')}</span>}
-            >
-              {input(field)}
-            </Form.Item>
-          )
-        })}
+        {sections.map((section, index) => (
+          <Fragment key={index}>
+            {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
+            {section.fields.map(({ field, readOnly }) => {
+              const errors = fieldErrors[field.name]
+              return (
+                <Form.Item
+                  key={field.name}
+                  label={labelOf(field)}
+                  // A child collection is a table, with no single input for the label to point to.
+                  htmlFor={field.type === 'child-collection' ? undefined : field.name}
+                  required={field.required}
+                  validateStatus={errors ? 'error' : undefined}
+                  help={errors && <span data-testid={`field-error-${field.name}`}>{errors.join(' ')}</span>}
+                >
+                  {input(field, readOnly)}
+                </Form.Item>
+              )
+            })}
+          </Fragment>
+        ))}
         <Flex gap="small">
           <Button htmlType="submit" type="primary" loading={saving}>
             {t('shell.form.save')}
@@ -326,9 +368,9 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
           <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
         </Flex>
       </Form>
-      {entity.fields
-        .filter((field) => field.type === 'reference' && field.target)
-        .map((field) => (
+      {shown
+        .filter(({ field, readOnly }) => !readOnly && field.type === 'reference' && field.target)
+        .map(({ field }) => (
           <ReferenceLookup
             key={field.name}
             field={field}

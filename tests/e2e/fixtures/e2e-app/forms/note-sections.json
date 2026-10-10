@@ -1,0 +1,17 @@
+{
+  "id": "7a3e9c10-2b4d-4e6f-8a90-1c2d3e4f5a0b",
+  "kind": "form",
+  "name": "NoteSections",
+  "formatVersion": 1,
+  "entity": "Note",
+  "sections": [
+    {
+      "title": { "textKey": "noteSections.main" },
+      "fields": [{ "field": "title" }, { "field": "code", "readOnly": true }]
+    },
+    {
+      "title": { "textKey": "noteSections.details" },
+      "fields": [{ "field": "priority" }]
+    }
+  ]
+}
