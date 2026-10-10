@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using NpgsqlTypes;
 using Record = Axis.Data.Records.Record;
 
 namespace Axis.Integration.Tests;
@@ -103,16 +104,40 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
-    /// <summary>Inserts a request with a new title, <paramref name="amount"/> and <paramref name="divisor"/>, and returns its id.</summary>
-    public async Task<Guid> InsertRequestAsync(decimal amount, long divisor)
+    /// <summary>
+    /// Inserts a request with a new title, <paramref name="amount"/>, <paramref name="divisor"/> and
+    /// an optional <paramref name="department"/>, and returns its id.
+    /// </summary>
+    public async Task<Guid> InsertRequestAsync(decimal amount, long divisor, Guid? department = null)
     {
         var id = Guid.NewGuid();
         await using var command = DataSource.CreateCommand(
-            $"INSERT INTO {RequestTable} ({Column("id")}, {Column("title")}, {Column("amount")}, {Column("divisor")}) VALUES (@id, @title, @amount, @divisor)");
+            $"""
+            INSERT INTO {RequestTable} ({Column("id")}, {Column("title")}, {Column("amount")}, {Column("divisor")}, {Column("department")})
+            VALUES (@id, @title, @amount, @divisor, @department)
+            """);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("title", $"Request {id:N}");
         command.Parameters.AddWithValue("amount", amount);
         command.Parameters.AddWithValue("divisor", divisor);
+        command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
+        await command.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    /// <summary>Inserts a department with a new name and <paramref name="manager"/>, and returns its id.</summary>
+    public async Task<Guid> InsertDepartmentAsync(string? manager)
+    {
+        Assert.True(Model.TryGetEntity("Department", out var department));
+        var id = Guid.NewGuid();
+        await using var command = DataSource.CreateCommand(
+            $"""
+            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(department.Id))} ({Column("id")}, {Column("name")}, {Column("manager")})
+            VALUES (@id, @name, @manager)
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("name", $"Department {id:N}");
+        command.Parameters.Add(new NpgsqlParameter("manager", NpgsqlDbType.Text) { Value = (object?)manager ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
         return id;
     }
@@ -294,6 +319,33 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return rows;
     }
 
+    /// <summary>The instance's tasks, in the order they were created.</summary>
+    public async Task<IReadOnlyList<TaskRow>> TasksAsync(Guid instanceId)
+    {
+        await using var command = DataSource.CreateCommand(
+            """
+            SELECT id, state, assignee_kind, assignee, form_id, due_at, created_at, due_at - created_at
+            FROM axis.process_tasks WHERE process_instance_id = @id ORDER BY created_at, id
+            """);
+        command.Parameters.AddWithValue("id", instanceId);
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<TaskRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new TaskRow(
+                reader.GetGuid(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetGuid(4),
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
+                reader.GetFieldValue<DateTimeOffset>(6),
+                reader.IsDBNull(7) ? null : reader.GetTimeSpan(7)));
+        }
+
+        return rows;
+    }
+
     /// <summary>The actions of the instance's audit records with the actor <c>system</c>, in the order they were written.</summary>
     public async Task<IReadOnlyList<string>> SystemAuditActionsAsync(Guid instanceId)
     {
@@ -352,3 +404,14 @@ public sealed record HistoryRow(
     string? Decision,
     string? Error,
     bool FinishedAfterStart);
+
+/// <summary>A row of a process instance's tasks. <see cref="DueIn"/> is its <c>due_at</c> minus its <c>created_at</c>.</summary>
+public sealed record TaskRow(
+    Guid Id,
+    string State,
+    string AssigneeKind,
+    string Assignee,
+    Guid FormId,
+    DateTimeOffset? DueAt,
+    DateTimeOffset CreatedAt,
+    TimeSpan? DueIn);

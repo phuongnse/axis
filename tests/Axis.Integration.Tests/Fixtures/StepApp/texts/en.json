@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
-    "request.amountNegative": "The amount cannot be negative."
+    "request.amountNegative": "The amount cannot be negative.",
+    "request.approve": "Approve the request",
+    "requestReview.main": "Request",
+    "task.approve": "Approve"
   }
 }

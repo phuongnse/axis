@@ -16,4 +16,6 @@ public static class AuditActions
     public const string ProcessCompleted = "process.completed";
 
     public const string ProcessFailed = "process.failed";
+
+    public const string TaskCreated = "task.created";
 }

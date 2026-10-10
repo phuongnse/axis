@@ -22,7 +22,7 @@ flowchart LR
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
   It becomes the BFF (OIDC client and cookie session) *(planned for M4)*.
 - **Axis.Worker** executes durable work. So far it runs work items, and
-  through them the `decision`, `operation` and `end` steps of process
+  through them the `decision`, `task`, `operation` and `end` steps of process
   instances. Other process steps, timers, outbox delivery, triggers and
   schedules come later *(planned for M3 and later)*. It loads the same modules
   as the server.
@@ -42,7 +42,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items, decision, operation and end steps (built); running task steps, tasks, outbox, timers (M3)
+  Axis.Processes/         work items, decision, task, operation and end steps (built); task API, outbox, timers (M3)
   Axis.Policy/            roles, policies, evaluation (M4)
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory

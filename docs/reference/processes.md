@@ -8,11 +8,12 @@ built with `decision`, `task`, `operation` and `end` steps, and so are their
 model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
 the `axis.process_instances`, `axis.process_step_history`,
-`axis.process_start_receipts` and `axis.process_work_items` tables are built
-too. So is the engine that runs `decision`, `operation` and `end` steps, see
+`axis.process_tasks`, `axis.process_start_receipts` and
+`axis.process_work_items` tables are built too. So is the engine that runs
+`decision`, `task`, `operation` and `end` steps, see
 [Running a step](#running-a-step). Everything else here is
-*(planned for M3)*: running `task` steps, the task API and the other tables.
-Until the worker runs `task` steps, an instance that reaches one fails.
+*(planned for M3)*: the task API, so a `waiting` instance stays waiting until
+it comes.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -179,7 +180,7 @@ M3 has four step types. Wait for event, timer and sub-process come later.
 
   The step's transaction evaluates the assignee, creates the task as `open`
   and sets the instance to `waiting`. A `user` expression that gives `null`
-  fails the step. Completing the task resumes the instance, see
+  or blank text fails the step. Completing the task resumes the instance, see
   [Task API](#task-api).
 - **`operation`.** M3 has one built-in operation, `updateRecord`. Its `set`
   maps fields of the subject record to expressions, and `next` names the step
@@ -588,9 +589,7 @@ as usual.
 
 ### Running a step
 
-The worker runs the `decision`, `operation` and `end` steps. A `task` step
-compiles, but it fails the instance until the worker runs that type
-*(planned for M3)*. Each work
+The worker runs the `decision`, `task`, `operation` and `end` steps. Each work
 item of kind `process.step` runs the current step of its instance in one
 transaction:
 
@@ -607,12 +606,20 @@ transaction:
      step.
    - An **operation** evaluates each `set` expression on the record. The
      instance stays `running` on its `next` step.
+   - A **task** evaluates its assignee. A `user` expression gives the user id,
+     and one that gives `null`, blank text or a run-time error fails the step.
+     A `role` is the role name. The instance becomes `waiting` on the task
+     step.
    - An **end** step sets the instance to `completed` with its `ended_at` time.
 4. It sets the new state and step, with the next revision, only if the
    instance is still `running` at the revision it loaded. Otherwise another
    transaction changed the instance first. The step then writes nothing else,
    and its work item is deleted, so it never runs again.
-5. An operation then writes the values the way a record update does. Each
+5. A task step then inserts its task into `axis.process_tasks` as `open`. Its
+   `due_at` is the transaction time, `now()`, plus `dueIn`, or null without
+   `dueIn`. `dueIn` is added as a fixed length of time.
+
+   An operation then writes the values the way a record update does. Each
    value must fit its field, and a `null` for a required field is refused.
    Computed fields are recomputed, validations run, and the record's version
    goes up by one. A refused write is an error, keyed and worded as in the
@@ -624,12 +631,15 @@ transaction:
      [record API](record-api.md#audit-records-and-history) writes them.
    - A decision and an operation write `process.stepCompleted` with details
      `{ "step", "next" }`.
+   - A task step writes `task.created` with details `{ "step", "taskId" }`.
    - An end step writes `process.completed` with details `{ "step" }`.
-7. A decision and an operation insert the work item of the next step.
+7. A decision and an operation insert the work item of the next step. A task
+   step inserts none, because the instance waits for the task.
 
 Any exception in the step, such as a `when` that divides by zero, a missing
-subject record or a record write that a validation refuses, rolls all of it
-back, so the record keeps its values and version. The error of a refused write
+subject record, a record write that a validation refuses or a task assignee
+that gives no user, rolls all of it back. So the record keeps its values and
+version, and no task is stored. The error of a refused write
 names each field pointer and message, such as
 `The record update was rejected: /values/amount: request.amountNegative`. A
 following transaction then sets the instance to `failed` with its `ended_at`
@@ -680,7 +690,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "completed" }` for an end step, null for a failed step |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "state": "completed" }` for an end step, null for a failed step |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -693,9 +703,29 @@ database, with history in `axis.__processes_migrations` (see
   database clock. Completed and failed items are deleted.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
-- `axis.process_tasks`: one row per task, with its instance, step,
-  application, assignee kind and value, form, due date, state, outcome, and
-  who completed it and when.
+- `axis.process_tasks`: one row per task. Times use the database clock. An
+  index on application, state, assignee kind and assignee finds the open tasks
+  of a user id or a role name.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID |
+  | `process_instance_id` | `uuid` | The instance |
+  | `process_id` | `uuid` | The process |
+  | `release_id` | `uuid` | The release the instance is pinned to |
+  | `application_id` | `uuid` | The application |
+  | `step` | `text` | The declared name of the task step |
+  | `subject_entity_id` | `uuid` | The subject entity |
+  | `subject_id` | `uuid` | The subject record |
+  | `assignee_kind` | `text` | `user` or `role` |
+  | `assignee` | `text` | The user id that the `user` expression gave, or the role name |
+  | `form_id` | `uuid` | The id of the step's form |
+  | `due_at` | `timestamptz`, null | `created_at` plus `dueIn`, or null when the step has no `dueIn` |
+  | `state` | `text` | `open` or `completed` |
+  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open` |
+  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open` |
+  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open` |
+  | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 
 ## Limits in M3
 
@@ -705,3 +735,5 @@ database, with history in `axis.__processes_migrations` (see
 - **No sign-in until M4.** Tasks cannot be completed in Production before
   sign-in arrives. Processes can be used only in Development and in tests in
   M3.
+- **No user check.** The user id that a `user` assignee gives is not checked
+  against any list of users. A wrong id creates a task that nobody sees.
