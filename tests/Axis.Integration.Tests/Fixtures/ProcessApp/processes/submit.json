@@ -1,0 +1,13 @@
+{
+  "id": "8a3c51e2-6f0d-4b7a-9e14-2c5d7f8b9a03",
+  "kind": "process",
+  "name": "Submit",
+  "formatVersion": 1,
+  "entity": "Request",
+  "startCondition": {
+    "expression": "status is null or status == 'draft'",
+    "message": { "textKey": "request.cannotSubmit" }
+  },
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

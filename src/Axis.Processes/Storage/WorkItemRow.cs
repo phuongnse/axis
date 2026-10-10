@@ -22,4 +22,7 @@ public sealed class WorkItemRow
 
     /// <summary>The token of the current claim, or <see langword="null"/> when the item was never claimed.</summary>
     public Guid? ClaimToken { get; init; }
+
+    /// <summary>The process instance the item runs a step of, or <see langword="null"/> for other work.</summary>
+    public Guid? ProcessInstanceId { get; init; }
 }

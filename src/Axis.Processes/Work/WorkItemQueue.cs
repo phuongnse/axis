@@ -22,25 +22,33 @@ public static class WorkItemQueue
         RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at
         """;
 
-    /// <summary>Adds a ready work item and returns its id.</summary>
+    /// <summary>
+    /// Adds a ready work item and returns its id. <paramref name="processInstanceId"/> names the
+    /// process instance the item runs a step of, when it does.
+    /// </summary>
     public static async Task<Guid> EnqueueAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         string tenantId,
         string kind,
         DateTimeOffset dueAt,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? processInstanceId = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
-            "INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at) VALUES (@id, @tenant, @kind, @due)",
+            """
+            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id)
+            VALUES (@id, @tenant, @kind, @due, @instance)
+            """,
             connection,
             transaction);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("tenant", tenantId);
         command.Parameters.AddWithValue("kind", kind);
         command.Parameters.AddWithValue("due", dueAt.ToUniversalTime());
+        command.Parameters.Add(new NpgsqlParameter("instance", NpgsqlDbType.Uuid) { Value = (object?)processInstanceId ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return id;
     }

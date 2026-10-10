@@ -1,0 +1,11 @@
+{
+  "id": "8a3c51e2-6f0d-4b7a-9e14-2c5d7f8b9a02",
+  "kind": "entity",
+  "name": "Request",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true },
+    { "name": "status", "type": "text" }
+  ]
+}

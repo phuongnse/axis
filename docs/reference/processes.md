@@ -6,9 +6,11 @@ execution, the worker settings and the tables. The `process` resource kind is
 built with `decision` and `end` steps, and so are their
 [compile checks](#compile-checks). A compiled process is part of the release
 model. The worker host, its claims (see [Execution](#execution)), the
-[worker settings](#worker-settings) and the `axis.process_work_items` table are
-built too. Everything else here is *(planned for M3)*: `task` and `operation`
-steps, the start endpoint, the task API, the engine and the other tables.
+[worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
+the `axis.process_instances`, `axis.process_start_receipts` and
+`axis.process_work_items` tables are built too. Everything else here is
+*(planned for M3)*: `task` and `operation` steps, the task API, the engine
+that runs the steps and the other tables.
 Until `task` and `operation` are built, a step of either type is `AXC0004`, so
 the purchase request example below does not compile yet.
 
@@ -137,8 +139,9 @@ the threshold, and ends approved, returned or rejected:
 
 - `entity` names the subject entity. Each instance runs for one record of it.
 - `startCondition` is optional. Its `expression` is a boolean expression over
-  the subject record. A start is allowed only when it is true. Its `message`
-  is a label, shown when a start fails the condition.
+  the subject record. A start is allowed only when it is true. A `false`, a
+  `null` or a run-time error fails the start. Its `message` is a label, shown
+  when a start fails the condition.
 - `start` names the first step.
 - `steps` is an array of step objects. Each has a `name` and a `type`. The
   other properties depend on the type, see [Steps](#steps).
@@ -257,8 +260,35 @@ are problem details, as in the [record API](record-api.md#errors).
 - **`422`.** The `Idempotency-Key` was used before with a different subject
   record.
 
-One transaction pins the active release, inserts the instance and its first
-work item, and stores the receipt for the `Idempotency-Key`.
+The `201` has no `Location` header, because there is no endpoint to read an
+instance yet. Starts have no authorization check until M4, as with record
+writes.
+
+A request is checked in this order, and the first failure is the response:
+
+1. The application and the process, `404`.
+2. The content type, `415`.
+3. The body, `400`.
+4. The `Idempotency-Key` header, `400`.
+
+One transaction then does the rest:
+
+1. With a key, it stores the receipt first. When the key is taken, it rolls
+   back and answers from the stored receipt, or with the `422`.
+2. It reads the subject record, and a missing one is the `400`.
+3. It evaluates the `startCondition` on the record, and a failure is the
+   `400`.
+4. It inserts the instance as `running` at revision 1, pinned to the release
+   that was active when the request was checked. Its next step is the
+   process's `start` step. An instance already running or waiting is the
+   `409`.
+5. It inserts the instance's first work item.
+6. It writes the audit record `process.started` for the subject record, with
+   details `{ "processId", "releaseId" }`. The actor is the signed-in test
+   user, or `anonymous`.
+
+When any part fails, nothing is written. The instance then waits for the
+worker to run its steps.
 
 **`Idempotency-Key`.** The header is optional.
 
@@ -558,14 +588,16 @@ database, with history in `axis.__processes_migrations` (see
 [storage](storage.md)):
 
 - `axis.process_instances`: one row per instance, with its process, subject
-  record, release, state and revision. A partial unique index on
+  record, release, state, revision and `step`, the step it runs next. A
+  partial unique index on
   application, process and subject record, where the state is `running` or
   `waiting`, enforces one start per submission.
 - `axis.process_step_history`: one row per step occurrence, with its input,
   output, decision and error.
 - `axis.process_work_items`: the ready work. Each item has an `id`, its
   `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
-  `claim_token` of its current claim. A worker claims only items of the
+  `claim_token` of its current claim. A step's item also has the
+  `process_instance_id` of its instance. A worker claims only items of the
   tenant it polls and only kinds it has a handler for. Lease times use the
   database clock. Completed and failed items are deleted.
 - `axis.process_start_receipts`: the stored `201` response of each
