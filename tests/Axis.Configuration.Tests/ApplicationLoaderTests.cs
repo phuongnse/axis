@@ -115,6 +115,67 @@ public sealed class ApplicationLoaderTests
     }
 
     [Fact]
+    public void Process_resource_loads_with_its_start_condition_and_steps()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("processes/review.json", Process("""
+                [
+                  { "name": "check", "type": "decision", "branches": [{ "when": "number is null", "next": "done" }], "otherwise": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """));
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var process = Assert.Single(result.Processes);
+        Assert.Equal(
+            (ResourceKinds.Process, "Review", "Order", "check", "processes/review.json"),
+            (process.Kind, process.Name, process.Entity, process.Start, process.File));
+        Assert.Equal(new ProcessStartConditionDefinition { Expression = "number is null", Message = new TextReference("order.cannotStart") }, process.StartCondition);
+        Assert.Equal(["check", "done"], process.Steps.Select(step => step.Name));
+        var check = process.Steps[0];
+        Assert.Equal((ProcessStepDefinition.Decision, "done"), (check.Type, check.Otherwise));
+        Assert.Equal(new DecisionBranchDefinition { When = "number is null", Next = "done" }, Assert.Single(check.Branches!));
+        Assert.Equal((ProcessStepDefinition.End, null, null), (process.Steps[1].Type, process.Steps[1].Branches, process.Steps[1].Otherwise));
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "done", "type": "end", "next": "done" }""", "/steps/0/next", "Property 'next' is not allowed here.")]
+    [InlineData("""{ "name": "done", "type": "end", "otherwise": "done" }""", "/steps/0/otherwise", "Property 'otherwise' is not allowed here.")]
+    [InlineData("""{ "name": "done", "type": "decision", "branches": [], "otherwise": "done" }""", "/steps/0/branches", "Value should have at least 1 items (minItems)")]
+    [InlineData("""{ "name": "done", "type": "decision", "branches": [{ "when": "true", "next": "done" }] }""", "/steps/0", "Required properties [\"otherwise\"] are not present (required)")]
+    public void Process_step_that_does_not_fit_its_type_is_one_schema_violation(string step, string path, string message)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("processes/review.json", Process($"[{step}]"));
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        // The failed "if" of the other step type adds no diagnostic.
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "processes/review.json", path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Empty(result.Processes);
+    }
+
+    [Fact]
+    public void Process_task_step_is_not_built_yet_and_is_a_schema_violation()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("processes/review.json", Process("""[{ "name": "approve", "type": "task", "outcomes": { "approve": "done" } }, { "name": "done", "type": "end" }]"""));
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        Assert.Equal(
+            [(DiagnosticCodes.SchemaViolation, "/steps/0/outcomes"), (DiagnosticCodes.SchemaViolation, "/steps/0/type")],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Empty(result.Processes);
+    }
+
+    [Fact]
     public void Folder_with_every_failure_reports_all_diagnostics_in_one_pass_sorted_by_file_then_path()
     {
         var result = ApplicationLoader.Load(Fixture("broken-app"));
@@ -428,6 +489,12 @@ public sealed class ApplicationLoaderTests
 
     private const string OrderEntity = """
         { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text" }] }
+        """;
+
+    private static string Process(string steps) => $$"""
+        { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Order",
+          "startCondition": { "expression": "number is null", "message": { "textKey": "order.cannotStart" } },
+          "start": "check", "steps": {{steps}} }
         """;
 
     private static void AssertUnlistable(ApplicationLoadResult result, string folderPath)

@@ -2,10 +2,15 @@
 
 Detailed reference for processes: the resource shape, the steps, the compile
 checks, the start endpoint, the instance states, execution, the worker
-settings and the tables. The worker host, its claims (see
-[Execution](#execution)), the [worker settings](#worker-settings) and the
-`axis.process_work_items` table are built. Everything else here is *(planned
-for M3)*.
+settings and the tables. The `process` resource kind is built with `decision`
+and `end` steps, and so are their [compile checks](#compile-checks). A
+compiled process is part of the release model. The worker host, its claims
+(see [Execution](#execution)), the [worker settings](#worker-settings) and the
+`axis.process_work_items` table are built too. Everything else here is
+*(planned for M3)*: `task` and `operation` steps, the start endpoint, the
+engine and the other tables. Until `task` and `operation` are built, a step of
+either type is `AXC0004`, so the purchase request example below does not
+compile yet.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -143,22 +148,33 @@ M3 has four step types. Wait for event, timer and sub-process come later.
 
 ## Compile checks
 
-The compiler reports these as diagnostics. Their codes are assigned when the
-checks are built.
+The compiler reports these as diagnostics. The checks for `decision` and
+`end` steps are built. The rest come with `task` and `operation` steps
+*(planned for M3)*. Every problem of a process is reported in one pass. See
+[the Resolve step](configuration.md#configuration-pipeline) for the details.
 
-- `entity` names a loaded entity that is not a child entity.
-- Step names are unique within the process, ignoring letter case.
-- `start`, every `next`, every branch `next`, `otherwise` and every outcome
-  target name a step of the process.
-- Every step is reachable from `start`.
-- The steps form no cycle. See [Limits in M3](#limits-in-m3).
-- A decision has at least one branch.
-- Each `when` and the `startCondition` expression give a boolean.
-- The fields in an `updateRecord` `set` are fields of the subject entity.
-  None is computed or a child collection. Each expression fits its field's
-  type.
-- An `end` step has no `next`.
-- The `startCondition` message text key exists, checked like other labels.
+- `entity` names a loaded entity (`AXC0067`) that is not a child entity
+  (`AXC0068`).
+- Step names are unique within the process, ignoring letter case
+  (`AXC0069`).
+- `start`, every branch `next` and `otherwise` name a step of the process,
+  ignoring letter case (`AXC0070`). Outcome targets and `next` of an
+  operation join this check *(planned for M3)*.
+- Every step is reachable from `start` (`AXC0071`).
+- Every step has a path to an `end` step (`AXC0072`).
+- The steps form no cycle (`AXC0073`). See [Limits in M3](#limits-in-m3).
+- A decision has at least one branch (`AXC0004`).
+- Each `when` and the `startCondition` expression give a boolean. They see
+  the subject entity's fields, computed ones included, its child collections
+  through aggregates, and the named rules. Reference paths are not resolved
+  yet, so a path is `AXC0046` *(paths planned for M3)*. See
+  [Scope in a process expression](expressions.md#names-and-references).
+- *(planned for M3)* The fields in an `updateRecord` `set` are fields of the
+  subject entity. None is computed or a child collection. Each expression
+  fits its field's type.
+- An `end` step has no `next`, `branches` or `otherwise` (`AXC0004`).
+- The `startCondition` message text key exists, checked like other labels
+  (`AXC0028`).
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 

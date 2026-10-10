@@ -2,7 +2,7 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A <c>rule</c> resource: a named expression with typed parameters and a result type, which
-/// validations call like a function. Its parameters, body and calls are checked by
+/// validations, data source filters and process conditions call like a function. Its parameters, body and calls are checked by
 /// <see cref="Compilation.ApplicationCompiler"/>.
 /// </summary>
 public sealed record RuleResource : Resource
