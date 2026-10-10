@@ -29,9 +29,15 @@ public static class ExpressionInterpreter
     /// throws <see cref="InvalidOperationException"/>. <paramref name="records"/> finds the records
     /// a path reads. A path gives <c>null</c> when a reference along it is <c>null</c> or names no
     /// record. A path evaluated without <paramref name="records"/> is a bug in the caller too.
+    /// <paramref name="now"/> is what <c>now()</c> gives: the start time of the caller's transaction.
+    /// A <c>now()</c> evaluated without it is a bug in the caller too.
     /// </summary>
     public static ExpressionEvaluationResult Evaluate(
-        ExpressionNode expression, ExpressionCheckResult checkResult, ExpressionValues values, ExpressionRecordResolver? records = null)
+        ExpressionNode expression,
+        ExpressionCheckResult checkResult,
+        ExpressionValues values,
+        ExpressionRecordResolver? records = null,
+        DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(checkResult);
@@ -43,7 +49,7 @@ public static class ExpressionInterpreter
 
         try
         {
-            return new ExpressionEvaluationResult(new Evaluator(values, checkResult, new Budget(), records).Eval(expression), null);
+            return new ExpressionEvaluationResult(new Evaluator(values, checkResult, new Budget(), records, now).Eval(expression), null);
         }
         catch (EvaluationFailure failure)
         {
@@ -58,7 +64,11 @@ public static class ExpressionInterpreter
     }
 
     private sealed class Evaluator(
-        ExpressionValues values, ExpressionCheckResult checkResult, Budget budget, ExpressionRecordResolver? records)
+        ExpressionValues values,
+        ExpressionCheckResult checkResult,
+        Budget budget,
+        ExpressionRecordResolver? records,
+        DateTimeOffset? now)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -201,6 +211,9 @@ public static class ExpressionInterpreter
 
                 case "date" or "dateTime":
                     return DateLiteral(call, signature.Name == "date");
+
+                case "now":
+                    return now ?? throw new InvalidOperationException("now() was evaluated without the transaction's time.");
             }
 
             // Every argument is evaluated. A null one then gives null before any error is checked.
@@ -264,7 +277,7 @@ public static class ExpressionInterpreter
             var items = new object?[rows.Count];
             for (var i = 0; i < items.Length; i++)
             {
-                items[i] = new Evaluator(rows[i], checkResult, budget, records).Eval(item);
+                items[i] = new Evaluator(rows[i], checkResult, budget, records, now).Eval(item);
             }
 
             switch (name)
@@ -351,7 +364,7 @@ public static class ExpressionInterpreter
                 arguments[i] = KeyValuePair.Create(parameter.Name, WidenTo(parameter.Type, Eval(call.Arguments[i])));
             }
 
-            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget, records).Eval(rule.Body);
+            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget, records, now).Eval(rule.Body);
             return WidenTo(rule.ResultType, result);
         }
 

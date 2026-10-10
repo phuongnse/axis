@@ -42,6 +42,24 @@ public sealed class ProcessTaskStepTests(ProcessStepFixture fixture) : IClassFix
     }
 
     [Fact]
+    public async Task Task_step_whose_user_expression_uses_now_assigns_the_task_with_the_step_time()
+    {
+        // The assignee is the manager only when now() has a time, so a step that evaluates the
+        // expression without its transaction time fails instead.
+        var department = await fixture.InsertDepartmentAsync("maria");
+        var subjectId = await fixture.InsertRequestAsync(500m, 1, department);
+        var instanceId = await fixture.StartAsync("TimedApprove", subjectId, fixture.FirstReleaseId);
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal((ProcessStarts.Waiting, 2L, "approve", false), await fixture.InstanceAsync(instanceId));
+        var task = Assert.Single(await fixture.TasksAsync(instanceId));
+        Assert.Equal((ProcessTasks.Open, ProcessTasks.UserAssignee, "maria"), (task.State, task.AssigneeKind, task.Assignee));
+        var row = Assert.Single(await fixture.HistoryAsync(instanceId));
+        Assert.Equal(("approve", 1L, null), (row.Step, row.Revision, row.Error));
+    }
+
+    [Fact]
     public async Task Task_step_for_a_role_stores_the_role_name_and_no_due_date_without_due_in()
     {
         var subjectId = await fixture.InsertRequestAsync(500m, 1);

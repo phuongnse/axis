@@ -18,6 +18,8 @@ public sealed class ComputedFieldCompilerTests
         { """{ "name": "total", "type": "decimal", "expression": "quantity *" }""", ExpressionDiagnosticCodes.SyntaxError, "/fields/4/expression", "character" },
         { """{ "name": "due", "type": "date", "expression": "addDays(date('2026-13-45'), quantity)" }""", ExpressionDiagnosticCodes.TypeMismatch, "/fields/4/expression", "'2026-13-45' is not a valid date at character 9." },
         { """{ "name": "state", "type": "enum", "values": ["a", "b"], "expression": "status" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/fields/4/expression", "enum" },
+        // A stored value cannot depend on the current time.
+        { """{ "name": "stamped", "type": "date-time", "expression": "now()" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time at character 1." },
     };
 
     [Theory]
@@ -116,6 +118,8 @@ public sealed class ComputedFieldCompilerTests
     [InlineData("sum(lines, price)", ExpressionDiagnosticCodes.UnknownName, "'price'")]
     [InlineData("sum(quantity, 1)", ExpressionDiagnosticCodes.TypeMismatch, "child collection")]
     [InlineData("if(lines == null, 0, 1)", ExpressionDiagnosticCodes.TypeMismatch, "list<Line>")]
+    // The current time is refused inside the item expression too.
+    [InlineData("count(lines, now() > dateTime('2026-01-01T00:00:00Z'))", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "at character 14.")]
     public void Wrong_aggregate_in_a_computed_field_is_reported_at_its_expression(string expression, string code, string messagePart)
     {
         using var folder = Folder(

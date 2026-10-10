@@ -35,7 +35,7 @@ public sealed record ComputedFieldModel
             throw new ArgumentException($"The computed field does not parse: {parsed.Diagnostic.Message}", nameof(expression));
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected, storedValue: true);
         if (!check.Succeeded)
         {
             throw new ArgumentException($"The computed field does not type-check: {check.Diagnostic.Message}", nameof(expression));

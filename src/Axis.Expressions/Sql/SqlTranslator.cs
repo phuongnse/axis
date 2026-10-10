@@ -197,6 +197,7 @@ public static class SqlTranslator
                 "year" or "month" or "day" => $"((extract({name} from {arguments[0]}))::bigint)",
                 "addDays" => $"({arguments[0]} + ({arguments[1]})::int)",
                 "daysBetween" => $"({arguments[1]} - {arguments[0]})",
+                "now" => "now()",
                 _ => throw NotTranslated(name, call.Offset),
             };
         }

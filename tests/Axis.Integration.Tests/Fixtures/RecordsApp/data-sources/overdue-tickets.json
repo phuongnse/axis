@@ -1,0 +1,13 @@
+{
+  "id": "0e846a72-730b-4dec-9abb-ead8daca9357",
+  "kind": "dataSource",
+  "name": "OverdueTickets",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "dueAt", "path": "dueAt" }
+  ],
+  "filter": "dueAt < now()",
+  "sort": "title"
+}

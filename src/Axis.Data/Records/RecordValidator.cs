@@ -11,7 +11,8 @@ namespace Axis.Data.Records;
 /// validation's text key. When several validations fail on one key, the first in declaration
 /// order is reported. The owner's aggregates read the same rows as <see cref="RecordComputer"/>:
 /// the body's rows of a collection, or the stored rows when an update leaves the collection out.
-/// Rows an update leaves out are not checked again as rows.
+/// Rows an update leaves out are not checked again as rows. <c>now()</c> gives the time the caller
+/// passes, which is the start time of the transaction that writes the record.
 /// </summary>
 public static class RecordValidator
 {
@@ -23,14 +24,15 @@ public static class RecordValidator
         ApplicationModel application,
         EntityModel entity,
         IReadOnlyList<RecordValue> values,
-        IReadOnlyList<RecordRows> rows)
+        IReadOnlyList<RecordRows> rows,
+        DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
 
-        return Validate(application, entity, null, values, rows);
+        return Validate(application, entity, null, values, rows, now);
     }
 
     /// <summary>
@@ -44,7 +46,8 @@ public static class RecordValidator
         EntityModel entity,
         Record? stored,
         IReadOnlyList<RecordValue> values,
-        IReadOnlyList<RecordRows> rows)
+        IReadOnlyList<RecordRows> rows,
+        DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
@@ -55,7 +58,7 @@ public static class RecordValidator
             throw new ArgumentException("An update of an entity with validations needs the stored record.", nameof(stored));
         }
 
-        return Validate(application, entity, stored, values, rows);
+        return Validate(application, entity, stored, values, rows, now);
     }
 
     private static SortedDictionary<string, string[]>? Validate(
@@ -63,7 +66,8 @@ public static class RecordValidator
         EntityModel entity,
         Record? stored,
         IReadOnlyList<RecordValue> values,
-        IReadOnlyList<RecordRows> rows)
+        IReadOnlyList<RecordRows> rows,
+        DateTimeOffset? now)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
 
@@ -93,7 +97,7 @@ public static class RecordValidator
             // A row value that cannot be held exactly stops every validation of the owner.
             if (RecordCollections.TryAdd(application, entity, stored, rows, record, errors))
             {
-                Run(entity, record, "/values", errors);
+                Run(entity, record, "/values", errors, now);
             }
         }
 
@@ -112,7 +116,7 @@ public static class RecordValidator
                     row[value.Field.Name] = (RecordClrValues.FromInput(value, out var exact), exact);
                 }
 
-                Run(collection.Child, row, $"/values/{collection.Collection.Name}/{index}", errors);
+                Run(collection.Child, row, $"/values/{collection.Collection.Name}/{index}", errors, now);
             }
         }
 
@@ -128,7 +132,8 @@ public static class RecordValidator
         EntityModel entity,
         Dictionary<string, (object? Value, bool Exact)> record,
         string prefix,
-        SortedDictionary<string, string[]> errors)
+        SortedDictionary<string, string[]> errors,
+        DateTimeOffset? now)
     {
         var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();
         if (inexact.Count > 0)
@@ -145,7 +150,7 @@ public static class RecordValidator
         var values = new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
         foreach (var validation in entity.Validations)
         {
-            var result = ExpressionInterpreter.Evaluate(validation.Syntax, validation.Check, values);
+            var result = ExpressionInterpreter.Evaluate(validation.Syntax, validation.Check, values, records: null, now: now);
             if (!result.Succeeded || result.Value is not true)
             {
                 errors.TryAdd($"{prefix}/{validation.Field}", [validation.Message.TextKey]);

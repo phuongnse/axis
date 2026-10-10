@@ -17,7 +17,8 @@ public sealed class DataSourceCompilerTests
             { "name": "amount", "type": "decimal" },
             { "name": "customer", "type": "reference", "target": "Customer" },
             { "name": "status", "type": "enum", "values": ["open", "closed"] },
-            { "name": "paid", "type": "boolean" }
+            { "name": "paid", "type": "boolean" },
+            { "name": "dueAt", "type": "date-time" }
           ] }
         """;
 
@@ -377,6 +378,23 @@ public sealed class DataSourceCompilerTests
         Assert.Equal(Filter, filter.Expression);
         Assert.True(filter.Check.Succeeded);
         Assert.Equal("boolean", filter.Check.Type.ToString());
+    }
+
+    [Fact]
+    public void Filter_can_compare_a_field_with_the_current_time()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "filter": "dueAt < now()" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var filter = Assert.Single(result.Model.DataSources).Filter;
+        Assert.NotNull(filter);
+        Assert.True(filter.Check.Succeeded);
     }
 
     [Fact]

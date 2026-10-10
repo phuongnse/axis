@@ -38,6 +38,8 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("DATETIME('2026-10-08T09:30:00Z')", "date-time")]
     [InlineData("date('2026-02-28')", "date")]
     [InlineData("dateTime('2026-10-08T09:30:00+07:00')", "date-time")]
+    [InlineData("now()", "date-time")]
+    [InlineData("NOW()", "date-time")]
     // Arithmetic: integers stay integers, a decimal on either side gives a decimal.
     [InlineData("i + i", "integer")]
     [InlineData("i - 1", "integer")]
@@ -58,6 +60,8 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("dt >= dt", "boolean")]
     [InlineData("dt < date('2026-10-08')", "boolean")]
     [InlineData("ts > dateTime('2026-10-08T09:30:00Z')", "boolean")]
+    [InlineData("now() > dateTime('2020-01-01T00:00:00Z')", "boolean")]
+    [InlineData("ts <= now()", "boolean")]
     // Equality on two values of the same type, with integers widening to decimals.
     [InlineData("t == 'a'", "boolean")]
     [InlineData("i == d", "boolean")]
@@ -164,12 +168,44 @@ public sealed class ExpressionTypeCheckerTests
     [Theory]
     [InlineData("date('a', 'b')", "Function 'date' needs 1 argument, found 2 at character 1.")]
     [InlineData("dateTime()", "Function 'dateTime' needs 1 argument, found 0 at character 1.")]
+    [InlineData("now(1)", "Function 'now' needs 0 arguments, found 1 at character 1.")]
     public void A_date_literal_with_the_wrong_argument_count_is_reported(string text, string message)
     {
         var diagnostic = CheckFails(text, ExpressionType.Null);
 
         Assert.Equal(ExpressionDiagnosticCodes.WrongArgumentCount, diagnostic.Code);
+        Assert.Equal(0, diagnostic.Offset);
         Assert.Equal(message, diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("now()", 0)]
+    [InlineData("coalesce(ts, now())", 13)]
+    public void Now_in_a_stored_value_is_reported_at_the_call(string text, int offset)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.DateTime, storedValue: true).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.CurrentTimeInStoredValue, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal(
+            $"Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time at character {offset + 1}.",
+            diagnostic.Message);
+    }
+
+    [Fact]
+    public void Now_in_the_item_of_an_aggregate_of_a_stored_value_is_reported_at_the_call()
+    {
+        var parsed = ExpressionParser.Parse("max(lineItems, now())");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var stored = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.DateTime, storedValue: true);
+        var notStored = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.DateTime);
+
+        Assert.Equal((ExpressionDiagnosticCodes.CurrentTimeInStoredValue, 15), (stored.Diagnostic?.Code, stored.Diagnostic?.Offset));
+        Assert.Equal(ExpressionType.DateTime, notStored.Type);
     }
 
     [Theory]

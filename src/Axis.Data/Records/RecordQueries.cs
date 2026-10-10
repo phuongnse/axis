@@ -88,6 +88,21 @@ public static class RecordQueries
         new("search", NpgsqlDbType.Text) { Value = search };
 
     /// <summary>
+    /// Reads the start time of the current transaction, which is what <c>now()</c> gives in an
+    /// expression. Call it inside the caller's transaction, so it is that transaction's time.
+    /// </summary>
+    public static async Task<DateTimeOffset> TransactionTimeAsync(
+        NpgsqlConnection connection, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand("SELECT now()", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return reader.GetFieldValue<DateTimeOffset>(0);
+    }
+
+    /// <summary>
     /// Reads the record with <paramref name="id"/> and the rows of its child collections, or
     /// <see langword="null"/> when there is none. <paramref name="application"/> declares the child entities.
     /// </summary>

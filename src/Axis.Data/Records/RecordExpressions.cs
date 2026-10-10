@@ -21,6 +21,7 @@ public static class RecordExpressions
     /// reference that names no record gives <c>null</c>. A stored decimal that <see cref="decimal"/>
     /// cannot hold exactly, on the record or on a record a path reads, stops the evaluation with a
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as no value is rounded.
+    /// <c>now()</c> gives <paramref name="now"/>, which is the start time of the caller's transaction.
     /// </summary>
     public static async Task<ExpressionEvaluationResult> EvaluateAsync(
         NpgsqlConnection connection,
@@ -28,6 +29,7 @@ public static class RecordExpressions
         EntityModel entity,
         Record record,
         ExpressionModel expression,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -131,7 +133,8 @@ public static class RecordExpressions
             expression.Syntax,
             expression.Check,
             new ExpressionValues(subject.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
-            Resolve);
+            Resolve,
+            now);
     }
 
     /// <summary>The field names of a path's target, from the subject's field to the last reference, such as <c>department, manager</c>.</summary>

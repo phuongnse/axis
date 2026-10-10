@@ -182,6 +182,7 @@ public sealed class RuleCompilerTests
     // An aggregate is a built-in function too.
     [InlineData("sum")]
     [InlineData("Count")]
+    [InlineData("now")]
     public void A_rule_named_like_a_built_in_function_is_reported_at_its_name(string name)
     {
         using var folder = Folder(null).With($"rules/{name}.json", Rule("66666666-6666-4666-8666-666666666606", name, "value > 0"));
@@ -235,6 +236,26 @@ public sealed class RuleCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.SchemaViolation, "rules/status.json", "/parameters/0/type"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_rule_can_give_the_current_time()
+    {
+        using var folder = Folder("Stamp() > dateTime('2020-01-01T00:00:00Z')").With("rules/stamp.json", """
+            { "id": "66666666-6666-4666-8666-666666666607", "kind": "rule", "name": "Stamp", "formatVersion": 1,
+              "parameters": [], "resultType": "date-time", "expression": "now()" }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        var validation = Assert.Single(order.Validations);
+        var now = new DateTimeOffset(2026, 10, 10, 8, 30, 0, TimeSpan.Zero);
+        var evaluated = ExpressionInterpreter.Evaluate(
+            validation.Syntax, validation.Check, new ExpressionValues([KeyValuePair.Create("quantity", (object?)1L)]), now: now);
+        Assert.Equal(true, evaluated.Value);
     }
 
     [Fact]

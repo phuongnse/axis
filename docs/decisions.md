@@ -414,7 +414,8 @@ of process steps and task decisions, and record history, are
   `PR-{yyyy}-{n:5}`. See
   [configuration](reference/configuration.md#sequences).
   - The counter restarts each UTC year, but only when the format has
-    `{yyyy}`. The year is UTC until applications have a time zone.
+    `{yyyy}`. The year is UTC
+    [until applications have a time zone](#d22-current-time-and-time-zones--agreed).
   - An entity `text` field names a `sequence`. Its value is assigned on
     create, and clients cannot write it.
   - The counter row is locked and updated in the caller's transaction, so a
@@ -427,3 +428,38 @@ actor to record and a trail that cannot be rewritten. Real authentication
 waits for M4, so a fixed list of test users stands in, and it must never
 reach Production. Business numbers come from the same transaction as the
 record, so they never repeat and never skip.
+
+## D22. Current time and time zones — Agreed
+
+The expression function `now()` gives the current time as a `date-time`. It is
+an instant, so it never depends on a time zone. See
+[expressions](reference/expressions.md#functions).
+
+- **One value per transaction:** every `now()` in one database transaction
+  gives the same value, the transaction's start time.
+  - A process step uses the step's transaction. That covers its decision
+    branches, its `updateRecord` values and a task's `assignee.user`. The
+    value is the same instant as the step history's `started_at`.
+  - A start condition uses the start transaction.
+  - A validation uses the transaction that writes the record.
+  - A data source filter uses the query. It is translated to SQL as
+    PostgreSQL's `now()`.
+  - A rule uses the transaction of whatever calls it.
+- **Both back ends agree:** the interpreter and the SQL translation give the
+  same value for `now()` in one transaction.
+- **Not in computed fields:** a computed field's value is stored, so it would
+  go stale. `now()` in a computed field, including inside an aggregate's item
+  expression, is `AXC0086` at the call.
+
+**Waits for a time zone rule.** Applications have no time zone yet, and the
+rule has no milestone. These wait for it:
+
+- `today()`, and taking a date from a `date-time`.
+- Calendar durations in a task's `dueIn`, such as `P1M` and `P1Y`. They are
+  `AXC0084` for now.
+- The local year in a sequence's `{yyyy}`, which is UTC today.
+
+*Why:* processes need the time of a step, for example to set `submittedAt`.
+One value per transaction keeps every expression in a step consistent with
+the step's own record. An instant needs no time zone, so `now()` can come
+first, and everything that does need one waits for a single rule.

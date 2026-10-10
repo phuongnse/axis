@@ -80,6 +80,8 @@ public sealed class SqlTranslatorTests
         },
         { "addDays(dt, 3) > dt", "((\"dt\" + (@f0)::int) > \"dt\")", [("f0", ExpressionTypeKind.Integer, 3L)] },
         { "daysBetween(dt, date('2026-10-08')) == 1", "((@f0 - \"dt\") IS NOT DISTINCT FROM @f1)", [("f0", ExpressionTypeKind.Date, new DateOnly(2026, 10, 8)), ("f1", ExpressionTypeKind.Integer, 1L)] },
+        // now() is PostgreSQL's transaction start time, with no parameter.
+        { "ts < now()", "(\"ts\" < now())", [] },
     };
 
     [Theory]

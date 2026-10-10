@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using static Axis.Integration.Tests.RecordApiFixture;
@@ -6,11 +7,13 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The validations of the RecordsApp fixture: an item's quantity is positive, its price is not
-/// negative, a closed item is not active, and a part name does not start with a space.
+/// negative, a closed item is not active, and a part name does not start with a space. A
+/// ticket's due time is in the future.
 /// </summary>
 public sealed class RecordValidationEndpointTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
     private const string Items = "/api/apps/RecordsApp/entities/Item/records";
+    private const string Tickets = "/api/apps/RecordsApp/entities/Ticket/records";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -105,6 +108,25 @@ public sealed class RecordValidationEndpointTests(RecordApiFixture fixture) : IC
         using var problem = await PatchAsync(id, """{ "version": 1, "values": { "quantity": 4 } }""", HttpStatusCode.Conflict);
 
         Assert.False(problem.RootElement.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task Validation_that_compares_with_now_refuses_a_past_time_and_accepts_a_future_one()
+    {
+        await fixture.ResetAsync();
+        // A day either side, so clock skew between the test and the database cannot flip the result.
+        var past = DateTimeOffset.UtcNow.AddDays(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        var future = DateTimeOffset.UtcNow.AddDays(1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+
+        using var refused = Request(HttpMethod.Post, Tickets, HostA, $$"""{ "values": { "title": "Late", "dueAt": "{{past}}" } }""");
+        using var refusedResponse = await fixture.Client.SendAsync(refused, CancellationToken);
+        using var problem = await ReadProblemAsync(refusedResponse, HttpStatusCode.BadRequest);
+        Assert.Equal([("/values/dueAt", "ticket.dueInPast")], Errors(problem));
+
+        using var accepted = Request(HttpMethod.Post, Tickets, HostA, $$"""{ "values": { "title": "On time", "dueAt": "{{future}}" } }""");
+        using var acceptedResponse = await fixture.Client.SendAsync(accepted, CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, acceptedResponse.StatusCode);
+        Assert.Equal(1, (await fixture.TableShapeAsync(TenantA, "Ticket")).RowCount);
     }
 
     private async Task<string> CreateItemAsync(string values)
