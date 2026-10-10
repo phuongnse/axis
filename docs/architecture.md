@@ -21,9 +21,9 @@ flowchart LR
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
   It becomes the BFF (OIDC client and cookie session) *(planned for M4)*.
-- **Axis.Worker** *(planned for M3)* executes durable work: process steps,
-  timers, outbox delivery, triggers and schedules. It loads the same modules
-  as the server.
+- **Axis.Worker** executes durable work. So far it runs work items. Process
+  steps, timers, outbox delivery, triggers and schedules come later *(planned
+  for M3 and later)*. It loads the same modules as the server.
 - **Platform database** stores installation-level data: the tenant directory
   and platform settings *(tenant directory planned for M9; tenants come from
   server configuration until then)*.
@@ -35,7 +35,7 @@ flowchart LR
 ```text
 src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
-  Axis.Worker/            background host (M3)
+  Axis.Worker/            background host
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -58,9 +58,9 @@ Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
 checker, interpreter and SQL translation), `Axis.Presentation` (the platform site, its texts and the
-shapes of application site metadata), `Axis.Tenancy`, the test projects and
-`web/`. `Axis.Worker`,
-`Axis.Processes` and `Axis.Policy` do not exist yet.
+shapes of application site metadata), `Axis.Processes` (work items only so
+far), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
+`Axis.Policy` does not exist yet.
 
 ## Module rules
 
@@ -96,7 +96,7 @@ Moved to [reference/record-api.md](reference/record-api.md).
 ## Tenancy (D10)
 
 - **Resolution.** `TenantContext` is resolved from the request host. For
-  background jobs it is resolved from the job's tenant ID *(planned for M3)*.
+  background work it is set from the work item's tenant ID.
 - **Connections.** A connection factory returns connections only for the
   current tenant. Without a tenant context, data access fails.
 - **Scoping.** Cache keys, file storage paths, job records and log scopes all
@@ -228,7 +228,8 @@ They exist only in development and tests, never in Production.
 
   A revision mismatch aborts the transaction.
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
-  lease. Commits check the claim token (fencing).
+  lease. Commits check the claim token (fencing). Claims and fencing are
+  built for work items.
 - **External operations.** These run outside the transaction, using the
   operation identity as their idempotency key. The result is recorded by a
   following transaction.

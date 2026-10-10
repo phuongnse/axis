@@ -358,8 +358,8 @@ development or E2E server serves a real application without a separate step.
   empty the step does not run. That is the default, and so the Production
   behaviour.
 - **Order.** Tenants are processed in ordinal order of their id. For each
-  tenant, the step applies the configuration and data migrations to the
-  tenant database, then compiles each listed folder against that database and
+  tenant, the step applies the configuration, data and processes migrations
+  to the tenant database, then compiles each listed folder against that database and
   activates the release, in the listed order. The same folders apply to
   every tenant.
 - **Before listening.** The step runs before any hosted service starts, so
