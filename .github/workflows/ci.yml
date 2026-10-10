@@ -1,9 +1,11 @@
 name: CI
 
+# A push to any branch runs CI, so hand-made pull requests show its result. NexKit's
+# branches are left out: NexKit runs the same scripts as its own checks, and its pushes and
+# pull requests use the Actions token, which starts no workflow or waits for approval.
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches-ignore: ['nexkit/**']
   # NexKit starts CI on main after it merges, because its merge starts no push workflow.
   workflow_dispatch:
 

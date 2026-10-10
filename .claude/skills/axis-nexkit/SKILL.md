@@ -103,8 +103,8 @@ Check CI on `main` after each merge. NexKit starts it with `workflow_dispatch`:
 gh run list --workflow ci.yml --branch main --limit 5 --json databaseId,event,conclusion,headSha,url
 ```
 
-The CI workflow on a NexKit pull request waits as `action_required`, because
-NexKit opens it with the Actions token. It is not a required check, so leave it.
+The CI workflow does not run on NexKit branches; NexKit's checks run the same
+scripts there.
 
 Split an issue that reports `too_large`. Create each part with
 `gh issue create --milestone "<parent's milestone>"`, then add the parts to the
