@@ -9,6 +9,9 @@ public sealed record ProcessStepDefinition
 {
     public const string Decision = "decision";
 
+    /// <summary>The <c>task</c> step type: a human task that waits for a person to complete it with one of its outcomes.</summary>
+    public const string TaskStep = "task";
+
     /// <summary>The <c>operation</c> step type. <see cref="Operation"/> is the operation the step runs.</summary>
     public const string OperationStep = "operation";
 
@@ -19,7 +22,7 @@ public sealed record ProcessStepDefinition
 
     public required string Name { get; init; }
 
-    /// <summary>The step type: <c>decision</c>, <c>operation</c> or <c>end</c>.</summary>
+    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>.</summary>
     public required string Type { get; init; }
 
     /// <summary>The ordered branches of a decision, or null for any other step.</summary>
@@ -39,4 +42,22 @@ public sealed record ProcessStepDefinition
 
     /// <summary>The step an operation step leads to, or null for any other step.</summary>
     public string? Next { get; init; }
+
+    /// <summary>The label of a task, shown in the task inbox and on the task page, or null for any other step.</summary>
+    public TextReference? Label { get; init; }
+
+    /// <summary>Who a task is assigned to, or null for any other step.</summary>
+    public TaskAssigneeDefinition? Assignee { get; init; }
+
+    /// <summary>The form a task shows over the subject record, or null for any other step.</summary>
+    public string? Form { get; init; }
+
+    /// <summary>
+    /// The ISO 8601 duration from a task's creation to its due date, or null when the task has no
+    /// due date or for any other step.
+    /// </summary>
+    public string? DueIn { get; init; }
+
+    /// <summary>The outcomes a task is completed with, in file order, or null for any other step.</summary>
+    public IReadOnlyList<TaskOutcomeDefinition>? Outcomes { get; init; }
 }

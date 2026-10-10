@@ -6,8 +6,9 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled process: its subject entity, its optional start condition, its first step and its
 /// steps. Every transition names a step of the process by its declared name, every condition
-/// is a boolean expression checked over the subject entity's fields and the named rules, and every
-/// value an operation sets is checked against its field's type over the same scope.
+/// is a boolean expression checked over the subject entity's fields and the named rules, every
+/// value an operation sets is checked against its field's type over the same scope, and a task's
+/// <c>user</c> assignee is a <c>text</c> expression over that scope too.
 /// </summary>
 public sealed record ProcessModel
 {
@@ -52,6 +53,28 @@ public sealed record DecisionStepModel(string Name, IReadOnlyList<DecisionBranch
 
 /// <summary>A branch of a decision: its boolean condition and the declared name of the step it leads to.</summary>
 public sealed record DecisionBranchModel(ExpressionModel When, string Next);
+
+/// <summary>
+/// A human task: a person assigned through <see cref="Assignee"/> completes it on
+/// <see cref="Form"/>, shown over the subject record, with one of its <see cref="Outcomes"/>.
+/// <see cref="DueIn"/> is the time from the task's creation to its due date, or null when it has none.
+/// </summary>
+public sealed record TaskStepModel(
+    string Name,
+    TextReference Label,
+    TaskAssigneeModel Assignee,
+    FormReference Form,
+    TimeSpan? DueIn,
+    IReadOnlyList<TaskOutcomeModel> Outcomes) : ProcessStepModel(Name);
+
+/// <summary>
+/// The assignee of a task: exactly one of <see cref="User"/>, a <c>text</c> expression over the
+/// subject record that gives a user id, and <see cref="Role"/>, a role name.
+/// </summary>
+public sealed record TaskAssigneeModel(ExpressionModel? User, string? Role);
+
+/// <summary>An outcome of a task: its name, its label and the declared name of the step it leads to.</summary>
+public sealed record TaskOutcomeModel(string Name, TextReference Label, string Next);
 
 /// <summary>
 /// An operation step. M3 has one operation, <c>updateRecord</c>: it sets each field in

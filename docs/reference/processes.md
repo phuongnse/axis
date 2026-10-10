@@ -3,7 +3,7 @@
 Detailed reference for processes: the resource shape, the steps, the compile
 checks, the start endpoint, the instance and task states, the task API,
 execution, the worker settings and the tables. The `process` resource kind is
-built with `decision`, `operation` and `end` steps, and so are their
+built with `decision`, `task`, `operation` and `end` steps, and so are their
 [compile checks](#compile-checks). A compiled process is part of the release
 model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
@@ -11,9 +11,8 @@ the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_start_receipts` and `axis.process_work_items` tables are built
 too. So is the engine that runs `decision`, `operation` and `end` steps, see
 [Running a step](#running-a-step). Everything else here is
-*(planned for M3)*: `task` steps, the task API and the other tables.
-Until `task` is built, a step of that type is `AXC0004`, so the purchase
-request example below does not compile yet.
+*(planned for M3)*: running `task` steps, the task API and the other tables.
+Until the worker runs `task` steps, an instance that reaches one fails.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -168,8 +167,11 @@ M3 has four step types. Wait for event, timer and sub-process come later.
     Queues come later.
   - `form` names a [form resource](frontend.md) whose entity is the subject
     entity. The task page shows it over the subject record.
-  - `dueIn` is optional. It is a positive ISO 8601 duration, such as `P3D`.
-    The task's due date is the time the task is created plus `dueIn`. It is
+  - `dueIn` is optional. It is a positive ISO 8601 duration in whole
+    numbers: either weeks, such as `P2W`, or days with an optional time part
+    of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
+    and months are `AXC0084` until calendar durations come with the time zone
+    rule, because they have no fixed length. The task's due date is the time the task is created plus `dueIn`. It is
     shown only. Escalation needs timers, so it comes later.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
@@ -190,18 +192,17 @@ M3 has four step types. Wait for event, timer and sub-process come later.
 
 ## Compile checks
 
-The compiler reports these as diagnostics. The checks for `decision`,
-`operation` and `end` steps are built. The rest come with `task` steps
-*(planned for M3)*. Every problem of a process is reported in one pass. See
+The compiler reports these as diagnostics. Every problem of a process is
+reported in one pass. See
 [the Resolve step](configuration.md#configuration-pipeline) for the details.
 
 - `entity` names a loaded entity (`AXC0067`) that is not a child entity
   (`AXC0068`).
 - Step names are unique within the process, ignoring letter case
   (`AXC0069`).
-- `start`, every branch `next`, `otherwise` and the `next` of an operation
-  name a step of the process, ignoring letter case (`AXC0070`). Outcome
-  targets join this check *(planned for M3)*.
+- `start`, every branch `next`, `otherwise`, the `next` of an operation and
+  every outcome `next` of a task name a step of the process, ignoring letter
+  case (`AXC0070`).
 - Every step is reachable from `start` (`AXC0071`).
 - Every step has a path to an `end` step (`AXC0072`).
 - The steps form no cycle (`AXC0073`). See [Limits in M3](#limits-in-m3).
@@ -223,21 +224,30 @@ The compiler reports these as diagnostics. The checks for `decision`,
   expression code, such as `AXC0048` for a value of the wrong type.
 - An operation has `operation`, a `set` with at least one field and `next`,
   and no `branches` or `otherwise`. A decision has no `operation`, `set` or
-  `next` (`AXC0004`).
-- An `end` step has no `next`, `branches`, `otherwise`, `operation` or `set`
-  (`AXC0004`).
-- *(planned for M3)* A task's `assignee` has exactly one of `user` and
-  `role`. A `user` expression gives `text`. A `role` is a non-empty name.
-- *(planned for M3)* A task's `form` names a loaded form whose entity is the
-  subject entity.
-- *(planned for M3)* A task's `dueIn`, when set, parses as a positive ISO 8601
-  duration.
-- *(planned for M3)* A task has at least one outcome. Outcome names are
-  unique within the step, ignoring letter case.
+  `next`. Neither has a task's `label`, `assignee`, `form`, `dueIn` or
+  `outcomes` (`AXC0004`).
+- A task has `label`, `assignee`, `form` and at least one outcome, and no
+  `branches`, `otherwise`, `operation`, `set` or `next` (`AXC0004`).
+- An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set` or
+  any task property (`AXC0004`).
+- A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
+  `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). Whether
+  the role exists is not checked, as roles come in M4.
+- A `user` expression gives `text`, with the same scope as a `when`. A
+  problem is reported at `/steps/{i}/assignee/user` with its expression code,
+  such as `AXC0048` for a number.
+- A task's `form` names a loaded form (`AXC0082`) whose entity is the subject
+  entity (`AXC0083`). Each is reported at `/steps/{i}/form`.
+- A task's `dueIn`, when set, is a positive ISO 8601 duration in whole
+  numbers: either weeks, such as `P2W`, or days with an optional time part
+  of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
+  and months are not allowed until calendar durations come with the time
+  zone rule (`AXC0084` at `/steps/{i}/dueIn`).
+- Outcome names are unique within the step, ignoring letter case (`AXC0085`
+  at `/steps/{i}/outcomes/{j}/name`).
 - The `startCondition` message text key exists, checked like other labels
-  (`AXC0028`).
-  *(planned for M3)* So do the text keys of each task `label` and each
-  outcome `label`.
+  (`AXC0028`). So do the text keys of each task `label` and each outcome
+  `label`.
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 
@@ -579,7 +589,8 @@ as usual.
 ### Running a step
 
 The worker runs the `decision`, `operation` and `end` steps. A `task` step
-fails the instance until that type is built *(planned for M3)*. Each work
+compiles, but it fails the instance until the worker runs that type
+*(planned for M3)*. Each work
 item of kind `process.step` runs the current step of its instance in one
 transaction:
 

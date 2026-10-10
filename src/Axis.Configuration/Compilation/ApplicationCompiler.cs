@@ -117,6 +117,8 @@ public static class ApplicationCompiler
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
             loaded.UnloadedEntityNames,
+            FindForm,
+            loaded.UnloadedFormNames,
             textKeys,
             rules,
             diagnostics);
@@ -137,7 +139,7 @@ public static class ApplicationCompiler
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, rules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
         };
         return result with

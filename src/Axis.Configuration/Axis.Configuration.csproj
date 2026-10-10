@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Configuration.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Schemas\*.schema.json" LogicalName="Axis.Configuration.Schemas.%(Filename)%(Extension)" />
   </ItemGroup>
 

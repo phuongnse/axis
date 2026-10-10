@@ -171,16 +171,17 @@ flowchart LR
      `entity` that is a child entity is `AXC0068` at `/entity`, naming the
      owner. Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
-     step. `start`, each branch `next`, each `otherwise` and each operation
-     `next` must name a step, ignoring letter case, otherwise it is `AXC0070`
-     at that property. A
+     step. `start`, each branch `next`, each `otherwise`, each operation
+     `next` and each task outcome `next` must name a step, ignoring letter
+     case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
      `AXC0072` at `/steps/{i}`. A step with a transition to an unknown step
      is not also `AXC0072`. A transition that closes a cycle is `AXC0073` at
      that transition, naming the steps in the cycle. The steps are walked in
-     file order, with the branches before `otherwise`. A step whose name is
+     file order, with the branches, then `otherwise`, then `next`, then the
+     outcomes. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
      `startCondition` expression and each decision `when` are parsed and
      type-checked as a boolean over the entity's fields, computed ones
@@ -197,11 +198,24 @@ flowchart LR
      A computed field, a sequence field or a child collection is `AXC0080`.
      Each `set` expression is parsed and type-checked against its field's
      type, with the same scope as a `when`. Each of these is reported at
-     `/steps/{i}/set/{field}`. A decision with no branches, an operation
-     without `operation`, `set` or `next`, and an `end` step with
-     `branches`, `otherwise` or any other property, are `AXC0004`. Only
-     `decision`, `operation` and `end` steps are built: a `task` step is
-     `AXC0004`. See [processes](processes.md#compile-checks).
+     `/steps/{i}/set/{field}`. A task step's `assignee` without exactly one
+     of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. Whether a
+     `role` exists is not checked. A `user` expression is parsed and
+     type-checked as `text`, with the same scope as a `when`, and a problem is
+     reported at `/steps/{i}/assignee/user`. A task's `form` that names no
+     loaded form, ignoring letter case, is `AXC0082` at `/steps/{i}/form`. A
+     name whose form file was not loaded because of its own errors is not
+     reported again. A form over another entity than the process's is
+     `AXC0083` at `/steps/{i}/form`. It is not checked when either entity is
+     unknown. A `dueIn` that is not a positive whole-number duration is
+     `AXC0084` at `/steps/{i}/dueIn`. A later outcome with a name already
+     used in the step, ignoring letter case, is `AXC0085` at
+     `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
+     `label` join the `AXC0028` check. A decision with no branches, an
+     operation without `operation`, `set` or `next`, a task without `label`,
+     `assignee`, `form` or an outcome, and an `end` step with `branches`,
+     `otherwise` or any other property, are `AXC0004`. See
+     [processes](processes.md#compile-checks).
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -412,10 +426,10 @@ sorted by file and then path.
 | `AXC0067` | A process's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
 | `AXC0068` | A process's `entity` is a child entity. Reported at `/entity`, naming the owner. |
 | `AXC0069` | An earlier step of the same process already uses this `name`, ignoring letter case. Reported at `/steps/{i}/name` of the later step, naming the first one. The later step is left out of `AXC0071`, `AXC0072` and `AXC0073`. |
-| `AXC0070` | A process's `start`, a branch `next`, an `otherwise` or an operation's `next` names no step of the process, ignoring letter case. Reported at that property, such as `/start`, `/steps/{i}/branches/{j}/next` or `/steps/{i}/next`. |
+| `AXC0070` | A process's `start`, a branch `next`, an `otherwise`, an operation's `next` or a task outcome's `next` names no step of the process, ignoring letter case. Reported at that property, such as `/start`, `/steps/{i}/branches/{j}/next`, `/steps/{i}/next` or `/steps/{i}/outcomes/{j}/next`. |
 | `AXC0071` | A process step cannot be reached from `start`. Reported at `/steps/{i}`. Not checked when `start` names no step. |
 | `AXC0072` | A process step has no path to an `end` step. Reported at `/steps/{i}`. Not reported for a step with a transition to an unknown step, which is already `AXC0070`. |
-| `AXC0073` | Process steps form a cycle, such as a → b → a. Reported at the transition that closes the cycle, walking the steps in file order and each step's branches before its `otherwise`. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3). |
+| `AXC0073` | Process steps form a cycle, such as a → b → a. Reported at the transition that closes the cycle, walking the steps in file order and each step's transitions in order: the branches, then `otherwise`, then `next`, then the outcomes. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3). |
 | `AXC0074` | A form's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
@@ -423,6 +437,11 @@ sorted by file and then path.
 | `AXC0078` | A process operation step's `operation` is not `updateRecord`, matched exactly. Reported at `/steps/{i}/operation`. Its `set` is then not checked. |
 | `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
+| `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
+| `AXC0082` | A process task step's `form` names no loaded form, ignoring letter case. Reported at `/steps/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
+| `AXC0083` | A process task step's `form` is over another entity than the process's subject entity. Reported at `/steps/{i}/form`, naming both entities. Not checked when either entity is unknown. |
+| `AXC0084` | A process task step's `dueIn` is not a positive ISO 8601 duration in the accepted form: whole-number weeks (`W`), or days (`D`) with an optional `T` part of hours (`H`), minutes (`M`) and seconds (`S`), such as `P2W`, `P3D`, `PT4H` or `P1DT12H`. Years and months are `AXC0084` until calendar durations come with the time zone rule, because they have no fixed length. Reported at `/steps/{i}/dueIn`. |
+| `AXC0085` | An earlier outcome of the same task step already uses this `name`, ignoring letter case. Reported at `/steps/{i}/outcomes/{j}/name` of the later outcome, naming the first one. |
 
 ## Startup activation
 
