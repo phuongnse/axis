@@ -100,6 +100,12 @@ works on a fresh clone:
   to the server.
 - `dotnet watch` applies C# changes, or restarts the server or the worker without
   a prompt when it cannot. Vite applies SPA changes.
+- A change to any `*.json` file under an activated application folder restarts the
+  server once, and the server activates the edited configuration again. The
+  script watches the `ActivateOnStartup` folders itself, and prints a `[dev]` line
+  when it restarts the server. The worker and the SPA keep running. If the edited
+  configuration does not activate, the server exits on its own and the script stops
+  with a non-zero code.
 - `AXIS_POSTGRES_PORT`, `AXIS_SERVER_PORT` and `AXIS_WEB_PORT` move the three
   ports. The defaults are 5432, 5206 and 5173. When `AXIS_POSTGRES_PORT` is set,
   the script points the server's connection strings and the worker's
