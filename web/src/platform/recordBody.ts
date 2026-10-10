@@ -14,8 +14,8 @@ export function isJsonNumber(text: string): boolean {
  * decimal goes out as the typed text, with every digit. Text that is not a JSON number goes out as
  * a JSON string, and the server rejects it on its field. Values are written in field declaration
  * order, and `version` only when it is given. A child collection goes out as its whole row list,
- * each row with its non-null child fields in declaration order. A computed field is never sent,
- * because the server sets it and rejects a body that does.
+ * each row with its non-null child fields in declaration order. A computed or sequence field is
+ * never sent, because the server sets it and rejects a body that does.
  */
 export function buildRecordBody(
   fields: readonly FieldMetadata[],
@@ -23,7 +23,7 @@ export function buildRecordBody(
   version?: number,
 ): string {
   const entries = fields
-    .filter((field) => !field.computed && Object.hasOwn(values, field.name))
+    .filter((field) => !field.computed && !field.sequence && Object.hasOwn(values, field.name))
     .map((field) => `${JSON.stringify(field.name)}:${fieldText(field, values[field.name])}`)
   const versionText = version === undefined ? '' : `"version":${String(version)},`
   return `{${versionText}"values":{${entries.join(',')}}}`
@@ -39,7 +39,7 @@ function fieldText(field: FieldMetadata, value: FieldValue): string {
 // A row is read like a create body, so a field left out is stored as null.
 function rowText(fields: readonly FieldMetadata[], row: RecordRow): string {
   const entries = fields
-    .filter((field) => !field.computed && (row[field.name] ?? null) !== null)
+    .filter((field) => !field.computed && !field.sequence && (row[field.name] ?? null) !== null)
     .map((field) => `${JSON.stringify(field.name)}:${valueText(field, row[field.name])}`)
   return `{${entries.join(',')}}`
 }

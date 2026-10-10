@@ -73,13 +73,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
           "fields": [
             {
               "name": "name", "type": "text", "labelKey": null,
-              "required": true, "unique": false, "computed": false, "maxLength": 100,
+              "required": true, "unique": false, "computed": false, "sequence": false,
+              "maxLength": 100,
               "precision": null, "scale": null, "values": null, "target": null,
               "fields": null
             },
             {
               "name": "department", "type": "reference", "labelKey": "item.department",
-              "required": false, "unique": false, "computed": false, "maxLength": null,
+              "required": false, "unique": false, "computed": false, "sequence": false,
+              "maxLength": null,
               "precision": null, "scale": null, "values": null,
               "target": {
                 "entity": "Department",
@@ -114,7 +116,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     declaration order. A `child-collection` field is listed too. Tables show
     no column for it, and forms show its rows.
   - Each field has its name, its `type` as written in entity files (such as
-    `date-time`), its label key, `required`, `unique` and `computed`, `maxLength` for
+    `date-time`), its label key, `required`, `unique`, `computed` and `sequence`, `maxLength` for
     text, `precision` and `scale` for decimal, `values` for enum, `target`
     for reference, and `fields` for child collection. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
@@ -122,6 +124,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `computed` is `true` for a [computed field](configuration.md#entity-logic).
     The server sets its value on every write, so the form shows it read-only
     and never sends it.
+  - `sequence` is `true` for a text field that names a
+    [sequence](configuration.md#sequences). The server numbers it on create,
+    so the form shows it read-only and never sends it.
   - `target` names the referenced entity, its display field and the path of
     its record API, so the SPA never builds a record URL itself. It is only
     for a reference. A child collection's `target` is `null`, because a child
@@ -370,7 +375,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `enum` | a choice of the declared values, as written in the entity file |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
     | `child-collection` | a table of its rows, described under **Child collections** |
-    | any type with `computed` | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
+    | any type with `computed` or `sequence` | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
@@ -413,7 +418,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       removing a row clears the collection's cell errors, because their
       indexes would point at the wrong rows.
   - **Changed fields.** The form sends only the fields whose value differs
-    from the value it started from. It never sends a computed field. A new record starts with every field
+    from the value it started from. It never sends a computed or sequence field. A new record starts with every field
     `null` and every child collection empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
@@ -446,7 +451,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     the record's history from the
     [history endpoint](record-api.md#audit-records-and-history), newest
     first.
-  - **Sequence fields** *(planned for M3)*. Page metadata marks a field that
+  - **Sequence fields**. Page metadata marks a field that
     names a [sequence](configuration.md#sequences), so the form shows it
     read-only. It is empty on a new record, and the form never sends it.
   - **Form binding** *(planned for M3)*. A `form` widget names a `form`

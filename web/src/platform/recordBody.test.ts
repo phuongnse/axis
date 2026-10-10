@@ -10,6 +10,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     required: false,
     unique: false,
     computed: false,
+    sequence: false,
     maxLength: null,
     precision: null,
     scale: null,
@@ -109,6 +110,13 @@ describe('buildRecordBody', () => {
   it('leaves a computed field out even when it holds a value', () => {
     const withTotal = [...fields, { ...field('total', 'decimal'), computed: true }]
     expect(buildRecordBody(withTotal, { amount: '1.50', total: '3.00' }, 2)).toBe(
+      '{"version":2,"values":{"amount":1.50}}',
+    )
+  })
+
+  it('leaves a sequence field out even when it holds a value', () => {
+    const withNumber = [{ ...field('number', 'text'), sequence: true }, ...fields]
+    expect(buildRecordBody(withNumber, { number: 'PR-2026-00042', amount: '1.50' }, 2)).toBe(
       '{"version":2,"values":{"amount":1.50}}',
     )
   })

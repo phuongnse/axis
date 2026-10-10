@@ -150,6 +150,7 @@ public static class ApplicationSites
             field.Required,
             field.Unique,
             field.IsComputed,
+            field.Sequence is not null,
             field.MaxLength,
             field.Precision,
             field.Scale,

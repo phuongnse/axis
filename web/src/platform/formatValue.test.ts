@@ -10,6 +10,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     required: false,
     unique: false,
     computed: false,
+    sequence: false,
     maxLength: null,
     precision: null,
     scale: null,

@@ -1,0 +1,7 @@
+{
+  "id": "72ecc491-f825-4968-8eb6-1f2ac19cae7d",
+  "kind": "sequence",
+  "name": "PurchaseRequestNumber",
+  "formatVersion": 1,
+  "format": "PR-{yyyy}-{n:5}"
+}

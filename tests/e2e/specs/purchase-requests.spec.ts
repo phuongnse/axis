@@ -93,6 +93,33 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(page).toHaveURL(tablePath)
 })
 
+test('a new purchase request gets a number from the sequence on save, and the form shows it read-only', async ({
+  page,
+}) => {
+  const title = `Numbered ${Date.now()}-${test.info().retry}`
+  const number = page.getByLabel('Number', { exact: true })
+  await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
+
+  // The server numbers the request on create, so the new form shows the field empty and read-only.
+  await page.getByRole('link', { name: 'New' }).click()
+  await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
+  await expect(number).toHaveValue('')
+  await expect(number).toHaveAttribute('readonly')
+  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await choose(page, 'Department', 'Finance')
+  await page.getByRole('button', { name: 'Add row' }).click()
+  await page.getByLabel('Description 1', { exact: true }).fill('Paper')
+  await page.getByLabel('Quantity 1', { exact: true }).fill('1')
+  await page.getByLabel('Unit price 1', { exact: true }).fill('10')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page).toHaveURL(tablePath)
+  await page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('link', { name: 'Open' }).click()
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await expect(number).toHaveAttribute('readonly')
+  await expect(number).toHaveValue(new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
+})
+
 test('the purchase request list reads a data source, shows department names, and keeps paging and sorting after reload, in light and dark mode', async ({
   page,
   request,

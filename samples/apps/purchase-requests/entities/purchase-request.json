@@ -5,6 +5,14 @@
   "formatVersion": 1,
   "label": { "textKey": "purchaseRequest.label" },
   "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "maxLength": 20,
+      "unique": true,
+      "sequence": "PurchaseRequestNumber",
+      "label": { "textKey": "purchaseRequest.number" }
+    },
     { "name": "title", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "purchaseRequest.title" } },
     { "name": "requester", "type": "text", "maxLength": 100, "label": { "textKey": "purchaseRequest.requester" } },
     { "name": "department", "type": "reference", "target": "Department", "required": true, "label": { "textKey": "purchaseRequest.department" } },

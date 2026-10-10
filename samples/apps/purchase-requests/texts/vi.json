@@ -22,6 +22,7 @@
     "supplier.code": "Mã",
     "supplier.name": "Tên",
     "purchaseRequest.label": "Yêu cầu mua hàng",
+    "purchaseRequest.number": "Số yêu cầu",
     "purchaseRequest.title": "Tiêu đề",
     "purchaseRequest.requester": "Người yêu cầu",
     "purchaseRequest.department": "Phòng ban",
