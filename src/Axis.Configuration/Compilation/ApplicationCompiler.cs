@@ -68,6 +68,15 @@ public static class ApplicationCompiler
 
         DataSourceResource? FindDataSource(string name) => dataSourcesByName.GetValueOrDefault(name);
 
+        // Sequence names follow the same rule too.
+        var sequencesByName = new Dictionary<string, SequenceResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var sequence in loaded.Sequences)
+        {
+            sequencesByName.TryAdd(sequence.Name, sequence);
+        }
+
+        SequenceResource? FindSequence(string name) => sequencesByName.GetValueOrDefault(name);
+
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
@@ -79,7 +88,16 @@ public static class ApplicationCompiler
         var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
         foreach (var entity in loaded.Entities)
         {
-            CheckEntity(entity, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, textKeys, rules, diagnostics);
+            CheckEntity(
+                entity,
+                FindEntity,
+                ownersByChildName,
+                loaded.UnloadedEntityNames,
+                FindSequence,
+                loaded.UnloadedSequenceNames,
+                textKeys,
+                rules,
+                diagnostics);
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, textKeys, diagnostics);
@@ -100,7 +118,7 @@ public static class ApplicationCompiler
             return result;
         }
 
-        var entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName, rules)).ToList();
+        var entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName, sequencesByName, rules)).ToList();
         var model = new ApplicationModel
         {
             Manifest = loaded.Application,
@@ -238,6 +256,8 @@ public static class ApplicationCompiler
         Func<string, EntityResource?> findEntity,
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> unloadedEntityNames,
+        Func<string, SequenceResource?> findSequence,
+        IReadOnlySet<string> unloadedSequenceNames,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -265,6 +285,7 @@ public static class ApplicationCompiler
 
             CheckTextKey(field.Label, entity.File, entity.Id, $"{path}/label", textKeys, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, Report);
+            CheckSequence(field, path, childOwner, findSequence, unloadedSequenceNames, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
             var type = FieldTypes.Parse(field.Type);
@@ -386,6 +407,47 @@ public static class ApplicationCompiler
             {
                 report(problem.Code, problem.Message, $"{path}/expression");
             }
+        }
+    }
+
+    /// <summary>
+    /// Checks the field's <c>sequence</c>: only an optional text field that clients would otherwise
+    /// write, on an entity that is not a child entity, can have one, and it names a loaded sequence.
+    /// All four reasons share one path, so only the first is reported. A field that is not text gets
+    /// only that diagnostic, as with any type-specific property.
+    /// </summary>
+    private static void CheckSequence(
+        FieldDefinition field,
+        string path,
+        ChildOwner? childOwner,
+        Func<string, SequenceResource?> findSequence,
+        IReadOnlySet<string> unloadedSequenceNames,
+        Action<string, string, string> report)
+    {
+        if (field.Sequence is not { } sequence)
+        {
+            return;
+        }
+
+        var isText = FieldTypes.Parse(field.Type) == FieldType.Text;
+        var problem = !isText ? $"'sequence' applies only to text fields, not to {field.Type} fields."
+            : field.Required == true ? "A field with a 'sequence' cannot be required: the server fills it when the record is created."
+            : field.Expression is not null ? "A field with a 'sequence' cannot have an 'expression': it is either numbered or computed."
+            : childOwner is not null ? $"A field with a 'sequence' cannot belong to a child entity, but this entity is owned by '{childOwner}'."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/sequence");
+        }
+
+        // A sequence file that is in the folder but was not loaded is not reported again; that
+        // file's own diagnostics already are.
+        if (isText && findSequence(sequence) is null && !unloadedSequenceNames.Contains(sequence))
+        {
+            report(
+                DiagnosticCodes.UnknownSequence,
+                $"The sequence '{sequence}' was not found. No loaded sequence has that name.",
+                $"{path}/sequence");
         }
     }
 
@@ -925,12 +987,15 @@ public static class ApplicationCompiler
     }
 
     private static EntityModel BuildEntity(
-        EntityResource entity, Dictionary<string, EntityResource> entitiesByName, IEnumerable<ExpressionRule> rules)
+        EntityResource entity,
+        Dictionary<string, EntityResource> entitiesByName,
+        Dictionary<string, SequenceResource> sequencesByName,
+        IEnumerable<ExpressionRule> rules)
     {
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
-        var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName)).ToList();
+        var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName, sequencesByName)).ToList();
         var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity);
         return new EntityModel
         {
@@ -947,10 +1012,15 @@ public static class ApplicationCompiler
         };
     }
 
-    private static FieldModel BuildField(FieldDefinition field, ExpressionScope inputScope, Dictionary<string, EntityResource> entitiesByName)
+    private static FieldModel BuildField(
+        FieldDefinition field,
+        ExpressionScope inputScope,
+        Dictionary<string, EntityResource> entitiesByName,
+        Dictionary<string, SequenceResource> sequencesByName)
     {
         var type = FieldTypes.Parse(field.Type);
         var target = field.Target is null ? null : entitiesByName[field.Target];
+        var sequence = field.Sequence is null ? null : sequencesByName[field.Sequence];
         return new FieldModel
         {
             Name = field.Name,
@@ -967,6 +1037,7 @@ public static class ApplicationCompiler
             Computed = field.Expression is null
                 ? null
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
+            Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
         };
     }
 

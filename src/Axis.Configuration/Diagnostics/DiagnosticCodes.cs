@@ -61,6 +61,8 @@ public static class DiagnosticCodes
     public const string DuplicateRuleParameter = "AXC0056";
     public const string RuleNameIsFunction = "AXC0057";
 
+    public const string UnknownSequence = "AXC0066";
+
     public const string UnknownProcessEntity = "AXC0067";
     public const string ProcessOverChildEntity = "AXC0068";
     public const string DuplicateStepName = "AXC0069";
