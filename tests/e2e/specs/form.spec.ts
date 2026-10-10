@@ -112,6 +112,48 @@ test('line items are added, edited and removed in the form, in light and dark mo
   expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5 }])
 })
 
+// Each test has its own browser context, so the sign-in cookie does not reach other specs.
+test('after a signed-in user edits a note, its history shows the update first, in light and dark mode', async ({
+  page,
+}) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const title = `History ${run}`
+  const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
+  await page.goto('/e2e/notes?pageSize=100&sort=-title')
+  await page.getByRole('banner').getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('menuitemradio', { name: 'Binh Engineering Manager' }).click()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager' })).toBeVisible()
+  // The page's request context shares the sign-in cookie, so Binh creates the note.
+  await createRecord(page.request, 'Note', { title })
+  await page.reload()
+
+  const row = page.getByRole('row', { name: new RegExp(`${title} `) })
+  await row.getByRole('link', { name: 'Open' }).click()
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await page.getByRole('textbox', { name: 'Title' }).fill(`${title} edited`)
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page).toHaveURL(tablePath)
+
+  const edited = page.getByRole('row', { name: new RegExp(`${title} edited`) })
+  for (const mode of ['light', 'dark']) {
+    if (mode === 'dark') {
+      await page.getByRole('switch', { name: 'Dark mode' }).click()
+    }
+    await edited.getByRole('link', { name: 'Open' }).click()
+    const history = page.locator(`[data-theme-mode="${mode}"]`).getByTestId('record-history')
+    await expect(history).toContainText('History')
+    const entries = history.getByTestId('history-entry')
+    await expect(entries).toHaveCount(2)
+    for (const text of ['Updated', 'Binh Engineering Manager', 'Changed: Title']) {
+      await expect(entries.first()).toContainText(text)
+    }
+    await expect(entries.nth(1)).toContainText('Created')
+    await expect(entries.nth(1)).toContainText('Binh Engineering Manager')
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page).toHaveURL(tablePath)
+  }
+})
+
 test('an empty form shows the server error under the title', async ({ page }) => {
   await page.goto('/e2e/noteform/new')
 

@@ -33,9 +33,10 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     workers claim and run), with history in `axis.__processes_migrations`.
     See [processes](processes.md#tables).
   - `Axis.Data` also owns `axis.audit_records`, with history in
-    `axis.__data_migrations`. Other modules append audit records only
-    through its contract, `AuditRecords.AppendAsync`, which takes the
-    caller's open transaction. A process start and each process step write
+    `axis.__data_migrations`. Other modules append and read audit records
+    only through its contract. `AuditRecords.AppendAsync` takes the
+    caller's open transaction, and `AuditRecords.ListForRecordAsync` reads
+    one record's history. A process start and each process step write
     their audit records this way, inside their own transaction. See
     [Audit records and sequence counters](#audit-records-and-sequence-counters).
   - Releases are immutable, enforced through the context's change tracking:

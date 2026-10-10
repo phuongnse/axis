@@ -38,5 +38,22 @@
   "shell.form.clear": "Clear",
   "shell.form.addRow": "Add row",
   "shell.form.removeRow": "Remove",
-  "shell.lookup.search": "Search"
+  "shell.lookup.search": "Search",
+  "shell.history.title": "History",
+  "shell.history.empty": "No history yet.",
+  "shell.history.loadFailed": "The history could not be loaded.",
+  "shell.history.system": "System",
+  "shell.history.anonymous": "Anonymous",
+  "shell.history.fields": "Changed",
+  "shell.history.outcome": "Outcome",
+  "shell.history.step": "Step",
+  "shell.history.action.record.created": "Created",
+  "shell.history.action.record.updated": "Updated",
+  "shell.history.action.record.deleted": "Deleted",
+  "shell.history.action.process.started": "Process started",
+  "shell.history.action.process.stepCompleted": "Step completed",
+  "shell.history.action.process.completed": "Process completed",
+  "shell.history.action.process.failed": "Process failed",
+  "shell.history.action.task.created": "Task created",
+  "shell.history.action.task.completed": "Task decided"
 }

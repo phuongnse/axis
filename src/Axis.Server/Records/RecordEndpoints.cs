@@ -21,8 +21,9 @@ namespace Axis.Server.Records;
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
 /// validations reads the stored record first, so an unknown record is a 404 there.
-/// A delete is 204, or 404 or 409 from storage. The problem titles never contain text from the
-/// request.
+/// A delete is 204, or 404 or 409 from storage. A record's history is checked as a single read
+/// (404), then paging (400), and an unknown or deleted record is a 404. The problem titles never
+/// contain text from the request.
 /// </summary>
 internal static class RecordEndpoints
 {
@@ -33,6 +34,7 @@ internal static class RecordEndpoints
         var records = endpoints.MapGroup("/api/apps/{app}/entities/{entity}/records");
         records.MapGet("", ListAsync);
         records.MapGet("/{id}", GetAsync);
+        records.MapGet("/{id}/history", HistoryAsync);
         records.MapPost("", CreateAsync);
         records.MapPatch("/{id}", UpdateAsync);
         records.MapDelete("/{id}", DeleteAsync);
@@ -117,6 +119,57 @@ internal static class RecordEndpoints
         return await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is { } record
             ? Results.Ok(record)
             : RecordNotFound();
+    }
+
+    // Every audit record that names the record is listed, whoever wrote it: the record API, a
+    // process start, a step or a task decision. The actor's display name comes from the test
+    // users, so it is null for system, anonymous or an id that is no longer configured.
+    private static async Task<IResult> HistoryAsync(
+        string app,
+        string entity,
+        string id,
+        string? page,
+        string? pageSize,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        TestUserDirectory directory,
+        CancellationToken cancellationToken)
+    {
+        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        if (!TryParseId(id, out var recordId))
+        {
+            return RecordNotFound();
+        }
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        if (!PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size))
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is null)
+        {
+            return RecordNotFound();
+        }
+
+        var result = await AuditRecords.ListForRecordAsync(connection, model.Id, recordId, pageNumber, size, cancellationToken);
+        var items = result.Items
+            .Select(item => new RecordHistoryItem(
+                item.Id,
+                item.OccurredAt.UtcDateTime,
+                item.Actor,
+                directory.Find(item.Actor)?.DisplayName,
+                item.Action,
+                item.ProcessInstanceId,
+                JsonNode.Parse(item.Details)!))
+            .ToList();
+        return Results.Ok(new RecordHistoryResponse(items, pageNumber, size, result.TotalCount));
     }
 
     // The body is read here rather than bound, so the parser reports every body problem by JSON
@@ -421,3 +474,19 @@ internal static class RecordEndpoints
 
 /// <summary>One page of a record list and the number of records that match the search, or of every record without one.</summary>
 internal sealed record RecordListResponse(IReadOnlyList<Record> Items, int Page, int PageSize, long TotalCount);
+
+/// <summary>One page of a record's audit records, newest first, and the number of its audit records.</summary>
+internal sealed record RecordHistoryResponse(IReadOnlyList<RecordHistoryItem> Items, int Page, int PageSize, long TotalCount);
+
+/// <summary>
+/// One audit record of a record. <see cref="ActorName"/> is the test user's display name, or null
+/// when the actor is no configured test user.
+/// </summary>
+internal sealed record RecordHistoryItem(
+    Guid Id,
+    DateTime OccurredAt,
+    string Actor,
+    string? ActorName,
+    string Action,
+    Guid? ProcessInstanceId,
+    JsonNode Details);

@@ -6,6 +6,7 @@ import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
 import { formatValue } from './formatValue'
 import { buildRecordBody } from './recordBody'
+import { RecordHistory } from './RecordHistory'
 import { fetchRecord, saveRecord, type FieldValue, type RecordItem, type RecordRow, type RecordValue } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { EntityWidgetMetadata, FieldMetadata } from './site'
@@ -100,7 +101,8 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * A child collection that changed is sent as its whole row list, and a row's errors appear on its
  * cells. A computed field, of the record or of a row, is shown read-only with the value the server
  * returned, and never sent. So is a sequence field, which is empty on a new record because the
- * server numbers it on create, and so is a field the form marks read-only.
+ * server numbers it on create, and so is a field the form marks read-only. A saved record shows its
+ * history below the form. A new record has none.
  */
 export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
@@ -368,6 +370,15 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
           <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
         </Flex>
       </Form>
+      {recordId !== null && (
+        <RecordHistory
+          key={recordId}
+          recordsPath={entity.recordsPath}
+          recordId={recordId}
+          fields={entity.fields}
+          locale={locale}
+        />
+      )}
       {shown
         .filter(({ field, readOnly }) => !readOnly && field.type === 'reference' && field.target)
         .map(({ field }) => (
