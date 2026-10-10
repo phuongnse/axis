@@ -288,10 +288,11 @@ related records. There a path is `AXC0046`.
 - **Scope in a process expression.** A `startCondition` and a decision
   `when` see the subject record's fields, computed ones included, its child
   collections through aggregates, and the named rules. The compiler
-  type-checks them as booleans. *(planned for M3)* They and an `updateRecord`
-  value will also see paths through reference fields of up to 3 hops, and
-  the interpreter will read the referenced records along a path. Until then
-  a path is `AXC0046`. Validations and computed fields keep their scope. See
+  type-checks them as booleans. *(planned for M3)* An `updateRecord` value and
+  a task's `assignee.user` will see the same names. All of them will also see
+  paths through reference fields of up to 3 hops, and the interpreter will
+  read the referenced records along a path. Until then a path is `AXC0046`.
+  Validations and computed fields keep their scope. See
   [processes](processes.md#steps).
 
 ## Functions

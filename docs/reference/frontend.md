@@ -19,9 +19,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and a table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold
   other widgets. Data sources are agreed in
   [D18](../decisions.md#d18-data-sources--agreed) and described in
-  [data-sources.md](data-sources.md). Navigate actions and shared `form`
-  resources are expected to replace the other M1 shortcuts; see
-  [D15](../decisions.md#d15-presentation-model--agreed), where those parts are
+  [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
+  and the `startProcess` action are agreed in
+  [D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed)
+  *(planned for M3)*. Navigate actions are expected to replace the table's
+  `formPage` link; see
+  [D15](../decisions.md#d15-presentation-model--agreed), where that part is
   still **Proposed**.
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
@@ -96,10 +99,16 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `titles` in the site list has one entry per available locale of the site,
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
-  - `type` of a widget is `table` or `form`. `formPage` is the page holding
-    the form for a table's records, and `null` otherwise. Exactly one of
-    `entity` and `dataSource` is set, and the other is `null`. The data source
-    binding of the table widget below describes `dataSource`.
+  - `type` of a widget is `table` or `form`, and `taskInbox` *(planned for
+    M3)*. `formPage` is the page holding the form for a table's records, and
+    `null` otherwise. On a `table` or `form`, exactly one of `entity` and
+    `dataSource` is set, and the other is `null`. A `taskInbox` has both
+    `null`. The data source binding of the table widget below describes
+    `dataSource`.
+  - *(planned for M3)* Every widget also has `form`, `actions` and
+    `tasksPath`, never left out. `form` and `actions` are described under the
+    form widget, and `tasksPath` under the task inbox widget. On a widget they
+    do not apply to, they are `null`, `[]` and `null`.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -146,6 +155,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
+  | `/{site}/{inboxpage}/{taskId}` | *(planned for M3)* the task page of the task with that id, under the page of a task inbox |
 
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
@@ -157,6 +167,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     id that is not in the hyphenated 8-4-4-4-12 hex form, and an id the
     entity has no record for show the not-found page inside the site shell.
     An id in the wrong form is not requested.
+  - *(planned for M3)* `new` on a task inbox page, and a task id that is not
+    in the hyphenated 8-4-4-4-12 hex form, show the not-found page inside the
+    site shell. A task id in the wrong form is not requested. A well-formed
+    task id that the task API answers `404` for shows the not-found page
+    inside the site shell, as for a record.
   - Inside a site, the shell shows the site's title, navigation and locales.
     The theme toggle and the locale switch work as they do on the platform
     site.
@@ -295,6 +310,49 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.
+- **Form resource** *(planned for M3)*. A `form` resource lays out the fields
+  of one entity in sections, and any field can be read-only. One form serves
+  both a page and a task (D20).
+
+  ```json
+  {
+    "id": "8b3e5c71-4d2a-4f6b-9c0e-1a2b3c4d5e6f",
+    "kind": "form",
+    "name": "PurchaseRequestReview",
+    "formatVersion": 1,
+    "entity": "PurchaseRequest",
+    "sections": [
+      {
+        "title": { "textKey": "purchaseRequest.sections.request" },
+        "fields": [
+          { "field": "title", "readOnly": true },
+          { "field": "department", "readOnly": true },
+          { "field": "supplier", "readOnly": true },
+          { "field": "lineItems", "readOnly": true },
+          { "field": "totalAmount", "readOnly": true }
+        ]
+      },
+      {
+        "title": { "textKey": "purchaseRequest.sections.decision" },
+        "fields": [{ "field": "decisionComments" }]
+      }
+    ]
+  }
+  ```
+
+  - Each section has a `title` label and its `fields`, in the order shown.
+    Each entry names a `field` of the entity. `readOnly` is optional and
+    `false` by default.
+  - A field appears at most once in the form. A field the form does not list
+    is not shown and never sent.
+  - Computed fields and sequence fields are always read-only, whatever
+    `readOnly` says.
+  - On a page, `readOnly` only shapes the UI until policies arrive in M4,
+    because the record API still accepts those fields. In a task, the server
+    enforces it: completing a task rejects a value for a field the form does
+    not make editable (see [Task API](processes.md#task-api)).
+  - `form` joins the kinds of the Load step when it is built, and diagnostic
+    codes come with the issue that builds the checks.
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
   record API. It adds no rules of its own: the server validates.
@@ -391,6 +449,89 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Sequence fields** *(planned for M3)*. Page metadata marks a field that
     names a [sequence](configuration.md#sequences), so the form shows it
     read-only. It is empty on a new record, and the form never sends it.
+  - **Form binding** *(planned for M3)*. A `form` widget names a `form`
+    resource, or an `entity` as shorthand for all its fields in declaration
+    order. With a `form`, the widget shows its sections in order, each under
+    its title, and shows a read-only field as on a computed field. It sends
+    only the editable fields it shows.
+  - **Start process action** *(planned for M3)*. A `form` widget can declare
+    `startProcess` actions. Each is shown as a button below the form, with
+    its label.
+
+    ```json
+    {
+      "type": "form",
+      "form": "PurchaseRequestEdit",
+      "actions": [
+        {
+          "type": "startProcess",
+          "process": "PurchaseRequestApproval",
+          "label": { "textKey": "purchaseRequest.submit" }
+        }
+      ]
+    }
+    ```
+
+    - The process must name the form's entity as its subject.
+    - A click saves the record first: a create on a new record, or the
+      changed fields on an existing one, as the save button does. If the save
+      fails, its errors show as for a save, and nothing starts.
+    - Then it posts `{ "subjectId" }` to the
+      [start endpoint](processes.md#start-endpoint), with a new
+      `Idempotency-Key` for each click.
+    - On `201` it shows a success message and loads the record again, at its
+      edit address when it was new. A `400` or `409` shows its message above
+      the form, looked up in the site texts first.
+    - The button is disabled while the save and the start run.
+  - **Form metadata** *(planned for M3)*. Page metadata gives the widget's
+    `entity` as today, so the SPA knows every field's type. It adds:
+    - `form`: `{ "name", "sections": [ { "titleKey", "fields": [ { "name", "readOnly" } ] } ] }`,
+      or `null` when the widget names an `entity`. `readOnly` already
+      includes computed and sequence fields.
+    - `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
+      or `[]`. `instancesPath` is the start endpoint, such as
+      `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
+      so the SPA never builds it itself.
+- **Task inbox widget** *(planned for M3)*. A page whose widget is a
+  `taskInbox` lists the signed-in user's open tasks in the application,
+  through the [task API](processes.md#task-api).
+
+  ```json
+  {
+    "id": "e1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b",
+    "kind": "page",
+    "name": "MyTasks",
+    "formatVersion": 1,
+    "title": { "textKey": "pages.myTasks.title" },
+    "widgets": [{ "type": "taskInbox" }]
+  }
+  ```
+
+  - **Metadata.** The widget has `"entity": null`, `"dataSource": null` and
+    a `tasksPath`, such as `"/api/apps/PurchasingApp/tasks"`. `tasksPath` is
+    `null` on every other widget and never left out.
+  - **Columns.** The task's label, the subject's label and the due date,
+    formatted as a `date-time` cell. An empty due date is an empty cell.
+  - **Paging.** `page` and `pageSize` live in the URL, as for a table. There
+    is no sort.
+  - **Links.** Each row opens the task page at
+    `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
+  - **Signed out.** With nobody signed in, the task API answers `401`, and
+    the widget shows a sign-in prompt in place of the rows.
+- **Task page** *(planned for M3)*. The address `/{site}/{inboxpage}/{taskId}`
+  shows one task, under the page of its task inbox.
+  - It shows the step's label, the subject's label, the due date and the
+    form's sections over the subject record. The layout and the field types
+    come from the task read's `form`, and the values from the subject
+    record, read through the record API.
+  - It has one button per outcome, with the outcome's label.
+  - A click sends the outcome, the changed editable values and the record's
+    `version` to the complete endpoint. On success it returns to the inbox.
+  - A `403` shows a message that the task is assigned to someone else.
+  - A `409` for a decided task shows a message that the task is already
+    completed, and loads the task again.
+  - A `400` maps its keys as the form widget does: `/values/<field>` under
+    that field, and every other key, such as `/outcome`, above the form.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

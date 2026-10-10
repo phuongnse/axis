@@ -1,22 +1,25 @@
 # Processes
 
 Detailed reference for processes: the resource shape, the steps, the compile
-checks, the start endpoint, the instance states, execution, the worker
-settings and the tables. The `process` resource kind is built with `decision`
-and `end` steps, and so are their [compile checks](#compile-checks). A
-compiled process is part of the release model. The worker host, its claims
-(see [Execution](#execution)), the [worker settings](#worker-settings) and the
-`axis.process_work_items` table are built too. Everything else here is
-*(planned for M3)*: `task` and `operation` steps, the start endpoint, the
-engine and the other tables. Until `task` and `operation` are built, a step of
-either type is `AXC0004`, so the purchase request example below does not
-compile yet.
+checks, the start endpoint, the instance and task states, the task API,
+execution, the worker settings and the tables. The `process` resource kind is
+built with `decision` and `end` steps, and so are their
+[compile checks](#compile-checks). A compiled process is part of the release
+model. The worker host, its claims (see [Execution](#execution)), the
+[worker settings](#worker-settings) and the `axis.process_work_items` table are
+built too. Everything else here is *(planned for M3)*: `task` and `operation`
+steps, the start endpoint, the task API, the engine and the other tables.
+Until `task` and `operation` are built, a step of either type is `AXC0004`, so
+the purchase request example below does not compile yet.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
-[D19](../decisions.md#d19-process-resource-and-worker-host--agreed). The
+[D19](../decisions.md#d19-process-resource-and-worker-host--agreed), and human
+tasks follow
+[D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed). The
 reasons for durable execution are in
-[knowledge](../domain/knowledge.md#execution).
+[knowledge](../domain/knowledge.md#execution), and for human tasks in
+[knowledge](../domain/knowledge.md#human-work).
 
 - **Process.** A `process` resource is a set of named steps and the
   transitions between them. It names one entity, its subject.
@@ -26,6 +29,9 @@ reasons for durable execution are in
   for. Each instance has exactly one.
 - **Step.** One unit of a process, such as a decision or a human task. A step
   names the step that follows it.
+- **Task.** One occurrence of a `task` step: the work a person must decide
+  on. It names its assignee, and it is `open` until one decision completes
+  it.
 
 Process expressions use the language of [expressions.md](expressions.md). For
 what they can see, see
@@ -74,7 +80,15 @@ the threshold, and ends approved, returned or rejected:
     {
       "name": "managerApproval",
       "type": "task",
-      "outcomes": { "approve": "financeCheck", "return": "markReturned", "reject": "markRejected" }
+      "label": { "textKey": "purchaseRequest.managerApproval" },
+      "assignee": { "user": "department.manager" },
+      "form": "PurchaseRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "financeCheck" },
+        { "name": "return", "label": { "textKey": "task.return" }, "next": "markReturned" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "markRejected" }
+      ]
     },
     {
       "name": "financeCheck",
@@ -85,7 +99,15 @@ the threshold, and ends approved, returned or rejected:
     {
       "name": "financeApproval",
       "type": "task",
-      "outcomes": { "approve": "markApproved", "return": "markReturned", "reject": "markRejected" }
+      "label": { "textKey": "purchaseRequest.financeApproval" },
+      "assignee": { "role": "finance" },
+      "form": "PurchaseRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "markApproved" },
+        { "name": "return", "label": { "textKey": "task.return" }, "next": "markReturned" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "markRejected" }
+      ]
     },
     {
       "name": "markApproved",
@@ -121,7 +143,7 @@ the threshold, and ends approved, returned or rejected:
 - `steps` is an array of step objects. Each has a `name` and a `type`. The
   other properties depend on the type, see [Steps](#steps).
 - Transitions name the next step by its name: `next`, `branches[].next`,
-  `otherwise` and the targets of task `outcomes`.
+  `otherwise` and `outcomes[].next` of a task.
 - `kind` stays the resource kind. Steps use `type`, as fields and widgets do.
 
 ## Steps
@@ -133,11 +155,26 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   first one that is true wins. A `when` that gives `null` counts as false.
   `otherwise` is required and names the step taken when no branch is true.
 - **`task`.** A human task. The instance waits until a person completes the
-  task with one of its outcomes. `outcomes` maps each outcome name, such as
-  `approve`, `return` or `reject`, to the next step. The assignee, the form
-  and the due date come with the human task design *(planned for M3)*. The
-  manager of the purchase request is expected to come from
-  `department.manager`.
+  task with one of its outcomes. It has these parts:
+  - `label` is required. It is a label with a text key, shown in the task
+    inbox and on the task page.
+  - `assignee` has exactly one of `{ "user": "<expression>" }` and
+    `{ "role": "<role name>" }`. A `user` expression gives `text`, a user id,
+    such as `department.manager`. A `role` names a role the user must hold.
+    Queues come later.
+  - `form` names a [form resource](frontend.md) whose entity is the subject
+    entity. The task page shows it over the subject record.
+  - `dueIn` is optional. It is a positive ISO 8601 duration, such as `P3D`.
+    The task's due date is the time the task is created plus `dueIn`. It is
+    shown only. Escalation needs timers, so it comes later.
+  - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
+    such as `approve`, `return` and `reject`. Each names the step taken when
+    the task is completed with it.
+
+  The step's transaction evaluates the assignee, creates the task as `open`
+  and sets the instance to `waiting`. A `user` expression that gives `null`
+  fails the step. Completing the task resumes the instance, see
+  [Task API](#task-api).
 - **`operation`.** M3 has one built-in operation, `updateRecord`. Its `set`
   maps fields of the subject record to expressions. The step writes them
   through the record update command, so computed fields are recomputed and
@@ -173,8 +210,18 @@ The compiler reports these as diagnostics. The checks for `decision` and
   subject entity. None is computed or a child collection. Each expression
   fits its field's type.
 - An `end` step has no `next`, `branches` or `otherwise` (`AXC0004`).
+- *(planned for M3)* A task's `assignee` has exactly one of `user` and
+  `role`. A `user` expression gives `text`. A `role` is a non-empty name.
+- *(planned for M3)* A task's `form` names a loaded form whose entity is the
+  subject entity.
+- *(planned for M3)* A task's `dueIn`, when set, parses as a positive ISO 8601
+  duration.
+- *(planned for M3)* A task has at least one outcome. Outcome names are
+  unique within the step, ignoring letter case.
 - The `startCondition` message text key exists, checked like other labels
   (`AXC0028`).
+  *(planned for M3)* So do the text keys of each task `label` and each
+  outcome `label`.
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 
@@ -238,6 +285,228 @@ Only `running` and `waiting` block a new start for the same process and
 record. A `failed` instance does not, so it never locks its record. Cancel
 comes in M7.
 
+## Task states
+
+| State | Meaning |
+| --- | --- |
+| `open` | The task waits for a decision. |
+| `completed` | The decision is recorded, and the instance moves on. |
+
+A task has no other state. Its due date is only shown, so there is no overdue
+state. Cancel comes in M7.
+
+## Task API
+
+The task API lets the signed-in user list their open tasks, read one task and
+complete it with an outcome. The user is the signed-in
+[test user](../architecture.md#development-test-users) until
+sign-in arrives in M4.
+
+**Who may act.** The user may act on a task when they are its assignee, or
+when the task's assignee is a role and the user holds it. In M3 a user's
+roles are the role names of their test user. This is checked on
+every request, at the moment of action. Policies in M4 add to this check and
+never replace it.
+
+**List my tasks.** `GET /api/apps/{app}/tasks?page=&pageSize=` lists the
+`open` tasks the user may act on, whatever release their instance is pinned
+to. `page` and `pageSize` follow the record API's
+[paging rules](record-api.md#paging-and-sorting). There is no `sort` or
+`search`. Tasks are ordered by `dueAt` ascending with no due date last, then
+by `createdAt`, then by `id`.
+
+```json
+{
+  "items": [
+    {
+      "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01",
+      "process": "PurchaseRequestApproval",
+      "step": "managerApproval",
+      "labelKey": "purchaseRequest.managerApproval",
+      "subject": {
+        "entity": "PurchaseRequest",
+        "id": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+        "label": "PR-2026-00042"
+      },
+      "dueAt": "2026-10-13T02:05:00Z",
+      "createdAt": "2026-10-10T02:05:00.123456Z"
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 1
+}
+```
+
+- `subject.label` is the value of the subject entity's display field, as the
+  record API's `labels` give it.
+- `dueAt` is `null` when the step has no `dueIn`.
+
+**Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
+state:
+
+```json
+{
+  "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01",
+  "process": "PurchaseRequestApproval",
+  "instanceId": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
+  "step": "managerApproval",
+  "labelKey": "purchaseRequest.managerApproval",
+  "state": "open",
+  "assignee": { "user": "maria", "role": null },
+  "subject": {
+    "entity": "PurchaseRequest",
+    "id": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+    "label": "PR-2026-00042"
+  },
+  "form": {
+    "name": "PurchaseRequestReview",
+    "sections": [
+      {
+        "titleKey": "purchaseRequest.sections.decision",
+        "fields": [{ "name": "decisionComments", "readOnly": false }]
+      }
+    ],
+    "entity": { "name": "PurchaseRequest", "fields": [] }
+  },
+  "outcomes": [
+    { "name": "approve", "labelKey": "task.approve" },
+    { "name": "return", "labelKey": "task.return" },
+    { "name": "reject", "labelKey": "task.reject" }
+  ],
+  "dueAt": "2026-10-13T02:05:00Z",
+  "createdAt": "2026-10-10T02:05:00.123456Z",
+  "completedAt": null,
+  "completedBy": null,
+  "outcome": null
+}
+```
+
+- `assignee` has the user id or the role name, and the other is `null`.
+- `form` is the step's form in the task's release, so a task pinned to an
+  earlier release keeps its own layout. It has the shape of a form widget's
+  `form` metadata, plus `entity` in the shape of a widget's `entity`
+  metadata, so the task page knows each field's type. See
+  [frontend](frontend.md). The example shortens both.
+- `completedAt`, `completedBy` and `outcome` are `null` while the task is
+  `open`.
+
+**Complete a task.** `POST /api/apps/{app}/tasks/{id}/complete` records the
+decision:
+
+```http
+POST /api/apps/{app}/tasks/{id}/complete
+Content-Type: application/json
+
+{ "outcome": "approve", "values": { "decisionComments": "Fine for Q4." }, "version": 3 }
+```
+
+- `outcome` is required. It names one of the step's outcomes, ignoring
+  letter case.
+- `values` is optional. It holds only fields the task's form makes editable,
+  in the record API's [value format](record-api.md#request-bodies-and-values).
+- `version` is the subject record's version, as the record API reads it. It
+  is required when `values` is not empty.
+- The response is `200` with the completed task, in the shape of a single
+  read.
+
+### Task API errors
+
+Errors are problem details, as in the [record API](record-api.md#errors).
+The titles are fixed and never contain text from the request. The content
+type follows the record API's
+[rules](record-api.md#create-update-and-delete), so a wrong one is a `415`.
+
+A request is checked in this order, and the first failure is the response:
+`401`, then `404`, then `403`, then `409`, then `415`, then `400`. So a user
+who may not act on a task never learns its state.
+
+- **`401`.** No test user is signed in. Every task route needs one.
+
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+    "title": "Sign in to work on tasks.",
+    "status": 401
+  }
+  ```
+
+- **`404`.** An unknown application, an application with no active release,
+  an unknown task, or an `{id}` that is not a UUID in the hyphenated form.
+
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+    "title": "No task exists with this id.",
+    "status": 404
+  }
+  ```
+- **`403`.** The user is not the assignee and does not hold the assignee
+  role. This applies to reading one task as well as completing it.
+
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.4",
+    "title": "This task is assigned to someone else.",
+    "status": 403
+  }
+  ```
+
+- **`409` for a decided task.** The task is not `open`, because another
+  completion came first. This covers a later completion and the loser of two
+  concurrent ones.
+
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+    "title": "This task is already completed.",
+    "status": 409
+  }
+  ```
+
+- **`400`.** The body is a validation problem keyed by JSON Pointer. Every
+  invalid part is reported in the same response.
+  - A missing outcome, or one the step does not have, is keyed `/outcome`.
+  - A value for a field the form does not make editable is keyed
+    `/values/<field>` with the message "Cannot be set.".
+  - A missing `version` when `values` is not empty is keyed `/version`.
+  - The values are then checked by the record update command. Its parse
+    errors and entity validations use the record API's keys and messages.
+
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+    "title": "One or more validation errors occurred.",
+    "status": 400,
+    "errors": {
+      "/outcome": ["Must be one of the step's outcomes."],
+      "/values/totalAmount": ["Cannot be set."]
+    }
+  }
+  ```
+
+- **`409` for a stale version.** The subject record's `version` is not the
+  stored one. It is keyed `/version`. It is found when the values are
+  written, so after the body checks, as in the record API.
+
+### Completing a task
+
+One transaction records the decision:
+
+1. It locks the task row and checks that the task is still `open`.
+2. It writes `values`, when there are any, through the record update command,
+   so computed fields are recomputed and validations run.
+3. It sets the task's `outcome`, `completedBy` and `completedAt`, and its
+   state to `completed`.
+4. It writes the step history and the audit record `task.completed`, with
+   details `{ "outcome", "fields" }`. `fields` names the changed fields and
+   holds no values.
+5. It sets the instance to `running` with a new revision, and inserts the
+   work item for the outcome's `next` step.
+
+When any part fails, nothing is written. The worker then runs the next step
+as usual.
+
 ## Execution
 
 - **Worker host.** `Axis.Worker` runs the steps, not the server. Each work
@@ -294,6 +563,9 @@ database, with history in `axis.__processes_migrations` (see
   database clock. Completed and failed items are deleted.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
+- `axis.process_tasks`: one row per task, with its instance, step,
+  application, assignee kind and value, form, due date, state, outcome, and
+  who completed it and when.
 
 ## Limits in M3
 
