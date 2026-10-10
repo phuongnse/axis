@@ -195,17 +195,22 @@ They exist only in development and tests, never in Production.
   server listens. The message names the environment. This matches how bad
   [tenant configuration](#tenant-configuration) stops startup.
 - **Choosing a user.** The SPA lists the users and lets the person pick one
-  *(planned for M3)*:
-  - `GET /api/test-users` returns the configured users *(planned for M3)*.
+  in the [shell header](reference/frontend.md):
+  - `GET /api/test-users` returns `{ "users": [ { "id", "displayName", "roles" } ] }`.
+    Each user has the same shape as `GET /api/me`, and the list keeps the
+    configuration order.
   - `POST /api/test-users/sign-in` with `{ "id": "..." }` signs that user in.
     It returns `200` with the same body as `GET /api/me`. An id that is not
     configured returns a `400` validation problem keyed `id`, and sets no
     cookie.
   - `POST /api/test-users/sign-out` signs the user out and returns `204`.
 
-  Outside the allowed environments these endpoints are not mapped. Only the
-  SPA fallback matches their paths, and it takes `GET` and `HEAD`, so a
-  `POST` answers `405` as on any other unmapped path. The `POST` endpoints
+  Outside the allowed environments the `POST` endpoints are not mapped. Only
+  the SPA fallback matches their paths, and it takes `GET` and `HEAD`, so a
+  `POST` answers `405` as on any other unmapped path. `GET /api/test-users`
+  is mapped in every environment, so it does not reach the SPA fallback.
+  Outside the allowed environments it answers a `404` problem details
+  response, and the SPA then shows no picker. The `POST` endpoints
   follow the record API's
   [content type rule](reference/record-api.md#create-update-and-delete),
   sign-out included.

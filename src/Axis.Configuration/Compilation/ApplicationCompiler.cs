@@ -15,7 +15,8 @@ namespace Axis.Configuration.Compilation;
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
 /// of every locale, checks the named rules and their calls, checks every entity's fields against
 /// the field type rules and type-checks its computed fields and validations, checks sites,
-/// pages and seeds, checks data sources and their filters, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
+/// pages and seeds, checks data sources and their filters, checks processes, their step graphs and
+/// their conditions, and resolves references between entities, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
 /// </summary>
@@ -82,8 +83,8 @@ public static class ApplicationCompiler
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
         }
 
-        // Validations, at their top level, and data source filters call rules. Computed fields and
-        // aggregate item expressions see no rules.
+        // Validations, at their top level, data source filters and process conditions call rules.
+        // Computed fields and aggregate item expressions see no rules.
         var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
         foreach (var entity in loaded.Entities)
         {
@@ -102,6 +103,14 @@ public static class ApplicationCompiler
         PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, rules, diagnostics);
+        ProcessChecker.Check(
+            loaded.Processes,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            textKeys,
+            rules,
+            diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -119,6 +128,7 @@ public static class ApplicationCompiler
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, rules)).ToList(),
         };
         return result with
         {

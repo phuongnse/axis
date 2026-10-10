@@ -57,6 +57,35 @@ public sealed class TestUserTests
     }
 
     [Fact]
+    public async Task The_test_user_list_returns_the_configured_users_in_order()
+    {
+        await using var factory = CreateFactory("Testing", _testUsers);
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync(new Uri("/api/test-users", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        var users = body.RootElement.GetProperty("users").EnumerateArray().ToList();
+        Assert.Equal(2, users.Count);
+        AssertUser(users[0], "anna", "Anna Employee", "employee");
+        AssertUser(users[1], "binh", "Binh Engineering Manager", "department-manager", "finance-reviewer");
+    }
+
+    [Fact]
+    public async Task Outside_development_and_testing_the_test_user_list_is_a_404_problem()
+    {
+        await using var factory = CreateFactory("Production", []);
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync(new Uri("/api/test-users", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("Test users are not available.", await response.Content.ReadAsStringAsync(CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Without_a_cookie_nobody_is_signed_in()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
@@ -173,7 +202,8 @@ public sealed class TestUserTests
         var signIn = await client.PostAsync(new Uri("/api/test-users/sign-in", UriKind.Relative), Json("""{ "id": "anna" }"""), CancellationToken);
         var me = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
 
-        Assert.DoesNotContain(endpoints, endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/test-users", StringComparison.Ordinal) == true);
+        // The test user list is mapped in every environment. Only the sign-in and sign-out routes are left out.
+        Assert.DoesNotContain(endpoints, endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/test-users/", StringComparison.Ordinal) == true);
         // Only the SPA fallback matches, and it takes GET and HEAD, as for any other path the server does not map.
         Assert.Equal(HttpStatusCode.MethodNotAllowed, signIn.StatusCode);
         await AssertNobodySignedInAsync(me);
@@ -210,10 +240,15 @@ public sealed class TestUserTests
     {
         using (body)
         {
-            Assert.Equal(id, body.RootElement.GetProperty("id").GetString());
-            Assert.Equal(displayName, body.RootElement.GetProperty("displayName").GetString());
-            Assert.Equal(roles, body.RootElement.GetProperty("roles").EnumerateArray().Select(role => role.GetString()!));
+            AssertUser(body.RootElement, id, displayName, roles);
         }
+    }
+
+    private static void AssertUser(JsonElement user, string id, string displayName, params string[] roles)
+    {
+        Assert.Equal(id, user.GetProperty("id").GetString());
+        Assert.Equal(displayName, user.GetProperty("displayName").GetString());
+        Assert.Equal(roles, user.GetProperty("roles").EnumerateArray().Select(role => role.GetString()!));
     }
 
     private static async Task AssertNobodySignedInAsync(HttpResponseMessage response)

@@ -11,7 +11,8 @@ namespace Axis.Configuration.Compilation;
 /// letter case. When a child lookup is given, each child collection whose child entity it finds
 /// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
-/// are given, which for now is the top level of a validation and a data source filter. A data
+/// are given, which for now is the top level of a validation, a data source filter and a process
+/// condition. A data
 /// source scope adds the data source's parameters after the fields, has the named rules it is
 /// given, and resolves paths through reference fields to the target entity's fields. No other
 /// scope resolves paths.

@@ -18,6 +18,7 @@ internal static class ResourceSchemas
         [ResourceKinds.DataSource] = Load("dataSource.schema.json"),
         [ResourceKinds.Rule] = Load("rule.schema.json"),
         [ResourceKinds.Sequence] = Load("sequence.schema.json"),
+        [ResourceKinds.Process] = Load("process.schema.json"),
     };
 
     public static bool TryGet(string kind, out JsonSchema schema) =>

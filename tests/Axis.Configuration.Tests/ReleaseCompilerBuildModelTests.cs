@@ -90,6 +90,37 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_keeps_the_process_files_and_compiles_back_into_its_processes()
+    {
+        var compiled = ApplicationCompiler.Compile(
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("entities/order.json", Order),
+            new ResourceContent("texts/en.json", """{ "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "order.cannotStart": "Cannot start" } }"""),
+            new ResourceContent("processes/review.json", """
+                { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Order",
+                  "startCondition": { "expression": "number is not null", "message": { "textKey": "order.cannotStart" } },
+                  "start": "check",
+                  "steps": [
+                    { "name": "check", "type": "decision", "branches": [{ "when": "length(number) > 5", "next": "long" }], "otherwise": "short" },
+                    { "name": "long", "type": "end" },
+                    { "name": "short", "type": "end" }
+                  ] }
+                """),
+        ]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.Contains("processes/review.json", release.Resources.Select(resource => resource.Path));
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.True(model.TryGetProcess("review", out var process));
+        Assert.Equal(["check", "long", "short"], process.Steps.Select(step => step.Name));
+    }
+
+    [Fact]
     public void Stored_release_with_invalid_content_throws()
     {
         var release = StoredRelease(Compile());
