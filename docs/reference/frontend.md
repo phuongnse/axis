@@ -169,7 +169,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     An id in the wrong form is not requested.
   - *(planned for M3)* `new` on a task inbox page, and a task id that is not
     in the hyphenated 8-4-4-4-12 hex form, show the not-found page inside the
-    site shell. A task id in the wrong form is not requested.
+    site shell. A task id in the wrong form is not requested. A well-formed
+    task id that the task API answers `404` for shows the not-found page
+    inside the site shell, as for a record.
   - Inside a site, the shell shows the site's title, navigation and locales.
     The theme toggle and the locale switch work as they do on the platform
     site.
