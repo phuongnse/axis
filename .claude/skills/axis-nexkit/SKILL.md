@@ -105,15 +105,6 @@ KIT="${TMPDIR:-/tmp}/nexkit-$REF"
 python3 "$KIT/bin/nexkit" status
 ```
 
-Check CI on `main` after each merge. NexKit starts it with `workflow_dispatch`:
-
-```bash
-gh run list --workflow ci.yml --branch main --limit 5 --json databaseId,event,conclusion,headSha,url
-```
-
-The CI workflow does not run on NexKit branches; NexKit's checks run the same
-scripts there.
-
 Split an issue that reports `too_large`. Create each part with
 `gh issue create --milestone "<parent's milestone>"`, then add the parts to the
 parent in order:
@@ -188,7 +179,7 @@ returns 404, upgrade `gh` and try again.
 - No edits in paths NexKit may not change, unless the pull request is hand-made.
 - While `merge.auto` is on, NexKit has merged by the time you look: review the
   merged pull request the same way, and raise problems with the owner. While it
-  is off, remind the owner that merging is theirs.
+  is off, NexKit mentions the owner when a pull request is ready.
 
 ## When something fails
 
