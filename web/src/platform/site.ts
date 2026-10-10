@@ -58,6 +58,8 @@ export interface FieldMetadata {
   unique: boolean
   /** The server computes the value on every write. The form shows it read-only and never sends it. */
   computed: boolean
+  /** A sequence numbers the field on create. The form shows it read-only and never sends it. */
+  sequence: boolean
   maxLength: number | null
   precision: number | null
   scale: number | null

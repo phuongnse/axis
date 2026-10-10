@@ -17,7 +17,7 @@ interface FormWidgetProps {
   recordId: string | null
   /** Where save and cancel go: the table page the user came from. */
   returnTo: string
-  /** The UI locale, for showing computed values. */
+  /** The UI locale, for showing computed and sequence values. */
   locale: string
 }
 
@@ -69,6 +69,7 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * validates, and its errors appear on the fields their JSON Pointer names. A child collection that
  * changed is sent as its whole row list, and a row's errors appear on its cells. A computed field,
  * of the record or of a row, is shown read-only with the value the server returned, and never sent.
+ * So is a sequence field, which is empty on a new record because the server numbers it on create.
  */
 export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
@@ -156,7 +157,10 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
     }
     const changed = Object.fromEntries(
       entity.fields
-        .filter((field) => !field.computed && !sameValue(field, values[field.name], snapshot.initial[field.name]))
+        .filter(
+          (field) =>
+            !field.computed && !field.sequence && !sameValue(field, values[field.name], snapshot.initial[field.name]),
+        )
         .map((field) => [field.name, values[field.name]]),
     )
     const body = buildRecordBody(entity.fields, changed, recordId === null ? undefined : snapshot.version)
@@ -256,8 +260,8 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
   const input = (field: FieldMetadata): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
-    if (field.computed) {
-      // The server computes the value on save, so it is shown as a table cell shows it.
+    if (field.computed || field.sequence) {
+      // The server sets the value on save, so it is shown as a table cell shows it.
       return <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t })} />
     }
     switch (field.type) {

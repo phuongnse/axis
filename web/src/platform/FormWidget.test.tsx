@@ -18,6 +18,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     required: false,
     unique: false,
     computed: false,
+    sequence: false,
     maxLength: null,
     precision: null,
     scale: null,
@@ -96,6 +97,23 @@ const computedWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note whose number a sequence hands out on create.
+const sequenceWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('number', 'text', 'note.number'), maxLength: 20, unique: true, sequence: true },
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      field('priority', 'integer', 'note.priority'),
+    ],
+  },
+}
+
+function sequenceJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"number":"PR-2026-00042","title":"Buy paper","priority":2},"labels":{}}`
+}
+
 function computedJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"amount":1.50,"total":3.00,"lines":[{"description":"Pens","code":"PENS"}]},"labels":{}}`
 }
@@ -125,6 +143,7 @@ const texts = {
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
+  'note.number': 'Number',
   'note.title': 'Title',
   'note.code': 'Code',
   'note.priority': 'Priority',
@@ -558,6 +577,47 @@ describe('FormWidget', () => {
       url: recordsPath,
       method: 'POST',
       body: '{"values":{"title":"Buy paper","amount":1.50,"lines":[{"description":"Pens"}]}}',
+    })
+  })
+
+  it('shows a sequence field empty and read-only on create, and leaves it out of the body', async () => {
+    const requests = stubFetch({ status: 201, body: sequenceJson(1) })
+    renderForm(null, sequenceWidget)
+
+    const number = screen.getByLabelText('Number')
+    expect(number).toHaveValue('')
+    expect(number).toHaveAttribute('readonly')
+    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(number, 'PR-1')
+    expect(number).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(1))
+    expect(requests()[0]).toEqual({
+      url: recordsPath,
+      method: 'POST',
+      body: '{"values":{"title":"Buy paper"}}',
+    })
+  })
+
+  it('shows a sequence field read-only with the loaded value on edit, and leaves it out of the body', async () => {
+    const requests = stubFetch({ status: 200, body: sequenceJson(1) }, { status: 200, body: sequenceJson(2) })
+    renderForm(noteId, sequenceWidget)
+
+    const number = await screen.findByLabelText('Number')
+    await waitFor(() => expect(number).toHaveValue('PR-2026-00042'))
+    expect(number).toHaveAttribute('readonly')
+    await userEvent.type(number, '9')
+    const priority = screen.getByLabelText('Priority')
+    await userEvent.clear(priority)
+    await userEvent.type(priority, '3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"priority":3}}',
     })
   })
 

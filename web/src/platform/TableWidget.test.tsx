@@ -14,6 +14,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     required: false,
     unique: false,
     computed: false,
+    sequence: false,
     maxLength: null,
     precision: null,
     scale: null,

@@ -94,6 +94,7 @@ const noteEntity: EntityMetadata = {
       required: true,
       unique: false,
       computed: false,
+      sequence: false,
       maxLength: 200,
       precision: null,
       scale: null,

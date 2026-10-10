@@ -23,4 +23,22 @@ public sealed class ApplicationSitesTests
             [("department", "reference", "purchaseRequest.department"), ("requests", "integer", null), ("total", "decimal", null)],
             widget.DataSource.Columns.Select(column => (column.Name, column.Type, column.LabelKey)));
     }
+
+    [Fact]
+    public void Form_marks_only_the_purchase_request_number_as_a_sequence_field()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+
+        var page = ApplicationSites.FindPage(result.Model, "PurchaseRequestForm");
+
+        Assert.NotNull(page);
+        var widget = Assert.Single(page.Widgets);
+        Assert.NotNull(widget.Entity);
+        Assert.Equal("number", widget.Entity.Fields[0].Name);
+        Assert.True(widget.Entity.Fields[0].Sequence);
+        Assert.All(widget.Entity.Fields.Skip(1), field => Assert.False(field.Sequence));
+        Assert.All(widget.Entity.Fields.SelectMany(field => field.Fields ?? []), field => Assert.False(field.Sequence));
+    }
 }

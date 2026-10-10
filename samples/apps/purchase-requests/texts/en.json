@@ -22,6 +22,7 @@
     "supplier.code": "Code",
     "supplier.name": "Name",
     "purchaseRequest.label": "Purchase request",
+    "purchaseRequest.number": "Number",
     "purchaseRequest.title": "Title",
     "purchaseRequest.requester": "Requester",
     "purchaseRequest.department": "Department",
