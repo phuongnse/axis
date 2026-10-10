@@ -120,16 +120,19 @@ returns 404, upgrade `gh` and try again.
 
 ## Checklist: writing an issue
 
-- One behaviour with 2–5 acceptance criteria, each checkable by a test or
-  command.
+- One behaviour, aiming for 2–5 acceptance criteria, each checkable by a test
+  or command. More than five: check whether the issue holds more than one
+  behaviour, and split it if so. If every criterion checks the same behaviour,
+  more are fine.
 - The text names the concepts the issue touches, in the terms of
   [concepts.md](../../../docs/domain/concepts.md), even when it links to the
   docs. Triage reads only the issue and its discussion, not the links.
 
 ## Checklist: reviewing a plan
 
-- The issue is one behaviour with 2–5 acceptance criteria, and each one can be
-  checked by a test or command.
+- The issue is one behaviour, aiming for 2–5 acceptance criteria, each
+  checkable by a test or command. More than five: split only if the issue holds
+  more than one behaviour. Do not re-plan only to cut the number of criteria.
 - The profile in the plan comment fits the issue, judged against the `when`
   texts. If not, re-plan with `/nexkit plan Use the <profile> profile`. If a
   `when` text caused the wrong choice, tell the owner and propose a fix to
