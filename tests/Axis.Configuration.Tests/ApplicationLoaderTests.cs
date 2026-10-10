@@ -161,16 +161,45 @@ public sealed class ApplicationLoaderTests
     }
 
     [Fact]
-    public void Process_task_step_is_not_built_yet_and_is_a_schema_violation()
+    public void Process_task_step_loads_with_its_label_assignee_form_due_duration_and_outcomes()
     {
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
-            .With("processes/review.json", Process("""[{ "name": "approve", "type": "task", "outcomes": { "approve": "done" } }, { "name": "done", "type": "end" }]"""));
+            .With("processes/review.json", Process("""
+                [
+                  { "name": "approve", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" },
+                    "form": "OrderReview", "dueIn": "P3D", "outcomes": [{ "name": "ok", "label": { "textKey": "task.ok" }, "next": "done" }] },
+                  { "name": "done", "type": "end" }
+                ]
+                """));
+
+        var result = ApplicationLoader.Load(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var step = Assert.Single(result.Processes).Steps[0];
+        Assert.Equal(
+            (ProcessStepDefinition.TaskStep, new TextReference("order.review"), new TaskAssigneeDefinition { Role = "finance" }, "OrderReview", "P3D"),
+            (step.Type, step.Label, step.Assignee, step.Form, step.DueIn));
+        Assert.Equal(new TaskOutcomeDefinition { Name = "ok", Label = new TextReference("task.ok"), Next = "done" }, Assert.Single(step.Outcomes!));
+    }
+
+    [Fact]
+    public void Process_task_step_with_outcomes_that_are_not_a_list_is_a_schema_violation()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("processes/review.json", Process("""
+                [
+                  { "name": "approve", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" },
+                    "form": "OrderReview", "outcomes": { "approve": "done" } },
+                  { "name": "done", "type": "end" }
+                ]
+                """));
 
         var result = ApplicationLoader.Load(folder.Path);
 
         Assert.Equal(
-            [(DiagnosticCodes.SchemaViolation, "/steps/0/outcomes"), (DiagnosticCodes.SchemaViolation, "/steps/0/type")],
+            [(DiagnosticCodes.SchemaViolation, "/steps/0/outcomes")],
             result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
         Assert.Empty(result.Processes);
     }

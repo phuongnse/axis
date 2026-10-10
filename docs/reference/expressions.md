@@ -297,8 +297,8 @@ Paths in validations and computed fields are not built. There a path is
   as a `null` reference does. A stored decimal on any record read that .NET
   `decimal` cannot hold exactly stops the evaluation with a run-time error.
   An `updateRecord` value sees the same scope, and is type-checked against
-  its field's type. *(planned for M3)* A task's `assignee.user` will see the
-  same scope too. Validations and computed fields keep their scope.
+  its field's type. A task's `assignee.user` sees the same scope too, and is
+  type-checked as `text`. Validations and computed fields keep their scope.
   See [processes](processes.md#steps).
 
 ## Functions

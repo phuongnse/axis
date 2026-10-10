@@ -11,10 +11,16 @@ public sealed class ProcessCompilerTests
 {
     private const string OrderId = "11111111-1111-4111-8111-111111111111";
     private const string ProcessId = "77777777-7777-4777-8777-777777777701";
+    private const string OrderReviewFormId = "99999999-9999-4999-8999-999999999901";
 
     private const string Texts = """
         { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-          "texts": { "order.cannotStart": "This order cannot be started." } }
+          "texts": {
+            "order.cannotStart": "This order cannot be started.",
+            "order.review": "Review the order",
+            "task.approve": "Approve",
+            "task.reject": "Reject"
+          } }
         """;
 
     private const string NeedsReview = """
@@ -368,7 +374,17 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "otherwise": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "set": { "status": "'x'" } }""")]
-    public void An_operation_shape_the_schema_refuses_is_a_schema_violation(string step)
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview" }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [] }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "queue": "x" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "next": "done" }] }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "form": "OrderReview" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "dueIn": "P3D" }""")]
+    public void A_step_shape_the_schema_refuses_is_a_schema_violation(string step)
     {
         using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"));
 
@@ -378,12 +394,236 @@ public sealed class ProcessCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void A_task_step_compiles_into_the_model_with_its_assignee_form_due_duration_and_outcomes()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var process = Assert.Single(result.Model.Processes);
+        var review = Assert.IsType<TaskStepModel>(process.Steps[0]);
+        Assert.Equal(
+            ("review", new TextReference("order.review"), new FormReference(Guid.Parse(OrderReviewFormId), "OrderReview"), (TimeSpan?)TimeSpan.FromDays(3)),
+            (review.Name, review.Label, review.Form, review.DueIn));
+        Assert.Null(review.Assignee.Role);
+        Assert.NotNull(review.Assignee.User);
+        Assert.Equal("'u1'", review.Assignee.User.Expression);
+        Assert.Equal("u1", Evaluate(review.Assignee.User, 0m));
+        Assert.Equal(
+            [("approve", new TextReference("task.approve"), "approved"), ("reject", new TextReference("task.reject"), "rejected")],
+            review.Outcomes.Select(outcome => (outcome.Name, outcome.Label, outcome.Next)));
+    }
+
+    [Fact]
+    public void A_task_step_assigned_to_a_role_with_no_due_date_compiles()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(assignee: """{ "role": "finance" }""", dueIn: null), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var review = Assert.IsType<TaskStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal((null, "finance", null), (review.Assignee.User, review.Assignee.Role, review.DueIn));
+    }
+
+    [Theory]
+    [InlineData("""{ "user": "'u1'", "role": "finance" }""", "OrderReview", "P3D", "reject", DiagnosticCodes.InvalidTaskAssignee, "/steps/0/assignee", "A task's assignee must have exactly one of 'user' and 'role'.")]
+    [InlineData("{}", "OrderReview", "P3D", "reject", DiagnosticCodes.InvalidTaskAssignee, "/steps/0/assignee", "A task's assignee must have exactly one of 'user' and 'role'.")]
+    [InlineData("""{ "role": "finance" }""", "Nope", "P3D", "reject", DiagnosticCodes.UnknownTaskForm, "/steps/0/form", "The form 'Nope' was not found. No loaded form has that name.")]
+    [InlineData("""{ "role": "finance" }""", "CustomerCard", "P3D", "reject", DiagnosticCodes.TaskFormOverOtherEntity, "/steps/0/form", "The form 'CustomerCard' is over the entity 'Customer'. A task's form must be over the process's entity 'Order'.")]
+    [InlineData("""{ "role": "finance" }""", "OrderReview", "P0D", "reject", DiagnosticCodes.InvalidTaskDueIn, "/steps/0/dueIn", null)]
+    [InlineData("""{ "role": "finance" }""", "OrderReview", "P1M", "reject", DiagnosticCodes.InvalidTaskDueIn, "/steps/0/dueIn", null)]
+    [InlineData("""{ "role": "finance" }""", "OrderReview", "soon", "reject", DiagnosticCodes.InvalidTaskDueIn, "/steps/0/dueIn", null)]
+    [InlineData("""{ "role": "finance" }""", "OrderReview", "P3D", "APPROVE", DiagnosticCodes.DuplicateOutcomeName, "/steps/0/outcomes/1/name", "The outcome name 'APPROVE' is already used by outcome 'approve' at '/steps/0/outcomes/0'.")]
+    public void A_task_problem_is_reported_with_its_own_code_at_its_path_and_gives_no_model(
+        string assignee, string form, string dueIn, string secondOutcome, string code, string path, string? message)
+    {
+        var steps = TaskSteps(assignee: assignee, form: form, dueIn: dueIn, secondOutcome: secondOutcome);
+        using var folder = Folder(Process("Order", steps, start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        if (message is not null)
+        {
+            Assert.Equal(message, diagnostic.Message);
+        }
+        else
+        {
+            Assert.Contains($"'{dueIn}'", diagnostic.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("customer.nope", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData("status +", ExpressionDiagnosticCodes.SyntaxError)]
+    public void A_user_assignee_expression_gets_the_usual_expression_diagnostics_at_its_user(string expression, string code)
+    {
+        using var folder = Folder(Process("Order", TaskSteps(assignee: $$"""{ "user": "{{expression}}" }"""), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "/steps/0/assignee/user"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_user_assignee_follows_paths_through_reference_fields()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(assignee: """{ "user": "customer.referredBy.name" }"""), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void Missing_task_and_outcome_label_keys_are_reported_at_their_text_keys()
+    {
+        var steps = TaskSteps().Replace("\"order.review\"", "\"order.nope\"", StringComparison.Ordinal)
+            .Replace("\"task.reject\"", "\"task.nope\"", StringComparison.Ordinal);
+        using var folder = Folder(Process("Order", steps, start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingTextKey, "/steps/0/label/textKey", "No locale has the text key 'order.nope'."),
+                (DiagnosticCodes.MissingTextKey, "/steps/0/outcomes/1/label/textKey", "No locale has the text key 'task.nope'."),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Message)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_outcome_next_joins_the_step_graph_checks()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "review", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview",
+                "outcomes": [
+                  { "name": "approve", "label": { "textKey": "task.approve" }, "next": "done" },
+                  { "name": "reject", "label": { "textKey": "task.reject" }, "next": "missing" }
+                ] },
+              { "name": "again", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview",
+                "outcomes": [{ "name": "retry", "label": { "textKey": "task.reject" }, "next": "again" }] },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownStep, "/steps/0/outcomes/1/next"),
+                (DiagnosticCodes.UnreachableStep, "/steps/1"),
+                (DiagnosticCodes.StepWithoutEnd, "/steps/1"),
+                (DiagnosticCodes.ProcessStepCycle, "/steps/1/outcomes/0/next"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_task_form_whose_file_was_not_loaded_is_not_reported_again_at_the_step()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(form: "BrokenForm"), start: "review"))
+            .With("forms/broken-form.json", """{ "id": "99999999-9999-4999-8999-999999999909", "kind": "form", "name": "BrokenForm", "formatVersion": 1 }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "forms/broken-form.json"), (diagnostic.Code, diagnostic.File));
+    }
+
+    [Fact]
+    public void A_task_over_an_unknown_entity_checks_neither_its_user_expression_nor_its_form_entity()
+    {
+        using var folder = Folder(Process("Nope", TaskSteps(assignee: """{ "user": "amount" }""", form: "CustomerCard"), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownProcessEntity, "/entity"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("P2W", 14 * 24 * 60 * 60)]
+    [InlineData("P3D", 3 * 24 * 60 * 60)]
+    [InlineData("PT4H", 4 * 60 * 60)]
+    [InlineData("P1DT12H", 36 * 60 * 60)]
+    [InlineData("PT1H30M15S", (60 * 60) + (30 * 60) + 15)]
+    [InlineData("P0DT1S", 1)]
+    public void A_positive_whole_number_duration_in_weeks_or_days_and_time_parses(string text, int seconds)
+    {
+        Assert.True(IsoDuration.TryParse(text, out var duration));
+        Assert.Equal(TimeSpan.FromSeconds(seconds), duration);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("P")]
+    [InlineData("PT")]
+    [InlineData("P1DT")]
+    [InlineData("P1M")]
+    [InlineData("P1Y")]
+    [InlineData("P0D")]
+    [InlineData("PT0S")]
+    [InlineData("-P1D")]
+    [InlineData("P1.5D")]
+    [InlineData("P1W2D")]
+    [InlineData("p1d")]
+    [InlineData("P1D ")]
+    [InlineData("P1D\n")]
+    [InlineData("P٣D")]
+    [InlineData("P99999999999999999999D")]
+    [InlineData("P9999999999999D")]
+    public void A_duration_outside_the_accepted_form_or_not_positive_does_not_parse(string text)
+    {
+        Assert.False(IsoDuration.TryParse(text, out var duration));
+        Assert.Equal(TimeSpan.Zero, duration);
+    }
+
     private static object? Evaluate(ExpressionModel expression, decimal amount)
     {
         var result = ExpressionInterpreter.Evaluate(
             expression.Syntax, expression.Check, new ExpressionValues([KeyValuePair.Create("amount", (object?)amount)]));
         Assert.True(result.Succeeded, result.Error?.Message);
         return result.Value;
+    }
+
+    /// <summary>
+    /// Steps that start with the task <c>review</c> on <paramref name="form"/>, whose outcomes
+    /// <c>approve</c> and <paramref name="secondOutcome"/> lead to the end steps <c>approved</c> and <c>rejected</c>.
+    /// </summary>
+    private static string TaskSteps(
+        string assignee = """{ "user": "'u1'" }""",
+        string form = "OrderReview",
+        string? dueIn = "P3D",
+        string secondOutcome = "reject")
+    {
+        var due = dueIn is null ? "" : $$""" "dueIn": "{{dueIn}}", """;
+        return $$"""
+            [
+              { "name": "review", "type": "task", "label": { "textKey": "order.review" }, "assignee": {{assignee}}, "form": "{{form}}", {{due}}
+                "outcomes": [
+                  { "name": "approve", "label": { "textKey": "task.approve" }, "next": "approved" },
+                  { "name": "{{secondOutcome}}", "label": { "textKey": "task.reject" }, "next": "rejected" }
+                ] },
+              { "name": "approved", "type": "end" },
+              { "name": "rejected", "type": "end" }
+            ]
+            """;
     }
 
     /// <summary>The process <c>OrderReview</c> over <paramref name="entity"/>, with an optional start condition.</summary>
@@ -402,7 +642,8 @@ public sealed class ProcessCompilerTests
     /// <summary>
     /// An application with an <c>Order</c> entity that references a <c>Customer</c>, owns <c>OrderLine</c> rows and
     /// takes its number from the <c>OrderNumber</c> sequence, a <c>Customer</c> that references the customer who
-    /// referred it, the rule <c>NeedsReview</c> and <paramref name="process"/>.
+    /// referred it, the rule <c>NeedsReview</c>, the forms <c>OrderReview</c> over <c>Order</c> and <c>CustomerCard</c>
+    /// over <c>Customer</c>, and <paramref name="process"/>.
     /// </summary>
     private static TemporaryFolder Folder(string process) =>
         new TemporaryFolder()
@@ -433,6 +674,14 @@ public sealed class ProcessCompilerTests
                     { "name": "name", "type": "text", "required": true },
                     { "name": "referredBy", "type": "reference", "target": "Customer" }
                   ] }
+                """)
+            .With("forms/order-review.json", $$"""
+                { "id": "{{OrderReviewFormId}}", "kind": "form", "name": "OrderReview", "formatVersion": 1, "entity": "Order",
+                  "sections": [ { "title": { "textKey": "order.review" }, "fields": [ { "field": "amount" } ] } ] }
+                """)
+            .With("forms/customer-card.json", """
+                { "id": "99999999-9999-4999-8999-999999999902", "kind": "form", "name": "CustomerCard", "formatVersion": 1, "entity": "Customer",
+                  "sections": [ { "title": { "textKey": "order.review" }, "fields": [ { "field": "name" } ] } ] }
                 """)
             .With("processes/order-review.json", process);
 }

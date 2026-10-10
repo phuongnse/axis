@@ -52,7 +52,7 @@
       "required": ["name", "type"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "type": { "enum": ["decision", "operation", "end"] },
+        "type": { "enum": ["decision", "task", "operation", "end"] },
         "branches": {
           "type": "array",
           "minItems": 1,
@@ -66,27 +66,71 @@
           "propertyNames": { "$ref": "#/$defs/name" },
           "additionalProperties": { "type": "string", "minLength": 1 }
         },
-        "next": { "$ref": "#/$defs/name" }
+        "next": { "$ref": "#/$defs/name" },
+        "label": { "$ref": "#/$defs/textReference" },
+        "assignee": { "$ref": "#/$defs/assignee" },
+        "form": { "$ref": "#/$defs/name" },
+        "dueIn": { "type": "string", "minLength": 1 },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/outcome" }
+        }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "decision" } } },
           "then": {
             "required": ["branches", "otherwise"],
-            "properties": { "operation": false, "set": false, "next": false }
+            "properties": {
+              "operation": false,
+              "set": false,
+              "next": false,
+              "label": false,
+              "assignee": false,
+              "form": false,
+              "dueIn": false,
+              "outcomes": false
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "task" } } },
+          "then": {
+            "required": ["label", "assignee", "form", "outcomes"],
+            "properties": { "branches": false, "otherwise": false, "operation": false, "set": false, "next": false }
           }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "operation" } } },
           "then": {
             "required": ["operation", "set", "next"],
-            "properties": { "branches": false, "otherwise": false }
+            "properties": {
+              "branches": false,
+              "otherwise": false,
+              "label": false,
+              "assignee": false,
+              "form": false,
+              "dueIn": false,
+              "outcomes": false
+            }
           }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "end" } } },
           "then": {
-            "properties": { "branches": false, "otherwise": false, "operation": false, "set": false, "next": false }
+            "properties": {
+              "branches": false,
+              "otherwise": false,
+              "operation": false,
+              "set": false,
+              "next": false,
+              "label": false,
+              "assignee": false,
+              "form": false,
+              "dueIn": false,
+              "outcomes": false
+            }
           }
         }
       ]
@@ -97,6 +141,24 @@
       "required": ["when", "next"],
       "properties": {
         "when": { "type": "string", "minLength": 1 },
+        "next": { "$ref": "#/$defs/name" }
+      }
+    },
+    "assignee": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "label", "next"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "label": { "$ref": "#/$defs/textReference" },
         "next": { "$ref": "#/$defs/name" }
       }
     }

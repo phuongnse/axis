@@ -17,10 +17,14 @@ namespace Axis.Configuration.Compilation;
 /// of at most 3 hops. An operation step runs <c>updateRecord</c>, and each field its <c>set</c>
 /// names is a field of the subject entity, named once, that is not computed, numbered by a
 /// sequence or a child collection. Each <c>set</c> expression type-checks against its field's type
-/// over the same scope as a condition. Every problem of a process is
+/// over the same scope as a condition. A task step's assignee is exactly one of a <c>user</c>, a
+/// <c>text</c> expression over the same scope, and a <c>role</c>. Its form is a loaded form over
+/// the subject entity, its <c>dueIn</c> is a positive fixed duration, its outcome names are unique
+/// ignoring letter case, and each outcome's <c>next</c> is a transition. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
-/// is left out of the reachability, end and cycle checks, and a step with a transition to an
-/// unknown step is not also reported as having no path to an end.
+/// is left out of the reachability, end and cycle checks, a step with a transition to an
+/// unknown step is not also reported as having no path to an end, and a form or entity file that
+/// was not loaded because of its own errors is not reported again.
 /// </summary>
 internal static class ProcessChecker
 {
@@ -33,6 +37,8 @@ internal static class ProcessChecker
         Func<string, EntityResource?> findEntity,
         Func<string, string?> ownerOf,
         IReadOnlySet<string> unloadedEntityNames,
+        Func<string, FormResource?> findForm,
+        IReadOnlySet<string> unloadedFormNames,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -67,16 +73,31 @@ internal static class ProcessChecker
             CheckGraph(process, Report);
 
             // The expressions cannot be checked without the entity.
+            ExpressionScope? scope = null;
             if (entity is not null)
             {
-                var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
+                scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
                 CheckConditions(process, scope, Report);
                 CheckOperations(process, entity, scope, Report);
             }
 
+            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, Report);
+
             if (process.StartCondition is { } startCondition)
             {
                 ApplicationCompiler.CheckTextKey(startCondition.Message, process.File, process.Id, "/startCondition/message", textKeys, diagnostics);
+            }
+
+            for (var index = 0; index < process.Steps.Count; index++)
+            {
+                var step = process.Steps[index];
+                ApplicationCompiler.CheckTextKey(step.Label, process.File, process.Id, $"/steps/{index}/label", textKeys, diagnostics);
+                var outcomes = step.Outcomes ?? [];
+                for (var outcome = 0; outcome < outcomes.Count; outcome++)
+                {
+                    ApplicationCompiler.CheckTextKey(
+                        outcomes[outcome].Label, process.File, process.Id, $"/steps/{index}/outcomes/{outcome}/label", textKeys, diagnostics);
+                }
             }
         }
     }
@@ -85,9 +106,11 @@ internal static class ProcessChecker
     /// Builds a checked process. Each transition is the declared name of the step it names, and each
     /// condition is compiled over the subject entity's fields, its child collections, the named rules
     /// and paths through reference fields. The fields an operation sets are in the entity's
-    /// declaration order, so a release rebuilt from its stored files has the same model.
+    /// declaration order, so a release rebuilt from its stored files has the same model. A task's
+    /// form is resolved and its <c>dueIn</c> becomes a fixed duration.
     /// </summary>
-    public static ProcessModel Build(ProcessResource process, Func<string, EntityResource?> findEntity, IEnumerable<ExpressionRule> rules)
+    public static ProcessModel Build(
+        ProcessResource process, Func<string, EntityResource?> findEntity, Func<string, FormResource?> findForm, IEnumerable<ExpressionRule> rules)
     {
         var entity = findEntity(process.Entity)!;
         var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
@@ -112,6 +135,22 @@ internal static class ProcessChecker
             ];
         }
 
+        // A checked task has exactly one of user and role, a loaded form and a valid dueIn.
+        TaskStepModel BuildTask(ProcessStepDefinition step)
+        {
+            var form = findForm(step.Form!)!;
+            TimeSpan? dueIn = step.DueIn is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
+            return new TaskStepModel(
+                step.Name,
+                step.Label!,
+                new TaskAssigneeModel(
+                    step.Assignee!.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null,
+                    step.Assignee.Role),
+                new FormReference(form.Id, form.Name),
+                dueIn,
+                step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList());
+        }
+
         return new ProcessModel
         {
             Id = process.Id,
@@ -129,13 +168,14 @@ internal static class ProcessChecker
                         step.Name,
                         step.Branches!.Select(branch => new DecisionBranchModel(Compile(branch.When), Resolve(branch.Next))).ToList(),
                         Resolve(step.Otherwise!)),
+                    ProcessStepDefinition.TaskStep => BuildTask(step),
                     ProcessStepDefinition.OperationStep => new OperationStepModel(
                         step.Name,
                         step.Operation!,
                         Assign(step.Set!),
                         Resolve(step.Next!)),
                     ProcessStepDefinition.End => new EndStepModel(step.Name),
-                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, operation and end steps."),
+                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation and end steps."),
                 })
                 .ToList(),
         };
@@ -198,6 +238,12 @@ internal static class ProcessChecker
             if (step.Next is { } next)
             {
                 transitions[index].Add(new Transition(Resolve(next, $"{path}/next"), $"{path}/next"));
+            }
+
+            for (var outcome = 0; outcome < (step.Outcomes?.Count ?? 0); outcome++)
+            {
+                var outcomePath = $"{path}/outcomes/{outcome}/next";
+                transitions[index].Add(new Transition(Resolve(step.Outcomes![outcome].Next, outcomePath), outcomePath));
             }
         }
 
@@ -281,7 +327,7 @@ internal static class ProcessChecker
     /// <summary>
     /// Reports each transition that closes a cycle, at that transition, naming the steps in the
     /// cycle. The steps are walked depth-first in file order, each step's transitions in order: the
-    /// branches, then <c>otherwise</c>, then <c>next</c>. A step with two transitions to the same step is reported once.
+    /// branches, then <c>otherwise</c>, then <c>next</c>, then the outcomes. A step with two transitions to the same step is reported once.
     /// </summary>
     private static void CheckCycles(
         IReadOnlyList<ProcessStepDefinition> steps, List<Transition>[] transitions, bool[] duplicate, Action<string, string, string> report)
@@ -431,6 +477,91 @@ internal static class ProcessChecker
                 if (problem is not null)
                 {
                     report(problem.Code, problem.Message, path);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, and a
+    /// <c>user</c> expression gives <c>text</c> over <paramref name="scope"/>. Its form is a loaded
+    /// form whose entity is <paramref name="entity"/>. Its <c>dueIn</c>, when set, is a positive
+    /// fixed duration, and its outcome names are unique ignoring letter case. The expression and the
+    /// form's entity are not checked when the subject entity is unknown, and the form's entity is not
+    /// checked when the form's own entity is unknown.
+    /// </summary>
+    private static void CheckTasks(
+        ProcessResource process,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
+        Func<string, FormResource?> findForm,
+        IReadOnlySet<string> unloadedFormNames,
+        Action<string, string, string> report)
+    {
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type != ProcessStepDefinition.TaskStep)
+            {
+                continue;
+            }
+
+            var path = $"/steps/{index}";
+            var assignee = step.Assignee!;
+            if ((assignee.User is null) == (assignee.Role is null))
+            {
+                report(DiagnosticCodes.InvalidTaskAssignee, "A task's assignee must have exactly one of 'user' and 'role'.", $"{path}/assignee");
+            }
+
+            if (assignee.User is { } user && scope is not null)
+            {
+                var parsed = ExpressionParser.Parse(user);
+                ExpressionDiagnostic? problem = parsed.Succeeded
+                    ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Text).Diagnostic
+                    : parsed.Diagnostic;
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, $"{path}/assignee/user");
+                }
+            }
+
+            var formName = step.Form!;
+            if (findForm(formName) is { } form)
+            {
+                if (entity is not null && findEntity(form.Entity) is { } formEntity && !ReferenceEquals(formEntity, entity))
+                {
+                    report(
+                        DiagnosticCodes.TaskFormOverOtherEntity,
+                        $"The form '{form.Name}' is over the entity '{formEntity.Name}'. A task's form must be over the process's entity '{entity.Name}'.",
+                        $"{path}/form");
+                }
+            }
+            else if (!unloadedFormNames.Contains(formName))
+            {
+                report(DiagnosticCodes.UnknownTaskForm, $"The form '{formName}' was not found. No loaded form has that name.", $"{path}/form");
+            }
+
+            if (step.DueIn is { } dueIn && !IsoDuration.TryParse(dueIn, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTaskDueIn,
+                    $"The duration '{dueIn}' is not valid. 'dueIn' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                    $"{path}/dueIn");
+            }
+
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var outcomes = step.Outcomes!;
+            for (var outcome = 0; outcome < outcomes.Count; outcome++)
+            {
+                var name = outcomes[outcome].Name;
+                if (!firstIndexByName.TryAdd(name, outcome))
+                {
+                    var firstIndex = firstIndexByName[name];
+                    report(
+                        DiagnosticCodes.DuplicateOutcomeName,
+                        $"The outcome name '{name}' is already used by outcome '{outcomes[firstIndex].Name}' at '{path}/outcomes/{firstIndex}'.",
+                        $"{path}/outcomes/{outcome}/name");
                 }
             }
         }
