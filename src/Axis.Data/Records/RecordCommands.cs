@@ -24,9 +24,11 @@ public static class RecordCommands
     /// Inserts a record with version 1, holding <paramref name="values"/> and SQL <c>NULL</c> or the
     /// column default for every other field, and the rows of each collection in
     /// <paramref name="rows"/>. Its id is <paramref name="id"/>, such as a seed record's fixed id,
-    /// or a new version 7 id when <paramref name="id"/> is not given. The caller must hold a
-    /// transaction when <paramref name="rows"/> is not empty, and roll it back unless the record
-    /// is <see cref="RecordWriteOutcome.Written"/>.
+    /// or a new version 7 id when <paramref name="id"/> is not given. Each field that names a
+    /// sequence gets the sequence's next number, taken after the reference check so a refused
+    /// create returns before it touches a counter. The caller must hold a transaction when
+    /// <paramref name="rows"/> is not empty or the entity has a sequence field, and roll it back
+    /// unless the record is <see cref="RecordWriteOutcome.Written"/>, which hands the number back.
     /// </summary>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
@@ -48,6 +50,7 @@ public static class RecordCommands
             return missing;
         }
 
+        values = await WithSequenceNumbersAsync(connection, application, entity, values, cancellationToken);
         await using var command = new NpgsqlCommand { Connection = connection };
         command.Parameters.AddWithValue("id", id ?? Guid.CreateVersion7());
         var columns = new List<string> { EntityNaming.Quote(EntityNaming.IdColumn), EntityNaming.Quote(EntityNaming.VersionColumn) };
@@ -150,6 +153,35 @@ public static class RecordCommands
         {
             return RecordDeleteOutcome.Referenced;
         }
+    }
+
+    /// <summary>
+    /// Adds the next number of each sequence field to <paramref name="values"/>, which never
+    /// holds one: the parser refuses it. The UTC year is read once, so the period a number is
+    /// counted in and the year it shows are the same.
+    /// </summary>
+    private static async Task<IReadOnlyList<RecordValue>> WithSequenceNumbersAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        IReadOnlyList<RecordValue> values,
+        CancellationToken cancellationToken)
+    {
+        var sequenceFields = RecordQueries.Columns(entity).Where(field => field.Sequence is not null).ToList();
+        if (sequenceFields.Count == 0)
+        {
+            return values;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var numbered = new List<RecordValue>(values);
+        foreach (var field in sequenceFields)
+        {
+            var number = await SequenceCounters.NextAsync(connection, application.Manifest.Id, field.Sequence!, now, cancellationToken);
+            numbered.Add(new RecordValue(field, number));
+        }
+
+        return numbered;
     }
 
     /// <summary>

@@ -22,12 +22,12 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     they never use `axis.active_releases`, `axis.active_sites` or the
     configuration context directly.
   - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity
-    with its application and table) and `axis.provisioned_enum_values` (each
-    recorded enum value), with history in `axis.__data_migrations`.
-  - `Axis.Data` also owns `axis.audit_records` and
-    `axis.sequence_counters`, with history in `axis.__data_migrations`
-    *(planned for M3)*. Processes write audit records through its contract,
-    inside their own transaction. See
+    with its application and table), `axis.provisioned_enum_values` (each
+    recorded enum value) and `axis.sequence_counters` (the last number of
+    each sequence and period), with history in `axis.__data_migrations`.
+  - `Axis.Data` also owns `axis.audit_records`, with history in
+    `axis.__data_migrations` *(planned for M3)*. Processes write audit
+    records through its contract, inside their own transaction. See
     [Audit records and sequence counters](#audit-records-and-sequence-counters).
   - Releases are immutable, enforced through the context's change tracking:
     a release and its resources are only inserted together. Saving fails when
@@ -200,11 +200,12 @@ child tables are in [Schema planning](#schema-planning).
 
 ## Audit records and sequence counters
 
-*(planned for M3)* `Axis.Data` owns both tables (D21). They are system tables
-in the `axis` schema of the tenant database.
+`Axis.Data` owns both tables (D21). They are system tables in the `axis`
+schema of the tenant database.
 
-- **Audit records.** `axis.audit_records` is append-only. Each row is
-  written in the same transaction as the action it records.
+- **Audit records** *(planned for M3)*. `axis.audit_records` is
+  append-only. Each row is written in the same transaction as the action it
+  records.
 
   | Column | Type | Meaning |
   | --- | --- | --- |
@@ -226,7 +227,8 @@ in the `axis` schema of the tenant database.
     statement trigger raise an exception, so no row can be changed or
     removed.
 - **Sequence counters.** `axis.sequence_counters` holds one row per
-  [sequence](configuration.md#sequences) and period.
+  [sequence](configuration.md#sequences) and period. The row is created by
+  the first number of the period.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

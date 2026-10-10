@@ -17,6 +17,7 @@
     "item.priceNotNegative": "Giá không được âm.",
     "item.closedInactive": "Mặt hàng đã đóng không thể hoạt động.",
     "itemPart.noLeadingSpace": "Tên bộ phận không được bắt đầu bằng khoảng trắng.",
-    "order.needsLine": "Đơn hàng cần ít nhất một dòng."
+    "order.needsLine": "Đơn hàng cần ít nhất một dòng.",
+    "ticket.priorityPositive": "Mức ưu tiên phải lớn hơn không."
   }
 }

@@ -195,8 +195,9 @@ public static partial class RecordInputParser
                 continue;
             }
 
-            // The server computes the value on every write, so a body never sets it, not even to null.
-            if (field.IsComputed)
+            // The server computes the value on every write, or numbers it on create, so a body
+            // never sets it, not even to null.
+            if (field.IsComputed || field.Sequence is not null)
             {
                 AddError(errors, propertyPointer, Messages.Computed);
                 continue;

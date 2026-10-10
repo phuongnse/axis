@@ -4,7 +4,8 @@ namespace Axis.Data.Storage;
 
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
-/// <c>entities</c> schema. The caller supplies the connection to the tenant database.
+/// <c>entities</c> schema, and the counters of the sequences. The caller supplies the connection
+/// to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
 {
@@ -19,6 +20,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<ProvisionedEntityRow> ProvisionedEntities => Set<ProvisionedEntityRow>();
 
     public DbSet<ProvisionedEnumValueRow> ProvisionedEnumValues => Set<ProvisionedEnumValueRow>();
+
+    public DbSet<SequenceCounterRow> SequenceCounters => Set<SequenceCounterRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -49,6 +52,16 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             value.Property(v => v.EntityId).HasColumnName("entity_id");
             value.Property(v => v.FieldName).HasColumnName("field_name");
             value.Property(v => v.Value).HasColumnName("value");
+        });
+
+        modelBuilder.Entity<SequenceCounterRow>(counter =>
+        {
+            counter.ToTable("sequence_counters");
+            counter.HasKey(c => new { c.SequenceId, c.Period }).HasName("pk_sequence_counters");
+            counter.Property(c => c.SequenceId).HasColumnName("sequence_id").ValueGeneratedNever();
+            counter.Property(c => c.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
+            counter.Property(c => c.Period).HasColumnName("period").ValueGeneratedNever();
+            counter.Property(c => c.LastValue).HasColumnName("last_value").ValueGeneratedNever();
         });
     }
 }
