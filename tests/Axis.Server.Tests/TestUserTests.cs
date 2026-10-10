@@ -85,7 +85,7 @@ public sealed class TestUserTests
         Assert.Equal(
             "Must be the id of a configured test user.",
             problem.RootElement.GetProperty("errors").GetProperty("id")[0].GetString());
-        Assert.DoesNotContain("zoe", problem.RootElement.GetProperty("title").GetString(), StringComparison.Ordinal);
+        Assert.Equal("One or more validation errors occurred.", problem.RootElement.GetProperty("title").GetString());
         await AssertNobodySignedInAsync(await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken));
     }
 
