@@ -13,7 +13,8 @@ checklists and what to do when something fails.
 You may post `/nexkit plan`, `/nexkit fix` and `/nexkit review` yourself. Post
 `/nexkit go` only when the owner says so explicitly, and only on the latest
 plan, after the check below that it holds every agreed change. Never approve
-a pull request, approve a waiting CI run or merge. Those are the owner's.
+or merge a pull request yourself. While `auto_merge` is on, NexKit merges. While
+it is off, merging is the owner's.
 
 ## Where the values live
 
@@ -36,12 +37,12 @@ change with a NexKit release or a settings change.
     -H 'Accept: application/vnd.github.raw'
   ```
 
-- **Protected paths and the automatic fix limit:** `.nexkit/config.json`. When a
-  key is `null`, the value is NexKit's default, from its configuration doc at
-  the pinned ref.
+- **Protected paths, the automatic fix limit and automatic merge:**
+  `.nexkit/config.json`. When a key is `null` or missing, the value is NexKit's
+  default, from its configuration doc at the pinned ref.
 
   ```bash
-  jq '.protected_paths, .max_auto_fixes' .nexkit/config.json
+  jq '.protected_paths, .max_auto_fixes, .auto_merge, .after_merge_workflows' .nexkit/config.json
   ```
 
 - **Profiles, their `when` texts and models:** `.nexkit/config.json`. A
@@ -96,11 +97,14 @@ gh pr list --state open --json number,title,headRefName,reviewDecision,statusChe
   --jq ".[] | select(.headRefName | startswith(\"$PREFIX\"))"
 ```
 
-Find CI runs that wait for approval, then give each run URL to the owner:
+Check CI on `main` after each merge. NexKit starts it with `workflow_dispatch`:
 
 ```bash
-gh run list --status action_required --json databaseId,displayTitle,headBranch,url
+gh run list --workflow ci.yml --branch main --limit 5 --json databaseId,event,conclusion,headSha,url
 ```
+
+The CI workflow on a NexKit pull request waits as `action_required`, because
+NexKit opens it with the Actions token. It is not a required check, so leave it.
 
 Split an issue that reports `too_large`. Create each part with
 `gh issue create --milestone "<parent's milestone>"`, then add the parts to the
@@ -171,7 +175,9 @@ returns 404, upgrade `gh` and try again.
 - Tests cover the change, including denied access where it applies.
 - The required checks on `main` are green.
 - No edits in paths NexKit may not change, unless the pull request is hand-made.
-- Remind the owner that approval and merging are theirs.
+- While `auto_merge` is on, NexKit has merged by the time you look: review the
+  merged pull request the same way, and raise problems with the owner. While it
+  is off, remind the owner that merging is theirs.
 
 ## When something fails
 
@@ -185,7 +191,8 @@ returns 404, upgrade `gh` and try again.
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | The review job errored | Comment `/nexkit review` to retry. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
-| A CI run waits as `action_required` | Remind the owner and give them the run URL. |
+| NexKit's automatic merge was refused | The round's comment says why, usually a rule on `main`. Tell the owner. The pull request waits for them. |
+| CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the failure and the run link, in the current milestone, and plan it before other issues. |
 
 For the mechanics behind each failure, read NexKit's troubleshooting doc at the
 pinned ref, found as described under "Where the values live".
