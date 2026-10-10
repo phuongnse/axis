@@ -366,7 +366,7 @@ sorted by file and then path.
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
 | `AXC0045` | A data source's `sort` names no projected field, or names a projected field whose path ends at a `reference`. For a grouped data source, it names no group field or measure, or names a group field whose path ends at a `reference`. Reported at `/sort`. |
 | `AXC0046` | An expression names a field that is not in its scope, including an unknown field after a `.`. Outside a data source filter and a process condition, every `.` path is reported this way. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
-| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. This includes a `date('…')` or `dateTime('…')` text that is not a valid date or date-time, such as `date('2026-13-45')`, in every use. It also includes a child collection used anywhere but as the first argument of an aggregate, such as `lineItems == null`, and an aggregate over a field that is not a child collection, such as `sum(title, amount)`. In a data source filter it also includes a `.` after a field that is not a `reference`, such as `name.x`, or after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
+| `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. This includes a `date('…')` or `dateTime('…')` text that is not a valid date or date-time, such as `date('2026-13-45')`, in every use. It also includes a child collection used anywhere but as the first argument of an aggregate, such as `lineItems == null`, and an aggregate over a field that is not a child collection, such as `sum(title, amount)`. In a data source filter or a process condition it also includes a `.` after a field that is not a `reference`, such as `name.x`. In a data source filter it also includes a `.` after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
 | `AXC0050` | An expression calls a function or rule that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
@@ -438,7 +438,9 @@ development or E2E server serves a real application without a separate step.
   record API's rules apply, and a synced seed still needs every required
   field. Every record is parsed before any write, and every invalid value is
   `AXC0033` at `/records/{i}/values/<field>`, as is a value for a
-  [computed field](#entity-logic). Seed records are not run
+  [computed field](#entity-logic) or a [sequence](#sequences) field. An
+  inserted seed record gets the sequence's next number, like any other
+  create, and a synced update keeps the number. Seed records are not run
   through the entity's [validations](#entity-logic) yet. Then all inserts and updates of
   the folder run in one transaction, seed files in path order and records in
   file order, so a reference value must name an existing record or one
@@ -613,9 +615,8 @@ computed fields come later:
 ## Sequences
 
 A `sequence` resource hands out business numbers, such as `PR-2026-00042`
-(D21). The compiler checks sequences and the fields that name them. Assigning
-the numbers is *(planned for M3)*: until then, a field with a `sequence` is a
-plain optional text field.
+(D21). The compiler checks sequences and the fields that name them. The
+record create fills a field that names a sequence with the next number.
 
 ```json
 {
@@ -655,8 +656,8 @@ An entity `text` field names the sequence in its `sequence` property:
 ```
 
 - `sequence` names a loaded `sequence` resource, ignoring letter case.
-- *(planned for M3)* The field gets its number on create, in the create's
-  transaction, and clients cannot write it. See
+- The field gets its number on create, in the create's transaction, and
+  clients cannot write it. See
   [the record API](record-api.md#create-update-and-delete) and
   [storage](storage.md#audit-records-and-sequence-counters).
 - A field with `sequence` cannot be `required` or have an `expression`,

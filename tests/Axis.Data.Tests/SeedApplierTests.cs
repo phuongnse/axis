@@ -82,6 +82,33 @@ public sealed class SeedApplierTests
             result.Diagnostics.Select(diagnostic => diagnostic.Path));
     }
 
+    [Fact]
+    public async Task Value_for_a_sequence_field_is_reported_before_the_connection_is_used()
+    {
+        // The connection is never opened, so any database access would throw.
+        await using var connection = new NpgsqlConnection();
+        var ticket = Models.Entity(
+            Guid.Parse("11111111-1111-4111-8111-111111111114"),
+            "Ticket",
+            "entities/ticket.json",
+            Models.Field("title", FieldType.Text, required: true),
+            Models.Field("number", FieldType.Text, maxLength: 20) with
+            {
+                Sequence = new SequenceModel(Guid.Parse("11111111-1111-4111-8111-111111111115"), "TicketNumber", "T-{yyyy}-{n:4}"),
+            });
+        var model = Models.Application(ticket) with
+        {
+            Seeds = [Seed("seeds/tickets.json", ticket, Record("""{ "title": "First", "number": "T-2026-0001" }"""))],
+        };
+
+        var result = await SeedApplier.ApplyAsync(model, connection, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, result.Inserted);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidSeedValue, diagnostic.Code);
+        Assert.Equal(("seeds/tickets.json", "/records/0/values/number"), (diagnostic.File, diagnostic.Path));
+    }
+
     private static SeedModel Seed(string file, params SeedRecordDefinition[] records) => Seed(file, _note, records);
 
     private static SeedModel Seed(string file, EntityModel entity, params SeedRecordDefinition[] records) =>

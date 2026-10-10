@@ -17,6 +17,7 @@
     "item.priceNotNegative": "Price must not be negative.",
     "item.closedInactive": "A closed item cannot be active.",
     "itemPart.noLeadingSpace": "A part name must not start with a space.",
-    "order.needsLine": "An order needs at least one line."
+    "order.needsLine": "An order needs at least one line.",
+    "ticket.priorityPositive": "Priority must be greater than zero."
   }
 }

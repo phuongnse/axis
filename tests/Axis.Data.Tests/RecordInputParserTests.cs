@@ -448,6 +448,34 @@ public sealed class RecordInputParserTests
         Assert.Equal([("name", (object?)"a"), ("code", null)], row.Select(value => (value.Field.Name, value.Value)));
     }
 
+    [Theory]
+    [InlineData("\"T-2026-0001\"")]
+    [InlineData("null")]
+    public void Sequence_field_set_by_the_body_is_an_error_at_its_pointer(string json)
+    {
+        var entity = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e05"),
+            "Ticket",
+            "entities/ticket.json",
+            Field("title", FieldType.Text),
+            Field("number", FieldType.Text, maxLength: 20) with
+            {
+                Sequence = new SequenceModel(Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e06"), "TicketNumber", "T-{yyyy}-{n:4}"),
+            });
+        var application = Application(entity);
+
+        foreach (var (operation, version) in new[] { (RecordOperation.Create, ""), (RecordOperation.Update, "\"version\": 1, ") })
+        {
+            var body = $$"""{ {{version}}"values": { "title": "Hi", "number": {{json}} } }""";
+            var result = RecordInputParser.Parse(Encoding.UTF8.GetBytes(body), entity, application, operation);
+
+            Assert.Null(result.Input);
+            Assert.NotNull(result.Errors);
+            Assert.Equal(["/values/number"], result.Errors.Keys);
+            Assert.Equal(["Cannot be set."], result.Errors["/values/number"]);
+        }
+    }
+
     /// <summary>An owner whose <c>total</c> is computed, with rows whose <c>code</c> is computed.</summary>
     private static (EntityModel Entity, ApplicationModel Application) ComputedModels()
     {

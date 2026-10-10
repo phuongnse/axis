@@ -199,14 +199,14 @@ Everything in the repository and on GitHub is in English.
   sections and columns, that hold other widgets.
 
 - **Data:** see [D18](#d18-data-sources--agreed).
+- **Forms:** a `form` resource serves both a `form` widget and a process
+  task. See [D20](#d20-human-tasks-task-inbox-and-forms--agreed).
 
-Still **Proposed**, because they show how the M1 shortcuts are expected to
-grow but are not settled yet:
+Still **Proposed**, because it shows how the M1 shortcut is expected to grow
+but is not settled yet:
 
 - **Navigation:** `formPage` gives way to navigate actions with page
   parameters.
-- **Forms:** form layout becomes its own `form` resource that both a `form`
-  widget and a process task (M3) can use.
 
 *Why:* the page and widget split shapes data sources (M2), process task forms
 (M3) and authorization (M4). Keeping the page free of an entity or template
@@ -240,8 +240,8 @@ Entities get logic and owned rows in M2. See
 - **Validation:** an entity declares validation rules. Each has a boolean
   expression, a text key for its message and the field it is reported on. The
   server checks them on create and update, and a failure is a `400` at the
-  field's path. Validation on the client as the user types comes with full
-  forms in M3.
+  field's path. Validation on the client as the user types comes later
+  ([D20](#d20-human-tasks-task-inbox-and-forms--agreed)).
 - **Computed fields:** a field can have an expression. Its value is stored in
   its column and recomputed on every write of the record, in the same
   transaction. Clients cannot write it.
@@ -325,11 +325,60 @@ Processes and the worker host arrive in M3. See
 request thread, and each step is one transaction, so a crash leaves no partial
 work.
 
+## D20. Human tasks, task inbox and forms — Agreed
+
+Human work arrives in M3. See [processes](reference/processes.md#steps) and
+[the frontend](reference/frontend.md). All of it is *(planned for M3)*.
+
+- **Task step:** a `task` step has a `label`, an assignee, a `form`, an
+  optional `dueIn` and its outcomes.
+  - `label` is a required text key. The task inbox and the task page show
+    it, because every UI string comes from text resources.
+  - The assignee is either `user`, an expression that gives a user id, such
+    as `department.manager`, or `role`, a role name. Queues come later.
+  - `dueIn` is an ISO 8601 duration. It is stored as the task's due date and
+    shown. Escalation needs timers, so it comes later.
+  - Each outcome has a name, a label text key and a next step.
+- **Exactly one decision:** an open task can be completed once. A later or
+  concurrent completion is a `409`. An outcome the step does not allow is a
+  `400`.
+- **Who may act:** the current user may act when they are the assignee, or
+  hold the assignee role. Anyone else gets a `403`, and a request without a
+  user gets a `401`. This is checked at the moment of action. Policies in M4
+  add to this check and never replace it.
+- **Task form:** the task page shows the step's form over the subject
+  record. The fields the form makes editable are saved with the decision, in
+  the same transaction.
+- **Task inbox:** a `taskInbox` widget lists the current user's open tasks in
+  the application and opens the task page.
+- **Start process action:** a `form` widget can declare a `startProcess`
+  action, shown as a button. It saves the record first, then starts the
+  process. Navigate actions stay **Proposed** in
+  [D15](#d15-presentation-model--agreed).
+- **Form resource:** a `form` resource has one entity and sections of fields,
+  and each field can be read-only. A `form` widget names a `form`, or an
+  `entity` as shorthand for all its fields. The same `form` serves a page and
+  a task. This settles the forms point of D15.
+- **Later:** these come later, with no milestone yet:
+  - conditional visibility, required and read-only states;
+  - validation as the user types;
+  - wizard steps;
+  - file upload.
+
+  This replaces the sentence of D17 that put validation as the user types in
+  M3.
+
+*Why:* see [knowledge](domain/knowledge.md#human-work) and
+[user interface](domain/knowledge.md#user-interface). A task is a first-class
+step, so exactly one decision is recorded and the instance resumes from it.
+One form resource serves a page and a task, so a layout is written once.
+Moving the richer form features out keeps M3 on processes.
+
 ## D21. Development test users, audit records and sequences — Agreed
 
 M3 adds three platform pieces before processes run. Test users, their
-sign-in, the current user and the SPA user picker are built. Audit records,
-record history and sequences are *(planned for M3)*.
+sign-in, the current user, the SPA user picker and sequences are built. Audit
+records and record history are *(planned for M3)*.
 
 - **Test users:** server configuration holds a fixed list, `TestUsers`, with
   an id, a display name and role names for each user. The SPA lets the person

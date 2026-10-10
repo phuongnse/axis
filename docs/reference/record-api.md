@@ -147,11 +147,12 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   up in the target table by id, in the write's transaction. The check does not
   lock the target. The foreign key is the backstop: a target removed in
   between is a foreign-key violation that maps to the same error.
-- **Sequence fields** *(planned for M3)*. A `text` field that names a
+- **Sequence fields.** A `text` field that names a
   [sequence](configuration.md#sequences) gets its number on create, in the
-  write's transaction. A body that sets it on create or update, even to
-  `null`, is a `400` at its pointer with the message "Cannot be set.", as for
-  a computed field. See
+  write's transaction, after the reference check. A create that is refused
+  uses no number, so the next create gets it. A body that sets it on create
+  or update, even to `null`, is a `400` at its pointer with the message
+  "Cannot be set.", as for a computed field. See
   [Audit records and sequence counters](storage.md#audit-records-and-sequence-counters).
 
 ## Concurrency
@@ -366,7 +367,8 @@ A failure is keyed `/values/<field>` or by a row path such as
 validations fail on one key, it reports the first in declaration order. Every
 other key is reported in the same response. The message is the validation's
 text key, and the client shows the text in the user's locale. Validation on
-the client as the user types comes in M3.
+the client as the user types comes later
+([D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed)).
 
 A run-time error in an expression, or a computed value that does not fit its
 field, such as one with more fraction digits than `scale`, rejects the write

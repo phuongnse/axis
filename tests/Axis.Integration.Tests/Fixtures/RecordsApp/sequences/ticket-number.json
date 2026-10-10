@@ -1,0 +1,7 @@
+{
+  "id": "540a2995-9414-4cc8-b6e5-b49d11598b48",
+  "kind": "sequence",
+  "name": "TicketNumber",
+  "formatVersion": 1,
+  "format": "T-{yyyy}-{n:4}"
+}
