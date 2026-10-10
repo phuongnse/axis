@@ -101,7 +101,7 @@ test('a broken application folder stops the server', { timeout }, () => {
 
 test('the default ports are 5206 and 5432 on 127.0.0.1', () => {
   const { AXIS_SERVER_PORT, AXIS_POSTGRES_PORT, ...rest } = env
-  const config = compose(['config', '--format', 'json'], { env: rest })
+  const config = compose(['--env-file', '/dev/null', 'config', '--format', 'json'], { env: rest })
   assert.equal(config.status, 0, config.stderr)
   const { services } = JSON.parse(config.stdout)
   const published = (service) =>

@@ -67,7 +67,7 @@ if [ "$status" -ne 0 ]; then
   fi
 fi
 
-run_suite compose scripts node --test --test-reporter=spec --test-reporter-destination=stdout \
+run_suite compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
   --test-reporter=junit --test-reporter-destination="$results_dir/compose.xml" scripts/compose.test.mjs
 
 finish_report
