@@ -102,6 +102,12 @@ works on a fresh clone:
 - Ctrl+C stops the server and the SPA. PostgreSQL keeps running with its data.
   Run `docker compose down` to stop it. If the server or the SPA exits on its
   own, the other one stops too and the script exits non-zero.
+- `scripts/dev.sh` does not start the worker. To run it, start `scripts/dev.sh`
+  first, because the server migrates the tenant databases and the worker does
+  not. Then run `dotnet run --project src/Axis.Worker` in another terminal. It
+  runs the due work items of every tenant in its `Tenants` section. If you moved
+  PostgreSQL with `AXIS_POSTGRES_PORT`, also override `ConnectionStrings__Platform`
+  and `Tenants__default__ConnectionString` for the worker.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request
   sample, `../../samples/apps/purchase-requests`, in `ActivateOnStartup`. So
   `scripts/dev.sh` migrates every tenant database, then compiles and activates the
