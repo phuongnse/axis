@@ -197,11 +197,11 @@ public static class RecordComputer
     }
 
     /// <summary>
-    /// Converts a computed value to the value that is bound, as <see cref="RecordInputParser"/>
-    /// reads it from a body. Returns the error message when the value does not fit the column, or
-    /// null when it does.
+    /// Converts a value an expression gave, such as a computed field's, to the value that is bound,
+    /// as <see cref="RecordInputParser"/> reads it from a body. Returns the error message when the
+    /// value does not fit the column, or null when it does.
     /// </summary>
-    private static string? ToRecordValue(FieldModel field, object? computed, out RecordValue? value)
+    internal static string? ToRecordValue(FieldModel field, object? computed, out RecordValue? value)
     {
         value = null;
         if (computed is null)
@@ -245,8 +245,11 @@ public static class RecordComputer
 
                 value = new RecordValue(field, computed);
                 return null;
-            case FieldType.Integer or FieldType.Boolean or FieldType.Date or FieldType.DateTime:
+            case FieldType.Integer or FieldType.Boolean or FieldType.Date or FieldType.Reference:
                 value = new RecordValue(field, computed);
+                return null;
+            case FieldType.DateTime:
+                value = new RecordValue(field, ((DateTimeOffset)computed).ToUniversalTime());
                 return null;
             default:
                 throw new ArgumentOutOfRangeException(nameof(field), field.Type, "A field of this type cannot be computed.");

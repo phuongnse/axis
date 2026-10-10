@@ -1,0 +1,18 @@
+{
+  "id": "9e4d2b17-6a3c-4f85-b1e9-2c7a5d8f0b36",
+  "kind": "process",
+  "name": "Break",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "lower",
+  "steps": [
+    {
+      "name": "lower",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "amount": "-1", "status": "'submitted'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

@@ -20,11 +20,18 @@ public enum RecordWriteOutcome
 
     /// <summary>The table has a constraint the active model does not declare, such as an undeclared <c>NOT NULL</c>.</summary>
     SchemaConflict,
+
+    /// <summary>
+    /// A value does not fit its field, a computed field could not be computed, or a validation
+    /// failed; the errors say which. Only <see cref="RecordCommands.SetAsync"/> returns it.
+    /// </summary>
+    Invalid,
 }
 
 /// <summary>
 /// The outcome of a record create or update. <see cref="Errors"/> is set for
-/// <see cref="RecordWriteOutcome.MissingReference"/> and <see cref="RecordWriteOutcome.UniqueViolation"/>,
+/// <see cref="RecordWriteOutcome.MissingReference"/>, <see cref="RecordWriteOutcome.UniqueViolation"/>
+/// and <see cref="RecordWriteOutcome.Invalid"/>,
 /// keyed by RFC 6901 JSON Pointer such as <c>/values/category</c>, with fixed messages that
 /// never name a table, column or constraint.
 /// </summary>

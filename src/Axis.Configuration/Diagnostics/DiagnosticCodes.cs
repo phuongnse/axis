@@ -70,6 +70,9 @@ public static class DiagnosticCodes
     public const string UnreachableStep = "AXC0071";
     public const string StepWithoutEnd = "AXC0072";
     public const string ProcessStepCycle = "AXC0073";
+    public const string UnknownOperation = "AXC0078";
+    public const string UnknownSetField = "AXC0079";
+    public const string ReadOnlySetField = "AXC0080";
 
     public const string UnknownFormEntity = "AXC0074";
     public const string UnknownFormField = "AXC0075";

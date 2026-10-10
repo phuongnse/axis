@@ -1,9 +1,13 @@
+using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
+using Axis.Data.Audit;
 using Axis.Data.Naming;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
@@ -13,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Record = Axis.Data.Records.Record;
 
 namespace Axis.Integration.Tests;
 
@@ -28,6 +33,8 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     private static readonly string _appFolder = Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp");
 
     private static readonly TimeSpan _lease = TimeSpan.FromSeconds(30);
+
+    private static readonly TimeSpan _lockWaitTimeout = TimeSpan.FromSeconds(30);
 
     private readonly PostgreSqlFixture _database = new();
     private string? _connectionString;
@@ -110,6 +117,38 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>Reads the request <paramref name="id"/> as the record API does.</summary>
+    public async Task<Record> RequestAsync(Guid id)
+    {
+        await using var connection = await DataSource.OpenConnectionAsync();
+        return await RecordQueries.GetAsync(connection, Model, RequestEntity, id)
+            ?? throw new InvalidOperationException($"No request has the id '{id}'.");
+    }
+
+    /// <summary>
+    /// Sets the title of the request <paramref name="id"/> at <paramref name="version"/> in
+    /// <paramref name="transaction"/>, as a user's record update does, with its <c>record.updated</c>
+    /// audit record by the user <c>anna</c>. Returns the new version.
+    /// </summary>
+    public async Task<long> UpdateTitleAsync(NpgsqlTransaction transaction, Guid id, long version, string title)
+    {
+        Assert.True(RequestEntity.TryGetField("title", out var field));
+        var result = await RecordCommands.UpdateAsync(transaction.Connection!, Model, RequestEntity, id, version, [new RecordValue(field, title)], []);
+        Assert.Equal(RecordWriteOutcome.Written, result.Outcome);
+        var written = result.Record!.Version;
+        await AuditRecords.AppendAsync(
+            transaction,
+            new AuditEntry(
+                "anna",
+                AuditActions.RecordUpdated,
+                Model.Manifest.Id,
+                RequestEntity.Id,
+                id,
+                ProcessInstanceId: null,
+                new JsonObject { ["version"] = written, ["fields"] = new JsonArray("title") }));
+        return written;
+    }
+
     /// <summary>
     /// Starts <paramref name="process"/> for the request <paramref name="subjectId"/>, pinned to
     /// <paramref name="releaseId"/>, as the start endpoint does: the instance is <c>running</c> at
@@ -185,6 +224,19 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         var (releaseId, _) = await ActivateAsync(folder.Path);
         Assert.NotEqual(FirstReleaseId, releaseId);
         return releaseId;
+    }
+
+    /// <summary>Waits until one session of the tenant database waits on a lock, and fails when <paramref name="run"/> ends first.</summary>
+    public async Task WaitUntilBlockedOnLockAsync(Task run, CancellationToken cancellationToken)
+    {
+        var clock = Stopwatch.StartNew();
+        while (await CountAsync(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") != 1)
+        {
+            Assert.False(run.IsCompleted, "The step ended before it waited on a row lock.");
+            Assert.True(clock.Elapsed < _lockWaitTimeout, "The step never waited on a row lock.");
+            await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
+        }
     }
 
     /// <summary>Runs <paramref name="sql"/>, a <c>SELECT count(*)</c>, with the named parameters.</summary>
@@ -269,14 +321,16 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return (compiled.Release!.Id, compiled.Model!);
     }
 
-    private string RequestTable
+    private EntityModel RequestEntity
     {
         get
         {
             Assert.True(Model.TryGetEntity("Request", out var request));
-            return EntityNaming.QualifiedTable(EntityNaming.Table(request.Id));
+            return request;
         }
     }
+
+    private string RequestTable => EntityNaming.QualifiedTable(EntityNaming.Table(RequestEntity.Id));
 
     private static string Column(string field) =>
         EntityNaming.Quote(field == "id" ? EntityNaming.IdColumn : EntityNaming.Column(field));

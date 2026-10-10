@@ -171,8 +171,9 @@ flowchart LR
      `entity` that is a child entity is `AXC0068` at `/entity`, naming the
      owner. Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
-     step. `start`, each branch `next` and each `otherwise` must name a step,
-     ignoring letter case, otherwise it is `AXC0070` at that property. A
+     step. `start`, each branch `next`, each `otherwise` and each operation
+     `next` must name a step, ignoring letter case, otherwise it is `AXC0070`
+     at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
@@ -188,11 +189,19 @@ flowchart LR
      problem is reported at `/startCondition/expression` or
      `/steps/{i}/branches/{j}/when` with its
      [expression diagnostic](expressions.md#diagnostics) code. The
-     `startCondition` message joins the `AXC0028` check. A decision with no
-     branches, and an `end` step with `branches`, `otherwise` or any other
-     property, are `AXC0004`. Only `decision` and `end` steps are built: any
-     other step `type` is `AXC0004`. See
-     [processes](processes.md#compile-checks).
+     `startCondition` message joins the `AXC0028` check. An operation step
+     whose `operation` is not `updateRecord`, matched exactly, is `AXC0078`
+     at `/steps/{i}/operation`, and its `set` is not checked. Each key of an
+     `updateRecord` `set` must name a field of the entity, ignoring letter
+     case, that no earlier key of the step names, otherwise it is `AXC0079`.
+     A computed field, a sequence field or a child collection is `AXC0080`.
+     Each `set` expression is parsed and type-checked against its field's
+     type, with the same scope as a `when`. Each of these is reported at
+     `/steps/{i}/set/{field}`. A decision with no branches, an operation
+     without `operation`, `set` or `next`, and an `end` step with
+     `branches`, `otherwise` or any other property, are `AXC0004`. Only
+     `decision`, `operation` and `end` steps are built: a `task` step is
+     `AXC0004`. See [processes](processes.md#compile-checks).
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -403,7 +412,7 @@ sorted by file and then path.
 | `AXC0067` | A process's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
 | `AXC0068` | A process's `entity` is a child entity. Reported at `/entity`, naming the owner. |
 | `AXC0069` | An earlier step of the same process already uses this `name`, ignoring letter case. Reported at `/steps/{i}/name` of the later step, naming the first one. The later step is left out of `AXC0071`, `AXC0072` and `AXC0073`. |
-| `AXC0070` | A process's `start`, a branch `next` or an `otherwise` names no step of the process, ignoring letter case. Reported at that property, such as `/start` or `/steps/{i}/branches/{j}/next`. |
+| `AXC0070` | A process's `start`, a branch `next`, an `otherwise` or an operation's `next` names no step of the process, ignoring letter case. Reported at that property, such as `/start`, `/steps/{i}/branches/{j}/next` or `/steps/{i}/next`. |
 | `AXC0071` | A process step cannot be reached from `start`. Reported at `/steps/{i}`. Not checked when `start` names no step. |
 | `AXC0072` | A process step has no path to an `end` step. Reported at `/steps/{i}`. Not reported for a step with a transition to an unknown step, which is already `AXC0070`. |
 | `AXC0073` | Process steps form a cycle, such as a → b → a. Reported at the transition that closes the cycle, walking the steps in file order and each step's branches before its `otherwise`. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3). |
@@ -411,6 +420,9 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, matched exactly. Reported at `/steps/{i}/operation`. Its `set` is then not checked. |
+| `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
+| `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
 
 ## Startup activation
 

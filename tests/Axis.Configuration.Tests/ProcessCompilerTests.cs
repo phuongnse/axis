@@ -267,6 +267,117 @@ public sealed class ProcessCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void An_update_record_operation_compiles_with_its_fields_in_declaration_order()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "submit", "type": "operation", "operation": "updateRecord",
+                "set": { "STATUS": "'submitted'", "amount": "amount * 2" }, "next": "Done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "submit"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var process = Assert.Single(result.Model.Processes);
+        var submit = Assert.IsType<OperationStepModel>(process.Steps[0]);
+        Assert.Equal(("submit", "updateRecord", "done"), (submit.Name, submit.Operation, submit.Next));
+        Assert.Equal(
+            [("amount", "amount * 2"), ("status", "'submitted'")],
+            submit.Set.Select(assignment => (assignment.Field, assignment.Value.Expression)));
+        Assert.Equal(20m, Evaluate(submit.Set[0].Value, 10m));
+    }
+
+    [Theory]
+    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operation is 'updateRecord'.")]
+    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operation is 'updateRecord'.")]
+    [InlineData("updateRecord", """{ "nope": "'x'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/nope", "The field 'nope' was not found. The entity 'Order' has no field with that name.")]
+    [InlineData("updateRecord", """{ "status": "'x'", "STATUS": "'y'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/STATUS", "The field 'status' is already set by 'status' in this step.")]
+    [InlineData("updateRecord", """{ "large": "true" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/large", "The field 'large' is computed, so an operation cannot set it.")]
+    [InlineData("updateRecord", """{ "number": "'x'" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/number", "The field 'number' is numbered by a sequence, so an operation cannot set it.")]
+    [InlineData("updateRecord", """{ "lines": "null" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/lines", "The field 'lines' is a child collection, so an operation cannot set it.")]
+    [InlineData("updateRecord", """{ "amount": "'many'" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/steps/0/set/amount", "The expression must be decimal, but it is text.")]
+    public void An_operation_problem_is_reported_at_its_path_in_the_step_and_gives_no_model(
+        string operation, string set, string code, string path, string message)
+    {
+        using var folder = Folder(Process("Order", $$"""
+            [
+              { "name": "submit", "type": "operation", "operation": "{{operation}}", "set": {{set}}, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "submit"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("customer.nope", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData("amount +", ExpressionDiagnosticCodes.SyntaxError)]
+    public void A_set_expression_gets_the_usual_expression_diagnostics_at_its_field(string expression, string code)
+    {
+        using var folder = Folder(Process("Order", $$"""
+            [
+              { "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "{{expression}}" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "submit"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "/steps/0/set/status"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_operation_next_joins_the_step_graph_checks()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "missing" },
+              { "name": "loop", "type": "operation", "operation": "updateRecord", "set": { "status": "'y'" }, "next": "loop" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "submit"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownStep, "/steps/0/next"),
+                (DiagnosticCodes.UnreachableStep, "/steps/1"),
+                (DiagnosticCodes.StepWithoutEnd, "/steps/1"),
+                (DiagnosticCodes.ProcessStepCycle, "/steps/1/next"),
+                (DiagnosticCodes.UnreachableStep, "/steps/2"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" } }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "set": { "status": "'x'" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "otherwise": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "set": { "status": "'x'" } }""")]
+    public void An_operation_shape_the_schema_refuses_is_a_schema_violation(string step)
+    {
+        using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation && diagnostic.File == "processes/order-review.json");
+        Assert.Null(result.Model);
+    }
+
     private static object? Evaluate(ExpressionModel expression, decimal amount)
     {
         var result = ExpressionInterpreter.Evaluate(
@@ -289,14 +400,18 @@ public sealed class ProcessCompilerTests
     }
 
     /// <summary>
-    /// An application with an <c>Order</c> entity that references a <c>Customer</c> and owns <c>OrderLine</c> rows,
-    /// a <c>Customer</c> that references the customer who referred it, the rule <c>NeedsReview</c> and <paramref name="process"/>.
+    /// An application with an <c>Order</c> entity that references a <c>Customer</c>, owns <c>OrderLine</c> rows and
+    /// takes its number from the <c>OrderNumber</c> sequence, a <c>Customer</c> that references the customer who
+    /// referred it, the rule <c>NeedsReview</c> and <paramref name="process"/>.
     /// </summary>
     private static TemporaryFolder Folder(string process) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
             .With("texts/en.json", Texts)
             .With("rules/needs-review.json", NeedsReview)
+            .With("sequences/order-number.json", """
+                { "id": "88888888-8888-4888-8888-888888888801", "kind": "sequence", "name": "OrderNumber", "formatVersion": 1, "format": "O-{n:5}" }
+                """)
             .With("entities/order.json", $$"""
                 { "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
                   "fields": [
@@ -304,7 +419,8 @@ public sealed class ProcessCompilerTests
                     { "name": "status", "type": "text" },
                     { "name": "customer", "type": "reference", "target": "Customer" },
                     { "name": "large", "type": "boolean", "expression": "amount > 1000" },
-                    { "name": "lines", "type": "child-collection", "target": "OrderLine" }
+                    { "name": "lines", "type": "child-collection", "target": "OrderLine" },
+                    { "name": "number", "type": "text", "sequence": "OrderNumber" }
                   ] }
                 """)
             .With("entities/order-line.json", """

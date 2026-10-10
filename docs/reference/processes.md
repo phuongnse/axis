@@ -3,18 +3,17 @@
 Detailed reference for processes: the resource shape, the steps, the compile
 checks, the start endpoint, the instance and task states, the task API,
 execution, the worker settings and the tables. The `process` resource kind is
-built with `decision` and `end` steps, and so are their
+built with `decision`, `operation` and `end` steps, and so are their
 [compile checks](#compile-checks). A compiled process is part of the release
 model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_start_receipts` and `axis.process_work_items` tables are built
-too. So is the engine that runs `decision` and `end` steps, see
+too. So is the engine that runs `decision`, `operation` and `end` steps, see
 [Running a step](#running-a-step). Everything else here is
-*(planned for M3)*: `task` and `operation` steps, the task API and the other
-tables.
-Until `task` and `operation` are built, a step of either type is `AXC0004`, so
-the purchase request example below does not compile yet.
+*(planned for M3)*: `task` steps, the task API and the other tables.
+Until `task` is built, a step of that type is `AXC0004`, so the purchase
+request example below does not compile yet.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -181,17 +180,18 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   fails the step. Completing the task resumes the instance, see
   [Task API](#task-api).
 - **`operation`.** M3 has one built-in operation, `updateRecord`. Its `set`
-  maps fields of the subject record to expressions. The step writes them
-  through the record update command, so computed fields are recomputed and
-  validations run, in the step's transaction. A validation failure fails the
-  step. Operations from extension packages and external calls come in M5.
+  maps fields of the subject record to expressions, and `next` names the step
+  that follows. The step writes the values with the record update rules, so
+  computed fields are recomputed and validations run, in the step's
+  transaction. A validation failure fails the step. Operations from extension
+  packages and external calls come in M5.
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
   `end` step has no `next`.
 
 ## Compile checks
 
-The compiler reports these as diagnostics. The checks for `decision` and
-`end` steps are built. The rest come with `task` and `operation` steps
+The compiler reports these as diagnostics. The checks for `decision`,
+`operation` and `end` steps are built. The rest come with `task` steps
 *(planned for M3)*. Every problem of a process is reported in one pass. See
 [the Resolve step](configuration.md#configuration-pipeline) for the details.
 
@@ -199,9 +199,9 @@ The compiler reports these as diagnostics. The checks for `decision` and
   (`AXC0068`).
 - Step names are unique within the process, ignoring letter case
   (`AXC0069`).
-- `start`, every branch `next` and `otherwise` name a step of the process,
-  ignoring letter case (`AXC0070`). Outcome targets and `next` of an
-  operation join this check *(planned for M3)*.
+- `start`, every branch `next`, `otherwise` and the `next` of an operation
+  name a step of the process, ignoring letter case (`AXC0070`). Outcome
+  targets join this check *(planned for M3)*.
 - Every step is reachable from `start` (`AXC0071`).
 - Every step has a path to an `end` step (`AXC0072`).
 - The steps form no cycle (`AXC0073`). See [Limits in M3](#limits-in-m3).
@@ -212,10 +212,20 @@ The compiler reports these as diagnostics. The checks for `decision` and
   such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- *(planned for M3)* The fields in an `updateRecord` `set` are fields of the
-  subject entity. None is computed or a child collection. Each expression
-  fits its field's type.
-- An `end` step has no `next`, `branches` or `otherwise` (`AXC0004`).
+- An operation names `updateRecord`, matched exactly as a step `type` is
+  (`AXC0078` at `/steps/{i}/operation`).
+- Each key of an `updateRecord` `set` names a field of the subject entity,
+  ignoring letter case, that no earlier key of the step names (`AXC0079`).
+  The field is not computed, not numbered by a sequence and not a child
+  collection (`AXC0080`). Each is reported at `/steps/{i}/set/{field}`.
+- Each `set` expression fits its field's type, with the same scope as a
+  `when`. A problem is reported at `/steps/{i}/set/{field}` with its
+  expression code, such as `AXC0048` for a value of the wrong type.
+- An operation has `operation`, a `set` with at least one field and `next`,
+  and no `branches` or `otherwise`. A decision has no `operation`, `set` or
+  `next` (`AXC0004`).
+- An `end` step has no `next`, `branches`, `otherwise`, `operation` or `set`
+  (`AXC0004`).
 - *(planned for M3)* A task's `assignee` has exactly one of `user` and
   `role`. A `user` expression gives `text`. A `role` is a non-empty name.
 - *(planned for M3)* A task's `form` names a loaded form whose entity is the
@@ -568,8 +578,8 @@ as usual.
 
 ### Running a step
 
-The worker runs the `decision` and `end` steps. A `task` or `operation` step
-fails the instance until those types are built *(planned for M3)*. Each work
+The worker runs the `decision`, `operation` and `end` steps. A `task` step
+fails the instance until that type is built *(planned for M3)*. Each work
 item of kind `process.step` runs the current step of its instance in one
 transaction:
 
@@ -577,25 +587,43 @@ transaction:
    skipped, and the item is deleted with no other write.
 2. It reads the release the instance is pinned to, so an instance keeps the
    step graph it started with after a new release is activated.
-3. It reads the subject record and runs the step:
+3. It reads the subject record and runs the step. An operation first locks
+   the subject record's row, so it reads the latest stored version, and a
+   user's write of the same record waits until the step's transaction ends.
    - A **decision** evaluates its branches in order and takes the first `when`
      that is true. A `when` that gives `null` counts as false. When no branch
      is true, it takes `otherwise`. The instance stays `running` on the next
      step.
+   - An **operation** evaluates each `set` expression on the record. The
+     instance stays `running` on its `next` step.
    - An **end** step sets the instance to `completed` with its `ended_at` time.
 4. It sets the new state and step, with the next revision, only if the
    instance is still `running` at the revision it loaded. Otherwise another
    transaction changed the instance first. The step then writes nothing else,
    and its work item is deleted, so it never runs again.
-5. It writes the step's history row and one audit record with the actor
-   `system`: `process.stepCompleted` with details `{ "step", "next" }` for a
-   decision, or `process.completed` with details `{ "step" }` for an end step.
-6. A decision inserts the work item of the next step.
+5. An operation then writes the values the way a record update does. Each
+   value must fit its field, and a `null` for a required field is refused.
+   Computed fields are recomputed, validations run, and the record's version
+   goes up by one. A refused write is an error, keyed and worded as in the
+   [record API](record-api.md#child-rows-computed-fields-and-validations).
+6. It writes the step's history row and its audit records, all with the actor
+   `system`:
+   - An operation first writes `record.updated` for the subject record, with
+     the instance id. Its details are `{ "version", "fields" }`, as the
+     [record API](record-api.md#audit-records-and-history) writes them.
+   - A decision and an operation write `process.stepCompleted` with details
+     `{ "step", "next" }`.
+   - An end step writes `process.completed` with details `{ "step" }`.
+7. A decision and an operation insert the work item of the next step.
 
-Any exception in the step, such as a `when` that divides by zero or a missing
-subject record, rolls all of it back. A following transaction then sets the
-instance to `failed` with its `ended_at` time and the next revision, writes a
-history row with the error, and writes the audit record `process.failed` with
+Any exception in the step, such as a `when` that divides by zero, a missing
+subject record or a record write that a validation refuses, rolls all of it
+back, so the record keeps its values and version. The error of a refused write
+names each field pointer and message, such as
+`The record update was rejected: /values/amount: request.amountNegative`. A
+following transaction then sets the instance to `failed` with its `ended_at`
+time and the next revision, writes a history row with the error, and writes
+the audit record `process.failed` with
 details `{ "step" }` and the actor `system`. It does nothing when the instance
 has changed since the step loaded it. No step is retried.
 
@@ -641,7 +669,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "state": "completed" }` for an end step, null for a failed step |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "completed" }` for an end step, null for a failed step |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |

@@ -411,7 +411,7 @@ internal static class RecordEndpoints
         {
             RecordWriteOutcome.NotFound => RecordNotFound(),
             RecordWriteOutcome.StaleVersion => Conflict("The record has changed since this version was read."),
-            RecordWriteOutcome.MissingReference => Results.ValidationProblem(result.Errors!),
+            RecordWriteOutcome.MissingReference or RecordWriteOutcome.Invalid => Results.ValidationProblem(result.Errors!),
             RecordWriteOutcome.UniqueViolation => Results.ValidationProblem(
                 result.Errors!,
                 statusCode: StatusCodes.Status409Conflict,

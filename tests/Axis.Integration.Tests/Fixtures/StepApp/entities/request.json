@@ -7,6 +7,15 @@
   "fields": [
     { "name": "title", "type": "text", "required": true },
     { "name": "amount", "type": "decimal", "precision": 20, "scale": 2 },
-    { "name": "divisor", "type": "integer" }
+    { "name": "divisor", "type": "integer" },
+    { "name": "status", "type": "enum", "values": ["draft", "submitted"] },
+    { "name": "submittedAt", "type": "date-time" }
+  ],
+  "validations": [
+    {
+      "expression": "amount is null or amount >= 0",
+      "message": { "textKey": "request.amountNegative" },
+      "field": "amount"
+    }
   ]
 }

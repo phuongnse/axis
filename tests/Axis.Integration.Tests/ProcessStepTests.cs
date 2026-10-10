@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
@@ -8,8 +7,6 @@ namespace Axis.Integration.Tests;
 
 public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture<ProcessStepFixture>
 {
-    private static readonly TimeSpan _lockWaitTimeout = TimeSpan.FromSeconds(30);
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -107,7 +104,7 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
 
         // The step loads revision 1, then its guarded update waits on the row lock this test holds.
         var run = fixture.RunNextAsync(CancellationToken);
-        await WaitUntilBlockedOnLockAsync(run);
+        await fixture.WaitUntilBlockedOnLockAsync(run, CancellationToken);
         await transaction.CommitAsync(CancellationToken);
 
         Assert.True(await run);
@@ -174,17 +171,4 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
 
     private Task<long> CountWorkItemsAsync(Guid instanceId) =>
         fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE process_instance_id = @id", ("id", instanceId));
-
-    /// <summary>Waits until one session of the tenant database waits on a lock, and fails when <paramref name="run"/> ends first.</summary>
-    private async Task WaitUntilBlockedOnLockAsync(Task run)
-    {
-        var clock = Stopwatch.StartNew();
-        while (await fixture.CountAsync(
-            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") != 1)
-        {
-            Assert.False(run.IsCompleted, "The step ended before it waited on the instance's row lock.");
-            Assert.True(clock.Elapsed < _lockWaitTimeout, "The step never waited on the instance's row lock.");
-            await Task.Delay(TimeSpan.FromMilliseconds(20), CancellationToken);
-        }
-    }
 }
