@@ -14,11 +14,13 @@ namespace Axis.Expressions.Typing;
 /// aggregate, and the aggregate's item expression sees only the child row's fields. A path through
 /// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
 /// other scope. The text of a <c>date</c> or <c>dateTime</c> literal must be a valid date or
-/// date-time under <see cref="DateLiterals"/>. It stops at the first problem and reports only that one.
+/// date-time under <see cref="DateLiterals"/>. A stored value, such as a computed field, cannot call
+/// <c>now()</c>, because the value would go stale. It stops at the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
-    public static ExpressionCheckResult Check(ExpressionNode expression, ExpressionScope scope, ExpressionType expected)
+    public static ExpressionCheckResult Check(
+        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(scope);
@@ -30,7 +32,8 @@ public static class ExpressionTypeChecker
                 scope,
                 new HashSet<CallNode>(ReferenceEqualityComparer.Instance),
                 new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance),
-                new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance));
+                new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
+                storedValue);
             var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
@@ -176,6 +179,14 @@ public static class ExpressionTypeChecker
 
         switch (name)
         {
+            case "now":
+                return context.StoredValue
+                    ? throw Fail(
+                        ExpressionDiagnosticCodes.CurrentTimeInStoredValue,
+                        "Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time",
+                        call.Offset)
+                    : ExpressionType.DateTime;
+
             case "length":
                 Need(call, name, types, 0, IsText, "text");
                 return ExpressionType.Integer;
@@ -566,14 +577,15 @@ public static class ExpressionTypeChecker
     };
 
     /// <summary>
-    /// What one check carries down the tree: the scope, and the decimal calls, rule calls and path
-    /// steps found so far.
+    /// What one check carries down the tree: the scope, the decimal calls, rule calls and path
+    /// steps found so far, and whether the expression computes a stored value.
     /// </summary>
     private sealed record Context(
         ExpressionScope Scope,
         HashSet<CallNode> DecimalCalls,
         Dictionary<CallNode, ExpressionRule> RuleCalls,
-        Dictionary<MemberNode, string> PathTargets);
+        Dictionary<MemberNode, string> PathTargets,
+        bool StoredValue);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using static Axis.Integration.Tests.RecordApiFixture;
@@ -153,6 +154,31 @@ public sealed class DataSourceEndpointTests(RecordApiFixture fixture) : IClassFi
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Filter_that_compares_with_now_returns_only_the_records_whose_time_has_passed()
+    {
+        await fixture.ResetAsync();
+        // A day either side, so clock skew between the test and the database cannot flip the result.
+        // The rows are inserted directly, because the ticket validation refuses a past due time.
+        var past = DateTimeOffset.UtcNow.AddDays(-1);
+        var overdue = await InsertTicketAsync("Overdue", past);
+        var older = await InsertTicketAsync("Older", past.AddDays(-1));
+        await InsertTicketAsync("Upcoming", DateTimeOffset.UtcNow.AddDays(1));
+        await InsertTicketAsync("Undated", null);
+
+        using var rows = await GetJsonAsync("/api/apps/RecordsApp/data-sources/OverdueTickets/rows", HostA);
+
+        Assert.Equal([older, overdue], RowIds(rows));
+        Assert.Equal(2L, rows.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    private Task<Guid> InsertTicketAsync(string title, DateTimeOffset? dueAt) =>
+        fixture.InsertAsync(TenantA, "Ticket", new Dictionary<string, string?>
+        {
+            ["title"] = title,
+            ["dueAt"] = dueAt?.ToString("O", CultureInfo.InvariantCulture),
+        });
 
     private Task<Guid> InsertDepartmentAsync(string tenant, string name) =>
         fixture.InsertAsync(tenant, "Department", new Dictionary<string, string?> { ["name"] = name });

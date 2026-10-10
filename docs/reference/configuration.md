@@ -236,7 +236,8 @@ flowchart LR
    `/validations/{i}/expression`. The expression of each
    [computed field](#entity-logic) is parsed and type-checked against the
    entity's fields that are not computed and its child collections, and
-   must give the field's type.
+   must give the field's type. A call to `now()` in it, including inside an
+   aggregate's item expression, is `AXC0086`.
    A problem in it is reported the same way at `/fields/{i}/expression`. A `field` that names no field of the
    entity, ignoring letter case, is `AXC0052` at `/validations/{i}/field`,
    and the `message` joins the `AXC0028` check. A validation with an error
@@ -440,8 +441,9 @@ sorted by file and then path.
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
 | `AXC0082` | A process task step's `form` names no loaded form, ignoring letter case. Reported at `/steps/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
 | `AXC0083` | A process task step's `form` is over another entity than the process's subject entity. Reported at `/steps/{i}/form`, naming both entities. Not checked when either entity is unknown. |
-| `AXC0084` | A process task step's `dueIn` is not a positive ISO 8601 duration in the accepted form: whole-number weeks (`W`), or days (`D`) with an optional `T` part of hours (`H`), minutes (`M`) and seconds (`S`), such as `P2W`, `P3D`, `PT4H` or `P1DT12H`. Years and months are `AXC0084` until calendar durations come with the time zone rule, because they have no fixed length. Reported at `/steps/{i}/dueIn`. |
+| `AXC0084` | A process task step's `dueIn` is not a positive ISO 8601 duration in the accepted form: whole-number weeks (`W`), or days (`D`) with an optional `T` part of hours (`H`), minutes (`M`) and seconds (`S`), such as `P2W`, `P3D`, `PT4H` or `P1DT12H`. Years and months are `AXC0084` until calendar durations come with the [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed), because they have no fixed length. Reported at `/steps/{i}/dueIn`. |
 | `AXC0085` | An earlier outcome of the same task step already uses this `name`, ignoring letter case. Reported at `/steps/{i}/outcomes/{j}/name` of the later outcome, naming the first one. |
+| `AXC0086` | A computed field calls `now()`, also inside an aggregate's item expression, such as `count(lines, dueAt < now())`. A stored value cannot depend on the current time. Reported at `/fields/{i}/expression`, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
 
 ## Startup activation
 
@@ -679,7 +681,8 @@ record create fills a field that names a sequence with the next number.
 }
 ```
 
-- **Tokens.** `{yyyy}` is the four-digit UTC year. `{n}` is the number, and
+- **Tokens.** `{yyyy}` is the four-digit UTC year. The local year waits for
+  the [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed). `{n}` is the number, and
   `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
   Every other character is literal.
 - **One number.** The format holds exactly one `{n}` or `{n:k}` token. It
@@ -687,7 +690,8 @@ record create fills a field that names a sequence with the next number.
   format is `AXC0004` at `/format`.
 - **Yearly restart.** The counter restarts each UTC year, but only when the
   format holds `{yyyy}`. Without a year, a restart would hand out the same
-  number twice. Application time zones come later.
+  number twice. Application time zones wait for the
+  [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed).
 
 An entity `text` field names the sequence in its `sequence` property:
 
@@ -848,6 +852,8 @@ below. Both examples below compile, given that rule.
   - It reads only the record's own fields and its child rows, never a
     reference path. It reads the entity's own fields that are not computed.
     Naming a computed field, itself included, is `AXC0046`.
+  - It cannot call `now()`, because its stored value would go stale. A call,
+    also inside an aggregate's item expression, is `AXC0086`.
   - It reads child rows only through an
     [aggregate](expressions.md#aggregates), such as `sum(lineItems, amount)`.
     Inside the item expression, names are the child row's fields, computed

@@ -62,7 +62,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
         Assert.NotNull(record);
         var before = Commands(log);
 
-        var result = await RecordExpressions.EvaluateAsync(connection, model, entity, record, When(model, SalesWithManager), CancellationToken);
+        var result = await RecordExpressions.EvaluateAsync(connection, model, entity, record, When(model, SalesWithManager), DateTimeOffset.UtcNow, CancellationToken);
 
         Assert.True(result.Succeeded, result.Error?.Message);
         Assert.Equal(true, result.Value);
@@ -81,7 +81,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
         Assert.True(model.TryGetEntity("PurchaseRequest", out var entity));
         var record = await RecordQueries.GetAsync(connection, model, entity, id, CancellationToken);
         Assert.NotNull(record);
-        var result = await RecordExpressions.EvaluateAsync(connection, model, entity, record, When(model, condition), CancellationToken);
+        var result = await RecordExpressions.EvaluateAsync(connection, model, entity, record, When(model, condition), DateTimeOffset.UtcNow, CancellationToken);
         Assert.True(result.Succeeded, result.Error?.Message);
         return result.Value;
     }

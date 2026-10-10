@@ -171,8 +171,8 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
     numbers: either weeks, such as `P2W`, or days with an optional time part
     of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
-    and months are `AXC0084` until calendar durations come with the time zone
-    rule, because they have no fixed length. The task's due date is the time the task is created plus `dueIn`. It is
+    and months are `AXC0084` until calendar durations come with the
+    [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed), because they have no fixed length. The task's due date is the time the task is created plus `dueIn`. It is
     shown only. Escalation needs timers, so it comes later.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
@@ -242,8 +242,8 @@ reported in one pass. See
 - A task's `dueIn`, when set, is a positive ISO 8601 duration in whole
   numbers: either weeks, such as `P2W`, or days with an optional time part
   of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
-  and months are not allowed until calendar durations come with the time
-  zone rule (`AXC0084` at `/steps/{i}/dueIn`).
+  and months are not allowed until calendar durations come with the
+  [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed) (`AXC0084` at `/steps/{i}/dueIn`).
 - Outcome names are unique within the step, ignoring letter case (`AXC0085`
   at `/steps/{i}/outcomes/{j}/name`).
 - The `startCondition` message text key exists, checked like other labels
@@ -611,6 +611,12 @@ transaction:
      A `role` is the role name. The instance becomes `waiting` on the task
      step.
    - An **end** step sets the instance to `completed` with its `ended_at` time.
+
+   `now()` in any of these expressions, a task's `assignee.user` included,
+   gives the start time of the step's transaction. That is the same instant
+   the history row stores as `started_at`. A validation that the operation's
+   write runs sees it too. See
+   [D22](../decisions.md#d22-current-time-and-time-zones--agreed).
 4. It sets the new state and step, with the next revision, only if the
    instance is still `running` at the revision it loaded. Otherwise another
    transaction changed the instance first. The step then writes nothing else,

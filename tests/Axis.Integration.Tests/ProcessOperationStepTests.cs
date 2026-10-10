@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
@@ -20,8 +21,15 @@ public sealed class ProcessOperationStepTests(ProcessStepFixture fixture) : ICla
         var record = await fixture.RequestAsync(subjectId);
         Assert.Equal(2L, record.Version);
         Assert.Equal("submitted", record.Values["status"]!.GetValue<string>());
-        Assert.Equal("2026-10-10T09:30:00.000000Z", record.Values["submittedAt"]!.GetValue<string>());
         Assert.Equal($"Request {subjectId:N}", record.Values["title"]!.GetValue<string>());
+
+        // now() is the step transaction's start time, which the history stores as started_at.
+        var startedAt = Assert.IsType<DateTime>(await fixture.ScalarAsync(
+            "SELECT started_at FROM axis.process_step_history WHERE process_instance_id = @id AND step = 'submit'",
+            ("id", instanceId)));
+        Assert.Equal(
+            new DateTimeOffset(startedAt),
+            DateTimeOffset.Parse(record.Values["submittedAt"]!.GetValue<string>(), CultureInfo.InvariantCulture));
 
         var history = await fixture.HistoryAsync(instanceId);
         Assert.Equal(["submit", "done"], history.Select(row => row.Step));

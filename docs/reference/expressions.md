@@ -236,8 +236,11 @@ and in [functions](#functions).
   field's `values`. See [Types](#types).
 - **Negative numbers.** A negative number is unary minus applied to a
   literal.
-- **Current time.** v1 has no `now()` and no `today()`. They come later,
-  together with a time zone rule.
+- **Current time.** `now()` gives the start time of the current database
+  transaction as a `date-time`. It is an instant, so it never depends on a
+  time zone, and every call in one transaction gives the same value. See
+  [Functions](#functions). `today()` and taking a date from an instant wait
+  for the [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed).
 
 ## Names and references
 
@@ -278,7 +281,8 @@ Paths in validations and computed fields are not built. There a path is
   that are not computed and its child collections through aggregates, and no
   reference path. Another computed field, itself included, is an unknown
   name. Inside an item expression, names are the child row's fields,
-  computed ones included, and no rules.
+  computed ones included, and no rules. It cannot call `now()`, which is
+  `AXC0086`.
 - **Scope in a validation.** The expression sees the entity's fields,
   computed ones included, its child collections through aggregates, and the
   named rules at its top level.
@@ -330,9 +334,26 @@ argument is `null`.
 | `if(condition, then, else)` | type of the branches | A `null` condition picks `else`. Only the picked branch is evaluated. The branches fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal. | Yes |
 | `date(text literal)` | date | See [Literals](#literals). | Yes |
 | `dateTime(text literal)` | date-time | See [Literals](#literals). | Yes |
+| `now()` | date-time | The start time of the current transaction. Not allowed in a computed field (`AXC0086`). | Yes |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
-day from an instant needs a time zone, and the time zone rule comes later.
+day from an instant needs a time zone, so it waits for the
+[time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed).
+
+`now()` gives the same instant for every call in one transaction, and the
+interpreter and the SQL translation agree on it:
+
+- **Process step.** The step's transaction. That covers its decision
+  branches, its `updateRecord` values and a task's `assignee.user`, and it
+  is the same instant as the step history's `started_at`.
+- **Start condition.** The start transaction.
+- **Validation.** The transaction that writes the record.
+- **Data source filter.** The query, as PostgreSQL `now()`.
+- **Rule.** The transaction of whatever calls it.
+
+A computed field's value is stored and would go stale, so `now()` in a
+computed field, including inside an aggregate's item expression, is
+`AXC0086` at the call.
 
 The text functions take `text` only. An enum value is not text to them,
 because no conversion is implicit except integer to decimal.
@@ -482,6 +503,7 @@ These translate to SQL:
 - `year`, `month` and `day`, through `extract`, cast to `bigint`;
 - `addDays`, as `date + integer`;
 - `daysBetween`, as `b - a`;
+- `now()`, as PostgreSQL `now()`, the start time of the query's transaction;
 - rule calls, inlined when the rule body is in the subset. Each argument is
   translated once, in the filter's context, and its SQL replaces every use of
   the parameter. So a literal argument is one parameter however often the
@@ -560,7 +582,8 @@ There are three families:
 
 - **Syntax.** Tokens, the grammar and literal forms.
 - **Type.** Unknown names, type mismatches, unknown enum values, wrong
-  argument counts, and use of something outside the SQL subset in a filter.
+  argument counts, use of something outside the SQL subset in a filter, and
+  `now()` in a computed field.
 - **Cost.** The limits on length, depth, nodes, hops, rule call depth and
   rule call cycles.
 
@@ -611,6 +634,9 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks.
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
   the limit.
+- **`AXC0086`.** A computed field calls `now()`, including inside an
+  aggregate's item expression, at the call. A stored value cannot depend on
+  the current time.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).

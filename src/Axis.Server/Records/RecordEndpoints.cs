@@ -171,15 +171,18 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
-        if (RecordValidator.ValidateCreate(application!, model, computed.Values, computed.Rows) is { } failures)
-        {
-            return Results.ValidationProblem(failures);
-        }
-
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The validations run in the write transaction, so their now() is its start time.
+            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            if (RecordValidator.ValidateCreate(application!, model, computed.Values, computed.Rows, now) is { } failures)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return Results.ValidationProblem(failures);
+            }
+
             result = await RecordCommands.CreateAsync(connection, application!, model, computed.Values, computed.Rows, cancellationToken: cancellationToken);
             await CompleteAsync(
                 transaction,
@@ -231,8 +234,8 @@ internal static class RecordEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
 
         // The stored record is read outside the write transaction. The client read its version
-        // earlier, so a write that passes the version check finds the record as computed and
-        // validated here.
+        // earlier, so a write that passes the version check finds the record as computed here and
+        // validated below.
         Record? stored = null;
         if (model.Validations.Count > 0 || model.HasComputedFields)
         {
@@ -249,14 +252,17 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
-        if (RecordValidator.ValidateUpdate(application!, model, stored, computed.Values, computed.Rows) is { } failures)
-        {
-            return Results.ValidationProblem(failures);
-        }
-
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The validations run in the write transaction, so their now() is its start time.
+            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            if (RecordValidator.ValidateUpdate(application!, model, stored, computed.Values, computed.Rows, now) is { } failures)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return Results.ValidationProblem(failures);
+            }
+
             result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
             await CompleteAsync(
                 transaction,

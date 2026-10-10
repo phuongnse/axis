@@ -115,12 +115,17 @@ internal static class ProcessStartEndpoints
             return SubjectProblem("No record of the process's entity has this id.");
         }
 
-        // Only true passes: false, null and a run-time error all fail the start.
-        if (model.StartCondition is { } condition
-            && (await RecordExpressions.EvaluateAsync(connection, application, entity, record, condition.Expression, cancellationToken)).Value is not true)
+        // Only true passes: false, null and a run-time error all fail the start. now() is this
+        // transaction's start time.
+        if (model.StartCondition is { } condition)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return SubjectProblem(condition.Message.TextKey);
+            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            var result = await RecordExpressions.EvaluateAsync(connection, application, entity, record, condition.Expression, now, cancellationToken);
+            if (result.Value is not true)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return SubjectProblem(condition.Message.TextKey);
+            }
         }
 
         var instance = new ProcessInstanceRow

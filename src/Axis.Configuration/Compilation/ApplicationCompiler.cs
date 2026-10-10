@@ -340,7 +340,8 @@ public static class ApplicationCompiler
     /// the field's type over the entity's fields that are not computed and its child collections,
     /// which only aggregates accept. A computed field is not in the scope, so naming one, itself
     /// included, is an unknown name. An aggregate's item expression sees the child row's fields,
-    /// computed ones included. An expression problem is reported at the expression with its own code.
+    /// computed ones included. A stored value cannot depend on the current time, so <c>now()</c> is
+    /// refused. An expression problem is reported at the expression with its own code.
     /// </summary>
     private static void CheckComputedFields(
         EntityResource entity, Func<string, EntityResource?> findEntity, Action<string, string, string> report)
@@ -366,7 +367,7 @@ public static class ApplicationCompiler
 
             var parsed = ExpressionParser.Parse(field.Expression);
             ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!).Diagnostic
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, storedValue: true).Diagnostic
                 : parsed.Diagnostic;
             if (problem is not null)
             {

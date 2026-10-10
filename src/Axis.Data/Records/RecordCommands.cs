@@ -137,12 +137,14 @@ public static class RecordCommands
     /// transaction back unless the record is <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
+    /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a validation.</param>
     public static async Task<RecordWriteResult> SetAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Record stored,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -180,7 +182,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: computeErrors);
         }
 
-        if (RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows) is { } failures)
+        if (RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now) is { } failures)
         {
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }

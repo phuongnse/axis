@@ -20,6 +20,7 @@
     "item.closedInactive": "Mặt hàng đã đóng không thể hoạt động.",
     "itemPart.noLeadingSpace": "Tên bộ phận không được bắt đầu bằng khoảng trắng.",
     "order.needsLine": "Đơn hàng cần ít nhất một dòng.",
-    "ticket.priorityPositive": "Mức ưu tiên phải lớn hơn không."
+    "ticket.priorityPositive": "Mức ưu tiên phải lớn hơn không.",
+    "ticket.dueInPast": "Thời hạn phải ở trong tương lai."
   }
 }

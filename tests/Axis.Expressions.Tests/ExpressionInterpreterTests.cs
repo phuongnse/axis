@@ -406,6 +406,43 @@ public sealed class ExpressionInterpreterTests
         Assert.Throws<InvalidOperationException>(() => EvaluateWithRules("IsPositive(i)", [signature]));
     }
 
+    [Fact]
+    public void Now_gives_the_time_the_caller_supplies_for_every_call()
+    {
+        var now = new DateTimeOffset(2026, 10, 10, 8, 30, 0, TimeSpan.Zero);
+
+        Assert.Equal(now, Assert.IsType<DateTimeOffset>(EvaluateAt("now()", now, _scope, Values([])).Value));
+        Assert.Equal(true, EvaluateAt("now() == now()", now, _scope, Values([])).Value);
+        Assert.Equal(true, EvaluateAt("now() > dateTime('2026-10-10T08:29:59Z')", now, _scope, Values([])).Value);
+    }
+
+    [Fact]
+    public void Now_in_a_rule_body_gives_the_caller_time()
+    {
+        var now = new DateTimeOffset(2026, 10, 10, 8, 30, 0, TimeSpan.Zero);
+        var stamp = Rule("Stamp", "now()", ExpressionType.DateTime);
+
+        var result = EvaluateAt("Stamp()", now, new ExpressionScope(_fields, [stamp]), Values([]));
+
+        Assert.Equal(now, result.Value);
+    }
+
+    [Fact]
+    public void Now_in_an_aggregate_item_gives_the_caller_time()
+    {
+        var now = new DateTimeOffset(2026, 10, 10, 8, 30, 0, TimeSpan.Zero);
+
+        var result = EvaluateOver("max(lines, now())", Rows((1, 1m, true), (2, 2m, false)), now);
+
+        Assert.Equal(now, result.Value);
+    }
+
+    [Fact]
+    public void Now_without_the_caller_time_is_a_bug_to_evaluate()
+    {
+        Assert.Throws<InvalidOperationException>(() => Evaluate("now()"));
+    }
+
     public static TheoryData<string, bool> Corpus
     {
         get
@@ -742,8 +779,18 @@ public sealed class ExpressionInterpreterTests
         return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides));
     }
 
+    /// <summary>Evaluates <paramref name="text"/> over <paramref name="scope"/>, with <paramref name="now"/> as the time of <c>now()</c>.</summary>
+    private static ExpressionEvaluationResult EvaluateAt(string text, DateTimeOffset now, ExpressionScope scope, ExpressionValues values)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, values, now: now);
+    }
+
     /// <summary>Evaluates <paramref name="text"/> over a record whose collection <c>lines</c> holds <paramref name="lines"/>.</summary>
-    private static ExpressionEvaluationResult EvaluateOver(string text, IReadOnlyList<ExpressionValues> lines)
+    private static ExpressionEvaluationResult EvaluateOver(string text, IReadOnlyList<ExpressionValues> lines, DateTimeOffset? now = null)
     {
         var items = new ExpressionScope(new Dictionary<string, ExpressionType>
         {
@@ -757,7 +804,7 @@ public sealed class ExpressionInterpreterTests
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
         var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
-        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("lines", lines)]));
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("lines", lines)]), now: now);
     }
 
     private static IReadOnlyList<ExpressionValues> Rows(params (long? Qty, decimal? Amount, bool? Ok)[] rows) =>

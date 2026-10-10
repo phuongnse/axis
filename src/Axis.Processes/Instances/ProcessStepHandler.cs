@@ -193,7 +193,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         AuditEntry? recordAudit = null;
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity, record, assignments, cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity, record, assignments, instance.Now, cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
@@ -262,7 +262,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         for (var index = 0; index < step.Branches.Count; index++)
         {
             var branch = step.Branches[index];
-            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, branch.When, cancellationToken);
+            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, branch.When, instance.Now, cancellationToken);
             if (result.Error is { } error)
             {
                 throw Failure(error.Message, instance, input);
@@ -299,7 +299,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 throw Failure($"The entity '{entity.Name}' has no field '{assignment.Field}'.", instance, input);
             }
 
-            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, assignment.Value, cancellationToken);
+            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, assignment.Value, instance.Now, cancellationToken);
             if (result.Error is { } error)
             {
                 throw Failure(error.Message, instance, input);
@@ -330,7 +330,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
             return (ProcessTasks.RoleAssignee, step.Assignee.Role!);
         }
 
-        var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, user, cancellationToken);
+        var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, user, instance.Now, cancellationToken);
         if (result.Error is { } error)
         {
             throw Failure(error.Message, instance, input);

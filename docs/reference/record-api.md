@@ -144,7 +144,10 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   its child collections in one transaction. When any write fails, nothing is
   written, neither the owner nor any row. A delete also runs in a
   transaction. Each write commits its
-  [audit record](#audit-records-and-history) in the same transaction.
+  [audit record](#audit-records-and-history) in the same transaction. The
+  validations run in the write's transaction, so `now()` in a validation is
+  that transaction's start time
+  ([D22](../decisions.md#d22-current-time-and-time-zones--agreed)).
 - **References.** Before the write, each non-null `reference` value is looked
   up in the target table by id, in the write's transaction. The check does not
   lock the target. The foreign key is the backstop: a target removed in
@@ -355,7 +358,8 @@ A record with a child collection holds its rows inside `values`:
    the changes from the body, the rows it will store and the computed fields. A computed field that
    fails is a `400`, and then no validation runs. So a change to one field
    can break a validation reported on another.
-3. The validations of the entity and of each row the body sends run. A
+3. The validations of the entity and of each row the body sends run, inside
+   the write's transaction, so `now()` is that transaction's start time. A
    validation's aggregates read the same rows as the computed fields, so
    `count(lineItems) >= 1` refuses a create without rows and an update that
    sends an empty array. Rows an update leaves out are unchanged and are not

@@ -113,6 +113,21 @@ public sealed class ValidationCompilerTests
         Assert.All(order.Validations, validation => Assert.True(validation.Check.Succeeded));
     }
 
+    [Fact]
+    public void Validation_can_compare_a_field_with_the_current_time()
+    {
+        using var folder = Folder("""
+            [{ "expression": "dueAt is null or dueAt > now()", "message": { "textKey": "order.quantityPositive" }, "field": "dueAt" }]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        Assert.True(Assert.Single(order.Validations).Check.Succeeded);
+    }
+
     private static TemporaryFolder Folder(string? validations) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
@@ -121,6 +136,7 @@ public sealed class ValidationCompilerTests
                 { "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
                   "fields": [
                     { "name": "quantity", "type": "integer" },
+                    { "name": "dueAt", "type": "date-time" },
                     { "name": "status", "type": "enum", "values": ["open", "closed"] },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" },
                     { "name": "customer", "type": "reference", "target": "Customer" }

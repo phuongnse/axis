@@ -297,6 +297,28 @@ public sealed class ProcessCompilerTests
         Assert.Equal(20m, Evaluate(submit.Set[0].Value, 10m));
     }
 
+    [Fact]
+    public void A_start_condition_and_a_set_expression_can_use_the_current_time()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            """
+            [
+              { "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "submittedAt": "now()" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """,
+            start: "submit",
+            startCondition: "submittedAt is null or submittedAt < now()"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var submit = Assert.IsType<OperationStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal("date-time", Assert.Single(submit.Set).Value.Check.Type?.ToString());
+    }
+
     [Theory]
     [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operation is 'updateRecord'.")]
     [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operation is 'updateRecord'.")]
@@ -488,6 +510,20 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_user_assignee_can_use_the_current_time()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            TaskSteps(assignee: """{ "user": "if(now() > dateTime('2000-01-01T00:00:00Z'), 'u1', 'u2')" }"""),
+            start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
     public void Missing_task_and_outcome_label_keys_are_reported_at_their_text_keys()
     {
         var steps = TaskSteps().Replace("\"order.review\"", "\"order.nope\"", StringComparison.Ordinal)
@@ -658,6 +694,7 @@ public sealed class ProcessCompilerTests
                   "fields": [
                     { "name": "amount", "type": "decimal" },
                     { "name": "status", "type": "text" },
+                    { "name": "submittedAt", "type": "date-time" },
                     { "name": "customer", "type": "reference", "target": "Customer" },
                     { "name": "large", "type": "boolean", "expression": "amount > 1000" },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" },
