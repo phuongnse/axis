@@ -68,7 +68,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers | Docker |
-| `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL and the built server, runs Playwright in Chromium, then runs the Compose smoke test | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. Each
 suite writes a JUnit file to `artifacts/test-results/`, and the E2E server output
@@ -77,10 +77,22 @@ summary per suite and the failed tests with their `file:line`. On GitHub Actions
 the summary goes to the job summary and each failed test becomes an error
 annotation.
 
-For local development:
+To run Axis, run `docker compose up --build`. It builds Axis from source and starts
+PostgreSQL and the server with the purchase request sample at http://localhost:5206. It needs
+only Docker. `docker compose logs server` shows the activation diagnostics. Set
+`AXIS_SERVER_PORT` and `AXIS_POSTGRES_PORT` to change the host ports (5206 and 5432). Both
+ports are published on `127.0.0.1` only.
 
-- Run `docker compose up -d` to start PostgreSQL.
+For local development with hot reload:
+
+- Run `docker compose up -d postgres` to start only PostgreSQL. If you moved it with
+  `AXIS_POSTGRES_PORT`, also override `ConnectionStrings__Platform` and
+  `Tenants__default__ConnectionString` for `dotnet run`.
 - Run `dotnet run --project src/Axis.Server` to start the server on port 5206.
+- Run `dotnet run --project src/Axis.Worker` to start the worker. It runs the
+  due work items of every tenant in its `Tenants` section. Start the server
+  first, because the server migrates the tenant databases and the worker
+  does not.
 - Run `npm run dev --prefix web` to start the SPA with hot reload. It proxies
   `/api` and `/health` to the server.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request

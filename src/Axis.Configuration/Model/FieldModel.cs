@@ -5,8 +5,8 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled field. Type-specific properties are set only for the type they belong to:
 /// <see cref="MaxLength"/> for text, <see cref="Precision"/> and <see cref="Scale"/> for decimal,
-/// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection, and
-/// <see cref="TargetDisplayField"/> for reference.
+/// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
+/// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> for text.
 /// </summary>
 public sealed record FieldModel
 {
@@ -38,6 +38,9 @@ public sealed record FieldModel
 
     /// <summary>Whether the server computes the field's value on every write. Clients cannot set it.</summary>
     public bool IsComputed => Computed is not null;
+
+    /// <summary>The sequence that numbers the field, or null when it has none.</summary>
+    public SequenceModel? Sequence { get; init; }
 
     /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no

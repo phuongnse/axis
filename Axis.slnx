@@ -5,8 +5,10 @@
     <Project Path="src/Axis.Data/Axis.Data.csproj" />
     <Project Path="src/Axis.Expressions/Axis.Expressions.csproj" />
     <Project Path="src/Axis.Presentation/Axis.Presentation.csproj" />
+    <Project Path="src/Axis.Processes/Axis.Processes.csproj" />
     <Project Path="src/Axis.Server/Axis.Server.csproj" />
     <Project Path="src/Axis.Tenancy/Axis.Tenancy.csproj" />
+    <Project Path="src/Axis.Worker/Axis.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Axis.Configuration.Tests/Axis.Configuration.Tests.csproj" />

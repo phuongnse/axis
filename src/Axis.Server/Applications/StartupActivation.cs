@@ -58,8 +58,10 @@ internal sealed partial class StartupActivation(
         var database = scope.ServiceProvider.GetRequiredService<TenantDatabase>();
         var configuration = await database.GetConfigurationAsync(cancellationToken);
         var data = await database.GetDataAsync(cancellationToken);
+        var processes = await database.GetProcessesAsync(cancellationToken);
         await configuration.Database.MigrateAsync(cancellationToken);
         await data.Database.MigrateAsync(cancellationToken);
+        await processes.Database.MigrateAsync(cancellationToken);
 
         foreach (var folder in options.Folders)
         {

@@ -2,8 +2,10 @@
 
 Detailed reference for processes: the resource shape, the steps, the compile
 checks, the start endpoint, the instance and task states, the task API,
-execution, the worker settings and the tables. Nothing in this file is built yet. Everything here is
-*(planned for M3)*.
+execution, the worker settings and the tables. The worker host, its claims
+(see [Execution](#execution)), the [worker settings](#worker-settings) and the
+`axis.process_work_items` table are built. Everything else here is *(planned
+for M3)*.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -278,7 +280,7 @@ state. Cancel comes in M7.
 
 The task API lets the signed-in user list their open tasks, read one task and
 complete it with an outcome. The user is the signed-in
-[test user](../architecture.md#development-test-users-planned-for-m3) until
+[test user](../architecture.md#development-test-users) until
 sign-in arrives in M4.
 
 **Who may act.** The user may act on a task when they are its assignee, or
@@ -500,6 +502,12 @@ as usual.
 - **Failure.** A failing step rolls back. A following transaction records the
   error in the history and sets the instance to `failed`. Retry policies come
   in M5, and operator retry in M7.
+- **Work item errors.** When a work item's handler throws, its writes roll
+  back. A following transaction, still checked against the claim token,
+  deletes the item and calls the handler's failure callback with the error.
+  The item is not retried. A worker that crashes or stops before it commits
+  calls no failure callback. Its item is claimed again after the lease
+  expires.
 - **History.** Every step occurrence records its input, its output, the
   decision taken and any error.
 
@@ -529,8 +537,11 @@ database, with history in `axis.__processes_migrations` (see
   `waiting`, enforces one start per submission.
 - `axis.process_step_history`: one row per step occurrence, with its input,
   output, decision and error.
-- `axis.process_work_items`: the ready work, with its tenant id, claim token
-  and lease expiry.
+- `axis.process_work_items`: the ready work. Each item has an `id`, its
+  `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
+  `claim_token` of its current claim. A worker claims only items of the
+  tenant it polls and only kinds it has a handler for. Lease times use the
+  database clock. Completed and failed items are deleted.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
 - `axis.process_tasks`: one row per task, with its instance, step,

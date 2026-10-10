@@ -17,8 +17,8 @@ flowchart LR
 
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
-   (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource` or
-   `rule`). The manifest is the single `application`
+   (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
+   `rule` or `sequence`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -96,6 +96,14 @@ flowchart LR
      not compared with resource ids. Seed values are not checked at compile
      time; the startup step checks them before it inserts any record (see
      [Startup activation](#startup-activation)).
+   - **Sequences.** A field's [`sequence`](#sequences) must name a loaded
+     `sequence` resource, ignoring letter case, otherwise it is `AXC0066` at
+     `/fields/{i}/sequence`. A name whose sequence file was not loaded
+     because of its own errors, such as a bad `format`, is not reported
+     again. A `sequence` is `AXC0013` at `/fields/{i}/sequence` when the
+     field is not `text`, is `required`, has an `expression`, or belongs to
+     a child entity. The field gets one diagnostic, for the first of these
+     reasons in that order. A field that is not `text` gets no `AXC0066`.
    - **Data sources.** A data source's `entity` must name a loaded entity,
      ignoring letter case, otherwise it is `AXC0042` at `/entity`, and its
      fields and sort are not checked further. A name whose entity file was
@@ -143,7 +151,8 @@ flowchart LR
      not checked. See
      [data sources](data-sources.md#compile-checks).
 
-   The model holds the text resources, each entity's display field, the
+   The model holds the text resources, each entity's display field, each
+   field's sequence with its id, name and format, the
    sites and pages with their entity, data source and page references
    resolved, the
    seeds in path order with their entity resolved, and the data sources in
@@ -292,7 +301,7 @@ sorted by file and then path.
 | `AXC0010` | The file could not be read, for example because access is denied. |
 | `AXC0011` | Another field of the same entity already uses this `name`, ignoring letter case. |
 | `AXC0012` | A reference or child collection field's `target` names no loaded entity. Not reported when the target names an entity file in the folder that was not loaded because of its own errors. |
-| `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. This includes `required` on a computed field, and an `expression` on a `reference` or `child-collection` field. |
+| `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. This includes `required` on a computed field, and an `expression` on a `reference` or `child-collection` field. A `sequence` on a field that is not `text`, is `required`, has an `expression` or belongs to a child entity is reported once, at `/fields/{i}/sequence`. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference or child collection, `values` on an enum. |
 | `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
 | `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
@@ -345,6 +354,7 @@ sorted by file and then path.
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
 | `AXC0064` | A data source's `entity` is a child entity. Reported at `/entity`, naming the owner. |
 | `AXC0065` | Rule calls nest more than 8 deep, such as R1 → R2 → … → R9. Reported once, at `/expression` of the lowest rule past the limit, not at the rules or validations that call it. The message names the rules in the chain in call order. A rule in a cycle, or that calls into one, gets only `AXC0055`. See [cost bounds](expressions.md#cost-bounds). |
+| `AXC0066` | A field's `sequence` names no loaded sequence, ignoring letter case. Reported at `/fields/{i}/sequence`. Not reported when the name is a sequence file that was not loaded because of its own errors, or when the field is not `text`. |
 
 ## Startup activation
 
@@ -358,8 +368,8 @@ development or E2E server serves a real application without a separate step.
   empty the step does not run. That is the default, and so the Production
   behaviour.
 - **Order.** Tenants are processed in ordinal order of their id. For each
-  tenant, the step applies the configuration and data migrations to the
-  tenant database, then compiles each listed folder against that database and
+  tenant, the step applies the configuration, data and processes migrations
+  to the tenant database, then compiles each listed folder against that database and
   activates the release, in the listed order. The same folders apply to
   every tenant.
 - **Before listening.** The step runs before any hosted service starts, so
@@ -563,9 +573,10 @@ computed fields come later:
 
 ## Sequences
 
-*(planned for M3)* A `sequence` resource hands out business numbers, such as
-`PR-2026-00042` (D21). `sequence` joins the kinds of the Load step when it is
-built, and diagnostic codes come with the issue that builds the checks.
+A `sequence` resource hands out business numbers, such as `PR-2026-00042`
+(D21). The compiler checks sequences and the fields that name them. Assigning
+the numbers is *(planned for M3)*: until then, a field with a `sequence` is a
+plain optional text field.
 
 ```json
 {
@@ -580,7 +591,9 @@ built, and diagnostic codes come with the issue that builds the checks.
 - **Tokens.** `{yyyy}` is the four-digit UTC year. `{n}` is the number, and
   `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
   Every other character is literal.
-- **One number.** The format holds exactly one `{n}` or `{n:k}` token.
+- **One number.** The format holds exactly one `{n}` or `{n:k}` token. It
+  may hold `{yyyy}`, even more than once, and no other braces. Any other
+  format is `AXC0004` at `/format`.
 - **Yearly restart.** The counter restarts each UTC year, but only when the
   format holds `{yyyy}`. Without a year, a restart would hand out the same
   number twice. Application time zones come later.
@@ -603,12 +616,13 @@ An entity `text` field names the sequence in its `sequence` property:
 ```
 
 - `sequence` names a loaded `sequence` resource, ignoring letter case.
-- The field gets its number on create, in the create's transaction, and
-  clients cannot write it. See
+- *(planned for M3)* The field gets its number on create, in the create's
+  transaction, and clients cannot write it. See
   [the record API](record-api.md#create-update-and-delete) and
   [storage](storage.md#audit-records-and-sequence-counters).
 - A field with `sequence` cannot be `required` or have an `expression`,
-  because the server always assigns its value.
+  because the server always assigns its value. A child entity's field cannot
+  have a `sequence` either. Each of these is `AXC0013`.
 
 ## Entity field types and constraints
 
@@ -643,8 +657,9 @@ is `AXC0013`.
   field is `AXC0013` at `/fields/{i}/required`, and an `expression` on a
   `reference` or `child-collection` field is `AXC0013` at
   `/fields/{i}/expression`. See [Entity logic](#entity-logic).
-- `sequence` *(planned for M3)* names a [sequence](#sequences), ignoring
-  letter case. It cannot be combined with `required` or `expression`.
+- `sequence` names a [sequence](#sequences), ignoring letter case. It cannot
+  be combined with `required: true` or `expression`, and a child entity's
+  field cannot have it. Each is `AXC0013` at `/fields/{i}/sequence`.
 
 ## Entity logic
 

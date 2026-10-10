@@ -404,7 +404,7 @@ audit records can be read as its history (D21).
 - **Actions.** The actions are `record.created`, `record.updated` and
   `record.deleted`.
 - **Actor.** The actor is the signed-in
-  [test user](../architecture.md#development-test-users-planned-for-m3), or
+  [test user](../architecture.md#development-test-users), or
   `anonymous` when nobody is signed in.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
   On update it also has `"fields"`, the names of the changed fields. Field
