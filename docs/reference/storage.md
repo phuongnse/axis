@@ -215,8 +215,8 @@ schema of the tenant database.
 - **Audit records.** `axis.audit_records` is append-only. Each row is
   written in the same transaction as the action it records. The record API
   and the process [start endpoint](processes.md#start-endpoint) write them,
-  and so do [process steps](processes.md#running-a-step). The audit records of
-  tasks are *(planned for M3)*.
+  and so do [process steps](processes.md#running-a-step) and
+  [task completions](processes.md#completing-a-task).
 
   | Column | Type | Meaning |
   | --- | --- | --- |

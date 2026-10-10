@@ -1,0 +1,13 @@
+{
+  "id": "1b070902-c8b3-44ef-bc02-827496e65f39",
+  "kind": "form",
+  "name": "RequestDecision",
+  "formatVersion": 1,
+  "entity": "Request",
+  "sections": [
+    {
+      "title": { "textKey": "requestDecision.main" },
+      "fields": [{ "field": "title", "readOnly": true }, { "field": "comment" }]
+    }
+  ]
+}

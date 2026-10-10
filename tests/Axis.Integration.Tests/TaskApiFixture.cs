@@ -213,6 +213,82 @@ public sealed class TaskApiFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>
+    /// The state of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>, its
+    /// task and its subject record, and the number of its audit records, history rows and work items.
+    /// The audit records count those of the instance and of its subject record.
+    /// </summary>
+    public async Task<ProcessSnapshot> SnapshotAsync(string tenant, Guid instanceId)
+    {
+        Assert.True(Model.TryGetEntity("Request", out var request));
+        await using var command = DataSource(tenant).CreateCommand(
+            $"""
+            SELECT i.state, i.step, i.revision,
+                   (SELECT t.state FROM axis.process_tasks t WHERE t.process_instance_id = i.id),
+                   (SELECT count(*) FROM axis.audit_records a WHERE a.process_instance_id = i.id OR a.record_id = i.subject_id),
+                   (SELECT count(*) FROM axis.process_step_history h WHERE h.process_instance_id = i.id),
+                   (SELECT count(*) FROM axis.process_work_items w WHERE w.process_instance_id = i.id),
+                   (SELECT r.{Column("version")} FROM {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} r WHERE r.{Column("id")} = i.subject_id)
+            FROM axis.process_instances i WHERE i.id = @id
+            """);
+        command.Parameters.AddWithValue("id", instanceId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync(), "The instance does not exist.");
+        return new ProcessSnapshot(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetInt64(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.GetInt64(4),
+            reader.GetInt64(5),
+            reader.GetInt64(6),
+            reader.GetInt64(7));
+    }
+
+    /// <summary>The actor and details of each audit record of <paramref name="action"/> of the instance <paramref name="instanceId"/>, oldest first.</summary>
+    public async Task<IReadOnlyList<(string Actor, string Details)>> AuditRecordsAsync(string tenant, Guid instanceId, string action)
+    {
+        await using var command = DataSource(tenant).CreateCommand(
+            "SELECT actor, details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = @action ORDER BY id");
+        command.Parameters.AddWithValue("id", instanceId);
+        command.Parameters.AddWithValue("action", action);
+        var rows = new List<(string, string)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>The step history rows of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>, oldest first.</summary>
+    public async Task<IReadOnlyList<HistoryRow>> HistoryAsync(string tenant, Guid instanceId)
+    {
+        await using var command = DataSource(tenant).CreateCommand(
+            """
+            SELECT step, revision, input::text, output::text, output->>'next', decision, error, started_at <= finished_at
+            FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY started_at, finished_at
+            """);
+        command.Parameters.AddWithValue("id", instanceId);
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<HistoryRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new HistoryRow(
+                reader.GetString(0),
+                reader.GetInt64(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetBoolean(7)));
+        }
+
+        return rows;
+    }
+
     private NpgsqlDataSource DataSource(string tenant) => _tenants[tenant].DataSource;
 
     private async Task<Tenant> CreateTenantAsync(string databaseName)
@@ -242,7 +318,26 @@ public sealed class TaskApiFixture : IAsyncLifetime
     }
 
     private static string Column(string field) =>
-        EntityNaming.Quote(field == "id" ? EntityNaming.IdColumn : EntityNaming.Column(field));
+        EntityNaming.Quote(field switch
+        {
+            "id" => EntityNaming.IdColumn,
+            "version" => EntityNaming.VersionColumn,
+            _ => EntityNaming.Column(field),
+        });
 
     private sealed record Tenant(string ConnectionString, NpgsqlDataSource DataSource, Guid ReleaseId);
 }
+
+/// <summary>
+/// An instance's state, step and revision, its task's state, its subject record's version, and the
+/// number of its audit records, history rows and work items.
+/// </summary>
+public sealed record ProcessSnapshot(
+    string State,
+    string Step,
+    long Revision,
+    string? TaskState,
+    long AuditRecords,
+    long HistoryRows,
+    long WorkItems,
+    long SubjectVersion);

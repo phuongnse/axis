@@ -1,0 +1,23 @@
+{
+  "id": "f4a6bf11-bc47-4165-9fec-eedbaa5a778f",
+  "kind": "process",
+  "name": "Decide",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "request.decide" },
+      "assignee": { "user": "department.manager" },
+      "form": "RequestDecision",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "approved" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "rejected" }
+      ]
+    },
+    { "name": "approved", "type": "end" },
+    { "name": "rejected", "type": "end" }
+  ]
+}

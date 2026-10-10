@@ -10,7 +10,8 @@
     { "name": "divisor", "type": "integer" },
     { "name": "status", "type": "enum", "values": ["draft", "submitted"] },
     { "name": "submittedAt", "type": "date-time" },
-    { "name": "department", "type": "reference", "target": "Department" }
+    { "name": "department", "type": "reference", "target": "Department" },
+    { "name": "comment", "type": "text" }
   ],
   "validations": [
     {
