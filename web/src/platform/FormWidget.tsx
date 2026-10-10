@@ -1,11 +1,12 @@
 import { Alert, Button, Flex, Form } from 'antd'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
-import { fetchRecord, saveRecord, type RecordItem } from './records'
-import type { EntityWidgetMetadata } from './site'
+import { newIdempotencyKey, startProcess } from './processes'
+import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
+import type { EntityWidgetMetadata, WidgetAction } from './site'
 import { useText } from './texts'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -31,7 +32,8 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * cells. A computed field, of the record or of a row, is shown read-only with the value the server
  * returned, and never sent. So is a sequence field, which is empty on a new record because the
  * server numbers it on create, and so is a field the form marks read-only. A saved record shows its
- * history below the form. A new record has none.
+ * history below the form, and a button for each of the widget's actions. A new record has neither.
+ * An action saves the changed fields, then starts its process for the record.
  */
 export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
@@ -43,6 +45,11 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [started, setStarted] = useState(false)
+  // The Idempotency-Key of each action's start that got no final answer, by start endpoint, so a
+  // retry cannot start a second instance.
+  const startKeys = useRef<Record<string, string>>({})
 
   const start = useCallback(
     (record: RecordItem) => {
@@ -54,6 +61,7 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
   )
 
   useEffect(() => {
+    startKeys.current = {}
     if (recordId === null) {
       return
     }
@@ -86,10 +94,24 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
     }
   }
 
-  const save = async () => {
-    if (saving) {
+  const showSaveProblem = (problem: RecordProblem) => {
+    if (Object.keys(problem.errors).length === 0) {
+      // The record API answers a stale version with a 409 that names no field.
+      if (problem.status === 409 && recordId !== null) {
+        setConflict(true)
+      } else {
+        setFormErrors([t('shell.form.saveFailed')])
+      }
       return
     }
+    form.showProblem(problem)
+  }
+
+  const save = async () => {
+    if (saving || starting) {
+      return
+    }
+    setStarted(false)
     const body = buildRecordBody(entity.fields, form.changed(), recordId === null ? undefined : form.version)
     setSaving(true)
     form.clearErrors()
@@ -100,22 +122,77 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
         navigate(returnTo)
         return
       }
-      const { problem } = result
-      if (Object.keys(problem.errors).length === 0) {
-        // The record API answers a stale version with a 409 that names no field.
-        if (problem.status === 409 && recordId !== null) {
-          setConflict(true)
-        } else {
-          setFormErrors([t('shell.form.saveFailed')])
-        }
-        return
-      }
-      form.showProblem(problem)
+      showSaveProblem(result.problem)
     } catch (error) {
       console.warn(`Saving a record of '${entity.name}' failed`, error)
       setFormErrors([t('shell.form.saveFailed')])
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Saves the changed fields, when there are any, as the save button does. Returns whether the
+  // record is saved and the start may follow.
+  const saveBeforeStart = async (id: string) => {
+    const changed = form.changed()
+    // An empty update would raise the version and write a history entry for nothing.
+    if (Object.keys(changed).length === 0) {
+      return true
+    }
+    try {
+      const result = await saveRecord(entity.recordsPath, id, buildRecordBody(entity.fields, changed, form.version))
+      if (result.ok) {
+        start(result.record)
+        return true
+      }
+      showSaveProblem(result.problem)
+    } catch (error) {
+      console.warn(`Saving a record of '${entity.name}' failed`, error)
+      setFormErrors([t('shell.form.saveFailed')])
+    }
+    return false
+  }
+
+  const runAction = async (action: WidgetAction) => {
+    if (recordId === null || saving || starting) {
+      return
+    }
+    setStarting(true)
+    setStarted(false)
+    form.clearErrors()
+    setConflict(false)
+    try {
+      if (!(await saveBeforeStart(recordId))) {
+        return
+      }
+      // A key is kept only while its start has no final answer: a network error or a 5xx.
+      const key = (startKeys.current[action.instancesPath] ??= newIdempotencyKey())
+      let result
+      try {
+        result = await startProcess(action.instancesPath, recordId, key)
+      } catch (error) {
+        console.warn(`Starting the process '${action.process}' for '${recordId}' failed`, error)
+        setFormErrors([t('shell.form.startFailed')])
+        return
+      }
+      delete startKeys.current[action.instancesPath]
+      if (result.ok) {
+        setStarted(true)
+        await reload()
+        return
+      }
+      const { problem } = result
+      const messages = Object.values(problem.errors).flat()
+      if (messages.length > 0) {
+        // A start condition's message is a text key. A fixed message is no key, so it shows as is.
+        setFormErrors(messages.map((message) => t(message)))
+      } else if (problem.status === 409) {
+        setFormErrors([t('shell.form.processRunning')])
+      } else {
+        setFormErrors([t('shell.form.startFailed')])
+      }
+    } finally {
+      setStarting(false)
     }
   }
 
@@ -139,16 +216,28 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
           action={<Button onClick={reload}>{t('shell.form.reload')}</Button>}
         />
       )}
+      {started && <Alert data-testid="form-started" type="success" message={t('shell.form.processStarted')} />}
       {form.formErrors.length > 0 && (
         <Alert data-testid="form-error" type="error" message={form.formErrors.join(' ')} />
       )}
       <Form layout="vertical" onFinish={save}>
         {form.fields}
         <Flex gap="small">
-          <Button htmlType="submit" type="primary" loading={saving}>
+          <Button htmlType="submit" type="primary" loading={saving} disabled={starting}>
             {t('shell.form.save')}
           </Button>
           <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
+          {recordId !== null &&
+            widget.actions.map((action) => (
+              <Button
+                key={action.instancesPath}
+                htmlType="button"
+                disabled={saving || starting}
+                onClick={() => void runAction(action)}
+              >
+                {t(action.labelKey)}
+              </Button>
+            ))}
         </Flex>
       </Form>
       {recordId !== null && (

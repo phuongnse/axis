@@ -32,6 +32,7 @@ const noteWidget: EntityWidgetMetadata = {
   dataSource: null,
   form: null,
   tasksPath: null,
+  actions: [],
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -62,6 +63,7 @@ const noteListWidget: WidgetMetadata = {
   entity: null,
   form: null,
   tasksPath: null,
+  actions: [],
   dataSource: {
     name: 'NoteList',
     rowsPath,
@@ -288,6 +290,7 @@ describe('TableWidget', () => {
       entity: null,
       form: null,
       tasksPath: null,
+      actions: [],
       dataSource: {
         name: 'NotesByDepartment',
         rowsPath,
@@ -428,6 +431,7 @@ describe('TableWidget', () => {
       dataSource: null,
       form: null,
       tasksPath: null,
+      actions: [],
     })
 
     const cell = await screen.findByRole('cell', { name: '1250.50' })

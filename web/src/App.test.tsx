@@ -112,18 +112,30 @@ const pages: Record<string, PageMetadata> = {
     name: 'Notes',
     titleKey: 'pages.notes.title',
     widgets: [
-      { type: 'table', formPage: 'NoteForm', entity: noteEntity, dataSource: null, form: null, tasksPath: null },
+      {
+        type: 'table',
+        formPage: 'NoteForm',
+        entity: noteEntity,
+        dataSource: null,
+        form: null,
+        tasksPath: null,
+        actions: [],
+      },
     ],
   },
   noteform: {
     name: 'NoteForm',
     titleKey: 'pages.noteForm.title',
-    widgets: [{ type: 'form', formPage: null, entity: noteEntity, dataSource: null, form: null, tasksPath: null }],
+    widgets: [
+      { type: 'form', formPage: null, entity: noteEntity, dataSource: null, form: null, tasksPath: null, actions: [] },
+    ],
   },
   tasks: {
     name: 'Tasks',
     titleKey: 'pages.tasks.title',
-    widgets: [{ type: 'taskInbox', formPage: null, entity: null, dataSource: null, form: null, tasksPath }],
+    widgets: [
+      { type: 'taskInbox', formPage: null, entity: null, dataSource: null, form: null, tasksPath, actions: [] },
+    ],
   },
 }
 

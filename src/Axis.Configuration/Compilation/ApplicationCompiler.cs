@@ -86,6 +86,15 @@ public static class ApplicationCompiler
 
         FormResource? FindForm(string name) => formsByName.GetValueOrDefault(name);
 
+        // Process names follow the same rule too.
+        var processesByName = new Dictionary<string, ProcessResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var process in loaded.Processes)
+        {
+            processesByName.TryAdd(process.Name, process);
+        }
+
+        ProcessResource? FindProcess(string name) => processesByName.GetValueOrDefault(name);
+
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
@@ -109,7 +118,7 @@ public static class ApplicationCompiler
                 diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, textKeys, diagnostics);
+        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, textKeys, diagnostics);
         CheckSeeds(loaded, FindEntity, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, rules, diagnostics);
         ProcessChecker.Check(
@@ -135,7 +144,7 @@ public static class ApplicationCompiler
             Manifest = loaded.Application,
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
-            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName)).ToList(),
+            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
@@ -1073,7 +1082,8 @@ public static class ApplicationCompiler
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, PageResource> pagesByName,
         Dictionary<string, DataSourceResource> dataSourcesByName,
-        Dictionary<string, FormResource> formsByName) =>
+        Dictionary<string, FormResource> formsByName,
+        Dictionary<string, ProcessResource> processesByName) =>
         new()
         {
             Id = page.Id,
@@ -1094,7 +1104,18 @@ public static class ApplicationCompiler
                         entity is null ? null : new EntityReference(entity.Id, entity.Name),
                         widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
                         dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
-                        form is null ? null : new FormReference(form.Id, form.Name));
+                        form is null ? null : new FormReference(form.Id, form.Name))
+                    {
+                        // Each action is named as its process declares it. A widget without
+                        // actions keeps the shared empty list, so equal widgets stay equal.
+                        Actions = widget.Actions is null
+                            ? []
+                            : [.. widget.Actions.Select(action =>
+                            {
+                                var process = processesByName[action.Process];
+                                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
+                            })],
+                    };
                 })
                 .ToList(),
         };

@@ -32,6 +32,8 @@
     "noteReview.main": "Ghi chú",
     "noteReview.approve": "Duyệt",
     "noteReview.reject": "Từ chối",
+    "noteClose.action": "Đóng ghi chú",
+    "noteClose.cannotClose": "Chỉ có thể đóng ghi chú đang mở.",
     "category.label": "Danh mục",
     "category.name": "Tên"
   }

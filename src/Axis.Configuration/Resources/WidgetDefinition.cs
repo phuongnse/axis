@@ -24,4 +24,7 @@ public sealed record WidgetDefinition
     /// entity itself or a form over it.
     /// </summary>
     public string? FormPage { get; init; }
+
+    /// <summary>The buttons a <c>form</c> widget shows on a saved record, or null when it has none.</summary>
+    public IReadOnlyList<WidgetActionDefinition>? Actions { get; init; }
 }

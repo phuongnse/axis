@@ -131,6 +131,17 @@ export interface FormMetadata {
 }
 
 /**
+ * A `startProcess` action of a form widget: a button that starts `process` for the form's record by
+ * posting to `instancesPath`, the start endpoint, so the SPA never builds that URL itself.
+ */
+export interface WidgetAction {
+  type: 'startProcess'
+  process: string
+  labelKey: string
+  instancesPath: string
+}
+
+/**
  * One widget of a page. On a table or form, exactly one of `entity` and `dataSource` is set: the
  * widget shows all records of an entity, or the rows of a data source. `formPage` is set only on a
  * table that names the page holding its form. `form` is set only on a form widget that names a form,
@@ -145,6 +156,8 @@ export interface WidgetMetadata {
   form: FormMetadata | null
   /** The task API path on a task inbox, and `null` on every other widget. */
   tasksPath: string | null
+  /** The actions of a form widget, and `[]` on every other widget. */
+  actions: WidgetAction[]
 }
 
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */

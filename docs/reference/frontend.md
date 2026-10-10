@@ -23,8 +23,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
   and the `startProcess` action are agreed in
   [D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed). The
-  `form` resource, the task inbox and the task page are built. The `startProcess` action is
-  *(planned for M3)*. Navigate actions are expected to replace the table's
+  `form` resource, the task inbox, the task page and the `startProcess` action
+  are built. Navigate actions are expected to replace the table's
   `formPage` link; see
   [D15](../decisions.md#d15-presentation-model--agreed), where that part is
   still **Proposed**.
@@ -115,7 +115,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     described under **Form metadata** of the form widget.
   - Every widget also has `tasksPath`, never left out. It is described under
     the task inbox widget, and is `null` on every other widget.
-  - *(planned for M3)* Every widget also has `actions`, never left out. It
+  - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to.
   - `entity` is the widget's entity: its name, its label key, its display
@@ -494,9 +494,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     every cell read-only, and has no add or remove buttons. The widget sends
     only the editable fields it shows. A server error on a field the form
     does not show appears above the form.
-  - **Start process action** *(planned for M3)*. A `form` widget can declare
-    `startProcess` actions. Each is shown as a button below the form, with
-    its label.
+  - **Start process action**. A `form` widget can declare
+    `startProcess` actions. On a saved record, each is shown as a button
+    next to Save and Cancel, with its label. A new record shows no action
+    buttons, so a failed start never leaves a record behind on a form that
+    still says new.
 
     ```json
     {
@@ -512,16 +514,27 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     }
     ```
 
-    - The process must name the form's entity as its subject.
-    - A click saves the record first: a create on a new record, or the
-      changed fields on an existing one, as the save button does. If the save
-      fails, its errors show as for a save, and nothing starts.
+    - The process must name the form's entity as its subject. An unknown
+      process is `AXC0087`, and a process over another entity is `AXC0088`,
+      both at `/widgets/{i}/actions/{j}/process`. `actions` on another
+      widget type is `AXC0060`. The label joins the `AXC0028` check.
+    - A click saves the changed fields first, as the save button does. If
+      the save fails, its errors show as for a save, and nothing starts. When
+      no field has changed, the save is skipped, so the record's version and
+      history do not change for nothing.
     - Then it posts `{ "subjectId" }` to the
-      [start endpoint](processes.md#start-endpoint), with a new
-      `Idempotency-Key` for each click.
-    - On `201` it shows a success message and loads the record again, at its
-      edit address when it was new. A `400` or `409` shows its message above
-      the form, looked up in the site texts first.
+      [start endpoint](processes.md#start-endpoint) with an
+      `Idempotency-Key`. When a click got no final answer, a network error or
+      a `5xx`, the next click sends the same key, so a lost response cannot
+      start a second instance. Any other answer ends the key, and the next
+      click sends a new one.
+    - On `201` it shows a success message and loads the record again. The
+      first step runs on the worker after the `201`, so the record may still
+      show its old status until it is loaded again later.
+    - A `400`, such as a failed start condition, shows its messages above
+      the form, looked up in the site texts first. A `409` shows a platform
+      text saying the record is already in a running process. Any other
+      answer shows a generic platform error.
     - The button is disabled while the save and the start run.
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
@@ -530,7 +543,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `null` when the widget names an `entity`. `readOnly` already
       includes computed and sequence fields. Field names are as the entity
       declares them.
-    - *(planned for M3)* `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
+    - `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.
