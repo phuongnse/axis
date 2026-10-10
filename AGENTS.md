@@ -72,11 +72,13 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution | |
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
-| `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers, and a smoke test of `scripts/dev.sh` | Docker |
-| `scripts/e2e.sh` | Starts PostgreSQL, the built server and the worker, runs Playwright in Chromium, then runs the Compose smoke test | Docker |
+| `scripts/integration.sh` | .NET tests against real PostgreSQL through Testcontainers, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL, the built server and the worker, runs Playwright in Chromium, then runs the Compose smoke test, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 
-The test, integration and E2E scripts run every suite even when one fails. Each
-suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
+The test, integration and E2E scripts run every suite even when one fails. The one
+exception is a smoke test that NexKit's `NEXKIT_BASE_SHA` shows no change can affect. It is
+skipped and the summary lists it as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local
+runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
 goes to `artifacts/logs/e2e-server.log`, and the E2E worker output to
 `artifacts/logs/e2e-worker.log`. `scripts/test-report.mjs` then prints a
 summary per suite and the failed tests with their `file:line`. On GitHub Actions

@@ -40,6 +40,14 @@ models, are not copied here. Look them up where they live.
   can still break `main` together. When CI on `main` fails, the local agent
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.
+- **NexKit's checks skip smoke tests that a change cannot affect.** The
+  `scripts/dev.sh` and Docker Compose smoke tests take about 4 of the 9 minutes
+  of checks. NexKit sets `NEXKIT_BASE_SHA`, the commit the pull request started
+  from. A smoke test is skipped only when that variable is set, git can list the
+  changed and untracked files, and none of them is on the test's path list. The
+  lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
+  doubt runs the test. CI sets no base, so CI on `main` always runs both. The
+  test summary lists a skipped suite as skipped.
 - **Everything goes through NexKit, except changes in paths NexKit may not
   change.** Those paths are set by NexKit's
   [`protected_paths` setting][nexkit-config].
