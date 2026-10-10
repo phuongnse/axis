@@ -30,7 +30,8 @@
     "noteSections.details": "Details",
     "noteReview.task": "Review the note",
     "noteReview.main": "Note",
-    "noteReview.done": "Done",
+    "noteReview.approve": "Approve",
+    "noteReview.reject": "Reject",
     "category.label": "Category",
     "category.name": "Name"
   }

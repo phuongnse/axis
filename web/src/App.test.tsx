@@ -105,6 +105,8 @@ const noteEntity: EntityMetadata = {
   ],
 }
 
+const tasksPath = '/api/apps/E2eApp/tasks'
+
 const pages: Record<string, PageMetadata> = {
   notes: {
     name: 'Notes',
@@ -117,6 +119,11 @@ const pages: Record<string, PageMetadata> = {
     name: 'NoteForm',
     titleKey: 'pages.noteForm.title',
     widgets: [{ type: 'form', formPage: null, entity: noteEntity, dataSource: null, form: null, tasksPath: null }],
+  },
+  tasks: {
+    name: 'Tasks',
+    titleKey: 'pages.tasks.title',
+    widgets: [{ type: 'taskInbox', formPage: null, entity: null, dataSource: null, form: null, tasksPath }],
   },
 }
 
@@ -437,6 +444,20 @@ describe('App', () => {
       expect.anything(),
     )
     expect(fetch).not.toHaveBeenCalledWith(`${noteEntity.recordsPath}/42`, expect.anything())
+  })
+
+  it('shows the not-found page for new or a malformed task id under a task inbox page, and requests no task', async () => {
+    stubServer()
+
+    for (const path of ['/e2e/tasks/new', '/e2e/tasks/not-a-uuid']) {
+      const { unmount } = renderApp(path)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
+      unmount()
+    }
+    const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(requested.filter((url) => url.startsWith(tasksPath))).toEqual([])
   })
 
   it('shows the not-found page in the platform shell for an unknown site', async () => {

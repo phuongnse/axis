@@ -30,7 +30,8 @@
     "noteSections.details": "Chi tiết",
     "noteReview.task": "Xem xét ghi chú",
     "noteReview.main": "Ghi chú",
-    "noteReview.done": "Xong",
+    "noteReview.approve": "Duyệt",
+    "noteReview.reject": "Từ chối",
     "category.label": "Danh mục",
     "category.name": "Tên"
   }

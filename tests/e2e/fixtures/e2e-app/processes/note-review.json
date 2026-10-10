@@ -13,7 +13,10 @@
       "assignee": { "user": "'binh'" },
       "form": "NoteReview",
       "dueIn": "P3D",
-      "outcomes": [{ "name": "done", "label": { "textKey": "noteReview.done" }, "next": "end" }]
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "noteReview.approve" }, "next": "end" },
+        { "name": "reject", "label": { "textKey": "noteReview.reject" }, "next": "end" }
+      ]
     },
     { "name": "end", "type": "end" }
   ]
