@@ -181,11 +181,12 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   There is no in-memory state that matters after a crash.
 - **Step transactions.** A step transition loads the instance at its current
   revision, executes, and in one transaction writes:
-  - business changes
-  - new instance state
-  - the receipt
+  - business writes
+  - the new instance state and revision
+  - the step history
   - audit records
-  - outbox items
+  - the next work item
+  - outbox items *(planned for M5)*
 
   A revision mismatch aborts the transaction.
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
