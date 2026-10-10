@@ -420,6 +420,8 @@ is *(planned for M3)*.
   `anonymous` when nobody is signed in. A process
   [operation step](processes.md#running-a-step) that updates its subject
   record writes `record.updated` with the actor `system` and its instance id.
+  A [task completion](processes.md#completing-a-task) that writes values
+  writes no `record.updated`. Its `task.completed` record names the fields.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
   A delete holds the version the record had when it was deleted.
   - On update it also has `"fields"`: the declared names of the fields and

@@ -7,7 +7,10 @@
   "texts": {
     "request.amountNegative": "The amount cannot be negative.",
     "request.approve": "Approve the request",
+    "request.decide": "Decide on the request",
+    "requestDecision.main": "Decision",
     "requestReview.main": "Request",
-    "task.approve": "Approve"
+    "task.approve": "Approve",
+    "task.reject": "Reject"
   }
 }

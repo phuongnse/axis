@@ -12,8 +12,9 @@ the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_work_items` tables are built too. So is the engine that runs
 `decision`, `task`, `operation` and `end` steps, see
 [Running a step](#running-a-step). The [task API](#task-api) routes that
-list the user's tasks and read one task are built. Completing a task is
-*(planned for M3)*, so a `waiting` instance stays waiting until it comes.
+list the user's tasks, read one task and complete one are built. Completing
+a task resumes its `waiting` instance, see
+[Completing a task](#completing-a-task).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -527,6 +528,9 @@ who may not act on a task never learns its state.
   - A value for a field the form does not make editable is keyed
     `/values/<field>` with the message "Cannot be set.".
   - A missing `version` when `values` is not empty is keyed `/version`.
+  - Any other property, a repeated property and a body that is not a JSON
+    object get the record API's keys and messages, such as "Unknown
+    property.".
   - The values are then checked by the record update command. Its parse
     errors and entity validations use the record API's keys and messages.
 
@@ -546,6 +550,22 @@ who may not act on a task never learns its state.
   stored one. It is keyed `/version`. It is found when the values are
   written, so after the body checks, as in the record API.
 
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+    "title": "The record has changed since this version was read.",
+    "status": 409,
+    "errors": {
+      "/version": ["Must be the record's current version."]
+    }
+  }
+  ```
+
+- **Other write failures.** The other storage outcomes of writing the values
+  answer as in the record API's [errors](record-api.md#errors), such as a
+  `409` for a unique value, or a `404` when the subject record no longer
+  exists.
+
 ### Completing a task
 
 One transaction records the decision:
@@ -555,14 +575,23 @@ One transaction records the decision:
    so computed fields are recomputed and validations run.
 3. It sets the task's `outcome`, `completedBy` and `completedAt`, and its
    state to `completed`.
-4. It writes the step history and the audit record `task.completed`, with
-   details `{ "outcome", "fields" }`. `fields` names the changed fields and
-   holds no values.
-5. It sets the instance to `running` with a new revision, and inserts the
-   work item for the outcome's `next` step.
+4. It sets the instance to `running` on the outcome's `next` step, with a
+   new revision. The instance must be `waiting` on the task's step.
+5. It writes the history row of the task step at the revision the instance
+   waited at. Its `decision` is the outcome's declared name. Its input is
+   `{ "subjectId", "subjectVersion" }`, with the version the values were
+   written over, or `null` when there are no values. Its output is
+   `{ "taskId", "outcome", "next" }`, plus `subjectVersion`, the version the
+   values wrote, when there are any.
+6. It writes the audit record `task.completed`, with the user as its actor,
+   and details `{ "outcome", "fields" }`. `fields` names the changed fields
+   in declaration order and holds no values. A completion writes no
+   `record.updated`.
+7. It inserts the work item for the outcome's `next` step.
 
-When any part fails, nothing is written. The worker then runs the next step
-as usual.
+The form, the outcomes and the record write all use the release the instance
+is pinned to. When any part fails, nothing is written. The worker then runs
+the next step as usual.
 
 ## Execution
 
@@ -698,9 +727,9 @@ database, with history in `axis.__processes_migrations` (see
   | `process_instance_id` | `uuid` | The instance |
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
-  | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "state": "completed" }` for an end step, null for a failed step |
-  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. Null for other steps and failed steps |
+  | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step |
+  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |

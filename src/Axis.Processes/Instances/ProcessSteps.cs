@@ -97,6 +97,35 @@ internal static class ProcessSteps
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
+    /// <summary>
+    /// Moves an instance that is <c>waiting</c> on the task step <paramref name="taskStep"/> back to
+    /// <c>running</c> on <paramref name="next"/>, with the next revision, and returns the revision
+    /// it waited at. Returns <see langword="null"/> when the instance is not waiting on that step.
+    /// </summary>
+    public static async Task<long?> TryResumeAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string taskStep,
+        string next,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_instances
+            SET state = @running, step = @next, revision = revision + 1
+            WHERE id = @id AND state = @waiting AND step = @step
+            RETURNING revision - 1
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("step", taskStep);
+        command.Parameters.AddWithValue("next", next);
+        command.Parameters.AddWithValue("running", ProcessStarts.Running);
+        command.Parameters.AddWithValue("waiting", ProcessStarts.Waiting);
+        return await command.ExecuteScalarAsync(cancellationToken) is long revision ? revision : null;
+    }
+
     /// <summary>Adds the history row of a step occurrence. It finishes at the database's current time.</summary>
     public static async Task InsertHistoryAsync(NpgsqlTransaction transaction, StepOccurrence occurrence, CancellationToken cancellationToken)
     {
@@ -139,7 +168,9 @@ internal sealed record LoadedInstance(
 
 /// <summary>One occurrence of a step, as its history row records it.</summary>
 /// <param name="Revision">The instance revision the step ran at.</param>
-/// <param name="Decision">The branch a decision took, its zero-based index or <c>otherwise</c>.</param>
+/// <param name="Decision">
+/// The branch a decision took, its zero-based index or <c>otherwise</c>, or the outcome a task was completed with.
+/// </param>
 internal sealed record StepOccurrence(
     Guid InstanceId,
     string Step,

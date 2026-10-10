@@ -376,7 +376,7 @@ internal static class RecordEndpoints
     /// The declared names of the fields and child collections an update body sets, in declaration
     /// order. A field sent with its stored value is listed too, and a computed field never is.
     /// </summary>
-    private static IEnumerable<string> SetFields(EntityModel model, RecordInput input)
+    internal static IEnumerable<string> SetFields(EntityModel model, RecordInput input)
     {
         var named = input.Values.Select(value => value.Field.Name)
             .Concat(input.Rows.Select(rows => rows.Collection.Name))
@@ -388,14 +388,14 @@ internal static class RecordEndpoints
     private static bool TryParseId(string id, out Guid recordId) =>
         Guid.TryParseExact(id, "D", out recordId) && id.Length == 36;
 
-    private static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
+    internal static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         using var body = new MemoryStream();
         await request.Body.CopyToAsync(body, cancellationToken);
         return body.ToArray();
     }
 
-    private static IResult WriteFailure(RecordWriteResult result) =>
+    internal static IResult WriteFailure(RecordWriteResult result) =>
         result.Outcome switch
         {
             RecordWriteOutcome.NotFound => RecordNotFound(),

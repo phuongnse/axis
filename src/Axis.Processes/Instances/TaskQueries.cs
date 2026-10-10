@@ -85,6 +85,24 @@ public static class TaskQueries
     }
 
     /// <summary>
+    /// Reads and locks the task with <paramref name="id"/> in any state until the transaction ends,
+    /// or returns <see langword="null"/> when there is none. A concurrent lock waits for this
+    /// transaction, then reads the task as it committed.
+    /// </summary>
+    public static async Task<ProcessTaskRow?> LockAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT {Columns} FROM axis.process_tasks WHERE id = @id FOR UPDATE",
+            transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadTask(reader) : null;
+    }
+
+    /// <summary>
     /// Whether <paramref name="userId"/>, holding <paramref name="roles"/>, may act on
     /// <paramref name="task"/>: they are its assignee, or its assignee is a role they hold.
     /// </summary>
