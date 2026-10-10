@@ -561,6 +561,55 @@ computed fields come later:
   call, instead of running it. The expression must then be in the
   [SQL subset](expressions.md#sql-subset).
 
+## Sequences
+
+*(planned for M3)* A `sequence` resource hands out business numbers, such as
+`PR-2026-00042` (D21). `sequence` joins the kinds of the Load step when it is
+built, and diagnostic codes come with the issue that builds the checks.
+
+```json
+{
+  "id": "5d2f8a61-3c4b-4e7d-9a0f-6b1c2d3e4f09",
+  "kind": "sequence",
+  "name": "PurchaseRequestNumber",
+  "formatVersion": 1,
+  "format": "PR-{yyyy}-{n:5}"
+}
+```
+
+- **Tokens.** `{yyyy}` is the four-digit UTC year. `{n}` is the number, and
+  `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
+  Every other character is literal.
+- **One number.** The format holds exactly one `{n}` or `{n:k}` token.
+- **Yearly restart.** The counter restarts each UTC year, but only when the
+  format holds `{yyyy}`. Without a year, a restart would hand out the same
+  number twice. Application time zones come later.
+
+An entity `text` field names the sequence in its `sequence` property:
+
+```json
+{
+  "id": "0ec02f4a-bf31-4409-8eb9-bfb9c39b6756",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "number", "type": "text", "maxLength": 20, "unique": true, "sequence": "PurchaseRequestNumber" },
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 }
+  ]
+}
+```
+
+- `sequence` names a loaded `sequence` resource, ignoring letter case.
+- The field gets its number on create, in the create's transaction, and
+  clients cannot write it. See
+  [the record API](record-api.md#create-update-and-delete) and
+  [storage](storage.md#audit-records-and-sequence-counters).
+- A field with `sequence` cannot be `required` or have an `expression`,
+  because the server always assigns its value.
+
 ## Entity field types and constraints
 
 A field property is allowed only on the types that have an entry for it below.
@@ -570,17 +619,17 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | | | | | yes |
-| `integer` | yes | yes | | | | | | yes |
-| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes |
-| `boolean` | yes | yes | | | | | | yes |
-| `date` | yes | yes | | | | | | yes |
-| `date-time` | yes | yes | | | | | | yes |
-| `enum` | yes | yes | | | | | needed | yes |
-| `reference` | yes | yes | | | | needed | | |
-| `child-collection` | | | | | | needed | | |
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | | | | | yes | yes |
+| `integer` | yes | yes | | | | | | yes | |
+| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | |
+| `boolean` | yes | yes | | | | | | yes | |
+| `date` | yes | yes | | | | | | yes | |
+| `date-time` | yes | yes | | | | | | yes | |
+| `enum` | yes | yes | | | | | needed | yes | |
+| `reference` | yes | yes | | | | needed | | | |
+| `child-collection` | | | | | | needed | | | |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
@@ -594,6 +643,8 @@ is `AXC0013`.
   field is `AXC0013` at `/fields/{i}/required`, and an `expression` on a
   `reference` or `child-collection` field is `AXC0013` at
   `/fields/{i}/expression`. See [Entity logic](#entity-logic).
+- `sequence` *(planned for M3)* names a [sequence](#sequences), ignoring
+  letter case. It cannot be combined with `required` or `expression`.
 
 ## Entity logic
 

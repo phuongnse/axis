@@ -24,7 +24,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Field** | A typed attribute of an entity, with constraints. | M1 |
 | **Computed field** | A field whose value comes from an expression over the record's own fields and its child rows. It is stored and recomputed on every write. | M2 |
 | **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. See [data sources](../reference/data-sources.md). | M2 |
-| **Sequence** | A counter that hands out business numbers, such as `PR-2026-00042`, inside the caller's transaction. | M3 |
+| **Sequence** | A `sequence` resource that hands out business numbers from a format such as `PR-{yyyy}-{n:5}`, giving `PR-2026-00042`. A `text` field names it and gets its number on create, in the create's transaction, so there are no gaps. When the format has a year, the counter restarts each UTC year. See [configuration](../reference/configuration.md#sequences). | M3 |
 | **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. A seed can be synced so changed values update the seeded records on start. | M1 (basic), M2 |
 
 **Field types** start with:
@@ -134,5 +134,6 @@ See [processes](../reference/processes.md#steps).
 | **Policy** | A grant on a resource, record, field or action, optionally with a record filter rule. Default-deny applies. | M4 |
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. | M5 |
-| **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. | M3 |
+| **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
+| **Test user** | A development-only stand-in for a signed-in user, from a fixed list in server configuration. It works only in the `Development` and `Testing` environments, and OIDC replaces it in M4. See [architecture](../architecture.md#development-test-users-planned-for-m3). | M3 |
 | **Test scenario** | A configuration-level test that runs against a temporary tenant: it seeds data, runs actions or processes as given users and asserts the outcomes. | M6 |

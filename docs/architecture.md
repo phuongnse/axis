@@ -170,10 +170,48 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Record filters from policies are added to every data source query.
   - Field policies remove or mask fields from results and reject writes to
     protected fields.
-- **Before M4.** There is no authentication yet: every endpoint is open. A
-  development-only authentication handler with a fixed set of test users
-  arrives before M4 *(planned for M3)*. It must be impossible to enable it outside
-  the `Development` and test environments.
+- **Before M4.** There is no authentication yet: every endpoint is open.
+  Development test users arrive before M4, as described below (D21).
+
+### Development test users (planned for M3)
+
+Test users stand in for authentication until OIDC replaces them in M4 (D9).
+They exist only in development and tests, never in Production.
+
+- **Configuration.** The `TestUsers` section of the server configuration is
+  a fixed list. Each user has an id, a display name and role names:
+
+  ```json
+  "TestUsers": [
+    { "Id": "anna", "DisplayName": "Anna Requester", "Roles": ["requester"] }
+  ]
+  ```
+
+- **Allowed environments.** Test users work only in the `Development` and
+  `Testing` environments. `Testing` is the environment the server tests
+  already use.
+- **Startup guard.** When `TestUsers` has any entry in any other
+  environment, startup fails with an `InvalidOperationException` before the
+  server listens. The message names the environment. This matches how bad
+  [tenant configuration](#tenant-configuration) stops startup.
+- **Choosing a user.** The SPA lists the users and lets the person pick one:
+  - `GET /api/test-users` returns the configured users.
+  - `POST /api/test-users/sign-in` with `{ "id": "..." }` signs that user in.
+  - `POST /api/test-users/sign-out` signs the user out.
+
+  Outside the allowed environments these endpoints do not exist and answer
+  `404`. The `POST` endpoints follow the record API's
+  [content type rule](reference/record-api.md#create-update-and-delete).
+- **Cookie.** The server keeps the chosen user id in an HttpOnly,
+  SameSite=Strict cookie.
+- **Current user.** `GET /api/me` returns `{ "id", "displayName", "roles" }`
+  for the signed-in user. With nobody signed in, it is a `401` problem
+  details response.
+- **Open writes.** Until M4, record writes stay open with nobody signed in.
+  Their [audit records](reference/record-api.md#audit-records-and-history)
+  then have the actor `anonymous`.
+- **E2E server.** The E2E server runs as `Production` today. It moves to
+  `Testing` when M3 builds test users, so Playwright journeys can sign in.
 
 ## Process engine (D11, planned for M3)
 

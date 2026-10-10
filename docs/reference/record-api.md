@@ -23,6 +23,7 @@ endpoint from M4 (see [Authentication and authorization](../architecture.md#auth
 | `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
 | `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
 | `DELETE /api/apps/{app}/entities/{entity}/records/{id}` | `204` with no body |
+| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=` *(planned for M3)* | `200` with one page of the record's audit records. See [Audit records and history](#audit-records-and-history) |
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
@@ -146,6 +147,12 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   up in the target table by id, in the write's transaction. The check does not
   lock the target. The foreign key is the backstop: a target removed in
   between is a foreign-key violation that maps to the same error.
+- **Sequence fields** *(planned for M3)*. A `text` field that names a
+  [sequence](configuration.md#sequences) gets its number on create, in the
+  write's transaction. A body that sets it on create or update, even to
+  `null`, is a `400` at its pointer with the message "Cannot be set.", as for
+  a computed field. See
+  [Audit records and sequence counters](storage.md#audit-records-and-sequence-counters).
 
 ## Concurrency
 
@@ -383,5 +390,56 @@ answered with `400`:
   "errors": {
     "/values/lineItems/1/quantity": ["lineItem.quantityPositive"]
   }
+}
+```
+
+## Audit records and history
+
+*(planned for M3)* Every record write leaves an audit record, and one record's
+audit records can be read as its history (D21).
+
+- **Writes.** A create, update or delete writes one audit record in the
+  write's transaction. When the write fails, no audit record is written.
+- **Actions.** The actions are `record.created`, `record.updated` and
+  `record.deleted`.
+- **Actor.** The actor is the signed-in
+  [test user](../architecture.md#development-test-users-planned-for-m3), or
+  `anonymous` when nobody is signed in.
+- **Details.** `details` is `{ "version": n }` with the record's new version.
+  On update it also has `"fields"`, the names of the changed fields. Field
+  values are never included, so the audit holds no sensitive data before
+  field masking exists.
+- **History.** `GET /api/apps/{app}/entities/{entity}/records/{id}/history`
+  returns the audit records of one record.
+  - The path follows the 404 rules of a single read.
+  - `page` and `pageSize` follow the [paging rules](#paging-and-sorting).
+    There is no `sort` or `search`.
+  - Items are ordered by `occurredAt` descending, then by `id` descending.
+
+For example:
+
+```json
+{
+  "items": [
+    {
+      "id": "01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d",
+      "occurredAt": "2026-10-06T02:05:00.123456Z",
+      "actor": "anna",
+      "action": "record.updated",
+      "processInstanceId": null,
+      "details": { "version": 2, "fields": ["title"] }
+    },
+    {
+      "id": "01926b3a-1c20-7b4d-8e6f-7a8b9c0d1e2f",
+      "occurredAt": "2026-10-06T02:00:00.123456Z",
+      "actor": "anna",
+      "action": "record.created",
+      "processInstanceId": null,
+      "details": { "version": 1 }
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 2
 }
 ```
