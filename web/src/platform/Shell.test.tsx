@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { DatePicker } from 'antd'
 import dayjs from 'dayjs'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
@@ -23,6 +23,14 @@ function renderShell(locale: string) {
     </MemoryRouter>,
   )
 }
+
+// The server offers no test users, so the shell shows no test user picker.
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ title: 'Not found', status: 404 }), { status: 404 })),
+  )
+})
 
 afterEach(() => {
   dayjs.locale('en')
