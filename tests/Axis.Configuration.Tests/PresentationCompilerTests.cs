@@ -343,7 +343,7 @@ public sealed class PresentationCompilerTests
     }
 
     /// <summary>A folder that compiles: a site whose navigation opens a table page of orders, and form pages for orders and customers.</summary>
-    private static TemporaryFolder Folder() =>
+    internal static TemporaryFolder Folder() =>
         new TemporaryFolder()
             .With("application.json", Manifest)
             .With("entities/order.json", Order)
@@ -368,7 +368,7 @@ public sealed class PresentationCompilerTests
           "navigation": [ { "page": "{{navigationPage}}", "label": { "textKey": "{{navigationKey}}" } } ] }
         """;
 
-    private static string Page(string name, string widget, string id = "55555555-5555-4555-8555-555555555551", string titleKey = "orders.title") =>
+    internal static string Page(string name, string widget, string id = "55555555-5555-4555-8555-555555555551", string titleKey = "orders.title") =>
         $$"""
         { "id": "{{id}}", "kind": "page", "name": "{{name}}", "formatVersion": 1,
           "title": { "textKey": "{{titleKey}}" }, "widgets": [ {{widget}} ] }

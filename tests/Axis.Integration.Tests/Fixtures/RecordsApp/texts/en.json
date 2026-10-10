@@ -11,6 +11,8 @@
     "items.title": "Items",
     "itemsByDepartment.title": "Items by department",
     "itemForm.title": "Item",
+    "itemSections.main": "Main",
+    "itemSections.pricing": "Pricing",
     "departments.title": "Departments",
     "item.department": "Department",
     "item.quantityPositive": "Quantity must be greater than zero.",

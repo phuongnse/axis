@@ -11,6 +11,8 @@
     "items.title": "Mặt hàng",
     "itemsByDepartment.title": "Mặt hàng theo phòng ban",
     "itemForm.title": "Mặt hàng",
+    "itemSections.main": "Chính",
+    "itemSections.pricing": "Giá",
     "departments.title": "Phòng ban",
     "item.department": "Phòng ban",
     "item.quantityPositive": "Số lượng phải lớn hơn không.",

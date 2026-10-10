@@ -1,20 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Axis page",
+  "title": "Axis form",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "kind", "name", "formatVersion", "title", "widgets"],
+  "required": ["id", "kind", "name", "formatVersion", "entity", "sections"],
   "properties": {
     "id": { "$ref": "#/$defs/id" },
-    "kind": { "const": "page" },
+    "kind": { "const": "form" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "title": { "$ref": "#/$defs/textReference" },
-    "widgets": {
+    "entity": { "$ref": "#/$defs/name" },
+    "sections": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 1,
-      "items": { "$ref": "#/$defs/widget" }
+      "items": { "$ref": "#/$defs/section" }
     }
   },
   "$defs": {
@@ -36,16 +35,26 @@
         "textKey": { "type": "string", "minLength": 1 }
       }
     },
-    "widget": {
+    "section": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type"],
+      "required": ["title", "fields"],
       "properties": {
-        "type": { "enum": ["table", "form"] },
-        "entity": { "$ref": "#/$defs/name" },
-        "dataSource": { "$ref": "#/$defs/name" },
-        "form": { "$ref": "#/$defs/name" },
-        "formPage": { "$ref": "#/$defs/name" }
+        "title": { "$ref": "#/$defs/textReference" },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/field" }
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field"],
+      "properties": {
+        "field": { "$ref": "#/$defs/name" },
+        "readOnly": { "type": "boolean" }
       }
     }
   }

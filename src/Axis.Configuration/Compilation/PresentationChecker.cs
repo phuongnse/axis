@@ -6,8 +6,9 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Checks the sites and pages of an application against its entities, pages, data sources and texts. A name
-/// that belongs to a file which was not loaded because of its own errors is not reported again.
+/// Checks the forms, sites and pages of an application against its entities, pages, data sources,
+/// forms and texts. A name that belongs to a file which was not loaded because of its own errors is
+/// not reported again.
 /// </summary>
 internal static class PresentationChecker
 {
@@ -16,12 +17,18 @@ internal static class PresentationChecker
         Func<string, EntityResource?> findEntity,
         Func<string, PageResource?> findPage,
         Func<string, DataSourceResource?> findDataSource,
+        Func<string, FormResource?> findForm,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
+        foreach (var form in loaded.Forms)
+        {
+            CheckForm(form, loaded, findEntity, textKeys, diagnostics);
+        }
+
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, findDataSource, textKeys, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, textKeys, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -33,12 +40,70 @@ internal static class PresentationChecker
         }
     }
 
+    /// <summary>
+    /// Checks a form: its entity exists, every section title has a text key, and each field is a
+    /// field of the entity listed once across all sections, ignoring letter case.
+    /// </summary>
+    private static void CheckForm(
+        FormResource form,
+        ApplicationLoadResult loaded,
+        Func<string, EntityResource?> findEntity,
+        IReadOnlySet<string> textKeys,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, form.File, path, form.Id));
+
+        var entity = findEntity(form.Entity);
+        if (entity is null && !loaded.UnloadedEntityNames.Contains(form.Entity))
+        {
+            Report(
+                DiagnosticCodes.UnknownFormEntity,
+                $"The entity '{form.Entity}' was not found. No loaded entity has that name.",
+                "/entity");
+        }
+
+        var firstPathByField = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var sectionIndex = 0; sectionIndex < form.Sections.Count; sectionIndex++)
+        {
+            var section = form.Sections[sectionIndex];
+            ApplicationCompiler.CheckTextKey(section.Title, form.File, form.Id, $"/sections/{sectionIndex}/title", textKeys, diagnostics);
+
+            // Without the entity there is nothing to check the fields against.
+            if (entity is null)
+            {
+                continue;
+            }
+
+            for (var fieldIndex = 0; fieldIndex < section.Fields.Count; fieldIndex++)
+            {
+                var name = section.Fields[fieldIndex].Field;
+                var path = $"/sections/{sectionIndex}/fields/{fieldIndex}/field";
+                if (ApplicationCompiler.FindField(entity, name) is null)
+                {
+                    Report(
+                        DiagnosticCodes.UnknownFormField,
+                        $"The field '{name}' was not found. The entity '{entity.Name}' has no field with that name.",
+                        path);
+                }
+                else if (!firstPathByField.TryAdd(name, path))
+                {
+                    Report(
+                        DiagnosticCodes.DuplicateFormField,
+                        $"The field '{name}' is already listed at '{firstPathByField[name]}'. A form lists each field once.",
+                        path);
+                }
+            }
+        }
+    }
+
     private static void CheckPage(
         PageResource page,
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
         Func<string, PageResource?> findPage,
         Func<string, DataSourceResource?> findDataSource,
+        Func<string, FormResource?> findForm,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
@@ -53,8 +118,28 @@ internal static class PresentationChecker
             var path = $"/widgets/{index}";
             var isForm = WidgetTypes.Parse(widget.Type) == WidgetType.Form;
 
-            // A widget shows all records of an entity or the rows of a data source, never both.
-            if ((widget.Entity is null) == (widget.DataSource is null))
+            if (isForm && widget.DataSource is not null)
+            {
+                // A form edits one record of an entity, which a projection of rows cannot.
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'dataSource' applies only to table widgets.", $"{path}/dataSource");
+                continue;
+            }
+
+            if (isForm && (widget.Form is null) == (widget.Entity is null))
+            {
+                // A form lays out the fields of its own entity, so naming an entity as well says nothing new.
+                Report(DiagnosticCodes.InvalidWidgetBinding, "A form widget must name exactly one of 'form' and 'entity'.", path);
+                continue;
+            }
+
+            if (!isForm && widget.Form is not null)
+            {
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'form' applies only to form widgets.", $"{path}/form");
+                continue;
+            }
+
+            // A table shows all records of an entity or the rows of a data source, never both.
+            if (!isForm && (widget.Entity is null) == (widget.DataSource is null))
             {
                 Report(
                     DiagnosticCodes.InvalidWidgetBinding,
@@ -63,13 +148,27 @@ internal static class PresentationChecker
                 continue;
             }
 
-            // The entity the widget's records belong to: its own, or the root entity of its data
-            // source. Null when the data source is unknown.
+            // The entity the widget's records belong to: its own, that of its form, or the root
+            // entity of its data source. Null when the form or data source is unknown.
             string? recordEntity = widget.Entity;
 
             // Whether the widget shows the groups of a data source rather than records.
             var grouped = false;
-            if (widget.Entity is { } entityName)
+            if (widget.Form is { } formName)
+            {
+                if (findForm(formName) is { } form)
+                {
+                    recordEntity = form.Entity;
+                }
+                else if (!loaded.UnloadedFormNames.Contains(formName))
+                {
+                    Report(
+                        DiagnosticCodes.UnknownWidgetForm,
+                        $"The form '{formName}' was not found. No loaded form has that name.",
+                        $"{path}/form");
+                }
+            }
+            else if (widget.Entity is { } entityName)
             {
                 if (findEntity(entityName) is null && !loaded.UnloadedEntityNames.Contains(entityName))
                 {
@@ -78,12 +177,6 @@ internal static class PresentationChecker
                         $"The entity '{entityName}' was not found. No loaded entity has that name.",
                         $"{path}/entity");
                 }
-            }
-            else if (isForm)
-            {
-                // A form edits one record of an entity, which a projection of rows cannot.
-                Report(DiagnosticCodes.InvalidWidgetBinding, "'dataSource' applies only to table widgets.", $"{path}/dataSource");
-                continue;
             }
             else if (findDataSource(widget.DataSource!) is { } dataSource)
             {
@@ -127,15 +220,17 @@ internal static class PresentationChecker
             else if (findPage(formPage) is { } target)
             {
                 // Rows of a data source carry the id of their root record, so the form must be over
-                // that root entity.
+                // that root entity. A form widget that names a form is over the form's entity, and a
+                // form that is unknown is already reported on the target page.
                 var targetWidget = target.Widgets[0];
+                var targetEntity = targetWidget.Entity ?? (targetWidget.Form is { } targetForm ? findForm(targetForm)?.Entity : null);
                 if (WidgetTypes.Parse(targetWidget.Type) != WidgetType.Form
-                    || (recordEntity is not null && !string.Equals(targetWidget.Entity, recordEntity, StringComparison.OrdinalIgnoreCase)))
+                    || (recordEntity is not null && targetEntity is not null && !string.Equals(targetEntity, recordEntity, StringComparison.OrdinalIgnoreCase)))
                 {
                     var expected = recordEntity is null ? "a form widget" : $"a form widget over '{recordEntity}'";
                     Report(
                         DiagnosticCodes.InvalidFormPage,
-                        $"The page '{target.Name}' must hold {expected}, but holds a {targetWidget.Type} widget over '{targetWidget.Entity ?? targetWidget.DataSource}'.",
+                        $"The page '{target.Name}' must hold {expected}, but holds a {targetWidget.Type} widget over '{targetEntity ?? targetWidget.DataSource}'.",
                         $"{path}/formPage");
                 }
             }

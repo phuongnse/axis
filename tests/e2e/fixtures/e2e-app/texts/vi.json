@@ -24,6 +24,8 @@
     "note.lines": "Các dòng",
     "noteLine.description": "Mô tả",
     "noteLine.quantity": "Số lượng",
+    "noteSections.main": "Chính",
+    "noteSections.details": "Chi tiết",
     "category.label": "Danh mục",
     "category.name": "Tên"
   }

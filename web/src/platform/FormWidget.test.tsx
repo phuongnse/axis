@@ -36,6 +36,7 @@ const noteWidget: EntityWidgetMetadata = {
   type: 'form',
   formPage: null,
   dataSource: null,
+  form: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -110,6 +111,39 @@ const sequenceWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note laid out by a form in two sections: code and lines are read-only, and done is left out.
+const sectionsWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [...noteWidget.entity.fields, ...linesWidget.entity.fields.filter((field) => field.name === 'lines')],
+  },
+  form: {
+    name: 'NoteSections',
+    sections: [
+      {
+        titleKey: 'noteSections.main',
+        fields: [
+          { name: 'title', readOnly: false },
+          { name: 'code', readOnly: true },
+          { name: 'category', readOnly: true },
+        ],
+      },
+      {
+        titleKey: 'noteSections.details',
+        fields: [
+          { name: 'priority', readOnly: false },
+          { name: 'lines', readOnly: true },
+        ],
+      },
+    ],
+  },
+}
+
+function sectionsJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","code":"N-1","priority":7,"done":true,"category":"${categoryId}","lines":[{"description":"Pens","quantity":2}]},"labels":{"category":"Office"}}`
+}
+
 function sequenceJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"number":"PR-2026-00042","title":"Buy paper","priority":2},"labels":{}}`
 }
@@ -159,6 +193,8 @@ const texts = {
   'noteLine.code': 'Line code',
   'note.total': 'Total',
   'note.amountPositive': 'Amount must be positive.',
+  'noteSections.main': 'Main',
+  'noteSections.details': 'Details',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -619,6 +655,59 @@ describe('FormWidget', () => {
       method: 'PATCH',
       body: '{"version":1,"values":{"priority":3}}',
     })
+  })
+
+  it('shows the sections of a form under their titles, with only the fields they list', async () => {
+    stubFetch({ status: 200, body: sectionsJson(1) })
+    renderForm(noteId, sectionsWidget)
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Buy paper')
+    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details'])
+    expect(screen.getByLabelText('Code')).toHaveValue('N-1')
+    expect(screen.getByLabelText('Priority')).toHaveValue('7')
+    expect(screen.queryByLabelText('Done')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument()
+  })
+
+  it('shows read-only fields and rows without letting them change, and never sends them', async () => {
+    const requests = stubFetch({ status: 200, body: sectionsJson(1) }, { status: 200, body: sectionsJson(2) })
+    renderForm(noteId, sectionsWidget)
+
+    const code = await screen.findByLabelText('Code')
+    expect(code).toHaveAttribute('readonly')
+    expect(screen.getByLabelText('Category')).toHaveValue('Office')
+    expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Description 1')).toHaveValue('Pens')
+    expect(screen.getByLabelText('Description 1')).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+
+    await userEvent.type(code, '9')
+    await userEvent.type(screen.getByLabelText('Description 1'), '!')
+    const priority = screen.getByLabelText('Priority')
+    await userEvent.clear(priority)
+    await userEvent.type(priority, '3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"priority":3}}',
+    })
+  })
+
+  it('shows an error on a field the form leaves out above the form', async () => {
+    stubFetch({
+      status: 400,
+      body: '{"title":"Invalid","status":400,"errors":{"/values/done":["Required."],"/values/title":["Too long."]}}',
+    })
+    renderForm(null, sectionsWidget)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
+    expect(screen.getByTestId('form-error')).toHaveTextContent('Required.')
   })
 
   it('has the add-row and remove-row texts in every platform locale', () => {

@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence` or `process`). The manifest is the single `application`
+   `rule`, `sequence`, `process` or `form`). The manifest is the single `application`
    resource, stored as `application.json` at the folder root; an `application`
    resource in any other file is not used as the manifest. Resource IDs are
    unique across the application, compared as UUIDs. Names are unique per
@@ -71,21 +71,35 @@ flowchart LR
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in
      `available`, and every available locale needs a `text` resource,
-     ignoring letter case, otherwise it is `AXC0025`. A widget names
-     exactly one of `entity` and `dataSource`, otherwise it is `AXC0060` at
+     ignoring letter case, otherwise it is `AXC0025`. A `table` widget names
+     exactly one of `entity` and `dataSource`, and a `form` widget exactly
+     one of `form` and `entity`, otherwise it is `AXC0060` at
      `/widgets/{i}`. A widget's `entity` must name a loaded entity
      (`AXC0021`). A `dataSource` is allowed only on a `table` widget, and
      its data source must have no required parameter (`AXC0060` at
      `/widgets/{i}/dataSource`). It must name a loaded data source
-     (`AXC0059`). A `formPage` is allowed only on a `table` widget and must
+     (`AXC0059`). A `form` is allowed only on a `form` widget (`AXC0060` at
+     `/widgets/{i}/form`), and must name a loaded form (`AXC0077`). A
+     `formPage` is allowed only on a `table` widget and must
      name a page whose widget is a `form` over the same entity, or over the
-     root entity of the table's data source (`AXC0022`). A `formPage` is not
+     root entity of the table's data source (`AXC0022`). A `form` widget
+     that names a form is over the form's entity. A `formPage` is not
      allowed when the table's data source has an `aggregate`, because a group
      is not a record (`AXC0022`). A navigation entry
-     must name a loaded page (`AXC0023`). Entity, page and data source names
+     must name a loaded page (`AXC0023`). Entity, page, data source and form names
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels and page titles join the
      `AXC0028` check.
+   - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
+     entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
+     and its fields are not checked. A name whose entity file was not loaded
+     because of its own errors is not reported again. Each section `field`
+     must name a field of that entity, ignoring letter case, otherwise it is
+     `AXC0075` at `/sections/{i}/fields/{j}/field`. A field that an earlier
+     entry of the form already lists, in any section and ignoring letter
+     case, is `AXC0076` at the later entry's `field`, naming the first one.
+     Each section title joins the `AXC0028` check, at
+     `/sections/{i}/title/textKey`.
    - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
      case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
      was not loaded because of its own errors is not reported again. Seed
@@ -341,7 +355,7 @@ sorted by file and then path.
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 | `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
-| `AXC0022` | A widget's `formPage` is set on a `form` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. Reported at `/widgets/{i}/formPage`. |
+| `AXC0022` | A widget's `formPage` is set on a `form` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`. |
 | `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
 | `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
 | `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |
@@ -379,7 +393,7 @@ sorted by file and then path.
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 | `AXC0058` | A path in a data source filter or a process condition takes more than 3 hops, such as `a.b.c.d.name`. Reported at the JSON Pointer of the expression string, such as `/filter` or `/steps/0/branches/0/when`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
-| `AXC0060` | A widget names both `entity` and `dataSource`, or neither, reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. |
+| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. |
 | `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |
 | `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
@@ -393,6 +407,10 @@ sorted by file and then path.
 | `AXC0071` | A process step cannot be reached from `start`. Reported at `/steps/{i}`. Not checked when `start` names no step. |
 | `AXC0072` | A process step has no path to an `end` step. Reported at `/steps/{i}`. Not reported for a step with a transition to an unknown step, which is already `AXC0070`. |
 | `AXC0073` | Process steps form a cycle, such as a → b → a. Reported at the transition that closes the cycle, walking the steps in file order and each step's branches before its `otherwise`. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3). |
+| `AXC0074` | A form's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
+| `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
+| `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
+| `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
 
 ## Startup activation
 
@@ -534,7 +552,9 @@ site, and its widgets are its content:
 ```
 
 - A page holds exactly one widget. The widget `type` is `table` or
-  `form`. A `form` names an `entity`. A `table` names an `entity`, as
+  `form`. A `form` names a `form` resource, which lays out the fields of
+  one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
+  shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`.
 - A `table` widget may name a `formPage`: the page with the `form` widget
   that opens one of its records.

@@ -62,7 +62,29 @@ public static class ApplicationSites
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
             widget.Entity is { } entity ? Entity(application, entity.Name) : null,
-            widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null);
+            widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
+            widget.Form is { } form ? Form(application, form.Name) : null);
+
+    private static FormMetadata Form(ApplicationModel application, string name)
+    {
+        // The compiler resolves every widget form and every form field, so the lookups always succeed.
+        if (!application.TryGetForm(name, out var form))
+        {
+            throw new InvalidOperationException($"The widget form '{name}' is not in the model.");
+        }
+
+        var entity = application.FindEntity(form.Entity.Id)
+            ?? throw new InvalidOperationException($"The form entity '{form.Entity.Name}' is not in the model.");
+        return new FormMetadata(
+            form.Name,
+            [.. form.Sections.Select(section => new FormSectionMetadata(
+                section.Title.TextKey,
+                [.. section.Fields.Select(entry =>
+                {
+                    entity.TryGetField(entry.Field, out var field);
+                    return new FormFieldMetadata(field!.Name, entry.ReadOnly || field.IsComputed || field.Sequence is not null);
+                })]))]);
+    }
 
     private static EntityMetadata Entity(ApplicationModel application, string name)
     {

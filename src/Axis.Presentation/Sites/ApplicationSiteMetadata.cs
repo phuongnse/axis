@@ -20,9 +20,24 @@ public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<Wi
 /// <summary>
 /// One widget. Exactly one of <see cref="Entity"/> and <see cref="DataSource"/> is set: the widget
 /// shows all records of an entity, or the rows of a data source. <see cref="FormPage"/> is set only
-/// on a table widget that names the page holding the form for its records.
+/// on a table widget that names the page holding the form for its records. <see cref="Form"/> is set
+/// only on a form widget that names a form; <see cref="Entity"/> is then the form's entity, with
+/// every field, so a client knows the type of each field the form shows.
 /// </summary>
-public sealed record WidgetMetadata(string Type, string? FormPage, EntityMetadata? Entity, DataSourceMetadata? DataSource);
+public sealed record WidgetMetadata(string Type, string? FormPage, EntityMetadata? Entity, DataSourceMetadata? DataSource, FormMetadata? Form);
+
+/// <summary>The form a form widget lays its entity's fields out with: its sections in display order.</summary>
+public sealed record FormMetadata(string Name, IReadOnlyList<FormSectionMetadata> Sections);
+
+/// <summary>One section of a form: the text key of its title and its fields in display order.</summary>
+public sealed record FormSectionMetadata(string TitleKey, IReadOnlyList<FormFieldMetadata> Fields);
+
+/// <summary>One field of a form section, by its declared name.</summary>
+/// <param name="ReadOnly">
+/// Whether a client shows the field without letting it be changed, and never sends it. A computed or
+/// numbered field is always read-only.
+/// </param>
+public sealed record FormFieldMetadata(string Name, bool ReadOnly);
 
 /// <summary>The entity a widget shows, with its fields and the path of its record API.</summary>
 public sealed record EntityMetadata(string Name, string? LabelKey, string? DisplayField, string RecordsPath, IReadOnlyList<FieldMetadata> Fields);

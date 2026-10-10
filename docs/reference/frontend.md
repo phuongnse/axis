@@ -15,13 +15,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   templates. Those components and a single token-based theme with light and
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
-- **How pages and widgets grow.** A page has one widget. A form binds an entity,
-  and a table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold
+- **How pages and widgets grow.** A page has one widget. A form binds an entity
+  or a `form` resource, which lays the entity's fields out in sections, and a
+  table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold
   other widgets. Data sources are agreed in
   [D18](../decisions.md#d18-data-sources--agreed) and described in
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
   and the `startProcess` action are agreed in
-  [D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed)
+  [D20](../decisions.md#d20-human-tasks-task-inbox-and-forms--agreed). The
+  `form` resource is built. The task inbox and the `startProcess` action are
   *(planned for M3)*. Navigate actions are expected to replace the table's
   `formPage` link; see
   [D15](../decisions.md#d15-presentation-model--agreed), where that part is
@@ -92,7 +94,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
             }
           ]
         },
-        "dataSource": null
+        "dataSource": null,
+        "form": null
       }
     ]
   }
@@ -107,10 +110,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `dataSource` is set, and the other is `null`. A `taskInbox` has both
     `null`. The data source binding of the table widget below describes
     `dataSource`.
-  - *(planned for M3)* Every widget also has `form`, `actions` and
-    `tasksPath`, never left out. `form` and `actions` are described under the
-    form widget, and `tasksPath` under the task inbox widget. On a widget they
-    do not apply to, they are `null`, `[]` and `null`.
+  - Every widget also has `form`, never left out. It is the widget's form
+    resource on a `form` widget that names one, and `null` otherwise. It is
+    described under **Form metadata** of the form widget.
+  - *(planned for M3)* Every widget also has `actions` and `tasksPath`, never
+    left out. `actions` is described under the form widget, and `tasksPath`
+    under the task inbox widget. On a widget they do not apply to, they are
+    `[]` and `null`.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -315,7 +321,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.
-- **Form resource** *(planned for M3)*. A `form` resource lays out the fields
+- **Form resource**. A `form` resource lays out the fields
   of one entity in sections, and any field can be read-only. One form serves
   both a page and a task (D20).
 
@@ -356,13 +362,21 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     because the record API still accepts those fields. In a task, the server
     enforces it: completing a task rejects a value for a field the form does
     not make editable (see [Task API](processes.md#task-api)).
-  - `form` joins the kinds of the Load step when it is built, and diagnostic
-    codes come with the issue that builds the checks.
+  - A section's `fields` and the form's `sections` hold at least one entry,
+    and a section without a `title` breaks the schema (`AXC0004`).
+  - Compile checks: an `entity` that names no loaded entity is `AXC0074`. A
+    `field` the entity does not have is `AXC0075`. A field listed again, in
+    any section and ignoring letter case, is `AXC0076`. A section title key
+    that no locale has is `AXC0028`. See
+    [Configuration pipeline](configuration.md#configuration-pipeline).
+  - A form over a child entity is not checked yet.
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
   record API. It adds no rules of its own: the server validates.
   - **Inputs.** There is one input per field, in declaration order, labelled
-    with the field's label or the field name. A required field's label is
+    with the field's label or the field name. A widget that names a `form`
+    shows only the fields its form lists, in its order, under the section
+    titles (see **Form binding**). A required field's label is
     marked, but the mark blocks nothing: the server still decides.
 
     | Field type | Input |
@@ -375,7 +389,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `enum` | a choice of the declared values, as written in the entity file |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
     | `child-collection` | a table of its rows, described under **Child collections** |
-    | any type with `computed` or `sequence` | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
+    | any type with `computed` or `sequence`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
@@ -418,7 +432,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       removing a row clears the collection's cell errors, because their
       indexes would point at the wrong rows.
   - **Changed fields.** The form sends only the fields whose value differs
-    from the value it started from. It never sends a computed or sequence field. A new record starts with every field
+    from the value it started from. It never sends a computed, sequence or
+    read-only field, nor a field its form does not show. A new record starts with every field
     `null` and every child collection empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
@@ -454,11 +469,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Sequence fields**. Page metadata marks a field that
     names a [sequence](configuration.md#sequences), so the form shows it
     read-only. It is empty on a new record, and the form never sends it.
-  - **Form binding** *(planned for M3)*. A `form` widget names a `form`
+  - **Form binding**. A `form` widget names a `form`
     resource, or an `entity` as shorthand for all its fields in declaration
-    order. With a `form`, the widget shows its sections in order, each under
-    its title, and shows a read-only field as on a computed field. It sends
-    only the editable fields it shows.
+    order. Naming both or neither is `AXC0060`, and a `form` that names no
+    loaded form is `AXC0077`. With a `form`, the widget shows its sections in
+    order, each under its title as a heading, and shows a read-only field as
+    on a computed field. A read-only child collection shows its rows with
+    every cell read-only, and has no add or remove buttons. The widget sends
+    only the editable fields it shows. A server error on a field the form
+    does not show appears above the form.
   - **Start process action** *(planned for M3)*. A `form` widget can declare
     `startProcess` actions. Each is shown as a button below the form, with
     its label.
@@ -488,12 +507,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       edit address when it was new. A `400` or `409` shows its message above
       the form, looked up in the site texts first.
     - The button is disabled while the save and the start run.
-  - **Form metadata** *(planned for M3)*. Page metadata gives the widget's
-    `entity` as today, so the SPA knows every field's type. It adds:
+  - **Form metadata**. Page metadata gives the widget's
+    `entity` with all its fields, so the SPA knows every field's type. It
+    adds:
     - `form`: `{ "name", "sections": [ { "titleKey", "fields": [ { "name", "readOnly" } ] } ] }`,
       or `null` when the widget names an `entity`. `readOnly` already
-      includes computed and sequence fields.
-    - `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
+      includes computed and sequence fields. Field names are as the entity
+      declares them.
+    - *(planned for M3)* `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.

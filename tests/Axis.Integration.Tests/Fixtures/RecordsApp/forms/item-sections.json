@@ -1,0 +1,17 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a0d",
+  "kind": "form",
+  "name": "ItemSections",
+  "formatVersion": 1,
+  "entity": "Item",
+  "sections": [
+    {
+      "title": { "textKey": "itemSections.main" },
+      "fields": [{ "field": "name" }, { "field": "quantity", "readOnly": true }]
+    },
+    {
+      "title": { "textKey": "itemSections.pricing" },
+      "fields": [{ "field": "price" }, { "field": "total" }]
+    }
+  ]
+}

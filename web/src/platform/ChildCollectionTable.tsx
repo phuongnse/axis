@@ -15,6 +15,8 @@ interface ChildCollectionTableProps {
   errors: Record<string, string[]>
   /** The UI locale, for showing computed values. */
   locale: string
+  /** Shows every cell read-only, with no add or remove buttons. */
+  readOnly?: boolean
 }
 
 // Field names start with a letter, so this key never names a field column.
@@ -23,9 +25,17 @@ const removeColumnKey = '$remove'
 /**
  * Edits the rows of a child collection as a table: one column per child field, each cell the same
  * input the form uses for that field type, a remove button per row and an add button below. A
- * computed cell is read-only and shows the value the server returned.
+ * computed cell is read-only and shows the value the server returned. A read-only collection shows
+ * every cell that way, and has no add or remove buttons.
  */
-export function ChildCollectionTable({ field, rows, onChange, errors, locale }: ChildCollectionTableProps) {
+export function ChildCollectionTable({
+  field,
+  rows,
+  onChange,
+  errors,
+  locale,
+  readOnly = false,
+}: ChildCollectionTableProps) {
   const t = useText()
   const childFields = useMemo(() => field.fields ?? [], [field.fields])
   // A client key per row object, carried over when a row is edited, so React keeps each row's inputs.
@@ -65,7 +75,7 @@ export function ChildCollectionTable({ field, rows, onChange, errors, locale }: 
                 )
               }
             >
-              {child.computed ? (
+              {readOnly || child.computed ? (
                 <Input
                   readOnly
                   aria-label={`${label} ${index + 1}`}
@@ -84,13 +94,15 @@ export function ChildCollectionTable({ field, rows, onChange, errors, locale }: 
         },
       }
     }),
-    {
+  ]
+  if (!readOnly) {
+    columns.push({
       key: removeColumnKey,
       render: (_value: unknown, _row: RecordRow, index: number) => (
         <Button onClick={() => remove(index)}>{t('shell.form.removeRow')}</Button>
       ),
-    },
-  ]
+    })
+  }
 
   return (
     <Flex vertical gap="small">
@@ -98,9 +110,11 @@ export function ChildCollectionTable({ field, rows, onChange, errors, locale }: 
       <ConfigProvider theme={{ components: { Form: { itemMarginBottom: 0 } } }}>
         <Table<RecordRow> rowKey={keyOf} columns={columns} dataSource={rows} pagination={false} />
       </ConfigProvider>
-      <Flex>
-        <Button onClick={add}>{t('shell.form.addRow')}</Button>
-      </Flex>
+      {!readOnly && (
+        <Flex>
+          <Button onClick={add}>{t('shell.form.addRow')}</Button>
+        </Flex>
+      )}
     </Flex>
   )
 }

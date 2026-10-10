@@ -72,6 +72,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemForm", widget.GetProperty("formPage").GetString());
 
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
 
         var entity = widget.GetProperty("entity");
         Assert.Equal("Item", entity.GetProperty("name").GetString());
@@ -163,6 +164,32 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("form", widget.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
         Assert.Equal("Item", widget.GetProperty("entity").GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
+    }
+
+    [Fact]
+    public async Task Form_page_over_a_form_returns_its_sections_with_read_only_flags_and_the_whole_entity()
+    {
+        using var page = await GetJsonAsync("/api/sites/records/pages/itemsections", HostA);
+
+        Assert.Equal("ItemSections", page.RootElement.GetProperty("name").GetString());
+        var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
+        Assert.Equal(
+            ["type", "formPage", "entity", "dataSource", "form"],
+            widget.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("form", widget.GetProperty("type").GetString());
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
+
+        // The total is computed, so it is read-only though the form does not say so.
+        Assert.Equal(
+            """{"name":"ItemSections","sections":[{"titleKey":"itemSections.main","fields":[{"name":"name","readOnly":false},{"name":"quantity","readOnly":true}]},{"titleKey":"itemSections.pricing","fields":[{"name":"price","readOnly":false},{"name":"total","readOnly":true}]}]}""",
+            widget.GetProperty("form").GetRawText());
+
+        // The entity keeps every field, so the SPA knows the type of each field the form shows.
+        var entity = widget.GetProperty("entity");
+        Assert.Equal("Item", entity.GetProperty("name").GetString());
+        Assert.Equal(10, entity.GetProperty("fields").GetArrayLength());
     }
 
     [Theory]

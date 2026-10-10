@@ -331,7 +331,8 @@ work.
 ## D20. Human tasks, task inbox and forms — Agreed
 
 Human work arrives in M3. See [processes](reference/processes.md#steps) and
-[the frontend](reference/frontend.md). All of it is *(planned for M3)*.
+[the frontend](reference/frontend.md). The `form` resource and the `form`
+widget that names one are built. The rest is *(planned for M3)*.
 
 - **Task step:** a `task` step has a `label`, an assignee, a `form`, an
   optional `dueIn` and its outcomes.
