@@ -4,8 +4,8 @@ namespace Axis.Data.Storage;
 
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
-/// <c>entities</c> schema, and the counters of the sequences. The caller supplies the connection
-/// to the tenant database.
+/// <c>entities</c> schema, the counters of the sequences and the audit records. The caller
+/// supplies the connection to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
 {
@@ -22,6 +22,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<ProvisionedEnumValueRow> ProvisionedEnumValues => Set<ProvisionedEnumValueRow>();
 
     public DbSet<SequenceCounterRow> SequenceCounters => Set<SequenceCounterRow>();
+
+    public DbSet<AuditRecordRow> AuditRecords => Set<AuditRecordRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -62,6 +64,25 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             counter.Property(c => c.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
             counter.Property(c => c.Period).HasColumnName("period").ValueGeneratedNever();
             counter.Property(c => c.LastValue).HasColumnName("last_value").ValueGeneratedNever();
+        });
+
+        // A trigger added by the migration rejects every update, delete and truncate.
+        modelBuilder.Entity<AuditRecordRow>(audit =>
+        {
+            audit.ToTable("audit_records");
+            audit.HasKey(a => a.Id).HasName("pk_audit_records");
+            audit.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            audit.Property(a => a.OccurredAt).HasColumnName("occurred_at");
+            audit.Property(a => a.Actor).HasColumnName("actor");
+            audit.Property(a => a.Action).HasColumnName("action");
+            audit.Property(a => a.ApplicationId).HasColumnName("application_id");
+            audit.Property(a => a.EntityId).HasColumnName("entity_id");
+            audit.Property(a => a.RecordId).HasColumnName("record_id");
+            audit.Property(a => a.ProcessInstanceId).HasColumnName("process_instance_id");
+            audit.Property(a => a.Details).HasColumnName("details").HasColumnType("jsonb");
+            audit.HasIndex(a => new { a.EntityId, a.RecordId, a.OccurredAt, a.Id })
+                .IsDescending(false, false, true, true)
+                .HasDatabaseName("ix_audit_records_entity_id_record_id_occurred_at_id");
         });
     }
 }

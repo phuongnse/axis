@@ -1,9 +1,12 @@
 using System.Globalization;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
+using Axis.Server.Users;
 using Npgsql;
 
 namespace Axis.Server.Records;
@@ -12,7 +15,9 @@ namespace Axis.Server.Records;
 /// Endpoints for the records of an entity in the active release of an application. A path that
 /// names no active application, entity or record is a 404 before the query or body is checked; a
 /// child entity is no entity here. A create or update writes the record and its child rows in one
-/// transaction.
+/// transaction. Every create, update and delete that succeeds appends one audit record in its
+/// transaction, with the signed-in test user as the actor, or <c>anonymous</c>. A write that fails
+/// leaves none.
 /// A body is checked in order: content type (415), then body (400), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
@@ -139,6 +144,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
@@ -175,7 +181,12 @@ internal static class RecordEndpoints
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             result = await RecordCommands.CreateAsync(connection, application!, model, computed.Values, computed.Rows, cancellationToken: cancellationToken);
-            await CompleteAsync(transaction, result, cancellationToken);
+            await CompleteAsync(
+                transaction,
+                result is { Outcome: RecordWriteOutcome.Written, Record: { } written }
+                    ? RecordAudit(request.HttpContext, directory, AuditActions.RecordCreated, application!, model, written.Id, written.Version)
+                    : null,
+                cancellationToken);
         }
 
         // The location uses the model's names, so a record has one URL whatever case the caller used.
@@ -191,6 +202,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
@@ -246,7 +258,12 @@ internal static class RecordEndpoints
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
-            await CompleteAsync(transaction, result, cancellationToken);
+            await CompleteAsync(
+                transaction,
+                result is { Outcome: RecordWriteOutcome.Written, Record: { } written }
+                    ? RecordAudit(request.HttpContext, directory, AuditActions.RecordUpdated, application!, model, written.Id, written.Version, SetFields(model, input))
+                    : null,
+                cancellationToken);
         }
 
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
@@ -258,11 +275,13 @@ internal static class RecordEndpoints
         string app,
         string entity,
         string id,
+        HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
-        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -274,7 +293,19 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        return await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken) switch
+        RecordDeleteResult result;
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);
+            await CompleteAsync(
+                transaction,
+                result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
+                    ? RecordAudit(httpContext, directory, AuditActions.RecordDeleted, application!, model, recordId, version)
+                    : null,
+                cancellationToken);
+        }
+
+        return result.Outcome switch
         {
             RecordDeleteOutcome.Deleted => Results.NoContent(),
             RecordDeleteOutcome.NotFound => RecordNotFound(),
@@ -305,19 +336,63 @@ internal static class RecordEndpoints
     }
 
     /// <summary>
-    /// Commits the owner and its rows when the record was written, and rolls back every write
-    /// otherwise. Disposing the transaction rolls back on an exception.
+    /// Appends <paramref name="audit"/> and commits the write when it succeeded, which is when
+    /// there is an audit record, and rolls back every write otherwise. Disposing the transaction
+    /// rolls back on an exception, so a write whose audit record fails is not committed.
     /// </summary>
-    private static async Task CompleteAsync(NpgsqlTransaction transaction, RecordWriteResult result, CancellationToken cancellationToken)
+    private static async Task CompleteAsync(NpgsqlTransaction transaction, AuditEntry? audit, CancellationToken cancellationToken)
     {
-        if (result.Outcome == RecordWriteOutcome.Written)
+        if (audit is not null)
         {
+            await AuditRecords.AppendAsync(transaction, audit, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         else
         {
             await transaction.RollbackAsync(cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// The audit record of a record write. Its details hold the record's version, and on update
+    /// the names of the fields the body sets. They never hold a field value.
+    /// </summary>
+    private static AuditEntry RecordAudit(
+        HttpContext httpContext,
+        TestUserDirectory directory,
+        string action,
+        ApplicationModel application,
+        EntityModel model,
+        Guid recordId,
+        long version,
+        IEnumerable<string>? fields = null)
+    {
+        var details = new JsonObject { ["version"] = version };
+        if (fields is not null)
+        {
+            details["fields"] = new JsonArray([.. fields.Select(name => JsonValue.Create(name))]);
+        }
+
+        return new AuditEntry(
+            directory.FindSignedIn(httpContext.User) ?? AuditActors.Anonymous,
+            action,
+            application.Manifest.Id,
+            model.Id,
+            recordId,
+            ProcessInstanceId: null,
+            details);
+    }
+
+    /// <summary>
+    /// The declared names of the fields and child collections an update body sets, in declaration
+    /// order. A field sent with its stored value is listed too, and a computed field never is.
+    /// </summary>
+    private static IEnumerable<string> SetFields(EntityModel model, RecordInput input)
+    {
+        var named = input.Values.Select(value => value.Field.Name)
+            .Concat(input.Rows.Select(rows => rows.Collection.Name))
+            .ToHashSet(StringComparer.Ordinal);
+        return model.Fields.Select(field => field.Name).Where(named.Contains);
     }
 
     // Only the hyphenated form names a record; any other text is no record, not a bad request.
