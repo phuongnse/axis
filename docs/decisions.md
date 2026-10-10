@@ -327,8 +327,9 @@ work.
 
 ## D21. Development test users, audit records and sequences — Agreed
 
-M3 adds three platform pieces before processes run. All are *(planned for
-M3)*.
+M3 adds three platform pieces before processes run. Test users, their
+sign-in and the current user are built. The SPA user picker, audit records,
+record history and sequences are *(planned for M3)*.
 
 - **Test users:** server configuration holds a fixed list, `TestUsers`, with
   an id, a display name and role names for each user. The SPA lets the person
@@ -336,7 +337,7 @@ M3)*.
   the `Development` environment and in tests, which run as `Testing`. When
   `TestUsers` is set in any other environment, startup fails. OIDC replaces
   them in M4 (D9). See
-  [architecture](architecture.md#development-test-users-planned-for-m3).
+  [architecture](architecture.md#development-test-users).
 - **Current user:** `GET /api/me` returns the signed-in test user, or `401`
   when there is none. Before M4, record writes stay open with no signed-in
   user, and the actor is then `anonymous`.

@@ -41,13 +41,26 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       ASPNETCORE_URLS: baseURL,
-      ASPNETCORE_ENVIRONMENT: 'Production',
+      ASPNETCORE_ENVIRONMENT: 'Testing',
       ConnectionStrings__Platform: connectionString,
       // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
       Tenants__default__Hosts__0: '127.0.0.1',
       Tenants__default__ConnectionString: connectionString,
       ActivateOnStartup__0: e2eApp,
       ActivateOnStartup__1: purchaseRequests,
+      // The purchase request users, as in appsettings.Development.json.
+      TestUsers__0__Id: 'anna',
+      TestUsers__0__DisplayName: 'Anna Employee',
+      TestUsers__0__Roles__0: 'employee',
+      TestUsers__1__Id: 'binh',
+      TestUsers__1__DisplayName: 'Binh Engineering Manager',
+      TestUsers__1__Roles__0: 'department-manager',
+      TestUsers__2__Id: 'chau',
+      TestUsers__2__DisplayName: 'Chau Operations Manager',
+      TestUsers__2__Roles__0: 'department-manager',
+      TestUsers__3__Id: 'dung',
+      TestUsers__3__DisplayName: 'Dung Finance Reviewer',
+      TestUsers__3__Roles__0: 'finance-reviewer',
     },
   },
 })

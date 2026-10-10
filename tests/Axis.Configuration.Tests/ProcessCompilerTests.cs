@@ -175,7 +175,7 @@ public sealed class ProcessCompilerTests
     [InlineData(true, "amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
     [InlineData(true, "nope > 1", ExpressionDiagnosticCodes.UnknownName)]
     // Reference paths are not resolved in a process yet.
-    [InlineData(true, "status.name == 'x'", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData(true, "customer.name == 'x'", ExpressionDiagnosticCodes.UnknownName)]
     public void A_condition_problem_is_reported_at_that_condition_and_gives_no_model(bool inStartCondition, string expression, string code)
     {
         var steps = $$"""
@@ -245,7 +245,10 @@ public sealed class ProcessCompilerTests
             """;
     }
 
-    /// <summary>An application with an <c>Order</c> entity that owns <c>OrderLine</c> rows, the rule <c>NeedsReview</c> and <paramref name="process"/>.</summary>
+    /// <summary>
+    /// An application with an <c>Order</c> entity that references a <c>Customer</c> and owns <c>OrderLine</c> rows,
+    /// the rule <c>NeedsReview</c> and <paramref name="process"/>.
+    /// </summary>
     private static TemporaryFolder Folder(string process) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
@@ -256,6 +259,7 @@ public sealed class ProcessCompilerTests
                   "fields": [
                     { "name": "amount", "type": "decimal" },
                     { "name": "status", "type": "text" },
+                    { "name": "customer", "type": "reference", "target": "Customer" },
                     { "name": "large", "type": "boolean", "expression": "amount > 1000" },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" }
                   ] }
@@ -263,6 +267,10 @@ public sealed class ProcessCompilerTests
             .With("entities/order-line.json", """
                 { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
                   "fields": [ { "name": "quantity", "type": "integer" } ] }
+                """)
+            .With("entities/customer.json", """
+                { "id": "11111111-1111-4111-8111-111111111113", "kind": "entity", "name": "Customer", "formatVersion": 1,
+                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
                 """)
             .With("processes/order-review.json", process);
 }

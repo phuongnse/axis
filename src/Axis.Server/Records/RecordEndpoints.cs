@@ -2,8 +2,8 @@ using System.Globalization;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 using Axis.Server.Applications;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
-using Microsoft.Net.Http.Headers;
 using Npgsql;
 
 namespace Axis.Server.Records;
@@ -147,9 +147,9 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!IsJson(request))
+        if (!JsonRequest.IsJson(request))
         {
-            return UnsupportedMediaType();
+            return JsonRequest.UnsupportedMediaType();
         }
 
         var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, application!, RecordOperation.Create);
@@ -204,9 +204,9 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
-        if (!IsJson(request))
+        if (!JsonRequest.IsJson(request))
         {
-            return UnsupportedMediaType();
+            return JsonRequest.UnsupportedMediaType();
         }
 
         var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, application!, RecordOperation.Update);
@@ -324,17 +324,6 @@ internal static class RecordEndpoints
     private static bool TryParseId(string id, out Guid recordId) =>
         Guid.TryParseExact(id, "D", out recordId) && id.Length == 36;
 
-    /// <summary>
-    /// Whether the content type is <c>application/json</c> with at most a <c>utf-8</c> charset.
-    /// A cross-site page can send other types, such as <c>text/plain</c>, without a preflight.
-    /// </summary>
-    private static bool IsJson(HttpRequest request) =>
-        MediaTypeHeaderValue.TryParse(request.ContentType, out var contentType)
-        && contentType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
-        && contentType.Parameters.All(parameter =>
-            parameter.Name.Equals("charset", StringComparison.OrdinalIgnoreCase)
-            && HeaderUtilities.RemoveQuotes(parameter.Value).Equals("utf-8", StringComparison.OrdinalIgnoreCase));
-
     private static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         using var body = new MemoryStream();
@@ -356,9 +345,6 @@ internal static class RecordEndpoints
             RecordWriteOutcome.SchemaConflict => Conflict("The stored schema does not match the active model."),
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
         };
-
-    private static IResult UnsupportedMediaType() =>
-        Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The request body must be application/json.");
 
     private static IResult Conflict(string title) =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: title);
