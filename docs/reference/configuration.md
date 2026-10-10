@@ -437,7 +437,9 @@ development or E2E server serves a real application without a separate step.
   record API's rules apply, and a synced seed still needs every required
   field. Every record is parsed before any write, and every invalid value is
   `AXC0033` at `/records/{i}/values/<field>`, as is a value for a
-  [computed field](#entity-logic). Seed records are not run
+  [computed field](#entity-logic) or a [sequence](#sequences) field. An
+  inserted seed record gets the sequence's next number, like any other
+  create, and a synced update keeps the number. Seed records are not run
   through the entity's [validations](#entity-logic) yet. Then all inserts and updates of
   the folder run in one transaction, seed files in path order and records in
   file order, so a reference value must name an existing record or one
@@ -612,9 +614,8 @@ computed fields come later:
 ## Sequences
 
 A `sequence` resource hands out business numbers, such as `PR-2026-00042`
-(D21). The compiler checks sequences and the fields that name them. Assigning
-the numbers is *(planned for M3)*: until then, a field with a `sequence` is a
-plain optional text field.
+(D21). The compiler checks sequences and the fields that name them. The
+record create fills a field that names a sequence with the next number.
 
 ```json
 {
@@ -654,8 +655,8 @@ An entity `text` field names the sequence in its `sequence` property:
 ```
 
 - `sequence` names a loaded `sequence` resource, ignoring letter case.
-- *(planned for M3)* The field gets its number on create, in the create's
-  transaction, and clients cannot write it. See
+- The field gets its number on create, in the create's transaction, and
+  clients cannot write it. See
   [the record API](record-api.md#create-update-and-delete) and
   [storage](storage.md#audit-records-and-sequence-counters).
 - A field with `sequence` cannot be `required` or have an `expression`,
