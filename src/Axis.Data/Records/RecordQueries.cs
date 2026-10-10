@@ -102,18 +102,24 @@ public static class RecordQueries
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
 
-        var row = EntityNaming.Quote(RowAlias);
-        Record? record;
-        await using (var command = new NpgsqlCommand(
-            $"SELECT {SelectList(entity, RowAlias)} FROM {Table(entity)} AS {row}{LabelJoins(entity, RowAlias)} WHERE {row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
-            connection))
-        {
-            command.Parameters.AddWithValue("id", id);
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            record = await reader.ReadAsync(cancellationToken) ? ReadRecord(reader, entity) : null;
-        }
-
+        var record = await FindRowAsync(connection, entity, id, cancellationToken);
         return record is null ? null : await WithRowsAsync(connection, application, entity, record, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the row of the record with <paramref name="id"/>, with its labels but without the rows
+    /// of its child collections, in one command. <see langword="null"/> when there is none.
+    /// </summary>
+    internal static async Task<Record?> FindRowAsync(
+        NpgsqlConnection connection, EntityModel entity, Guid id, CancellationToken cancellationToken)
+    {
+        var row = EntityNaming.Quote(RowAlias);
+        await using var command = new NpgsqlCommand(
+            $"SELECT {SelectList(entity, RowAlias)} FROM {Table(entity)} AS {row}{LabelJoins(entity, RowAlias)} WHERE {row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadRecord(reader, entity) : null;
     }
 
     /// <summary>

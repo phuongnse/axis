@@ -203,9 +203,10 @@ The compiler reports these as diagnostics. The checks for `decision` and
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
   the subject entity's fields, computed ones included, its child collections
-  through aggregates, and the named rules. Reference paths are not resolved
-  yet, so a path is `AXC0046` *(paths planned for M3)*. See
-  [Scope in a process expression](expressions.md#names-and-references).
+  through aggregates, the named rules, and paths through reference fields
+  such as `department.manager.name`. A path takes at most 3 hops
+  (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
+  See [Scope in a process expression](expressions.md#names-and-references).
 - *(planned for M3)* The fields in an `updateRecord` `set` are fields of the
   subject entity. None is computed or a child collection. Each expression
   fits its field's type.

@@ -17,8 +17,9 @@ expression. Data source
 and translates them, and the data source endpoint runs them as SQL. A filter
 can also call a named rule: its SQL inlines the rule's expression. A
 [process](processes.md#compile-checks) start condition and decision `when`
-are type-checked by the compiler too, and can call named rules. The engine
-that evaluates them comes later. Other uses come with the issues that build
+are type-checked by the compiler too, can call named rules and can follow
+paths through reference fields. The data module can evaluate them against a
+stored record. The engine that runs them comes later. Other uses come with the issues that build
 them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
@@ -239,14 +240,14 @@ and in [functions](#functions).
 
 ## Names and references
 
-Bare field names, data source parameters, paths in data
-source filters, child collections in aggregates and rule calls from
-validations, data source filters and process conditions are built: the type checker resolves names against the fields,
-parameters and collections it is given, paths against the reference fields'
-targets when it is given a way to find them, and calls against the rules it
-is given, ignoring letter case. Paths in validations, computed fields and
-process conditions are not built, because the interpreter cannot read
-related records. There a path is `AXC0046`.
+Bare field names, data source parameters, paths in data source filters and
+process conditions, child collections in aggregates and rule calls from
+validations, data source filters and process conditions are built: the type
+checker resolves names against the fields, parameters and collections it is
+given, paths against the reference fields' targets when it is given a way to
+find them, and calls against the rules it is given, ignoring letter case.
+Paths in validations and computed fields are not built. There a path is
+`AXC0046`.
 
 - **Letter case.** Names match ignoring letter case. This includes field,
   rule and function names.
@@ -287,13 +288,16 @@ related records. There a path is `AXC0046`.
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
 - **Scope in a process expression.** A `startCondition` and a decision
   `when` see the subject record's fields, computed ones included, its child
-  collections through aggregates, and the named rules. The compiler
-  type-checks them as booleans. *(planned for M3)* An `updateRecord` value and
-  a task's `assignee.user` will see the same names. All of them will also see
-  paths through reference fields of up to 3 hops, and the interpreter will
-  read the referenced records along a path. Until then a path is `AXC0046`.
-  Validations and computed fields keep their scope. See
-  [processes](processes.md#steps).
+  collections through aggregates, the named rules, and paths through
+  reference fields of up to 3 hops. The compiler type-checks them as
+  booleans. The data module reads the records a path names on the caller's
+  connection and transaction, before it evaluates, and reads each record at
+  most once per evaluation. A reference that names no record gives `null`,
+  as a `null` reference does. A stored decimal on any record read that .NET
+  `decimal` cannot hold exactly stops the evaluation with a run-time error.
+  *(planned for M3)* An `updateRecord` value and a task's `assignee.user`
+  will see the same scope. Validations and computed fields keep their scope.
+  See [processes](processes.md#steps).
 
 ## Functions
 
@@ -379,9 +383,9 @@ Compile-time limits. A compile error is reported when one is exceeded:
 | Rule call cycles | None allowed |
 
 Every compile-time limit is built. More than 3 hops is `AXC0058` in a data
-source filter and `AXC0043` in a projected `path`. Rule calls nested more
-than 8 deep are `AXC0065`. A cycle is `AXC0055`, so evaluation of a rule call
-always ends.
+source filter or a process condition, and `AXC0043` in a projected `path`.
+Rule calls nested more than 8 deep are `AXC0065`. A cycle is `AXC0055`, so
+evaluation of a rule call always ends.
 
 - **Depth.** Depth is the height of the syntax tree. A name or literal has
   depth 1. Each operator, call, path step, `is null` and `in` adds one level
@@ -572,7 +576,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0038`.** The expression has more than 500 syntax nodes.
 - **`AXC0046`.** A name that is not in scope, named in the message. This
   includes an unknown field after a `.`, and any `.` path outside a data
-  source filter.
+  source filter or a process condition.
 - **`AXC0047`.** Operand types an operator, function or rule does not
   accept, at the operator or the call. This includes an `in` item that does
   not fit, two different enums, an enum parameter with a value the field

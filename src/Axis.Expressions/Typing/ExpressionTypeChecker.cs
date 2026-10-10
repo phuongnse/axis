@@ -29,7 +29,8 @@ public static class ExpressionTypeChecker
             var context = new Context(
                 scope,
                 new HashSet<CallNode>(ReferenceEqualityComparer.Instance),
-                new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance));
+                new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance),
+                new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance));
             var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
@@ -39,7 +40,12 @@ public static class ExpressionTypeChecker
                     0));
             }
 
-            return new ExpressionCheckResult(actual, null) { DecimalCalls = context.DecimalCalls, RuleCalls = context.RuleCalls };
+            return new ExpressionCheckResult(actual, null)
+            {
+                DecimalCalls = context.DecimalCalls,
+                RuleCalls = context.RuleCalls,
+                PathTargets = context.PathTargets,
+            };
         }
         catch (CheckFailure failure)
         {
@@ -83,7 +89,8 @@ public static class ExpressionTypeChecker
     /// A path such as <c>department.manager.name</c>: it starts at a field of the scope, each name
     /// before the last is a reference field, and it takes at most <see cref="ExpressionLimits.MaxHops"/>
     /// hops. Each <c>.</c> is one hop. A reference parameter holds an id and not a row, so a path
-    /// cannot start at it.
+    /// cannot start at it. The target entity of each step is recorded, so that the interpreter knows
+    /// which record to read.
     /// </summary>
     private static ExpressionType InferMember(MemberNode member, Context context)
     {
@@ -126,9 +133,13 @@ public static class ExpressionTypeChecker
                 member.Offset);
         }
 
-        return context.Scope.TryGetReferenceField(target, member.Name, out var type)
-            ? type
-            : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
+        if (!context.Scope.TryGetReferenceField(target, member.Name, out var type))
+        {
+            throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
+        }
+
+        context.PathTargets[member] = target.Source ?? "";
+        return type;
     }
 
     private static ExpressionType InferCall(CallNode call, Context context)
@@ -554,9 +565,15 @@ public static class ExpressionTypeChecker
         _ => op.ToString(),
     };
 
-    /// <summary>What one check carries down the tree: the scope, and the decimal and rule calls found so far.</summary>
+    /// <summary>
+    /// What one check carries down the tree: the scope, and the decimal calls, rule calls and path
+    /// steps found so far.
+    /// </summary>
     private sealed record Context(
-        ExpressionScope Scope, HashSet<CallNode> DecimalCalls, Dictionary<CallNode, ExpressionRule> RuleCalls);
+        ExpressionScope Scope,
+        HashSet<CallNode> DecimalCalls,
+        Dictionary<CallNode, ExpressionRule> RuleCalls,
+        Dictionary<MemberNode, string> PathTargets);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)

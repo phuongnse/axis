@@ -174,8 +174,6 @@ public sealed class ProcessCompilerTests
     [InlineData(false, "amount >", ExpressionDiagnosticCodes.SyntaxError)]
     [InlineData(true, "amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
     [InlineData(true, "nope > 1", ExpressionDiagnosticCodes.UnknownName)]
-    // Reference paths are not resolved in a process yet.
-    [InlineData(true, "customer.name == 'x'", ExpressionDiagnosticCodes.UnknownName)]
     public void A_condition_problem_is_reported_at_that_condition_and_gives_no_model(bool inStartCondition, string expression, string code)
     {
         var steps = $$"""
@@ -192,6 +190,51 @@ public sealed class ProcessCompilerTests
         var path = inStartCondition ? "/startCondition/expression" : "/steps/0/branches/0/when";
         Assert.Equal((code, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    // The fourth '.' is at character 42.
+    [InlineData(false, "customer.referredBy.referredBy.referredBy.name == 'x'", ExpressionDiagnosticCodes.TooManyHops, "The path takes 4 hops, at most 3 are allowed at character 42.")]
+    [InlineData(true, "customer.referredBy.referredBy.referredBy.name == 'x'", ExpressionDiagnosticCodes.TooManyHops, "The path takes 4 hops, at most 3 are allowed at character 42.")]
+    [InlineData(false, "amount.name == 'x'", ExpressionDiagnosticCodes.TypeMismatch, "needs a reference, found decimal")]
+    [InlineData(true, "amount.name == 'x'", ExpressionDiagnosticCodes.TypeMismatch, "needs a reference, found decimal")]
+    [InlineData(true, "customer.nope == 'x'", ExpressionDiagnosticCodes.UnknownName, "Unknown field 'nope' of 'Customer'")]
+    public void A_path_problem_is_reported_at_its_condition(bool inStartCondition, string expression, string code, string messagePart)
+    {
+        var steps = $$"""
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "{{(inStartCondition ? "amount > 0" : expression)}}", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """;
+        using var folder = Folder(Process("Order", steps, startCondition: inStartCondition ? expression : "status is null"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        var path = inStartCondition ? "/startCondition/expression" : "/steps/0/branches/0/when";
+        Assert.Equal((code, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_condition_follows_paths_through_reference_fields()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "customer.referredBy.name == 'x'", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, startCondition: "customer.REFERREDBY is not null"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var process = Assert.Single(result.Model.Processes);
+        var when = Assert.IsType<DecisionStepModel>(process.Steps[0]).Branches[0].When;
+        Assert.Equal(["Customer", "Customer"], when.Check.PathTargets.Values);
     }
 
     [Fact]
@@ -247,7 +290,7 @@ public sealed class ProcessCompilerTests
 
     /// <summary>
     /// An application with an <c>Order</c> entity that references a <c>Customer</c> and owns <c>OrderLine</c> rows,
-    /// the rule <c>NeedsReview</c> and <paramref name="process"/>.
+    /// a <c>Customer</c> that references the customer who referred it, the rule <c>NeedsReview</c> and <paramref name="process"/>.
     /// </summary>
     private static TemporaryFolder Folder(string process) =>
         new TemporaryFolder()
@@ -270,7 +313,10 @@ public sealed class ProcessCompilerTests
                 """)
             .With("entities/customer.json", """
                 { "id": "11111111-1111-4111-8111-111111111113", "kind": "entity", "name": "Customer", "formatVersion": 1,
-                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
+                  "displayField": "name", "fields": [
+                    { "name": "name", "type": "text", "required": true },
+                    { "name": "referredBy", "type": "reference", "target": "Customer" }
+                  ] }
                 """)
             .With("processes/order-review.json", process);
 }
