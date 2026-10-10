@@ -17,6 +17,9 @@ Milestone **M2, Data and rules**, is complete. The current milestone is
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 
+Run Axis locally with `scripts/dev.sh`. It needs Docker, .NET and Node. See
+[AGENTS.md](AGENTS.md#commands) for details.
+
 ## Documentation
 
 | Document | Purpose |

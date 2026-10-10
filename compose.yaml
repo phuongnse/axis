@@ -1,4 +1,5 @@
 # Local development database. Matches src/Axis.Server/appsettings.Development.json.
+# scripts/dev.sh starts it. AXIS_POSTGRES_PORT moves the host port (default 5432).
 services:
   postgres:
     image: postgres:18-alpine
@@ -7,9 +8,15 @@ services:
       POSTGRES_PASSWORD: axis
       POSTGRES_DB: axis
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${AXIS_POSTGRES_PORT:-5432}:5432"
     volumes:
       - axis-postgres:/var/lib/postgresql
+    # Check over TCP: the image's initialization server listens only on the Unix socket.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "axis", "-d", "axis"]
+      interval: 1s
+      timeout: 5s
+      retries: 120
 
 volumes:
   axis-postgres:
