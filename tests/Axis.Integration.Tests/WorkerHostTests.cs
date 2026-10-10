@@ -156,6 +156,31 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         Assert.False(await runner.RunNextAsync("a", _longLease, CancellationToken));
     }
 
+    [Fact]
+    public async Task Worker_started_before_the_migrations_waits_then_claims_work_once_they_are_applied()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_before_migrations", migrate: false);
+        var logs = new LogCollector();
+        using var host = BuildHost("worker", logs, ("a", tenantA));
+        await host.StartAsync(CancellationToken);
+
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Waiting for the database of tenant a to be migrated.")));
+
+        // Two more poll intervals, so a failing poll would have logged an error by now.
+        await Task.Delay(TimeSpan.FromMilliseconds(100), CancellationToken);
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+
+        await MigrateAsync(tenantA);
+        var item = await EnqueueAsync(tenantA, "a", RecordKind);
+        await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1);
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal([new Run(item, "a", "worker")], await RunsAsync(tenantA));
+        Assert.Single(logs.Entries, entry => entry == "Information: Waiting for the database of tenant a to be migrated.");
+        Assert.Contains("Information: Tenant a is ready for work.", logs.Entries);
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
     private static IHost BuildHost(string worker, LogCollector logs, params (string TenantId, string ConnectionString)[] tenants)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
@@ -194,7 +219,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         return new Connections(new TenantConnectionFactory(options, accessor), accessor);
     }
 
-    private async Task<string> CreateTenantDatabaseAsync(string name)
+    private async Task<string> CreateTenantDatabaseAsync(string name, bool migrate = true)
     {
         await using (var dataSource = NpgsqlDataSource.Create(database.ConnectionString))
         {
@@ -207,11 +232,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         }
 
         var connectionString = new NpgsqlConnectionStringBuilder(database.ConnectionString) { Database = name }.ConnectionString;
-        await using (var context = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options))
+        if (migrate)
         {
-            await context.Database.MigrateAsync(CancellationToken);
+            await MigrateAsync(connectionString);
         }
 
+        // The test tables are in the public schema, so they do not count as migrations.
         await using (var dataSource = NpgsqlDataSource.Create(connectionString))
         await using (var command = dataSource.CreateCommand(
             "CREATE TABLE test_runs (item_id uuid, tenant_id text, worker text); CREATE TABLE test_failures (item_id uuid, message text)"))
@@ -220,6 +246,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         }
 
         return connectionString;
+    }
+
+    private static async Task MigrateAsync(string connectionString)
+    {
+        await using var context = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options);
+        await context.Database.MigrateAsync(CancellationToken);
     }
 
     private static async Task<Guid> EnqueueAsync(string connectionString, string tenantId, string kind, DateTimeOffset? dueAt = null)

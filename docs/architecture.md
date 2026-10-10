@@ -287,3 +287,6 @@ real metadata and records:
   platform journeys;
 - the purchase request sample in `samples/apps/purchase-requests`, for the
   purchase request skeleton journeys.
+
+The E2E run also starts the worker against the same database. Its output goes
+to `artifacts/logs/e2e-worker.log`.

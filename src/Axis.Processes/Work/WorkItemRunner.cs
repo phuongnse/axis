@@ -1,5 +1,7 @@
 using Axis.Core.Tenancy;
+using Axis.Processes.Storage;
 using Axis.Tenancy;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.Processes.Work;
@@ -37,6 +39,26 @@ public sealed partial class WorkItemRunner
         }
 
         _kinds = [.. _handlers.Keys.Order(StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Returns whether every processes migration is applied to the tenant database. A database
+    /// without the migrations history table has every migration pending.
+    /// </summary>
+    public async Task<bool> IsMigratedAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        var previous = _accessor.Current;
+        _accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
+            await using var context = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connection).Options);
+            return !(await context.Database.GetPendingMigrationsAsync(cancellationToken)).Any();
+        }
+        finally
+        {
+            _accessor.Current = previous;
+        }
     }
 
     /// <summary>

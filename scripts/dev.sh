@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs Axis locally: PostgreSQL in Docker, the server under dotnet watch and the SPA on Vite,
-# in one terminal. Ctrl+C stops the server and the SPA. PostgreSQL keeps running.
+# Runs Axis locally: PostgreSQL in Docker, the server and the worker under dotnet watch and the
+# SPA on Vite, in one terminal. The worker starts once the server has migrated the tenant
+# databases. Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running.
 # AXIS_POSTGRES_PORT, AXIS_SERVER_PORT and AXIS_WEB_PORT move the ports (5432, 5206, 5173).
 # Works with the bash 3.2 that ships with macOS.
 set -euo pipefail
@@ -33,6 +34,7 @@ log "Starting PostgreSQL on port $postgres_port"
 AXIS_POSTGRES_PORT="$postgres_port" docker compose up -d --wait --wait-timeout 120 postgres
 if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis;Password=axis"
+  # The worker reads the same tenant connection string, so this export moves it too.
   export ConnectionStrings__Platform="$connection"
   export Tenants__default__ConnectionString="$connection"
 fi
@@ -44,21 +46,26 @@ set -m
 
 state="$(mktemp -d)"
 server=""
+worker=""
 web=""
 
 # Prefixes each line with the process name. It ignores SIGINT so it keeps draining output
-# while the processes stop. It marks the server exit. When the app exits, dotnet watch
-# prints "Exited" and then waits for a file change instead of exiting. When it restarts the
-# app after an edit that hot reload cannot apply, it prints "Exited" too, and then builds.
-# So only an "Exited" line that the waiting line follows at once counts as an exit.
+# while the processes stop. It marks when the server listens, which it does only after it has
+# migrated the tenant databases. It marks the server and worker exits. When the app exits,
+# dotnet watch prints "Exited" and then waits for a file change instead of exiting. When it
+# restarts the app after an edit that hot reload cannot apply, it prints "Exited" too, and
+# then builds. So only an "Exited" line that the waiting line follows at once counts as an exit.
 prefix() {
   trap '' INT
   local exited=0
   while IFS= read -r line || [ -n "$line" ]; do
     printf '[%s] %s\n' "$1" "$line"
-    if [ "$1" = server ]; then
+    if [ "$1" = server ] && [[ $line == *"Now listening on"* ]]; then
+      : >"$state/server-listening"
+    fi
+    if [ "$1" != web ]; then
       if [ "$exited" -eq 1 ] && [[ $line == *"Waiting for a file to change before restarting"* ]]; then
-        : >"$state/server-exited"
+        : >"$state/$1-exited"
       fi
       exited=0
       if [[ $line == *"dotnet watch"*Exited* ]]; then exited=1; fi
@@ -90,9 +97,9 @@ signal_and_wait() {
   done
 }
 
-# Stops both processes and everything below them. The app and Vite stop on SIGINT. dotnet
+# Stops the processes and everything below them. The apps and Vite stop on SIGINT. dotnet
 # watch does not: it waits for a file change after its app has stopped. So the wait covers
-# the app and Vite only, and dotnet watch gets killed after that. The output prefixers
+# the apps and Vite only, and dotnet watch gets killed after that. The output prefixers
 # are not waited for either, because they end when the pipes close. Safe to call twice.
 stopped=0
 stop() {
@@ -100,7 +107,7 @@ stop() {
   stopped=1
   local pid command
   pids="" waiting=""
-  for pid in $server $web; do
+  for pid in $server $worker $web; do
     pids="$pids $pid $(descendants "$pid")"
   done
   for pid in $pids; do
@@ -141,14 +148,29 @@ log "Server on http://localhost:$server_port, SPA on http://localhost:$web_port.
 code=0
 while :; do
   if [ -e "$state/server-exited" ] || ! kill -0 "$server" 2>/dev/null; then
-    log "The server exited. Stopping the SPA."
+    log "The server exited. Stopping the worker and the SPA."
     code=1
     break
   fi
   if ! kill -0 "$web" 2>/dev/null; then
-    log "The SPA dev server exited. Stopping the server."
+    log "The SPA dev server exited. Stopping the server and the worker."
     code=1
     break
+  fi
+  if [ -n "$worker" ] && { [ -e "$state/worker-exited" ] || ! kill -0 "$worker" 2>/dev/null; }; then
+    log "The worker exited. Stopping the server and the SPA."
+    code=1
+    break
+  fi
+  # The worker waits for the migrations itself, but starting it later keeps its output quiet. It
+  # is not restarted with the server, because it needs only the migrated databases.
+  if [ -z "$worker" ] && [ -e "$state/server-listening" ]; then
+    log "The server has migrated the tenant databases. Starting the worker."
+    (cd src/Axis.Worker && DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true \
+      exec dotnet watch --non-interactive) \
+      </dev/null > >(prefix worker) 2>&1 &
+    worker=$!
+    disown "$worker"
   fi
   sleep 1
 done

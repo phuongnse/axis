@@ -2,6 +2,8 @@
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 # The server starts with two applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
+# The worker runs against the same database while Playwright runs. The run fails if it exits
+# early or never finds the tenant database migrated.
 # A Compose smoke test then builds the image and runs the stack on free ports.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -11,7 +13,12 @@ image="postgres:18-alpine"
 container="axis-e2e-postgres-$$"
 password="e2e-$RANDOM$RANDOM"
 
-cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
+worker_pid=""
+
+cleanup() {
+  if [ -n "$worker_pid" ]; then kill "$worker_pid" 2>/dev/null || true; fi
+  docker rm -f "$container" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 
 docker run -d --name "$container" -e POSTGRES_USER=axis -e POSTGRES_DB=axis \
@@ -50,21 +57,53 @@ scripts/build.sh
 mkdir -p artifacts/logs
 export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
 export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
+AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
 : >"$AXIS_E2E_SERVER_LOG"
+: >"$AXIS_E2E_WORKER_LOG"
 
 export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis;Password=$password"
-run_suite playwright tests/e2e npm test --prefix tests/e2e
 
-if [ "$status" -ne 0 ]; then
+# The worker waits until the server, which Playwright starts, has migrated the database. It runs
+# from the built dll, because dotnet run starts a child process that kill would miss.
+DOTNET_ENVIRONMENT=Testing Tenants__default__Hosts__0=127.0.0.1 \
+  Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" \
+  dotnet src/Axis.Worker/bin/Release/net10.0/Axis.Worker.dll >>"$AXIS_E2E_WORKER_LOG" 2>&1 &
+worker_pid=$!
+
+run_suite playwright tests/e2e npm test --prefix tests/e2e
+playwright_status=$status
+
+worker_failed=0
+if ! kill -0 "$worker_pid" 2>/dev/null; then
+  echo "The Axis worker exited before Playwright finished." >&2
+  worker_failed=1
+elif ! grep -qF 'Tenant default is ready for work' "$AXIS_E2E_WORKER_LOG"; then
+  echo "The Axis worker never found the E2E database migrated." >&2
+  worker_failed=1
+fi
+if [ "$worker_failed" -ne 0 ]; then status=1; fi
+kill "$worker_pid" 2>/dev/null || true
+wait "$worker_pid" 2>/dev/null || true
+worker_pid=""
+
+# print_log TITLE FILE
+print_log() {
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-    echo "::group::Axis server log (last 100 lines)"
+    echo "::group::$1 (last 100 lines)"
   else
-    echo "Axis server log (last 100 lines of artifacts/logs/e2e-server.log):"
+    echo "$1 (last 100 lines of ${2#"$root/"}):"
   fi
-  tail -n 100 "$AXIS_E2E_SERVER_LOG"
+  tail -n 100 "$2"
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
     echo "::endgroup::"
   fi
+}
+
+if [ "$playwright_status" -ne 0 ]; then
+  print_log "Axis server log" "$AXIS_E2E_SERVER_LOG"
+fi
+if [ "$playwright_status" -ne 0 ] || [ "$worker_failed" -ne 0 ]; then
+  print_log "Axis worker log" "$AXIS_E2E_WORKER_LOG"
 fi
 
 run_suite compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
