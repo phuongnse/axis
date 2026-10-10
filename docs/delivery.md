@@ -6,10 +6,12 @@ issue, and `/nexkit fix` and `/nexkit review` on its pull request.
 
 Three roles take part:
 
-- **The owner** decides. The owner approves plans, and chooses whether NexKit
-  merges its own pull requests or the owner merges each one.
-- **The local agent session** drives NexKit for the owner. It posts commands,
-  reads plans and triages pull requests.
+- **The owner** decides what only the owner can: **Proposed** design points,
+  questions a plan or a blocked round asks of the owner, and whether NexKit
+  merges its own pull requests. NexKit mentions the owner when a run needs a
+  person.
+- **The local agent session** drives NexKit for the owner. It writes issues,
+  posts commands, reviews plans and says go, and watches the work.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
   pipeline. They read [AGENTS.md](../AGENTS.md).
 
@@ -20,22 +22,38 @@ models, are not copied here. Look them up where they live.
 
 ## Decisions
 
-- **The local agent may post `/nexkit plan`, `/nexkit fix` and
-  `/nexkit review` itself.** It posts `/nexkit go` only when the owner says so
-  explicitly.
-- **NexKit merges a pull request once it passes, while `auto_merge` is on.**
-  With NexKit's [`auto_merge` setting][nexkit-auto-merge] on, NexKit
+- **The local agent posts every command itself, `/nexkit go` included.** It
+  posts `/nexkit go` on the latest plan once it holds every agreed change and
+  the local agent recommends it. It asks the owner first when the plan rests
+  on a **Proposed** decision or has a question only the owner can answer.
+- **NexKit merges a pull request once it passes, while `merge.auto` is on.**
+  With NexKit's [`merge.auto` setting][nexkit-auto-merge] on, NexKit
   squash-merges a pull request as soon as every check passes and the AI review
-  approves. The owner turns it off to decide each merge again, and then only
-  the owner merges. The switch is in `.nexkit/`, so changing it is a hand-made
-  pull request.
+  approves. Then it closes the issue the pull request implements. The owner
+  turns the setting off to decide each merge again, and then only the owner
+  merges. The switch is in `.nexkit/`, so changing it is a hand-made pull
+  request.
+- **NexKit mentions the owner when a person is needed.** The owner's login is
+  in NexKit's [`notify` setting][nexkit-config]. NexKit mentions it when a run
+  ends in a state that needs a person: a plan with questions or too large for
+  one session, a blocked or failed run, no automatic fix rounds left, or a
+  refused automatic merge. Every other run needs nobody.
+- **NexKit resolves conflicts with `main` by itself.** With
+  `conflicts.auto_resolve` on, each time `main` moves NexKit starts a fix round
+  for every open NexKit pull request that now conflicts with it. A conflict
+  that needs a choice ends the round as `blocked`, with a question.
+- **NexKit pauses at the Claude usage limit and resumes after it resets.** The
+  run's comment shows the reset time. No person repeats the command.
+- **A parent issue closes when its last part does.** With
+  `close_parent_issues` on, NexKit closes a parent issue once every sub-issue
+  is closed and at least one was completed.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks
   and no approval from a person. They do not require the CI workflow, which
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
 - **CI runs on `main` after every merge.** A merge by NexKit starts no `push`
   workflow, so NexKit starts the CI workflow on `main` itself, through its
-  `after_merge_workflows` setting. Two pull requests that pass on their own
+  `merge.after_workflows` setting. Two pull requests that pass on their own
   can still break `main` together. When CI on `main` fails, the local agent
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.
@@ -124,22 +142,24 @@ them.
    the plan agent find other places the change affects, such as another doc
    that must say the same. Do not open follow-up issues. When the plan reports
    `too_large`, split the issue into parts. Add each part as a GitHub
-   sub-issue of the parent, in order and in the parent's milestone. The parent
-   closes when all parts are done.
-4. **Implement.** The owner says go on the latest plan, and `/nexkit go` is
-   posted. NexKit implements that plan and opens a pull request.
+   sub-issue of the parent, in order and in the parent's milestone. NexKit
+   closes the parent when all parts are done.
+4. **Implement.** The local agent posts `/nexkit go` on the latest plan, as
+   described under Decisions. NexKit implements that plan and opens a pull
+   request.
 5. **Pull request.** Every round runs NexKit's checks and the AI review on the
    new commit. Merging needs both to pass.
-6. **Fix.** Comment `/nexkit fix <instructions>` for another round. This also
-   handles merge conflicts: NexKit merges `main` into the branch, it does not
-   rebase. When a conflict needs a choice, the round stops as `blocked` with a
-   question. Answer it with `/nexkit fix <decision>`. After a manual push,
-   comment `/nexkit review`. If the review job itself fails with an error,
-   `/nexkit review` retries it. If the review requests changes, NexKit starts
-   automatic fix rounds up to the limit in its configuration. After that, a
-   person decides on `/nexkit fix`.
-7. **Merge.** NexKit squash-merges and starts CI on `main`. With `auto_merge`
-   off, the owner squash-merges instead.
+6. **Fix.** Comment `/nexkit fix <instructions>` for another round. NexKit
+   starts the rounds for merge conflicts by itself: it merges `main` into the
+   branch, it does not rebase. When a conflict needs a choice, the round stops
+   as `blocked` with a question. Answer it with `/nexkit fix <decision>`.
+   After a manual push, comment `/nexkit review`. If the review job itself
+   fails with an error, `/nexkit review` retries it. If the review requests
+   changes, NexKit starts automatic fix rounds up to the limit in its
+   configuration. After that, a person decides on `/nexkit fix`.
+7. **Merge.** NexKit squash-merges, starts CI on `main` and closes the issue.
+   With `merge.auto` off, the owner squash-merges instead, and GitHub closes
+   the issue.
 8. **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
    are hand-made pull requests, as described under Decisions. A conflict in
    those paths, or a merge that brings workflow changes, is different: merge

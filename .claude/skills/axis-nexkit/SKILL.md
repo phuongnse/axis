@@ -10,11 +10,13 @@ The rules, the roles and the life of an issue are in
 only the practical parts: where values live, the `gh` commands, two review
 checklists and what to do when something fails.
 
-You may post `/nexkit plan`, `/nexkit fix` and `/nexkit review` yourself. Post
-`/nexkit go` only when the owner says so explicitly, and only on the latest
-plan, after the check below that it holds every agreed change. Never approve
-or merge a pull request yourself. While `auto_merge` is on, NexKit merges. While
-it is off, merging is the owner's.
+You post every command yourself. Post `/nexkit go` only on the latest plan,
+after the check below that it holds every agreed change, and only when you
+recommend it. Ask the owner first when the plan rests on a **Proposed**
+decision or has a question only the owner can answer. Never approve or merge a
+pull request yourself. While `merge.auto` is on, NexKit merges and closes the
+issue, and with `close_parent_issues` it closes finished parents too. While
+`merge.auto` is off, merging is the owner's.
 
 ## Where the values live
 
@@ -42,7 +44,7 @@ change with a NexKit release or a settings change.
   default, from its configuration doc at the pinned ref.
 
   ```bash
-  jq '.protected_paths, .max_auto_fixes, .auto_merge, .after_merge_workflows' .nexkit/config.json
+  jq '{protected_paths, fix, merge, conflicts, usage_limit, close_parent_issues, notify}' .nexkit/config.json
   ```
 
 - **Profiles, their `when` texts and models:** `.nexkit/config.json`. A
@@ -89,12 +91,18 @@ the profile, its models and why triage chose it:
 gh issue view <N> --comments
 ```
 
-List open NexKit pull requests with their review decision and check status:
+See all open NexKit work and what needs a person with NexKit's local
+`status` command, at the pinned ref. It lists each issue and pull request with
+its state and last round, the recent merges with their CI runs on `main`, and
+a last section with only what needs a person. `--json` gives the same as JSON.
+Start every session with it, and use it to watch the work:
 
 ```bash
-PREFIX=$(grep -oE "head\.ref, '[^']+'" .github/workflows/nexkit.yml | sed -E "s/.*'([^']+)'/\1/")
-gh pr list --state open --json number,title,headRefName,reviewDecision,statusCheckRollup \
-  --jq ".[] | select(.headRefName | startswith(\"$PREFIX\"))"
+REPO=$(grep -oE 'nexkit_repository: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
+REF=$(grep -oE 'nexkit_ref: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
+KIT="${TMPDIR:-/tmp}/nexkit-$REF"
+[ -d "$KIT" ] || git clone -q --depth 1 --branch "$REF" "https://github.com/$REPO" "$KIT"
+python3 "$KIT/bin/nexkit" status
 ```
 
 Check CI on `main` after each merge. NexKit starts it with `workflow_dispatch`:
@@ -178,7 +186,7 @@ returns 404, upgrade `gh` and try again.
 - Tests cover the change, including denied access where it applies.
 - The required checks on `main` are green.
 - No edits in paths NexKit may not change, unless the pull request is hand-made.
-- While `auto_merge` is on, NexKit has merged by the time you look: review the
+- While `merge.auto` is on, NexKit has merged by the time you look: review the
   merged pull request the same way, and raise problems with the owner. While it
   is off, remind the owner that merging is theirs.
 
@@ -188,13 +196,14 @@ returns 404, upgrade `gh` and try again.
 | --- | --- |
 | Publish fails after `/nexkit go` | Read the run log. If the base branch was force-pushed, the same `/nexkit go` fixes it. Otherwise diagnose first. Ask the owner before posting `/nexkit go` again. |
 | A round ends as `blocked` | Answer the question with `/nexkit fix <decision>`. Ask the owner first when the choice is theirs. |
-| Merge conflict with `main` | Comment `/nexkit fix`. NexKit merges `main` into the branch. Answer any `blocked` question it asks. |
+| Merge conflict with `main` | Nothing: NexKit starts a conflict round by itself. Answer a `blocked` question with `/nexkit fix <decision>`. After `conflicts.max_rounds` such rounds, comment `/nexkit fix` yourself. |
 | Conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that profile is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
+| A run is paused at the Claude usage limit (⏸️) | Nothing: NexKit runs the same command again after the reset. If it stops a second time with an unknown reset time, repeat the command. |
 | The review job errored | Comment `/nexkit review` to retry. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
-| NexKit's automatic merge was refused | The round's comment says why, usually a rule on `main`. Tell the owner. The pull request waits for them. |
+| NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
 | CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the failure and the run link, in the current milestone, and plan it before other issues. |
 
 For the mechanics behind each failure, read NexKit's troubleshooting doc at the

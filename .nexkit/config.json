@@ -78,9 +78,20 @@
       }
     }
   },
-  "max_auto_fixes": 2,
-  "auto_merge": true,
-  "after_merge_workflows": [
-    "ci.yml"
+  "fix": {
+    "max_auto_rounds": 2
+  },
+  "merge": {
+    "auto": true,
+    "after_workflows": [
+      "ci.yml"
+    ]
+  },
+  "conflicts": {
+    "auto_resolve": true
+  },
+  "close_parent_issues": true,
+  "notify": [
+    "phuongnse"
   ]
 }
