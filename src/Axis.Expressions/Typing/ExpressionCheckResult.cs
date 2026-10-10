@@ -21,4 +21,11 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     /// <summary>The rule each rule call resolved to, keyed by the call and compared by reference.</summary>
     public IReadOnlyDictionary<CallNode, ExpressionRule> RuleCalls { get; internal init; } =
         new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// The target entity name of each path step, such as <c>department.manager</c>, keyed by the
+    /// step and compared by reference. The name is the reference's target as the scope gives it.
+    /// </summary>
+    public IReadOnlyDictionary<MemberNode, string> PathTargets { get; internal init; } =
+        new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
 }

@@ -169,8 +169,9 @@ flowchart LR
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
      `startCondition` expression and each decision `when` are parsed and
      type-checked as a boolean over the entity's fields, computed ones
-     included, its child collections, which only aggregates accept, and the
-     named rules. A problem is reported at `/startCondition/expression` or
+     included, its child collections, which only aggregates accept, the
+     named rules, and paths through `reference` fields of at most 3 hops. A
+     problem is reported at `/startCondition/expression` or
      `/steps/{i}/branches/{j}/when` with its
      [expression diagnostic](expressions.md#diagnostics) code. The
      `startCondition` message joins the `AXC0028` check. A decision with no
@@ -364,7 +365,7 @@ sorted by file and then path.
 | `AXC0043` | A data source field's `path` names no field of the data source's entity or of a reference's target, goes through a field that is not a `reference`, takes more than 3 hops, or ends at a `child-collection` field, which has no column. The message says which. Reported at `/fields/{i}/path`. |
 | `AXC0044` | An earlier field of the same data source already uses this `name`, compared exactly. Reported at `/fields/{i}/name` of the later field. |
 | `AXC0045` | A data source's `sort` names no projected field, or names a projected field whose path ends at a `reference`. For a grouped data source, it names no group field or measure, or names a group field whose path ends at a `reference`. Reported at `/sort`. |
-| `AXC0046` | An expression names a field that is not in its scope, including an unknown field after a `.`. Outside a data source filter, every `.` path is reported this way. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0046` | An expression names a field that is not in its scope, including an unknown field after a `.`. Outside a data source filter and a process condition, every `.` path is reported this way. Reported at the JSON Pointer of the expression string, with the character position in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0047` | An expression gives an operator, function or rule operands of types it does not accept, such as `'a' < 'b'`, `quantity and true`, `length(1)` or `IsPositive('a')`. This includes a `date('…')` or `dateTime('…')` text that is not a valid date or date-time, such as `date('2026-13-45')`, in every use. It also includes a child collection used anywhere but as the first argument of an aggregate, such as `lineItems == null`, and an aggregate over a field that is not a child collection, such as `sum(title, amount)`. In a data source filter it also includes a `.` after a field that is not a `reference`, such as `name.x`, or after a parameter. Reported at the JSON Pointer of the expression string, with the character position of the operator or the call in the message. |
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
@@ -376,7 +377,7 @@ sorted by file and then path.
 | `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
-| `AXC0058` | A path in a data source filter takes more than 3 hops, such as `a.b.c.d.name`. Reported at `/filter`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0058` | A path in a data source filter or a process condition takes more than 3 hops, such as `a.b.c.d.name`. Reported at the JSON Pointer of the expression string, such as `/filter` or `/steps/0/branches/0/when`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
 | `AXC0060` | A widget names both `entity` and `dataSource`, or neither, reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. |
 | `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |

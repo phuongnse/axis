@@ -24,6 +24,10 @@ public sealed class ExpressionInterpreterTests
 
     private static readonly ExpressionScope _scope = new(_fields);
 
+    private static readonly Guid _sales = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000011");
+    private static readonly Guid _support = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000012");
+    private static readonly Guid _binh = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000021");
+
     /// <summary>The time a worst-case expression may take to finish or run out of steps.</summary>
     private static readonly TimeSpan _worstCaseTime = TimeSpan.FromSeconds(2);
 
@@ -577,6 +581,45 @@ public sealed class ExpressionInterpreterTests
     }
 
     [Fact]
+    public void A_path_reads_the_field_of_the_record_each_reference_names()
+    {
+        Assert.Equal("Binh", EvaluatePath("r.manager.name", _sales).Value);
+        Assert.Equal("Sales", EvaluatePath("r.name", _sales).Value);
+    }
+
+    [Fact]
+    public void A_null_reference_along_a_path_gives_null()
+    {
+        Assert.Null(EvaluatePath("r.manager.name", null).Value);
+        Assert.Null(EvaluatePath("r.manager.name", _support).Value);
+        Assert.Equal(true, EvaluatePath("r.manager is null", _support).Value);
+    }
+
+    [Fact]
+    public void A_reference_that_names_no_record_gives_null()
+    {
+        Assert.Null(EvaluatePath("r.name", Guid.Parse("0199a9e5-7c1e-7000-8000-0000000000ff")).Value);
+    }
+
+    [Fact]
+    public void A_path_that_ends_at_a_reference_gives_its_id()
+    {
+        Assert.Equal(_binh, EvaluatePath("r.manager", _sales).Value);
+        Assert.Equal(true, EvaluatePath("r.manager.department == r", _sales).Value);
+        Assert.Equal(false, EvaluatePath("r.manager.department == r", _support).Value);
+    }
+
+    [Fact]
+    public void A_path_without_a_record_resolver_is_a_bug()
+    {
+        var parsed = ExpressionParser.Parse("r.name");
+        var check = ExpressionTypeChecker.Check(parsed.Expression!, PathScope(), ExpressionType.Null);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ExpressionInterpreter.Evaluate(parsed.Expression!, check, Values([("r", _sales)])));
+    }
+
+    [Fact]
     public void A_value_of_an_unexpected_type_is_a_bug()
     {
         Assert.Throws<InvalidOperationException>(() => Evaluate("i + 1", ("i", 1)));
@@ -609,6 +652,44 @@ public sealed class ExpressionInterpreterTests
             var half = count / 2;
             return new BinaryNode(1, BinaryOperator.Add, Build(start, half), Build(start + half, count - half));
         }
+    }
+
+    /// <summary>
+    /// The field <c>r</c> of <see cref="_fields"/> names a department with a name and a manager,
+    /// and a manager is an employee with a name and a department.
+    /// </summary>
+    private static ExpressionScope PathScope() => new(
+        _fields,
+        referenceFields: (entity, field) => (entity.ToLowerInvariant(), field.ToLowerInvariant()) switch
+        {
+            ("department", "name") => ExpressionType.Text,
+            ("department", "manager") => ExpressionType.Reference("Employee"),
+            ("employee", "name") => ExpressionType.Text,
+            ("employee", "department") => ExpressionType.Reference("department"),
+            _ => null,
+        });
+
+    /// <summary>
+    /// Evaluates <paramref name="text"/> with <c>r</c> set to <paramref name="department"/>, reading
+    /// the stored departments and employees in memory.
+    /// </summary>
+    private static ExpressionEvaluationResult EvaluatePath(string text, Guid? department)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, PathScope(), ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("r", department)]), (entity, id) =>
+            (entity.ToLowerInvariant(), id) switch
+            {
+                ("department", var found) when found == _sales => new ExpressionValues(
+                    new Dictionary<string, object?> { ["name"] = "Sales", ["manager"] = _binh }),
+                ("department", var found) when found == _support => new ExpressionValues(
+                    new Dictionary<string, object?> { ["name"] = "Support", ["manager"] = null }),
+                ("employee", var found) when found == _binh => new ExpressionValues(
+                    new Dictionary<string, object?> { ["name"] = "Binh", ["department"] = _sales }),
+                _ => null,
+            });
     }
 
     /// <summary>The values in <see cref="_setValues"/>, with <paramref name="overrides"/> replacing some.</summary>

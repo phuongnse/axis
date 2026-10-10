@@ -13,7 +13,8 @@ namespace Axis.Configuration.Compilation;
 /// transition names one of them. Every step is reachable from <c>start</c>, has a path to an
 /// <c>end</c> step and is in no cycle. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
-/// collections, which only aggregates accept, and the named rules. Every problem of a process is
+/// collections, which only aggregates accept, the named rules, and paths through reference fields
+/// of at most 3 hops. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, and a step with a transition to an
 /// unknown step is not also reported as having no path to an end.
@@ -65,7 +66,7 @@ internal static class ProcessChecker
             // The expressions cannot be checked without the entity.
             if (entity is not null)
             {
-                CheckConditions(process, ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity), Report);
+                CheckConditions(process, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity), Report);
             }
 
             if (process.StartCondition is { } startCondition)
@@ -77,12 +78,13 @@ internal static class ProcessChecker
 
     /// <summary>
     /// Builds a checked process. Each transition is the declared name of the step it names, and each
-    /// condition is compiled over the subject entity's fields, its child collections and the named rules.
+    /// condition is compiled over the subject entity's fields, its child collections, the named rules
+    /// and paths through reference fields.
     /// </summary>
     public static ProcessModel Build(ProcessResource process, Func<string, EntityResource?> findEntity, IEnumerable<ExpressionRule> rules)
     {
         var entity = findEntity(process.Entity)!;
-        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity);
+        var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
 
         ExpressionModel Compile(string expression) => ExpressionModel.Compile(expression, scope, ExpressionType.Boolean);
 

@@ -12,10 +12,9 @@ namespace Axis.Configuration.Compilation;
 /// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
 /// are given, which for now is the top level of a validation, a data source filter and a process
-/// condition. A data
-/// source scope adds the data source's parameters after the fields, has the named rules it is
-/// given, and resolves paths through reference fields to the target entity's fields. No other
-/// scope resolves paths.
+/// condition. A data source scope adds the data source's parameters after the fields, has the named
+/// rules it is given, and resolves paths through reference fields to the target entity's fields. A
+/// process scope resolves paths the same way. No other scope resolves paths.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -107,10 +106,26 @@ public static class ExpressionScopes
             ],
             rules,
             CollectionsOf(all, findEntity),
-            (target, name) => findEntity(target)?.Fields
-                .FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)) is { } field
-                ? TypeOf(field)
-                : null);
+            ReferenceFieldsOf(findEntity));
+    }
+
+    /// <summary>
+    /// The scope of a process condition: every field of the subject entity, computed ones
+    /// included, its child collections, which only aggregates accept, and the named
+    /// <paramref name="rules"/>. A path through a reference field resolves to a field of the entity
+    /// <paramref name="findEntity"/> returns for the target's name.
+    /// </summary>
+    internal static ExpressionScope ForProcess(
+        IEnumerable<FieldDefinition> fields,
+        IEnumerable<ExpressionRule> rules,
+        Func<string, EntityResource?> findEntity)
+    {
+        var all = fields.ToList();
+        return Build(
+            all.Select(field => (field.Name, TypeOf(field))),
+            rules,
+            CollectionsOf(all, findEntity),
+            ReferenceFieldsOf(findEntity));
     }
 
     /// <summary>The expression type of a field's value, or null for a child collection.</summary>
@@ -138,6 +153,13 @@ public static class ExpressionScopes
                     : null)
                 .OfType<ExpressionCollection>(),
         ];
+
+    /// <summary>Finds a field of the entity <paramref name="findEntity"/> returns for a reference's target, ignoring letter case.</summary>
+    private static ReferenceFieldResolver ReferenceFieldsOf(Func<string, EntityResource?> findEntity) =>
+        (target, name) => findEntity(target)?.Fields
+            .FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)) is { } field
+            ? TypeOf(field)
+            : null;
 
     private static ExpressionScope Build(
         IEnumerable<(string Name, ExpressionType? Type)> fields,

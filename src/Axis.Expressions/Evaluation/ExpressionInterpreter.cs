@@ -7,8 +7,9 @@ namespace Axis.Expressions.Evaluation;
 /// <summary>
 /// Evaluates a checked expression against one record's field values, following the null rules and
 /// run-time errors in docs/reference/expressions.md. It covers literals, bare field names, every
-/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections
-/// and calls to named rules. It does no I/O. Arithmetic is exact, and an evaluation stops after
+/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections,
+/// calls to named rules and paths through reference fields. It does no I/O: it reads the records a
+/// path names through an <see cref="ExpressionRecordResolver"/> the caller gives. Arithmetic is exact, and an evaluation stops after
 /// <see cref="ExpressionLimits.MaxSteps"/> steps, counting the steps of the rules it calls and of
 /// an aggregate's item expression on every row. Each node evaluated is one step, and a
 /// <c>concat</c> also costs one step for each full <see cref="ExpressionLimits.CharactersPerStep"/>
@@ -25,10 +26,12 @@ public static class ExpressionInterpreter
     /// an integer it picks as a decimal, even when the field that would make it decimal is empty.
     /// A failed check throws <see cref="ArgumentException"/>. A missing field, a value of an
     /// unexpected CLR type, or a node the interpreter does not build yet is a bug in the caller, and
-    /// throws <see cref="InvalidOperationException"/>.
+    /// throws <see cref="InvalidOperationException"/>. <paramref name="records"/> finds the records
+    /// a path reads. A path gives <c>null</c> when a reference along it is <c>null</c> or names no
+    /// record. A path evaluated without <paramref name="records"/> is a bug in the caller too.
     /// </summary>
     public static ExpressionEvaluationResult Evaluate(
-        ExpressionNode expression, ExpressionCheckResult checkResult, ExpressionValues values)
+        ExpressionNode expression, ExpressionCheckResult checkResult, ExpressionValues values, ExpressionRecordResolver? records = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(checkResult);
@@ -40,7 +43,7 @@ public static class ExpressionInterpreter
 
         try
         {
-            return new ExpressionEvaluationResult(new Evaluator(values, checkResult, new Budget()).Eval(expression), null);
+            return new ExpressionEvaluationResult(new Evaluator(values, checkResult, new Budget(), records).Eval(expression), null);
         }
         catch (EvaluationFailure failure)
         {
@@ -54,7 +57,8 @@ public static class ExpressionInterpreter
         public int Steps { get; set; }
     }
 
-    private sealed class Evaluator(ExpressionValues values, ExpressionCheckResult checkResult, Budget budget)
+    private sealed class Evaluator(
+        ExpressionValues values, ExpressionCheckResult checkResult, Budget budget, ExpressionRecordResolver? records)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -67,6 +71,7 @@ public static class ExpressionInterpreter
                 BooleanLiteral literal => literal.Value,
                 NullLiteral => null,
                 NameNode name => Name(name),
+                MemberNode member => Member(member),
                 CallNode call => Call(call),
                 UnaryNode unary => Unary(unary),
                 BinaryNode binary => Binary(binary),
@@ -103,6 +108,45 @@ public static class ExpressionInterpreter
             return value is null or string or long or decimal or bool or DateOnly or DateTimeOffset or Guid
                 ? value
                 : throw Unexpected(value);
+        }
+
+        /// <summary>
+        /// One step of a path: the field <c>member.Name</c> of the record the target's reference
+        /// names. A <c>null</c> reference, or one that names no record, gives <c>null</c>.
+        /// </summary>
+        private object? Member(MemberNode member)
+        {
+            switch (Eval(member.Target))
+            {
+                case null:
+                    return null;
+                case Guid id:
+                    if (!checkResult.PathTargets.TryGetValue(member, out var entity))
+                    {
+                        throw new InvalidOperationException($"The type checker recorded no target entity for '.{member.Name}'.");
+                    }
+
+                    if (records is null)
+                    {
+                        throw new InvalidOperationException("A path was evaluated without a record resolver.");
+                    }
+
+                    if (records(entity, id) is not { } record)
+                    {
+                        return null;
+                    }
+
+                    if (!record.TryGetValue(member.Name, out var value))
+                    {
+                        throw new InvalidOperationException($"No value was given for field '{member.Name}' of '{entity}'.");
+                    }
+
+                    return value is null or string or long or decimal or bool or DateOnly or DateTimeOffset or Guid
+                        ? value
+                        : throw Unexpected(value);
+                case var other:
+                    throw Unexpected(other);
+            }
         }
 
         private object? Call(CallNode call)
@@ -220,7 +264,7 @@ public static class ExpressionInterpreter
             var items = new object?[rows.Count];
             for (var i = 0; i < items.Length; i++)
             {
-                items[i] = new Evaluator(rows[i], checkResult, budget).Eval(item);
+                items[i] = new Evaluator(rows[i], checkResult, budget, records).Eval(item);
             }
 
             switch (name)
@@ -307,7 +351,7 @@ public static class ExpressionInterpreter
                 arguments[i] = KeyValuePair.Create(parameter.Name, WidenTo(parameter.Type, Eval(call.Arguments[i])));
             }
 
-            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget).Eval(rule.Body);
+            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget, records).Eval(rule.Body);
             return WidenTo(rule.ResultType, result);
         }
 

@@ -25,6 +25,8 @@ public sealed class ValidationCompilerTests
         { """{ "expression": "count(quantity) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "child collection" },
         { """{ "expression": "sum(lines) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.WrongArgumentCount, "/validations/0/expression", "'sum'" },
         { """{ "expression": "all(lines, quantity > 0)", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'quantity'" },
+        // Only data source filters and process conditions follow paths.
+        { """{ "expression": "customer.name == 'x'", "message": { "textKey": "order.quantityPositive" }, "field": "customer" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "Unknown field 'name' after '.'" },
         { """{ "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "nope" }""", DiagnosticCodes.UnknownValidationField, "/validations/0/field", "'nope'" },
         { """{ "expression": "quantity > 0", "message": { "textKey": "order.missing" }, "field": "quantity" }""", DiagnosticCodes.MissingTextKey, "/validations/0/message/textKey", "'order.missing'" },
     };
@@ -120,7 +122,8 @@ public sealed class ValidationCompilerTests
                   "fields": [
                     { "name": "quantity", "type": "integer" },
                     { "name": "status", "type": "enum", "values": ["open", "closed"] },
-                    { "name": "lines", "type": "child-collection", "target": "OrderLine" }
+                    { "name": "lines", "type": "child-collection", "target": "OrderLine" },
+                    { "name": "customer", "type": "reference", "target": "Customer" }
                   ]{{(validations is null ? "" : $", \"validations\": {validations}")}} }
                 """)
             .With("entities/order-line.json", """
@@ -130,5 +133,9 @@ public sealed class ValidationCompilerTests
                     { "name": "amount", "type": "decimal" },
                     { "name": "total", "type": "decimal", "expression": "amount * 2" }
                   ] }
+                """)
+            .With("entities/customer.json", """
+                { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "Customer", "formatVersion": 1,
+                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
                 """);
 }
