@@ -4,7 +4,8 @@
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
 # The worker runs against the same database while Playwright runs. The run fails if it exits
 # early or never finds the tenant database migrated.
-# A Compose smoke test then builds the image and runs the stack on free ports.
+# A Compose smoke test then builds the image and runs the stack on free ports. It is skipped
+# when $NEXKIT_BASE_SHA shows that nothing it covers changed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -106,7 +107,7 @@ if [ "$playwright_status" -ne 0 ] || [ "$worker_failed" -ne 0 ]; then
   print_log "Axis worker log" "$AXIS_E2E_WORKER_LOG"
 fi
 
-run_suite compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
+run_suite_if_affected compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
   --test-reporter=junit --test-reporter-destination="$results_dir/compose.xml" scripts/compose.test.mjs
 
 finish_report

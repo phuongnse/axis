@@ -131,6 +131,26 @@ describe('command line', () => {
     assert.doesNotMatch(result.stdout, /::error/)
   })
 
+  test('reports a --skipped suite as skipped, with no annotation and exit 0', () => {
+    const report = buildReport({
+      suites: ['passing:tests/Sample.Tests', 'absent:web'],
+      resultsDir,
+      root,
+      skipped: ['absent'],
+    })
+
+    assert.equal(report.ok, true)
+    assert.match(formatSummary(report), /^\| absent \(skipped: not affected by this change\) \| - \| - \| - \| - \|$/m)
+    assert.deepEqual(formatAnnotations(report), [])
+
+    const result = runCli(['--skipped', 'absent', 'passing:tests/Sample.Tests', 'absent:web'], {
+      GITHUB_ACTIONS: 'true',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /absent \(skipped: not affected by this change\)/)
+    assert.doesNotMatch(result.stdout, /::error/)
+  })
+
   test('exits 1 when a suite failed or is missing', () => {
     assert.equal(runCli(['passing:tests/Sample.Tests', 'failing:web']).status, 1)
     assert.equal(runCli(['passing:tests/Sample.Tests', 'absent:web']).status, 1)

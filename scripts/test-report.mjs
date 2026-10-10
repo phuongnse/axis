@@ -1,12 +1,13 @@
 // Reports on the JUnit XML files written by the test scripts.
 //
-// Usage: node scripts/test-report.mjs [--results-dir DIR] [--root DIR] NAME:CWD...
+// Usage: node scripts/test-report.mjs [--results-dir DIR] [--root DIR] [--skipped NAME]... NAME:CWD...
 //
 // Each suite NAME has its results in DIR/NAME.xml. CWD is the directory, relative to
 // the root, that the suite's relative file paths start from. The Markdown summary is
 // appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. On GitHub
-// Actions every failed test also gets an ::error annotation. Exits 1 when a suite has
-// failed tests or no results file.
+// Actions every failed test also gets an ::error annotation. A suite named by --skipped did
+// not run and has no results file. It is reported as skipped. Exits 1 when any other suite
+// has failed tests or no results file.
 import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -127,9 +128,12 @@ export function locateFailure(test, root, cwd) {
 }
 
 /** Reads the results of each suite. Suites are "NAME:CWD" strings or { name, cwd } objects. */
-export function buildReport({ suites, resultsDir, root }) {
+export function buildReport({ suites, resultsDir, root, skipped = [] }) {
   const results = suites.map((suite) => {
     const [name, cwd = '.'] = typeof suite === 'string' ? suite.split(/:(.*)/s) : [suite.name, suite.cwd]
+    if (skipped.includes(name)) {
+      return { name, missing: false, unaffected: true, passed: 0, failed: 0, skipped: 0, duration: 0, failures: [] }
+    }
     const file = path.join(resultsDir, `${name}.xml`)
     if (!existsSync(file)) return { name, missing: true, passed: 0, failed: 0, skipped: 0, duration: 0, failures: [] }
 
@@ -186,11 +190,15 @@ export function formatSummary(report) {
     '| --- | ---: | ---: | ---: | ---: |',
   ]
   for (const suite of report.suites) {
-    lines.push(
-      suite.missing
-        ? `| ${tableCell(suite.name)} (missing: no results file) | - | - | - | - |`
-        : `| ${tableCell(suite.name)} | ${suite.passed} | ${suite.failed} | ${suite.skipped} | ${formatDuration(suite.duration)} |`,
-    )
+    if (suite.unaffected) {
+      lines.push(`| ${tableCell(suite.name)} (skipped: not affected by this change) | - | - | - | - |`)
+    } else if (suite.missing) {
+      lines.push(`| ${tableCell(suite.name)} (missing: no results file) | - | - | - | - |`)
+    } else {
+      lines.push(
+        `| ${tableCell(suite.name)} | ${suite.passed} | ${suite.failed} | ${suite.skipped} | ${formatDuration(suite.duration)} |`,
+      )
+    }
   }
 
   const failures = report.suites.flatMap((suite) => suite.failures)
@@ -233,14 +241,16 @@ export function main(args, env = process.env, stdout = process.stdout) {
   let resultsDir
   let root = scriptRoot
   const suites = []
+  const skipped = []
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--results-dir') resultsDir = args[++i]
     else if (args[i] === '--root') root = args[++i]
+    else if (args[i] === '--skipped') skipped.push(args[++i])
     else suites.push(args[i])
   }
   root = path.resolve(root)
   resultsDir = path.resolve(resultsDir ?? path.join(root, 'artifacts/test-results'))
-  const report = buildReport({ suites, resultsDir, root })
+  const report = buildReport({ suites, resultsDir, root, skipped })
 
   const summary = formatSummary(report)
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `${summary}\n`)
