@@ -88,6 +88,7 @@ app.MapPresentationEndpoints();
 app.MapSiteEndpoints();
 app.MapRecordEndpoints();
 app.MapProcessEndpoints();
+app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
 app.MapUserEndpoints();
 

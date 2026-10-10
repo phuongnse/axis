@@ -11,9 +11,9 @@ the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts` and
 `axis.process_work_items` tables are built too. So is the engine that runs
 `decision`, `task`, `operation` and `end` steps, see
-[Running a step](#running-a-step). Everything else here is
-*(planned for M3)*: the task API, so a `waiting` instance stays waiting until
-it comes.
+[Running a step](#running-a-step). The [task API](#task-api) routes that
+list the user's tasks and read one task are built. Completing a task is
+*(planned for M3)*, so a `waiting` instance stays waiting until it comes.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -486,7 +486,10 @@ who may not act on a task never learns its state.
   ```
 
 - **`404`.** An unknown application, an application with no active release,
-  an unknown task, or an `{id}` that is not a UUID in the hyphenated form.
+  an unknown task, or an `{id}` that is not a UUID in the hyphenated form. A
+  task of another application is an unknown task. For an unknown application,
+  or one with no active release, the title is "No application is active under
+  this name." instead of the one below.
 
   ```json
   {

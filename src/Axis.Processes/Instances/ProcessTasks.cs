@@ -3,8 +3,11 @@ using NpgsqlTypes;
 
 namespace Axis.Processes.Instances;
 
-/// <summary>Writes the human tasks of process instances over a connection to a tenant database.</summary>
-internal static class ProcessTasks
+/// <summary>
+/// Writes the human tasks of process instances over a connection to a tenant database, and names
+/// their states and assignee kinds.
+/// </summary>
+public static class ProcessTasks
 {
     /// <summary>The state of a task that waits for a decision.</summary>
     public const string Open = "open";
@@ -19,7 +22,7 @@ internal static class ProcessTasks
     public const string RoleAssignee = "role";
 
     /// <summary>Inserts <paramref name="task"/> as <c>open</c>. It is created at the transaction's time.</summary>
-    public static async Task InsertAsync(NpgsqlTransaction transaction, NewTask task, CancellationToken cancellationToken)
+    internal static async Task InsertAsync(NpgsqlTransaction transaction, NewTask task, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """

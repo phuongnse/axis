@@ -89,19 +89,35 @@ internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenant
         return site is null ? null : new ActiveSite(model, site);
     }
 
+    /// <summary>
+    /// Returns the model of the current tenant's release <paramref name="releaseId"/>, active or
+    /// not, such as the release a process instance is pinned to.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No tenant context is set, or the tenant has no such release.</exception>
+    public async Task<ApplicationModel> GetReleaseModelAsync(Guid releaseId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = CurrentTenantId();
+        var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
+        return await LoadAsync(store, tenantId, releaseId, cancellationToken);
+    }
+
     private string CurrentTenantId() =>
         (tenants.Current
             ?? throw new InvalidOperationException("No tenant context is set. Applications are only resolved while a tenant is resolved.")).TenantId;
 
-    private async Task<ApplicationModel> LoadAsync(ActiveReleaseStore store, string tenantId, ActiveRelease active, CancellationToken cancellationToken)
+    private Task<ApplicationModel> LoadAsync(ActiveReleaseStore store, string tenantId, ActiveRelease active, CancellationToken cancellationToken) =>
+        LoadAsync(store, tenantId, active.ReleaseId, cancellationToken);
+
+    // Releases are immutable and never deleted, so an active or pinned release is always stored.
+    private async Task<ApplicationModel> LoadAsync(ActiveReleaseStore store, string tenantId, Guid releaseId, CancellationToken cancellationToken)
     {
-        if (cache.TryGet(tenantId, active.ReleaseId, out var cached))
+        if (cache.TryGet(tenantId, releaseId, out var cached))
         {
             return cached;
         }
 
-        var release = await store.GetReleaseAsync(active.ReleaseId, cancellationToken)
-            ?? throw new InvalidOperationException($"The active release '{active.ReleaseId}' could not be found.");
-        return cache.GetOrAdd(tenantId, active.ReleaseId, ReleaseCompiler.BuildModel(release));
+        var release = await store.GetReleaseAsync(releaseId, cancellationToken)
+            ?? throw new InvalidOperationException($"The release '{releaseId}' could not be found.");
+        return cache.GetOrAdd(tenantId, releaseId, ReleaseCompiler.BuildModel(release));
     }
 }

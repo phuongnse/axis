@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Audit;
@@ -27,12 +26,6 @@ namespace Axis.Server.Records;
 /// </summary>
 internal static class RecordEndpoints
 {
-    private const int DefaultPage = 1;
-
-    private const int DefaultPageSize = 20;
-
-    private const int MaxPageSize = 100;
-
     private const int MaxSearchLength = 200;
 
     public static void MapRecordEndpoints(this IEndpointRouteBuilder endpoints)
@@ -67,17 +60,7 @@ internal static class RecordEndpoints
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var pageNumber = DefaultPage;
-        if (page is not null && (!TryParseInteger(page, out pageNumber) || pageNumber < 1))
-        {
-            errors["page"] = ["Must be an integer of at least 1."];
-        }
-
-        var size = DefaultPageSize;
-        if (pageSize is not null && (!TryParseInteger(pageSize, out size) || size is < 1 or > MaxPageSize))
-        {
-            errors["pageSize"] = [$"Must be an integer from 1 to {MaxPageSize}."];
-        }
+        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
 
         RecordSort? order = null;
         if (sort is not null && !RecordSort.TryParse(sort, model, out order))
@@ -423,9 +406,6 @@ internal static class RecordEndpoints
 
     private static IResult Conflict(string title) =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: title);
-
-    private static bool TryParseInteger(string text, out int value) =>
-        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
 
     private static IResult RecordNotFound() => NotFound("No record has this id.");
 

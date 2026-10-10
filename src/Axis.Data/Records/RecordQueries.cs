@@ -107,6 +107,42 @@ public static class RecordQueries
     }
 
     /// <summary>
+    /// Reads the display field value of each record of <paramref name="ids"/>, by record id, in
+    /// one command. A record that is missing or whose display value is NULL has no entry, and an
+    /// entity without a display field gives no entries.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<Guid, string>> ReadDisplayLabelsAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(ids);
+
+        var labels = new Dictionary<Guid, string>();
+        if (entity.DisplayField is null || ids.Count == 0)
+        {
+            return labels;
+        }
+
+        var id = EntityNaming.Quote(EntityNaming.IdColumn);
+        var display = EntityNaming.Quote(EntityNaming.Column(entity.DisplayField));
+        await using var command = new NpgsqlCommand(
+            $"SELECT {id}, {display} FROM {Table(entity)} WHERE {id} = ANY(@ids) AND {display} IS NOT NULL",
+            connection);
+        command.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = ids.ToArray() });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            labels[reader.GetGuid(0)] = reader.GetString(1);
+        }
+
+        return labels;
+    }
+
+    /// <summary>
     /// Reads the row of the record with <paramref name="id"/>, with its labels but without the rows
     /// of its child collections, in one command. <see langword="null"/> when there is none.
     /// </summary>
