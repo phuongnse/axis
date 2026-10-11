@@ -62,6 +62,8 @@ export interface FieldMetadata {
   computed: boolean
   /** A sequence numbers the field on create. The form shows it read-only and never sends it. */
   sequence: boolean
+  /** The server sets the field to the creating user's id. The form shows it read-only and never sends it. */
+  creator: boolean
   maxLength: number | null
   precision: number | null
   scale: number | null

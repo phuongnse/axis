@@ -76,14 +76,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
             {
               "name": "name", "type": "text", "labelKey": null,
               "required": true, "unique": false, "computed": false, "sequence": false,
-              "maxLength": 100,
+              "creator": false, "maxLength": 100,
               "precision": null, "scale": null, "values": null, "target": null,
               "fields": null
             },
             {
               "name": "department", "type": "reference", "labelKey": "item.department",
               "required": false, "unique": false, "computed": false, "sequence": false,
-              "maxLength": null,
+              "creator": false, "maxLength": null,
               "precision": null, "scale": null, "values": null,
               "target": {
                 "entity": "Department",
@@ -123,8 +123,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     declaration order. A `child-collection` field is listed too. Tables show
     no column for it, and forms show its rows.
   - Each field has its name, its `type` as written in entity files (such as
-    `date-time`), its label key, `required`, `unique`, `computed` and `sequence`, `maxLength` for
-    text, `precision` and `scale` for decimal, `values` for enum, `target`
+    `date-time`), its label key, `required`, `unique`, `computed`, `sequence` and `creator`,
+    `maxLength` for text, `precision` and `scale` for decimal, `values` for enum, `target`
     for reference, and `fields` for child collection. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
     never left out.
@@ -134,6 +134,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `sequence` is `true` for a text field that names a
     [sequence](configuration.md#sequences). The server numbers it on create,
     so the form shows it read-only and never sends it.
+  - `creator` is `true` for a text field that declares
+    [`creator`](configuration.md#record-creator). The server sets it to the
+    creating user's id on create, so the form shows it read-only and never
+    sends it.
   - `target` names the referenced entity, its display field and the path of
     its record API, so the SPA never builds a record URL itself. It is only
     for a reference. A child collection's `target` is `null`, because a child
@@ -397,7 +401,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `false` by default.
   - A field appears at most once in the form. A field the form does not list
     is not shown and never sent.
-  - Computed fields and sequence fields are always read-only, whatever
+  - Computed, sequence and creator fields are always read-only, whatever
     `readOnly` says.
   - On a page, `readOnly` only shapes the UI, because the record API still
     accepts those fields. From M4 *(planned)*, the server enforces field
@@ -432,7 +436,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `enum` | a choice of the declared values, as written in the entity file |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
     | `child-collection` | a table of its rows, described under **Child collections** |
-    | any type with `computed` or `sequence`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
+    | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
@@ -476,8 +480,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       removing a row clears the collection's cell errors, because their
       indexes would point at the wrong rows.
   - **Changed fields.** The form sends only the fields whose value differs
-    from the value it started from. It never sends a computed, sequence or
-    read-only field, nor a field its form does not show. A new record starts with every field
+    from the value it started from. It never sends a computed, sequence, creator
+    or read-only field, nor a field its form does not show. A new record starts with every field
     `null` and every child collection empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
@@ -527,6 +531,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Sequence fields**. Page metadata marks a field that
     names a [sequence](configuration.md#sequences), so the form shows it
     read-only. It is empty on a new record, and the form never sends it.
+  - **Creator fields**. Page metadata marks a field that declares
+    [`creator`](configuration.md#record-creator), so the form shows it
+    read-only. It is empty on a new record, shows the creating user's id once
+    saved, and the form never sends it.
   - **Form binding**. A `form` widget names a `form`
     resource, or an `entity` as shorthand for all its fields in declaration
     order. Naming both or neither is `AXC0060`, and a `form` that names no
@@ -583,7 +591,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     adds:
     - `form`: `{ "name", "sections": [ { "titleKey", "fields": [ { "name", "readOnly" } ] } ] }`,
       or `null` when the widget names an `entity`. `readOnly` already
-      includes computed and sequence fields. Field names are as the entity
+      includes computed, sequence and creator fields. Field names are as the entity
       declares them.
     - `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
       or `[]`. `instancesPath` is the start endpoint, such as

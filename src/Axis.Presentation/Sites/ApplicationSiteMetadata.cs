@@ -52,8 +52,8 @@ public sealed record FormSectionMetadata(string TitleKey, IReadOnlyList<FormFiel
 
 /// <summary>One field of a form section, by its declared name.</summary>
 /// <param name="ReadOnly">
-/// Whether a client shows the field without letting it be changed, and never sends it. A computed or
-/// numbered field is always read-only.
+/// Whether a client shows the field without letting it be changed, and never sends it. A computed,
+/// numbered or creator field is always read-only.
 /// </param>
 public sealed record FormFieldMetadata(string Name, bool ReadOnly);
 
@@ -109,6 +109,7 @@ public sealed record DataSourceColumnMetadata(
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
 /// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
 /// <param name="Sequence">Whether a sequence numbers the field on create. A client shows it and never sends it.</param>
+/// <param name="Creator">Whether the server sets the field to the creating user's id. A client shows it and never sends it.</param>
 /// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
 public sealed record FieldMetadata(
     string Name,
@@ -118,6 +119,7 @@ public sealed record FieldMetadata(
     bool Unique,
     bool Computed,
     bool Sequence,
+    bool Creator,
     int? MaxLength,
     int? Precision,
     int? Scale,

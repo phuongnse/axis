@@ -11,6 +11,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     unique: false,
     computed: false,
     sequence: false,
+    creator: false,
     maxLength: null,
     precision: null,
     scale: null,
@@ -117,6 +118,13 @@ describe('buildRecordBody', () => {
   it('leaves a sequence field out even when it holds a value', () => {
     const withNumber = [{ ...field('number', 'text'), sequence: true }, ...fields]
     expect(buildRecordBody(withNumber, { number: 'PR-2026-00042', amount: '1.50' }, 2)).toBe(
+      '{"version":2,"values":{"amount":1.50}}',
+    )
+  })
+
+  it('leaves a creator field out even when it holds a value', () => {
+    const withCreator = [...fields, { ...field('createdBy', 'text'), creator: true }]
+    expect(buildRecordBody(withCreator, { amount: '1.50', createdBy: 'anna' }, 2)).toBe(
       '{"version":2,"values":{"amount":1.50}}',
     )
   })

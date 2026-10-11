@@ -23,6 +23,7 @@
     "note.dueAt": "Due at",
     "note.status": "Status",
     "note.category": "Category",
+    "note.createdBy": "Created by",
     "note.lines": "Lines",
     "noteLine.description": "Description",
     "noteLine.quantity": "Quantity",

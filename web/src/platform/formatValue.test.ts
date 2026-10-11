@@ -11,6 +11,7 @@ function field(name: string, type: FieldType): FieldMetadata {
     unique: false,
     computed: false,
     sequence: false,
+    creator: false,
     maxLength: null,
     precision: null,
     scale: null,

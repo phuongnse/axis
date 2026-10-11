@@ -334,6 +334,7 @@ public static class ApplicationCompiler
             CheckTextKey(field.Label, entity.File, entity.Id, $"{path}/label", textKeys, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, Report);
             CheckSequence(field, path, childOwner, findSequence, unloadedSequenceNames, Report);
+            CheckCreator(field, path, childOwner, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
             var type = FieldTypes.Parse(field.Type);
@@ -497,6 +498,32 @@ public static class ApplicationCompiler
                 DiagnosticCodes.UnknownSequence,
                 $"The sequence '{sequence}' was not found. No loaded sequence has that name.",
                 $"{path}/sequence");
+        }
+    }
+
+    /// <summary>
+    /// Checks a field's <c>creator</c> property: it applies only to text fields, and a creator
+    /// field is optional, neither computed nor numbered, and not on a child entity. Only the first
+    /// problem is reported.
+    /// </summary>
+    private static void CheckCreator(
+        FieldDefinition field, string path, ChildOwner? childOwner, Action<string, string, string> report)
+    {
+        if (field.Creator is not { } creator)
+        {
+            return;
+        }
+
+        var problem = FieldTypes.Parse(field.Type) != FieldType.Text ? $"'creator' applies only to text fields, not to {field.Type} fields."
+            : !creator ? null
+            : field.Required == true ? "A 'creator' field cannot be required: the server fills it when a signed-in user creates the record."
+            : field.Expression is not null ? "A 'creator' field cannot have an 'expression': the server sets it to the user who created the record."
+            : field.Sequence is not null ? "A 'creator' field cannot have a 'sequence': the server sets it to the user who created the record."
+            : childOwner is not null ? $"A 'creator' field cannot belong to a child entity, but this entity is owned by '{childOwner}'."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/creator");
         }
     }
 
@@ -1088,6 +1115,7 @@ public static class ApplicationCompiler
                 ? null
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
+            Creator = field.Creator == true,
         };
     }
 

@@ -95,7 +95,7 @@ public static class ApplicationSites
                 [.. section.Fields.Select(entry =>
                 {
                     entity.TryGetField(entry.Field, out var field);
-                    return new FormFieldMetadata(field!.Name, entry.ReadOnly || field.IsComputed || field.Sequence is not null);
+                    return new FormFieldMetadata(field!.Name, entry.ReadOnly || field.IsComputed || field.Sequence is not null || field.Creator);
                 })]))]);
     }
 
@@ -193,6 +193,7 @@ public static class ApplicationSites
             field.Unique,
             field.IsComputed,
             field.Sequence is not null,
+            field.Creator,
             field.MaxLength,
             field.Precision,
             field.Scale,

@@ -70,6 +70,29 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await expect(page).toHaveURL(tablePath)
 })
 
+test('a note saved by a signed-in user shows its creator read-only', async ({ page }) => {
+  const title = `Creator ${Date.now()}-${test.info().retry}`
+  await useSession(page, 'binh')
+  const me = (await (await page.request.get('/api/me')).json()) as { id: string }
+  await page.goto('/e2e/notes?pageSize=100&sort=-title')
+
+  await page.getByRole('link', { name: 'New' }).click()
+  await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
+  await expect(page.getByLabel('Created by', { exact: true })).toHaveValue('')
+  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
+  await page
+    .getByRole('row', { name: new RegExp(`${title} `) })
+    .getByRole('link', { name: 'Open' })
+    .click()
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  const createdBy = page.getByLabel('Created by', { exact: true })
+  await expect(createdBy).toHaveValue(me.id)
+  await expect(createdBy).not.toBeEditable()
+})
+
 test('line items are added, edited and removed in the form, in light and dark mode', async ({ page, request }) => {
   const run = `${Date.now()}-${test.info().retry}`
   const title = `Lines ${run}`

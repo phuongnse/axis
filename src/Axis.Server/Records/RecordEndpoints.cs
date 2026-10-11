@@ -14,9 +14,10 @@ namespace Axis.Server.Records;
 /// Endpoints for the records of an entity in the active release of an application. A path that
 /// names no active application, entity or record is a 404 before the query or body is checked; a
 /// child entity is no entity here. A create or update writes the record and its child rows in one
-/// transaction. Every create, update and delete that succeeds appends one audit record in its
-/// transaction. Its actor is the session user, with their display name, or <c>anonymous</c>. A
-/// write that fails leaves none.
+/// transaction. A create by a signed-in user sets the entity's creator fields to the session
+/// user's id, and a create without a session leaves them <c>null</c>. Every create, update and
+/// delete that succeeds appends one audit record in its transaction. Its actor is the session
+/// user, with their display name, or <c>anonymous</c>. A write that fails leaves none.
 /// A body is checked in order: content type (415), then body (400), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
@@ -199,14 +200,17 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        // The creator fields are set before the computed fields and validations, so they see the
+        // record as it will be stored.
         var input = parsed.Input!;
-        var computed = RecordComputer.ComputeCreate(application!, model, input.Values, input.Rows);
+        var user = await CurrentUsers.FindAsync(request.HttpContext);
+        var values = RecordCreator.WithCreator(model, input.Values, user?.Id);
+        var computed = RecordComputer.ComputeCreate(application!, model, values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
             return Results.ValidationProblem(computeErrors);
         }
 
-        var user = await CurrentUsers.FindAsync(request.HttpContext);
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
