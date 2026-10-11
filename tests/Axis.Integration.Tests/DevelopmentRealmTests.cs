@@ -12,6 +12,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
     public static TheoryData<string, string, string[]> Users => new()
     {
         { "anna", "Anna Employee", ["employee"] },
+        { "lan", "Lan Employee", ["employee"] },
         { "binh", "Binh Engineering Manager", ["department-manager"] },
         { "chau", "Chau Operations Manager", ["department-manager"] },
         { "dung", "Dung Finance Reviewer", ["finance-reviewer"] },

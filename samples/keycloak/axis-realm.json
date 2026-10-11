@@ -83,6 +83,28 @@
       }
     },
     {
+      "id": "lan",
+      "username": "lan",
+      "enabled": true,
+      "email": "lan@axis.local",
+      "emailVerified": true,
+      "firstName": "Lan",
+      "lastName": "Employee",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "employee"
+        ]
+      }
+    },
+    {
       "id": "binh",
       "username": "binh",
       "enabled": true,
