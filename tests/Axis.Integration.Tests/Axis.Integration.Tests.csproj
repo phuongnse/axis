@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.Keycloak" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
@@ -33,6 +34,7 @@
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\apps\purchase-requests\**\*" Link="Samples\purchase-requests\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\keycloak\axis-realm.json" Link="Keycloak\axis-realm.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

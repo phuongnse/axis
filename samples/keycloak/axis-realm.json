@@ -1,0 +1,152 @@
+{
+  "realm": "axis",
+  "enabled": true,
+  "roles": {
+    "client": {
+      "axis": [
+        {
+          "name": "employee",
+          "clientRole": true
+        },
+        {
+          "name": "department-manager",
+          "clientRole": true
+        },
+        {
+          "name": "finance-reviewer",
+          "clientRole": true
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "axis",
+      "name": "Axis",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "axis-development-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5206/*",
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5280/*"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5206/*##http://localhost:5173/*##http://127.0.0.1:5280/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "axis",
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "anna",
+      "username": "anna",
+      "enabled": true,
+      "email": "anna@axis.local",
+      "emailVerified": true,
+      "firstName": "Anna",
+      "lastName": "Employee",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "employee"
+        ]
+      }
+    },
+    {
+      "id": "binh",
+      "username": "binh",
+      "enabled": true,
+      "email": "binh@axis.local",
+      "emailVerified": true,
+      "firstName": "Binh",
+      "lastName": "Engineering Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "department-manager"
+        ]
+      }
+    },
+    {
+      "id": "chau",
+      "username": "chau",
+      "enabled": true,
+      "email": "chau@axis.local",
+      "emailVerified": true,
+      "firstName": "Chau",
+      "lastName": "Operations Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "department-manager"
+        ]
+      }
+    },
+    {
+      "id": "dung",
+      "username": "dung",
+      "enabled": true,
+      "email": "dung@axis.local",
+      "emailVerified": true,
+      "firstName": "Dung",
+      "lastName": "Finance Reviewer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "finance-reviewer"
+        ]
+      }
+    }
+  ]
+}
