@@ -333,7 +333,9 @@ work.
 Human work arrives in M3. See [processes](reference/processes.md#steps) and
 [the frontend](reference/frontend.md). The `form` resource, the `form`
 widget that names one, the task inbox widget, the task page and the start
-process action are built. The rest is *(planned for M3)*.
+process action are built. So are task steps, task completion with its
+one-decision and who-may-act checks, and saving the task form with the
+decision. Only the items under **Later** are not built.
 
 - **Task step:** a `task` step has a `label`, an assignee, a `form`, an
   optional `dueIn` and its outcomes.

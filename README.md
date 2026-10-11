@@ -12,8 +12,8 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Milestone **M2, Data and rules**, is complete. The current milestone is
-**M3, Processes and tasks**. The [roadmap](docs/roadmap.md) says what each
+Milestone **M3, Processes and tasks**, is complete. The current milestone is
+**M4, Identity and authorization**. The [roadmap](docs/roadmap.md) says what each
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 
@@ -35,7 +35,7 @@ Node. It runs the server, the worker and the SPA with hot reload. See
 | [Product brief](docs/product-brief.md) | What Axis is, who uses it, the first application |
 | [Decisions](docs/decisions.md) | Decisions that have been agreed, with reasons |
 | [Architecture](docs/architecture.md) | Modules, hosts, tenancy, security, execution and testing |
-| [Reference](docs/reference/) | Detailed behaviour: configuration, storage, record API, frontend, expressions and data sources |
+| [Reference](docs/reference/) | Detailed behaviour: configuration, storage, record API, frontend, expressions, data sources and processes |
 | [Concepts](docs/domain/concepts.md) | The Axis vocabulary and what each resource does |
 | [Design knowledge](docs/domain/knowledge.md) | What business applications need and the pitfalls to avoid |
 | [Roadmap](docs/roadmap.md) | Milestones, what each delivers and its status |
