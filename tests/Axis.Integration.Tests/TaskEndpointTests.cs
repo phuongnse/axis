@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -17,8 +18,8 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     {
         var (userTask, userSubject) = await CreateTaskAsync(TenantA, "Approve");
         var (roleTask, roleSubject) = await CreateTaskAsync(TenantA, "RoleApprove");
-        using var maria = await SignInAsync("maria", TenantA);
-        using var fiona = await SignInAsync("fiona", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
 
         using var mariaList = await ListAsync(maria, TenantA);
         var mariaIds = Ids(mariaList);
@@ -59,7 +60,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     {
         var (userTask, _) = await CreateTaskAsync(TenantA, "Approve");
         var (roleTask, _) = await CreateTaskAsync(TenantA, "RoleApprove");
-        using var otto = await SignInAsync("otto", TenantA);
+        using var otto = fixture.CreateClient().SignedInAs("otto");
 
         using var list = await ListAsync(otto, TenantA);
         var ids = Ids(list);
@@ -78,7 +79,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     public async Task The_manager_reads_their_task_with_its_form_from_the_tasks_release()
     {
         var (task, subject) = await CreateTaskAsync(TenantA, "Approve");
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await SendAsync(maria, $"{Tasks}/{task:D}", TenantA);
 
@@ -125,7 +126,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     public async Task A_role_holder_reads_the_role_task()
     {
         var (task, _) = await CreateTaskAsync(TenantA, "RoleApprove");
-        using var fiona = await SignInAsync("fiona", TenantA);
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
 
         using var response = await SendAsync(fiona, $"{Tasks}/{task:D}", TenantA);
 
@@ -159,7 +160,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     [InlineData(Tasks + "/{0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01}", "No task exists with this id.")]
     public async Task An_unknown_application_or_task_is_404(string path, string title)
     {
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await SendAsync(maria, path, TenantA);
 
@@ -174,7 +175,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     [InlineData("?page=x", "page")]
     public async Task An_invalid_page_is_400(string query, string key)
     {
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await SendAsync(maria, Tasks + query, TenantA);
 
@@ -187,7 +188,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
     {
         var (taskA, _) = await CreateTaskAsync(TenantA, "Approve");
         var (taskB, _) = await CreateTaskAsync(TenantB, "Approve");
-        using var maria = await SignInAsync("maria", TenantB);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var list = await ListAsync(maria, TenantB);
         var ids = Ids(list);
@@ -218,14 +219,6 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
         return (await fixture.TaskIdAsync(tenant, instance), subject);
     }
 
-    private async Task<HttpClient> SignInAsync(string user, string tenant)
-    {
-        var client = fixture.CreateClient();
-        using var signIn = RecordApiFixture.Request(HttpMethod.Post, "/api/test-users/sign-in", Host(tenant), $$"""{ "id": "{{user}}" }""");
-        using var response = await client.SendAsync(signIn, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return client;
-    }
 
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string path, string tenant)
     {

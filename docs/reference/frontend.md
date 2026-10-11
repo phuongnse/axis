@@ -512,9 +512,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - Each entry shows its action, who did it, its time and a short summary.
       The action is a platform text, such as "Updated" or "Task decided". An
       action without a text shows as it is.
-    - Who did it is the test user's display name. Without one, it is
-      "System" for `system`, "Anonymous" for `anonymous`, or else the raw
-      user id. From M4 it is the stored `actorName` *(planned for M4)*.
+    - Who did it is the stored `actorName`. Without one, it is "System" for
+      `system`, "Anonymous" for `anonymous`, or else the raw user id.
     - The time uses the user's locale, with the medium date and time styles.
     - The summary is built from the details. It lists the labels of the
       fields it names, then the task outcome, then the step, joined by " · ".
@@ -684,9 +683,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     and query string as `returnUrl`. Two kinds of call are exempt.
     `GET /api/me` answers `401` when nobody is signed in, so the header shows
     the button. The task API calls, which list, read and complete tasks,
-    still read only the test user, so a person signed in through the
-    identity provider would loop through sign-in. The task inbox and task
-    page keep their own sign-in prompt.
+    answer `401` when nobody is signed in. The task inbox and task page keep
+    their own sign-in prompt for it until sign-in is needed everywhere
+    *(planned for M4)*.
   - Its texts are the platform texts `shell.account.signIn`,
     `shell.account.signOut` and `shell.account.label`, the menu's label.
 - **Test user picker.** In `Development` and `Testing`, the shell header of

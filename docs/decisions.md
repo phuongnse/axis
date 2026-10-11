@@ -473,8 +473,8 @@ first, and everything that does need one waits for a single rule.
 
 M4 replaces the test users with real sign-in through each tenant's identity
 provider. The flow, the identity provider per tenant, the endpoints, the
-session, its tenant binding, the roles, the current user, CSRF and Keycloak
-are in place. Sign-in needed, the removal of test users and the audit actor
+session, its tenant binding, the roles, the current user, CSRF, Keycloak and
+the audit actor are in place. Sign-in needed and the removal of test users
 are *(planned for M4)*. See
 [architecture](architecture.md#sign-in-and-the-session) for the details.
 

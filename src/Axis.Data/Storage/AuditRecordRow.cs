@@ -15,6 +15,12 @@ public sealed class AuditRecordRow
     /// <summary>A user id, <c>system</c> for the worker, or <c>anonymous</c> when nobody is signed in.</summary>
     public required string Actor { get; init; }
 
+    /// <summary>
+    /// The actor's display name when the action was taken, or null for <c>system</c> and
+    /// <c>anonymous</c>.
+    /// </summary>
+    public string? ActorName { get; init; }
+
     /// <summary>The action, such as <c>record.created</c>.</summary>
     public required string Action { get; init; }
 

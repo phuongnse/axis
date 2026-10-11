@@ -22,8 +22,9 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Two tenant databases, <c>a</c> and <c>b</c>, each with the configuration, data and processes
 /// migrations applied and the StepApp fixture activated, served by the real server on hosts
-/// <c>a.example.test</c> and <c>b.example.test</c>. The server knows the test users <c>maria</c>
-/// and <c>fiona</c>, who hold the role <c>finance</c>, and <c>otto</c>, who holds <c>employee</c>.
+/// <c>a.example.test</c> and <c>b.example.test</c>. The test authentication scheme signs in
+/// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, and <c>otto</c>, who holds
+/// <c>employee</c>.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
 /// a test runs the work items that create tasks itself.
 /// </summary>
@@ -75,15 +76,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:b:Hosts:0", Host(TenantB));
             builder.UseSetting("Tenants:b:ConnectionString", b.ConnectionString);
             builder.UseTestOidc(TenantA, TenantB);
-            builder.UseSetting("TestUsers:0:Id", "maria");
-            builder.UseSetting("TestUsers:0:DisplayName", "Maria Manager");
-            builder.UseSetting("TestUsers:0:Roles:0", "finance");
-            builder.UseSetting("TestUsers:1:Id", "fiona");
-            builder.UseSetting("TestUsers:1:DisplayName", "Fiona Finance");
-            builder.UseSetting("TestUsers:1:Roles:0", "finance");
-            builder.UseSetting("TestUsers:2:Id", "otto");
-            builder.UseSetting("TestUsers:2:DisplayName", "Otto Other");
-            builder.UseSetting("TestUsers:2:Roles:0", "employee");
+            builder.UseTestAuthentication(
+                new TestIdentity("maria", "Maria Manager", "finance"),
+                new TestIdentity("fiona", "Fiona Finance", "finance"),
+                new TestIdentity("otto", "Otto Other", "employee"));
         });
 
         var settings = new ConfigurationBuilder()
@@ -248,18 +244,37 @@ public sealed class TaskApiFixture : IAsyncLifetime
             reader.GetInt64(7));
     }
 
-    /// <summary>The actor and details of each audit record of <paramref name="action"/> of the instance <paramref name="instanceId"/>, oldest first.</summary>
-    public async Task<IReadOnlyList<(string Actor, string Details)>> AuditRecordsAsync(string tenant, Guid instanceId, string action)
+    /// <summary>
+    /// The actor, the stored actor name and the details of each audit record of
+    /// <paramref name="action"/> of the instance <paramref name="instanceId"/>, oldest first.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Actor, string? ActorName, string Details)>> AuditRecordsAsync(string tenant, Guid instanceId, string action)
     {
         await using var command = DataSource(tenant).CreateCommand(
-            "SELECT actor, details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = @action ORDER BY id");
+            "SELECT actor, actor_name, details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = @action ORDER BY id");
         command.Parameters.AddWithValue("id", instanceId);
         command.Parameters.AddWithValue("action", action);
-        var rows = new List<(string, string)>();
+        var rows = new List<(string, string?, string)>();
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            rows.Add((reader.GetString(0), reader.GetString(1)));
+            rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetString(2)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>The actor and the stored actor name of each audit record of the record <paramref name="recordId"/>, oldest first.</summary>
+    public async Task<IReadOnlyList<(string Actor, string? ActorName)>> ActorsAsync(string tenant, Guid recordId)
+    {
+        await using var command = DataSource(tenant).CreateCommand(
+            "SELECT actor, actor_name FROM axis.audit_records WHERE record_id = @record ORDER BY occurred_at, id");
+        command.Parameters.AddWithValue("record", recordId);
+        var rows = new List<(string, string?)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
         }
 
         return rows;

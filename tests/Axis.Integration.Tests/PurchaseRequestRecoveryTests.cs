@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Server.Tests;
 using Npgsql;
 using static Axis.Integration.Tests.SampleAppFixture;
 
@@ -21,8 +22,8 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     [InlineData(10000, "waiting", "financeApproval", "submitted")]
     public async Task A_decision_made_while_no_worker_runs_is_taken_up_by_the_next_worker(int unitPrice, string state, string steps, string status)
     {
-        using var anna = await fixture.SignInAsync("anna");
-        using var chau = await fixture.SignInAsync("chau");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var chau = fixture.CreateClient().SignedInAs("chau");
         var subject = await CreateRequestAsync(anna, unitPrice);
         var instance = await StartAsync(anna, subject);
 
@@ -76,7 +77,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_worker_that_dies_mid_step_leaves_no_partial_writes_and_the_next_worker_commits_the_step_once()
     {
-        using var anna = await fixture.SignInAsync("anna");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
         var subject = await CreateRequestAsync(anna, 500);
         var instance = await StartAsync(anna, subject);
         var (_, version) = await ReadAsync(anna, subject);

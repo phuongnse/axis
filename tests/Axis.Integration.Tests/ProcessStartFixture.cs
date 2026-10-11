@@ -17,7 +17,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the configuration, data and processes migrations applied
 /// and the ProcessApp fixture activated, served by the real server on host <c>a.example.test</c>.
-/// The server knows the test user <c>anna</c>.
+/// The test authentication scheme signs in <c>anna</c>.
 /// </summary>
 public sealed class ProcessStartFixture : IAsyncLifetime
 {
@@ -77,8 +77,7 @@ public sealed class ProcessStartFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:Hosts:0", Host);
             builder.UseSetting("Tenants:a:ConnectionString", _connectionString);
             builder.UseTestOidc("a");
-            builder.UseSetting("TestUsers:0:Id", "anna");
-            builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");
+            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
         });
         _client = _factory.CreateClient();
     }

@@ -74,6 +74,7 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             audit.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
             audit.Property(a => a.OccurredAt).HasColumnName("occurred_at");
             audit.Property(a => a.Actor).HasColumnName("actor");
+            audit.Property(a => a.ActorName).HasColumnName("actor_name");
             audit.Property(a => a.Action).HasColumnName("action");
             audit.Property(a => a.ApplicationId).HasColumnName("application_id");
             audit.Property(a => a.EntityId).HasColumnName("entity_id");

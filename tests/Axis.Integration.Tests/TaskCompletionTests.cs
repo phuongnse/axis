@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -23,7 +24,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     {
         var (task, subject, instance) = await CreateTaskAsync(TenantA, "Decide");
         var waiting = await fixture.SnapshotAsync(TenantA, instance);
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await CompleteAsync(
             maria, task, TenantA, $$"""{ "outcome": "Approve", "values": { "comment": "Fine for Q4." }, "version": {{waiting.SubjectVersion}} }""");
@@ -62,8 +63,8 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
             SubjectVersion = waiting.SubjectVersion + 1,
         }, resumed);
 
-        var (actor, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
-        Assert.Equal("maria", actor);
+        var (actor, actorName, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+        Assert.Equal(("maria", "Maria Manager"), (actor, actorName));
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{ "outcome": "approve", "fields": ["comment"] }"""), JsonNode.Parse(details)));
         Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.RecordUpdated));
 
@@ -94,14 +95,14 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     {
         var (task, _, instance) = await CreateTaskAsync(TenantA, "Decide");
         var waiting = await fixture.SnapshotAsync(TenantA, instance);
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await CompleteAsync(maria, task, TenantA, """{ "outcome": "reject" }""");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var body = await ReadJsonAsync(response);
         Assert.Equal("reject", body.RootElement.GetProperty("outcome").GetString());
-        var (_, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+        var (_, _, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{ "outcome": "reject", "fields": [] }"""), JsonNode.Parse(details)));
         var decided = (await fixture.HistoryAsync(TenantA, instance))[^1];
         Assert.True(JsonNode.DeepEquals(
@@ -120,13 +121,13 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     public async Task A_role_holder_completes_the_role_task()
     {
         var (task, _, instance) = await CreateTaskAsync(TenantA, "RoleApprove");
-        using var fiona = await SignInAsync("fiona", TenantA);
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
 
         using var response = await CompleteAsync(fiona, task, TenantA, """{ "outcome": "approve" }""");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var (actor, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
-        Assert.Equal("fiona", actor);
+        var (actor, actorName, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+        Assert.Equal(("fiona", "Fiona Finance"), (actor, actorName));
     }
 
     [Fact]
@@ -134,8 +135,8 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     {
         var (task, _, instance) = await CreateTaskAsync(TenantA, "Decide");
         var waiting = await fixture.SnapshotAsync(TenantA, instance);
-        using var first = await SignInAsync("maria", TenantA);
-        using var second = await SignInAsync("maria", TenantA);
+        using var first = fixture.CreateClient().SignedInAs("maria");
+        using var second = fixture.CreateClient().SignedInAs("maria");
 
         var responses = await Task.WhenAll(
             CompleteAsync(first, task, TenantA, $$"""{ "outcome": "approve", "values": { "comment": "First" }, "version": {{waiting.SubjectVersion}} }"""),
@@ -194,7 +195,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     {
         var (task, _, instance) = await CreateTaskAsync(TenantA, "Decide");
         var waiting = await fixture.SnapshotAsync(TenantA, instance);
-        using var client = user is null ? fixture.CreateClient() : await SignInAsync(user, TenantA);
+        using var client = user is null ? fixture.CreateClient() : fixture.CreateClient().SignedInAs(user);
 
         using var request = RecordApiFixture.Request(HttpMethod.Post, $"{Tasks}/{task:D}/complete", Host(TenantA), body, contentType);
         using var response = await client.SendAsync(request, CancellationToken);
@@ -221,7 +222,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     public async Task An_unlisted_or_read_only_field_and_an_unknown_outcome_are_reported_with_their_messages()
     {
         var (task, _, _) = await CreateTaskAsync(TenantA, "Decide");
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await CompleteAsync(
             maria, task, TenantA, """{ "outcome": "nope", "values": { "title": "New", "amount": 5 }, "version": 1 }""");
@@ -239,7 +240,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     [InlineData(Tasks + "/not-a-uuid/complete", "No task exists with this id.")]
     public async Task An_unknown_application_or_task_is_404(string path, string title)
     {
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var request = RecordApiFixture.Request(HttpMethod.Post, path, Host(TenantA), Valid);
         using var response = await maria.SendAsync(request, CancellationToken);
@@ -253,7 +254,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     {
         var (task, _, instance) = await CreateTaskAsync(TenantA, "Decide");
         var waiting = await fixture.SnapshotAsync(TenantA, instance);
-        using var maria = await SignInAsync("maria", TenantB);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
 
         using var response = await CompleteAsync(maria, task, TenantB, """{ "outcome": "approve" }""");
 
@@ -275,14 +276,6 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
         return (await fixture.TaskIdAsync(tenant, instance), subject, instance);
     }
 
-    private async Task<HttpClient> SignInAsync(string user, string tenant)
-    {
-        var client = fixture.CreateClient();
-        using var signIn = RecordApiFixture.Request(HttpMethod.Post, "/api/test-users/sign-in", Host(tenant), $$"""{ "id": "{{user}}" }""");
-        using var response = await client.SendAsync(signIn, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return client;
-    }
 
     private static async Task<HttpResponseMessage> CompleteAsync(HttpClient client, Guid task, string tenant, string body)
     {

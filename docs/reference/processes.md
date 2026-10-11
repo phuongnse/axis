@@ -331,8 +331,8 @@ One transaction then does the rest:
    `409`.
 5. It inserts the instance's first work item.
 6. It writes the audit record `process.started` for the subject record, with
-   details `{ "processId", "releaseId" }`. The actor is the signed-in test
-   user, or `anonymous`.
+   details `{ "processId", "releaseId" }`. The actor is the
+   [current user](#task-api) with their display name, or `anonymous`.
 
 When any part fails, nothing is written. The instance then waits for the
 worker to run its steps.
@@ -376,17 +376,18 @@ state. Cancel comes in M7.
 ## Task API
 
 The task API lets the signed-in user list their open tasks, read one task and
-complete it with an outcome. The user is the signed-in
-[test user](../architecture.md#development-test-users) until
-sign-in arrives in M4.
+complete it with an outcome. The user is the user of the
+[session](../architecture.md#sign-in-and-the-session)
+([D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)).
+Without a session, it is the signed-in
+[test user](../architecture.md#development-test-users), until test users are
+removed in M4.
 
 **Who may act.** The user may act on a task when they are its assignee, or
-when the task's assignee is a role and the user holds it. In M3 a user's
-roles are the role names of their test user. This is checked on
-every request, at the moment of action. Policies in M4 add to this check and
-never replace it. From M4 *(planned)*, the user and their roles come from
-the session
-([D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)).
+when the task's assignee is a role and the user holds it. The user's roles
+are the roles kept in their session, or the role names of their test user.
+This is checked on every request, at the moment of action. Policies in M4 add
+to this check and never replace it.
 
 **Policies on tasks** *(planned for M4)*. These follow
 [D24](../decisions.md#d24-roles-and-policies--agreed).
@@ -518,7 +519,8 @@ who may not act on a task never learns its state. A completion without the
 [CSRF header](record-api.md#create-update-and-delete) is a `403` before any
 of these checks.
 
-- **`401`.** No test user is signed in. Every task route needs one.
+- **`401`.** Nobody is signed in, through a session or as a test user.
+  Every task route needs a signed-in user.
 
   ```json
   {
@@ -625,10 +627,10 @@ One transaction records the decision:
    written over, or `null` when there are no values. Its output is
    `{ "taskId", "outcome", "next" }`, plus `subjectVersion`, the version the
    values wrote, when there are any.
-6. It writes the audit record `task.completed`, with the user as its actor,
-   and details `{ "outcome", "fields" }`. `fields` names the changed fields
-   in declaration order and holds no values. A completion writes no
-   `record.updated`.
+6. It writes the audit record `task.completed`, with the user and their
+   display name as its actor, and details `{ "outcome", "fields" }`.
+   `fields` names the changed fields in declaration order and holds no
+   values. A completion writes no `record.updated`.
 7. It inserts the work item for the outcome's `next` step.
 
 The form, the outcomes and the record write all use the release the instance
