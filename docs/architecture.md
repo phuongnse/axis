@@ -284,7 +284,8 @@ Everything in this section is *(planned for M4)*. It follows
 
 ### Authorization
 
-Everything in this section is *(planned for M4)*. It follows
+The `role` and `policy` resources and their compile checks are built.
+Everything else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in

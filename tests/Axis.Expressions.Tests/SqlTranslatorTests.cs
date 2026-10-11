@@ -97,6 +97,22 @@ public sealed class SqlTranslatorTests
     }
 
     [Fact]
+    public void Current_user_in_a_policy_filter_is_the_named_parameter_the_caller_binds()
+    {
+        var parsed = ExpressionParser.Parse("t == currentUser() or t == 'x'");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, policyFilter: true);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, check);
+
+        // Only the literal is a numbered parameter. The user id is never part of the SQL text.
+        Assert.Equal("((\"t\" IS NOT DISTINCT FROM @currentUser) OR (\"t\" IS NOT DISTINCT FROM @f0))", result.Sql);
+        Assert.Equal("f0", Assert.Single(result.Parameters).Name);
+        Assert.Equal("currentUser", SqlTranslator.CurrentUserParameter);
+    }
+
+    [Fact]
     public void Text_and_names_never_reach_the_sql_unquoted()
     {
         var result = Translate("t == 'x''); DROP TABLE t; --'");

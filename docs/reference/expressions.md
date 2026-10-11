@@ -5,7 +5,9 @@ null rules, functions, cost limits and the SQL subset. The grammar, the syntax
 diagnostics and the length, depth and node limits are built in
 `Axis.Expressions`. So are the type checker and the interpreter for literals,
 bare field names, every operator, every [function](#functions) and the
-[aggregates](#aggregates), and the translation of the [SQL subset](#sql-subset). Sections
+[aggregates](#aggregates), and the translation of the [SQL subset](#sql-subset).
+The one exception is [`currentUser()`](#current-user): the type checker and the
+SQL translation take it, but the interpreter does not evaluate it yet. Sections
 marked *(planned for Mx)* are not built yet. Entity
 [validations](configuration.md#entity-logic) and
 [computed fields](configuration.md#entity-logic) are resource file uses: the
@@ -20,7 +22,9 @@ can also call a named rule: its SQL inlines the rule's expression. A
 are type-checked by the compiler too, can call named rules and can follow
 paths through reference fields. The data module can evaluate them against a
 stored record. The start endpoint runs the start condition, and the worker runs
-each decision `when`. Other uses come with the issues that build
+each decision `when`. A [policy](configuration.md#roles-and-policies)
+filter is type-checked and translated by the compiler too, but nothing runs it
+yet *(planned for M4)*. Other uses come with the issues that build
 them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
@@ -29,13 +33,15 @@ and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
 [knowledge](../domain/knowledge.md#logic-in-configuration).
 
 One language holds the logic of validation, named rules, computed fields,
-data source filters and process conditions. From M4 it also holds policy
-filters *(planned for M4)*. It has two back ends:
+data source filters, process conditions and policy filters. It has two back
+ends:
 
 - **Interpreter.** It evaluates an expression against one record, in the
   server process.
 - **SQL translation.** It turns an expression into a `WHERE` condition for a
-  data source filter, and from M4 for a policy filter *(planned for M4)*. Only a subset of the language translates. See
+  data source filter. The compiler also translates each policy filter, and
+  running it as a `WHERE` condition is *(planned for M4)*. Only a subset of
+  the language translates. See
   [SQL subset](#sql-subset).
 
 Both back ends must give the same result for every expression in the subset.
@@ -274,7 +280,8 @@ Paths in validations and computed fields are not built. There a path is
   result types are the scalar field types except `enum`, which comes later
   (see [Resource file shape](configuration.md#resource-file-shape)). A rule
   name may not reuse a built-in function or aggregate name. A validation, a
-  data source filter and a process condition can call rules, but not inside
+  data source filter, a process condition and a policy filter can call rules,
+  but not inside
   an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
 - **Scope in a computed field.** The expression sees the entity's own fields
@@ -291,15 +298,16 @@ Paths in validations and computed fields are not built. There a path is
   It can call the named rules, with fields, paths, parameters and literals as
   arguments. Its child collections type-check in aggregates, but no
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
-- **Scope in a policy filter** *(planned for M4)*. A
+- **Scope in a policy filter.** A
   [policy](configuration.md#roles-and-policies) filter sees the entity's
   fields, paths through reference fields of up to 3 hops, the named rules and
-  [`currentUser()`](#current-user). It must be boolean and stay inside the
-  [SQL subset](#sql-subset), because record lists and data sources run it as
-  SQL and a single record runs it in the interpreter. So it cannot use an
-  aggregate or `lower`. A rule body cannot call `currentUser()`, so a filter
-  passes the user id to a rule as an argument, such as
-  `IsRequester(requester, currentUser())`.
+  [`currentUser()`](#current-user). The compiler type-checks it as a boolean
+  and translates it to SQL. It must stay inside the [SQL subset](#sql-subset),
+  because record lists and data sources will run it as SQL and a single
+  record will run it in the interpreter *(planned for M4)*. So it cannot use
+  an aggregate or `lower`, which are `AXC0053`. A rule body cannot call
+  `currentUser()`, so a filter passes the user id to a rule as an argument,
+  such as `IsRequester(requester, currentUser())`.
 - **Scope in a process expression.** A `startCondition` and a decision
   `when` see the subject record's fields, computed ones included, its child
   collections through aggregates, the named rules, and paths through
@@ -344,6 +352,7 @@ argument is `null`.
 | `date(text literal)` | date | See [Literals](#literals). | Yes |
 | `dateTime(text literal)` | date-time | See [Literals](#literals). | Yes |
 | `now()` | date-time | The start time of the current transaction. Not allowed in a computed field (`AXC0086`). | Yes |
+| `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so it waits for the
@@ -369,8 +378,9 @@ because no conversion is implicit except integer to decimal.
 
 ### Current user
 
-Everything in this section is *(planned for M4)*. It follows
-[D24](../decisions.md#d24-roles-and-policies--agreed).
+It follows [D24](../decisions.md#d24-roles-and-policies--agreed). The type
+check and the SQL translation are built. Evaluating it, in the interpreter and
+by binding the SQL parameter, is *(planned for M4)*.
 
 `currentUser()` gives the signed-in user's id as `text`, as the
 [session](../architecture.md#sign-in-and-the-session) holds it. A policy
@@ -380,9 +390,9 @@ filter uses it to compare a record with the user, such as
 - **Where.** It is allowed only in a
   [policy filter](configuration.md#roles-and-policies), including as an
   argument of a rule call there. Anywhere else, including inside a rule body,
-  it is a compile error. Its code comes with the issue that builds it.
-- **SQL.** It is sent as a bound `text` parameter, never spliced into the
-  SQL text.
+  it is `AXC0095` at the call.
+- **SQL.** It becomes the named parameter `@currentUser`, which the caller
+  binds as `text`. The id is never spliced into the SQL text.
 - **One value.** Every call in one request gives the same id, so the
   interpreter and the SQL translation agree.
 
@@ -532,6 +542,8 @@ These translate to SQL:
 - `addDays`, as `date + integer`;
 - `daysBetween`, as `b - a`;
 - `now()`, as PostgreSQL `now()`, the start time of the query's transaction;
+- `currentUser()`, as the named parameter `@currentUser`, which the caller
+  binds as `text`;
 - rule calls, inlined when the rule body is in the subset. Each argument is
   translated once, in the filter's context, and its SQL replaces every use of
   the parameter. So a literal argument is one parameter however often the
@@ -581,10 +593,9 @@ Rules:
 
 ## Writing expressions in resource files
 
-Entity validations, computed fields, rules, data source filters and
-[process](processes.md#resource-shape) conditions are written this way.
-From M4, [policy](configuration.md#roles-and-policies) filters are written
-the same way *(planned for M4)*.
+Entity validations, computed fields, rules, data source filters,
+[process](processes.md#resource-shape) conditions and
+[policy](configuration.md#roles-and-policies) filters are written this way.
 
 An expression is one JSON string:
 
@@ -611,8 +622,8 @@ There are three families:
 
 - **Syntax.** Tokens, the grammar and literal forms.
 - **Type.** Unknown names, type mismatches, unknown enum values, wrong
-  argument counts, use of something outside the SQL subset in a filter, and
-  `now()` in a computed field.
+  argument counts, use of something outside the SQL subset in a filter,
+  `now()` in a computed field, and `currentUser()` outside a policy filter.
 - **Cost.** The limits on length, depth, nodes, hops, rule call depth and
   rule call cycles.
 
@@ -630,7 +641,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0038`.** The expression has more than 500 syntax nodes.
 - **`AXC0046`.** A name that is not in scope, named in the message. This
   includes an unknown field after a `.`, and any `.` path outside a data
-  source filter or a process condition.
+  source filter, a policy filter or a process condition.
 - **`AXC0047`.** Operand types an operator, function or rule does not
   accept, at the operator or the call. This includes an `in` item that does
   not fit, two different enums, an enum parameter with a value the field
@@ -656,7 +667,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   arguments, at the call. This includes an aggregate without its item
   expression, such as `sum(lineItems)`. The message names the expected count, such as "needs 2 arguments" or
   "needs at least 1 argument", and the count found.
-- **`AXC0053`.** A data source filter uses something outside the
+- **`AXC0053`.** A data source or policy filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
   includes `/`, `lower`, `upper`, `trim`, every aggregate, a call to a rule
   whose body is outside the subset, and a filter whose rule calls inline to
@@ -666,6 +677,10 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0086`.** A computed field calls `now()`, including inside an
   aggregate's item expression, at the call. A stored value cannot depend on
   the current time.
+- **`AXC0095`.** An expression that is not a policy filter calls
+  `currentUser()`, at the call. This includes a validation, a computed field,
+  a data source filter, a process expression and a rule body. A rule
+  argument inside a policy filter may call it.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).

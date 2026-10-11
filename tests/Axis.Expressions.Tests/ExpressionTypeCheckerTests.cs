@@ -209,6 +209,38 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
+    [InlineData("currentUser()", "text")]
+    [InlineData("t == currentUser()", "boolean")]
+    [InlineData("CURRENTUSER() != null", "boolean")]
+    public void Current_user_in_a_policy_filter_is_text(string text, string type)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), policyFilter: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected(type), result.Type);
+    }
+
+    [Theory]
+    [InlineData("currentUser()", "text", false, 0)]
+    [InlineData("t == currentUser()", "boolean", false, 5)]
+    // A stored value is not a policy filter either.
+    [InlineData("concat(t, currentUser())", "text", true, 10)]
+    public void Current_user_outside_a_policy_filter_is_reported_at_the_call(string text, string type, bool storedValue, int offset)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), storedValue).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.CurrentUserOutsidePolicyFilter, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal($"Function 'currentUser' is allowed only in a policy filter at character {offset + 1}.", diagnostic.Message);
+    }
+
+    [Theory]
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date at character 7.")]
     [InlineData("dt == date('2026-02-29')", 6, "'2026-02-29' is not a valid date at character 7.")]
     [InlineData("ts == dateTime('2026-10-08T09:30:00')", 6, "'2026-10-08T09:30:00' is not a valid date-time at character 7.")]

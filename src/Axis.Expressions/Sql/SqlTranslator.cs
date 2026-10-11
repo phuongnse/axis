@@ -13,7 +13,8 @@ namespace Axis.Expressions.Sql;
 /// to report what does not translate, and the data source query calls it to build its
 /// <c>WHERE</c> clause. Every literal value becomes a named parameter <c>@f0</c>, <c>@f1</c>, …,
 /// so no value is ever part of the SQL text. Only the literal <c>null</c> is written, as the
-/// keyword <c>NULL</c>. Every operator is wrapped in parentheses, so the SQL keeps the
+/// keyword <c>NULL</c>. <c>currentUser()</c> becomes the named parameter
+/// <see cref="CurrentUserParameter"/>, which is not in the result's parameters. Every operator is wrapped in parentheses, so the SQL keeps the
 /// expression's precedence. A call to a named rule is inlined: the rule's body is rendered with
 /// each parameter replaced by the SQL of its argument. Before any SQL is built, the filter with
 /// every rule body inlined is counted against <see cref="ExpressionLimits.MaxInlinedNodes"/>. It
@@ -21,6 +22,12 @@ namespace Axis.Expressions.Sql;
 /// </summary>
 public static class SqlTranslator
 {
+    /// <summary>
+    /// The name of the parameter <c>currentUser()</c> becomes, without its <c>@</c>. The caller
+    /// binds it as text to the signed-in user's id.
+    /// </summary>
+    public const string CurrentUserParameter = "currentUser";
+
     /// <summary>
     /// Translates <paramref name="expression"/>, which must have passed
     /// <see cref="ExpressionTypeChecker"/>. <paramref name="column"/> maps a field path to the SQL
@@ -198,6 +205,7 @@ public static class SqlTranslator
                 "addDays" => $"({arguments[0]} + ({arguments[1]})::int)",
                 "daysBetween" => $"({arguments[1]} - {arguments[0]})",
                 "now" => "now()",
+                "currentUser" => "@" + CurrentUserParameter,
                 _ => throw NotTranslated(name, call.Offset),
             };
         }

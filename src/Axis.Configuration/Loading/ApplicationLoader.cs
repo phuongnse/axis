@@ -57,6 +57,7 @@ public static class ApplicationLoader
                 [],
                 [],
                 [],
+                [],
                 [new Diagnostic(DiagnosticCodes.UnlistableFolder, "The application folder could not be listed.", File: "", Path: "")],
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -111,6 +112,7 @@ public static class ApplicationLoader
         var processes = new List<ProcessResource>();
         var forms = new List<FormResource>();
         var roles = new List<RoleResource>();
+        var policies = new List<PolicyResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -237,6 +239,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Role:
                         roles.Add(root.Deserialize<RoleResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Policy:
+                        policies.Add(root.Deserialize<PolicyResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -256,6 +261,7 @@ public static class ApplicationLoader
             processes,
             forms,
             roles,
+            policies,
             resources,
             DiagnosticOrder.Sort(diagnostics),
             unloadedEntityNames,
@@ -427,7 +433,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}' or '{ResourceKinds.Role}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}' or '{ResourceKinds.Policy}'.",
                 file,
                 "/kind",
                 resourceId));

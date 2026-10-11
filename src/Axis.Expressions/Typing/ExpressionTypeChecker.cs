@@ -15,12 +15,15 @@ namespace Axis.Expressions.Typing;
 /// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
 /// other scope. The text of a <c>date</c> or <c>dateTime</c> literal must be a valid date or
 /// date-time under <see cref="DateLiterals"/>. A stored value, such as a computed field, cannot call
-/// <c>now()</c>, because the value would go stale. It stops at the first problem and reports only that one.
+/// <c>now()</c>, because the value would go stale. Only a policy filter can call <c>currentUser()</c>,
+/// including as a rule argument there, because no other expression runs for a signed-in user. A
+/// rule body is checked on its own, so it cannot call it. It stops at the first problem and reports
+/// only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
     public static ExpressionCheckResult Check(
-        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false)
+        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool policyFilter = false)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(scope);
@@ -33,7 +36,8 @@ public static class ExpressionTypeChecker
                 new HashSet<CallNode>(ReferenceEqualityComparer.Instance),
                 new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance),
                 new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
-                storedValue);
+                storedValue,
+                policyFilter);
             var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
@@ -186,6 +190,14 @@ public static class ExpressionTypeChecker
                         "Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time",
                         call.Offset)
                     : ExpressionType.DateTime;
+
+            case "currentUser":
+                return context.PolicyFilter
+                    ? ExpressionType.Text
+                    : throw Fail(
+                        ExpressionDiagnosticCodes.CurrentUserOutsidePolicyFilter,
+                        "Function 'currentUser' is allowed only in a policy filter",
+                        call.Offset);
 
             case "length":
                 Need(call, name, types, 0, IsText, "text");
@@ -578,14 +590,16 @@ public static class ExpressionTypeChecker
 
     /// <summary>
     /// What one check carries down the tree: the scope, the decimal calls, rule calls and path
-    /// steps found so far, and whether the expression computes a stored value.
+    /// steps found so far, whether the expression computes a stored value, and whether it is a
+    /// policy filter.
     /// </summary>
     private sealed record Context(
         ExpressionScope Scope,
         HashSet<CallNode> DecimalCalls,
         Dictionary<CallNode, ExpressionRule> RuleCalls,
         Dictionary<MemberNode, string> PathTargets,
-        bool StoredValue);
+        bool StoredValue,
+        bool PolicyFilter);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)
