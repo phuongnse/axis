@@ -135,15 +135,32 @@ test('the purchase request list reads a data source, shows department names, and
   page,
   request,
 }) => {
-  // Titles of this run sort after those of the other tests and of earlier retries, so with
-  // sort=-title the first ten are on page 1 and the eleventh opens page 2.
+  // Other specs title their requests in Latin letters. Titles that start with the Greek Ω sort
+  // after those under any collation, and titles of this run sort after those of earlier retries.
+  // So with sort=-title the first ten are on page 1 and the eleventh opens page 2. A later spec
+  // that titles requests in a script sorting after Greek, such as CJK, would break this.
   const run = `${Date.now()}-${test.info().retry}`
+  const prefix = `Ω List ${run}`
   const finance = await departmentId(request, 'Finance')
+  // It sorts after every "Zz …" title that other specs use, so each run checks that those titles
+  // never reach page 2.
+  const decoy = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
+    data: {
+      values: {
+        title: `Zzzz Decoy ${run}`,
+        department: finance,
+        status: 'draft',
+        lineItems: [{ description: 'Item', quantity: 1, unitPrice: 10 }],
+      },
+    },
+    headers: csrfHeaders,
+  })
+  expect(decoy.status()).toBe(201)
   for (let index = 1; index <= 11; index++) {
     const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
       data: {
         values: {
-          title: `Zz List ${run} ${String(index).padStart(2, '0')}`,
+          title: `${prefix} ${String(index).padStart(2, '0')}`,
           department: finance,
           status: 'draft',
           lineItems: [{ description: 'Item', quantity: 1, unitPrice: 10 }],
@@ -159,7 +176,7 @@ test('the purchase request list reads a data source, shows department names, and
   expect((await rowsLoad).status()).toBe(200)
 
   const listPath = /\/purchasing\/purchaserequests\?page=2&pageSize=10&sort=-title$/
-  const first = page.getByRole('row', { name: new RegExp(`Zz List ${run} 01 `) })
+  const first = page.locator('.ant-table-tbody tr.ant-table-row').first()
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
       await page.getByRole('switch', { name: 'Dark mode' }).click()
@@ -171,6 +188,7 @@ test('the purchase request list reads a data source, shows department names, and
     await expect(page.locator('.ant-pagination-item-active')).toHaveText('2')
     await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
     await expect(page.getByRole('columnheader', { name: 'Department' })).toBeVisible()
+    await expect(first).toContainText(`${prefix} 01`)
     await expect(first).toContainText('Finance')
   }
 })
