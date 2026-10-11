@@ -10,7 +10,7 @@ namespace Axis.Server.Presentation;
 /// their pages to the SPA. A site is found by its path. The endpoints need a session: without one
 /// they answer 401 before any 404, so a signed-out caller cannot learn which sites or pages exist.
 /// A site's navigation leaves out the pages the user cannot read, such a page answers 403, and page
-/// metadata lists only the actions and access the user's grants allow.
+/// metadata lists only the fields, actions and access the user's grants allow.
 /// </summary>
 internal static class SiteEndpoints
 {

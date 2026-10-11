@@ -22,8 +22,8 @@ public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<Wi
 /// <see cref="DataSource"/> is set: the widget shows all records of an entity, or the rows of a data
 /// source. <see cref="FormPage"/> is set only on a table widget that names the page holding the form
 /// for its records. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
-/// is then the form's entity, with every field, so a client knows the type of each field the form
-/// shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
+/// is then the form's entity, with every field the user may read, so a client knows the type of each
+/// field the form shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
 /// <see cref="Access"/> is set on a table or form widget and null on a task inbox.
 /// </summary>

@@ -6,7 +6,8 @@ using Axis.Server.DataSources;
 namespace Axis.Server.Presentation;
 
 /// <summary>
-/// Shapes navigation and page metadata by a signed-in user's grants. This only shapes the UI: the
+/// Shapes navigation and page metadata by a signed-in user's grants, down to the fields the user may
+/// read. This only shapes the UI: the
 /// record API, the data source endpoint and the process start endpoint still check every request.
 /// </summary>
 internal static class PageAccess
@@ -24,19 +25,48 @@ internal static class PageAccess
         page.Widgets.All(widget => CanRead(application, roles, widget));
 
     /// <summary>
-    /// <paramref name="metadata"/>, the metadata of <paramref name="page"/>, with only the
-    /// <c>startProcess</c> actions <paramref name="roles"/> may start and the access they hold.
+    /// <paramref name="metadata"/>, the metadata of <paramref name="page"/>, with only the fields
+    /// <paramref name="roles"/> may read, the <c>startProcess</c> actions they may start and the
+    /// access they hold.
     /// </summary>
     public static PageMetadata Shape(ApplicationModel application, IReadOnlyList<string> roles, PageModel page, PageMetadata metadata) =>
         metadata with
         {
-            Widgets = [.. page.Widgets.Zip(metadata.Widgets, (widget, described) => described with
-            {
-                Actions = [.. described.Actions.Where(action =>
-                    application.TryGetProcess(action.Process, out var process) && PolicyEvaluator.AllowsStart(application, roles, process))],
-                Access = ApplicationSites.WidgetEntity(application, widget) is { } entity ? Access(application, roles, entity) : null,
-            })],
+            Widgets = [.. page.Widgets.Zip(metadata.Widgets, (widget, described) => Shape(application, roles, widget, described))],
         };
+
+    private static WidgetMetadata Shape(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget, WidgetMetadata described)
+    {
+        var entity = ApplicationSites.WidgetEntity(application, widget);
+
+        // Fields gives null for every field. The page answers 403 before shaping when the user has
+        // no read grant, so the set is never empty here.
+        var readable = entity is null ? null : PolicyEvaluator.Fields(application, roles, entity, PolicyAction.Read);
+        return described with
+        {
+            Entity = readable is null ? described.Entity : Readable(described.Entity, readable),
+            Form = readable is null ? described.Form : Readable(described.Form, readable),
+            Actions = [.. described.Actions.Where(action =>
+                application.TryGetProcess(action.Process, out var process) && PolicyEvaluator.AllowsStart(application, roles, process))],
+            Access = entity is null ? null : Access(application, roles, entity),
+        };
+    }
+
+    // A child collection field covers its rows as a whole, so it is kept with all its fields or
+    // left out.
+    private static EntityMetadata? Readable(EntityMetadata? entity, IReadOnlySet<string> readable) =>
+        entity is null ? null : entity with { Fields = [.. entity.Fields.Where(field => readable.Contains(field.Name))] };
+
+    // A section with no readable field is left out.
+    private static FormMetadata? Readable(FormMetadata? form, IReadOnlySet<string> readable) =>
+        form is null
+            ? null
+            : form with
+            {
+                Sections = [.. form.Sections
+                    .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
+                    .Where(section => section.Fields.Count > 0)],
+            };
 
     private static bool CanRead(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget)
     {

@@ -309,6 +309,50 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     }
 
     [Theory]
+    [InlineData("items")]
+    [InlineData("itemsections")]
+    public async Task Entity_lists_only_the_fields_the_user_may_read(string page)
+    {
+        using var client = fixture.CreateClient().SignedInAs("fia");
+
+        using var metadata = await GetJsonAsync(client, $"/api/sites/records/pages/{page}", HostA);
+
+        // The parts child collection is not readable, so it is left out as a whole.
+        Assert.Equal(["name", "department"], EntityFieldNames(metadata));
+    }
+
+    [Fact]
+    public async Task Form_leaves_out_the_fields_the_user_may_not_read_and_the_sections_left_empty()
+    {
+        using var client = fixture.CreateClient().SignedInAs("fia");
+
+        using var page = await GetJsonAsync(client, "/api/sites/records/pages/itemsections", HostA);
+
+        Assert.Equal(
+            """{"name":"ItemSections","sections":[{"titleKey":"itemSections.main","fields":[{"name":"name","readOnly":false}]}]}""",
+            Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("form").GetRawText());
+    }
+
+    [Fact]
+    public async Task Read_grant_without_fields_keeps_every_field_and_every_form_section()
+    {
+        using var client = fixture.CreateClient().SignedInAs("rita");
+
+        using var items = await GetJsonAsync(client, "/api/sites/records/pages/items", HostA);
+        using var sections = await GetJsonAsync(client, "/api/sites/records/pages/itemsections", HostA);
+
+        Assert.Equal(
+            ["name", "quantity", "price", "active", "neededBy", "orderedAt", "status", "parts", "department", "total"],
+            EntityFieldNames(items));
+        var parts = Assert.Single(EntityFields(items), field => field.GetProperty("name").GetString() == "parts");
+        Assert.Equal(["name", "code"], parts.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
+        Assert.Equal(10, EntityFieldNames(sections).Count);
+        Assert.Equal(
+            """{"name":"ItemSections","sections":[{"titleKey":"itemSections.main","fields":[{"name":"name","readOnly":false},{"name":"quantity","readOnly":true}]},{"titleKey":"itemSections.pricing","fields":[{"name":"price","readOnly":false},{"name":"total","readOnly":true}]}]}""",
+            Assert.Single(sections.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("form").GetRawText());
+    }
+
+    [Theory]
     [InlineData("/api/sites/unknown", HostA, "No site is active under this path.")]
     [InlineData("/api/sites/api", HostA, "No site is active under this path.")]
     [InlineData("/api/sites/unknown/texts/en", HostA, "No site is active under this path.")]
@@ -336,6 +380,12 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }
+
+    private static List<JsonElement> EntityFields(JsonDocument page) =>
+        [.. Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("entity").GetProperty("fields").EnumerateArray()];
+
+    private static List<string?> EntityFieldNames(JsonDocument page) =>
+        [.. EntityFields(page).Select(field => field.GetProperty("name").GetString())];
 
     private static List<string?> NavigationPages(JsonDocument site) =>
         [.. site.RootElement.GetProperty("navigation").EnumerateArray().Select(entry => entry.GetProperty("page").GetString())];

@@ -536,7 +536,7 @@ the root entity's read filters and the readable fields. A process start
 enforces the `start` grant and read access to the subject record. The task
 API keeps the assignee check and leaves out the fields the user may not
 read, and the worker's steps run outside policies. Navigation and page
-metadata follow the grants, except leaving out unreadable fields.
+metadata follow the grants.
 Everything else below is *(planned for M4)*. See [architecture](architecture.md#authorization) for the
 details. It builds on [D12](#d12-authorization-is-server-side-and-default-deny--agreed).
 
@@ -570,8 +570,8 @@ details. It builds on [D12](#d12-authorization-is-server-side-and-default-deny--
   so a user cannot move a record out of their reach.
 - **Fields on reads:** the user may read the union of the `fields` of their
   `read` grants on the entity. Other fields are left out of records, data
-  source rows and history details. The readable fields are per entity, not
-  per record.
+  source rows, history details and page metadata. The readable fields are
+  per entity, not per record.
 - **Fields on writes:** writing a field that no `create` or `update` grant
   covers is `403` with the field's path.
 - **Data sources:** the root entity's read filters are added to the data
