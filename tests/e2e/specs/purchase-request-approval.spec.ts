@@ -46,8 +46,17 @@ async function submit(page: Page, id: string, title: string) {
   await expect(page.getByTestId('form-started')).toBeVisible()
 }
 
-/** Opens the task named `task` for the request titled `title` from My tasks, and approves it. */
-async function approve(page: Page, title: string, task: string, comment?: string) {
+/**
+ * Opens the task named `task` for the request titled `title` from My tasks, and decides it with
+ * `outcome` and an optional comment.
+ */
+async function decide(
+  page: Page,
+  title: string,
+  task: string,
+  outcome: 'Approve' | 'Return' | 'Reject',
+  comment?: string,
+) {
   const row = page.getByRole('row', { name: new RegExp(title) })
   // The worker creates the task some time after the start or the previous decision.
   await expect(async () => {
@@ -59,7 +68,7 @@ async function approve(page: Page, title: string, task: string, comment?: string
   if (comment !== undefined) {
     await page.getByLabel('Decision comments', { exact: true }).fill(comment)
   }
-  await page.getByRole('button', { name: 'Approve' }).click()
+  await page.getByRole('button', { name: outcome }).click()
   await expect(page).toHaveURL(/\/purchasing\/mytasks$/)
 }
 
@@ -71,11 +80,11 @@ function statusValue(page: Page) {
     .locator('.ant-select-selection-item')
 }
 
-/** Opens the request form until it shows `approved`, since the worker ends the process later. */
-async function expectApproved(page: Page, id: string) {
+/** Opens the request form until it shows `status`, since the worker ends the process later. */
+async function expectStatus(page: Page, id: string, status: string) {
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect(statusValue(page)).toHaveText('approved', { timeout: 1_000 })
+    await expect(statusValue(page)).toHaveText(status, { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 }
 
@@ -97,9 +106,9 @@ test('a request below the threshold is approved by the department manager from M
 
   await signIn(page, 'chau')
   const comment = `Fine ${Date.now()}`
-  await approve(page, title, 'Manager approval', comment)
+  await decide(page, title, 'Manager approval', 'Approve', comment)
 
-  await expectApproved(page, id)
+  await expectStatus(page, id, 'approved')
   await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
   await expectHistory(page, ['Chau Operations Manager'])
 })
@@ -112,14 +121,74 @@ test('a request at the threshold needs the finance reviewer after the manager be
   await submit(page, id, title)
 
   await signIn(page, 'chau')
-  await approve(page, title, 'Manager approval')
+  await decide(page, title, 'Manager approval', 'Approve')
   const read = await page.request.get(`${recordsPath}/${id}`)
   expect(read.ok()).toBe(true)
   expect(((await read.json()) as { values: { status: string } }).values.status).toBe('submitted')
 
   await signIn(page, 'dung')
-  await approve(page, title, 'Finance approval')
+  await decide(page, title, 'Finance approval', 'Approve')
 
-  await expectApproved(page, id)
+  await expectStatus(page, id, 'approved')
   await expectHistory(page, ['Chau Operations Manager', 'Dung Finance Reviewer'])
+})
+
+test('a returned request is edited and submitted again, and the manager then approves it', async ({ page }) => {
+  await signIn(page, 'anna')
+  const { title, id } = await createRequest(page, 'Return', 500)
+  await submit(page, id, title)
+
+  await signIn(page, 'chau')
+  const comment = `Two desks, please ${Date.now()}`
+  await decide(page, title, 'Manager approval', 'Return', comment)
+  await expectStatus(page, id, 'returned')
+
+  await signIn(page, 'anna')
+  await page.goto(`/purchasing/purchaserequestform/${id}`)
+  await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
+  await page.getByLabel('Quantity 1', { exact: true }).fill('2')
+  // Submit saves the edit before it starts the process.
+  await page.getByRole('button', { name: 'Submit' }).click()
+  await expect(page.getByTestId('form-started')).toBeVisible()
+
+  await signIn(page, 'chau')
+  await decide(page, title, 'Manager approval', 'Approve')
+
+  await expectStatus(page, id, 'approved')
+  const read = await page.request.get(`${recordsPath}/${id}`)
+  expect(read.ok()).toBe(true)
+  const record = (await read.json()) as { values: { lineItems: { quantity: number }[] } }
+  expect(record.values.lineItems.map((item) => item.quantity)).toEqual([2])
+  const entries = page.getByTestId('record-history').getByTestId('history-entry')
+  await expect(entries.filter({ hasText: 'Process started' }).filter({ hasText: 'Anna Employee' })).toHaveCount(2)
+})
+
+test('a rejected request cannot be submitted again, and the manager gets no new task', async ({ page }) => {
+  await signIn(page, 'anna')
+  const { title, id } = await createRequest(page, 'Reject', 500)
+  await submit(page, id, title)
+
+  await signIn(page, 'chau')
+  await decide(page, title, 'Manager approval', 'Reject')
+  await expectStatus(page, id, 'rejected')
+
+  await signIn(page, 'anna')
+  await page.goto(`/purchasing/purchaserequestform/${id}`)
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  const start = page.waitForResponse((response) =>
+    response.url().endsWith('/processes/PurchaseRequestApproval/instances'),
+  )
+  await page.getByRole('button', { name: 'Submit' }).click()
+
+  expect((await start).status()).toBe(400)
+  await expect(page.getByTestId('form-error')).toHaveText(
+    'Only a draft or returned request with a total can be submitted.',
+  )
+  await expect(page.getByTestId('form-started')).toHaveCount(0)
+
+  await signIn(page, 'chau')
+  const tasks = await page.request.get(`${appPath}/tasks?pageSize=100`)
+  expect(tasks.status()).toBe(200)
+  const { items } = (await tasks.json()) as { items: { subject: { id: string } }[] }
+  expect(items.filter((item) => item.subject.id === id)).toEqual([])
 })

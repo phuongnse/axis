@@ -24,4 +24,21 @@ public sealed class SampleApplicationTests
         Assert.Equal("PurchaseRequestNumber", number.Sequence.Name);
         Assert.Equal("PR-{yyyy}-{n:5}", number.Sequence.Format);
     }
+
+    [Fact]
+    public void Purchase_request_start_condition_message_has_an_English_and_a_Vietnamese_text()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+
+        Assert.NotNull(result.Model);
+        var process = Assert.Single(result.Model.Processes);
+        Assert.NotNull(process.StartCondition);
+        Assert.Equal("purchaseRequest.cannotSubmit", process.StartCondition.Message.TextKey);
+        foreach (var locale in new[] { "en", "vi" })
+        {
+            var texts = Assert.Single(result.Model.Texts, texts => texts.Locale == locale);
+            Assert.True(texts.Texts.TryGetValue("purchaseRequest.cannotSubmit", out var text), $"The {locale} texts have no purchaseRequest.cannotSubmit.");
+            Assert.False(string.IsNullOrWhiteSpace(text));
+        }
+    }
 }
