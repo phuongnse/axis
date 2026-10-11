@@ -1,0 +1,9 @@
+{
+  "id": "7d3f1b9e-2c5a-4e86-b0d4-9a6e8c2f1b57",
+  "kind": "role",
+  "name": "false-only",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.falseOnly"
+  }
+}

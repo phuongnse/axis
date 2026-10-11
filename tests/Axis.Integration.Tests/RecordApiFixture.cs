@@ -13,6 +13,7 @@ using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -25,9 +26,11 @@ namespace Axis.Integration.Tests;
 /// activated, and a compiled release of an application that was never activated. The test
 /// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
-/// holds only undeclared role names, <c>fern</c> and <c>fia</c> hold only grants with a filter or
-/// fields, and <c>dora</c> holds only a data source grant. <see cref="Client"/> is signed in as
-/// <c>anna</c>.
+/// holds only undeclared role names, <c>fia</c> holds only a grant with fields, and <c>dora</c>
+/// holds only a data source grant. <c>fern</c> and <see cref="SqlTextUser"/> hold the record
+/// filters of the <c>filtered</c> role, <c>fred</c> holds only a read filter that is
+/// <c>false</c>, and <c>faye</c> holds a read filter that overflows for some items and one that
+/// matches items of the Finance department. <see cref="Client"/> is signed in as <c>anna</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
 {
@@ -35,6 +38,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
     public const string TenantB = "b";
     public const string HostA = "a.example.test";
     public const string HostB = "b.example.test";
+
+    /// <summary>A user id that holds SQL text, signed in with the <c>filtered</c> role.</summary>
+    public const string SqlTextUser = "x' OR '1'='1";
 
     /// <summary>The header every unsafe request under <c>/api</c> must carry as <c>1</c>.</summary>
     public const string CsrfHeader = "X-Axis-Csrf";
@@ -47,6 +53,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
         ["SELECT", "INSERT", "UPDATE", "DELETE", "entities", "e_", "f_", "uq_", "fk_", "Exception", "   at "];
 
     private readonly PostgreSqlFixture _database = new();
+    private readonly LogCollector _logs = new();
     private readonly Dictionary<string, string> _connectionStrings = [];
     private readonly Dictionary<string, NpgsqlDataSource> _dataSources = [];
     private WebApplicationFactory<Program>? _factory;
@@ -54,6 +61,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
     private ApplicationModel? _model;
 
     public HttpClient Client => _client ?? throw new InvalidOperationException("The test host is not started.");
+
+    /// <summary>Every log entry the server wrote.</summary>
+    internal LogCollector Logs => _logs;
 
     /// <summary>The compiled model of the RecordsApp fixture, the same in both tenants.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
@@ -110,6 +120,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            builder.ConfigureLogging(logging => logging.AddProvider(_logs));
             builder.UseSetting("ConnectionStrings:Platform", ConnectionString(TenantA));
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", ConnectionString(TenantA));
@@ -123,7 +134,10 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 new TestIdentity("uma", "Uma Undeclared", "Employee", "auditor"),
                 new TestIdentity("fern", "Fern Filtered", "filtered"),
                 new TestIdentity("fia", "Fia Fielded", "fielded"),
-                new TestIdentity("dora", "Dora Data Source", "dsonly"));
+                new TestIdentity("dora", "Dora Data Source", "dsonly"),
+                new TestIdentity("fred", "Fred False", "false-only"),
+                new TestIdentity("faye", "Faye Failing", "failing"),
+                new TestIdentity(SqlTextUser, "Mallory", "filtered"));
         });
         _client = _factory.CreateClient().SignedInAs("anna");
     }
@@ -222,6 +236,13 @@ public sealed class RecordApiFixture : IAsyncLifetime
         }
 
         return records;
+    }
+
+    /// <summary>The number of audit records in the database of <paramref name="tenant"/>.</summary>
+    public async Task<long> AuditRecordCountAsync(string tenant)
+    {
+        await using var command = _dataSources[tenant].CreateCommand("SELECT count(*) FROM axis.audit_records");
+        return (long)(await command.ExecuteScalarAsync())!;
     }
 
     /// <summary>The catalog columns of the table of <paramref name="entityName"/> in order, and its row count.</summary>

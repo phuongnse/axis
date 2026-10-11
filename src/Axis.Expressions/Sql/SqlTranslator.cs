@@ -12,7 +12,7 @@ namespace Axis.Expressions.Sql;
 /// docs/reference/expressions.md. It is the only definition of that subset: the compiler calls it
 /// to report what does not translate, and the data source query calls it to build its
 /// <c>WHERE</c> clause. Every literal value becomes a named parameter <c>@f0</c>, <c>@f1</c>, …,
-/// so no value is ever part of the SQL text. Only the literal <c>null</c> is written, as the
+/// or with another prefix the caller gives, so no value is ever part of the SQL text. Only the literal <c>null</c> is written, as the
 /// keyword <c>NULL</c>. <c>currentUser()</c> becomes the named parameter
 /// <see cref="CurrentUserParameter"/>, which is not in the result's parameters. Every operator is wrapped in parentheses, so the SQL keeps the
 /// expression's precedence. A call to a named rule is inlined: the rule's body is rendered with
@@ -34,22 +34,25 @@ public static class SqlTranslator
     /// text of its column. The path is the names as written, so a bare name is a one-item list and
     /// <c>department.name</c> is <c>["department", "name"]</c>. <paramref name="check"/> is the type
     /// checker's result, which says the rule each rule call resolved to. Without it no rule call is
-    /// translated.
+    /// translated. <paramref name="parameterPrefix"/> starts each parameter name, so several
+    /// translations can share one statement with different prefixes.
     /// </summary>
     public static SqlTranslationResult Translate(
         ExpressionNode expression,
         Func<IReadOnlyList<string>, string> column,
-        ExpressionCheckResult? check = null)
+        ExpressionCheckResult? check = null,
+        string parameterPrefix = "f")
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(column);
+        ArgumentException.ThrowIfNullOrEmpty(parameterPrefix);
 
         var ruleCalls = check?.RuleCalls ?? new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
         var parameters = new List<SqlValue>();
         try
         {
             InlinedSize.Check(expression, ruleCalls);
-            var sql = new Translation(column, parameters, ruleCalls).Render(expression);
+            var sql = new Translation(column, parameters, ruleCalls, parameterPrefix).Render(expression);
             return new SqlTranslationResult(sql, parameters, null);
         }
         catch (TranslationFailure failure)
@@ -61,7 +64,8 @@ public static class SqlTranslator
     private sealed class Translation(
         Func<IReadOnlyList<string>, string> column,
         List<SqlValue> parameters,
-        IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls)
+        IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls,
+        string parameterPrefix)
     {
         /// <summary>The rule calls of the expression being rendered: the filter's, or the body's inside a rule.</summary>
         private IReadOnlyDictionary<CallNode, ExpressionRule> _ruleCalls = ruleCalls;
@@ -275,7 +279,7 @@ public static class SqlTranslator
 
         private string Parameter(ExpressionTypeKind kind, object value)
         {
-            var name = "f" + parameters.Count.ToString(CultureInfo.InvariantCulture);
+            var name = parameterPrefix + parameters.Count.ToString(CultureInfo.InvariantCulture);
             parameters.Add(new SqlValue(name, kind, value));
             return "@" + name;
         }

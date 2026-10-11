@@ -7,7 +7,8 @@ diagnostics and the length, depth and node limits are built in
 bare field names, every operator, every [function](#functions) and the
 [aggregates](#aggregates), and the translation of the [SQL subset](#sql-subset).
 The one exception is [`currentUser()`](#current-user): the type checker and the
-SQL translation take it, but the interpreter does not evaluate it yet. Sections
+SQL translation take it, and the record API binds its `@currentUser`
+parameter, but the interpreter does not evaluate it. Sections
 marked *(planned for Mx)* are not built yet. Entity
 [validations](configuration.md#entity-logic) and
 [computed fields](configuration.md#entity-logic) are resource file uses: the
@@ -23,8 +24,8 @@ are type-checked by the compiler too, can call named rules and can follow
 paths through reference fields. The data module can evaluate them against a
 stored record. The start endpoint runs the start condition, and the worker runs
 each decision `when`. A [policy](configuration.md#roles-and-policies)
-filter is type-checked and translated by the compiler too, but nothing runs it
-yet *(planned for M4)*. Other uses come with the issues that build
+filter is type-checked and translated by the compiler too, and the record API
+runs it as SQL. Other uses come with the issues that build
 them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
@@ -40,7 +41,7 @@ ends:
   server process.
 - **SQL translation.** It turns an expression into a `WHERE` condition for a
   data source filter. The compiler also translates each policy filter, and
-  running it as a `WHERE` condition is *(planned for M4)*. Only a subset of
+  the record API runs each one as a `WHERE` condition. Only a subset of
   the language translates. See
   [SQL subset](#sql-subset).
 
@@ -303,11 +304,11 @@ Paths in validations and computed fields are not built. There a path is
   fields, paths through reference fields of up to 3 hops, the named rules and
   [`currentUser()`](#current-user). The compiler type-checks it as a boolean
   and translates it to SQL. It must stay inside the [SQL subset](#sql-subset),
-  because record lists and data sources will run it as SQL and a single
-  record will run it in the interpreter *(planned for M4)*. So it cannot use
-  an aggregate or `lower`, which are `AXC0053`. A rule body cannot call
-  `currentUser()`, so a filter passes the user id to a rule as an argument,
-  such as `IsRequester(requester, currentUser())`.
+  because record lists and single-record checks run it as SQL, and
+  [data sources](data-sources.md#authorization) will too *(planned for M4)*.
+  So it cannot use an aggregate or `lower`, which are `AXC0053`. A rule body
+  cannot call `currentUser()`, so a filter passes the user id to a rule as an
+  argument, such as `IsRequester(requester, currentUser())`.
 - **Scope in a process expression.** A `startCondition` and a decision
   `when` see the subject record's fields, computed ones included, its child
   collections through aggregates, the named rules, and paths through
@@ -379,8 +380,10 @@ because no conversion is implicit except integer to decimal.
 ### Current user
 
 It follows [D24](../decisions.md#d24-roles-and-policies--agreed). The type
-check and the SQL translation are built. Evaluating it, in the interpreter and
-by binding the SQL parameter, is *(planned for M4)*.
+check, the SQL translation and binding the `@currentUser` parameter are built:
+the record API binds it when it runs a policy filter. The interpreter does not
+evaluate it, and that is not planned for M4, because every policy filter runs
+as SQL.
 
 `currentUser()` gives the signed-in user's id as `text`, as the
 [session](../architecture.md#sign-in-and-the-session) holds it. A policy

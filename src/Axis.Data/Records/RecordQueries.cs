@@ -26,15 +26,20 @@ public static class RecordQueries
     /// sort field and then by id ascending, or by id alone without a sort, and counts the records
     /// that match. A page past the last one has no items. A non-empty <paramref name="search"/>
     /// keeps only the records whose display field contains it, ignoring case, with no wildcard
-    /// characters; the text is a parameter. An entity without a display field ignores it.
+    /// characters; the text is a parameter. An entity without a display field ignores it. A
+    /// <paramref name="condition"/>, such as the user's read filters, keeps only the records that
+    /// match it, in both the page and the count. Returns <see langword="null"/> when the database
+    /// rejects the condition for these records with a data exception (SQLSTATE class 22), such as
+    /// an integer overflow. Any other database error is thrown.
     /// </summary>
-    public static async Task<RecordPage> ListAsync(
+    public static async Task<RecordPage?> ListAsync(
         NpgsqlConnection connection,
         EntityModel entity,
         int page,
         int pageSize,
         RecordSort? sort,
         string? search,
+        RecordCondition? condition = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -45,43 +50,62 @@ public static class RecordQueries
         var table = Table(entity);
         var row = EntityNaming.Quote(RowAlias);
         var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
-        var where = filtered
-            ? $" WHERE strpos(lower({row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}), lower(@search)) > 0"
-            : "";
-        long totalCount;
-        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
-        {
-            if (filtered)
-            {
-                count.Parameters.Add(SearchParameter(search!));
-            }
-
-            totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
-        }
-
-        var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
-        var order = sort is null
-            ? $"{id} ASC"
-            : $"{row}.{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
-        await using var command = new NpgsqlCommand(
-            $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
-            connection);
+        var conditions = new List<string>();
         if (filtered)
         {
-            command.Parameters.Add(SearchParameter(search!));
+            conditions.Add($"strpos(lower({row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}), lower(@search)) > 0");
         }
 
-        command.Parameters.AddWithValue("limit", pageSize);
-        command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
-
-        var items = new List<Record>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        if (condition is not null)
         {
-            items.Add(ReadRecord(reader, entity));
+            conditions.Add(condition.Sql);
         }
 
-        return new RecordPage(items, totalCount);
+        var where = conditions.Count > 0 ? $" WHERE {string.Join(" AND ", conditions)}" : "";
+        try
+        {
+            long totalCount;
+            await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
+            {
+                if (filtered)
+                {
+                    count.Parameters.Add(SearchParameter(search!));
+                }
+
+                condition?.AddTo(count);
+                totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+            }
+
+            var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
+            var order = sort is null
+                ? $"{id} ASC"
+                : $"{row}.{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
+            await using var command = new NpgsqlCommand(
+                $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
+                connection);
+            if (filtered)
+            {
+                command.Parameters.Add(SearchParameter(search!));
+            }
+
+            condition?.AddTo(command);
+            command.Parameters.AddWithValue("limit", pageSize);
+            command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
+
+            var items = new List<Record>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(ReadRecord(reader, entity));
+            }
+
+            return new RecordPage(items, totalCount);
+        }
+        catch (PostgresException exception) when (condition is not null && exception.SqlState.StartsWith("22", StringComparison.Ordinal))
+        {
+            // Class 22 is a data exception: the condition could not be evaluated for some record.
+            return null;
+        }
     }
 
     private static NpgsqlParameter SearchParameter(string search) =>

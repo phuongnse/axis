@@ -1,0 +1,10 @@
+{
+  "id": "f4b2c6d1-3e8a-4a57-9c0e-6d1b2a7f8e31",
+  "kind": "policy",
+  "name": "FalseOnlyAccess",
+  "formatVersion": 1,
+  "roles": ["false-only"],
+  "grants": [
+    { "entity": "Item", "actions": ["read"], "filter": "false" }
+  ]
+}
