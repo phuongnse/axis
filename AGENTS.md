@@ -95,8 +95,8 @@ change the host ports (5206, 5432 and 8080). All three ports are published on `1
 only.
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
-realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `binh`,
-`chau` and `dung`, and the development password is `axis` for each. Under `scripts/dev.sh`,
+realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
+`binh`, `chau` and `dung`, and the development password is `axis` for each. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the

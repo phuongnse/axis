@@ -315,8 +315,8 @@ are marked *(planned for M4)*.
   it does not yet, because the server in its container cannot reach Keycloak
   at the address the browser uses. So under Compose the record API and the
   data source endpoint answer `401`.
-  - It holds the purchase request users with fixed ids: `anna` the
-    employee, `binh` and `chau` the department managers, and `dung` the
+  - It holds the purchase request users with fixed ids: `anna` and `lan`
+    the employees, `binh` and `chau` the department managers, and `dung` the
     finance reviewer. Seed data and E2E journeys already name these ids.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A

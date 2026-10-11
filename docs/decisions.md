@@ -507,7 +507,7 @@ needed is *(planned for M4)*. See
   that only test hosts register. This replaces the test-user part of D21.
 - **Keycloak:** Docker Compose, `scripts/dev.sh` and the E2E run start
   Keycloak with an imported development realm.
-  - The realm holds the purchase request users, an employee, two department
+  - The realm holds the purchase request users, two employees, two department
     managers and a finance reviewer, with a development-only password.
   - It maps their roles to the `roles` claim.
   - It fixes each user's id, so seed data such as a department's manager can
