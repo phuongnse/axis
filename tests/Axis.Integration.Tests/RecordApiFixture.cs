@@ -85,7 +85,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
         await _database.InitializeAsync();
         foreach (var tenant in new[] { TenantA, TenantB })
         {
-            var connectionString = await CreateDatabaseAsync($"records_{tenant}");
+            var connectionString = await _database.CreateDatabaseAsync($"records_{tenant}");
             _connectionStrings[tenant] = connectionString;
             _dataSources[tenant] = NpgsqlDataSource.Create(connectionString);
             await using var configuration = CreateConfigurationContext(connectionString);
@@ -369,14 +369,6 @@ public sealed class RecordApiFixture : IAsyncLifetime
         }
 
         return request;
-    }
-
-    private async Task<string> CreateDatabaseAsync(string name)
-    {
-        await using var dataSource = NpgsqlDataSource.Create(_database.ConnectionString);
-        await using var command = dataSource.CreateCommand($"""CREATE DATABASE "{name}" """);
-        await command.ExecuteNonQueryAsync();
-        return new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Database = name }.ConnectionString;
     }
 
     private static ConfigurationDbContext CreateConfigurationContext(string connectionString) =>

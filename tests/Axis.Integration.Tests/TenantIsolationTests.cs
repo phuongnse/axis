@@ -61,8 +61,8 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
 
     public async ValueTask InitializeAsync()
     {
-        var tenantA = await CreateDatabaseAsync("tenant_a");
-        var tenantB = await CreateDatabaseAsync("tenant_b");
+        var tenantA = await database.CreateDatabaseAsync("tenant_a", CancellationToken);
+        var tenantB = await database.CreateDatabaseAsync("tenant_b", CancellationToken);
 
         // A test host, not Program: the row endpoints exist only here.
         var builder = WebApplication.CreateBuilder();
@@ -113,19 +113,6 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         {
             await _app.DisposeAsync();
         }
-    }
-
-    private async Task<string> CreateDatabaseAsync(string name)
-    {
-        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
-        // CREATE DATABASE cannot run in a transaction block, so each statement is its own command.
-        foreach (var sql in new[] { $"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", $"""CREATE DATABASE "{name}" """ })
-        {
-            await using var command = dataSource.CreateCommand(sql);
-            await command.ExecuteNonQueryAsync(CancellationToken);
-        }
-
-        return new NpgsqlConnectionStringBuilder(database.ConnectionString) { Database = name }.ConnectionString;
     }
 
     private async Task PostAsync(string host, string value)

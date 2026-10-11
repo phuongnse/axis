@@ -219,19 +219,9 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         return new Connections(new TenantConnectionFactory(options, accessor), accessor);
     }
 
-    private async Task<string> CreateTenantDatabaseAsync(string name, bool migrate = true)
+    private async Task<string> CreateTenantDatabaseAsync(string prefix, bool migrate = true)
     {
-        await using (var dataSource = NpgsqlDataSource.Create(database.ConnectionString))
-        {
-            // CREATE DATABASE cannot run in a transaction block, so each statement is its own command.
-            foreach (var sql in new[] { $"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", $"""CREATE DATABASE "{name}" """ })
-            {
-                await using var command = dataSource.CreateCommand(sql);
-                await command.ExecuteNonQueryAsync(CancellationToken);
-            }
-        }
-
-        var connectionString = new NpgsqlConnectionStringBuilder(database.ConnectionString) { Database = name }.ConnectionString;
+        var connectionString = await database.CreateDatabaseAsync(prefix, CancellationToken);
         if (migrate)
         {
             await MigrateAsync(connectionString);

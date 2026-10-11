@@ -54,13 +54,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _database.InitializeAsync();
-        await using (var admin = NpgsqlDataSource.Create(_database.ConnectionString))
-        await using (var create = admin.CreateCommand("""CREATE DATABASE "sample_a" """))
-        {
-            await create.ExecuteNonQueryAsync();
-        }
-
-        _connectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Database = "sample_a" }.ConnectionString;
+        _connectionString = await _database.CreateDatabaseAsync("sample_a");
         _dataSource = NpgsqlDataSource.Create(_connectionString);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

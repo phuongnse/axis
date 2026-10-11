@@ -496,6 +496,14 @@ per run. It starts the first time a test needs it, so a run with no such test
 starts none. It is removed when the run ends. A test class never starts its own
 Keycloak. A test that changes realm state must not use the shared container.
 
+The integration tests also share one PostgreSQL 18 container per run. It starts
+the first time a test needs it, so a run with no such test starts none, and it is
+removed when the run ends. Each test class works in its own new database on that
+server, and every database a fixture creates has a name unique in the run. A
+fixture never starts its own container. Tenant isolation tests still use one
+tenant database per tenant. Tests that read `pg_stat_activity` must filter on
+`current_database()`, so they do not see or end other classes' sessions.
+
 Some doc facts are checked by machine. `scripts/lint.sh` checks every relative
 Markdown link and `#anchor` in the repository. Unit tests in
 `Axis.Configuration.Tests` compare the diagnostic code table and the resource
