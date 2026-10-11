@@ -618,6 +618,11 @@ the next step as usual.
   The item is not retried. A worker that crashes or stops before it commits
   calls no failure callback. Its item is claimed again after the lease
   expires.
+- **Restarts.** A `waiting` instance has no work item, so it needs no running
+  worker. A task decision is accepted while no worker runs: it queues the
+  next step's work item. The next worker to start runs that step. A step that
+  a worker never committed leaves no trace, and the worker that claims it after
+  the lease runs it once.
 - **History.** Every step occurrence records its input, its output, the
   decision taken and any error.
 

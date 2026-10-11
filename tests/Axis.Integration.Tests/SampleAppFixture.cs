@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Net;
+using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Processes.Work;
@@ -7,6 +10,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -15,8 +20,10 @@ namespace Axis.Integration.Tests;
 /// One tenant database, <c>a</c>, served by the real server on host <c>a.example.test</c>. The
 /// server migrates it and activates the purchase request sample through <c>ActivateOnStartup</c>,
 /// so the sample's department seeds are applied as well. The server knows the test users
-/// <c>anna</c>, an employee, and <c>chau</c>, the Operations manager. The fixture also holds the
-/// worker's services for the tenant, with the host never started, so a test runs the work items itself.
+/// <c>anna</c>, an employee, <c>chau</c>, the Operations manager, and <c>dung</c>, a finance
+/// reviewer. The fixture also holds the worker's services for the tenant, with the host never
+/// started, so a test runs the work items itself. A test can instead start real worker hosts with
+/// <see cref="StartWorkerAsync"/>, and stop them to stand for a worker that is down.
 /// </summary>
 public sealed class SampleAppFixture : IAsyncLifetime
 {
@@ -28,6 +35,8 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public static readonly Guid Operations = Guid.Parse("2cec287b-4f8a-4ac4-a38c-08214a1846ae");
 
     private static readonly string _appFolder = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
+
+    private const string App = "/api/apps/PurchaseRequests";
 
     private static readonly TimeSpan _lease = TimeSpan.FromSeconds(30);
 
@@ -65,6 +74,9 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting("TestUsers:1:Id", "chau");
             builder.UseSetting("TestUsers:1:DisplayName", "Chau Operations Manager");
             builder.UseSetting("TestUsers:1:Roles:0", "department-manager");
+            builder.UseSetting("TestUsers:2:Id", "dung");
+            builder.UseSetting("TestUsers:2:DisplayName", "Dung Finance Reviewer");
+            builder.UseSetting("TestUsers:2:Roles:0", "finance-reviewer");
         });
 
         // Creating a client starts the server, which migrates the database and activates the sample first.
@@ -109,6 +121,106 @@ public sealed class SampleAppFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Starts a worker host for the tenant, with a two second lease, that logs to <paramref name="logs"/>.
+    /// The caller stops and disposes it.
+    /// </summary>
+    internal async Task<IHost> StartWorkerAsync(LogCollector logs)
+    {
+        var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:LeaseDuration"] = "00:00:02",
+            [$"Tenants:{Tenant}:Hosts:0"] = Host,
+            [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
+        });
+        builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(logs);
+        builder.Services.AddAxisWorker(builder.Configuration);
+        var host = builder.Build();
+        await host.StartAsync(CancellationToken);
+        return host;
+    }
+
+    /// <summary>A new client of the server signed in as the test user <paramref name="user"/>. The caller disposes it.</summary>
+    public async Task<HttpClient> SignInAsync(string user)
+    {
+        var client = CreateClient();
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/test-users/sign-in", $$"""{ "id": "{{user}}" }""");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return client;
+    }
+
+    /// <summary>Creates a draft Operations request with one line item of <paramref name="unitPrice"/>, and returns its id.</summary>
+    public static async Task<Guid> CreateRequestAsync(HttpClient client, decimal unitPrice)
+    {
+        using var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            $"{App}/entities/PurchaseRequest/records",
+            $$"""
+            {
+              "values": {
+                "title": "Request {{Guid.NewGuid():N}}",
+                "status": "draft",
+                "department": "{{Operations:D}}",
+                "lineItems": [{ "description": "Desk", "quantity": 1, "unitPrice": {{unitPrice.ToString(CultureInfo.InvariantCulture)}} }]
+              }
+            }
+            """);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return await ReadIdAsync(response);
+    }
+
+    /// <summary>Starts the approval process for the request <paramref name="subjectId"/>, and returns the instance id.</summary>
+    public static async Task<Guid> StartAsync(HttpClient client, Guid subjectId)
+    {
+        using var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            $"{App}/processes/PurchaseRequestApproval/instances",
+            $$"""{ "subjectId": "{{subjectId:D}}" }""");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return await ReadIdAsync(response);
+    }
+
+    /// <summary>Completes the task <paramref name="taskId"/> with the JSON <paramref name="body"/>. The caller disposes the response.</summary>
+    public static Task<HttpResponseMessage> CompleteAsync(HttpClient client, Guid taskId, string body) =>
+        SendAsync(client, HttpMethod.Post, $"{App}/tasks/{taskId:D}/complete", body);
+
+    /// <summary>Runs <paramref name="sql"/> on the tenant database, a <c>SELECT count(*)</c>, with the named parameters.</summary>
+    public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters) =>
+        (long)(await ScalarAsync(sql, parameters))!;
+
+    /// <summary>Runs <paramref name="sql"/> on the tenant database with the named parameters, and returns the first column of the first row.</summary>
+    public async Task<object?> ScalarAsync(string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = (_dataSource ?? throw new InvalidOperationException("The fixture is not initialized.")).CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        var result = await command.ExecuteScalarAsync(CancellationToken);
+        return result is DBNull ? null : result;
+    }
+
+    /// <summary>Opens a new connection to the tenant database. The caller disposes it.</summary>
+    public ValueTask<NpgsqlConnection> OpenConnectionAsync() =>
+        (_dataSource ?? throw new InvalidOperationException("The fixture is not initialized.")).OpenConnectionAsync(CancellationToken);
+
+    /// <summary>Waits until <paramref name="condition"/> holds, for at most 30 seconds.</summary>
+    public static async Task WaitUntilAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (!await condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 30 seconds.");
+            await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken);
+        }
+    }
+
     /// <summary>The id of the sample's active release in the tenant.</summary>
     public async Task<Guid> ActiveReleaseIdAsync(CancellationToken cancellationToken)
     {
@@ -133,6 +245,20 @@ public sealed class SampleAppFixture : IAsyncLifetime
         }
 
         return rows;
+    }
+
+    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, string body)
+    {
+        using var request = RecordApiFixture.Request(method, path, Host, body);
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static async Task<Guid> ReadIdAsync(HttpResponseMessage response)
+    {
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return body.RootElement.GetProperty("id").GetGuid();
     }
 }
 

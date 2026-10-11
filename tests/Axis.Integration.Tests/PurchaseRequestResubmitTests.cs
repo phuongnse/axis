@@ -18,9 +18,9 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_returned_request_keeps_its_ended_instance_and_a_resubmission_starts_a_new_one_on_the_active_release()
     {
-        using var anna = await SignInAsync("anna");
-        using var chau = await SignInAsync("chau");
-        var subject = await CreateRequestAsync(anna);
+        using var anna = await fixture.SignInAsync("anna");
+        using var chau = await fixture.SignInAsync("chau");
+        var subject = await CreateRequestAsync(anna, 500);
         using (var started = await StartAsync(anna, subject))
         {
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
@@ -70,9 +70,9 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_rejected_request_fails_the_start_condition_and_no_instance_is_created()
     {
-        using var anna = await SignInAsync("anna");
-        using var chau = await SignInAsync("chau");
-        var subject = await CreateRequestAsync(anna);
+        using var anna = await fixture.SignInAsync("anna");
+        using var chau = await fixture.SignInAsync("chau");
+        var subject = await CreateRequestAsync(anna, 500);
         using (var started = await StartAsync(anna, subject))
         {
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
@@ -90,27 +90,6 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
         Assert.Equal(["purchaseRequest.cannotSubmit"], errors.GetProperty("/subjectId").EnumerateArray().Select(error => error.GetString()));
         var instance = Assert.Single(await fixture.InstancesAsync(subject));
         Assert.Equal(ProcessStarts.Completed, instance.State);
-    }
-
-    /// <summary>Creates a draft Operations request with one line item, and returns its id.</summary>
-    private static async Task<Guid> CreateRequestAsync(HttpClient client)
-    {
-        using var response = await SendAsync(
-            client,
-            HttpMethod.Post,
-            Records,
-            $$"""
-            {
-              "values": {
-                "title": "Request {{Guid.NewGuid():N}}",
-                "status": "draft",
-                "department": "{{Operations:D}}",
-                "lineItems": [{ "description": "Desk", "quantity": 1, "unitPrice": 500 }]
-              }
-            }
-            """);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await ReadJsonAsync(response)).RootElement.GetProperty("id").GetGuid();
     }
 
     /// <summary>Completes the one open task of <paramref name="subject"/> with <paramref name="outcome"/>, then runs the worker.</summary>
@@ -145,14 +124,6 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
 
     private static Task<HttpResponseMessage> StartAsync(HttpClient client, Guid subject) =>
         SendAsync(client, HttpMethod.Post, Instances, $$"""{ "subjectId": "{{subject:D}}" }""");
-
-    private async Task<HttpClient> SignInAsync(string user)
-    {
-        var client = fixture.CreateClient();
-        using var response = await SendAsync(client, HttpMethod.Post, "/api/test-users/sign-in", $$"""{ "id": "{{user}}" }""");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return client;
-    }
 
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, string? body = null)
     {

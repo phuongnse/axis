@@ -2,8 +2,9 @@
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 # The server starts with two applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
-# The worker runs against the same database while Playwright runs. The run fails if it exits
-# early or never finds the tenant database migrated.
+# The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
+# can restart it: it writes the restart file, then stops the worker process. The run fails if the
+# worker exits without a restart request, or never finds the tenant database migrated.
 # A Compose smoke test then builds the image and runs the stack on free ports. It is skipped
 # when $NEXKIT_BASE_SHA shows that nothing it covers changed.
 set -euo pipefail
@@ -15,9 +16,23 @@ container="axis-e2e-postgres-$$"
 password="e2e-$RANDOM$RANDOM"
 
 worker_pid=""
+worker_dir="$(mktemp -d)"
+export AXIS_E2E_WORKER_PID_FILE="$worker_dir/worker.pid"
+export AXIS_E2E_WORKER_RESTART_FILE="$worker_dir/restart"
+
+# stop_worker: stops the restart loop first, so it starts no new worker, then the worker itself.
+stop_worker() {
+  if [ -n "$worker_pid" ]; then
+    kill "$worker_pid" 2>/dev/null || true
+    if [ -s "$AXIS_E2E_WORKER_PID_FILE" ]; then kill "$(cat "$AXIS_E2E_WORKER_PID_FILE")" 2>/dev/null || true; fi
+    wait "$worker_pid" 2>/dev/null || true
+    worker_pid=""
+  fi
+  rm -rf "$worker_dir"
+}
 
 cleanup() {
-  if [ -n "$worker_pid" ]; then kill "$worker_pid" 2>/dev/null || true; fi
+  stop_worker
   docker rm -f "$container" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -58,7 +73,7 @@ scripts/build.sh
 mkdir -p artifacts/logs
 export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
 export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
-AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
+export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
 : >"$AXIS_E2E_SERVER_LOG"
 : >"$AXIS_E2E_WORKER_LOG"
 
@@ -66,9 +81,25 @@ export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis;
 
 # The worker waits until the server, which Playwright starts, has migrated the database. It runs
 # from the built dll, because dotnet run starts a child process that kill would miss.
-DOTNET_ENVIRONMENT=Testing Tenants__default__Hosts__0=127.0.0.1 \
-  Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" \
-  dotnet src/Axis.Worker/bin/Release/net10.0/Axis.Worker.dll >>"$AXIS_E2E_WORKER_LOG" 2>&1 &
+# The loop starts the worker again only when a spec wrote the restart file before it stopped the
+# worker, so a worker that exits on its own still ends the loop and fails the run. Each worker
+# writes its pid to the pid file for the spec to stop. A worker stopped in the middle of a step
+# keeps its claim until the lease runs out, so the lease is 5 seconds instead of 30, and a restart
+# delays the other specs' work only briefly.
+run_worker() {
+  local child
+  while true; do
+    DOTNET_ENVIRONMENT=Testing Tenants__default__Hosts__0=127.0.0.1 \
+      Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
+      dotnet src/Axis.Worker/bin/Release/net10.0/Axis.Worker.dll >>"$AXIS_E2E_WORKER_LOG" 2>&1 &
+    child=$!
+    echo "$child" >"$AXIS_E2E_WORKER_PID_FILE"
+    wait "$child" || true
+    if [ ! -e "$AXIS_E2E_WORKER_RESTART_FILE" ]; then break; fi
+    rm -f "$AXIS_E2E_WORKER_RESTART_FILE"
+  done
+}
+run_worker &
 worker_pid=$!
 
 run_suite playwright tests/e2e npm test --prefix tests/e2e
@@ -76,16 +107,14 @@ playwright_status=$status
 
 worker_failed=0
 if ! kill -0 "$worker_pid" 2>/dev/null; then
-  echo "The Axis worker exited before Playwright finished." >&2
+  echo "The Axis worker exited before Playwright finished, with no restart requested." >&2
   worker_failed=1
 elif ! grep -qF 'Tenant default is ready for work' "$AXIS_E2E_WORKER_LOG"; then
   echo "The Axis worker never found the E2E database migrated." >&2
   worker_failed=1
 fi
 if [ "$worker_failed" -ne 0 ]; then status=1; fi
-kill "$worker_pid" 2>/dev/null || true
-wait "$worker_pid" 2>/dev/null || true
-worker_pid=""
+stop_worker
 
 # print_log TITLE FILE
 print_log() {

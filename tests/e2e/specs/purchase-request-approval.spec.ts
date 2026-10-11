@@ -1,3 +1,4 @@
+import { readFileSync, writeFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
@@ -46,6 +47,17 @@ async function submit(page: Page, id: string, title: string) {
   await expect(page.getByTestId('form-started')).toBeVisible()
 }
 
+/** Opens My tasks until it lists a task for the request titled `title`, and returns its row. */
+async function waitForTask(page: Page, title: string) {
+  const row = page.getByRole('row', { name: new RegExp(title) })
+  // The worker creates the task some time after the start or the previous decision.
+  await expect(async () => {
+    await page.goto('/purchasing/mytasks?pageSize=100')
+    await expect(row).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: 30_000 })
+  return row
+}
+
 /**
  * Opens the task named `task` for the request titled `title` from My tasks, and decides it with
  * `outcome` and an optional comment.
@@ -57,12 +69,7 @@ async function decide(
   outcome: 'Approve' | 'Return' | 'Reject',
   comment?: string,
 ) {
-  const row = page.getByRole('row', { name: new RegExp(title) })
-  // The worker creates the task some time after the start or the previous decision.
-  await expect(async () => {
-    await page.goto('/purchasing/mytasks?pageSize=100')
-    await expect(row).toBeVisible({ timeout: 1_000 })
-  }).toPass({ timeout: 30_000 })
+  const row = await waitForTask(page, title)
   await row.getByRole('link', { name: task }).click()
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
   if (comment !== undefined) {
@@ -70,6 +77,32 @@ async function decide(
   }
   await page.getByRole('button', { name: outcome }).click()
   await expect(page).toHaveURL(/\/purchasing\/mytasks$/)
+}
+
+/** The value of the environment variable `name`, which scripts/e2e.sh sets. */
+function env(name: string) {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`${name} is not set. Run the E2E tests with scripts/e2e.sh.`)
+  }
+  return value
+}
+
+/**
+ * Stops the E2E worker process and waits until scripts/e2e.sh has started another one and it is
+ * ready for work. The restart file tells the script that the stop is asked for.
+ */
+async function restartWorker() {
+  const log = env('AXIS_E2E_WORKER_LOG')
+  const pidFile = env('AXIS_E2E_WORKER_PID_FILE')
+  const restartFile = env('AXIS_E2E_WORKER_RESTART_FILE')
+  const readyCount = () => readFileSync(log, 'utf8').split('Tenant default is ready for work').length - 1
+  const before = readyCount()
+  const pid = Number(readFileSync(pidFile, 'utf8').trim())
+  writeFileSync(restartFile, '')
+  process.kill(pid, 'SIGTERM')
+  await expect.poll(readyCount, { timeout: 60_000 }).toBeGreaterThan(before)
+  expect(Number(readFileSync(pidFile, 'utf8').trim())).not.toBe(pid)
 }
 
 /** The value the Status select shows. */
@@ -191,4 +224,17 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   expect(tasks.status()).toBe(200)
   const { items } = (await tasks.json()) as { items: { subject: { id: string } }[] }
   expect(items.filter((item) => item.subject.id === id)).toEqual([])
+})
+
+test('a request waiting for the manager is approved after the worker restarts', async ({ page }) => {
+  await signIn(page, 'anna')
+  const { title, id } = await createRequest(page, 'Restart', 500)
+  await submit(page, id, title)
+
+  await signIn(page, 'chau')
+  await waitForTask(page, title)
+  await restartWorker()
+  await decide(page, title, 'Manager approval', 'Approve')
+
+  await expectStatus(page, id, 'approved')
 })
