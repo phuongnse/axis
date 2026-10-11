@@ -15,7 +15,7 @@ namespace Axis.Integration.Tests;
 /// session it leaves. Tenant a is served at localhost and tenant b at b.example.test, and both sign
 /// in at the same realm. The test drives Keycloak's login form as a browser would.
 /// </summary>
-public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixture<KeycloakFixture>, IAsyncLifetime
+public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
     // Port 1 on loopback refuses connections immediately. No test here touches a database.
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
@@ -25,9 +25,12 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
     private static readonly Uri _serverAddress = new("http://localhost:5206");
 
     private readonly List<string> _serverResponses = [];
+    private Uri? _authority;
     private WebApplicationFactory<Program>? _factory;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
+    private Uri Authority => _authority ?? throw new InvalidOperationException("The test host is not started.");
 
     private WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
 
@@ -117,7 +120,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
         Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
         using var body = JsonDocument.Parse(await signOut.Content.ReadAsStringAsync(CancellationToken));
         var signOutUrl = body.RootElement.GetProperty("signOutUrl").GetString();
-        Assert.StartsWith($"{keycloak.Authority}/protocol/openid-connect/logout?", signOutUrl, StringComparison.Ordinal);
+        Assert.StartsWith($"{Authority}/protocol/openid-connect/logout?", signOutUrl, StringComparison.Ordinal);
         Assert.Contains("client_id=axis", signOutUrl, StringComparison.Ordinal);
         Assert.Contains($"post_logout_redirect_uri={Uri.EscapeDataString("http://localhost:5206/")}", signOutUrl, StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
@@ -138,9 +141,10 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
     }
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        var authority = keycloak.Authority.ToString();
+        _authority = await keycloak.StartAsync();
+        var authority = _authority.ToString();
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -152,7 +156,6 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
             UseKeycloak(builder, "a", authority);
             UseKeycloak(builder, "b", authority);
         });
-        return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
@@ -188,7 +191,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
         var challenge = await SendAsync(client, HttpMethod.Get, path);
         Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
         var authorize = challenge.Headers.Location!;
-        Assert.StartsWith($"{keycloak.Authority}/protocol/openid-connect/auth?", authorize.AbsoluteUri, StringComparison.Ordinal);
+        Assert.StartsWith($"{Authority}/protocol/openid-connect/auth?", authorize.AbsoluteUri, StringComparison.Ordinal);
         Assert.Contains("code_challenge=", authorize.Query, StringComparison.Ordinal);
         Assert.Contains("code_challenge_method=S256", authorize.Query, StringComparison.Ordinal);
 
