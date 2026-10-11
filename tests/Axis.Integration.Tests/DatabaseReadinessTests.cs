@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Npgsql;
@@ -28,6 +29,7 @@ public sealed class DatabaseReadinessTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("ConnectionStrings:Platform", database.ConnectionString);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", database.ConnectionString);
+            builder.UseTestOidc("default");
         });
         using var client = factory.CreateClient();
 

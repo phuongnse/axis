@@ -6,6 +6,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data.Naming;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -361,6 +362,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("Tenants:a:ConnectionString", a);
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", b);
+            builder.UseTestOidc("a", "b");
             if (folder is not null)
             {
                 builder.UseSetting("ActivateOnStartup:0", folder);

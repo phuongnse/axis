@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Axis.Server.Tenancy;
+using Axis.Server.Tests;
 using Axis.Tenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -48,6 +49,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
             builder.UseSetting("ConnectionStrings:Platform", database.ConnectionString);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", database.ConnectionString);
+            builder.UseTestOidc("default");
         });
         using var client = factory.CreateClient();
         using var request = Request(HttpMethod.Get, "/health/ready", "unknown.example");

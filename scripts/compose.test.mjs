@@ -77,7 +77,7 @@ test('the stack runs from source', { timeout }, async () => {
   assert.equal(records.status, 200)
   assert.ok(Array.isArray((await records.json()).items))
 
-  // Keycloak serves the development realm. The server does not use it yet.
+  // Keycloak serves the development realm. Sign-in through Compose is not wired yet.
   const discovery = await fetch(`${keycloakUrl}/realms/axis/.well-known/openid-configuration`)
   assert.equal(discovery.status, 200)
   assert.match((await discovery.json()).issuer, /\/realms\/axis$/)

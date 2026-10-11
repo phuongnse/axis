@@ -6,6 +6,7 @@ using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +76,7 @@ public sealed class ProcessStartFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", _connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host);
             builder.UseSetting("Tenants:a:ConnectionString", _connectionString);
+            builder.UseTestOidc("a");
             builder.UseSetting("TestUsers:0:Id", "anna");
             builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");
         });

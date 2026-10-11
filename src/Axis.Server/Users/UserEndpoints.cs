@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -7,11 +8,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 namespace Axis.Server.Users;
 
 /// <summary>
-/// The current user, the list of development test users, and their sign-in endpoints. The list is
-/// mapped in every environment and answers a 404 problem where test users are not allowed, so the
-/// request does not reach the SPA fallback. The sign-in cookie
-/// holds a signed ticket with the user id. The name and roles are read from the configured list on
-/// every request, so an id that is no longer configured is nobody signed in.
+/// The current user, from the session or else the signed-in test user, the list of development
+/// test users, and their sign-in endpoints. The list is mapped in every environment and answers a
+/// 404 problem where test users are not allowed, so the request does not reach the SPA fallback.
+/// The test-user sign-in cookie holds a signed ticket with the user id. The name and roles are read
+/// from the configured list on every request, so an id that is no longer configured is nobody
+/// signed in.
 /// A sign-in body is checked in order: content type (415), then body (400), then the id (400). The
 /// problem titles never contain text from the request.
 /// </summary>
@@ -19,7 +21,7 @@ internal static class UserEndpoints
 {
     public static void MapUserEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/me", GetCurrentUser);
+        endpoints.MapGet("/api/me", GetCurrentUserAsync);
         endpoints.MapGet("/api/test-users", GetTestUsers);
     }
 
@@ -30,10 +32,19 @@ internal static class UserEndpoints
         testUsers.MapPost("/sign-out", SignOutAsync);
     }
 
-    private static IResult GetCurrentUser(HttpContext httpContext, TestUserDirectory directory) =>
-        directory.FindSignedIn(httpContext.User) is { } id && directory.Find(id) is { } user
+    // The session comes first. Without one, the signed-in test user still counts.
+    private static async Task<IResult> GetCurrentUserAsync(HttpContext httpContext, TestUserDirectory directory)
+    {
+        var session = await httpContext.AuthenticateAsync(Session.Scheme);
+        if (session.Succeeded && Session.Read(session.Principal) is { } sessionUser)
+        {
+            return Results.Ok(sessionUser);
+        }
+
+        return directory.FindSignedIn(httpContext.User) is { } id && directory.Find(id) is { } user
             ? Results.Ok(ToResponse(user))
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
+    }
 
     private static IResult GetTestUsers(TestUserDirectory directory) =>
         directory.Enabled

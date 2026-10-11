@@ -397,8 +397,9 @@ record history are built.
   [architecture](architecture.md#development-test-users).
   [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed) replaces this
   bullet and the test-user part of **Current user** in M4.
-- **Current user:** `GET /api/me` returns the signed-in test user, or `401`
-  when there is none. Before M4, record writes stay open with no signed-in
+- **Current user:** `GET /api/me` returns the session user from
+  [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed), or else the
+  signed-in test user, or `401` when there is neither. Before M4, record writes stay open with no signed-in
   user, and the actor is then `anonymous`.
 - **Audit records:** rows in `axis.audit_records` are append-only.
   - Each one commits in the same transaction as its action.
@@ -471,7 +472,10 @@ first, and everything that does need one waits for a single rule.
 ## D23. Sign-in through OIDC and the BFF session — Agreed
 
 M4 replaces the test users with real sign-in through each tenant's identity
-provider. Everything below is *(planned for M4)*. See
+provider. The flow, the identity provider per tenant, the endpoints, the
+session, its tenant binding, the roles, the current user and Keycloak are in
+place. Sign-in needed, CSRF, the removal of test users and the audit actor are
+*(planned for M4)*. See
 [architecture](architecture.md#sign-in-and-the-session) for the details.
 
 - **Flow:** OIDC authorization code flow with PKCE. The server is the

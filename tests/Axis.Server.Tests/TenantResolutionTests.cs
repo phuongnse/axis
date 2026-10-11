@@ -40,7 +40,7 @@ public sealed class TenantResolutionTests
     [MemberData(nameof(InvalidTenants))]
     public async Task Startup_fails_with_a_message_naming_the_tenant_configuration_problem(string[] settings, string problem)
     {
-        await using var factory = CreateFactory(settings);
+        await using var factory = CreateFactory(settings, withOidc: false);
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
@@ -110,11 +110,17 @@ public sealed class TenantResolutionTests
         return request;
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string[] settings) =>
+    // An invalid tenant configuration stops startup before the Oidc blocks are read.
+    private static WebApplicationFactory<Program> CreateFactory(string[] settings, bool withOidc = true) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            if (withOidc)
+            {
+                builder.UseTestOidc("default");
+            }
+
             foreach (var setting in settings)
             {
                 var separator = setting.IndexOf('=', StringComparison.Ordinal);

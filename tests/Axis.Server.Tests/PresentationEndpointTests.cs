@@ -119,6 +119,7 @@ public sealed class PresentationEndpointTests
             builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseTestOidc("default");
         });
 
     private sealed record SiteBody(string Name, string TitleKey, LocalesBody Locales, List<NavigationBody> Navigation);

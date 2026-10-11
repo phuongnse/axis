@@ -1,6 +1,7 @@
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
 using Axis.Server.Applications;
+using Axis.Server.Authentication;
 using Axis.Server.DataSources;
 using Axis.Server.Health;
 using Axis.Server.Presentation;
@@ -10,6 +11,7 @@ using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,33 +28,49 @@ builder.Services.AddHealthChecks()
 builder.Services.AddProblemDetails();
 builder.Services.AddTenancy(builder.Configuration);
 
+// Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
+var oidcTenants = TenantOidcSettings.Load(builder.Configuration);
+
 // Fails startup when test users are configured outside Development and Testing. The directory is
 // registered in every environment, because GET /api/me reads it.
 var testUsers = TestUserDirectory.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(testUsers);
+
+// The development, E2E and test servers run over http, where a Secure cookie never comes back.
+var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");
+var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+builder.Services.TryAddSingleton(TimeProvider.System);
+
+// The test-user cookie stays the default while test users are enabled, so record writes,
+// process starts and tasks keep taking their actor from it.
+var authentication = builder.Services.AddAuthentication(
+    testUsers.Enabled ? CookieAuthenticationDefaults.AuthenticationScheme : Session.Scheme);
 if (testUsers.Enabled)
 {
-    builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-        .AddCookie(options =>
+    authentication.AddCookie(options =>
+    {
+        options.Cookie.Name = "Axis.TestUser";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        // The development and E2E servers run over http.
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        // An API answers with a status code, never a redirect to a sign-in page.
+        options.Events.OnRedirectToLogin = context =>
         {
-            options.Cookie.Name = "Axis.TestUser";
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SameSite = SameSiteMode.Strict;
-            // The development and E2E servers run over http.
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            // An API answers with a status code, never a redirect to a sign-in page.
-            options.Events.OnRedirectToLogin = context =>
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return Task.CompletedTask;
-            };
-            options.Events.OnRedirectToAccessDenied = context =>
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                return Task.CompletedTask;
-            };
-        });
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
 }
+
+authentication
+    .AddSession(sessionCookiePolicy)
+    .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed);
 
 // Off unless folders are listed, which is the Production default.
 var startupFolders = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
@@ -74,12 +92,10 @@ var app = builder.Build();
 // Outermost, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
 
-// Then tenant resolution, so API and SPA paths alike need a known tenant host.
+// Then tenant resolution, so API and SPA paths alike need a known tenant host, and a session is
+// checked against the resolved tenant.
 app.UseTenantResolution();
-if (testUsers.Enabled)
-{
-    app.UseAuthentication();
-}
+app.UseAuthentication();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -91,6 +107,7 @@ app.MapProcessEndpoints();
 app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
 app.MapUserEndpoints();
+app.MapAuthEndpoints();
 
 // The sign-in endpoints exist only in Development and Testing. The test user list answers 404 elsewhere.
 if (testUsers.Enabled)

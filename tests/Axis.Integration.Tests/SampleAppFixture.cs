@@ -4,6 +4,7 @@ using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Processes.Work;
+using Axis.Server.Tests;
 using Axis.Worker;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -67,6 +68,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", _connectionString);
             builder.UseSetting($"Tenants:{Tenant}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{Tenant}:ConnectionString", _connectionString);
+            builder.UseTestOidc(Tenant);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
             builder.UseSetting("TestUsers:0:Id", "anna");
             builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");

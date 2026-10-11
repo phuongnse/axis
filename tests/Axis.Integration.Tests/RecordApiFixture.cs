@@ -9,6 +9,7 @@ using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -107,6 +108,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:ConnectionString", ConnectionString(TenantA));
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", ConnectionString(TenantB));
+            builder.UseTestOidc("a", "b");
             builder.UseSetting("TestUsers:0:Id", "anna");
             builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");
             builder.UseSetting("TestUsers:0:Roles:0", "employee");
