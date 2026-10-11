@@ -301,7 +301,9 @@ One transaction then does the rest:
 
 1. With a key, it stores the receipt first. When the key is taken, it rolls
    back and answers from the stored receipt, or with the `422`.
-2. It reads the subject record, and a missing one is the `400`.
+2. It locks and reads the subject record. A missing one is the `400`. The
+   lock makes the start condition see the latest version, and an edit of the
+   record waits until the start commits or rolls back.
 3. It evaluates the `startCondition` on the record, and a failure is the
    `400`.
 4. It inserts the instance as `running` at revision 1, pinned to the release
