@@ -21,7 +21,7 @@ namespace Axis.Server.Processes;
 /// The endpoint that starts a process instance for one subject record. The instance is pinned to
 /// the release active when the request is resolved. A request is checked in order: application
 /// and process (404), content type (415), body (400), <c>Idempotency-Key</c> (400). Then one
-/// transaction claims the key's receipt, reads the subject record (400), checks the start
+/// transaction claims the key's receipt, locks and reads the subject record (400), checks the start
 /// condition (400), inserts the instance (409) and its first work item, and appends the audit
 /// record <c>process.started</c>. A repeat with a claimed key returns the stored response, or 422
 /// for another record. A start that fails writes nothing. The problem titles never contain text
@@ -109,7 +109,10 @@ internal static class ProcessStartEndpoints
                     title: "This Idempotency-Key was used with a different subject record.");
         }
 
-        if (await RecordQueries.GetAsync(connection, application, entity, subjectId, cancellationToken) is not { } record)
+        // The lock makes the read below and the start condition see the latest version, and a
+        // concurrent write of the record waits until this start commits or rolls back.
+        if (!await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken)
+            || await RecordQueries.GetAsync(connection, application, entity, subjectId, cancellationToken) is not { } record)
         {
             await transaction.RollbackAsync(cancellationToken);
             return SubjectProblem("No record of the process's entity has this id.");

@@ -20,8 +20,8 @@ namespace Axis.Integration.Tests;
 /// One tenant database, <c>a</c>, served by the real server on host <c>a.example.test</c>. The
 /// server migrates it and activates the purchase request sample through <c>ActivateOnStartup</c>,
 /// so the sample's department seeds are applied as well. The server knows the test users
-/// <c>anna</c>, an employee, <c>chau</c>, the Operations manager, and <c>dung</c>, a finance
-/// reviewer. The fixture also holds the worker's services for the tenant, with the host never
+/// <c>anna</c>, an employee, <c>chau</c>, the Operations manager, and <c>dung</c> and <c>hoa</c>,
+/// two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
 /// started, so a test runs the work items itself. A test can instead start real worker hosts with
 /// <see cref="StartWorkerAsync"/>, and stop them to stand for a worker that is down.
 /// </summary>
@@ -77,6 +77,9 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting("TestUsers:2:Id", "dung");
             builder.UseSetting("TestUsers:2:DisplayName", "Dung Finance Reviewer");
             builder.UseSetting("TestUsers:2:Roles:0", "finance-reviewer");
+            builder.UseSetting("TestUsers:3:Id", "hoa");
+            builder.UseSetting("TestUsers:3:DisplayName", "Hoa Finance Reviewer");
+            builder.UseSetting("TestUsers:3:Roles:0", "finance-reviewer");
         });
 
         // Creating a client starts the server, which migrates the database and activates the sample first.
