@@ -326,9 +326,9 @@ The `role` and `policy` resources and their compile checks are built. For
 the record API and the data source endpoint, so are the session `401`, the
 matching of roles, grants by action and the `403` without a grant. The record
 API also enforces record filters and field lists: reads, writes and their
-failures as described below. Until the data source endpoint adds read filters
-and field checks, an entity grant with a `filter` or a `fields` list grants
-nothing there. So access is never wider than a policy intends. Everything else in this section is *(planned for M4)*. It follows
+failures as described below. The data source endpoint adds the root entity's
+read filters to its SQL and checks every projected field. Everything else in
+this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in
@@ -389,7 +389,8 @@ The `role` and `policy` resource files are described in
 - **Data sources.** A data source needs a `read` grant on it and a `read`
   grant on its root entity. The root entity's read filters are added to the
   data source's own filter in SQL. A data source that projects or aggregates
-  a field the user may not read is a `403` as a whole. See
+  a field the user may not read is a `403` as a whole. For a path through
+  `reference` fields, every field along the path must be readable. See
   [data sources](reference/data-sources.md#authorization).
 - **Processes and tasks.** A process start needs a `start` grant on the
   process and read access to the subject record. The task assignee check
@@ -408,7 +409,8 @@ The `role` and `policy` resource files are described in
   and an action. It answers allow or deny, the read filters to add, and the
   readable and writable field sets. Today it answers allow or deny for an
   entity or a data source, and the record filters and the field set of an
-  entity and an action. The record API and the data source endpoint call it.
+  entity and an action. The record API and the data source endpoint call it,
+  and both apply the record filters and the field sets it answers.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 

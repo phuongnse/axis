@@ -3,9 +3,10 @@
   "kind": "policy",
   "name": "E2eAccess",
   "formatVersion": 1,
-  "roles": ["employee", "department-manager", "finance-reviewer"],
+  "roles": ["employee", "department-manager"],
   "grants": [
     { "entity": "Note", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Category", "actions": ["read", "create", "update", "delete"] }
+    { "entity": "Category", "actions": ["read", "create", "update", "delete"] },
+    { "dataSource": "NoteRows", "actions": ["read"] }
   ]
 }

@@ -1,0 +1,13 @@
+{
+  "id": "e614a23f-2a52-46d6-b8cc-44101eb5ac7f",
+  "kind": "dataSource",
+  "name": "NoteRows",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "category", "path": "category" }
+  ],
+  "sort": "title",
+  "pageSize": 100
+}

@@ -234,10 +234,11 @@ public sealed class PolicyCompilerTests
         // The grant with a fields list counts, and it has no filter, so it reaches every record.
         Assert.Equal(new RecordAccess(true, null), update);
         Assert.Equal(new RecordAccess(true, null), PolicyEvaluator.Access(model, ["employee"], request, PolicyAction.Delete));
-        Assert.False(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Delete));
 
-        // A filtered grant never reaches every record, so the data source check still refuses it.
-        Assert.False(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Read));
+        // A filtered read grant on the root entity is enough for the data source check, which
+        // leaves the filters to the query.
+        Assert.True(model.TryGetDataSource("RequestList", out var requestList));
+        Assert.True(PolicyEvaluator.AllowsRead(model, ["employee"], requestList));
     }
 
     [Theory]
@@ -271,7 +272,6 @@ public sealed class PolicyCompilerTests
         var access = PolicyEvaluator.Access(model, ["employee"], request, PolicyAction.Read);
 
         Assert.Equal(new RecordAccess(true, null), access);
-        Assert.True(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Read));
     }
 
     [Fact]

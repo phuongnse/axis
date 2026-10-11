@@ -1,8 +1,11 @@
 using System.Globalization;
+using Axis.Configuration.Model;
 using Axis.Data.DataSources;
+using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Server.Applications;
 using Axis.Server.Http;
+using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 
@@ -13,11 +16,15 @@ namespace Axis.Server.DataSources;
 /// is routed. A request is checked in order: session (401), then the path (404), then the user's
 /// grants (403), and only then the query. A request without a session is a 401 before the path is
 /// read. A path that names no active application or data source is a 404. Reading the rows takes
-/// a <c>read</c> grant on the data source and a <c>read</c> grant on its root entity. The paging and sorting rules are those of the record list, except that the default
-/// page size and sort are the data source's own. The data source parameters are read by
-/// <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter is a
-/// 400 problem with a fixed title. The problem titles never contain text from the request, SQL or
-/// storage names.
+/// a <c>read</c> grant on the data source, a <c>read</c> grant on its root entity, and a grant to
+/// read every field along the path of every projected field, as <see cref="DataSourceFieldAccess"/>
+/// decides. The rows, the count and the measures cover only the root records that match one of
+/// the user's read filters on the root entity, as well as the data source's filter. The paging
+/// and sorting rules are those of the record list, except that the default page size and sort are
+/// the data source's own. The data source parameters are read by
+/// <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter or the
+/// read filters is a 400 problem with a fixed title, and each read filter is logged by its policy
+/// and grant. The problem titles never contain text from the request, SQL or storage names.
 /// </summary>
 internal static class DataSourceEndpoints
 {
@@ -44,6 +51,7 @@ internal static class DataSourceEndpoints
         string? sort,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(context) is not { } user)
@@ -61,7 +69,8 @@ internal static class DataSourceEndpoints
             return NotFound("The application has no data source with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsRead(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsRead(application, user.Roles, model)
+            || DataSourceFieldAccess.Read(application, user.Roles, model) is not { } fields)
         {
             return Grants.Forbidden();
         }
@@ -92,16 +101,33 @@ internal static class DataSourceEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        // AllowsRead found the root entity, so it is in the model.
+        var root = application.FindEntity(model.Entity.Id)!;
+        var read = PolicyEvaluator.Access(application, user.Roles, root, PolicyAction.Read);
+        var condition = read.Filters is { } filters
+            ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
+            : null;
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await DataSourceQueries.ListAsync(connection, application, model, pageNumber, size, order, parameters, cancellationToken);
+        var result = await DataSourceQueries.ListAsync(
+            connection, application, model, pageNumber, size, order, parameters, condition, cancellationToken);
         if (result is null)
         {
+            // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
+            if (read.Filters is not null)
+            {
+                var logger = loggerFactory.CreateLogger(typeof(DataSourceEndpoints).FullName!);
+                foreach (var filter in read.Filters)
+                {
+                    RecordFilterLog.DataSourceFailed(logger, filter.Policy, filter.Grant, model.Name);
+                }
+            }
+
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "The data source filter could not be evaluated for these rows.");
         }
 
-        return Results.Ok(new DataSourceRowsResponse(result.Items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new DataSourceRowsResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
 
     private static bool TryParseInteger(string text, out int value) =>

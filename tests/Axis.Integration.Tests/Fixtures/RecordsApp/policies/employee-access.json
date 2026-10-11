@@ -17,6 +17,7 @@
     { "dataSource": "ItemsMatching", "actions": ["read"] },
     { "dataSource": "ItemsNamed", "actions": ["read"] },
     { "dataSource": "ItemsOverflow", "actions": ["read"] },
-    { "dataSource": "OverdueTickets", "actions": ["read"] }
+    { "dataSource": "OverdueTickets", "actions": ["read"] },
+    { "dataSource": "ItemNames", "actions": ["read"] }
   ]
 }

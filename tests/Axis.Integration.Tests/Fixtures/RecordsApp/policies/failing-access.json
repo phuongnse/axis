@@ -6,6 +6,7 @@
   "roles": ["failing"],
   "grants": [
     { "entity": "Item", "actions": ["read"], "filter": "quantity * 9223372036854775807 > 0" },
-    { "entity": "Item", "actions": ["read"], "filter": "department.name == 'Finance'" }
+    { "entity": "Item", "actions": ["read"], "filter": "department.name == 'Finance'" },
+    { "dataSource": "ActiveItems", "actions": ["read"] }
   ]
 }

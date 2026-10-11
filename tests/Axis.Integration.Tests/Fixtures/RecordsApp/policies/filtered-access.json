@@ -8,6 +8,10 @@
     { "entity": "Item", "actions": ["read"], "filter": "false" },
     { "entity": "Item", "actions": ["read"], "filter": "status is not null" },
     { "entity": "Item", "actions": ["create", "update", "delete"], "filter": "status == 'open'" },
-    { "entity": "Ticket", "actions": ["read", "create", "update", "delete"], "filter": "requester == currentUser()" }
+    { "entity": "Ticket", "actions": ["read", "create", "update", "delete"], "filter": "requester == currentUser()" },
+    { "dataSource": "ActiveItems", "actions": ["read"] },
+    { "dataSource": "ItemTotals", "actions": ["read"] },
+    { "dataSource": "OverdueTickets", "actions": ["read"] },
+    { "dataSource": "ItemsByDepartment", "actions": ["read"] }
   ]
 }

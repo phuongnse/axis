@@ -1,0 +1,13 @@
+{
+  "id": "1a4ce4b3-c755-4eda-8047-da5e33860cff",
+  "kind": "policy",
+  "name": "ReviewAccess",
+  "formatVersion": 1,
+  "roles": ["finance-reviewer"],
+  "grants": [
+    { "entity": "Note", "actions": ["read"], "filter": "contains(title, 'Shared')" },
+    { "entity": "Note", "actions": ["create"] },
+    { "entity": "Category", "actions": ["read"], "filter": "contains(name, 'Shared')" },
+    { "dataSource": "NoteRows", "actions": ["read"] }
+  ]
+}

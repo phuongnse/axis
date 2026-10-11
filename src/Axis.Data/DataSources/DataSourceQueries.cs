@@ -32,10 +32,12 @@ public static class DataSourceQueries
     /// of the rows that pass, ordered by the sort and then by each group field ascending, and the
     /// count is the number of groups. <paramref name="parameters"/> holds one value per
     /// declared parameter, in declaration order. <paramref name="application"/> resolves the paths
-    /// in the filter. A page past the last one has no items. Returns
-    /// <see langword="null"/> when the database rejects the filter for these rows with a data
-    /// exception (SQLSTATE class 22), such as an integer overflow or a date out of range. Any other
-    /// database error is thrown.
+    /// in the filter. When <paramref name="condition"/> is given, a root row passes only when it
+    /// also matches it, in both statements and before any grouping, so the rows, the count and
+    /// every measure cover only those root records. A page past the last one has no items. Returns
+    /// <see langword="null"/> when the database rejects the filter or the condition for these rows
+    /// with a data exception (SQLSTATE class 22), such as an integer overflow or a date out of
+    /// range. Any other database error is thrown.
     /// </summary>
     public static async Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
@@ -45,6 +47,7 @@ public static class DataSourceQueries
         int pageSize,
         DataSourceSort? sort,
         IReadOnlyList<DataSourceParameterValue> parameters,
+        RecordCondition? condition = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -54,53 +57,22 @@ public static class DataSourceQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
-        var row = EntityNaming.Quote(RowAlias);
-        var joins = new Joins();
-        string select, groupBy, order;
-        if (dataSource.Aggregate is { } aggregate)
-        {
-            (select, groupBy) = GroupedSelectList(aggregate, joins);
-
-            // Each group is unique by its group fields, so they break every tie.
-            var groupOrder = aggregate.GroupBy.Select(field => $"{joins.ColumnOf(field.Path)} ASC");
-            order = string.Join(", ", sort is null ? groupOrder : [OrderTerm(sort, joins), .. groupOrder]);
-        }
-        else
-        {
-            select = SelectList(dataSource, joins);
-            groupBy = "";
-            var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
-            order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins)}, {id} ASC";
-        }
-
-        var (where, values) = Where(application, dataSource, joins);
-        var from = $"{table} AS {row}{joins.Sql}{where}";
-
-        // Without a group field, the one total row has no order.
-        var orderBy = order.Length == 0 ? "" : $" ORDER BY {order}";
-
-        // A grouped count wraps the grouped statement, so it counts groups. Without a group field
-        // the inner statement is one total row even when no row passes.
-        var countSql = dataSource.Aggregate is null
-            ? $"SELECT count(*) FROM {from}"
-            : $"SELECT count(*) FROM (SELECT count(*) FROM {from}{groupBy}) AS g";
-
+        var statement = Statement(application, dataSource, sort, condition);
         try
         {
             long totalCount;
-            await using (var count = new NpgsqlCommand(countSql, connection))
+            await using (var count = new NpgsqlCommand(statement.CountSql, connection))
             {
-                AddValues(count, values);
+                AddValues(count, statement.Values);
                 AddParameters(count, parameters);
+                condition?.AddTo(count);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
             }
 
-            await using var command = new NpgsqlCommand(
-                $"SELECT {select} FROM {from}{groupBy}{orderBy} LIMIT @limit OFFSET @offset",
-                connection);
-            AddValues(command, values);
+            await using var command = new NpgsqlCommand(statement.PageSql, connection);
+            AddValues(command, statement.Values);
             AddParameters(command, parameters);
+            condition?.AddTo(command);
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -121,16 +93,63 @@ public static class DataSourceQueries
     }
 
     /// <summary>
-    /// The <c>WHERE</c> clause of the filter, with a leading space, and the values it names. Both
-    /// are empty without a filter. A bare name in the filter is a parameter, matched ignoring letter
-    /// case, or else a column of the root row. A longer path is a column of a joined target.
+    /// The count and the page statement of <paramref name="dataSource"/>, and the values of its
+    /// filter. The page statement ends with <c>LIMIT @limit OFFSET @offset</c>. Both put the
+    /// filter and <paramref name="condition"/>, joined with <c>AND</c>, in one <c>WHERE</c> clause
+    /// over the root row before any grouping. Neither holds a value from the filter, a parameter
+    /// or the condition: each is a parameter that the caller adds.
     /// </summary>
-    private static (string Where, IReadOnlyList<SqlValue> Values) Where(
+    internal static DataSourceStatement Statement(
+        ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition)
+    {
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
+        var row = EntityNaming.Quote(RowAlias);
+        var joins = new Joins();
+        string select, groupBy, order;
+        if (dataSource.Aggregate is { } aggregate)
+        {
+            (select, groupBy) = GroupedSelectList(aggregate, joins);
+
+            // Each group is unique by its group fields, so they break every tie.
+            var groupOrder = aggregate.GroupBy.Select(field => $"{joins.ColumnOf(field.Path)} ASC");
+            order = string.Join(", ", sort is null ? groupOrder : [OrderTerm(sort, joins), .. groupOrder]);
+        }
+        else
+        {
+            select = SelectList(dataSource, joins);
+            groupBy = "";
+            var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
+            order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins)}, {id} ASC";
+        }
+
+        var (filter, values) = Filter(application, dataSource, joins);
+        string[] conditions = [.. new[] { filter, condition?.Sql }.OfType<string>()];
+        var where = conditions.Length == 0 ? "" : $" WHERE {string.Join(" AND ", conditions)}";
+        var from = $"{table} AS {row}{joins.Sql}{where}";
+
+        // Without a group field, the one total row has no order.
+        var orderBy = order.Length == 0 ? "" : $" ORDER BY {order}";
+
+        // A grouped count wraps the grouped statement, so it counts groups. Without a group field
+        // the inner statement is one total row even when no row passes.
+        var countSql = dataSource.Aggregate is null
+            ? $"SELECT count(*) FROM {from}"
+            : $"SELECT count(*) FROM (SELECT count(*) FROM {from}{groupBy}) AS g";
+        var pageSql = $"SELECT {select} FROM {from}{groupBy}{orderBy} LIMIT @limit OFFSET @offset";
+        return new DataSourceStatement(countSql, pageSql, values);
+    }
+
+    /// <summary>
+    /// The filter as SQL and the values it names, or null and no values without a filter. A bare
+    /// name in the filter is a parameter, matched ignoring letter case, or else a column of the root
+    /// row. A longer path is a column of a joined target.
+    /// </summary>
+    private static (string? Sql, IReadOnlyList<SqlValue> Values) Filter(
         ApplicationModel application, DataSourceModel dataSource, Joins joins)
     {
         if (dataSource.Filter is not { } filter)
         {
-            return ("", []);
+            return (null, []);
         }
 
         var translated = SqlTranslator.Translate(
@@ -156,7 +175,7 @@ public static class DataSourceQueries
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
         }
 
-        return ($" WHERE {translated.Sql}", translated.Parameters);
+        return (translated.Sql, translated.Parameters);
     }
 
     /// <summary>The fields a filter path names, from the root entity through each reference's target, ignoring letter case.</summary>
@@ -403,3 +422,9 @@ public static class DataSourceQueries
         private sealed record Join(string Alias, EntityReference Target, string ParentAlias, FieldModel Reference);
     }
 }
+
+/// <summary>
+/// The SQL of a data source read: the count statement, the page statement and the values of the
+/// data source filter that both name.
+/// </summary>
+internal sealed record DataSourceStatement(string CountSql, string PageSql, IReadOnlyList<SqlValue> Values);

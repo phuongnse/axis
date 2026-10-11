@@ -825,18 +825,20 @@ A `role` resource declares a role that users can hold:
   Two roles with the same name are `AXC0006`.
 
 A `policy` resource gives roles grants. The record API and the data source
-endpoint enforce entity and data source grants. The record API enforces the
-filter and fields rules below. The data source endpoint applies neither yet,
-so there an entity grant with a `filter` or `fields` grants nothing
-*(planned for M4)*. Process grants are not enforced yet *(planned for M4)*. The purchase request sample targets the three policies below.
+endpoint enforce entity and data source grants. Both enforce the filter and
+fields rules below: the data source endpoint adds the root entity's read
+filters to its query and refuses a data source that shows a field the user
+may not read. Process grants are not enforced yet *(planned for M4)*. The purchase request sample targets the three policies below.
 Employees reach their own requests, department managers the requests of
 their department, and finance reviewers the submitted ones.
 
 For now, the sample's policies leave out every `filter` and `fields`, so
 each role reaches every purchase request. Its employee policy also reads
 `RequestsByDepartment`, because a sample journey opens that page as the
-employee. The filters return once data sources apply record filters and
-check fields. The target policies are:
+employee. Data sources now apply record filters and check fields, but the
+sample keeps its policies without them for now. Restoring the target
+policies changes the sample's journeys, so it is separate work. The target
+policies are:
 
 ```json
 {
