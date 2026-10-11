@@ -103,19 +103,19 @@ async function restartWorker() {
   expect(Number(readFileSync(pidFile, 'utf8').trim())).not.toBe(pid)
 }
 
-/** The value the Status select shows. */
+/**
+ * The Status input. The managers and the finance reviewer may not update a request, so they see
+ * it read-only.
+ */
 function statusValue(page: Page) {
-  return page
-    .locator('.ant-form-item')
-    .filter({ has: page.getByText('Status', { exact: true }) })
-    .locator('.ant-select-selection-item')
+  return page.getByLabel('Status', { exact: true })
 }
 
 /** Opens the request form until it shows `status`, since the worker ends the process later. */
 async function expectStatus(page: Page, id: string, status: string) {
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect(statusValue(page)).toHaveText(status, { timeout: 1_000 })
+    await expect(statusValue(page)).toHaveValue(status, { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 }
 

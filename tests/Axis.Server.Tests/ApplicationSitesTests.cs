@@ -41,4 +41,24 @@ public sealed class ApplicationSitesTests
         Assert.All(widget.Entity.Fields.Skip(1), field => Assert.False(field.Sequence));
         Assert.All(widget.Entity.Fields.SelectMany(field => field.Fields ?? []), field => Assert.False(field.Sequence));
     }
+
+    [Fact]
+    public void Unshaped_access_lists_every_entity_action_and_field_and_a_task_inbox_has_none()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+
+        var table = Assert.Single(ApplicationSites.FindPage(result.Model, "PurchaseRequests")!.Widgets);
+        var inbox = Assert.Single(ApplicationSites.FindPage(result.Model, "MyTasks")!.Widgets);
+
+        // The table is over a data source, so its access is about the data source's root entity.
+        Assert.Null(table.Entity);
+        Assert.NotNull(table.Access);
+        Assert.Equal(["read", "create", "update", "delete"], table.Access.Actions);
+        result.Model.TryGetEntity("PurchaseRequest", out var entity);
+        Assert.Equal(entity!.Fields.Select(field => field.Name), table.Access.CreateFields);
+        Assert.Equal(entity.Fields.Select(field => field.Name), table.Access.UpdateFields);
+        Assert.Null(inbox.Access);
+    }
 }

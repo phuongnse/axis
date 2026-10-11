@@ -96,7 +96,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         },
         "dataSource": null,
         "form": null,
-        "tasksPath": null
+        "tasksPath": null,
+        "actions": [],
+        "access": {
+          "actions": ["read", "create", "update", "delete"],
+          "createFields": ["name", "department"],
+          "updateFields": ["name", "department"]
+        }
       }
     ]
   }
@@ -118,6 +124,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to.
+  - Every widget also has `access`, never left out. It is described under
+    **Policies** below, and is `null` on a `taskInbox`.
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -159,13 +167,18 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     can hold it.
   - An unknown site, page or locale is a 404 problem with a fixed title. A
     site active only in another tenant does not exist for the request.
-  - Until M4 the endpoints are open. The record API and the data source
-    endpoint already need a session and a grant. So a page that reads
-    records starts sign-in when nobody is signed in, and its data fails to
-    load for a user without a grant.
-  - **Policies** *(planned for M4)*. From M4, policies shape the site and
-    page metadata, as [Authorization](../architecture.md#authorization)
-    describes. This only shapes the UI. The server checks every request.
+  - The endpoints need no session yet. Answering `401` without one is
+    *(planned for M4)*. The record API and the data source endpoint already
+    need a session and a grant. So a page that reads records starts sign-in
+    when nobody is signed in, and its data fails to load for a user without
+    a grant.
+  - **Policies**. Policies shape the site and page metadata of a signed-in
+    user, as [Authorization](../architecture.md#authorization) describes.
+    This only shapes the UI. The server checks every request.
+    - **Signed out.** Without a session, the metadata is not shaped. Navigation
+      lists every entry, every page answers `200`, `actions` lists every
+      action, and `access` lists every entity action and every field. The
+      first data call then answers `401` and starts sign-in.
     - **Readable pages.** A page is readable when its widget is. A widget
       over an entity, or over a form of an entity, needs a `read` grant on
       that entity. A widget over a data source needs what the
@@ -174,10 +187,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Unreadable pages.** The page endpoint answers `403` for a page the
       user cannot read. Site navigation leaves out entries whose page the
       user cannot read.
-    - **Fields.** `entity.fields`, a child collection's `fields` and the
-      form metadata leave out the fields the user may not read. A form
-      section with no field left is left out. The task API's form already
-      does this, see [policies on tasks](processes.md#task-api).
+    - **Fields** *(planned for M4)*. `entity.fields`, a child collection's
+      `fields` and the form metadata leave out the fields the user may not
+      read. A form section with no field left is left out. The task API's
+      form already does this, see [policies on tasks](processes.md#task-api).
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process.
     - **Access.** Every `table` and `form` widget gets an `access` object.
@@ -202,7 +215,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         `[]` when the action is not in `actions`.
       - A table shows its create button only with `create`. A form shows a
         field it may not write as read-only, as on a computed field, and
-        never sends it.
+        never sends it. On a new record it writes the `createFields`, and on
+        a saved record the `updateFields`.
+      - A form has no save button without the action it needs: `create` on a
+        new record and `update` on a saved one. Cancel and the start process
+        buttons stay.
       - A `taskInbox` has `"access": null`.
 - **Routing.** The SPA routes on the client with `react-router` v7. The
   server answers every other path with the SPA, so each address below
@@ -361,7 +378,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     Node 22 or later for the same reason. The API never coerces a string to a
     number, so the form widget sends numbers back as JSON numbers.
   - **Links.** When the widget names a form page, a create button links to
-    `/{site}/{formpage}/new` and each row has an open link to
+    `/{site}/{formpage}/new`, if the widget's `access` has `create`. Each row
+    has an open link to
     `/{site}/{formpage}/{id}`, with the page name in lower case. The create
     button is a link: a click with a modifier key or the middle button opens
     the form in a new tab or window. Both pass the table's address, with
@@ -550,9 +568,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     does not show appears above the form.
   - **Start process action**. A `form` widget can declare
     `startProcess` actions. On a saved record, each is shown as a button
-    next to Save and Cancel, with its label. A new record shows no action
-    buttons, so a failed start never leaves a record behind on a form that
-    still says new.
+    next to Save and Cancel, with its label. For a signed-in user, page
+    metadata lists only the actions whose process the user holds a `start`
+    grant on. A new record shows no action buttons, so a failed start never
+    leaves a record behind on a form that still says new.
 
     ```json
     {

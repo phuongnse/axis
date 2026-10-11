@@ -535,7 +535,8 @@ filters and their field lists. The data source endpoint enforces grants,
 the root entity's read filters and the readable fields. A process start
 enforces the `start` grant and read access to the subject record. The task
 API keeps the assignee check and leaves out the fields the user may not
-read, and the worker's steps run outside policies.
+read, and the worker's steps run outside policies. Navigation and page
+metadata follow the grants, except leaving out unreadable fields.
 Everything else below is *(planned for M4)*. See [architecture](architecture.md#authorization) for the
 details. It builds on [D12](#d12-authorization-is-server-side-and-default-deny--agreed).
 

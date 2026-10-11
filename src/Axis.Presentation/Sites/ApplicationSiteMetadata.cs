@@ -25,9 +25,13 @@ public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<Wi
 /// is then the form's entity, with every field, so a client knows the type of each field the form
 /// shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
+/// <see cref="Access"/> is set on a table or form widget and null on a task inbox.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
 /// <param name="Actions">The buttons a form widget shows on a saved record, in page file order.</param>
+/// <param name="Access">
+/// What the user may do with the widget's entity, or with the root entity of its data source.
+/// </param>
 public sealed record WidgetMetadata(
     string Type,
     string? FormPage,
@@ -35,7 +39,17 @@ public sealed record WidgetMetadata(
     DataSourceMetadata? DataSource,
     FormMetadata? Form,
     string? TasksPath,
-    IReadOnlyList<ActionMetadata> Actions);
+    IReadOnlyList<ActionMetadata> Actions,
+    WidgetAccess? Access);
+
+/// <summary>
+/// The entity actions a user may take on a widget's entity, and the fields each write action covers.
+/// This only shapes the UI: the server checks every request.
+/// </summary>
+/// <param name="Actions">The granted entity actions, in the order <c>read</c>, <c>create</c>, <c>update</c>, <c>delete</c>.</param>
+/// <param name="CreateFields">The fields a create may write, in declaration order. Empty without <c>create</c>.</param>
+/// <param name="UpdateFields">The fields an update may write, in declaration order. Empty without <c>update</c>.</param>
+public sealed record WidgetAccess(IReadOnlyList<string> Actions, IReadOnlyList<string> CreateFields, IReadOnlyList<string> UpdateFields);
 
 /// <summary>A <c>startProcess</c> action of a form widget, which starts a process for the form's record.</summary>
 /// <param name="Type">The kind of action: always <c>startProcess</c>.</param>

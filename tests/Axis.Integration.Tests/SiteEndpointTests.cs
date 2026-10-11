@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -177,7 +178,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemSections", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            ["type", "formPage", "entity", "dataSource", "form", "tasksPath", "actions"],
+            ["type", "formPage", "entity", "dataSource", "form", "tasksPath", "actions", "access"],
             widget.EnumerateObject().Select(property => property.Name));
         Assert.Equal("form", widget.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
@@ -203,8 +204,88 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("MyTasks", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            """{"type":"taskInbox","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","actions":[]}""",
+            """{"type":"taskInbox","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","actions":[],"access":null}""",
             widget.GetRawText());
+    }
+
+    [Fact]
+    public async Task Without_a_session_navigation_and_access_are_not_shaped()
+    {
+        using var client = fixture.CreateClient();
+
+        using var site = await GetJsonAsync(client, "/api/sites/records", HostA);
+        using var page = await GetJsonAsync(client, "/api/sites/records/pages/itemsbydepartment", HostA);
+
+        Assert.Equal(["Items", "Departments"], NavigationPages(site));
+        Assert.Equal(
+            """{"actions":["read","create","update","delete"],"createFields":["name","quantity","price","active","neededBy","orderedAt","status","parts","department","total"],"updateFields":["name","quantity","price","active","neededBy","orderedAt","status","parts","department","total"]}""",
+            Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("access").GetRawText());
+    }
+
+    [Fact]
+    public async Task Navigation_leaves_out_the_pages_the_user_cannot_read()
+    {
+        using var client = fixture.CreateClient().SignedInAs("rita");
+
+        using var site = await GetJsonAsync(client, "/api/sites/records", HostA);
+
+        Assert.Equal(["Items"], NavigationPages(site));
+    }
+
+    [Theory]
+    [InlineData("rita", "departments")]
+    [InlineData("rita", "itemsbydepartment")]
+    [InlineData("binh", "items")]
+    [InlineData("fia", "itemsbydepartment")]
+    public async Task Page_the_user_cannot_read_is_a_403_problem(string user, string page)
+    {
+        using var client = fixture.CreateClient().SignedInAs(user);
+        using var request = Request($"/api/sites/records/pages/{page}", HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task Unknown_page_is_a_404_before_the_grants_are_checked()
+    {
+        using var client = fixture.CreateClient().SignedInAs("binh");
+        using var request = Request("/api/sites/records/pages/Unknown", HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        await ReadProblemAsync(response, HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Task_inbox_page_is_readable_by_a_user_without_a_role()
+    {
+        using var client = fixture.CreateClient().SignedInAs("binh");
+
+        using var page = await GetJsonAsync(client, "/api/sites/records/pages/mytasks", HostA);
+
+        var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
+        Assert.Equal("taskInbox", widget.GetProperty("type").GetString());
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("access").ValueKind);
+    }
+
+    [Fact]
+    public async Task Access_lists_the_granted_actions_and_the_fields_each_write_grant_covers()
+    {
+        using var reader = fixture.CreateClient().SignedInAs("rita");
+        using var fielded = fixture.CreateClient().SignedInAs("fia");
+
+        using var readerPage = await GetJsonAsync(reader, "/api/sites/records/pages/items", HostA);
+        using var fieldedPage = await GetJsonAsync(fielded, "/api/sites/records/pages/itemform", HostA);
+
+        Assert.Equal(
+            """{"actions":["read"],"createFields":[],"updateFields":[]}""",
+            Assert.Single(readerPage.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("access").GetRawText());
+        Assert.Equal(
+            """{"actions":["read","create","update"],"createFields":["name","quantity"],"updateFields":["name","quantity"]}""",
+            Assert.Single(fieldedPage.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("access").GetRawText());
     }
 
     [Theory]
@@ -226,11 +307,16 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(title, problem.RootElement.GetProperty("title").GetString());
     }
 
-    private async Task<JsonDocument> GetJsonAsync(string path, string host)
+    private Task<JsonDocument> GetJsonAsync(string path, string host) => GetJsonAsync(fixture.Client, path, host);
+
+    private static async Task<JsonDocument> GetJsonAsync(HttpClient client, string path, string host)
     {
         using var request = Request(path, host);
-        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+        using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }
+
+    private static List<string?> NavigationPages(JsonDocument site) =>
+        [.. site.RootElement.GetProperty("navigation").EnumerateArray().Select(entry => entry.GetProperty("page").GetString())];
 }

@@ -173,15 +173,16 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the
-    action. The task API calls it for the fields a task shows. Every other
-    API endpoint does so *(planned for M4)*. Worker steps run as `system`,
-    outside policies.
+    action. The task API calls it for the fields a task shows. The site
+    endpoints call it to shape navigation and page metadata for a signed-in
+    user. Every other API endpoint does so *(planned for M4)*. Worker steps
+    run as `system`, outside policies.
   - Record filters from policies limit every record list and single-record
     check of the record API, data source queries and the subject record of a
     process start.
   - Field policies leave out fields from record API results, data source
     rows and task forms, and reject record API writes to protected fields.
-    Applying them to page metadata is *(planned for M4)*.
+    Leaving unreadable fields out of page metadata is *(planned for M4)*.
   - See [Authorization](#authorization).
 - **Before M4.** People sign in through OIDC. The record API, the data
   source endpoint and the process start endpoint need a session and a
@@ -332,7 +333,9 @@ failures as described below. The data source endpoint adds the root entity's
 read filters to its SQL and checks every projected field. A process start
 checks the session, the `start` grant and read access to the subject record.
 The task API keeps the assignee check and leaves out the fields the user may
-not read. Everything else in this section is *(planned for M4)*. It follows
+not read. Navigation and page metadata follow a signed-in user's grants, except
+that page metadata still lists the fields the user may not read. Everything
+else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in
@@ -416,7 +419,9 @@ The `role` and `policy` resource files are described in
   field set of an entity and an action. The record API, the data source
   endpoint and the process start endpoint call it, and apply the record
   filters it answers. The record API, the data source endpoint and the task
-  API apply the field sets.
+  API apply the field sets. The site endpoints call it to leave unreadable
+  pages out of navigation, to answer `403` for them, and to list a widget's
+  allowed actions and writable fields in page metadata.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 

@@ -146,6 +146,19 @@ export interface WidgetAction {
 }
 
 /**
+ * What the signed-in user may do with a table or form widget's entity, or with the root entity of
+ * its data source. `actions` lists the granted entity actions in the order `read`, `create`,
+ * `update`, `delete`. `createFields` and `updateFields` list the fields a create and an update may
+ * write, in declaration order, and are `[]` when the action is not granted. This only shapes the UI:
+ * the server checks every request.
+ */
+export interface WidgetAccess {
+  actions: ('read' | 'create' | 'update' | 'delete')[]
+  createFields: string[]
+  updateFields: string[]
+}
+
+/**
  * One widget of a page. On a table or form, exactly one of `entity` and `dataSource` is set: the
  * widget shows all records of an entity, or the rows of a data source. `formPage` is set only on a
  * table that names the page holding its form. `form` is set only on a form widget that names a form,
@@ -160,8 +173,10 @@ export interface WidgetMetadata {
   form: FormMetadata | null
   /** The task API path on a task inbox, and `null` on every other widget. */
   tasksPath: string | null
-  /** The actions of a form widget, and `[]` on every other widget. */
+  /** The actions of a form widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
+  /** What the user may do with a table or form widget's entity, and `null` on a task inbox. */
+  access: WidgetAccess | null
 }
 
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */

@@ -30,22 +30,24 @@ export interface Section {
 /**
  * The sections a form shows over its entity. With no form, every field is in one section without
  * a title. A computed, sequence or creator field is set by the server, so it is read-only in any
- * form.
+ * form. With `writable`, a field it does not hold is read-only too, because the user may not write
+ * it.
  */
-export function sectionsOf(entity: EntityMetadata, form: FormMetadata | null): Section[] {
+export function sectionsOf(
+  entity: EntityMetadata,
+  form: FormMetadata | null,
+  writable?: ReadonlySet<string>,
+): Section[] {
+  const fixed = (field: FieldMetadata) =>
+    field.computed || field.sequence || field.creator || (writable !== undefined && !writable.has(field.name))
   if (form === null) {
-    return [
-      {
-        titleKey: null,
-        fields: entity.fields.map((field) => ({ field, readOnly: field.computed || field.sequence || field.creator })),
-      },
-    ]
+    return [{ titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: fixed(field) })) }]
   }
   return form.sections.map((section) => ({
     titleKey: section.titleKey,
     fields: section.fields.flatMap((entry) => {
       const field = entity.fields.find((candidate) => candidate.name === entry.name)
-      return field ? [{ field, readOnly: entry.readOnly || field.computed || field.sequence || field.creator }] : []
+      return field ? [{ field, readOnly: entry.readOnly || fixed(field) }] : []
     }),
   }))
 }
