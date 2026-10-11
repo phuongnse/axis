@@ -1,7 +1,8 @@
 import { Button, Dropdown, type MenuProps } from 'antd'
 import type { MenuItemType } from 'antd/es/menu/interface'
 import { useEffect, useState } from 'react'
-import { fetchCurrentUser, fetchTestUsers, signIn, signOut, type TestUser } from './testUsers'
+import { fetchCurrentUser } from './currentUser'
+import { fetchTestUsers, signIn, signOut, type TestUser } from './testUsers'
 import { useText } from './texts'
 
 interface Users {
@@ -13,9 +14,10 @@ interface Users {
 type UserItem = MenuItemType & { role: 'menuitemradio'; 'aria-checked': boolean }
 
 /**
- * The development test user picker in the shell header: the signed-in user's name, or a sign-in
- * prompt, with a menu to switch user or sign out. Either action reloads the page. It renders
- * nothing when the server does not offer the test user list, as in Production.
+ * The development test user picker in the shell header: a "Test user" button with a menu to switch
+ * user, with the signed-in one checked, or to sign out. Either action reloads the page. The account
+ * button beside it shows the signed-in user's name. It renders nothing when the server does not
+ * offer the test user list, as in Production.
  */
 export function TestUserPicker({ reload = () => window.location.reload() }: { reload?: () => void }) {
   const t = useText()
@@ -63,7 +65,7 @@ export function TestUserPicker({ reload = () => window.location.reload() }: { re
 
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.user.label') }}>
-      <Button type="text">{users.current?.displayName ?? t('shell.user.signIn')}</Button>
+      <Button type="text">{t('shell.user.label')}</Button>
     </Dropdown>
   )
 }

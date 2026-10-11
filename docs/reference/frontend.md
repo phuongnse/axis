@@ -667,10 +667,32 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     letter case, and any other locale uses `en_US`. dayjs, which the pickers
     use, follows the same locale. The shell sets both through a nested
     `ConfigProvider` that inherits the theme tokens.
+- **Account button.** The shell header of every site shows an account
+  button first among its actions, before the test user picker. It loads
+  `GET /api/me` each time a shell mounts, and shows nothing while it loads or
+  when the load fails. See
+  [sign-in and the session](../architecture.md#sign-in-and-the-session).
+  - With nobody signed in, it is a **Sign in** button. It sends the browser
+    to `/api/auth/sign-in` with the current path and query string as
+    `returnUrl`, so the person comes back to the same page.
+  - With someone signed in, it shows their display name, a test user
+    included. Its menu holds **Sign out**, which ends the session and then
+    sends the browser to the identity provider's sign-out page. It ends only
+    the session from the identity provider. A test user signs out from the
+    picker.
+  - A `401` from any API call starts the same sign-in, with the current path
+    and query string as `returnUrl`. Two kinds of call are exempt.
+    `GET /api/me` answers `401` when nobody is signed in, so the header shows
+    the button. The task API calls, which list, read and complete tasks,
+    still read only the test user, so a person signed in through the
+    identity provider would loop through sign-in. The task inbox and task
+    page keep their own sign-in prompt.
+  - Its texts are the platform texts `shell.account.signIn`,
+    `shell.account.signOut` and `shell.account.label`, the menu's label.
 - **Test user picker.** In `Development` and `Testing`, the shell header of
   every site shows a [test user](../architecture.md#development-test-users)
-  picker before the locale switch. Its button shows the signed-in user's
-  display name, or a sign-in prompt when nobody is signed in. D23 removes the
+  picker before the locale switch. Its button reads "Test user". The
+  account button before it shows the signed-in user's name. D23 removes the
   picker in M4 *(planned for M4)*. See
   [Sign-in and the session](../architecture.md#sign-in-and-the-session).
   - The button opens a menu of the test users in configuration order. Each
@@ -683,8 +705,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     mounts. When the list is not available, as in Production, it shows
     nothing. When a sign-in or sign-out request fails, it logs a warning and
     changes nothing.
-  - Its texts are the platform texts `shell.user.label`, `shell.user.signIn`
-    and `shell.user.signOut`.
+  - Its texts are the platform texts `shell.user.label` and
+    `shell.user.signOut`.
 - **Text resolution.** The SPA resolves each key through catalogs in order.
   On the platform site the only catalog is the platform texts. Inside an
   application site, the site texts come first and the platform texts second,

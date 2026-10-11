@@ -98,7 +98,7 @@ Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the de
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `binh`,
 `chau` and `dung`, and the development password is `axis` for each. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
-answers `GET /api/me`. The SPA does not offer sign-in yet. *(Planned for M4.)* Sign-in through
+answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
 browser uses. See [sign-in and the session](docs/architecture.md#sign-in-and-the-session).
 

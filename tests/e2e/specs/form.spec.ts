@@ -124,7 +124,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
   const title = `History ${run}`
   const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
-  await page.getByRole('banner').getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('banner').getByRole('button', { name: 'Test user' }).click()
   await page.getByRole('menuitemradio', { name: 'Binh Engineering Manager' }).click()
   await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager' })).toBeVisible()
   // The page's request context shares the sign-in cookie, so Binh creates the note.

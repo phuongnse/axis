@@ -337,6 +337,9 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
 })
 
 test('switching the locale to Vietnamese shows the Vietnamese navigation', async ({ page }) => {
+  // In Testing the header also holds the test user picker. At the default width it pushes the last
+  // Vietnamese navigation entry into the overflow menu, so this test uses a wider window.
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/purchasing/purchaserequests')
   await expect(page.getByRole('menuitem', { name: 'Purchase requests' })).toBeVisible()
 
