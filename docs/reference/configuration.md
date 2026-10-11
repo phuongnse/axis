@@ -775,10 +775,9 @@ This section follows
 [Authorization](../architecture.md#authorization) describes how the server
 applies it. The `role` and `policy` resources, the check of task assignees
 and the policy checks are built. So are matching the roles claim and
-enforcing entity and data source grants on the record API and the data
-source endpoint, and record filters and field lists on the record API.
-Filters and fields on data sources, and policies on processes, are
-*(planned for M4)*. Each compile check below is a compile error.
+enforcing every grant. That covers entity grants with filters and fields on
+the record API, data source grants with root read filters and field checks,
+and process `start` grants. Each compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
 

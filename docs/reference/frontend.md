@@ -426,10 +426,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     is not shown and never sent.
   - Computed, sequence and creator fields are always read-only, whatever
     `readOnly` says.
-  - On a page, `readOnly` only shapes the UI, because the record API still
-    accepts those fields. From M4 *(planned)*, the server enforces field
-    write grants on a page's writes instead, and `readOnly` stays a layout
-    choice. In a task, the server
+  - On a page, `readOnly` only shapes the UI. The record API enforces the
+    user's field write grants, so it still accepts a read-only field that an
+    `update` grant covers. In a task, the server
     enforces it: completing a task rejects a value for a field the form does
     not make editable (see [Task API](processes.md#task-api)).
   - A section's `fields` and the form's `sections` hold at least one entry,
@@ -464,8 +463,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
     sorted ascending by the target's display field, in one column for that
-    field. From M4 *(planned)*, the record API lists only the target records
-    that match the user's read filters. It pages 20 records at a time and keeps nothing in the URL.
+    field. The record API lists only the target records that match the
+    user's read filters. It pages 20 records at a time and keeps nothing in the URL.
     Loading, empty and error states use the table's texts. Clicking a row
     or pressing Enter on it picks the record and closes the dialog. The same
     dialog picks the record of a `reference` filter input.

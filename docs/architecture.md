@@ -62,7 +62,7 @@ samples/
 Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
-checker, interpreter and SQL translation), `Axis.Policy` (the evaluation of entity and data source grants and record filters),
+checker, interpreter and SQL translation), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
 `decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
@@ -174,8 +174,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the
     action. The task API calls it for the fields a task shows. The site
-    endpoints call it to shape navigation and page metadata. Every other API
-    endpoint does so *(planned for M4)*. Worker steps run as `system`,
+    endpoints call it to shape navigation and page metadata. `GET /api/me`,
+    `GET /api/site`, `GET /api/texts/{locale}` and the `/api/auth` endpoints
+    carry no application content and call no policy. Worker steps run as `system`,
     outside policies.
   - Record filters from policies limit every record list and single-record
     check of the record API, data source queries and the subject record of a
@@ -184,12 +185,6 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     rows, task forms and page metadata, and reject record API writes to
     protected fields.
   - See [Authorization](#authorization).
-- **Before M4.** People sign in through OIDC. The record API, the data
-  source endpoint and the process start endpoint need a session and a
-  grant. The task API needs a session and the assignee check. The site
-  endpoints need a session and shape their answer by the user's grants.
-  There is no other way to sign in.
-  Record writes, process starts and tasks take their user from the session.
 
 ### Sign-in and the session
 
@@ -293,8 +288,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   right after it resolves the tenant and before authentication, so a refused
   write does no work and does not renew the session cookie. On the record
   API, the data source endpoint, the process start endpoint and the task
-  API, the session check follows it. On the other endpoints it is
-  *(planned for M4)*. The SPA sends every `/api`
+  API, the session check follows it. `POST /api/auth/sign-out` needs no
+  session, so no session check follows it. The SPA sends every `/api`
   call through one wrapper around `fetch`, which adds the header to its
   writes. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
@@ -335,8 +330,9 @@ failures as described below. The data source endpoint adds the root entity's
 read filters to its SQL and checks every projected field. A process start
 checks the session, the `start` grant and read access to the subject record.
 The task API keeps the assignee check and leaves out the fields the user may
-not read. Navigation and page metadata follow the user's grants. Everything
-else in this section is *(planned for M4)*. It follows
+not read. Navigation and page metadata follow the user's grants, and page
+metadata leaves out the fields the user may not read. Everything in this
+section is built. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in
