@@ -18,6 +18,7 @@ public sealed class ProcessCompilerTests
           "texts": {
             "order.cannotStart": "This order cannot be started.",
             "order.review": "Review the order",
+            "role.finance": "Finance",
             "task.approve": "Approve",
             "task.reject": "Reject"
           } }
@@ -582,6 +583,34 @@ public sealed class ProcessCompilerTests
         Assert.Equal((DiagnosticCodes.SchemaViolation, "forms/broken-form.json"), (diagnostic.Code, diagnostic.File));
     }
 
+    [Theory]
+    [InlineData("auditor")]
+    [InlineData("FINANCE")]
+    public void A_task_role_that_names_no_declared_role_exactly_is_reported_at_the_assignee_role(string role)
+    {
+        using var folder = Folder(Process("Order", TaskSteps(assignee: $$"""{ "role": "{{role}}" }"""), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownTaskRole, "processes/order-review.json", "/steps/0/assignee/role", $"The role '{role}' was not found. No declared role has that name."),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_task_role_whose_file_was_not_loaded_is_not_reported_again_at_the_step()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(assignee: """{ "role": "auditor" }"""), start: "review"))
+            .With("roles/auditor.json", """{ "id": "44444444-4444-4444-8444-444444444402", "kind": "role", "name": "auditor", "formatVersion": 1 }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "roles/auditor.json"), (diagnostic.Code, diagnostic.File));
+    }
+
     [Fact]
     public void A_task_over_an_unknown_entity_checks_neither_its_user_expression_nor_its_form_entity()
     {
@@ -679,13 +708,16 @@ public sealed class ProcessCompilerTests
     /// An application with an <c>Order</c> entity that references a <c>Customer</c>, owns <c>OrderLine</c> rows and
     /// takes its number from the <c>OrderNumber</c> sequence, a <c>Customer</c> that references the customer who
     /// referred it, the rule <c>NeedsReview</c>, the forms <c>OrderReview</c> over <c>Order</c> and <c>CustomerCard</c>
-    /// over <c>Customer</c>, and <paramref name="process"/>.
+    /// over <c>Customer</c>, the role <c>finance</c>, and <paramref name="process"/>.
     /// </summary>
     private static TemporaryFolder Folder(string process) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
             .With("texts/en.json", Texts)
             .With("rules/needs-review.json", NeedsReview)
+            .With("roles/finance.json", """
+                { "id": "44444444-4444-4444-8444-444444444401", "kind": "role", "name": "finance", "formatVersion": 1, "label": { "textKey": "role.finance" } }
+                """)
             .With("sequences/order-number.json", """
                 { "id": "88888888-8888-4888-8888-888888888801", "kind": "sequence", "name": "OrderNumber", "formatVersion": 1, "format": "O-{n:5}" }
                 """)

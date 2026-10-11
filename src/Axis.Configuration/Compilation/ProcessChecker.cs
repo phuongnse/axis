@@ -18,19 +18,21 @@ namespace Axis.Configuration.Compilation;
 /// names is a field of the subject entity, named once, that is not computed, numbered by a
 /// sequence or a child collection. Each <c>set</c> expression type-checks against its field's type
 /// over the same scope as a condition. A task step's assignee is exactly one of a <c>user</c>, a
-/// <c>text</c> expression over the same scope, and a <c>role</c>. Its form is a loaded form over
-/// the subject entity, its <c>dueIn</c> is a positive fixed duration, its outcome names are unique
-/// ignoring letter case, and each outcome's <c>next</c> is a transition. Every problem of a process is
+/// <c>text</c> expression over the same scope, and a <c>role</c>, which names a declared role
+/// exactly. Its form is a loaded form over the subject entity, its <c>dueIn</c> is a positive fixed
+/// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
+/// transition. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
-/// unknown step is not also reported as having no path to an end, and a form or entity file that
-/// was not loaded because of its own errors is not reported again.
+/// unknown step is not also reported as having no path to an end, and a form, entity or role file
+/// that was not loaded because of its own errors is not reported again.
 /// </summary>
 internal static class ProcessChecker
 {
     /// <summary>
     /// Checks <paramref name="processes"/>, which come in path order. <paramref name="ownerOf"/>
     /// names the owner of a child entity, or gives null for a root entity.
+    /// <paramref name="roleNames"/> holds the declared role names, compared exactly.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -39,6 +41,8 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, FormResource?> findForm,
         IReadOnlySet<string> unloadedFormNames,
+        IReadOnlySet<string> roleNames,
+        IReadOnlySet<string> unloadedRoleNames,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -81,7 +85,7 @@ internal static class ProcessChecker
                 CheckOperations(process, entity, scope, Report);
             }
 
-            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, Report);
+            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, roleNames, unloadedRoleNames, Report);
 
             if (process.StartCondition is { } startCondition)
             {
@@ -483,9 +487,10 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, and a
-    /// <c>user</c> expression gives <c>text</c> over <paramref name="scope"/>. Its form is a loaded
-    /// form whose entity is <paramref name="entity"/>. Its <c>dueIn</c>, when set, is a positive
+    /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, a
+    /// <c>user</c> expression gives <c>text</c> over <paramref name="scope"/>, and a <c>role</c> is
+    /// one of <paramref name="roleNames"/>, compared exactly, unless its file was not loaded. Its
+    /// form is a loaded form whose entity is <paramref name="entity"/>. Its <c>dueIn</c>, when set, is a positive
     /// fixed duration, and its outcome names are unique ignoring letter case. The expression and the
     /// form's entity are not checked when the subject entity is unknown, and the form's entity is not
     /// checked when the form's own entity is unknown.
@@ -497,6 +502,8 @@ internal static class ProcessChecker
         Func<string, EntityResource?> findEntity,
         Func<string, FormResource?> findForm,
         IReadOnlySet<string> unloadedFormNames,
+        IReadOnlySet<string> roleNames,
+        IReadOnlySet<string> unloadedRoleNames,
         Action<string, string, string> report)
     {
         for (var index = 0; index < process.Steps.Count; index++)
@@ -512,6 +519,12 @@ internal static class ProcessChecker
             if ((assignee.User is null) == (assignee.Role is null))
             {
                 report(DiagnosticCodes.InvalidTaskAssignee, "A task's assignee must have exactly one of 'user' and 'role'.", $"{path}/assignee");
+            }
+
+            // A role file that was not loaded because of its own errors is not reported again.
+            if (assignee.Role is { } role && !roleNames.Contains(role) && !unloadedRoleNames.Contains(role))
+            {
+                report(DiagnosticCodes.UnknownTaskRole, $"The role '{role}' was not found. No declared role has that name.", $"{path}/assignee/role");
             }
 
             if (assignee.User is { } user && scope is not null)

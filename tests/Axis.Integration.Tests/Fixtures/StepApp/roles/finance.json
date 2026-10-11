@@ -1,0 +1,7 @@
+{
+  "id": "100b0fa1-1bbf-4adc-bb33-5a335547e680",
+  "kind": "role",
+  "name": "finance",
+  "formatVersion": 1,
+  "label": { "textKey": "role.finance" }
+}

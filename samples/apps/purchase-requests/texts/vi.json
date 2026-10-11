@@ -52,6 +52,9 @@
     "lineItem.unitPriceNotNegative": "Đơn giá không được âm.",
     "task.approve": "Duyệt",
     "task.return": "Trả lại",
-    "task.reject": "Từ chối"
+    "task.reject": "Từ chối",
+    "role.employee": "Nhân viên",
+    "role.departmentManager": "Trưởng phòng",
+    "role.financeReviewer": "Người duyệt tài chính"
   }
 }

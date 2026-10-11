@@ -74,6 +74,7 @@ public static class DiagnosticCodes
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";
     public const string InvalidTaskAssignee = "AXC0081";
+    public const string UnknownTaskRole = "AXC0089";
     public const string UnknownTaskForm = "AXC0082";
     public const string TaskFormOverOtherEntity = "AXC0083";
     public const string InvalidTaskDueIn = "AXC0084";

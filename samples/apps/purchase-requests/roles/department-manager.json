@@ -1,0 +1,7 @@
+{
+  "id": "6fedaeb5-8afd-4fed-9aad-af8dc6b60f58",
+  "kind": "role",
+  "name": "department-manager",
+  "formatVersion": 1,
+  "label": { "textKey": "role.departmentManager" }
+}

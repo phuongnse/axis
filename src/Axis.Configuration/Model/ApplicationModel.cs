@@ -5,7 +5,7 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled application: its manifest, every entity, site, page, seed, data source, process and
-/// form with references resolved, and its texts.
+/// form with references resolved, its roles and its texts.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -33,6 +33,9 @@ public sealed record ApplicationModel
 
     /// <summary>The application's forms, in path order.</summary>
     public IReadOnlyList<FormModel> Forms { get; init; } = [];
+
+    /// <summary>The application's roles, in path order.</summary>
+    public IReadOnlyList<RoleResource> Roles { get; init; } = [];
 
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)

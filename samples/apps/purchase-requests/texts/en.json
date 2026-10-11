@@ -52,6 +52,9 @@
     "lineItem.unitPriceNotNegative": "Unit price cannot be negative.",
     "task.approve": "Approve",
     "task.return": "Return",
-    "task.reject": "Reject"
+    "task.reject": "Reject",
+    "role.employee": "Employee",
+    "role.departmentManager": "Department manager",
+    "role.financeReviewer": "Finance reviewer"
   }
 }
