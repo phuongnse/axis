@@ -94,6 +94,7 @@ public sealed class PresentationEndpointTests
     }
 
     // The tenant database is unreachable, so a 404 here shows the path rule answered before any query.
+    // The site endpoints need a session, so the client signs in first.
     [Theory]
     [InlineData("/api/sites/-bad")]
     [InlineData("/api/sites/%E2%84%AArecords")]
@@ -102,7 +103,7 @@ public sealed class PresentationEndpointTests
     public async Task Site_path_outside_the_pattern_is_a_404_problem_without_a_query(string path)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient().SignedInAs("anna");
 
         var response = await client.GetAsync(new Uri(path, UriKind.Relative), CancellationToken);
 
@@ -120,6 +121,7 @@ public sealed class PresentationEndpointTests
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseTestOidc("default");
+            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
         });
 
     private sealed record SiteBody(string Name, string TitleKey, LocalesBody Locales, List<NavigationBody> Navigation);

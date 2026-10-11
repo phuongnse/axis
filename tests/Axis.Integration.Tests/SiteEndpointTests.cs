@@ -208,18 +208,38 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             widget.GetRawText());
     }
 
-    [Fact]
-    public async Task Without_a_session_navigation_and_access_are_not_shaped()
+    [Theory]
+    [InlineData("/api/sites")]
+    [InlineData("/api/sites/records")]
+    [InlineData("/api/sites/records/texts/en")]
+    [InlineData("/api/sites/records/pages/items")]
+    [InlineData("/api/sites/unknown")]
+    [InlineData("/api/sites/unknown/texts/en")]
+    [InlineData("/api/sites/records/pages/Unknown")]
+    [InlineData("/api/sites/records/texts/fr")]
+    public async Task Without_a_session_a_site_endpoint_is_a_401_problem_before_any_404(string path)
     {
         using var client = fixture.CreateClient();
+        using var request = Request(path, HostA);
 
-        using var site = await GetJsonAsync(client, "/api/sites/records", HostA);
-        using var page = await GetJsonAsync(client, "/api/sites/records/pages/itemsbydepartment", HostA);
+        using var response = await client.SendAsync(request, CancellationToken);
 
-        Assert.Equal(["Items", "Departments"], NavigationPages(site));
-        Assert.Equal(
-            """{"actions":["read","create","update","delete"],"createFields":["name","quantity","price","active","neededBy","orderedAt","status","parts","department","total"],"updateFields":["name","quantity","price","active","neededBy","orderedAt","status","parts","department","total"]}""",
-            Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("access").GetRawText());
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Unauthorized);
+        Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Theory]
+    [InlineData("/api/site")]
+    [InlineData("/api/texts/en")]
+    [InlineData("/health/ready")]
+    public async Task Without_a_session_a_shell_endpoint_answers(string path)
+    {
+        using var client = fixture.CreateClient();
+        using var request = Request(path, HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { assignLocation } from './platform/navigation'
 import type {
   ApplicationSite,
   EntityMetadata,
@@ -12,6 +13,8 @@ import type {
   WidgetAccess,
 } from './platform/site'
 import { ThemeModeProvider } from './platform/theme'
+
+vi.mock('./platform/navigation')
 
 const site: SiteMetadata = {
   name: 'platform',
@@ -39,6 +42,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.sites.title': 'Sites',
     'shell.home.sites.empty': 'No application is active.',
     'shell.home.sites.loadFailed': 'The sites could not be loaded.',
+    'shell.home.sites.signIn': 'Sign in to see the sites.',
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
@@ -384,6 +388,18 @@ describe('App', () => {
     expect(error).toHaveTextContent('The sites could not be loaded.')
     expect(screen.getByText('Sites')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'E2E notes' })).not.toBeInTheDocument()
+  })
+
+  it('shows a sign-in prompt in place of the sites without starting sign-in when nobody is signed in', async () => {
+    vi.mocked(assignLocation).mockReset()
+    stubServer({ sitesStatus: 401 })
+
+    renderApp()
+
+    expect(await screen.findByTestId('sites-sign-in')).toHaveTextContent('Sign in to see the sites.')
+    expect(screen.getByText('Sites')).toBeInTheDocument()
+    expect(screen.queryByTestId('sites-error')).not.toBeInTheDocument()
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 
   it('shows site titles in the current locale', async () => {

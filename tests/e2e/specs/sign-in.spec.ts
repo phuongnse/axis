@@ -1,12 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// The task inbox keeps its own sign-in prompt, so it stays on the page while nobody is signed in. A
-// page that reads records would start sign-in on its own, before the header's button is clicked.
-const page100 = '/e2e/tasks?pageSize=100'
+// The platform home page stays open while nobody is signed in. Every application page needs a
+// session and would start sign-in on its own, before the header's button is clicked.
 
-/** Signs in as Anna on the Keycloak login page from the header's sign-in button. */
+/** Signs in as Anna on the Keycloak login page from the header's sign-in button on the home page. */
 async function signInAsAnna(page: Page) {
-  await page.goto(page100)
+  await page.goto('/')
   await page.getByRole('banner').getByRole('button', { name: 'Sign in' }).click()
   await page.locator('#username').fill('anna')
   await page.locator('#password').fill('axis')
@@ -14,13 +13,13 @@ async function signInAsAnna(page: Page) {
 }
 
 // Each test has its own browser context, so the session cookie does not reach other specs.
-test('a person signs in on the Keycloak login page, returns to the page, and sees the name in light and dark mode', async ({
+test('a person signs in on the Keycloak login page, returns to the home page, and sees the name in light and dark mode', async ({
   page,
   baseURL,
 }) => {
   await signInAsAnna(page)
 
-  await expect(page).toHaveURL(`${baseURL}${page100}`)
+  await expect(page).toHaveURL(`${baseURL}/`)
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
       await page.getByRole('switch', { name: 'Dark mode' }).click()

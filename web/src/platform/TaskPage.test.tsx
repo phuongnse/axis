@@ -4,9 +4,12 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatValue } from './formatValue'
+import { assignLocation } from './navigation'
 import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TaskPage } from './TaskPage'
 import { TextProvider } from './TextProvider'
+
+vi.mock('./navigation')
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -316,12 +319,20 @@ describe('TaskPage', () => {
     expect(await screen.findByTestId('not-found')).toBeInTheDocument()
   })
 
-  it('shows the sign-in prompt when nobody is signed in', async () => {
-    stubTaskApi({ reads: [{ status: 401, body: { title: 'Sign in to work on tasks.', status: 401 } }] })
+  it('starts sign-in with the current path and query string when nobody is signed in', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', `/e2e/tasks/${taskId}?from=inbox`)
+    stubTaskApi({ reads: [{ status: 401, body: { title: 'Sign in to read or write this data.', status: 401 } }] })
 
     renderPage()
 
-    expect(await screen.findByText('Sign in to see your tasks.')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
+        `/api/auth/sign-in?returnUrl=%2Fe2e%2Ftasks%2F${taskId}%3Ffrom%3Dinbox`,
+      ),
+    )
+    expect(screen.queryByTestId('tasks-sign-in')).not.toBeInTheDocument()
   })
 
   it('shows an error when the task fails to load, and when completing fails', async () => {

@@ -21,8 +21,8 @@ flowchart LR
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
   It is the BFF: the OIDC client and the cookie session. The record API, the
-  data source endpoint, the process start endpoint and the task API require a
-  session. Requiring one on its other endpoints is *(planned for M4)*.
+  data source endpoint, the process start endpoint, the task API and the site
+  endpoints require a session.
 - **Axis.Worker** executes durable work. So far it runs work items, and
   through them the `decision`, `task`, `operation` and `end` steps of process
   instances. Wait for event, timer and sub-process steps come later. Outbox
@@ -174,9 +174,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the
     action. The task API calls it for the fields a task shows. The site
-    endpoints call it to shape navigation and page metadata for a signed-in
-    user. Every other API endpoint does so *(planned for M4)*. Worker steps
-    run as `system`, outside policies.
+    endpoints call it to shape navigation and page metadata. Every other API
+    endpoint does so *(planned for M4)*. Worker steps run as `system`,
+    outside policies.
   - Record filters from policies limit every record list and single-record
     check of the record API, data source queries and the subject record of a
     process start.
@@ -186,16 +186,16 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - See [Authorization](#authorization).
 - **Before M4.** People sign in through OIDC. The record API, the data
   source endpoint and the process start endpoint need a session and a
-  grant. The task API needs a session and the assignee check. The other
-  endpoints do not need a session yet. There is no other way to sign in.
+  grant. The task API needs a session and the assignee check. The site
+  endpoints need a session and shape their answer by the user's grants.
+  There is no other way to sign in.
   Record writes, process starts and tasks take their user from the session.
 
 ### Sign-in and the session
 
 It follows
 [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed).
-Sign-in, the session and `GET /api/me` are in place. The parts still to come
-are marked *(planned for M4)*.
+Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 
 - **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
   server is the confidential client: it exchanges the code for tokens, reads
@@ -270,8 +270,7 @@ are marked *(planned for M4)*.
   task API read the current user the same way, and their audit records store
   the user's id and display name.
 - **Sign-in needed.** Without a session, these answer a `401` problem
-  details response. It is built for records, record history, data source
-  rows, process start and tasks. The others are *(planned for M4)*:
+  details response:
   - every route under `/api/apps/{app}/`: records, record history, data
     source rows, process start and tasks. The session is checked before any
     `404`, so a caller without a session cannot learn which applications or
@@ -279,7 +278,9 @@ are marked *(planned for M4)*.
   - `GET /api/sites`, `GET /api/sites/{path}`,
     `GET /api/sites/{path}/texts/{locale}` and
     `GET /api/sites/{path}/pages/{page}`. Site texts belong to an
-    application, so they count as application content;
+    application, so they count as application content. The session is checked
+    before any `404`, so a caller without a session cannot learn which sites
+    or pages exist;
   - `GET /api/me`.
 
   These stay open, because the shell needs them before anyone signs in:
@@ -313,8 +314,9 @@ are marked *(planned for M4)*.
   Testcontainers container serves the whole integration run. Under `scripts/dev.sh` and in
   the E2E run, the server signs people in through it. Under Docker Compose
   it does not yet, because the server in its container cannot reach Keycloak
-  at the address the browser uses. So under Compose the record API and the
-  data source endpoint answer `401`.
+  at the address the browser uses. So under Compose the site endpoints, the
+  record API and the data source endpoint answer `401`, and an application
+  page starts a sign-in that cannot complete.
   - It holds the purchase request users with fixed ids: `anna` and `lan`
     the employees, `binh` and `chau` the department managers, and `dung` the
     finance reviewer. Seed data and E2E journeys already name these ids.
@@ -333,7 +335,7 @@ failures as described below. The data source endpoint adds the root entity's
 read filters to its SQL and checks every projected field. A process start
 checks the session, the `start` grant and read access to the subject record.
 The task API keeps the assignee check and leaves out the fields the user may
-not read. Navigation and page metadata follow a signed-in user's grants, except
+not read. Navigation and page metadata follow the user's grants, except
 that page metadata still lists the fields the user may not read. Everything
 else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and

@@ -62,29 +62,15 @@ export interface TaskItem {
 /** The outcome of completing a task, or the problem the server reported. */
 export type CompleteResult = { ok: true } | { ok: false; problem: RecordProblem }
 
-// A 401 from the task API must not start sign-in. The task inbox and task page keep their own
-// sign-in prompt until sign-in is needed everywhere in M4.
-const taskApiOptions = { signInOnUnauthorized: false }
-
-/** What the task API answers when nobody is signed in. */
-export const signInRequired = 'signInRequired'
-
 /** What the task API answers when the signed-in user may not act on the task. */
 export const assignedElsewhere = 'assignedElsewhere'
 
 /**
  * Loads one page of the signed-in user's open tasks, in the task API's order. `query` holds the
- * task API's `page` and `pageSize`. A 401 returns {@link signInRequired}, and any other failure throws.
+ * task API's `page` and `pageSize`. A 401 starts sign-in and throws, as any other failure does.
  */
-export async function fetchTasks(
-  tasksPath: string,
-  query: string,
-  signal?: AbortSignal,
-): Promise<TaskPage | typeof signInRequired> {
-  const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal }, taskApiOptions)
-  if (response.status === 401) {
-    return signInRequired
-  }
+export async function fetchTasks(tasksPath: string, query: string, signal?: AbortSignal): Promise<TaskPage> {
+  const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal })
   if (!response.ok) {
     throw new Error(`Loading the tasks of '${tasksPath}' failed with status ${response.status}.`)
   }
@@ -92,20 +78,17 @@ export async function fetchTasks(
 }
 
 /**
- * Loads one task in any state, or returns `null` when the task API has no task with the id. A 401
- * returns {@link signInRequired}, a 403 returns {@link assignedElsewhere}, and any other failure throws.
+ * Loads one task in any state, or returns `null` when the task API has no task with the id. A 403
+ * returns {@link assignedElsewhere}. A 401 starts sign-in and throws, as any other failure does.
  */
 export async function fetchTask(
   tasksPath: string,
   id: string,
   signal?: AbortSignal,
-): Promise<TaskItem | null | typeof signInRequired | typeof assignedElsewhere> {
-  const response = await apiFetch(`${tasksPath}/${id}`, { signal }, taskApiOptions)
+): Promise<TaskItem | null | typeof assignedElsewhere> {
+  const response = await apiFetch(`${tasksPath}/${id}`, { signal })
   if (response.status === 404) {
     return null
-  }
-  if (response.status === 401) {
-    return signInRequired
   }
   if (response.status === 403) {
     return assignedElsewhere
@@ -119,14 +102,15 @@ export async function fetchTask(
 
 /**
  * Completes a task. `body` is the prepared body text, so number text reaches the server unchanged.
- * A 400, 403 or 409 comes back as the problem, and any other failure throws.
+ * A 400, 403 or 409 comes back as the problem. A 401 starts sign-in and throws, as any other
+ * failure does.
  */
 export async function completeTask(tasksPath: string, id: string, body: string): Promise<CompleteResult> {
-  const response = await apiFetch(
-    `${tasksPath}/${id}/complete`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
-    taskApiOptions,
-  )
+  const response = await apiFetch(`${tasksPath}/${id}/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
   if (response.ok) {
     return { ok: true }
   }

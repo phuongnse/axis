@@ -107,6 +107,52 @@ function row(page: Page, title: string) {
   return page.getByRole("row", { name: new RegExp(`${title} `) });
 }
 
+/** Creates and starts an Operations request as anna, and returns its id. */
+async function startOperationsRequest(
+  apiRequest: APIRequest,
+  baseURL: string | undefined,
+  title: string,
+) {
+  return asUser(apiRequest, baseURL, "anna", async (anna) => {
+    const created = await createRequest(anna, title, "Operations");
+    await start(anna, created);
+    return created;
+  });
+}
+
+/**
+ * The id of the manager approval task for the Operations request `id`. chau manages Operations, so
+ * the worker assigns the task to chau. It waits until the worker has created the task.
+ */
+async function managerTaskId(
+  apiRequest: APIRequest,
+  baseURL: string | undefined,
+  id: string,
+) {
+  return asUser(apiRequest, baseURL, "chau", async (chau) => {
+    let found = "";
+    await expect(async () => {
+      const response = await chau.get(`${tasksPath}?pageSize=100`);
+      expect(response.status()).toBe(200);
+      const { items } = (await response.json()) as {
+        items: { id: string; subject: { id: string } }[];
+      };
+      const task = items.find((item) => item.subject.id === id);
+      expect(task).toBeDefined();
+      found = task!.id;
+    }).toPass({ timeout: 30_000 });
+    return found;
+  });
+}
+
+/** Signs in as `user` on the Keycloak login page. */
+async function logIn(page: Page, user: SampleUser) {
+  await expect(page.locator("#username")).toBeVisible();
+  await page.locator("#username").fill(user);
+  await page.locator("#password").fill("axis");
+  await page.locator("#kc-login").click();
+}
+
 test("an employee does not see another employee's request in the list or by its address", async ({
   page,
   playwright,
@@ -182,31 +228,8 @@ test("an employee who opens a manager's task cannot see or complete it, and the 
   baseURL,
 }) => {
   const title = `Zz Task ${runId()}`;
-  const id = await asUser(playwright.request, baseURL, "anna", async (anna) => {
-    const created = await createRequest(anna, title, "Operations");
-    await start(anna, created);
-    return created;
-  });
-  // chau manages Operations, so the worker assigns the manager approval to chau.
-  const taskId = await asUser(
-    playwright.request,
-    baseURL,
-    "chau",
-    async (chau) => {
-      let found = "";
-      await expect(async () => {
-        const response = await chau.get(`${tasksPath}?pageSize=100`);
-        expect(response.status()).toBe(200);
-        const { items } = (await response.json()) as {
-          items: { id: string; subject: { id: string } }[];
-        };
-        const task = items.find((item) => item.subject.id === id);
-        expect(task).toBeDefined();
-        found = task!.id;
-      }).toPass({ timeout: 30_000 });
-      return found;
-    },
-  );
+  const id = await startOperationsRequest(playwright.request, baseURL, title);
+  const taskId = await managerTaskId(playwright.request, baseURL, id);
   await useSession(page, "anna");
 
   await page.goto(`/purchasing/mytasks/${taskId}`);
@@ -356,12 +379,46 @@ for (const entry of signedOutPages) {
     expect((await request.get(entry.api(id))).status()).toBe(401);
 
     await page.goto(address);
-    await expect(page.locator("#username")).toBeVisible();
-    await page.locator("#username").fill(entry.user);
-    await page.locator("#password").fill("axis");
-    await page.locator("#kc-login").click();
+    await logIn(page, entry.user);
 
     await page.waitForURL(`${baseURL}${address}`);
     await entry.expectation(page, title);
   });
 }
+
+test("a signed-out person who opens My tasks signs in on the Keycloak login page and lands back on it", async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const address = "/purchasing/mytasks?pageSize=100";
+
+  // The request fixture holds no session either.
+  expect((await request.get(`${tasksPath}?pageSize=100`)).status()).toBe(401);
+
+  await page.goto(address);
+  await logIn(page, "chau");
+
+  await page.waitForURL(`${baseURL}${address}`);
+  await expect(page.getByRole("columnheader", { name: "Task" })).toBeVisible();
+});
+
+test("a signed-out person who opens a task's address signs in on the Keycloak login page and lands back on it", async ({
+  page,
+  request,
+  playwright,
+  baseURL,
+}) => {
+  const title = `Zz Signed out task ${runId()}`;
+  const id = await startOperationsRequest(playwright.request, baseURL, title);
+  const taskId = await managerTaskId(playwright.request, baseURL, id);
+  const address = `/purchasing/mytasks/${taskId}`;
+
+  expect((await request.get(`${tasksPath}/${taskId}`)).status()).toBe(401);
+
+  await page.goto(address);
+  await logIn(page, "chau");
+
+  await page.waitForURL(`${baseURL}${address}`);
+  await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+});

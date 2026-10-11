@@ -21,7 +21,8 @@ function siteTitle(site: SiteListItem, locale: string): string {
 function SiteList() {
   const t = useText()
   const { locale } = usePlatform().current
-  const [sites, setSites] = useState<SiteListItem[]>()
+  // `null` when nobody is signed in.
+  const [sites, setSites] = useState<SiteListItem[] | null>()
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -41,6 +42,8 @@ function SiteList() {
     <ProCard title={t('shell.home.sites.title')}>
       {failed ? (
         <Alert data-testid="sites-error" type="error" message={t('shell.home.sites.loadFailed')} />
+      ) : sites === null ? (
+        <Alert data-testid="sites-sign-in" type="info" message={t('shell.home.sites.signIn')} />
       ) : (
         <List
           loading={!sites}

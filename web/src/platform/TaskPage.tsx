@@ -6,7 +6,7 @@ import { formatValue } from './formatValue'
 import { buildCompleteBody } from './recordBody'
 import { fetchRecord } from './records'
 import type { WidgetMetadata } from './site'
-import { assignedElsewhere, completeTask, fetchTask, signInRequired, type TaskItem } from './tasks'
+import { assignedElsewhere, completeTask, fetchTask, type TaskItem } from './tasks'
 import { useText } from './texts'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -22,7 +22,7 @@ interface TaskPageProps {
 }
 
 /** The task read, `null` when the task API has none with the id, or why it could not be shown. */
-type TaskState = TaskItem | null | typeof signInRequired | typeof assignedElsewhere | 'failed'
+type TaskState = TaskItem | null | typeof assignedElsewhere | 'failed'
 
 const dueAtField = { name: 'dueAt', type: 'date-time' } as const
 
@@ -71,9 +71,6 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale }: TaskPag
   }
   if (task === null) {
     return <NotFoundPage />
-  }
-  if (task === signInRequired) {
-    return <Alert data-testid="tasks-sign-in" type="info" message={t('shell.tasks.signIn')} />
   }
   if (task === assignedElsewhere) {
     return <Alert data-testid="task-assigned-elsewhere" type="warning" message={t('shell.task.assignedElsewhere')} />

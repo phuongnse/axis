@@ -7,10 +7,10 @@ namespace Axis.Server.Presentation;
 
 /// <summary>
 /// Read-only endpoints that describe the sites of the tenant's active applications, their texts and
-/// their pages to the SPA. A site is found by its path. The endpoints need no session. For a
-/// signed-in user, a site's navigation leaves out the pages they cannot read, such a page answers
-/// 403, and page metadata lists only the actions and access their grants allow. Without a session
-/// the metadata is not shaped, and the record API and the data source endpoint start sign-in.
+/// their pages to the SPA. A site is found by its path. The endpoints need a session: without one
+/// they answer 401 before any 404, so a signed-out caller cannot learn which sites or pages exist.
+/// A site's navigation leaves out the pages the user cannot read, such a page answers 403, and page
+/// metadata lists only the actions and access the user's grants allow.
 /// </summary>
 internal static class SiteEndpoints
 {
@@ -18,8 +18,13 @@ internal static class SiteEndpoints
     {
         var sites = endpoints.MapGroup("/api/sites");
 
-        sites.MapGet("", async (ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
+        sites.MapGet("", async (HttpContext context, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
         {
+            if (await CurrentUsers.FindAsync(context) is null)
+            {
+                return Grants.SignInRequired();
+            }
+
             var applications = await resolver.ListAsync(cancellationToken);
             var items = applications
                 .SelectMany(application => application.Sites.Select(site => ApplicationSites.ListItem(application, site)))
@@ -30,16 +35,17 @@ internal static class SiteEndpoints
 
         sites.MapGet("/{path}", async (HttpContext context, string path, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
         {
+            if (await CurrentUsers.FindAsync(context) is not { } user)
+            {
+                return Grants.SignInRequired();
+            }
+
             if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
             {
                 return SiteNotFound();
             }
 
             var site = ApplicationSites.Describe(active.Site);
-            if (await CurrentUsers.FindAsync(context) is not { } user)
-            {
-                return Results.Ok(site);
-            }
 
             // The compiler resolves every navigation entry's page, so the lookup always succeeds.
             var readable = active.Site.Navigation
@@ -49,8 +55,13 @@ internal static class SiteEndpoints
             return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))] });
         });
 
-        sites.MapGet("/{path}/texts/{locale}", async (string path, string locale, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
+        sites.MapGet("/{path}/texts/{locale}", async (HttpContext context, string path, string locale, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
         {
+            if (await CurrentUsers.FindAsync(context) is null)
+            {
+                return Grants.SignInRequired();
+            }
+
             if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
             {
                 return SiteNotFound();
@@ -63,6 +74,11 @@ internal static class SiteEndpoints
 
         sites.MapGet("/{path}/pages/{page}", async (HttpContext context, string path, string page, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
         {
+            if (await CurrentUsers.FindAsync(context) is not { } user)
+            {
+                return Grants.SignInRequired();
+            }
+
             if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
             {
                 return SiteNotFound();
@@ -71,11 +87,6 @@ internal static class SiteEndpoints
             if (ApplicationSites.FindPage(active.Application, page) is not { } metadata)
             {
                 return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The site's application has no page with this name.");
-            }
-
-            if (await CurrentUsers.FindAsync(context) is not { } user)
-            {
-                return Results.Ok(metadata);
             }
 
             // The metadata holds the page's declared name, so the lookup always succeeds.

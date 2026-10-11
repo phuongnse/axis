@@ -2,9 +2,12 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { formatValue } from './formatValue'
+import { assignLocation } from './navigation'
 import type { WidgetMetadata } from './site'
 import { TaskInboxWidget } from './TaskInboxWidget'
 import { TextProvider } from './TextProvider'
+
+vi.mock('./navigation')
 
 const tasksPath = '/api/apps/E2eApp/tasks'
 
@@ -56,7 +59,6 @@ const texts = {
   'shell.tasks.dueAt': 'Due',
   'shell.tasks.empty': 'No open tasks.',
   'shell.tasks.loadFailed': 'The tasks could not be loaded.',
-  'shell.tasks.signIn': 'Sign in to see your tasks.',
   'noteReview.task': 'Review the note',
   'noteApproval.task': 'Approve the note',
 }
@@ -112,13 +114,20 @@ describe('TaskInboxWidget', () => {
     expect(within(approve).getAllByRole('cell')[2]).toHaveTextContent(/^$/)
   })
 
-  it('shows a sign-in prompt and no table when nobody is signed in', async () => {
+  it('starts sign-in with the current path and query string when nobody is signed in', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', '/e2e/tasks?pageSize=100')
     stubTasks('', 401)
 
-    renderWidget()
+    renderWidget('?pageSize=100')
 
-    expect(await screen.findByText('Sign in to see your tasks.')).toBeInTheDocument()
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
+        '/api/auth/sign-in?returnUrl=%2Fe2e%2Ftasks%3FpageSize%3D100',
+      ),
+    )
+    expect(screen.queryByTestId('tasks-sign-in')).not.toBeInTheDocument()
   })
 
   it('shows an error when the tasks fail to load', async () => {

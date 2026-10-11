@@ -35,7 +35,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Platform site.** The built-in platform site in `Axis.Presentation` serves
   the shell through two endpoints, `GET /api/site` and
   `GET /api/texts/{locale}`. The home page also uses `GET /api/sites` (see
-  Application sites below) to list the tenant's sites.
+  Application sites below) to list the tenant's sites. When it answers `401`,
+  the home page shows a sign-in prompt in place of the list.
   - `GET /api/site` returns the site name, its title key, the locales
     (default, fallback and available) and the navigation items. Navigation
     labels are text keys, never literal text.
@@ -167,18 +168,16 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     can hold it.
   - An unknown site, page or locale is a 404 problem with a fixed title. A
     site active only in another tenant does not exist for the request.
-  - The endpoints need no session yet. Answering `401` without one is
-    *(planned for M4)*. The record API and the data source endpoint already
-    need a session and a grant. So a page that reads records starts sign-in
-    when nobody is signed in, and its data fails to load for a user without
-    a grant.
-  - **Policies**. Policies shape the site and page metadata of a signed-in
-    user, as [Authorization](../architecture.md#authorization) describes.
+  - The endpoints need a session. Without one they answer a `401` problem,
+    before any `404`, so a signed-out caller cannot learn which sites or
+    pages exist. So every application page starts sign-in when nobody is
+    signed in. The record API and the data source endpoint also need a
+    grant, so a page's data fails to load for a user without one.
+  - **Policies**. Policies shape the site and page metadata, as
+    [Authorization](../architecture.md#authorization) describes.
     This only shapes the UI. The server checks every request.
-    - **Signed out.** Without a session, the metadata is not shaped. Navigation
-      lists every entry, every page answers `200`, `actions` lists every
-      action, and `access` lists every entity action and every field. The
-      first data call then answers `401` and starts sign-in.
+    - **Always shaped.** The endpoints need a session, so the metadata is
+      always shaped by the user's grants.
     - **Readable pages.** A page is readable when its widget is. A widget
       over an entity, or over a form of an entity, needs a `read` grant on
       that entity. A widget over a data source needs what the
@@ -227,7 +226,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Address | Shows |
   | --- | --- |
-  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one |
+  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
@@ -652,9 +651,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Links.** Each row opens the task page at
     `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
   - **Signed out.** With nobody signed in, the task API answers `401`, and
-    the widget shows a sign-in prompt in place of the rows. The platform
-    texts `shell.tasks.*` hold the column headers, the empty text, the load
-    error and the sign-in prompt.
+    the widget starts sign-in like any other call. The platform texts
+    `shell.tasks.*` hold the column headers, the empty text and the load
+    error.
 - **Task page**. The address `/{site}/{inboxpage}/{taskId}`
   shows one task, under the page of its task inbox.
   - It shows the step's label, the subject's label, the due date and the
@@ -674,8 +673,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - A task that is not `open`, when the page loads or after a `409` loads it
     again, shows only the already completed message, with no form or
     outcome buttons. So nobody retries a decision that cannot succeed.
-  - With nobody signed in, the task read answers `401`, and the page shows
-    the task inbox's sign-in prompt.
+  - With nobody signed in, the task read answers `401`, and the page starts
+    sign-in like any other call.
   - Any other failure to load the task or its subject record, or to
     complete it, shows a generic error message.
   - On success the page goes to the inbox page's plain address, without the
@@ -708,12 +707,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     **Sign out**, which ends the session and then sends the browser to the
     identity provider's sign-out page.
   - A `401` from any API call starts the same sign-in, with the current path
-    and query string as `returnUrl`. Two kinds of call are exempt.
-    `GET /api/me` answers `401` when nobody is signed in, so the header shows
-    the button. The task API calls, which list, read and complete tasks,
-    answer `401` when nobody is signed in. The task inbox and task page keep
-    their own sign-in prompt for it until sign-in is needed everywhere
-    *(planned for M4)*.
+    and query string as `returnUrl`. Two calls are exempt. `GET /api/me`
+    answers `401` when nobody is signed in, so the header shows the button.
+    The home page's `GET /api/sites` answers `401` too, so the home page
+    shows a sign-in prompt and stays open to a signed-out person.
   - Its texts are the platform texts `shell.account.signIn`,
     `shell.account.signOut` and `shell.account.label`, the menu's label.
 - **Text resolution.** The SPA resolves each key through catalogs in order.
