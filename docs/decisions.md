@@ -388,18 +388,12 @@ sign-in, the current user, the SPA user picker, sequences, the audit records
 of record API writes, process starts, process steps and task decisions, and
 record history are built.
 
-- **Test users:** server configuration holds a fixed list, `TestUsers`, with
-  an id, a display name and role names for each user. The SPA lets the person
-  pick one, and the server keeps the choice in a cookie. They work only in
-  the `Development` environment and in tests, which run as `Testing`. When
-  `TestUsers` is set in any other environment, startup fails. OIDC replaces
-  them in M4 (D9). See
-  [architecture](architecture.md#development-test-users).
-  [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed) replaces this
-  bullet and the test-user part of **Current user** in M4.
+- **Test users:** replaced by
+  [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed), which removed
+  them in M4.
 - **Current user:** `GET /api/me` returns the session user from
-  [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed), or else the
-  signed-in test user, or `401` when there is neither. Before M4, record writes stay open with no signed-in
+  [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed), or `401`
+  when there is none. Before M4, record writes stay open with no signed-in
   user, and the actor is then `anonymous`.
 - **Audit records:** rows in `axis.audit_records` are append-only.
   - Each one commits in the same transaction as its action.
@@ -474,8 +468,8 @@ first, and everything that does need one waits for a single rule.
 M4 replaces the test users with real sign-in through each tenant's identity
 provider. The flow, the identity provider per tenant, the endpoints, the
 session, its tenant binding, the roles, the current user, CSRF, Keycloak and
-the audit actor are in place. Sign-in needed and the removal of test users
-are *(planned for M4)*. See
+the audit actor are in place, and the test users are removed. Sign-in
+needed is *(planned for M4)*. See
 [architecture](architecture.md#sign-in-and-the-session) for the details.
 
 - **Flow:** OIDC authorization code flow with PKCE. The server is the

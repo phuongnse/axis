@@ -379,15 +379,11 @@ The task API lets the signed-in user list their open tasks, read one task and
 complete it with an outcome. The user is the user of the
 [session](../architecture.md#sign-in-and-the-session)
 ([D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)).
-Without a session, it is the signed-in
-[test user](../architecture.md#development-test-users), until test users are
-removed in M4.
 
 **Who may act.** The user may act on a task when they are its assignee, or
 when the task's assignee is a role and the user holds it. The user's roles
-are the roles kept in their session, or the role names of their test user.
-This is checked on every request, at the moment of action. Policies in M4 add
-to this check and never replace it.
+are the roles kept in their session. This is checked on every request, at
+the moment of action. Policies in M4 add to this check and never replace it.
 
 **Policies on tasks** *(planned for M4)*. These follow
 [D24](../decisions.md#d24-roles-and-policies--agreed).
@@ -519,7 +515,7 @@ who may not act on a task never learns its state. A completion without the
 [CSRF header](record-api.md#create-update-and-delete) is a `403` before any
 of these checks.
 
-- **`401`.** Nobody is signed in, through a session or as a test user.
+- **`401`.** Nobody is signed in.
   Every task route needs a signed-in user.
 
   ```json
@@ -819,8 +815,5 @@ database, with history in `axis.__processes_migrations` (see
 - **No cycles.** A process may not contain a cycle. A loop with no task step
   would run for ever. A returned request starts a new instance, so M3 needs
   no loops.
-- **No sign-in until M4.** Tasks cannot be completed in Production before
-  sign-in arrives. Processes can be used only in Development and in tests in
-  M3.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees.

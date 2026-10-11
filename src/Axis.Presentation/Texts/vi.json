@@ -16,8 +16,6 @@
   "shell.account.label": "Tài khoản",
   "shell.account.signIn": "Đăng nhập",
   "shell.account.signOut": "Đăng xuất",
-  "shell.user.label": "Người dùng thử",
-  "shell.user.signOut": "Đăng xuất",
   "shell.home.sites.title": "Trang ứng dụng",
   "shell.home.sites.empty": "Chưa có ứng dụng nào được kích hoạt.",
   "shell.home.sites.loadFailed": "Không thể tải danh sách trang ứng dụng.",

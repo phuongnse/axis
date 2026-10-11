@@ -177,12 +177,11 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Field policies leave out fields from results and reject writes to
     protected fields.
   - See [Authorization](#authorization).
-- **Before M4.** People can sign in through OIDC, but no endpoint needs a
-  session yet: every endpoint is open. Development test users still work
-  beside the session, as described below (D21), until
-  [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)
-  removes them. Record writes, process starts and tasks take their user from
-  the session first, and from the test user when there is no session.
+- **Before M4.** People sign in through OIDC, but no endpoint needs a
+  session yet: every endpoint is open. There is no other way to sign in.
+  Record writes, process starts and tasks take their user from the session.
+  Record writes stay open with nobody signed in. Their audit records then
+  have the actor `anonymous` and no display name.
 
 ### Sign-in and the session
 
@@ -260,10 +259,9 @@ are marked *(planned for M4)*.
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. Without a
-  session it is a `401`, as today. Until test users are removed, it falls
-  back to the signed-in test user when there is no session. Record writes,
-  process starts and the task API read the current user the same way, and
-  their audit records store the user's id and display name.
+  session it is a `401`, as today. Record writes, process starts and the
+  task API read the current user the same way, and their audit records store
+  the user's id and display name.
 - **Sign-in needed** *(planned for M4)*. Without a session, these answer a
   `401` problem details response:
   - every route under `/api/apps/{app}/`: records, record history, data
@@ -306,10 +304,9 @@ are marked *(planned for M4)*.
   the E2E run, the server signs people in through it. Under Docker Compose
   it does not yet, because the server in its container cannot reach Keycloak
   at the address the browser uses.
-  - It holds the purchase request users with the ids they have today as
-    test users: `anna` the employee, `binh` and `chau` the department
-    managers, and `dung` the finance reviewer. Seed data and E2E journeys
-    already name these ids.
+  - It holds the purchase request users with fixed ids: `anna` the
+    employee, `binh` and `chau` the department managers, and `dung` the
+    finance reviewer. Seed data and E2E journeys already name these ids.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
@@ -429,74 +426,6 @@ A `null` filter adds nothing either. Suppose a policy granted `read` with the
 filter `submittedAt >= dateTime('2026-01-01T00:00:00Z')`. A draft has no
 `submittedAt`, so the filter is `null` for it, and that grant gives no access
 to the draft. Only another grant can make it readable.
-
-### Development test users
-
-M4 removes `TestUsers`, their endpoints and the SPA picker (D23), and local
-sign-in then goes through Keycloak. See
-[Sign-in and the session](#sign-in-and-the-session). Until then, this section
-holds.
-
-Test users stand in for authentication until OIDC replaces them in M4 (D9).
-They exist only in development and tests, never in Production.
-
-- **Configuration.** The `TestUsers` section of the server configuration is
-  a fixed list. Each user has an id, a display name and role names:
-
-  ```json
-  "TestUsers": [
-    { "Id": "anna", "DisplayName": "Anna Employee", "Roles": ["employee"] }
-  ]
-  ```
-
-- **Allowed environments.** Test users work only in the `Development` and
-  `Testing` environments. `Testing` is the environment the server tests
-  already use.
-- **Startup guard.** When `TestUsers` has any entry in any other
-  environment, startup fails with an `InvalidOperationException` before the
-  server listens. The message names the environment. This matches how bad
-  [tenant configuration](#tenant-configuration) stops startup.
-- **Choosing a user.** The SPA lists the users and lets the person pick one
-  in the [shell header](reference/frontend.md):
-  - `GET /api/test-users` returns `{ "users": [ { "id", "displayName", "roles" } ] }`.
-    Each user has the same shape as `GET /api/me`, and the list keeps the
-    configuration order.
-  - `POST /api/test-users/sign-in` with `{ "id": "..." }` signs that user in.
-    It returns `200` with the same body as `GET /api/me`. An id that is not
-    configured returns a `400` validation problem keyed `id`, and sets no
-    cookie.
-  - `POST /api/test-users/sign-out` signs the user out and returns `204`.
-
-  Outside the allowed environments the `POST` endpoints are not mapped. Only
-  the SPA fallback matches their paths, and it takes `GET` and `HEAD`, so a
-  `POST` with the [CSRF header](#sign-in-and-the-session) answers `405` as on
-  any other unmapped path. Without the header it is a `403`. `GET /api/test-users`
-  is mapped in every environment, so it does not reach the SPA fallback.
-  Outside the allowed environments it answers a `404` problem details
-  response, and the SPA then shows no picker. The `POST` endpoints
-  follow the record API's
-  [content type rule](reference/record-api.md#create-update-and-delete),
-  sign-out included.
-- **Cookie.** The server keeps the chosen user id in an HttpOnly,
-  SameSite=Strict cookie. It is an ASP.NET Core authentication cookie: a
-  signed ticket that a client cannot change.
-- **Current user.** Without a [session](#sign-in-and-the-session),
-  `GET /api/me` returns `{ "id", "displayName", "roles" }` for the signed-in
-  test user. With nobody signed in, it is a `401` problem
-  details response. The name and roles come from `TestUsers` on every
-  request, so an id that is no longer configured is nobody signed in.
-  `GET /api/me` exists in every environment.
-- **Actor.** Without a session, record writes, process starts and the task
-  API act as the signed-in test user. Their
-  [audit records](reference/record-api.md#audit-records-and-history) store the
-  test user's id and display name.
-- **Open writes.** Until M4, record writes stay open with nobody signed in.
-  Their audit records then have the actor `anonymous` and no display name.
-- **Development and E2E users.** `dotnet run` and the E2E server run with
-  the purchase request users: an employee, two department managers and a
-  finance reviewer. The E2E server runs as `Testing`. Only the test user
-  journey still signs in as a test user. The other journeys sign in through
-  Keycloak.
 
 ## Process engine (D11)
 

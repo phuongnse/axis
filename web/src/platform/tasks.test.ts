@@ -5,7 +5,7 @@ import { completeTask, fetchTask, fetchTasks, signInRequired } from './tasks'
 vi.mock('./navigation')
 
 describe('task API calls', () => {
-  it('do not start sign-in on a 401, because the task API still reads only the test user', async () => {
+  it('do not start sign-in on a 401, because the task pages keep their own sign-in prompt', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ title: 'Sign in to work on tasks.' }), { status: 401 })),

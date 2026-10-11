@@ -24,7 +24,7 @@ function renderShell(locale: string) {
   )
 }
 
-// The server offers no test users, so the shell shows no test user picker.
+// The 404 answers the account button's GET /api/me, so the button shows nothing.
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
