@@ -382,8 +382,8 @@ because no conversion is implicit except integer to decimal.
 It follows [D24](../decisions.md#d24-roles-and-policies--agreed). The type
 check, the SQL translation and binding the `@currentUser` parameter are built:
 the record API binds it when it runs a policy filter. The interpreter does not
-evaluate it, and that is not planned for M4, because every policy filter runs
-as SQL.
+evaluate it, and no milestone plans that, because every policy filter runs as
+SQL.
 
 `currentUser()` gives the signed-in user's id as `text`, as the
 [session](../architecture.md#sign-in-and-the-session) holds it. A policy
