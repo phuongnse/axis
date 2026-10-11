@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Integration tests against real PostgreSQL containers, and the smoke test of scripts/dev.sh
-# (requires Docker with the compose plugin, and network access for the first SPA install).
+# Integration tests against real PostgreSQL and Keycloak containers, and the smoke test of
+# scripts/dev.sh (requires Docker with the compose plugin, and network access for the first SPA
+# install).
 # The smoke test is skipped when $NEXKIT_BASE_SHA shows that nothing it covers changed.
 set -euo pipefail
 cd "$(dirname "$0")/.."

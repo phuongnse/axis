@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
+# Keycloak runs with the development realm from samples/keycloak, and Playwright starts the
+# server only once the realm answers. The server does not use Keycloak yet.
 # The server starts with two applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
@@ -14,6 +16,8 @@ source scripts/lib/test-results.sh
 image="postgres:18-alpine"
 container="axis-e2e-postgres-$$"
 password="e2e-$RANDOM$RANDOM"
+keycloak_image="quay.io/keycloak/keycloak:26.4"
+keycloak_container="axis-e2e-keycloak-$$"
 
 worker_pid=""
 worker_dir="$(mktemp -d)"
@@ -34,12 +38,20 @@ stop_worker() {
 cleanup() {
   stop_worker
   docker rm -f "$container" >/dev/null 2>&1 || true
+  docker rm -f "$keycloak_container" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 docker run -d --name "$container" -e POSTGRES_USER=axis -e POSTGRES_DB=axis \
   -e POSTGRES_PASSWORD="$password" -p 127.0.0.1::5432 "$image" >/dev/null
 port="$(docker port "$container" 5432/tcp | head -n1 | sed 's/.*://')"
+
+# Keycloak starts now and imports the realm while PostgreSQL and the build get ready.
+docker run -d --name "$keycloak_container" \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" -p 127.0.0.1::8080 \
+  "$keycloak_image" start-dev --import-realm >/dev/null
+keycloak_port="$(docker port "$keycloak_container" 8080/tcp | head -n1 | sed 's/.*://')"
 
 # Check over TCP: the image's initialization server listens only on the Unix socket.
 timeout="${AXIS_E2E_POSTGRES_TIMEOUT:-60}"
@@ -69,6 +81,31 @@ if [ "$ready" -ne 1 ]; then
 fi
 
 scripts/build.sh
+
+discovery="http://127.0.0.1:$keycloak_port/realms/axis/.well-known/openid-configuration"
+timeout="${AXIS_E2E_KEYCLOAK_TIMEOUT:-180}"
+ready=0
+reason="did not answer after $timeout seconds"
+for _ in $(seq 1 "$timeout"); do
+  if curl -fs -o /dev/null "$discovery"; then
+    ready=1
+    break
+  fi
+  if [ "$(docker inspect -f '{{.State.Running}}' "$keycloak_container" 2>/dev/null)" != "true" ]; then
+    reason="stopped before it answered"
+    break
+  fi
+  sleep 1
+done
+
+if [ "$ready" -ne 1 ]; then
+  {
+    echo "The axis realm of Keycloak in $keycloak_container $reason."
+    echo "Container logs:"
+    docker logs "$keycloak_container" 2>&1 || true
+  } >&2
+  exit 1
+fi
 
 mkdir -p artifacts/logs
 export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"

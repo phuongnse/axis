@@ -54,6 +54,7 @@ tests/
     fixtures/e2e-app/     generic test application the E2E server activates
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
+  keycloak/               the development Keycloak realm with the sample's users
 ```
 
 Projects are created when the first issue needs them. The solution holds
@@ -269,13 +270,17 @@ Everything in this section is *(planned for M4)*. It follows
   development realm in Keycloak through Testcontainers. E2E journeys sign in
   through Keycloak.
 - **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
-  Keycloak with an imported development realm, `axis`.
+  Keycloak with an imported development realm, `axis`. This part is in place:
+  the realm is `samples/keycloak/axis-realm.json`, and an integration test
+  fixture starts it through Testcontainers. The server does not use it yet.
   - It holds the purchase request users with the ids they have today as
     test users: `anna` the employee, `binh` and `chau` the department
     managers, and `dung` the finance reviewer. Seed data and E2E journeys
     already name these ids.
   - Every user has the same development-only password.
-  - The realm maps each user's roles to the `roles` claim.
+  - The roles are client roles of the confidential client `axis`. A
+    client-role mapper writes them to the `roles` claim, so the claim holds
+    only the sample roles.
 
 ### Authorization
 
@@ -492,7 +497,7 @@ Moved to [reference/frontend.md](reference/frontend.md).
 | Level | Tooling | Scope |
 | --- | --- | --- |
 | Unit | xUnit | Compiler, expression engine, policy evaluation, pure logic |
-| Integration | xUnit + Testcontainers PostgreSQL | Storage, transactions, concurrency, tenancy isolation, engine recovery |
+| Integration | xUnit + Testcontainers PostgreSQL and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm |
 | Frontend unit | Vitest + Testing Library | Shared components and metadata rendering |
 | End to end | Playwright | Real server + real database + SPA, user journeys and denied access |
 

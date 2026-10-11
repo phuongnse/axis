@@ -149,11 +149,12 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       recursive: true,
       filter: (source) => !excluded.has(path.basename(source)),
     })
-    ports = { postgres: await freePort(), server: await freePort(), web: await freePort() }
+    ports = { postgres: await freePort(), keycloak: await freePort(), server: await freePort(), web: await freePort() }
     env = {
       ...process.env,
       COMPOSE_PROJECT_NAME: project,
       AXIS_POSTGRES_PORT: String(ports.postgres),
+      AXIS_KEYCLOAK_PORT: String(ports.keycloak),
       AXIS_SERVER_PORT: String(ports.server),
       AXIS_WEB_PORT: String(ports.web),
       MSBUILDDISABLENODEREUSE: '1',
@@ -176,6 +177,13 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const run = startDev()
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
+
+    // Keycloak serves the development realm, and starts before the server.
+    const discovery = await fetch(`http://localhost:${ports.keycloak}/realms/axis/.well-known/openid-configuration`)
+    assert.equal(discovery.status, 200)
+    const keycloakStart = run.stdout.indexOf('Keycloak on port')
+    assert.ok(keycloakStart >= 0, run.stdout)
+    assert.ok(keycloakStart < run.stdout.indexOf('[server]'), `Server output before Keycloak started:\n${run.stdout}`)
 
     // The worker starts only after the server has migrated the tenant databases.
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
@@ -202,6 +210,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       encoding: 'utf8',
     })
     assert.match(services, /postgres/)
+    assert.match(services, /keycloak/)
   })
 
   it('skips the install on the second run', async () => {

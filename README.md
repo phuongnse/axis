@@ -20,8 +20,9 @@ the commands.
 ## Run Axis
 
 Run `docker compose up --build`. It needs only Docker. It builds Axis from source
-and starts PostgreSQL, the server with the purchase request sample at
-http://localhost:5206, and the worker. See [AGENTS.md](AGENTS.md#commands) for the
+and starts PostgreSQL, Keycloak with the development realm at http://localhost:8080,
+the server with the purchase request sample at http://localhost:5206, and the worker.
+The server does not use Keycloak yet. See [AGENTS.md](AGENTS.md#commands) for the
 port variables.
 
 For development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and
