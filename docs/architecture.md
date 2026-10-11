@@ -181,8 +181,8 @@ Startup fails with an `InvalidOperationException` naming every problem when:
     check of the record API, data source queries and the subject record of a
     process start.
   - Field policies leave out fields from record API results, data source
-    rows and task forms, and reject record API writes to protected fields.
-    Leaving unreadable fields out of page metadata is *(planned for M4)*.
+    rows, task forms and page metadata, and reject record API writes to
+    protected fields.
   - See [Authorization](#authorization).
 - **Before M4.** People sign in through OIDC. The record API, the data
   source endpoint and the process start endpoint need a session and a
@@ -335,8 +335,7 @@ failures as described below. The data source endpoint adds the root entity's
 read filters to its SQL and checks every projected field. A process start
 checks the session, the `start` grant and read access to the subject record.
 The task API keeps the assignee check and leaves out the fields the user may
-not read. Navigation and page metadata follow the user's grants, except
-that page metadata still lists the fields the user may not read. Everything
+not read. Navigation and page metadata follow the user's grants. Everything
 else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
@@ -423,7 +422,7 @@ The `role` and `policy` resource files are described in
   filters it answers. The record API, the data source endpoint and the task
   API apply the field sets. The site endpoints call it to leave unreadable
   pages out of navigation, to answer `403` for them, and to list a widget's
-  allowed actions and writable fields in page metadata.
+  readable fields, allowed actions and writable fields in page metadata.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 
