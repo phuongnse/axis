@@ -8,6 +8,10 @@
     { "entity": "Item", "actions": ["read"], "fields": ["name", "department"] },
     { "entity": "Item", "actions": ["create", "update"], "fields": ["name", "quantity"] },
     { "entity": "Ticket", "actions": ["read", "create"], "fields": ["title"] },
-    { "entity": "Order", "actions": ["read"], "fields": ["lineCount"] }
+    { "entity": "Order", "actions": ["read"], "fields": ["lineCount"] },
+    { "dataSource": "ItemsByName", "actions": ["read"] },
+    { "dataSource": "ItemTotals", "actions": ["read"] },
+    { "dataSource": "ItemsByDepartment", "actions": ["read"] },
+    { "dataSource": "ItemNames", "actions": ["read"] }
   ]
 }

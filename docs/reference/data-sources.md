@@ -13,6 +13,9 @@ the read endpoint, the response and the errors. Parts of this file are built:
   its columns, paging and sorting
 - the filter inputs of a bound table, with their values in the URL
 - the table binding of grouped data sources
+- record and field policies: the root entity's read filters in the query,
+  the field check on every projected field, and labels limited to readable
+  target display fields
 
 Dn refers to
 [decisions.md](../decisions.md). The design follows
@@ -220,27 +223,27 @@ ignoring letter case, as in the record API.
 
 ### Authorization
 
-It follows [Authorization](../architecture.md#authorization). The session and
-the grants are built. The record filters, fields and joined targets are
-*(planned for M4)*.
+It follows [Authorization](../architecture.md#authorization). The session, the
+grants, the record filters, the fields and the joined targets are built.
 
 - **Session.** A request without a session is a `401`, before the path.
 - **Grants.** The user needs a `read` grant on the data source and a `read`
   grant on its root entity, otherwise `403`. Only roles claim values that
-  name a declared role count. An entity grant with a `filter` grants nothing
-  here until the record filters below are built, even though the record API
-  enforces it. An entity grant with a `fields` list grants nothing here
-  until the data source checks fields, as described below, even though the
-  record API enforces it.
+  name a declared role count. An entity grant with a `filter` or a `fields`
+  list counts, and then limits the rows or the fields as described below.
 - **Record filters.** The root entity's read filters are combined with OR and
   added to the data source's own `filter` with AND, in SQL, before any
   grouping. So rows, groups, measures and `totalCount` cover only the
   records the user may read.
 - **Fields.** Every projected field must be one the user may read, otherwise
-  the whole data source is a `403`. This covers a field that a measure
-  aggregates, and the field a path through `reference` fields ends at, such
-  as `name` in `department.name`. There are no partial rows, so authors make
-  one data source per audience.
+  the whole data source is a `403`. This covers every entry of `fields`,
+  also in a grouped data source, and so every field that a measure
+  aggregates. For a path through `reference` fields, every field along the
+  path must be readable on its own entity, not only the field it ends at. So
+  `department.name` needs `department` on the root entity and `name` on the
+  target. The path also shows which record is referenced, so the stricter
+  rule cannot leak. There are no partial rows, so authors make one data
+  source per audience.
 - **Joined targets.** The record filters of a target that a path joins do not
   apply. A label in `labels` shows when the user may read the target's display
   field, as for the record API's [labels](record-api.md#record-shape).
@@ -358,16 +361,15 @@ fixed and never contain text from the request.
 
 A request is checked in this order, and the first failure is the response:
 the session, then the path, then the grants, then the query, then the
-database. From M4 *(planned)*, the readable fields are checked with the
-grants.
+database. The readable fields are checked with the grants.
 
 - **`401`.** A request without a session, or with a session from another
   tenant. It comes before the path, so it is a `401` even for an unknown
   application. The title is fixed.
 - **`403`.** The user has no `read` grant on the data source or on its root
-  entity. The title is fixed and names no data source. From M4 *(planned)*,
-  it is also a `403` when the user may not read one of its projected or
-  aggregated fields. See [Authorization](#authorization).
+  entity, or may not read one of its projected or aggregated fields. The
+  title is fixed and names no data source or field. See
+  [Authorization](#authorization).
 - **`404`.** An unknown application, an application with no active release
   and an unknown data source. The path is resolved before the query is
   checked, so a path that names nothing is a 404 whatever its query.
@@ -378,9 +380,11 @@ grants.
 - **`400` for the database.** A database data exception while evaluating the
   filter, such as an integer overflow or a date out of range from `addDays`.
   The title is fixed, and the response holds no SQL. Any other database
-  error is a `500`. From M4 *(planned)*, a run-time failure in a policy read
-  filter is the same `400`, and no rows are returned. PostgreSQL cannot fail
-  one branch of an `or`, so the whole query fails closed.
+  error is a `500`. A run-time failure in a policy read filter is the same
+  `400`, and no rows are returned. PostgreSQL cannot fail one branch of an
+  `or`, so the whole query fails closed. The server logs the policy and grant
+  index of each of the user's read filters on the root entity, never a
+  record value.
 - **`500`.** An unexpected error is caught by the exception handler. The
   response has no exception type, message or stack trace.
 

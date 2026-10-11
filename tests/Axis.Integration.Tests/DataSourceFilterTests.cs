@@ -108,7 +108,7 @@ public sealed class DataSourceFilterTests(RecordApiFixture fixture) : IClassFixt
 
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
-        var page = await DataSourceQueries.ListAsync(connection, fixture.Model, dataSource, 1, 100, null, [], CancellationToken);
+        var page = await DataSourceQueries.ListAsync(connection, fixture.Model, dataSource, 1, 100, null, [], cancellationToken: CancellationToken);
 
         // Every filter keeps some rows and drops some, so it tells the two back ends apart.
         Assert.InRange(expected.Count, 1, rows.Count - 1);
@@ -272,7 +272,7 @@ public sealed class DataSourceFilterTests(RecordApiFixture fixture) : IClassFixt
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
         var page = await DataSourceQueries.ListAsync(
-            connection, fixture.Model, dataSource, 1, 100, null, [new DataSourceParameterValue(_minQuantity, minQuantity)], CancellationToken);
+            connection, fixture.Model, dataSource, 1, 100, null, [new DataSourceParameterValue(_minQuantity, minQuantity)], cancellationToken: CancellationToken);
 
         Assert.NotNull(page);
         Assert.Equal(expected.Count, page.TotalCount);

@@ -134,7 +134,7 @@ public sealed class DataSourceRelationTests(RecordApiFixture fixture) : IClassFi
         log.Clear();
 
         var page = await DataSourceQueries.ListAsync(
-            connection, fixture.Model, dataSource, 1, pageSize, DataSourceSort.Default(dataSource), [new(dataSource.Parameters[0], null)], CancellationToken);
+            connection, fixture.Model, dataSource, 1, pageSize, DataSourceSort.Default(dataSource), [new(dataSource.Parameters[0], null)], cancellationToken: CancellationToken);
 
         Assert.NotNull(page);
         // Npgsql logs one entry per executed command. Matching on the message alone keeps the test

@@ -304,8 +304,8 @@ Paths in validations and computed fields are not built. There a path is
   fields, paths through reference fields of up to 3 hops, the named rules and
   [`currentUser()`](#current-user). The compiler type-checks it as a boolean
   and translates it to SQL. It must stay inside the [SQL subset](#sql-subset),
-  because record lists and single-record checks run it as SQL, and
-  [data sources](data-sources.md#authorization) will too *(planned for M4)*.
+  because record lists, single-record checks and
+  [data sources](data-sources.md#authorization) run it as SQL.
   So it cannot use an aggregate or `lower`, which are `AXC0053`. A rule body
   cannot call `currentUser()`, so a filter passes the user id to a rule as an
   argument, such as `IsRequester(requester, currentUser())`.

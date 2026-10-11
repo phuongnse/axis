@@ -9,8 +9,8 @@ namespace Axis.Policy;
 /// grants nothing. A policy applies when the user holds any of its roles. An entity grant with a
 /// <see cref="GrantModel.Filter"/> grants the records that match it, and one with
 /// <see cref="GrantModel.Fields"/> grants those fields, through <see cref="Access"/> and
-/// <see cref="Fields"/> only. The data source checks, <see cref="Allows"/> and
-/// <see cref="AllowsRead"/>, count neither.
+/// <see cref="Fields"/>. The caller applies them: the record API and the data source endpoint
+/// both add the filters to their SQL and check the fields.
 /// </summary>
 public static class PolicyEvaluator
 {
@@ -81,29 +81,17 @@ public static class PolicyEvaluator
     }
 
     /// <summary>
-    /// Whether <paramref name="roles"/> grant <paramref name="action"/> on every record of
-    /// <paramref name="entity"/>, through a grant with neither a filter nor fields. The data
-    /// source endpoint applies neither record filters nor field lists yet, so it needs such a
-    /// grant.
-    /// </summary>
-    public static bool Allows(ApplicationModel application, IEnumerable<string> roles, EntityModel entity, PolicyAction action) =>
-        Grants(application, roles).Any(grant =>
-            grant.Entity?.Id == entity.Id
-            && grant.Actions.Contains(action)
-            && grant.Filter is null
-            && grant.Fields is null);
-
-    /// <summary>
     /// Whether <paramref name="roles"/> grant <c>read</c> on <paramref name="dataSource"/>. That
-    /// takes a <c>read</c> grant on the data source and one on every record of its root entity, as
-    /// <see cref="Allows"/> decides.
+    /// takes a <c>read</c> grant on the data source and any <c>read</c> grant on its root entity,
+    /// as <see cref="Access"/> decides, whatever its filter or fields. The caller limits the rows
+    /// to the root entity's read filters and checks the projected fields.
     /// </summary>
     public static bool AllowsRead(ApplicationModel application, IEnumerable<string> roles, DataSourceModel dataSource)
     {
         var held = roles.ToList();
         return Grants(application, held).Any(grant => grant.DataSource?.Id == dataSource.Id && grant.Actions.Contains(PolicyAction.Read))
             && application.FindEntity(dataSource.Entity.Id) is { } entity
-            && Allows(application, held, entity, PolicyAction.Read);
+            && Access(application, held, entity, PolicyAction.Read).Granted;
     }
 
     /// <summary>The grants of every policy that names a role the user holds.</summary>

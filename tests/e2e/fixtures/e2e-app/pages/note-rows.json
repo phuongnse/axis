@@ -1,0 +1,8 @@
+{
+  "id": "99ddd88d-ab5d-41bc-8932-b4ef02e7f8fb",
+  "kind": "page",
+  "name": "NoteRows",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteRows.title" },
+  "widgets": [{ "type": "table", "dataSource": "NoteRows" }]
+}

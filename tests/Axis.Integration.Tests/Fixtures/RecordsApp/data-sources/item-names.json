@@ -1,0 +1,12 @@
+{
+  "id": "83d05eb3-6f46-44df-bc14-a316adcdde8f",
+  "kind": "dataSource",
+  "name": "ItemNames",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "department", "path": "department" }
+  ],
+  "sort": "name"
+}

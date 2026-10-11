@@ -2,7 +2,8 @@ namespace Axis.Server.Records;
 
 /// <summary>
 /// Log lines for record filters that fail at run time. A line names the policy, the grant's index
-/// in its grants and the entity. It never holds a record value or the database's message.
+/// in its grants and the entity or the data source. It never holds a record value or the
+/// database's message.
 /// </summary>
 internal static partial class RecordFilterLog
 {
@@ -11,4 +12,7 @@ internal static partial class RecordFilterLog
 
     [LoggerMessage(LogLevel.Warning, "A record list of entity {Entity} failed because its read filters could not be evaluated. They include the filter of grant {Grant} of policy {Policy}.")]
     public static partial void ListFailed(ILogger logger, string policy, int grant, string entity);
+
+    [LoggerMessage(LogLevel.Warning, "A data source {DataSource} failed because its filter or the read filters could not be evaluated. The read filters include the filter of grant {Grant} of policy {Policy}.")]
+    public static partial void DataSourceFailed(ILogger logger, string policy, int grant, string dataSource);
 }
