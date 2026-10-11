@@ -27,11 +27,17 @@ namespace Axis.Server.Records;
 /// filter is a 403 too: it is checked in the write transaction, after storage, and rolls the write
 /// back. A filter that fails for a record grants nothing through its grant and is logged, and a
 /// list whose filters fail is a 400.
+/// A grant with <c>fields</c> covers only those fields. A record, in a list, a single read or the
+/// response of a create or update, holds only the values the user's <c>read</c> grants cover, and a
+/// reference label only when the user may also read the target's display field. A history leaves
+/// the other field names out of the details. A sort by a field the user may not read is a 400, as
+/// is a search when they may not read the display field.
 /// A create or update writes the record and its child rows in one transaction. A create sets the
 /// entity's creator fields to the session user's id. Every create, update and delete that
 /// succeeds appends one audit record in its transaction. Its actor is the session user, with their
 /// display name. A write that fails leaves none.
-/// A body is checked in order: content type (415), then body (400), then the computed fields of
+/// A body is checked in order: content type (415), then body (400), then a field that no grant for
+/// the action covers (403, at the path of each such field), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
 /// validations reads the stored record first, so an unknown record is a 404 there.
@@ -87,11 +93,14 @@ internal static class RecordEndpoints
             return Grants.Forbidden();
         }
 
+        var fields = RecordFieldAccess.Read(application!, user.Roles, model);
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
 
+        // A field the user may not read is no sort, and its display field no search, so neither
+        // can probe a hidden value.
         RecordSort? order = null;
-        if (sort is not null && !RecordSort.TryParse(sort, model, out order))
+        if (sort is not null && (!RecordSort.TryParse(sort, model, out order) || !fields.CanRead(order.Field.Name)))
         {
             errors["sort"] = ["Must be a declared field name, optionally preceded by '-'."];
         }
@@ -105,6 +114,10 @@ internal static class RecordEndpoints
             if (model.DisplayField is null)
             {
                 errors["search"] = ["The entity has no display field to search."];
+            }
+            else if (!fields.CanRead(model.DisplayField))
+            {
+                errors["search"] = ["You may not read the display field."];
             }
             else if (search.Length > MaxSearchLength || search.Contains('\0', StringComparison.Ordinal))
             {
@@ -133,7 +146,7 @@ internal static class RecordEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
         }
 
-        return Results.Ok(new RecordListResponse(result.Items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new RecordListResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
 
     private static async Task<IResult> GetAsync(
@@ -176,7 +189,7 @@ internal static class RecordEndpoints
         }
 
         return await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is { } record
-            ? Results.Ok(record)
+            ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(record))
             : RecordNotFound();
     }
 
@@ -233,6 +246,7 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
+        var fields = RecordFieldAccess.Read(application!, user.Roles, model);
         var result = await AuditRecords.ListForRecordAsync(connection, model.Id, recordId, pageNumber, size, cancellationToken);
         var items = result.Items
             .Select(item => new RecordHistoryItem(
@@ -242,7 +256,7 @@ internal static class RecordEndpoints
                 item.ActorName,
                 item.Action,
                 item.ProcessInstanceId,
-                JsonNode.Parse(item.Details)!))
+                VisibleDetails(JsonNode.Parse(item.Details)!, fields)))
             .ToList();
         return Results.Ok(new RecordHistoryResponse(items, pageNumber, size, result.TotalCount));
     }
@@ -286,6 +300,11 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        if (RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application!, user.Roles, model, PolicyAction.Create)) is { } unwritable)
+        {
+            return Grants.UnwritableFields(unwritable);
+        }
+
         // The creator fields are set before the computed fields and validations, so they see the
         // record as it will be stored.
         var input = parsed.Input!;
@@ -326,7 +345,9 @@ internal static class RecordEndpoints
 
         // The location uses the model's names, so a record has one URL whatever case the caller used.
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } created }
-            ? Results.Created($"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}", created)
+            ? Results.Created(
+                $"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}",
+                RecordFieldAccess.Read(application, user.Roles, model).Visible(created))
             : WriteFailure(result);
     }
 
@@ -411,6 +432,11 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        if (RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application!, user.Roles, model, PolicyAction.Update)) is { } unwritable)
+        {
+            return Grants.UnwritableFields(unwritable);
+        }
+
         var input = parsed.Input!;
         if (checkedVersions.Any(version => version != input.Version))
         {
@@ -464,7 +490,7 @@ internal static class RecordEndpoints
         }
 
         return result is { Outcome: RecordWriteOutcome.Written, Record: { } updated }
-            ? Results.Ok(updated)
+            ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(updated))
             : WriteFailure(result);
     }
 
@@ -679,6 +705,23 @@ internal static class RecordEndpoints
             .Concat(input.Rows.Select(rows => rows.Collection.Name))
             .ToHashSet(StringComparer.Ordinal);
         return model.Fields.Select(field => field.Name).Where(named.Contains);
+    }
+
+    /// <summary>
+    /// The details of an audit record with only the field names the user may read in its
+    /// <c>fields</c>, as a <c>record.updated</c> or a <c>task.completed</c> has.
+    /// </summary>
+    private static JsonNode VisibleDetails(JsonNode details, RecordFieldAccess fields)
+    {
+        if (fields.Readable is not null && details is JsonObject { } holder && holder["fields"] is JsonArray names)
+        {
+            holder["fields"] = new JsonArray([.. names
+                .Select(name => name is JsonValue value && value.TryGetValue<string>(out var text) ? text : null)
+                .Where(name => name is not null && fields.CanRead(name))
+                .Select(name => JsonValue.Create(name))]);
+        }
+
+        return details;
     }
 
     // Only the hyphenated form names a record; any other text is no record, not a bad request.

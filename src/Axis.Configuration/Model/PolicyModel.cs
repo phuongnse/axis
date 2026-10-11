@@ -3,7 +3,8 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled policy: the declared roles it applies to and its grants, each with its target
 /// resolved. The record API and the data source endpoint enforce its entity and data source
-/// grants, and a grant with a filter or fields grants nothing yet.
+/// grants. The record API applies a grant's filter and fields, and the data source endpoint counts
+/// only a grant with neither.
 /// </summary>
 public sealed record PolicyModel
 {
