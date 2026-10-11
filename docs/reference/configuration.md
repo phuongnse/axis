@@ -204,8 +204,9 @@ flowchart LR
      Each `set` expression is parsed and type-checked against its field's
      type, with the same scope as a `when`. Each of these is reported at
      `/steps/{i}/set/{field}`. A task step's `assignee` without exactly one
-     of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. Whether a
-     `role` exists is not checked. A `user` expression is parsed and
+     of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. From M4 a
+     `role` must name a declared [role](#roles-and-policies) *(planned for
+     M4)*. A `user` expression is parsed and
      type-checked as `text`, with the same scope as a `when`, and a problem is
      reported at `/steps/{i}/assignee/user`. A task's `form` that names no
      loaded form, ignoring letter case, is `AXC0082` at `/steps/{i}/form`. A
@@ -730,6 +731,188 @@ An entity `text` field names the sequence in its `sequence` property:
   because the server always assigns its value. A child entity's field cannot
   have a `sequence` either. Each of these is `AXC0013`.
 
+## Roles and policies
+
+Everything in this section is *(planned for M4)*. It follows
+[D24](../decisions.md#d24-roles-and-policies--agreed), and
+[Authorization](../architecture.md#authorization) describes how the server
+applies it. Each compile check below is a compile error, and its code comes
+with the issue that builds it.
+
+A `role` resource declares a role that users can hold:
+
+```json
+{
+  "id": "f373f3ea-4e4d-4842-9791-4daf7be47f0a",
+  "kind": "role",
+  "name": "employee",
+  "formatVersion": 1,
+  "label": { "textKey": "role.employee" }
+}
+```
+
+```json
+{
+  "id": "6fedaeb5-8afd-4fed-9aad-af8dc6b60f58",
+  "kind": "role",
+  "name": "department-manager",
+  "formatVersion": 1,
+  "label": { "textKey": "role.departmentManager" }
+}
+```
+
+```json
+{
+  "id": "83e56e02-92d0-46d4-a67d-78f6e76468a4",
+  "kind": "role",
+  "name": "finance-reviewer",
+  "formatVersion": 1,
+  "label": { "textKey": "role.financeReviewer" }
+}
+```
+
+- **Name.** A role name is lower-case letters, digits and hyphens. It starts
+  with a letter and is at most 60 characters long. Roles claim values and
+  task assignees already use names such as `finance-reviewer`, which the
+  usual resource name rule refuses. With one lower-case form, letter case
+  never matters.
+- **Claim values.** A role matches a roles claim value exactly. A claim value
+  that names no declared role is ignored.
+- **Label.** The `label` text key joins the `AXC0028` check.
+
+A `policy` resource gives roles grants. The purchase request sample has three
+policies. Employees reach their own requests, department managers the
+requests of their department, and finance reviewers the submitted ones:
+
+```json
+{
+  "id": "2eeb31d5-47d9-4fb9-bd84-eb7ffdc11f12",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "requester == currentUser()" },
+    {
+      "entity": "PurchaseRequest",
+      "actions": ["create", "update"],
+      "filter": "requester == currentUser() and status in ('draft', 'returned')",
+      "fields": ["title", "department", "supplier", "currency", "lineItems", "status"]
+    },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "process": "PurchaseRequestApproval", "actions": ["start"] }
+  ]
+}
+```
+
+```json
+{
+  "id": "7d9f722e-7406-4a39-87d5-e99293353a05",
+  "kind": "policy",
+  "name": "DepartmentManagerAccess",
+  "formatVersion": 1,
+  "roles": ["department-manager"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+  ]
+}
+```
+
+```json
+{
+  "id": "d9788ec8-1186-488d-8c83-cbc9e5441d11",
+  "kind": "policy",
+  "name": "FinanceReviewerAccess",
+  "formatVersion": 1,
+  "roles": ["finance-reviewer"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "status == 'submitted'" },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+  ]
+}
+```
+
+- **Roles.** `roles` lists one or more declared roles. A user who holds any
+  of them gets every grant of the policy.
+- **Grants.** `grants` lists one or more grants. Each has exactly one target,
+  `entity`, `dataSource` or `process`, and one or more `actions`:
+  - an `entity` takes `read`, `create`, `update` and `delete`;
+  - a `dataSource` takes `read`;
+  - a `process` takes `start`.
+- **Filter.** An entity grant may have a `filter`, a boolean
+  [expression](expressions.md#names-and-references) over the record. It sees
+  the entity's fields, paths through `reference` fields of up to 3 hops, the
+  named rules and [`currentUser()`](expressions.md#current-user). Without it,
+  the grant covers every record. On `read`, `update` and
+  `delete` the stored record must match it. On `create` and `update` the new
+  record must match it too. The employee's write grant above keeps a request
+  at `draft` or `returned`, so a new request is saved with one of those
+  statuses, and the process moves it on.
+- **Fields.** An entity grant may have `fields`, a list of field names of the
+  entity. Without it, the grant covers every field. A `child-collection`
+  field covers its rows as a whole.
+- **Combining.** The grants of all the user's policies combine with OR. A
+  filter that is `false`, `null` or fails gives nothing through its grant.
+  See [Combining grants](../architecture.md#combining-grants).
+
+Compile checks, each a compile error *(planned for M4)*:
+
+- A policy `roles` entry, or a process task's `assignee.role`, that names no
+  declared role, compared exactly.
+- A grant without exactly one of `entity`, `dataSource` and `process`.
+- A target that names no loaded entity, data source or process, ignoring
+  letter case.
+- An action that the target's kind does not take, such as `start` on an
+  entity.
+- A grant on a child entity. Child rows are read and written through their
+  owner's grants.
+- A `filter` or `fields` on a `dataSource` or `process` grant.
+- A `fields` entry that names no field of the entity, ignoring letter case.
+- A `filter` that is not boolean, or that uses something outside the
+  [SQL subset](expressions.md#sql-subset), such as an aggregate or `lower`.
+  It gets the usual [expression diagnostics](expressions.md#diagnostics)
+  too.
+
+### Record creator
+
+A `text` field can declare `"creator": true`. On create it gets the signed-in
+user's id, and policies use it, for example `requester == currentUser()`:
+
+```json
+{
+  "id": "d9ccbf89-5004-4d52-8885-2ee377b7caa5",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "requester", "type": "text", "maxLength": 100, "creator": true }
+  ]
+}
+```
+
+- **Value.** A create through the record API sets it to the user id from the
+  session, in the create's transaction. A create by the system or by seed
+  data leaves it `null`.
+- **Not writable.** Clients cannot write it, as for a
+  [sequence](#sequences) field. A body that sets it on create or update, even
+  to `null`, is a `400` at its pointer with the message "Cannot be set.". A
+  seed value for it is `AXC0033`.
+- **Allowed fields.** `creator` is allowed only on a `text` field. It cannot
+  be combined with `required`, `expression` or `sequence`, and a child
+  entity's field cannot have it. Each is a compile error.
+
 ## Entity field types and constraints
 
 A field property is allowed only on the types that have an entry for it below.
@@ -766,6 +949,9 @@ is `AXC0013`.
 - `sequence` names a [sequence](#sequences), ignoring letter case. It cannot
   be combined with `required: true` or `expression`, and a child entity's
   field cannot have it. Each is `AXC0013` at `/fields/{i}/sequence`.
+- `creator` *(planned for M4)* is allowed only on a `text` field. It cannot
+  be combined with `required`, `expression` or `sequence`, and a child
+  entity's field cannot have it. See [Record creator](#record-creator).
 
 ## Entity logic
 

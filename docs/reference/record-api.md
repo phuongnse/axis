@@ -11,8 +11,11 @@ the entities of the active release of an application, in the tenant that the
 request host resolves to. A record of another tenant does not exist for the
 request, so it is a 404 like any unknown record.
 
-The endpoints have no authorization yet. Policies are checked on every record
-endpoint from M4 (see [Authentication and authorization](../architecture.md#authentication-and-authorization)).
+From M4 *(planned)*, policies are checked on every record endpoint, as
+[Authorization](../architecture.md#authorization) describes. A user needs a
+grant for the action on the entity. A record outside every read filter is a
+`404`, and fields the user may not read are left out. Until then the
+endpoints are open.
 
 ## Routes
 
@@ -62,19 +65,32 @@ reference or every reference is `null`. A `null` reference has no entry.
 `values` keeps the record id of each reference, so a record read and sent back
 is unchanged.
 
+From M4 *(planned)*, `values` and `labels` hold only the fields the user may
+read. They are the union of the `fields` of the user's `read` grants on the
+entity, the same for every record. A field the user may not read is left out
+of both, so `null` still means an empty field. `id` and `version` are always
+there. A child entity's rows follow their owner's `fields` entry for the
+`child-collection` field, as a whole. See
+[Authorization](../architecture.md#authorization).
+
 The labels come from the same SQL statement as the records, through one left
 join per reference field to the target table. They are never read with one
 query per row. Create and update return their labels from the same statement
 as the write: the write is a data-modifying `WITH` clause, and the labels are
-selected from it with the same joins, because `RETURNING` cannot join. Labels
-are not filtered by access yet. From M4 the server decides whether a caller may
-see the label of a record it cannot read.
+selected from it with the same joins, because `RETURNING` cannot join.
+
+From M4 *(planned)*, a label shows when the user may read the reference field
+and the target entity's display field. The target's record filters do not hide
+it, so a user who reads a request sees its department's name even when no
+read filter on `Department` matches that department. The joins stay as they
+are.
 
 A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
 "totalCount": 42 }`. `items` holds records in the shape above, including
 `labels`. `page` and `pageSize` are the values used, and `totalCount` counts
 the records of the entity that match the `search`, or every record without
-one.
+one. From M4 *(planned)*, a list holds only records that match a read filter,
+and `totalCount` counts only those.
 
 ## Reading values
 
@@ -95,7 +111,9 @@ one.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
 - **`sort`.** A declared field name, or `-` and the name for descending
   order. The name matches exactly, so letter case matters. A
-  `child-collection` field is not a valid `sort`.
+  `child-collection` field is not a valid `sort`. From M4 *(planned)*, a field
+  the user may not read is not a valid `sort` either, as for an unknown
+  field.
 - **`search`.** Keeps only the records whose display field contains the text,
   ignoring letter case. Both sides go through PostgreSQL `lower()`, so case
   folding follows the tenant database. The text has no wildcards: `%`, `_`,
@@ -104,7 +122,8 @@ one.
   and an empty `search` means no filter. It is invalid on an entity without a
   display field, when repeated, when longer than 200 characters, or when it
   contains U+0000. The filter cannot use an index, so it reads the whole
-  table.
+  table. From M4 *(planned)*, a `search` is invalid when the user may not
+  read the display field.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -193,10 +212,41 @@ a session is a `401`. So a caller without a session cannot find out which
 applications or records exist. See
 [Sign-in and the session](../architecture.md#sign-in-and-the-session).
 
+From M4 *(planned)*, policies add checks too. The full order is:
+
+1. The CSRF header, `403`.
+2. The session, `401`.
+3. The path, `404`.
+4. A grant for the action on the entity, `403`.
+5. The stored record: unknown or outside every read filter, `404`.
+6. On update and delete, the stored record outside every `update` or
+   `delete` filter, `403`.
+7. The content type, `415`.
+8. The query of a list, or the body, `400`.
+9. Fields the user may not write, `403`.
+10. On create and update, the new record outside every `create` or `update`
+    filter, `403`.
+11. The validations, `400`, then storage.
+
+So a caller learns that a record exists only once they may read it. The field
+and value checks need the parsed body, so they come after it. See
+[Authorization](../architecture.md#authorization).
+
 - **`403` for the CSRF header** *(planned for M4)*. A `POST`, `PUT`, `PATCH`
   or `DELETE` without `X-Axis-Csrf: 1`.
 - **`401`** *(planned for M4)*. A request without a session, or with a
   session from another tenant.
+- **`403` without a grant** *(planned for M4)*. The user has no grant for the
+  action on the entity. A list or a single read needs `read`, a create
+  `create`, an update `update` and a delete `delete`. History needs `read`.
+- **`404` outside every read filter** *(planned for M4)*. A record that
+  matches no read filter of the user is answered like an unknown record.
+- **`403` for a record outside its write filters** *(planned for M4)*. The
+  stored record matches no `update` or `delete` filter, or the new record
+  matches no `create` or `update` filter. The title is fixed.
+- **`403` for a field write** *(planned for M4)*. The body writes a field that
+  no `create` or `update` grant of the user covers. It has the `errors` shape
+  of a `400`, keyed `/values/<field>`, and lists every such field.
 - **`404`.** An unknown application, an application with no active release,
   an unknown entity, an unknown record and an `{id}` that is not a UUID in the
   hyphenated form. The path is resolved before the query is checked, so a
@@ -469,7 +519,10 @@ can be read as its history (D21).
     that is no longer configured. From M4 *(planned)*, `actorName` is the
     display name stored with the audit record. It is `null` for `system` and
     for audit records written before M4, which have no stored name.
-  - The history is not filtered by access before M4. Anyone who can read the
+  - From M4 *(planned)*, the history needs read access to the record. A user
+    without a `read` grant on the entity gets a `403`, and a record outside
+    every read filter is a `404`. The `fields` of `details` leave out the
+    fields the user may not read. Until then, anyone who can read the
     record can read its history.
 
 For example:

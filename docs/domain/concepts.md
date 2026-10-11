@@ -71,7 +71,7 @@ Later constraints:
 | Concept | Meaning | From |
 | --- | --- | --- |
 | **Expression** | A typed, side-effect-free formula in Axis's [expression language](../reference/expressions.md), checked at compile time. | M2 |
-| **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations, data source filters and process conditions call rules today. Policy filters follow with policies (M4). | M2 |
+| **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations, data source filters and process conditions call rules today. Policy filters will call them too *(planned for M4)*. | M2 |
 | **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. M3 has one built-in operation, `updateRecord`, which sets fields of the subject record inside the step's transaction. Declared capabilities and idempotency, external calls and operations from extension packages come in M5. See [processes](../reference/processes.md#steps). | M3 (basic), M5 |
 | **Extension package** | Versioned C# code, and later React components, that adds operations and widgets under declared capabilities. | M5 |
 
@@ -130,8 +130,8 @@ See [processes](../reference/processes.md#steps).
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Role** | A named set of permissions. Users get roles through membership or identity-provider claims. | M4 |
-| **Policy** | A grant on a resource, record, field or action, optionally with a record filter rule. Default-deny applies. | M4 |
+| **Role** | A declared `role` resource with a name and a label. Users hold roles through the identity provider's roles claim, and a claim value that names no declared role is ignored. Policies give roles their grants. See [authorization](../architecture.md#authorization) *(planned for M4)*. | M4 |
+| **Policy** | A `policy` resource that gives one or more roles grants on entities, data sources and processes. An entity grant may have a record filter and a list of fields. The grants of all the user's policies combine with OR, and default-deny applies. See [authorization](../architecture.md#authorization) *(planned for M4)*. | M4 |
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. | M5 |
 | **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. From M4 it also holds the actor's display name *(planned for M4)*. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
