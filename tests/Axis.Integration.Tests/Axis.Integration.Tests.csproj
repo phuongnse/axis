@@ -29,6 +29,7 @@
     <Compile Include="..\Axis.Configuration.Tests\ModelAssert.cs" Link="ModelAssert.cs" />
     <Compile Include="..\Axis.Configuration.Tests\TemporaryFolder.cs" Link="TemporaryFolder.cs" />
     <Compile Include="..\Axis.Data.Tests\Models.cs" Link="Models.cs" />
+    <Compile Include="..\Axis.Server.Tests\TestOidc.cs" Link="TestOidc.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,7 +20,8 @@ flowchart LR
 ```
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
-  It becomes the BFF (OIDC client and cookie session) *(planned for M4)*.
+  It is the BFF: the OIDC client and the cookie session. Requiring a session
+  on its endpoints is *(planned for M4)*.
 - **Axis.Worker** executes durable work. So far it runs work items, and
   through them the `decision`, `task`, `operation` and `end` steps of process
   instances. Wait for event, timer and sub-process steps come later. Outbox
@@ -162,10 +163,10 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 
 ## Authentication and authorization
 
-- **Authentication (D9, D23, planned for M4).**
+- **Authentication (D9, D23).**
   - The server is the OIDC confidential client.
   - The browser gets a secure, HttpOnly, SameSite cookie session.
-  - API calls from the SPA are protected against CSRF.
+  - API calls from the SPA are protected against CSRF *(planned for M4)*.
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
 - **Authorization (D12, D24, planned for M4).**
@@ -176,19 +177,28 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Field policies leave out fields from results and reject writes to
     protected fields.
   - See [Authorization](#authorization).
-- **Before M4.** There is no authentication yet: every endpoint is open.
-  Development test users stand in for sign-in, as described below (D21),
-  until [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)
-  replaces them.
+- **Before M4.** People can sign in through OIDC, but no endpoint needs a
+  session yet: every endpoint is open. Development test users still work
+  beside the session, as described below (D21), until
+  [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)
+  removes them. Record writes, process starts and tasks take their actor from
+  the test user.
 
 ### Sign-in and the session
 
-Everything in this section is *(planned for M4)*. It follows
+It follows
 [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed).
+Sign-in, the session and `GET /api/me` are in place. The parts still to come
+are marked *(planned for M4)*.
 
 - **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
   server is the confidential client: it exchanges the code for tokens, reads
-  the claims and keeps no token after that (D9).
+  the claims from the ID token and keeps no token after that (D9). The
+  identity provider returns the code in the query string. Pushed
+  authorization requests stay off until FAPI 2.0 work (D9).
+  - The server registers one OIDC client per tenant. All of them share the
+    callback path, and each one ignores a callback that arrives on another
+    tenant's host.
 - **Tenant settings.** Each tenant in the [`Tenants` section](#tenant-configuration)
   has an `Oidc` block. `Claims` names the claims that give the user id, the
   display name and the roles. Each claim name is optional, and the defaults
@@ -215,7 +225,8 @@ Everything in this section is *(planned for M4)*. It follows
 - **Secret.** The client secret comes from the environment, such as
   `Tenants__default__Oidc__ClientSecret`. It is never in a committed file,
   except the development fixtures, which are never valid outside
-  `Development` and tests.
+  `Development` and tests. `appsettings.Development.json` and the E2E server
+  use the development realm's secret.
 - **Endpoints.**
   - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity
     provider. `returnUrl` must start with a single `/`. A value that does
@@ -223,18 +234,23 @@ Everything in this section is *(planned for M4)*. It follows
     response. A missing `returnUrl` means `/`.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
-    creates no session.
+    creates no session. For now it answers a `500` problem details response,
+    for example when the person cancels at the identity provider.
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
     identity provider returns it to `/`. The SPA calls sign-out with `fetch`
     so it can send the CSRF header, and a `fetch` call cannot follow a
-    redirect to the identity provider as a page.
-- **Session.** One HttpOnly, Secure, SameSite=Lax cookie.
+    redirect to the identity provider as a page. The SPA's sign-in and
+    sign-out are *(planned for M4)*.
+- **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
   - It holds the user id, the display name, the roles and the tenant id.
   - It holds no access, refresh or ID token, and no token reaches the
     browser.
   - It ends 8 hours after sign-in, or after 1 hour without requests,
-    whichever comes first.
+    whichever comes first. Every request with a session renews the cookie,
+    so the hour counts from the last request.
+  - In `Development` and `Testing`, which run over plain http, the session
+    cookie and the OIDC helper cookies are Secure only on https requests.
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.
@@ -243,9 +259,10 @@ Everything in this section is *(planned for M4)*. It follows
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. Without a
-  session it is a `401`, as today.
-- **Sign-in needed.** Without a session, these answer a `401` problem
-  details response:
+  session it is a `401`, as today. Until test users are removed, it falls
+  back to the signed-in test user when there is no session.
+- **Sign-in needed** *(planned for M4)*. Without a session, these answer a
+  `401` problem details response:
   - every route under `/api/apps/{app}/`: records, record history, data
     source rows, process start and tasks. The session is checked before any
     `404`, so a caller without a session cannot learn which applications or
@@ -261,18 +278,23 @@ Everything in this section is *(planned for M4)*. It follows
   `GET /api/auth/callback`, every path under `/health` and the SPA's static
   files. `POST /api/auth/sign-out` needs the CSRF header but no
   session.
-- **CSRF.** Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must carry
-  `X-Axis-Csrf: 1`, otherwise `403`. The CSRF header is checked first, then
-  the session. See the record API's
+- **CSRF** *(planned for M4)*. Every `POST`, `PUT`, `PATCH` and `DELETE`
+  under `/api` must carry `X-Axis-Csrf: 1`, otherwise `403`. The CSRF
+  header is checked first, then the session. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
-- **Tests.** Integration tests sign in through a test authentication scheme
-  that only test hosts register. Tests of sign-in itself start the
-  development realm in Keycloak through Testcontainers. E2E journeys sign in
-  through Keycloak.
+- **Tests.** Tests of sign-in itself start the development realm in Keycloak
+  through Testcontainers, and drive its login page. Tests of the session
+  lifetime create the session through a test-only hook and use a test clock.
+  Integration tests of other endpoints sign in through a test authentication
+  scheme that only test hosts register *(planned for M4)*. E2E journeys sign
+  in through Keycloak *(planned for M4)*.
 - **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
   Keycloak with an imported development realm, `axis`. This part is in place:
   the realm is `samples/keycloak/axis-realm.json`, and an integration test
-  fixture starts it through Testcontainers. The server does not use it yet.
+  fixture starts it through Testcontainers. Under `scripts/dev.sh` and in
+  the E2E run, the server signs people in through it. Under Docker Compose
+  it does not yet, because the server in its container cannot reach Keycloak
+  at the address the browser uses.
   - It holds the purchase request users with the ids they have today as
     test users: `anna` the employee, `binh` and `chau` the department
     managers, and `dung` the finance reviewer. Seed data and E2E journeys
@@ -445,8 +467,9 @@ They exist only in development and tests, never in Production.
 - **Cookie.** The server keeps the chosen user id in an HttpOnly,
   SameSite=Strict cookie. It is an ASP.NET Core authentication cookie: a
   signed ticket that a client cannot change.
-- **Current user.** `GET /api/me` returns `{ "id", "displayName", "roles" }`
-  for the signed-in user. With nobody signed in, it is a `401` problem
+- **Current user.** Without a [session](#sign-in-and-the-session),
+  `GET /api/me` returns `{ "id", "displayName", "roles" }` for the signed-in
+  test user. With nobody signed in, it is a `401` problem
   details response. The name and roles come from `TestUsers` on every
   request, so an id that is no longer configured is nobody signed in.
   `GET /api/me` exists in every environment.

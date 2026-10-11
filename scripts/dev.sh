@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs Axis locally: PostgreSQL and Keycloak in Docker, the server and the worker under dotnet
 # watch and the SPA on Vite, in one terminal. The server starts once PostgreSQL accepts
-# connections and Keycloak's development realm answers. The server does not use Keycloak yet.
+# connections and Keycloak's development realm answers. The server signs people in through that
+# realm at /api/auth/sign-in. The SPA does not offer it yet.
 # The worker starts once the server has migrated the tenant databases. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
 # activates the edited configuration. The worker and the SPA keep running. Ctrl+C stops the
@@ -45,6 +46,10 @@ if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   # The worker reads the same tenant connection string, so this export moves it too.
   export ConnectionStrings__Platform="$connection"
   export Tenants__default__ConnectionString="$connection"
+fi
+if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
+  # The server signs people in at the moved Keycloak.
+  export Tenants__default__Oidc__Authority="http://localhost:$AXIS_KEYCLOAK_PORT/realms/axis"
 fi
 
 # Job control leaves SIGINT enabled for the background processes. Without it, a

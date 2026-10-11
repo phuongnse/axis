@@ -265,6 +265,7 @@ public sealed class TestUserTests
             builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseTestOidc("default");
             foreach (var setting in settings)
             {
                 var separator = setting.IndexOf('=', StringComparison.Ordinal);

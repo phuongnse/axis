@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 # Keycloak runs with the development realm from samples/keycloak, and Playwright starts the
-# server only once the realm answers. The server does not use Keycloak yet.
+# server only once the realm answers. The server signs people in through that realm at
+# /api/auth/sign-in. The SPA does not offer it yet.
 # The server starts with two applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
@@ -115,6 +116,7 @@ export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
 : >"$AXIS_E2E_WORKER_LOG"
 
 export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis;Password=$password"
+export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 
 # The worker waits until the server, which Playwright starts, has migrated the database. It runs
 # from the built dll, because dotnet run starts a child process that kill would miss.

@@ -7,6 +7,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
+using Axis.Server.Tests;
 using Axis.Worker;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -73,6 +74,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:ConnectionString", a.ConnectionString);
             builder.UseSetting("Tenants:b:Hosts:0", Host(TenantB));
             builder.UseSetting("Tenants:b:ConnectionString", b.ConnectionString);
+            builder.UseTestOidc(TenantA, TenantB);
             builder.UseSetting("TestUsers:0:Id", "maria");
             builder.UseSetting("TestUsers:0:DisplayName", "Maria Manager");
             builder.UseSetting("TestUsers:0:Roles:0", "finance");

@@ -4,6 +4,7 @@ using Axis.Configuration.Tests;
 using Axis.Core.Tenancy;
 using Axis.Data;
 using Axis.Server.Applications;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -106,6 +107,7 @@ public sealed class ActiveApplicationResolverTests(DataDatabaseFixture database)
             builder.UseSetting("Tenants:a:ConnectionString", connectionString);
             builder.UseSetting("Tenants:b:Hosts:0", "b.example.test");
             builder.UseSetting("Tenants:b:ConnectionString", connectionString);
+            builder.UseTestOidc("a", "b");
         });
         return ValueTask.CompletedTask;
     }

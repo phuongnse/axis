@@ -96,10 +96,11 @@ only.
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `binh`,
-`chau` and `dung`, and the development password is `axis` for each. The server does not use
-Keycloak yet. *(Planned for M4.)* To sign in locally, open the site, choose sign in, and use
-one of the realm users. See
-[sign-in and the session](docs/architecture.md#sign-in-and-the-session).
+`chau` and `dung`, and the development password is `axis` for each. Under `scripts/dev.sh`,
+the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
+answers `GET /api/me`. The SPA does not offer sign-in yet. *(Planned for M4.)* Sign-in through
+Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
+browser uses. See [sign-in and the session](docs/architecture.md#sign-in-and-the-session).
 
 For local development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and Node, and
 works on a fresh clone:
@@ -126,7 +127,8 @@ works on a fresh clone:
   `AXIS_WEB_PORT` move the four ports. The defaults are 5432, 8080, 5206 and
   5173. When `AXIS_POSTGRES_PORT` is set, the script points the server's
   connection strings and the worker's `Tenants__default__ConnectionString` at
-  that port.
+  that port. When `AXIS_KEYCLOAK_PORT` is set, it points the server's
+  `Tenants__default__Oidc__Authority` at Keycloak on that port.
 - Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running with
   its data, and Keycloak keeps running. Run `docker compose down` to stop them.
   If any of the three exits on its own, the others stop too and the script
