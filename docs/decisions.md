@@ -473,9 +473,9 @@ first, and everything that does need one waits for a single rule.
 
 M4 replaces the test users with real sign-in through each tenant's identity
 provider. The flow, the identity provider per tenant, the endpoints, the
-session, its tenant binding, the roles, the current user and Keycloak are in
-place. Sign-in needed, CSRF, the removal of test users and the audit actor are
-*(planned for M4)*. See
+session, its tenant binding, the roles, the current user, CSRF and Keycloak
+are in place. Sign-in needed, the removal of test users and the audit actor
+are *(planned for M4)*. See
 [architecture](architecture.md#sign-in-and-the-session) for the details.
 
 - **Flow:** OIDC authorization code flow with PKCE. The server is the

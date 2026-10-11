@@ -31,7 +31,7 @@ public sealed class TestUserTests
     public async Task After_sign_in_the_current_user_is_that_test_user()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient();
+        using var client = CreateClient(factory);
 
         var signIn = await SignInAsync(client, "binh");
         var me = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
@@ -46,7 +46,7 @@ public sealed class TestUserTests
     public async Task After_sign_out_nobody_is_signed_in()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient();
+        using var client = CreateClient(factory);
         await SignInAsync(client, "anna");
 
         var signOut = await client.PostAsync(new Uri("/api/test-users/sign-out", UriKind.Relative), Json("{}"), CancellationToken);
@@ -60,7 +60,7 @@ public sealed class TestUserTests
     public async Task The_test_user_list_returns_the_configured_users_in_order()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient();
+        using var client = CreateClient(factory);
 
         var response = await client.GetAsync(new Uri("/api/test-users", UriKind.Relative), CancellationToken);
 
@@ -76,7 +76,7 @@ public sealed class TestUserTests
     public async Task Outside_development_and_testing_the_test_user_list_is_a_404_problem()
     {
         await using var factory = CreateFactory("Production", []);
-        using var client = factory.CreateClient();
+        using var client = CreateClient(factory);
 
         var response = await client.GetAsync(new Uri("/api/test-users", UriKind.Relative), CancellationToken);
 
@@ -89,7 +89,7 @@ public sealed class TestUserTests
     public async Task Without_a_cookie_nobody_is_signed_in()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient();
+        using var client = CreateClient(factory);
 
         var me = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
 
@@ -104,7 +104,7 @@ public sealed class TestUserTests
     public async Task Sign_in_with_an_unknown_id_is_a_400_and_sets_no_cookie(string body)
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = CreateClient(factory, new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         var signIn = await client.PostAsync(new Uri("/api/test-users/sign-in", UriKind.Relative), Json(body), CancellationToken);
 
@@ -122,7 +122,7 @@ public sealed class TestUserTests
     public async Task Sign_in_with_a_body_that_is_not_json_is_a_400()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = CreateClient(factory, new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         var signIn = await client.PostAsync(new Uri("/api/test-users/sign-in", UriKind.Relative), Json("{ \"id\": "), CancellationToken);
 
@@ -137,7 +137,7 @@ public sealed class TestUserTests
     public async Task A_post_that_is_not_json_is_a_415(string path)
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = CreateClient(factory, new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         var response = await client.PostAsync(
             new Uri(path, UriKind.Relative),
@@ -153,7 +153,7 @@ public sealed class TestUserTests
     public async Task The_sign_in_cookie_is_http_only_and_same_site_strict()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = CreateClient(factory, new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         var signIn = await SignInAsync(client, "anna");
 
@@ -169,7 +169,7 @@ public sealed class TestUserTests
     public async Task A_tampered_cookie_is_nobody_signed_in()
     {
         await using var factory = CreateFactory("Testing", _testUsers);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = CreateClient(factory, new WebApplicationFactoryClientOptions { HandleCookies = false });
         var cookie = Assert.Single((await SignInAsync(client, "anna")).Headers.GetValues("Set-Cookie"));
         var value = cookie[..cookie.IndexOf(';', StringComparison.Ordinal)];
 
@@ -196,7 +196,7 @@ public sealed class TestUserTests
     public async Task Without_test_users_production_starts_with_no_sign_in_endpoints()
     {
         await using var factory = CreateFactory("Production", []);
-        using var client = factory.CreateClient();
+        using var client = CreateClient(factory);
 
         var endpoints = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>();
         var signIn = await client.PostAsync(new Uri("/api/test-users/sign-in", UriKind.Relative), Json("""{ "id": "anna" }"""), CancellationToken);
@@ -256,6 +256,14 @@ public sealed class TestUserTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("Nobody is signed in.", await response.Content.ReadAsStringAsync(CancellationToken), StringComparison.Ordinal);
+    }
+
+    /// <summary>A client whose every request carries the CSRF header, as the SPA's writes do.</summary>
+    private static HttpClient CreateClient(WebApplicationFactory<Program> factory, WebApplicationFactoryClientOptions? options = null)
+    {
+        var client = options is null ? factory.CreateClient() : factory.CreateClient(options);
+        client.DefaultRequestHeaders.Add("X-Axis-Csrf", "1");
+        return client;
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string environment, string[] settings) =>

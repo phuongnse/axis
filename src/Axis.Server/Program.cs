@@ -4,6 +4,7 @@ using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.DataSources;
 using Axis.Server.Health;
+using Axis.Server.Http;
 using Axis.Server.Presentation;
 using Axis.Server.Processes;
 using Axis.Server.Records;
@@ -95,6 +96,9 @@ app.UseExceptionHandler();
 // Then tenant resolution, so API and SPA paths alike need a known tenant host, and a session is
 // checked against the resolved tenant.
 app.UseTenantResolution();
+
+// Before the session, so a refused write does no work and renews no cookie.
+app.UseCsrfHeader();
 app.UseAuthentication();
 
 app.UseDefaultFiles();

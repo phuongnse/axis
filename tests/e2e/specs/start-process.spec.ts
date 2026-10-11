@@ -1,10 +1,11 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 // Specs run in parallel against one database, so these tests rely only on the notes they create.
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 
 async function createNote(request: APIRequestContext, values: Record<string, unknown>) {
-  const response = await request.post(notesPath, { data: { values } })
+  const response = await request.post(notesPath, { data: { values }, headers: csrfHeaders })
   expect(response.status()).toBe(201)
   return (await response.json()) as { id: string }
 }

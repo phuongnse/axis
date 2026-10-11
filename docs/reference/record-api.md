@@ -157,11 +157,14 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   type matches ignoring letter case. The only allowed parameter is `charset`
   with the value `utf-8`, in any letter case. A cross-site page can send a
   `text/plain` or form body without a CORS preflight, so accepting it would
-  open a CSRF path once M4 adds the session cookie. SameSite cookies and the
-  M4 CSRF protection stay the main defence.
-- **CSRF header** *(planned for M4)*. Every `POST`, `PUT`, `PATCH` and
+  open a CSRF path for the session cookie. SameSite cookies and the CSRF
+  header stay the main defence.
+- **CSRF header.** Every `POST`, `PUT`, `PATCH` and
   `DELETE` under `/api` must carry the header `X-Axis-Csrf: 1`. Without it,
-  the response is a `403` problem details response. A cross-site page cannot
+  the response is a `403` problem details response, and nothing is written.
+  Only exactly one header with the value `1` passes: an empty value, any
+  other value or a repeated header is a `403` too. `GET` requests and paths
+  outside `/api` need no header. A cross-site page cannot
   set a custom header without a CORS preflight, which Axis does not allow.
   This adds to the content type rule and the SameSite session cookie. See
   [D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed).
@@ -206,10 +209,10 @@ storage: see
 [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations). A delete has no body, so it is checked for the path
 and then in storage (`404` or `409`).
 
-From M4 *(planned)*, two checks come before the path. A write without the
-[CSRF header](#create-update-and-delete) is a `403`, then a request without
-a session is a `401`. So a caller without a session cannot find out which
-applications or records exist. See
+A write without the [CSRF header](#create-update-and-delete) is a `403`
+before any of these checks. From M4 *(planned)*, the session comes next: a
+request without a session is a `401`, before the path. So a caller without a
+session cannot find out which applications or records exist. See
 [Sign-in and the session](../architecture.md#sign-in-and-the-session).
 
 From M4 *(planned)*, policies add checks too. The full order is:
@@ -232,8 +235,8 @@ So a caller learns that a record exists only once they may read it. The field
 and value checks need the parsed body, so they come after it. See
 [Authorization](../architecture.md#authorization).
 
-- **`403` for the CSRF header** *(planned for M4)*. A `POST`, `PUT`, `PATCH`
-  or `DELETE` without `X-Axis-Csrf: 1`.
+- **`403` for the CSRF header.** A `POST`, `PUT`, `PATCH` or `DELETE`
+  without `X-Axis-Csrf: 1`.
 - **`401`** *(planned for M4)*. A request without a session, or with a
   session from another tenant.
 - **`403` without a grant** *(planned for M4)*. The user has no grant for the

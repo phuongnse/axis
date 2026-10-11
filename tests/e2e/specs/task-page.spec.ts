@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 const tasksPath = '/api/apps/E2eApp/tasks'
@@ -10,17 +11,18 @@ const tasksPath = '/api/apps/E2eApp/tasks'
  */
 async function startReview(request: APIRequestContext, prefix: string) {
   const title = `${prefix} ${Date.now()}`
-  const created = await request.post(notesPath, { data: { values: { title } } })
+  const created = await request.post(notesPath, { data: { values: { title } }, headers: csrfHeaders })
   expect(created.status()).toBe(201)
   const note = await created.json()
   const started = await request.post('/api/apps/E2eApp/processes/NoteReview/instances', {
     data: { subjectId: note.id },
-    headers: { 'Idempotency-Key': randomUUID() },
+    headers: { ...csrfHeaders, 'Idempotency-Key': randomUUID() },
   })
   expect(started.status()).toBe(201)
 
   // The request fixture keeps its own cookies, so this sign-in does not reach the browser.
-  expect((await request.post('/api/test-users/sign-in', { data: { id: 'binh' } })).ok()).toBe(true)
+  const signedIn = await request.post('/api/test-users/sign-in', { data: { id: 'binh' }, headers: csrfHeaders })
+  expect(signedIn.ok()).toBe(true)
   let taskId = ''
   // The worker creates the task some time after the start.
   await expect(async () => {
@@ -36,7 +38,7 @@ async function startReview(request: APIRequestContext, prefix: string) {
 
 // The page's request context shares its cookies, so this signs the browser in.
 async function signIn(page: Page, id: string) {
-  expect((await page.request.post('/api/test-users/sign-in', { data: { id } })).ok()).toBe(true)
+  expect((await page.request.post('/api/test-users/sign-in', { data: { id }, headers: csrfHeaders })).ok()).toBe(true)
 }
 
 test('the manager opens a task from the inbox, fills in a field, approves and returns to an inbox without it', async ({
@@ -83,7 +85,10 @@ test('choosing an outcome after the task was decided shows that it is already co
   await page.goto(`/e2e/tasks/${taskId}`)
   const approve = page.getByRole('button', { name: 'Approve' })
   await expect(approve).toBeVisible()
-  const completed = await page.request.post(`${tasksPath}/${taskId}/complete`, { data: { outcome: 'approve' } })
+  const completed = await page.request.post(`${tasksPath}/${taskId}/complete`, {
+    data: { outcome: 'approve' },
+    headers: csrfHeaders,
+  })
   expect(completed.status()).toBe(200)
   await approve.click()
 

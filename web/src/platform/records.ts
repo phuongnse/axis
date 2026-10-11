@@ -1,3 +1,5 @@
+import { apiFetch } from './api'
+
 /**
  * A value of a record as the SPA holds it. Integers and decimals keep their JSON source text, so
  * they are strings.
@@ -56,7 +58,7 @@ export class RecordQueryProblem extends Error {
  * data source's parameter values. A 400 throws a {@link RecordQueryProblem}.
  */
 export async function fetchRecords(recordsPath: string, query: string, signal?: AbortSignal): Promise<RecordPage> {
-  const response = await fetch(`${recordsPath}${query ? `?${query}` : ''}`, { signal })
+  const response = await apiFetch(`${recordsPath}${query ? `?${query}` : ''}`, { signal })
   if (response.status === 400) {
     const problem = JSON.parse(await response.text()) as { errors?: Record<string, string[]> }
     throw new RecordQueryProblem(problem.errors ?? {})
@@ -97,7 +99,7 @@ function parseRecord(text: string): RecordItem {
 
 /** Loads one record, or returns `null` when the entity has no record with the id. */
 export async function fetchRecord(recordsPath: string, id: string, signal?: AbortSignal): Promise<RecordItem | null> {
-  const response = await fetch(`${recordsPath}/${id}`, { signal })
+  const response = await apiFetch(`${recordsPath}/${id}`, { signal })
   if (response.status === 404) {
     return null
   }
@@ -118,7 +120,7 @@ export async function saveRecord(
   body: string,
   signal?: AbortSignal,
 ): Promise<SaveResult> {
-  const response = await fetch(id === null ? recordsPath : `${recordsPath}/${id}`, {
+  const response = await apiFetch(id === null ? recordsPath : `${recordsPath}/${id}`, {
     method: id === null ? 'POST' : 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body,
@@ -170,7 +172,7 @@ export async function fetchHistory(
   page: number,
   signal?: AbortSignal,
 ): Promise<HistoryPage> {
-  const response = await fetch(`${recordsPath}/${id}/history?page=${page}&pageSize=${historyPageSize}`, { signal })
+  const response = await apiFetch(`${recordsPath}/${id}/history?page=${page}&pageSize=${historyPageSize}`, { signal })
   if (!response.ok) {
     throw new Error(`Loading the history of '${id}' of '${recordsPath}' failed with status ${response.status}.`)
   }

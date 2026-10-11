@@ -32,6 +32,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
     public const string HostA = "a.example.test";
     public const string HostB = "b.example.test";
 
+    /// <summary>The header every unsafe request under <c>/api</c> must carry as <c>1</c>.</summary>
+    public const string CsrfHeader = "X-Axis-Csrf";
+
     /// <summary>
     /// Text no error response may contain: SQL keywords, the storage schema and identifier
     /// prefixes, an exception type and the indent of a stack frame. Matched ordinal.
@@ -310,7 +313,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
 
     /// <summary>
     /// A request to <paramref name="host"/>. A <paramref name="body"/> is sent as UTF-8 bytes
-    /// with <paramref name="contentType"/> as is, or with no content type when it is null.
+    /// with <paramref name="contentType"/> as is, or with no content type when it is null. Any
+    /// method other than <c>GET</c> and <c>HEAD</c> carries the CSRF header.
     /// </summary>
     public static HttpRequestMessage Request(
         HttpMethod method,
@@ -321,6 +325,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
     {
         var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         request.Headers.Host = host;
+        if (method != HttpMethod.Get && method != HttpMethod.Head)
+        {
+            request.Headers.Add(CsrfHeader, "1");
+        }
+
         if (body is not null)
         {
             request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body));

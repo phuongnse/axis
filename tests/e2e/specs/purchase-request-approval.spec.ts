@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
 // it creates. They use Operations, whose manager is chau, so that the per-department test keeps the
@@ -9,7 +10,7 @@ const recordsPath = `${appPath}/entities/PurchaseRequest/records`
 
 // The page's request context shares its cookies, so this signs the browser in.
 async function signIn(page: Page, id: string) {
-  expect((await page.request.post('/api/test-users/sign-in', { data: { id } })).ok()).toBe(true)
+  expect((await page.request.post('/api/test-users/sign-in', { data: { id }, headers: csrfHeaders })).ok()).toBe(true)
 }
 
 /** The id of the seeded department named `name`, read from the record API. */
@@ -34,6 +35,7 @@ async function createRequest(page: Page, prefix: string, unitPrice: number) {
         lineItems: [{ description: 'Item', quantity: 1, unitPrice }],
       },
     },
+    headers: csrfHeaders,
   })
   expect(response.status()).toBe(201)
   return { title, id: ((await response.json()) as { id: string }).id }

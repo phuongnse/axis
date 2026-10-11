@@ -1,3 +1,4 @@
+import { apiFetch } from './api'
 import type { RecordProblem } from './records'
 
 /** The outcome of a start: the instance started, or the problem the server reported. */
@@ -13,7 +14,7 @@ export async function startProcess(
   subjectId: string,
   idempotencyKey: string,
 ): Promise<StartResult> {
-  const response = await fetch(instancesPath, {
+  const response = await apiFetch(instancesPath, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify({ subjectId }),

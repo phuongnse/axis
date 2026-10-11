@@ -93,8 +93,10 @@ describe('saveRecord', () => {
     expect(created).toEqual({ ok: true, record: { id: 'a', version: 1, values: { amount: '12.50' }, labels: {} } })
     const [[createUrl, create], [updateUrl, update]] = fetchMock.mock.calls
     expect([createUrl, create?.method, create?.body]).toEqual([recordsPath, 'POST', '{"values":{"amount":12.50}}'])
-    expect(create?.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(new Headers(create?.headers).get('Content-Type')).toBe('application/json')
+    expect(new Headers(create?.headers).get('X-Axis-Csrf')).toBe('1')
     expect([updateUrl, update?.method]).toEqual([`${recordsPath}/a`, 'PATCH'])
+    expect(new Headers(update?.headers).get('X-Axis-Csrf')).toBe('1')
   })
 
   it('returns a 400 or 409 problem with its errors, which default to none', async () => {

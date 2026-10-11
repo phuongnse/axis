@@ -1,3 +1,5 @@
+import { apiFetch } from './api'
+
 /** One navigation entry. The label is a text key. */
 export interface NavigationItem {
   key: string
@@ -171,7 +173,7 @@ export interface PageMetadata {
 }
 
 export async function fetchSite(signal?: AbortSignal): Promise<SiteMetadata> {
-  const response = await fetch('/api/site', { signal })
+  const response = await apiFetch('/api/site', { signal })
   if (!response.ok) {
     throw new Error(`Loading the site failed with status ${response.status}.`)
   }
@@ -179,7 +181,7 @@ export async function fetchSite(signal?: AbortSignal): Promise<SiteMetadata> {
 }
 
 export async function fetchSites(signal?: AbortSignal): Promise<SiteListItem[]> {
-  const response = await fetch('/api/sites', { signal })
+  const response = await apiFetch('/api/sites', { signal })
   if (!response.ok) {
     throw new Error(`Loading the sites failed with status ${response.status}.`)
   }
@@ -198,7 +200,7 @@ export async function fetchPage(path: string, page: string, signal?: AbortSignal
 }
 
 async function fetchOrNull<T>(url: string, signal?: AbortSignal): Promise<T | null> {
-  const response = await fetch(url, { signal })
+  const response = await apiFetch(url, { signal })
   if (response.status === 404) {
     return null
   }

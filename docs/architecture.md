@@ -166,7 +166,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - **Authentication (D9, D23).**
   - The server is the OIDC confidential client.
   - The browser gets a secure, HttpOnly, SameSite cookie session.
-  - API calls from the SPA are protected against CSRF *(planned for M4)*.
+  - API writes are protected against CSRF by a required header.
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
 - **Authorization (D12, D24, planned for M4).**
@@ -278,9 +278,13 @@ are marked *(planned for M4)*.
   `GET /api/auth/callback`, every path under `/health` and the SPA's static
   files. `POST /api/auth/sign-out` needs the CSRF header but no
   session.
-- **CSRF** *(planned for M4)*. Every `POST`, `PUT`, `PATCH` and `DELETE`
-  under `/api` must carry `X-Axis-Csrf: 1`, otherwise `403`. The CSRF
-  header is checked first, then the session. See the record API's
+- **CSRF.** Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must
+  carry `X-Axis-Csrf: 1`, otherwise `403`. The server checks the header
+  right after it resolves the tenant and before authentication, so a refused
+  write does no work and does not renew the session cookie. The session
+  check that follows it is *(planned for M4)*. The SPA sends every `/api`
+  call through one wrapper around `fetch`, which adds the header to its
+  writes. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
 - **Tests.** Tests of sign-in itself start the development realm in Keycloak
   through Testcontainers, and drive its login page. Tests of the session
@@ -458,7 +462,8 @@ They exist only in development and tests, never in Production.
 
   Outside the allowed environments the `POST` endpoints are not mapped. Only
   the SPA fallback matches their paths, and it takes `GET` and `HEAD`, so a
-  `POST` answers `405` as on any other unmapped path. `GET /api/test-users`
+  `POST` with the [CSRF header](#sign-in-and-the-session) answers `405` as on
+  any other unmapped path. Without the header it is a `403`. `GET /api/test-users`
   is mapped in every environment, so it does not reach the SPA fallback.
   Outside the allowed environments it answers a `404` problem details
   response, and the SPA then shows no picker. The `POST` endpoints

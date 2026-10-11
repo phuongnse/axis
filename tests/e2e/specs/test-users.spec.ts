@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 // The request fixture keeps its own cookies, so this sign-in does not reach other specs.
 test('a test user signs in and the current user endpoint returns that user', async ({ request }) => {
-  const signedIn = await request.post('/api/test-users/sign-in', { data: { id: 'anna' } })
+  const signedIn = await request.post('/api/test-users/sign-in', { data: { id: 'anna' }, headers: csrfHeaders })
   expect(signedIn.status()).toBe(200)
 
   const me = await request.get('/api/me')
