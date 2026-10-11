@@ -86,4 +86,10 @@ public static class DiagnosticCodes
     public const string UnknownWidgetForm = "AXC0077";
     public const string UnknownActionProcess = "AXC0087";
     public const string ActionProcessOverOtherEntity = "AXC0088";
+
+    public const string UnknownPolicyRole = "AXC0090";
+    public const string InvalidGrant = "AXC0091";
+    public const string UnknownGrantTarget = "AXC0092";
+    public const string GrantOnChildEntity = "AXC0093";
+    public const string UnknownGrantField = "AXC0094";
 }

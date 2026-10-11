@@ -19,4 +19,5 @@ public static class ExpressionDiagnosticCodes
     public const string OutsideSqlSubset = "AXC0053";
     public const string TooManyHops = "AXC0058";
     public const string CurrentTimeInStoredValue = "AXC0086";
+    public const string CurrentUserOutsidePolicyFilter = "AXC0095";
 }

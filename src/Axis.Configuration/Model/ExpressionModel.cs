@@ -17,10 +17,10 @@ public sealed record ExpressionModel
 
     /// <summary>
     /// Parses <paramref name="expression"/> and checks it against <paramref name="expected"/> over
-    /// <paramref name="scope"/>. The compiler reports every problem first, so a problem here throws
-    /// <see cref="ArgumentException"/>.
+    /// <paramref name="scope"/>. Only a policy filter can call <c>currentUser()</c>. The compiler
+    /// reports every problem first, so a problem here throws <see cref="ArgumentException"/>.
     /// </summary>
-    public static ExpressionModel Compile(string expression, ExpressionScope scope, ExpressionType expected)
+    public static ExpressionModel Compile(string expression, ExpressionScope scope, ExpressionType expected, bool policyFilter = false)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(scope);
@@ -32,7 +32,7 @@ public sealed record ExpressionModel
             throw new ArgumentException($"The expression does not parse: {parsed.Diagnostic.Message}", nameof(expression));
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected, policyFilter: policyFilter);
         if (!check.Succeeded)
         {
             throw new ArgumentException($"The expression does not type-check: {check.Diagnostic.Message}", nameof(expression));

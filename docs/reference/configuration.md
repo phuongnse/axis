@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form` or `role`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role` or `policy`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -228,6 +228,28 @@ flowchart LR
      `assignee`, `form` or an outcome, and an `end` step with `branches`,
      `otherwise` or any other property, are `AXC0004`. See
      [processes](processes.md#compile-checks).
+   - **Policies.** Each `roles` entry of a [policy](#roles-and-policies) must
+     name a declared role, compared exactly, otherwise it is `AXC0090` at
+     `/roles/{i}`. A grant without exactly one of `entity`, `dataSource` and
+     `process` is `AXC0091` at `/grants/{i}`, and nothing else of it is
+     checked. An action its target's kind does not take is `AXC0091` at
+     `/grants/{i}/actions/{j}`, and a `filter` or `fields` on a `dataSource`
+     or `process` grant is `AXC0091` at `/grants/{i}/filter` or
+     `/grants/{i}/fields`. A target that names no loaded entity, data source
+     or process, ignoring letter case, is `AXC0092` at `/grants/{i}/entity`,
+     `/grants/{i}/dataSource` or `/grants/{i}/process`. A grant on a child
+     entity is `AXC0093` at `/grants/{i}/entity`, naming the owner. Its
+     `fields` and `filter` are then not checked. A `fields` entry that names
+     no field of the entity, ignoring letter case, is `AXC0094` at
+     `/grants/{i}/fields/{j}`. The `filter` is parsed, type-checked as a
+     boolean over the entity's fields, paths through `reference` fields, the
+     named rules and [`currentUser()`](expressions.md#current-user), and
+     translated to SQL. Its first problem is reported at
+     `/grants/{i}/filter` with its
+     [expression diagnostic](expressions.md#diagnostics) code, and anything
+     outside the SQL subset, such as an aggregate or `lower`, is `AXC0053`.
+     A name whose role, entity, data source or process file was not loaded
+     because of its own errors is not reported again.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -237,8 +259,9 @@ flowchart LR
    path order with their entity, projected fields and parameter targets
    resolved and their filter checked. It also holds the processes in path
    order, with their entity resolved, each transition resolved to the
-   declared name of its step and their conditions checked. No model
-   is produced while any error remains.
+   declared name of its step and their conditions checked, and the
+   policies in path order, with each grant's target resolved and its filter
+   checked. No model is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -259,8 +282,8 @@ flowchart LR
    - **Rules.** Each [rule](#resource-file-shape)'s expression is parsed and
      type-checked against its own parameters, and must give its
      `resultType`. A problem in it is reported at `/expression` of the rule
-     file. A validation, a data source filter or a process condition may
-     call a rule, and each call is checked for the
+     file. A validation, a data source filter, a process condition or a
+     policy filter may call a rule, and each call is checked for the
      rule's name, its argument count and each argument's type, with the
      codes a function call gets (`AXC0050`, `AXC0051`, `AXC0047`). Rules
      that call each other in a cycle, such as A → B → A, are `AXC0055`
@@ -275,7 +298,8 @@ flowchart LR
      case, is `AXC0057` at `/name`. A rule whose own expression has an
      error, or that is in a cycle, is still known by its parameters and
      result type, so a call to it gets no further diagnostic. Validations,
-     data source filters and process conditions can call rules, but only
+     data source filters, process conditions and policy filters can call
+     rules, but only
      outside an aggregate's item expression. In a computed field or an item
      expression, a rule call is still `AXC0050`.
 4. **Release.** The compiled application is stored as a release with a
@@ -459,6 +483,12 @@ sorted by file and then path.
 | `AXC0087` | A `form` widget action's `process` names no loaded process. Reported at `/widgets/{i}/actions/{j}/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
+| `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource` and `process`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, and a process `start`. Or a `dataSource` or `process` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0092` | A policy grant's `entity`, `dataSource` or `process` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource` or `/grants/{i}/process`. Not reported when the name is a file that was not loaded because of its own errors. |
+| `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
+| `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
+| `AXC0095` | An expression that is not a policy filter calls `currentUser()`, such as a validation, a computed field, a data source filter, a process condition or a rule body. A rule argument inside a policy filter may call it. Reported at that expression's path, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
 
 ## Startup activation
 
@@ -743,10 +773,10 @@ An entity `text` field names the sequence in its `sequence` property:
 This section follows
 [D24](../decisions.md#d24-roles-and-policies--agreed), and
 [Authorization](../architecture.md#authorization) describes how the server
-applies it. The `role` resource and the check of task assignees are built.
-Policies and matching the roles claim are *(planned for M4)*. Each compile
-check below is a compile error, and its code comes with the issue that
-builds it.
+applies it. The `role` and `policy` resources, the check of task assignees
+and the policy checks are built. Matching the roles claim and enforcing
+policies are *(planned for M4)*. Each compile check below is a compile
+error.
 
 A `role` resource declares a role that users can hold:
 
@@ -792,7 +822,8 @@ A `role` resource declares a role that users can hold:
 - **Schema.** A name in another form, or a missing `label`, is `AXC0004`.
   Two roles with the same name are `AXC0006`.
 
-A `policy` resource gives roles grants *(planned for M4)*. The purchase
+A `policy` resource gives roles grants. Nothing enforces a policy yet: the
+filter, fields and combining rules below are *(planned for M4)*. The purchase
 request sample will have three policies. Employees reach their own requests, department managers the
 requests of their department, and finance reviewers the submitted ones:
 
@@ -880,23 +911,29 @@ Compile checks, each a compile error:
 
 - A process task's `assignee.role` that names no declared role, compared
   exactly, is `AXC0089`.
-
-The policy checks are *(planned for M4)*:
-
-- A policy `roles` entry that names no declared role, compared exactly.
-- A grant without exactly one of `entity`, `dataSource` and `process`.
+- A policy `roles` entry that names no declared role, compared exactly, is
+  `AXC0090`.
+- A grant without exactly one of `entity`, `dataSource` and `process` is
+  `AXC0091`.
 - A target that names no loaded entity, data source or process, ignoring
-  letter case.
+  letter case, is `AXC0092`.
 - An action that the target's kind does not take, such as `start` on an
-  entity.
-- A grant on a child entity. Child rows are read and written through their
-  owner's grants.
-- A `filter` or `fields` on a `dataSource` or `process` grant.
-- A `fields` entry that names no field of the entity, ignoring letter case.
-- A `filter` that is not boolean, or that uses something outside the
-  [SQL subset](expressions.md#sql-subset), such as an aggregate or `lower`.
-  It gets the usual [expression diagnostics](expressions.md#diagnostics)
-  too.
+  entity, is `AXC0091`.
+- A grant on a child entity is `AXC0093`. Child rows are read and written
+  through their owner's grants.
+- A `filter` or `fields` on a `dataSource` or `process` grant is `AXC0091`.
+- A `fields` entry that names no field of the entity, ignoring letter case,
+  is `AXC0094`.
+- A `filter` that is not boolean is `AXC0048`, and one that uses something
+  outside the [SQL subset](expressions.md#sql-subset), such as an aggregate
+  or `lower`, is `AXC0053`. It gets the other
+  [expression diagnostics](expressions.md#diagnostics) too.
+- `currentUser()` anywhere but a policy filter is `AXC0095`.
+
+The schema checks the shape of each property: `roles` and `grants` are
+non-empty lists, each action is one of `read`, `create`, `update`, `delete`
+and `start`, and a grant has no other properties. A problem there is
+`AXC0004`.
 
 ### Record creator
 

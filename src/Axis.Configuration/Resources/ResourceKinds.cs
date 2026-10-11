@@ -14,4 +14,5 @@ public static class ResourceKinds
     public const string Process = "process";
     public const string Form = "form";
     public const string Role = "role";
+    public const string Policy = "policy";
 }

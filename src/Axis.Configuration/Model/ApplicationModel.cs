@@ -4,8 +4,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled application: its manifest, every entity, site, page, seed, data source, process and
-/// form with references resolved, its roles and its texts.
+/// A compiled application: its manifest, every entity, site, page, seed, data source, process,
+/// form and policy with references resolved, its roles and its texts.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -36,6 +36,9 @@ public sealed record ApplicationModel
 
     /// <summary>The application's roles, in path order.</summary>
     public IReadOnlyList<RoleResource> Roles { get; init; } = [];
+
+    /// <summary>The application's policies, in path order.</summary>
+    public IReadOnlyList<PolicyModel> Policies { get; init; } = [];
 
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)

@@ -16,7 +16,8 @@ namespace Axis.Configuration.Compilation;
 /// of every locale, checks the named rules and their calls, checks every entity's fields against
 /// the field type rules and type-checks its computed fields and validations, checks forms, sites,
 /// pages and seeds, checks data sources and their filters, checks role labels, checks processes,
-/// their step graphs, their conditions and the roles their tasks name, and resolves references
+/// their step graphs, their conditions and the roles their tasks name, checks policies, their
+/// roles, their grants and their filters, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -142,6 +143,19 @@ public static class ApplicationCompiler
             textKeys,
             rules,
             diagnostics);
+        PolicyChecker.Check(
+            loaded.Policies,
+            roleNames,
+            loaded.UnloadedRoleNames,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            FindDataSource,
+            loaded.UnloadedDataSourceNames,
+            FindProcess,
+            loaded.UnloadedProcessNames,
+            rules,
+            diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -162,6 +176,7 @@ public static class ApplicationCompiler
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
             Roles = loaded.Roles,
+            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, rules)).ToList(),
         };
         return result with
         {
@@ -871,7 +886,7 @@ public static class ApplicationCompiler
             // A parameter without a usable type would only add noise to the filter's diagnostics.
             if (diagnostics.Count == countBeforeParameters
                 && dataSource.Filter is { } filter
-                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, rules)) is { } problem)
+                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, rules), policyFilter: false) is { } problem)
             {
                 Report(problem.Code, problem.Message, "/filter");
             }
@@ -931,13 +946,14 @@ public static class ApplicationCompiler
         };
 
     /// <summary>
-    /// The first problem of a data source filter: in parsing, in type checking over the entity's
-    /// fields, its child collections, the parameters, paths through reference fields and the named
-    /// rules, or outside the SQL subset with each rule call inlined. A filter that calls a rule
-    /// without a checked expression, directly or through the rules it calls, is not translated: that
-    /// rule already has its own diagnostic, as for a validation.
+    /// The first problem of a data source or policy filter: in parsing, in type checking over the
+    /// entity's fields, its child collections, a data source's parameters, paths through reference
+    /// fields and the named rules, or outside the SQL subset with each rule call inlined. Only a
+    /// policy filter can call <c>currentUser()</c>. A filter that calls a rule without a checked
+    /// expression, directly or through the rules it calls, is not translated: that rule already has
+    /// its own diagnostic, as for a validation.
     /// </summary>
-    private static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope)
+    internal static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope, bool policyFilter)
     {
         var parsed = ExpressionParser.Parse(filter);
         if (!parsed.Succeeded)
@@ -945,7 +961,7 @@ public static class ApplicationCompiler
             return parsed.Diagnostic;
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, policyFilter: policyFilter);
         if (!check.Succeeded)
         {
             return check.Diagnostic;
