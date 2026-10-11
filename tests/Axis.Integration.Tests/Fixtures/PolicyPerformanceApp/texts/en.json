@@ -1,0 +1,10 @@
+{
+  "id": "1d975857-c935-4f85-96f8-fcd5ca9a8388",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.manager": "Manager"
+  }
+}

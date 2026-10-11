@@ -1,0 +1,11 @@
+{
+  "id": "772f38f9-9326-48c3-8ea8-2a8c76238e9e",
+  "kind": "entity",
+  "name": "Department",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "manager", "type": "text", "maxLength": 100 }
+  ]
+}

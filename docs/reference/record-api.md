@@ -95,7 +95,9 @@ A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
 the records of the entity that match the `search`, or every record without
 one. A list holds only records that match one of the user's read filters,
 and `totalCount` counts only those. A grant without a `filter` matches every
-record.
+record. Each reference step of a read filter finds the target record through its
+primary key. No field has an index yet, so a filtered list reads the whole entity
+table.
 
 ## Reading values
 

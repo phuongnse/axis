@@ -1,0 +1,12 @@
+{
+  "id": "bb7c4b04-5fcb-4826-b94e-e01def9d3eb0",
+  "kind": "policy",
+  "name": "ManagerAccess",
+  "formatVersion": 1,
+  "roles": ["manager"],
+  "grants": [
+    { "entity": "Request", "actions": ["read"], "filter": "department.manager == currentUser()" },
+    { "entity": "Department", "actions": ["read"] },
+    { "dataSource": "RequestTotals", "actions": ["read"] }
+  ]
+}

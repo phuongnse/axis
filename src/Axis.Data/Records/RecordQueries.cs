@@ -47,25 +47,12 @@ public static class RecordQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        var table = Table(entity);
-        var row = EntityNaming.Quote(RowAlias);
         var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
-        var conditions = new List<string>();
-        if (filtered)
-        {
-            conditions.Add($"strpos(lower({row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}), lower(@search)) > 0");
-        }
-
-        if (condition is not null)
-        {
-            conditions.Add(condition.Sql);
-        }
-
-        var where = conditions.Count > 0 ? $" WHERE {string.Join(" AND ", conditions)}" : "";
+        var statement = ListStatement(entity, sort, filtered, condition);
         try
         {
             long totalCount;
-            await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {table} AS {row}{where}", connection))
+            await using (var count = new NpgsqlCommand(statement.CountSql, connection))
             {
                 if (filtered)
                 {
@@ -76,13 +63,7 @@ public static class RecordQueries
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
             }
 
-            var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
-            var order = sort is null
-                ? $"{id} ASC"
-                : $"{row}.{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
-            await using var command = new NpgsqlCommand(
-                $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset",
-                connection);
+            await using var command = new NpgsqlCommand(statement.PageSql, connection);
             if (filtered)
             {
                 command.Parameters.Add(SearchParameter(search!));
@@ -106,6 +87,38 @@ public static class RecordQueries
             // Class 22 is a data exception: the condition could not be evaluated for some record.
             return null;
         }
+    }
+
+    /// <summary>
+    /// The count and the page statement of a list of <paramref name="entity"/>. The page statement
+    /// ends with <c>LIMIT @limit OFFSET @offset</c>. When <paramref name="search"/> is set, both
+    /// keep only the records whose display field contains <c>@search</c>, and the entity must
+    /// have a display field. Both keep only the records that match <paramref name="condition"/>.
+    /// Neither holds a value: each is a parameter that the caller adds.
+    /// </summary>
+    internal static RecordListStatement ListStatement(EntityModel entity, RecordSort? sort, bool search, RecordCondition? condition)
+    {
+        var table = Table(entity);
+        var row = EntityNaming.Quote(RowAlias);
+        var conditions = new List<string>();
+        if (search)
+        {
+            conditions.Add($"strpos(lower({row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}), lower(@search)) > 0");
+        }
+
+        if (condition is not null)
+        {
+            conditions.Add(condition.Sql);
+        }
+
+        var where = conditions.Count > 0 ? $" WHERE {string.Join(" AND ", conditions)}" : "";
+        var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
+        var order = sort is null
+            ? $"{id} ASC"
+            : $"{row}.{EntityNaming.Quote(EntityNaming.Column(sort.Field.Name))} {(sort.Descending ? "DESC" : "ASC")}, {id} ASC";
+        return new RecordListStatement(
+            $"SELECT count(*) FROM {table} AS {row}{where}",
+            $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset");
     }
 
     private static NpgsqlParameter SearchParameter(string search) =>
@@ -339,3 +352,6 @@ public static class RecordQueries
             _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "Unknown field type."),
         };
 }
+
+/// <summary>The count and the page statement of a record list, as <see cref="RecordQueries.ListStatement"/> builds them.</summary>
+internal sealed record RecordListStatement(string CountSql, string PageSql);
