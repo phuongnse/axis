@@ -27,6 +27,8 @@
     "role.reader": "Người đọc",
     "role.filtered": "Có bộ lọc",
     "role.fielded": "Có trường",
-    "role.dsonly": "Chỉ nguồn dữ liệu"
+    "role.dsonly": "Chỉ nguồn dữ liệu",
+    "role.falseOnly": "Chỉ sai",
+    "role.failing": "Lỗi bộ lọc"
   }
 }

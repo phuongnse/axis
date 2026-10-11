@@ -27,6 +27,8 @@
     "role.reader": "Reader",
     "role.filtered": "Filtered",
     "role.fielded": "Fielded",
-    "role.dsonly": "Data source only"
+    "role.dsonly": "Data source only",
+    "role.falseOnly": "False only",
+    "role.failing": "Failing"
   }
 }

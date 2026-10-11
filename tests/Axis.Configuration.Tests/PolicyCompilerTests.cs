@@ -3,6 +3,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Sql;
+using Axis.Policy;
 
 namespace Axis.Configuration.Tests;
 
@@ -204,6 +205,80 @@ public sealed class PolicyCompilerTests
         Assert.Equal((ExpressionDiagnosticCodes.CurrentUserOutsidePolicyFilter, file, path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Equal($"Function 'currentUser' is allowed only in a policy filter {position}", diagnostic.Message);
         Assert.Null(result.Model);
+    }
+
+    private const string FilteredGrants = """
+        [
+          { "entity": "Request", "actions": ["read"], "filter": "owner == currentUser()" },
+          { "dataSource": "RequestList", "actions": ["read"] },
+          { "entity": "Request", "actions": ["read", "update"], "filter": "amount > 10" },
+          { "entity": "Request", "actions": ["update", "delete"], "fields": ["owner"] }
+        ]
+        """;
+
+    [Fact]
+    public void Access_lists_the_filter_of_each_matching_grant_with_its_policy_and_index()
+    {
+        using var folder = Folder(Policy("""["employee"]""", FilteredGrants));
+        var model = Compile(folder);
+        Assert.True(model.TryGetEntity("Request", out var request));
+
+        var read = PolicyEvaluator.Access(model, ["employee"], request, PolicyAction.Read);
+        var update = PolicyEvaluator.Access(model, ["employee"], request, PolicyAction.Update);
+
+        Assert.True(read.Granted);
+        Assert.Equal(
+            [("RequestAccess", 0, "owner == currentUser()"), ("RequestAccess", 2, "amount > 10")],
+            read.Filters!.Select(filter => (filter.Policy, filter.Grant, filter.Expression.Expression)));
+
+        // The grant with a fields list is not counted until field policies are built.
+        Assert.True(update.Granted);
+        Assert.Equal([2], update.Filters!.Select(filter => filter.Grant));
+
+        // A filtered grant never reaches every record, so the data source check still refuses it.
+        Assert.False(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Read));
+    }
+
+    [Theory]
+    [InlineData("employee", PolicyAction.Delete)]
+    [InlineData("employee", PolicyAction.Create)]
+    [InlineData("Employee", PolicyAction.Read)]
+    [InlineData("manager", PolicyAction.Read)]
+    public void Access_without_a_matching_grant_is_not_granted_and_reaches_no_record(string role, PolicyAction action)
+    {
+        using var folder = Folder(Policy("""["employee"]""", FilteredGrants));
+        var model = Compile(folder);
+        Assert.True(model.TryGetEntity("Request", out var request));
+
+        var access = PolicyEvaluator.Access(model, [role], request, action);
+
+        Assert.False(access.Granted);
+        Assert.Empty(access.Filters!);
+    }
+
+    [Fact]
+    public void Access_reaches_every_record_when_any_matching_grant_has_no_filter()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """
+            [
+              { "entity": "Request", "actions": ["read"], "filter": "owner == currentUser()" },
+              { "entity": "Request", "actions": ["read"] }
+            ]
+            """));
+        var model = Compile(folder);
+        Assert.True(model.TryGetEntity("Request", out var request));
+
+        var access = PolicyEvaluator.Access(model, ["employee"], request, PolicyAction.Read);
+
+        Assert.Equal(new RecordAccess(true, null), access);
+        Assert.True(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Read));
+    }
+
+    private static ApplicationModel Compile(TemporaryFolder folder)
+    {
+        var result = ApplicationCompiler.Compile(folder.Path);
+        Assert.Empty(result.Diagnostics);
+        return result.Model!;
     }
 
     private static string Policy(string roles, string grants) => $$"""

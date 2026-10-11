@@ -113,6 +113,18 @@ public sealed class SqlTranslatorTests
     }
 
     [Fact]
+    public void A_parameter_prefix_names_every_literal_parameter()
+    {
+        var parsed = ExpressionParser.Parse("i == 1 or t == 'x'");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, parameterPrefix: "g2f");
+
+        Assert.Equal("((\"i\" IS NOT DISTINCT FROM @g2f0) OR (\"t\" IS NOT DISTINCT FROM @g2f1))", result.Sql);
+        Assert.Equal(["g2f0", "g2f1"], result.Parameters.Select(parameter => parameter.Name));
+    }
+
+    [Fact]
     public void Text_and_names_never_reach_the_sql_unquoted()
     {
         var result = Translate("t == 'x''); DROP TABLE t; --'");

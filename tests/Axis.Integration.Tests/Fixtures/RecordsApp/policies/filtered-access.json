@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "roles": ["filtered"],
   "grants": [
-    { "entity": "Item", "actions": ["read", "create"], "filter": "true" }
+    { "entity": "Item", "actions": ["read"], "filter": "false" },
+    { "entity": "Item", "actions": ["read"], "filter": "status is not null" },
+    { "entity": "Item", "actions": ["create", "update", "delete"], "filter": "status == 'open'" },
+    { "entity": "Ticket", "actions": ["read", "create", "update", "delete"], "filter": "requester == currentUser()" }
   ]
 }

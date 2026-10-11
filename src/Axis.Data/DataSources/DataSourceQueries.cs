@@ -182,7 +182,7 @@ public static class DataSourceQueries
     }
 
     /// <summary>Adds each filter value as a parameter of its exact PostgreSQL type, so no value is ever inferred from text.</summary>
-    private static void AddValues(NpgsqlCommand command, IReadOnlyList<SqlValue> values)
+    internal static void AddValues(NpgsqlCommand command, IReadOnlyList<SqlValue> values)
     {
         foreach (var value in values)
         {

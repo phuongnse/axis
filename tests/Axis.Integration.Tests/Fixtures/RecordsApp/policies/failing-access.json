@@ -1,0 +1,11 @@
+{
+  "id": "0c7e9a52-8d14-4b6f-a3e2-5f9d1c8b7a40",
+  "kind": "policy",
+  "name": "FailingAccess",
+  "formatVersion": 1,
+  "roles": ["failing"],
+  "grants": [
+    { "entity": "Item", "actions": ["read"], "filter": "quantity * 9223372036854775807 > 0" },
+    { "entity": "Item", "actions": ["read"], "filter": "department.name == 'Finance'" }
+  ]
+}

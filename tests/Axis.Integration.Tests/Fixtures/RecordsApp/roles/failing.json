@@ -1,0 +1,9 @@
+{
+  "id": "b8e4d2a6-5f1c-4973-8d0b-3c7a9e5f2d18",
+  "kind": "role",
+  "name": "failing",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.failing"
+  }
+}

@@ -227,8 +227,10 @@ the grants are built. The record filters, fields and joined targets are
 - **Session.** A request without a session is a `401`, before the path.
 - **Grants.** The user needs a `read` grant on the data source and a `read`
   grant on its root entity, otherwise `403`. Only roles claim values that
-  name a declared role count. An entity grant with a `filter` or a `fields`
-  list grants nothing until record and field policies are built.
+  name a declared role count. An entity grant with a `filter` grants nothing
+  here until the record filters below are built, even though the record API
+  enforces it. An entity grant with a `fields` list grants nothing until
+  field policies are built.
 - **Record filters.** The root entity's read filters are combined with OR and
   added to the data source's own `filter` with AND, in SQL, before any
   grouping. So rows, groups, measures and `totalCount` cover only the

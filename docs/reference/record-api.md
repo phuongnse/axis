@@ -14,9 +14,9 @@ request, so it is a 404 like any unknown record.
 Every record endpoint needs a session and a policy grant for the action on
 the entity, as [Authorization](../architecture.md#authorization) describes.
 Without a session the answer is a `401`, and without a grant a `403`. A
-grant with a `filter` or a `fields` list grants nothing yet. From M4
-*(planned)*, a record outside every read filter is a `404`, and fields the
-user may not read are left out.
+grant with a `filter` reaches only the records that match it, so a record
+outside every read filter is a `404`. A grant with a `fields` list grants
+nothing yet. From M4 *(planned)*, fields the user may not read are left out.
 
 ## Routes
 
@@ -90,8 +90,9 @@ A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
 "totalCount": 42 }`. `items` holds records in the shape above, including
 `labels`. `page` and `pageSize` are the values used, and `totalCount` counts
 the records of the entity that match the `search`, or every record without
-one. From M4 *(planned)*, a list holds only records that match a read filter,
-and `totalCount` counts only those.
+one. A list holds only records that match one of the user's read filters,
+and `totalCount` counts only those. A grant without a `filter` matches every
+record.
 
 ## Reading values
 
@@ -225,25 +226,32 @@ find out which applications or records exist. See
 After the path, the user needs a grant for the action on the entity, or the
 answer is a `403` before the query or body is read.
 
-Policies add more checks. Steps 1 to 4 are built, and the rest of the
-policy checks are *(planned for M4)*. The full order is:
+Policies add more checks. Steps 1 to 8 and 10 to 11 are built, and the
+field check in step 9 is *(planned for M4)*. The full order is:
 
 1. The CSRF header, `403`.
 2. The session, `401`.
 3. The path, `404`.
 4. A grant for the action on the entity, `403`.
-5. The stored record: unknown or outside every read filter, `404`.
+5. The stored record: unknown or outside every read filter, `404`. On
+   update and delete, a user with no `read` grant on the entity cannot see
+   the record either, so it is a `404`.
 6. On update and delete, the stored record outside every `update` or
    `delete` filter, `403`.
 7. The content type, `415`.
 8. The query of a list, or the body, `400`.
 9. Fields the user may not write, `403`.
-10. On create and update, the new record outside every `create` or `update`
+10. The computed fields and the validations, `400`, then storage.
+11. On create and update, the new record outside every `create` or `update`
     filter, `403`.
-11. The validations, `400`, then storage.
 
 So a caller learns that a record exists only once they may read it. The field
-and value checks need the parsed body, so they come after it. See
+and value checks need the parsed body, so they come after it. The new record
+is checked as it is stored, inside the write transaction and after storage,
+so its creator, sequence and computed fields are set. When it is outside the
+filters, the write is rolled back and nothing is stored. On update, the
+`version` in the body must be the version the checks in steps 5 and 6 saw,
+otherwise the answer is the stale-version `409`. See
 [Authorization](../architecture.md#authorization).
 
 - **`403` for the CSRF header.** A `POST`, `PUT`, `PATCH` or `DELETE`
@@ -255,13 +263,23 @@ and value checks need the parsed body, so they come after it. See
   entity. A list or a single read needs `read`, a create `create`, an update
   `update` and a delete `delete`. History needs `read`. Only roles claim
   values that name a declared role of the application count. A grant with a
-  `filter` or a `fields` list grants nothing until record and field policies
-  are built. The title is fixed and names no entity or action.
-- **`404` outside every read filter** *(planned for M4)*. A record that
-  matches no read filter of the user is answered like an unknown record.
-- **`403` for a record outside its write filters** *(planned for M4)*. The
-  stored record matches no `update` or `delete` filter, or the new record
-  matches no `create` or `update` filter. The title is fixed.
+  `filter` counts, and reaches only the records that match it. A grant with
+  a `fields` list grants nothing until field policies are built. The title
+  is fixed and names no entity or action.
+- **`404` outside every read filter.** A record that matches no read filter
+  of the user is answered like an unknown record. That covers a single read,
+  a history, an update and a delete. An update or a delete by a user with no
+  `read` grant on the entity is a `404` too.
+- **`403` for a record outside its write filters.** The stored record
+  matches no `update` or `delete` filter, or the new record matches no
+  `create` or `update` filter. Nothing is written. The title is fixed: "The
+  record is outside your grants for this action." It names no entity or
+  filter.
+- **A filter that fails.** A filter that fails at run time for a record,
+  such as an integer overflow, adds no records through its grant, and the
+  server logs the policy name and the grant's index. Another grant can still
+  match the record. A list whose combined read filters fail is a `400` with
+  a fixed title, because PostgreSQL cannot fail one branch of an `or`.
 - **`403` for a field write** *(planned for M4)*. The body writes a field that
   no `create` or `update` grant of the user covers. It has the `errors` shape
   of a `400`, keyed `/values/<field>`, and lists every such field.
@@ -536,8 +554,8 @@ can be read as its history (D21).
     `anonymous` and audit records written before names were stored.
   - The history needs a session and a `read` grant on the entity. Without a
     session it is a `401`, and without the grant a `403`, before the record
-    is read. From M4 *(planned)*, a record outside every read filter is a
-    `404`, and the `fields` of `details` leave out the fields the user may
+    is read. A record outside every read filter is a `404`. From M4
+    *(planned)*, the `fields` of `details` leave out the fields the user may
     not read.
 
 For example:

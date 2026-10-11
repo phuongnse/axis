@@ -45,7 +45,7 @@ src/
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
   Axis.Processes/         work items, decision, task, operation and end steps, task API; outbox (M5)
-  Axis.Policy/            policy evaluation: entity and data source grants; record filters and field sets (M4)
+  Axis.Policy/            policy evaluation: entity and data source grants, record filters; field sets (M4)
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
@@ -62,7 +62,7 @@ samples/
 Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
-checker, interpreter and SQL translation), `Axis.Policy` (the evaluation of entity and data source grants),
+checker, interpreter and SQL translation), `Axis.Policy` (the evaluation of entity and data source grants and record filters),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
 `decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
@@ -174,8 +174,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - The record API and the data source endpoint call the policy module with
     the entity or data source and the action. Every other API endpoint and
     engine command does so *(planned for M4)*.
-  - Record filters from policies are added to every record list and data
-    source query *(planned for M4)*.
+  - Record filters from policies limit every record list and single-record
+    check of the record API. Adding them to data source queries is
+    *(planned for M4)*.
   - Field policies leave out fields from results and reject writes to
     protected fields *(planned for M4)*.
   - See [Authorization](#authorization).
@@ -322,10 +323,12 @@ are marked *(planned for M4)*.
 
 The `role` and `policy` resources and their compile checks are built. For
 the record API and the data source endpoint, so are the session `401`, the
-matching of roles, grants by action and the `403` without a grant. Until
-record and field policies are built, a grant with a `filter` or a `fields`
-list grants nothing, so access is never wider than a policy intends.
-Everything else in this section is *(planned for M4)*. It follows
+matching of roles, grants by action and the `403` without a grant. The record
+API also enforces record filters: reads, writes and their failures as
+described below. Until field policies are built, a grant with a `fields` list
+grants nothing. Until the data source endpoint adds read filters, an entity
+grant with a `filter` grants nothing there. So access is never wider than a
+policy intends. Everything else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in
@@ -350,9 +353,10 @@ The `role` and `policy` resource files are described in
 - **Reads.** A record is readable when it matches the filter of at least one
   of the user's `read` grants on its entity. A grant without a `filter`
   matches every record. Record lists and data sources add the read filters
-  to their SQL. A single record is checked with the interpreter. Both back
-  ends give the same answer, as for every
-  [expression](reference/expressions.md#sql-subset).
+  to their SQL. A single record is checked in SQL too, with one statement
+  per filtered grant, so reads and writes give the same answer and a filter
+  that fails denies through its own grant only. The user id is a parameter,
+  never part of the SQL text.
 - **Writes.**
   - A create needs the new record to match the filter of a `create` grant.
   - An update needs the stored record to be readable, otherwise `404`. It
@@ -396,14 +400,16 @@ The `role` and `policy` resource files are described in
   `system`. Policies do not check them.
 - **Failures.** A filter that fails at run time adds no records through its
   grant. The server logs the policy name and the grant's index, never a
-  record value. In SQL, PostgreSQL cannot fail one branch of an `or`, so the
-  whole query fails with a `400` and returns no rows.
+  record value. A single record is checked one grant at a time, so another
+  grant can still match it. In a list, PostgreSQL cannot fail one branch of
+  an `or`, so the whole query fails with a `400` and returns no rows.
 - **Module.** `Axis.Policy` holds the evaluation of the compiled policies of
   each release. Every endpoint and engine command calls it with a resource
   and an action. It answers allow or deny, the read filters to add, and the
   readable and writable field sets. Today it answers allow or deny for an
-  entity or a data source, and the record API and the data source endpoint
-  call it. The read filters and field sets are *(planned for M4)*.
+  entity or a data source, and the record filters of an entity and an
+  action. The record API and the data source endpoint call it. The field
+  sets are *(planned for M4)*.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 

@@ -18,6 +18,15 @@ namespace Axis.Server.Records;
 /// before the path is read, so it learns nothing about what exists. A path that names no active
 /// application, entity or record is a 404; a child entity is no entity here. A list, a read and a
 /// history need <c>read</c>, and a create, an update and a delete need that action.
+/// A grant with a record filter reaches only the records that match it, and the grants combine
+/// with OR. A list holds only the records that match a <c>read</c> filter, and a single read, a
+/// history, an update or a delete of any other record is a 404, as is an update or a delete by a
+/// user with no <c>read</c> grant. An update or a delete of a readable record that matches no
+/// <c>update</c> or <c>delete</c> filter is a 403. These checks come after the path and before the
+/// body. A create or update whose record as stored matches no <c>create</c> or <c>update</c>
+/// filter is a 403 too: it is checked in the write transaction, after storage, and rolls the write
+/// back. A filter that fails for a record grants nothing through its grant and is logged, and a
+/// list whose filters fail is a 400.
 /// A create or update writes the record and its child rows in one transaction. A create sets the
 /// entity's creator fields to the session user's id. Every create, update and delete that
 /// succeeds appends one audit record in its transaction. Its actor is the session user, with their
@@ -58,6 +67,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
@@ -71,7 +81,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Read))
+        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        if (!read.Granted)
         {
             return Grants.Forbidden();
         }
@@ -107,7 +118,21 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordQueries.ListAsync(connection, model, pageNumber, size, order, search, cancellationToken);
+        var condition = read.Filters is { } filters
+            ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
+            : null;
+        if (await RecordQueries.ListAsync(connection, model, pageNumber, size, order, search, condition, cancellationToken) is not { } result)
+        {
+            // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
+            var logger = Logger(loggerFactory);
+            foreach (var filter in read.Filters!)
+            {
+                RecordFilterLog.ListFailed(logger, filter.Policy, filter.Grant, model.Name);
+            }
+
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
+        }
+
         return Results.Ok(new RecordListResponse(result.Items, pageNumber, size, result.TotalCount));
     }
 
@@ -118,6 +143,7 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
@@ -131,7 +157,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Read))
+        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        if (!read.Granted)
         {
             return Grants.Forbidden();
         }
@@ -142,6 +169,12 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } filters
+            && await MatchAsync(connection, null, application!, model, recordId, filters, user, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+        {
+            return RecordNotFound();
+        }
+
         return await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is { } record
             ? Results.Ok(record)
             : RecordNotFound();
@@ -160,6 +193,7 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
@@ -173,7 +207,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Read))
+        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        if (!read.Granted)
         {
             return Grants.Forbidden();
         }
@@ -190,7 +225,10 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        if (await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is null)
+        var readable = read.Filters is { } filters
+            ? await MatchAsync(connection, null, application!, model, recordId, filters, user, loggerFactory, cancellationToken) is { Found: true, Matched: true }
+            : await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not null;
+        if (!readable)
         {
             return RecordNotFound();
         }
@@ -217,6 +255,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
@@ -230,7 +269,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Create))
+        var access = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Create);
+        if (!access.Granted)
         {
             return Grants.Forbidden();
         }
@@ -269,17 +309,24 @@ internal static class RecordEndpoints
             }
 
             result = await RecordCommands.CreateAsync(connection, application!, model, computed.Values, computed.Rows, cancellationToken: cancellationToken);
+            var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
+            var outside = written is not null
+                && !await WithinFiltersAsync(connection, transaction, application!, model, written.Id, access, user, loggerFactory, cancellationToken);
             await CompleteAsync(
                 transaction,
-                result is { Outcome: RecordWriteOutcome.Written, Record: { } written }
+                written is not null && !outside
                     ? RecordAudit(user, AuditActions.RecordCreated, application!, model, written.Id, written.Version)
                     : null,
                 cancellationToken);
+            if (outside)
+            {
+                return Grants.OutsideFilter();
+            }
         }
 
         // The location uses the model's names, so a record has one URL whatever case the caller used.
-        return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
-            ? Results.Created($"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{record.Id:D}", record)
+        return result is { Outcome: RecordWriteOutcome.Written, Record: { } created }
+            ? Results.Created($"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}", created)
             : WriteFailure(result);
     }
 
@@ -290,6 +337,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
@@ -303,7 +351,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Update))
+        var access = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Update);
+        if (!access.Granted)
         {
             return Grants.Forbidden();
         }
@@ -311,6 +360,44 @@ internal static class RecordEndpoints
         if (!TryParseId(id, out var recordId))
         {
             return RecordNotFound();
+        }
+
+        // An update needs the stored record to be readable, then to match an update filter. Each
+        // check gives the version it saw, which the body must name, so a write in between cannot
+        // carry the record past them.
+        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        if (!read.Granted)
+        {
+            return RecordNotFound();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        var checkedVersions = new List<long>();
+        if (read.Filters is { } readFilters)
+        {
+            var match = await MatchAsync(connection, null, application!, model, recordId, readFilters, user, loggerFactory, cancellationToken);
+            if (match is not { Found: true, Matched: true })
+            {
+                return RecordNotFound();
+            }
+
+            checkedVersions.Add(match.Version);
+        }
+
+        if (access.Filters is { } updateFilters)
+        {
+            var match = await MatchAsync(connection, null, application!, model, recordId, updateFilters, user, loggerFactory, cancellationToken);
+            if (!match.Found)
+            {
+                return RecordNotFound();
+            }
+
+            if (!match.Matched)
+            {
+                return Grants.OutsideFilter();
+            }
+
+            checkedVersions.Add(match.Version);
         }
 
         if (!JsonRequest.IsJson(request))
@@ -325,7 +412,10 @@ internal static class RecordEndpoints
         }
 
         var input = parsed.Input!;
-        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (checkedVersions.Any(version => version != input.Version))
+        {
+            return WriteFailure(new RecordWriteResult(RecordWriteOutcome.StaleVersion));
+        }
 
         // The stored record is read outside the write transaction. The client read its version
         // earlier, so a write that passes the version check finds the record as computed here and
@@ -358,16 +448,23 @@ internal static class RecordEndpoints
             }
 
             result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
+            var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
+            var outside = written is not null
+                && !await WithinFiltersAsync(connection, transaction, application!, model, written.Id, access, user, loggerFactory, cancellationToken);
             await CompleteAsync(
                 transaction,
-                result is { Outcome: RecordWriteOutcome.Written, Record: { } written }
+                written is not null && !outside
                     ? RecordAudit(user, AuditActions.RecordUpdated, application!, model, written.Id, written.Version, SetFields(model, input))
                     : null,
                 cancellationToken);
+            if (outside)
+            {
+                return Grants.OutsideFilter();
+            }
         }
 
-        return result is { Outcome: RecordWriteOutcome.Written, Record: { } record }
-            ? Results.Ok(record)
+        return result is { Outcome: RecordWriteOutcome.Written, Record: { } updated }
+            ? Results.Ok(updated)
             : WriteFailure(result);
     }
 
@@ -378,6 +475,7 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
@@ -391,7 +489,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Delete))
+        var access = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Delete);
+        if (!access.Granted)
         {
             return Grants.Forbidden();
         }
@@ -401,10 +500,35 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
+        // A delete needs the stored record to be readable, then to match a delete filter.
+        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        if (!read.Granted)
+        {
+            return RecordNotFound();
+        }
+
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The row is locked first, so the filters see the version that is deleted.
+            if (read.Filters is not null || access.Filters is not null)
+            {
+                if (!await RecordCommands.LockAsync(connection, model, recordId, cancellationToken)
+                    || (read.Filters is { } readFilters
+                        && await MatchAsync(connection, transaction, application!, model, recordId, readFilters, user, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return RecordNotFound();
+                }
+
+                if (!await WithinFiltersAsync(connection, transaction, application!, model, recordId, access, user, loggerFactory, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return Grants.OutsideFilter();
+                }
+            }
+
             result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);
             await CompleteAsync(
                 transaction,
@@ -423,6 +547,58 @@ internal static class RecordEndpoints
             var outcome => throw new InvalidOperationException($"Unexpected delete outcome {outcome}."),
         };
     }
+
+    /// <summary>
+    /// Whether the record with <paramref name="recordId"/> matches a filter of
+    /// <paramref name="access"/>, or <see langword="true"/> when it reaches every record. Run it
+    /// inside <paramref name="transaction"/> to check a record as the transaction wrote it.
+    /// </summary>
+    private static async Task<bool> WithinFiltersAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ApplicationModel application,
+        EntityModel model,
+        Guid recordId,
+        RecordAccess access,
+        CurrentUserResponse user,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken) =>
+        access.Filters is not { } filters
+        || (await MatchAsync(connection, transaction, application, model, recordId, filters, user, loggerFactory, cancellationToken)).Matched;
+
+    /// <summary>
+    /// Checks the record with <paramref name="recordId"/> against <paramref name="filters"/> for
+    /// <paramref name="user"/>, and logs the policy and grant of each filter that failed for it.
+    /// </summary>
+    private static async Task<RecordFilterMatch> MatchAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        ApplicationModel application,
+        EntityModel model,
+        Guid recordId,
+        IReadOnlyList<RecordFilter> filters,
+        CurrentUserResponse user,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var match = await RecordFilters.MatchAsync(
+            connection, transaction, application, model, recordId, Expressions(filters), user.Id, cancellationToken);
+        if (match.Failed.Count > 0)
+        {
+            var logger = Logger(loggerFactory);
+            foreach (var index in match.Failed)
+            {
+                RecordFilterLog.FilterFailed(logger, filters[index].Policy, filters[index].Grant, model.Name);
+            }
+        }
+
+        return match;
+    }
+
+    private static List<ExpressionModel> Expressions(IReadOnlyList<RecordFilter> filters) =>
+        [.. filters.Select(filter => filter.Expression)];
+
+    private static ILogger Logger(ILoggerFactory loggerFactory) => loggerFactory.CreateLogger(typeof(RecordEndpoints).FullName!);
 
     /// <summary>
     /// Finds the application and the entity in its active release, or the 404 that says which is

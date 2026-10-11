@@ -116,16 +116,14 @@ public sealed class RecordPolicyTests(RecordApiFixture fixture) : IClassFixture<
         await AssertProblemAsync(list, HttpStatusCode.Forbidden, ForbiddenTitle);
     }
 
-    // fern's only grant on Item has a filter and fia's has a fields list. Neither is enforced yet,
-    // so neither grants anything.
-    [Theory]
-    [InlineData("fern")]
-    [InlineData("fia")]
-    public async Task A_grant_with_a_filter_or_fields_grants_nothing_yet(string user)
+    // fia's only grant on Item has a fields list. Field policies are not built yet, so it grants
+    // nothing.
+    [Fact]
+    public async Task A_grant_with_fields_grants_nothing_yet()
     {
         await fixture.ResetAsync();
         var id = await fixture.InsertAsync(TenantA, "Item", new Dictionary<string, string?> { ["name"] = "Desk" });
-        using var client = fixture.CreateClient().SignedInAs(user);
+        using var client = fixture.CreateClient().SignedInAs("fia");
 
         using (var list = await SendAsync(client, "GET", Items, null))
         {
