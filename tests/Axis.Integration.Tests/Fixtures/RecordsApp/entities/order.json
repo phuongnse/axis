@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Order",
   "formatVersion": 1,
+  "displayField": "title",
   "fields": [
     { "name": "title", "type": "text", "required": true, "maxLength": 100 },
     { "name": "lines", "type": "child-collection", "target": "OrderLine" },

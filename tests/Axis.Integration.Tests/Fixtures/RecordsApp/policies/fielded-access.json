@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "roles": ["fielded"],
   "grants": [
-    { "entity": "Item", "actions": ["read", "create"], "fields": ["name"] }
+    { "entity": "Item", "actions": ["read"], "fields": ["name", "department"] },
+    { "entity": "Item", "actions": ["create", "update"], "fields": ["name", "quantity"] },
+    { "entity": "Ticket", "actions": ["read", "create"], "fields": ["title"] },
+    { "entity": "Order", "actions": ["read"], "fields": ["lineCount"] }
   ]
 }

@@ -231,16 +231,16 @@ public sealed class PolicyCompilerTests
             [("RequestAccess", 0, "owner == currentUser()"), ("RequestAccess", 2, "amount > 10")],
             read.Filters!.Select(filter => (filter.Policy, filter.Grant, filter.Expression.Expression)));
 
-        // The grant with a fields list is not counted until field policies are built.
-        Assert.True(update.Granted);
-        Assert.Equal([2], update.Filters!.Select(filter => filter.Grant));
+        // The grant with a fields list counts, and it has no filter, so it reaches every record.
+        Assert.Equal(new RecordAccess(true, null), update);
+        Assert.Equal(new RecordAccess(true, null), PolicyEvaluator.Access(model, ["employee"], request, PolicyAction.Delete));
+        Assert.False(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Delete));
 
         // A filtered grant never reaches every record, so the data source check still refuses it.
         Assert.False(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Read));
     }
 
     [Theory]
-    [InlineData("employee", PolicyAction.Delete)]
     [InlineData("employee", PolicyAction.Create)]
     [InlineData("Employee", PolicyAction.Read)]
     [InlineData("manager", PolicyAction.Read)]
@@ -272,6 +272,30 @@ public sealed class PolicyCompilerTests
 
         Assert.Equal(new RecordAccess(true, null), access);
         Assert.True(PolicyEvaluator.Allows(model, ["employee"], request, PolicyAction.Read));
+    }
+
+    [Fact]
+    public void Fields_are_the_union_over_the_matching_grants_and_every_field_when_one_has_no_fields()
+    {
+        const string Limited = """
+            { "entity": "Request", "actions": ["read"], "fields": ["owner"] },
+            { "entity": "Request", "actions": ["read", "update"], "filter": "amount > 10", "fields": ["AMOUNT"] },
+            { "entity": "Request", "actions": ["create"] }
+            """;
+        using var limited = Folder(Policy("""["employee"]""", $"[{Limited}]"));
+        using var unlimited = Folder(Policy("""["employee"]""", $$"""[{{Limited}}, { "entity": "Request", "actions": ["read"] }]"""));
+        var model = Compile(limited);
+        Assert.True(model.TryGetEntity("Request", out var request));
+        var everyField = Compile(unlimited);
+        Assert.True(everyField.TryGetEntity("Request", out var unlimitedRequest));
+
+        // The fields are the declared names, whatever the filters.
+        Assert.Equal(["amount", "owner"], PolicyEvaluator.Fields(model, ["employee"], request, PolicyAction.Read)!.Order(StringComparer.Ordinal));
+        Assert.Equal(["amount"], PolicyEvaluator.Fields(model, ["employee"], request, PolicyAction.Update)!);
+        Assert.Null(PolicyEvaluator.Fields(model, ["employee"], request, PolicyAction.Create));
+        Assert.Empty(PolicyEvaluator.Fields(model, ["employee"], request, PolicyAction.Delete)!);
+        Assert.Empty(PolicyEvaluator.Fields(model, ["manager"], request, PolicyAction.Read)!);
+        Assert.Null(PolicyEvaluator.Fields(everyField, ["employee"], unlimitedRequest, PolicyAction.Read));
     }
 
     private static ApplicationModel Compile(TemporaryFolder folder)

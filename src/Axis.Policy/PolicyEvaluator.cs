@@ -6,17 +6,18 @@ namespace Axis.Policy;
 /// Decides whether a user's roles grant an action on an entity or a data source of an
 /// application. Access is denied unless a grant allows it. A role counts only when a roles claim
 /// value equals the name of a role the application declares, compared exactly, so any other value
-/// grants nothing. A policy applies when the user holds any of its roles. An entity grant with
-/// <see cref="GrantModel.Fields"/> grants nothing until field policies are built, so such a grant
-/// never opens access. An entity grant with a <see cref="GrantModel.Filter"/> grants the records
-/// that match it through <see cref="Access"/> only.
+/// grants nothing. A policy applies when the user holds any of its roles. An entity grant with a
+/// <see cref="GrantModel.Filter"/> grants the records that match it, and one with
+/// <see cref="GrantModel.Fields"/> grants those fields, through <see cref="Access"/> and
+/// <see cref="Fields"/> only. The data source checks, <see cref="Allows"/> and
+/// <see cref="AllowsRead"/>, count neither.
 /// </summary>
 public static class PolicyEvaluator
 {
     /// <summary>
     /// What <paramref name="roles"/> grant for <paramref name="action"/> on
-    /// <paramref name="entity"/>. Only grants without <see cref="GrantModel.Fields"/> count. The
-    /// access is granted when any such grant exists. It reaches every record when one of them has
+    /// <paramref name="entity"/>. The access is granted when any grant for the action exists,
+    /// whatever its <see cref="GrantModel.Fields"/>. It reaches every record when one of them has
     /// no filter, and otherwise the records that match any of their filters.
     /// </summary>
     public static RecordAccess Access(ApplicationModel application, IEnumerable<string> roles, EntityModel entity, PolicyAction action)
@@ -31,7 +32,7 @@ public static class PolicyEvaluator
             for (var index = 0; index < policy.Grants.Count; index++)
             {
                 var grant = policy.Grants[index];
-                if (grant.Entity?.Id != entity.Id || !grant.Actions.Contains(action) || grant.Fields is not null)
+                if (grant.Entity?.Id != entity.Id || !grant.Actions.Contains(action))
                 {
                     continue;
                 }
@@ -49,9 +50,41 @@ public static class PolicyEvaluator
     }
 
     /// <summary>
+    /// The declared names of the fields of <paramref name="entity"/> that <paramref name="roles"/>
+    /// grant <paramref name="action"/> on: the union of the <see cref="GrantModel.Fields"/> of the
+    /// matching grants, whatever their filters. It is null, which means every field, when any
+    /// matching grant has no fields, and empty when no grant matches.
+    /// </summary>
+    public static IReadOnlySet<string>? Fields(ApplicationModel application, IEnumerable<string> roles, EntityModel entity, PolicyAction action)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        var fields = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var grant in Grants(application, roles))
+        {
+            if (grant.Entity?.Id != entity.Id || !grant.Actions.Contains(action))
+            {
+                continue;
+            }
+
+            if (grant.Fields is null)
+            {
+                return null;
+            }
+
+            fields.UnionWith(grant.Fields);
+        }
+
+        return fields;
+    }
+
+    /// <summary>
     /// Whether <paramref name="roles"/> grant <paramref name="action"/> on every record of
     /// <paramref name="entity"/>, through a grant with neither a filter nor fields. The data
-    /// source endpoint does not apply record filters yet, so it needs such a grant.
+    /// source endpoint applies neither record filters nor field lists yet, so it needs such a
+    /// grant.
     /// </summary>
     public static bool Allows(ApplicationModel application, IEnumerable<string> roles, EntityModel entity, PolicyAction action) =>
         Grants(application, roles).Any(grant =>

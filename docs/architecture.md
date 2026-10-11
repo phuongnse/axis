@@ -177,8 +177,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Record filters from policies limit every record list and single-record
     check of the record API. Adding them to data source queries is
     *(planned for M4)*.
-  - Field policies leave out fields from results and reject writes to
-    protected fields *(planned for M4)*.
+  - Field policies leave out fields from record API results and reject
+    record API writes to protected fields. Applying them to data sources,
+    task forms and page metadata is *(planned for M4)*.
   - See [Authorization](#authorization).
 - **Before M4.** People sign in through OIDC. The record API and the data
   source endpoint need a session and a grant. The other endpoints do not
@@ -324,11 +325,10 @@ are marked *(planned for M4)*.
 The `role` and `policy` resources and their compile checks are built. For
 the record API and the data source endpoint, so are the session `401`, the
 matching of roles, grants by action and the `403` without a grant. The record
-API also enforces record filters: reads, writes and their failures as
-described below. Until field policies are built, a grant with a `fields` list
-grants nothing. Until the data source endpoint adds read filters, an entity
-grant with a `filter` grants nothing there. So access is never wider than a
-policy intends. Everything else in this section is *(planned for M4)*. It follows
+API also enforces record filters and field lists: reads, writes and their
+failures as described below. Until the data source endpoint adds read filters
+and field checks, an entity grant with a `filter` or a `fields` list grants
+nothing there. So access is never wider than a policy intends. Everything else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in
@@ -407,9 +407,8 @@ The `role` and `policy` resource files are described in
   each release. Every endpoint and engine command calls it with a resource
   and an action. It answers allow or deny, the read filters to add, and the
   readable and writable field sets. Today it answers allow or deny for an
-  entity or a data source, and the record filters of an entity and an
-  action. The record API and the data source endpoint call it. The field
-  sets are *(planned for M4)*.
+  entity or a data source, and the record filters and the field set of an
+  entity and an action. The record API and the data source endpoint call it.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 

@@ -530,8 +530,9 @@ changes, so it is the default user id, and a tenant can name another claim.
 
 M4 adds authorization through roles and policies. The `role` and `policy`
 resources and their compile checks are built, and so is the compile check of
-`currentUser()`. The record API enforces entity grants and their record
-filters, and the data source endpoint enforces grants without a filter.
+`currentUser()`. The record API enforces entity grants, their record
+filters and their field lists. The data source endpoint enforces grants
+without a filter or a field list.
 Everything else below is *(planned for M4)*. See [architecture](architecture.md#authorization) for the
 details. It builds on [D12](#d12-authorization-is-server-side-and-default-deny--agreed).
 

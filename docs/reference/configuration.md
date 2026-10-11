@@ -776,8 +776,9 @@ This section follows
 applies it. The `role` and `policy` resources, the check of task assignees
 and the policy checks are built. So are matching the roles claim and
 enforcing entity and data source grants on the record API and the data
-source endpoint. Filters, fields and policies on processes are *(planned for
-M4)*. Each compile check below is a compile error.
+source endpoint, and record filters and field lists on the record API.
+Filters and fields on data sources, and policies on processes, are
+*(planned for M4)*. Each compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
 
@@ -825,10 +826,9 @@ A `role` resource declares a role that users can hold:
 
 A `policy` resource gives roles grants. The record API and the data source
 endpoint enforce entity and data source grants. The record API enforces the
-filter rules below. The data source endpoint does not apply filters yet, so
-there an entity grant with a `filter` grants nothing *(planned for M4)*. The
-fields rules are *(planned for M4)*, and until then a grant with `fields`
-grants nothing. Process grants are not enforced yet *(planned for M4)*. The purchase request sample targets the three policies below.
+filter and fields rules below. The data source endpoint applies neither yet,
+so there an entity grant with a `filter` or `fields` grants nothing
+*(planned for M4)*. Process grants are not enforced yet *(planned for M4)*. The purchase request sample targets the three policies below.
 Employees reach their own requests, department managers the requests of
 their department, and finance reviewers the submitted ones.
 
@@ -836,7 +836,7 @@ For now, the sample's policies leave out every `filter` and `fields`, so
 each role reaches every purchase request. Its employee policy also reads
 `RequestsByDepartment`, because a sample journey opens that page as the
 employee. The filters return once data sources apply record filters and
-field policies are built. The target policies are:
+check fields. The target policies are:
 
 ```json
 {
@@ -913,7 +913,10 @@ field policies are built. The target policies are:
   statuses, and the process moves it on.
 - **Fields.** An entity grant may have `fields`, a list of field names of the
   entity. Without it, the grant covers every field. A `child-collection`
-  field covers its rows as a whole.
+  field covers its rows as a whole. A user reads the union of the `fields`
+  of their `read` grants, creates those of their `create` grants and updates
+  those of their `update` grants. A delete removes the whole record, so
+  `fields` on a `delete` grant limits nothing.
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](../architecture.md#combining-grants).

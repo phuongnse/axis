@@ -15,8 +15,9 @@ Every record endpoint needs a session and a policy grant for the action on
 the entity, as [Authorization](../architecture.md#authorization) describes.
 Without a session the answer is a `401`, and without a grant a `403`. A
 grant with a `filter` reaches only the records that match it, so a record
-outside every read filter is a `404`. A grant with a `fields` list grants
-nothing yet. From M4 *(planned)*, fields the user may not read are left out.
+outside every read filter is a `404`. A grant with a `fields` list covers
+only those fields: fields the user may not read are left out, and a write of
+a field no grant covers is a `403`.
 
 ## Routes
 
@@ -53,8 +54,8 @@ hyphenated 8-4-4-4-12 hex form, in either letter case.
 }
 ```
 
-`values` holds every declared field of the entity under its declared name, in
-declaration order. A field that is SQL `NULL` is `null`; it is never left out.
+`values` holds every declared field of the entity that the user may read,
+under its declared name, in declaration order. A field that is SQL `NULL` is `null`; it is never left out.
 A `child-collection` field is an array of its rows, in their stored order. It
 is `[]` when the record has no rows. List responses leave it out. See
 [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
@@ -66,11 +67,13 @@ reference or every reference is `null`. A `null` reference has no entry.
 `values` keeps the record id of each reference, so a record read and sent back
 is unchanged.
 
-From M4 *(planned)*, `values` and `labels` hold only the fields the user may
-read. They are the union of the `fields` of the user's `read` grants on the
-entity, the same for every record. A field the user may not read is left out
-of both, so `null` still means an empty field. `id` and `version` are always
-there. A child entity's rows follow their owner's `fields` entry for the
+`values` and `labels` hold only the fields the user may read. They are the
+union of the `fields` of the user's `read` grants on the entity, the same for
+every record, and a grant without `fields` covers every field. A field the
+user may not read is left out of both, so `null` still means an empty field.
+That holds for computed, sequence and creator fields too. `id` and `version`
+are always there. A user with a `create` grant and no `read` grant gets a
+create response with empty `values` and `labels`. A child entity's rows follow their owner's `fields` entry for the
 `child-collection` field, as a whole. See
 [Authorization](../architecture.md#authorization).
 
@@ -80,11 +83,11 @@ query per row. Create and update return their labels from the same statement
 as the write: the write is a data-modifying `WITH` clause, and the labels are
 selected from it with the same joins, because `RETURNING` cannot join.
 
-From M4 *(planned)*, a label shows when the user may read the reference field
-and the target entity's display field. The target's record filters do not hide
-it, so a user who reads a request sees its department's name even when no
-read filter on `Department` matches that department. The joins stay as they
-are.
+A label shows when the user may read the reference field and the target
+entity's display field. Otherwise the field has no entry in `labels`, as for a
+`null` reference. The target's record filters do not hide it, so a user who
+reads a request sees its department's name even when no read filter on
+`Department` matches that department. The joins stay as they are.
 
 A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
 "totalCount": 42 }`. `items` holds records in the shape above, including
@@ -113,9 +116,8 @@ record.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
 - **`sort`.** A declared field name, or `-` and the name for descending
   order. The name matches exactly, so letter case matters. A
-  `child-collection` field is not a valid `sort`. From M4 *(planned)*, a field
-  the user may not read is not a valid `sort` either, as for an unknown
-  field.
+  `child-collection` field is not a valid `sort`. A field the user may not
+  read is not a valid `sort` either, as for an unknown field.
 - **`search`.** Keeps only the records whose display field contains the text,
   ignoring letter case. Both sides go through PostgreSQL `lower()`, so case
   folding follows the tenant database. The text has no wildcards: `%`, `_`,
@@ -124,8 +126,7 @@ record.
   and an empty `search` means no filter. It is invalid on an entity without a
   display field, when repeated, when longer than 200 characters, or when it
   contains U+0000. The filter cannot use an index, so it reads the whole
-  table. From M4 *(planned)*, a `search` is invalid when the user may not
-  read the display field.
+  table. A `search` is invalid when the user may not read the display field.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -226,8 +227,7 @@ find out which applications or records exist. See
 After the path, the user needs a grant for the action on the entity, or the
 answer is a `403` before the query or body is read.
 
-Policies add more checks. Steps 1 to 8 and 10 to 11 are built, and the
-field check in step 9 is *(planned for M4)*. The full order is:
+Policies add more checks. The full order is:
 
 1. The CSRF header, `403`.
 2. The session, `401`.
@@ -264,8 +264,8 @@ otherwise the answer is the stale-version `409`. See
   `update` and a delete `delete`. History needs `read`. Only roles claim
   values that name a declared role of the application count. A grant with a
   `filter` counts, and reaches only the records that match it. A grant with
-  a `fields` list grants nothing until field policies are built. The title
-  is fixed and names no entity or action.
+  a `fields` list counts too, and covers only those fields. The title is
+  fixed and names no entity or action.
 - **`404` outside every read filter.** A record that matches no read filter
   of the user is answered like an unknown record. That covers a single read,
   a history, an update and a delete. An update or a delete by a user with no
@@ -280,9 +280,11 @@ otherwise the answer is the stale-version `409`. See
   server logs the policy name and the grant's index. Another grant can still
   match the record. A list whose combined read filters fail is a `400` with
   a fixed title, because PostgreSQL cannot fail one branch of an `or`.
-- **`403` for a field write** *(planned for M4)*. The body writes a field that
-  no `create` or `update` grant of the user covers. It has the `errors` shape
-  of a `400`, keyed `/values/<field>`, and lists every such field.
+- **`403` for a field write.** The body writes a field that no `create` or
+  `update` grant of the user covers. It has the `errors` shape of a `400`,
+  keyed `/values/<field>`, and lists every such field. A child collection is
+  one field, so its rows are not checked one by one. Nothing is written. The
+  title is fixed: "You have no grant to write these fields."
 - **`404`.** An unknown application, an application with no active release,
   an unknown entity, an unknown record and an `{id}` that is not a UUID in the
   hyphenated form. The path is resolved before the query is checked, so a
@@ -554,9 +556,9 @@ can be read as its history (D21).
     `anonymous` and audit records written before names were stored.
   - The history needs a session and a `read` grant on the entity. Without a
     session it is a `401`, and without the grant a `403`, before the record
-    is read. A record outside every read filter is a `404`. From M4
-    *(planned)*, the `fields` of `details` leave out the fields the user may
-    not read.
+    is read. A record outside every read filter is a `404`. The `fields` of
+    `details`, in `record.updated` and `task.completed`, leave out the fields
+    the user may not read.
 
 For example:
 

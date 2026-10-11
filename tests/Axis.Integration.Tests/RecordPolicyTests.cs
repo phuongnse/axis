@@ -116,33 +116,6 @@ public sealed class RecordPolicyTests(RecordApiFixture fixture) : IClassFixture<
         await AssertProblemAsync(list, HttpStatusCode.Forbidden, ForbiddenTitle);
     }
 
-    // fia's only grant on Item has a fields list. Field policies are not built yet, so it grants
-    // nothing.
-    [Fact]
-    public async Task A_grant_with_fields_grants_nothing_yet()
-    {
-        await fixture.ResetAsync();
-        var id = await fixture.InsertAsync(TenantA, "Item", new Dictionary<string, string?> { ["name"] = "Desk" });
-        using var client = fixture.CreateClient().SignedInAs("fia");
-
-        using (var list = await SendAsync(client, "GET", Items, null))
-        {
-            await AssertProblemAsync(list, HttpStatusCode.Forbidden, ForbiddenTitle);
-        }
-
-        using (var read = await SendAsync(client, "GET", $"{Items}/{id:D}", null))
-        {
-            await AssertProblemAsync(read, HttpStatusCode.Forbidden, ForbiddenTitle);
-        }
-
-        using (var create = await SendAsync(client, "POST", Items, """{ "values": { "name": "Chair" } }"""))
-        {
-            await AssertProblemAsync(create, HttpStatusCode.Forbidden, ForbiddenTitle);
-        }
-
-        Assert.Equal(1, (await fixture.TableShapeAsync(TenantA, "Item")).RowCount);
-    }
-
     // dora holds a read grant on ActiveItems and none on Item, its root entity. anna holds both.
     [Fact]
     public async Task A_data_source_grant_without_a_read_grant_on_its_root_entity_is_403()
