@@ -295,8 +295,10 @@ are marked *(planned for M4)*.
   Integration tests of other endpoints sign in through a test authentication
   scheme that only test hosts register. A request names its user in a
   header, and the scheme builds the same principal as a session of that user.
-  The E2E sign-in journey drives the Keycloak login page. The other E2E journeys sign in
-  through Keycloak *(planned for M4)*.
+  The E2E sign-in journey drives the Keycloak login page. For the other E2E
+  journeys, a Playwright setup step signs each realm user in on the login page
+  once and saves the browser session. Journeys that act as a user load or swap
+  those saved sessions.
 - **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
   Keycloak with an imported development realm, `axis`. This part is in place:
   the realm is `samples/keycloak/axis-realm.json`, and an integration test
@@ -492,8 +494,9 @@ They exist only in development and tests, never in Production.
   Their audit records then have the actor `anonymous` and no display name.
 - **Development and E2E users.** `dotnet run` and the E2E server run with
   the purchase request users: an employee, two department managers and a
-  finance reviewer. The E2E server runs as `Testing`, so Playwright journeys
-  can sign in.
+  finance reviewer. The E2E server runs as `Testing`. Only the test user
+  journey still signs in as a test user. The other journeys sign in through
+  Keycloak.
 
 ## Process engine (D11)
 

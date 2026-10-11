@@ -1,13 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
-
-async function signInWithPicker(page: Page, name: string) {
-  await page.goto('/e2e/tasks')
-  await page.getByRole('banner').getByRole('button', { name: 'Test user' }).click()
-  await page.getByRole('menuitemradio', { name }).click()
-  await expect(page.getByRole('banner').getByRole('button', { name })).toBeVisible()
-}
+import { sessionFile, useSession } from '../sessions'
 
 // Specs run in parallel against one database, so this test looks only for the task it starts.
 test('the manager a task is assigned to sees it in the inbox in light and dark mode, and another user does not', async ({
@@ -29,7 +23,9 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
   })
   expect(started.status()).toBe(201)
 
-  await signInWithPicker(page, 'Binh Engineering Manager')
+  await useSession(page, 'binh')
+  await page.goto('/e2e/tasks')
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager' })).toBeVisible()
   const row = page.getByRole('row', { name: new RegExp(title) })
   // The worker creates the task some time after the start, so the inbox is loaded again until it shows.
   await expect(async () => {
@@ -50,10 +46,11 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
     await expect(themedRow.getByRole('cell', { name: title, exact: true })).toBeVisible()
   }
 
-  // A new context has its own cookies, so this sign-in does not change the manager's.
-  const otherContext = await browser.newContext({ baseURL })
+  // A new context has its own cookies, so Anna's session does not change the manager's.
+  const otherContext = await browser.newContext({ baseURL, storageState: sessionFile('anna') })
   const other = await otherContext.newPage()
-  await signInWithPicker(other, 'Anna Employee')
+  await other.goto('/e2e/tasks')
+  await expect(other.getByRole('banner').getByRole('button', { name: 'Anna Employee' })).toBeVisible()
   await expect(other.getByRole('main').getByText('No open tasks.')).toBeVisible()
   await expect(other.getByText(title)).toHaveCount(0)
   await otherContext.close()
