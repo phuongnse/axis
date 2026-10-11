@@ -262,14 +262,85 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
         Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
     }
 
-    /// <summary>
-    /// Creates a request in a department managed by <c>maria</c>, starts <paramref name="process"/>
-    /// for it and runs the tenant's work items, so the instance waits on its task. Returns the
-    /// task's id, the request's id and the instance's id.
-    /// </summary>
-    private async Task<(Guid Task, Guid Subject, Guid Instance)> CreateTaskAsync(string tenant, string process)
+    [Fact]
+    public async Task An_assignee_with_no_entity_grant_lists_reads_and_completes_their_task_and_no_one_else_may()
     {
-        var department = await fixture.InsertDepartmentAsync(tenant, "maria");
+        // Otto holds no StepApp role, so no policy grants him anything. Fiona holds every grant
+        // finance has, but is not the assignee.
+        var (task, subject, instance) = await CreateTaskAsync(TenantA, "Decide", manager: "otto");
+        using var otto = fixture.CreateClient().SignedInAs("otto");
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
+
+        using var list = await GetJsonAsync(otto, $"{Tasks}?pageSize=100", TenantA);
+        var item = list.RootElement.GetProperty("items").EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == task);
+        Assert.Equal(subject, item.GetProperty("subject").GetProperty("id").GetGuid());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("subject").GetProperty("label").ValueKind);
+
+        using var read = await GetJsonAsync(otto, $"{Tasks}/{task:D}", TenantA);
+        var form = read.RootElement.GetProperty("form");
+        Assert.Empty(form.GetProperty("sections").EnumerateArray());
+        Assert.Empty(form.GetProperty("entity").GetProperty("fields").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, read.RootElement.GetProperty("subject").GetProperty("label").ValueKind);
+
+        using (var request = RecordApiFixture.Request($"{Tasks}/{task:D}", Host(TenantA)))
+        using (var denied = await fiona.SendAsync(request, CancellationToken))
+        using (var problem = await RecordApiFixture.ReadProblemAsync(denied, HttpStatusCode.Forbidden))
+        {
+            Assert.Equal("This task is assigned to someone else.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        using (var denied = await CompleteAsync(fiona, task, TenantA, """{ "outcome": "approve" }"""))
+        using (var problem = await RecordApiFixture.ReadProblemAsync(denied, HttpStatusCode.Forbidden))
+        {
+            Assert.Equal("This task is assigned to someone else.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+
+        using var completed = await CompleteAsync(otto, task, TenantA, """{ "outcome": "approve" }""");
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        var (actor, _, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+        Assert.Equal("otto", actor);
+    }
+
+    [Fact]
+    public async Task A_task_leaves_out_the_fields_the_user_may_not_read_and_refuses_a_value_for_one()
+    {
+        // Rita may read only the title and the department of a request.
+        var (task, subject, instance) = await CreateTaskAsync(TenantA, "Decide", manager: "rita");
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var rita = fixture.CreateClient().SignedInAs("rita");
+
+        using var read = await GetJsonAsync(rita, $"{Tasks}/{task:D}", TenantA);
+
+        var form = read.RootElement.GetProperty("form");
+        var section = Assert.Single(form.GetProperty("sections").EnumerateArray());
+        Assert.Equal("requestDecision.main", section.GetProperty("titleKey").GetString());
+        Assert.Equal(["title"], section.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
+        Assert.Equal(
+            ["title", "department"],
+            form.GetProperty("entity").GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
+        Assert.Equal(RequestTitle(subject), read.RootElement.GetProperty("subject").GetProperty("label").GetString());
+
+        using var response = await CompleteAsync(
+            rita, task, TenantA, $$"""{ "outcome": "approve", "values": { "comment": "Fine" }, "version": {{waiting.SubjectVersion}} }""");
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(["/values/comment"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Equal(["Cannot be set."], errors.GetProperty("/values/comment").EnumerateArray().Select(message => message.GetString()));
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+    }
+
+    /// <summary>
+    /// Creates a request in a department managed by <paramref name="manager"/>, starts
+    /// <paramref name="process"/> for it and runs the tenant's work items, so the instance waits on
+    /// its task. Returns the task's id, the request's id and the instance's id.
+    /// </summary>
+    private async Task<(Guid Task, Guid Subject, Guid Instance)> CreateTaskAsync(string tenant, string process, string manager = "maria")
+    {
+        var department = await fixture.InsertDepartmentAsync(tenant, manager);
         var subject = await fixture.InsertRequestAsync(tenant, department);
         var instance = await fixture.StartAsync(tenant, process, subject);
         await fixture.RunUntilIdleAsync(tenant, CancellationToken);
@@ -281,6 +352,14 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     {
         using var request = RecordApiFixture.Request(HttpMethod.Post, $"{Tasks}/{task:D}/complete", Host(tenant), body);
         return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static async Task<JsonDocument> GetJsonAsync(HttpClient client, string path, string tenant)
+    {
+        using var request = RecordApiFixture.Request(path, Host(tenant));
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await ReadJsonAsync(response);
     }
 
     private static async Task<JsonDocument> ReadRecordAsync(HttpClient client, Guid id, string tenant)

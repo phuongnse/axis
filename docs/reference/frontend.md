@@ -174,9 +174,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Unreadable pages.** The page endpoint answers `403` for a page the
       user cannot read. Site navigation leaves out entries whose page the
       user cannot read.
-    - **Fields.** `entity.fields`, a child collection's `fields`, the task
-      form and the form metadata leave out the fields the user may not read.
-      A form section with no field left is left out.
+    - **Fields.** `entity.fields`, a child collection's `fields` and the
+      form metadata leave out the fields the user may not read. A form
+      section with no field left is left out. The task API's form already
+      does this, see [policies on tasks](processes.md#task-api).
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process.
     - **Access.** Every `table` and `form` widget gets an `access` object.

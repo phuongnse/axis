@@ -1,0 +1,8 @@
+{
+  "id": "83becea9-4d34-484f-9d8d-66cc67c0ea44",
+  "kind": "policy",
+  "name": "ReviewerAccess",
+  "formatVersion": 1,
+  "roles": ["reviewer"],
+  "grants": [{ "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }]
+}

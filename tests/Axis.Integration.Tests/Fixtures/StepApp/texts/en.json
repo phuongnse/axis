@@ -11,6 +11,7 @@
     "requestDecision.main": "Decision",
     "requestReview.main": "Request",
     "role.finance": "Finance",
+    "role.reviewer": "Reviewer",
     "task.approve": "Approve",
     "task.reject": "Reject"
   }

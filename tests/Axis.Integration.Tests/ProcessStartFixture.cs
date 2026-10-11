@@ -17,7 +17,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the configuration, data and processes migrations applied
 /// and the ProcessApp fixture activated, served by the real server on host <c>a.example.test</c>.
-/// The test authentication scheme signs in <c>anna</c>.
+/// The test authentication scheme signs in <c>anna</c>, who holds <c>requester</c>, and
+/// <c>olga</c>, who holds <c>reader</c>. <see cref="Client"/> is signed in as <c>anna</c>.
 /// </summary>
 public sealed class ProcessStartFixture : IAsyncLifetime
 {
@@ -71,9 +72,11 @@ public sealed class ProcessStartFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:Hosts:0", Host);
             builder.UseSetting("Tenants:a:ConnectionString", _connectionString);
             builder.UseTestOidc("a");
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
+            builder.UseTestAuthentication(
+                new TestIdentity("anna", "Anna Employee", "requester"),
+                new TestIdentity("olga", "Olga Reader", "reader"));
         });
-        _client = _factory.CreateClient();
+        _client = _factory.CreateClient().SignedInAs("anna");
     }
 
     public async ValueTask DisposeAsync()
@@ -92,14 +95,18 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
-    /// <summary>Inserts a request with a new title and <paramref name="status"/>, and returns its id.</summary>
-    public async Task<Guid> InsertRequestAsync(string? status)
+    /// <summary>
+    /// Inserts a request with <paramref name="status"/> and a new title that starts with
+    /// <paramref name="title"/>, and returns its id. The <c>requester</c> role reads only the
+    /// requests whose title starts with <c>Request</c>.
+    /// </summary>
+    public async Task<Guid> InsertRequestAsync(string? status, string title = "Request")
     {
         var id = Guid.NewGuid();
         await using var command = DataSource.CreateCommand(
             $"INSERT INTO {RequestTable} ({Column("id")}, {Column("title")}, {Column("status")}) VALUES (@id, @title, @status)");
         command.Parameters.AddWithValue("id", id);
-        command.Parameters.AddWithValue("title", $"Request {id:N}");
+        command.Parameters.AddWithValue("title", $"{title} {id:N}");
         command.Parameters.AddWithValue("status", (object?)status ?? DBNull.Value);
         await command.ExecuteNonQueryAsync();
         return id;

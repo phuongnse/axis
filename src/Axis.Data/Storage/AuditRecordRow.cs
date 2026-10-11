@@ -12,7 +12,10 @@ public sealed class AuditRecordRow
     /// <summary>The time of the transaction that wrote the action.</summary>
     public required DateTimeOffset OccurredAt { get; init; }
 
-    /// <summary>A user id, <c>system</c> for the worker, or <c>anonymous</c> when nobody is signed in.</summary>
+    /// <summary>
+    /// A user id, <c>system</c> for the worker, or <c>anonymous</c> in an older process start
+    /// with nobody signed in.
+    /// </summary>
     public required string Actor { get; init; }
 
     /// <summary>

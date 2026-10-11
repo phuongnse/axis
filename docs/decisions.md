@@ -393,8 +393,8 @@ record history are built.
   them in M4.
 - **Current user:** `GET /api/me` returns the session user from
   [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed), or `401`
-  when there is none. Before M4, record writes stay open with no signed-in
-  user, and the actor is then `anonymous`.
+  when there is none. Before M4, record writes and process starts stayed
+  open with no signed-in user, and the actor was then `anonymous`.
 - **Audit records:** rows in `axis.audit_records` are append-only.
   - Each one commits in the same transaction as its action.
   - M3 records these actions: record create, update and delete through the
@@ -532,7 +532,10 @@ M4 adds authorization through roles and policies. The `role` and `policy`
 resources and their compile checks are built, and so is the compile check of
 `currentUser()`. The record API enforces entity grants, their record
 filters and their field lists. The data source endpoint enforces grants,
-the root entity's read filters and the readable fields.
+the root entity's read filters and the readable fields. A process start
+enforces the `start` grant and read access to the subject record. The task
+API keeps the assignee check and leaves out the fields the user may not
+read, and the worker's steps run outside policies.
 Everything else below is *(planned for M4)*. See [architecture](architecture.md#authorization) for the
 details. It builds on [D12](#d12-authorization-is-server-side-and-default-deny--agreed).
 

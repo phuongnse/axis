@@ -1,0 +1,7 @@
+{
+  "id": "98857e7c-64aa-4196-9434-bb1dcb944f4c",
+  "kind": "role",
+  "name": "reviewer",
+  "formatVersion": 1,
+  "label": { "textKey": "role.reviewer" }
+}

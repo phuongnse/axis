@@ -1,0 +1,8 @@
+{
+  "id": "5b48037f-d1c6-4f87-854d-ec5ee9f83e60",
+  "kind": "policy",
+  "name": "ReaderAccess",
+  "formatVersion": 1,
+  "roles": ["reader"],
+  "grants": [{ "entity": "Request", "actions": ["read"] }]
+}

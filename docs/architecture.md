@@ -20,9 +20,9 @@ flowchart LR
 ```
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
-  It is the BFF: the OIDC client and the cookie session. The record API and
-  the data source endpoint require a session. Requiring one on its other
-  endpoints is *(planned for M4)*.
+  It is the BFF: the OIDC client and the cookie session. The record API, the
+  data source endpoint, the process start endpoint and the task API require a
+  session. Requiring one on its other endpoints is *(planned for M4)*.
 - **Axis.Worker** executes durable work. So far it runs work items, and
   through them the `decision`, `task`, `operation` and `end` steps of process
   instances. Wait for event, timer and sub-process steps come later. Outbox
@@ -45,7 +45,7 @@ src/
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
   Axis.Processes/         work items, decision, task, operation and end steps, task API; outbox (M5)
-  Axis.Policy/            policy evaluation: entity and data source grants, record filters; field sets (M4)
+  Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
@@ -171,22 +171,23 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
 - **Authorization (D12, D24).**
-  - The record API and the data source endpoint call the policy module with
-    the entity or data source and the action. Every other API endpoint and
-    engine command does so *(planned for M4)*.
+  - The record API, the data source endpoint and the process start endpoint
+    call the policy module with the entity, data source or process and the
+    action. The task API calls it for the fields a task shows. Every other
+    API endpoint does so *(planned for M4)*. Worker steps run as `system`,
+    outside policies.
   - Record filters from policies limit every record list and single-record
-    check of the record API. Adding them to data source queries is
-    *(planned for M4)*.
-  - Field policies leave out fields from record API results and reject
-    record API writes to protected fields. Applying them to data sources,
-    task forms and page metadata is *(planned for M4)*.
+    check of the record API, data source queries and the subject record of a
+    process start.
+  - Field policies leave out fields from record API results, data source
+    rows and task forms, and reject record API writes to protected fields.
+    Applying them to page metadata is *(planned for M4)*.
   - See [Authorization](#authorization).
-- **Before M4.** People sign in through OIDC. The record API and the data
-  source endpoint need a session and a grant. The other endpoints do not
-  need a session yet. There is no other way to sign in. Record writes,
-  process starts and tasks take their user from the session. A process
-  start stays open with nobody signed in. Its audit records then have the
-  actor `anonymous` and no display name.
+- **Before M4.** People sign in through OIDC. The record API, the data
+  source endpoint and the process start endpoint need a session and a
+  grant. The task API needs a session and the assignee check. The other
+  endpoints do not need a session yet. There is no other way to sign in.
+  Record writes, process starts and tasks take their user from the session.
 
 ### Sign-in and the session
 
@@ -268,8 +269,8 @@ are marked *(planned for M4)*.
   task API read the current user the same way, and their audit records store
   the user's id and display name.
 - **Sign-in needed.** Without a session, these answer a `401` problem
-  details response. It is built for records, record history and data source
-  rows, and for tasks. The others are *(planned for M4)*:
+  details response. It is built for records, record history, data source
+  rows, process start and tasks. The others are *(planned for M4)*:
   - every route under `/api/apps/{app}/`: records, record history, data
     source rows, process start and tasks. The session is checked before any
     `404`, so a caller without a session cannot learn which applications or
@@ -289,8 +290,9 @@ are marked *(planned for M4)*.
   carry `X-Axis-Csrf: 1`, otherwise `403`. The server checks the header
   right after it resolves the tenant and before authentication, so a refused
   write does no work and does not renew the session cookie. On the record
-  API and the data source endpoint, the session check follows it. On the
-  other endpoints it is *(planned for M4)*. The SPA sends every `/api`
+  API, the data source endpoint, the process start endpoint and the task
+  API, the session check follows it. On the other endpoints it is
+  *(planned for M4)*. The SPA sends every `/api`
   call through one wrapper around `fetch`, which adds the header to its
   writes. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
@@ -327,8 +329,10 @@ the record API and the data source endpoint, so are the session `401`, the
 matching of roles, grants by action and the `403` without a grant. The record
 API also enforces record filters and field lists: reads, writes and their
 failures as described below. The data source endpoint adds the root entity's
-read filters to its SQL and checks every projected field. Everything else in
-this section is *(planned for M4)*. It follows
+read filters to its SQL and checks every projected field. A process start
+checks the session, the `start` grant and read access to the subject record.
+The task API keeps the assignee check and leaves out the fields the user may
+not read. Everything else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
 The `role` and `policy` resource files are described in
@@ -408,9 +412,11 @@ The `role` and `policy` resource files are described in
   each release. Every endpoint and engine command calls it with a resource
   and an action. It answers allow or deny, the read filters to add, and the
   readable and writable field sets. Today it answers allow or deny for an
-  entity or a data source, and the record filters and the field set of an
-  entity and an action. The record API and the data source endpoint call it,
-  and both apply the record filters and the field sets it answers.
+  entity, a data source or a process start, and the record filters and the
+  field set of an entity and an action. The record API, the data source
+  endpoint and the process start endpoint call it, and apply the record
+  filters it answers. The record API, the data source endpoint and the task
+  API apply the field sets.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 

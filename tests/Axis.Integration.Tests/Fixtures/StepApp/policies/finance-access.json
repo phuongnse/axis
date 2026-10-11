@@ -5,7 +5,14 @@
   "formatVersion": 1,
   "roles": ["finance"],
   "grants": [
-    { "entity": "Request", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Department", "actions": ["read", "create", "update", "delete"] }
+    { "entity": "Request", "actions": ["read", "create", "delete"] },
+    {
+      "entity": "Request",
+      "actions": ["update"],
+      "fields": ["title", "amount", "divisor", "status", "department", "comment"]
+    },
+    { "entity": "Department", "actions": ["read", "create", "update", "delete"] },
+    { "process": "Decide", "actions": ["start"] },
+    { "process": "Approve", "actions": ["start"] }
   ]
 }

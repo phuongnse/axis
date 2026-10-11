@@ -9,9 +9,9 @@ namespace Axis.Server.Processes;
 /// <summary>
 /// Reads the body of a task completion: <c>outcome</c>, one of the step's outcomes ignoring letter
 /// case, and the optional <c>values</c> and <c>version</c>. A value is allowed only for a field the
-/// task's form makes editable. The allowed values and the version are then parsed by the record
-/// update parser, so they follow the record API's value format and keys. Every problem is reported
-/// in one pass, keyed by JSON Pointer into the body.
+/// task's form makes editable and the user may read. The allowed values and the version are then
+/// parsed by the record update parser, so they follow the record API's value format and keys.
+/// Every problem is reported in one pass, keyed by JSON Pointer into the body.
 /// </summary>
 internal static class TaskCompletionBody
 {
@@ -37,14 +37,16 @@ internal static class TaskCompletionBody
     /// <summary>
     /// Reads <paramref name="utf8Body"/> against the task <paramref name="step"/> and its
     /// <paramref name="form"/> over <paramref name="entity"/>, the subject entity in
-    /// <paramref name="release"/>.
+    /// <paramref name="release"/>. <paramref name="readable"/> holds the names of the fields the
+    /// user may read, or is null for every field.
     /// </summary>
     public static TaskCompletionResult Read(
         byte[] utf8Body,
         TaskStepModel step,
         FormModel form,
         EntityModel entity,
-        ApplicationModel release)
+        ApplicationModel release,
+        IReadOnlySet<string>? readable)
     {
         if (!Utf8.IsValid(utf8Body))
         {
@@ -119,7 +121,7 @@ internal static class TaskCompletionBody
             var allowed = new List<(string Name, string Value)>();
             if (values is { } valuesElement)
             {
-                var editable = Editable(form, entity);
+                var editable = Editable(form, entity, readable);
                 foreach (var property in valuesElement.EnumerateObject())
                 {
                     if (!TryReadName(property, out var name))
@@ -162,15 +164,16 @@ internal static class TaskCompletionBody
 
     /// <summary>
     /// The declared names of the fields <paramref name="form"/> makes editable: listed and not
-    /// read-only, and neither computed nor numbered by a sequence.
+    /// read-only, neither computed nor numbered by a sequence, and readable by the user.
     /// </summary>
-    private static HashSet<string> Editable(FormModel form, EntityModel entity) =>
+    private static HashSet<string> Editable(FormModel form, EntityModel entity, IReadOnlySet<string>? readable) =>
         form.Sections
             .SelectMany(section => section.Fields)
             .Where(field => !field.ReadOnly)
             .Select(field => entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, field.Field, StringComparison.Ordinal)))
             .Where(field => field is { IsComputed: false, Sequence: null })
             .Select(field => field!.Name)
+            .Where(name => readable is null || readable.Contains(name))
             .ToHashSet(StringComparer.Ordinal);
 
     /// <summary>

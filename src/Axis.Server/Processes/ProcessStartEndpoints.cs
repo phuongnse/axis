@@ -5,11 +5,13 @@ using Axis.Configuration.Model;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Records;
+using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Server.Applications;
 using Axis.Server.Http;
+using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Microsoft.Extensions.Primitives;
@@ -19,13 +21,15 @@ namespace Axis.Server.Processes;
 
 /// <summary>
 /// The endpoint that starts a process instance for one subject record. The instance is pinned to
-/// the release active when the request is resolved. A request is checked in order: application
-/// and process (404), content type (415), body (400), <c>Idempotency-Key</c> (400). Then one
-/// transaction claims the key's receipt, locks and reads the subject record (400), checks the start
+/// the release active when the request is resolved. A request is checked in order: session (401),
+/// application and process (404), the user's <c>start</c> grant on the process (403), content type
+/// (415), body (400), <c>Idempotency-Key</c> (400). Then one transaction claims the key's receipt,
+/// locks the subject record, checks that the user may read it and reads it (400), checks the start
 /// condition (400), inserts the instance (409) and its first work item, and appends the audit
-/// record <c>process.started</c>, whose actor is the current user or <c>anonymous</c>. A repeat
-/// with a claimed key returns the stored response, or 422 for another record. A start that fails
-/// writes nothing. The problem titles never contain text from the request.
+/// record <c>process.started</c>, whose actor is the session user. A record the user may not read
+/// gets the same 400 as one that does not exist, so the two cannot be told apart. A repeat with a
+/// claimed key returns the stored response, or 422 for another record. A start that fails writes
+/// nothing. The problem titles never contain text from the request.
 /// </summary>
 internal static class ProcessStartEndpoints
 {
@@ -49,8 +53,14 @@ internal static class ProcessStartEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
         {
             return NotFound("No application is active under this name.");
@@ -60,6 +70,11 @@ internal static class ProcessStartEndpoints
         if (!application.TryGetProcess(process, out var model))
         {
             return NotFound("The application has no process with this name.");
+        }
+
+        if (!PolicyEvaluator.AllowsStart(application, user.Roles, model))
+        {
+            return Grants.Forbidden();
         }
 
         if (!JsonRequest.IsJson(request))
@@ -90,7 +105,6 @@ internal static class ProcessStartEndpoints
         var response = new ProcessInstanceResponse(instanceId, model.Name, subjectId, active.ReleaseId, ProcessStarts.Running);
         var body = JsonSerializer.Serialize(response, JsonSerializerOptions.Web);
 
-        var user = await CurrentUsers.FindAsync(request.HttpContext);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -110,8 +124,14 @@ internal static class ProcessStartEndpoints
         }
 
         // The lock makes the read below and the start condition see the latest version, and a
-        // concurrent write of the record waits until this start commits or rolls back.
+        // concurrent write of the record waits until this start commits or rolls back. A record
+        // the user may not read does not exist for them.
+        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
         if (!await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken)
+            || !read.Granted
+            || (read.Filters is { } filters
+                && await RecordEndpoints.MatchAsync(connection, transaction, application, entity, subjectId, filters, user, loggerFactory, cancellationToken)
+                    is not { Found: true, Matched: true })
             || await RecordQueries.GetAsync(connection, application, entity, subjectId, cancellationToken) is not { } record)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -162,14 +182,14 @@ internal static class ProcessStartEndpoints
         await AuditRecords.AppendAsync(
             transaction,
             new AuditEntry(
-                user?.Id ?? AuditActors.Anonymous,
+                user.Id,
                 AuditActions.ProcessStarted,
                 application.Manifest.Id,
                 entity.Id,
                 subjectId,
                 instanceId,
                 new JsonObject { ["processId"] = model.Id, ["releaseId"] = active.ReleaseId },
-                user?.DisplayName),
+                user.DisplayName),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(response, statusCode: StatusCodes.Status201Created);

@@ -298,6 +298,22 @@ public sealed class PolicyCompilerTests
         Assert.Null(PolicyEvaluator.Fields(everyField, ["employee"], unlimitedRequest, PolicyAction.Read));
     }
 
+    [Fact]
+    public void Start_is_allowed_only_by_a_start_grant_on_the_process_for_a_declared_role_held()
+    {
+        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]"""));
+        using var entityOnly = Folder(Policy("""["employee"]""", """[{ "entity": "Request", "actions": ["read", "create", "update", "delete"] }]"""));
+        var model = Compile(granted);
+        Assert.True(model.TryGetProcess("RequestReview", out var process));
+        var withoutStart = Compile(entityOnly);
+        Assert.True(withoutStart.TryGetProcess("RequestReview", out var otherProcess));
+
+        Assert.True(PolicyEvaluator.AllowsStart(model, ["employee"], process));
+        Assert.False(PolicyEvaluator.AllowsStart(model, ["manager"], process));
+        Assert.False(PolicyEvaluator.AllowsStart(model, ["Employee"], process));
+        Assert.False(PolicyEvaluator.AllowsStart(withoutStart, ["employee"], otherProcess));
+    }
+
     private static ApplicationModel Compile(TemporaryFolder folder)
     {
         var result = ApplicationCompiler.Compile(folder.Path);
