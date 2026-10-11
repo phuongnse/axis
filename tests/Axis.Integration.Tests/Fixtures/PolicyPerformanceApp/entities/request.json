@@ -1,0 +1,12 @@
+{
+  "id": "39ff5940-f325-4300-b2f4-bcf71e79f353",
+  "kind": "entity",
+  "name": "Request",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "amount", "type": "integer" },
+    { "name": "department", "type": "reference", "target": "Department" }
+  ]
+}

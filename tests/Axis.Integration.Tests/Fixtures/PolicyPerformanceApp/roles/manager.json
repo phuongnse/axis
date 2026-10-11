@@ -1,0 +1,7 @@
+{
+  "id": "73826102-2316-47ff-bb8e-1816e4cd7e0a",
+  "kind": "role",
+  "name": "manager",
+  "formatVersion": 1,
+  "label": { "textKey": "role.manager" }
+}

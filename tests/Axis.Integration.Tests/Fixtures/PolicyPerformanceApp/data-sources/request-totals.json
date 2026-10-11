@@ -1,0 +1,16 @@
+{
+  "id": "bb2bc5f8-bdd0-4844-b9a8-f212aba20203",
+  "kind": "dataSource",
+  "name": "RequestTotals",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [{ "name": "amount", "path": "amount" }],
+  "filter": "amount > 0",
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      { "name": "requests", "function": "count" },
+      { "name": "amountSum", "function": "sum", "field": "amount" }
+    ]
+  }
+}
