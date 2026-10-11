@@ -92,8 +92,8 @@ public static class ProcessTasks
     /// <summary>
     /// Resumes the instance of the completed <paramref name="task"/> on the outcome's next step: the
     /// instance becomes <c>running</c> there with the next revision, the task step gets its history
-    /// row, the audit record <c>task.completed</c> is appended with the user as its actor, and the
-    /// work item of the next step is queued for <paramref name="tenantId"/>.
+    /// row, the audit record <c>task.completed</c> is appended with the user and their display name
+    /// as its actor, and the work item of the next step is queued for <paramref name="tenantId"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">The instance is not waiting on the task's step.</exception>
     public static async Task ResumeAsync(
@@ -143,7 +143,8 @@ public static class ProcessTasks
                 {
                     ["outcome"] = completion.Outcome,
                     ["fields"] = new JsonArray([.. completion.Fields.Select(field => JsonValue.Create(field))]),
-                }),
+                },
+                completion.UserName),
             cancellationToken);
         await WorkItemQueue.EnqueueAsync(
             connection,
@@ -163,6 +164,7 @@ public static class ProcessTasks
 /// <param name="Outcome">The declared name of the outcome.</param>
 /// <param name="Next">The declared name of the step the outcome leads to.</param>
 /// <param name="UserId">The user who completed the task.</param>
+/// <param name="UserName">The display name of the user who completed the task, stored in its audit record.</param>
 /// <param name="SubjectVersion">The subject record version the values were written over, or <see langword="null"/> when no values were written.</param>
 /// <param name="WrittenVersion">The subject record version the values wrote, or <see langword="null"/> when no values were written.</param>
 /// <param name="Fields">The declared names of the fields the completion set, in declaration order.</param>
@@ -170,6 +172,7 @@ public sealed record TaskCompletion(
     string Outcome,
     string Next,
     string UserId,
+    string UserName,
     long? SubjectVersion,
     long? WrittenVersion,
     IReadOnlyList<string> Fields);

@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Text.Json;
-using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -33,18 +32,10 @@ internal static class UserEndpoints
     }
 
     // The session comes first. Without one, the signed-in test user still counts.
-    private static async Task<IResult> GetCurrentUserAsync(HttpContext httpContext, TestUserDirectory directory)
-    {
-        var session = await httpContext.AuthenticateAsync(Session.Scheme);
-        if (session.Succeeded && Session.Read(session.Principal) is { } sessionUser)
-        {
-            return Results.Ok(sessionUser);
-        }
-
-        return directory.FindSignedIn(httpContext.User) is { } id && directory.Find(id) is { } user
-            ? Results.Ok(ToResponse(user))
+    private static async Task<IResult> GetCurrentUserAsync(HttpContext httpContext, TestUserDirectory directory) =>
+        await CurrentUsers.FindAsync(httpContext, directory) is { } user
+            ? Results.Ok(user)
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
-    }
 
     private static IResult GetTestUsers(TestUserDirectory directory) =>
         directory.Enabled

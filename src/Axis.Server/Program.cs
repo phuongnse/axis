@@ -42,8 +42,8 @@ var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environmen
 var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 builder.Services.TryAddSingleton(TimeProvider.System);
 
-// The test-user cookie stays the default while test users are enabled, so record writes,
-// process starts and tasks keep taking their actor from it.
+// Record writes, process starts and tasks read the session first. The test-user cookie stays the
+// default scheme while test users are enabled, so a signed-in test user still counts without one.
 var authentication = builder.Services.AddAuthentication(
     testUsers.Enabled ? CookieAuthenticationDefaults.AuthenticationScheme : Session.Scheme);
 if (testUsers.Enabled)

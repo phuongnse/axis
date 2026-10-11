@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Server.Tests;
 using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
@@ -25,7 +26,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
 
         var created = Assert.Single(await fixture.AuditRecordsAsync(TenantA, id));
 
-        Assert.Equal(new AuditRecord("anonymous", "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
+        Assert.Equal(new AuditRecord("anonymous", null, "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
         AssertDetails("""{ "version": 1 }""", created.Details);
 
         // The body names the fields out of declaration order. The computed total changes too, but
@@ -45,25 +46,60 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
         var audits = await fixture.AuditRecordsAsync(TenantA, id);
 
         Assert.Equal(["record.created", "record.updated", "record.deleted"], audits.Select(audit => audit.Action));
-        Assert.All(audits, audit => Assert.Equal(("anonymous", fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ApplicationId, audit.EntityId, audit.RecordId)));
+        Assert.All(audits, audit => Assert.Equal(("anonymous", null, fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
         AssertDetails("""{ "version": 2, "fields": ["name", "quantity", "parts"] }""", audits[1].Details);
         // A deleted record has no new version: the details hold the version it had.
         AssertDetails("""{ "version": 2 }""", audits[2].Details);
     }
 
     [Fact]
-    public async Task The_actor_is_the_signed_in_test_user_or_anonymous()
+    public async Task The_actor_and_their_name_are_the_signed_in_user_or_anonymous_with_no_name()
     {
-        using var client = fixture.CreateClient();
-        using var signIn = Request(HttpMethod.Post, "/api/test-users/sign-in", HostA, """{ "id": "anna" }""");
-        using var signedIn = await client.SendAsync(signIn, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+        using var client = fixture.CreateClient().SignedInAs("anna");
 
         var annas = await CreateItemAsync(client, HostA, """{ "name": "Chair" }""");
+        using (var update = Request(HttpMethod.Patch, $"{Items}/{annas:D}", HostA, """{ "version": 1, "values": { "quantity": 2 } }"""))
+        using (var updated = await client.SendAsync(update, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        }
+
         var anonymous = await CreateItemAsync(fixture.Client, HostA, """{ "name": "Lamp" }""");
 
-        Assert.Equal("anna", Assert.Single(await fixture.AuditRecordsAsync(TenantA, annas)).Actor);
-        Assert.Equal("anonymous", Assert.Single(await fixture.AuditRecordsAsync(TenantA, anonymous)).Actor);
+        Assert.Equal(
+            [("anna", "Anna Employee", "record.created"), ("anna", "Anna Employee", "record.updated")],
+            (await fixture.AuditRecordsAsync(TenantA, annas)).Select(audit => (audit.Actor, audit.ActorName, audit.Action)));
+        var anonymousAudit = Assert.Single(await fixture.AuditRecordsAsync(TenantA, anonymous));
+        Assert.Equal(("anonymous", null), (anonymousAudit.Actor, anonymousAudit.ActorName));
+    }
+
+    [Fact]
+    public async Task An_unknown_test_user_counts_as_nobody_signed_in()
+    {
+        using var client = fixture.CreateClient().SignedInAs("mallory");
+
+        var id = await CreateItemAsync(client, HostA, """{ "name": "Shelf" }""");
+
+        var audit = Assert.Single(await fixture.AuditRecordsAsync(TenantA, id));
+        Assert.Equal(("anonymous", null), (audit.Actor, audit.ActorName));
+    }
+
+    [Fact]
+    public async Task The_actor_name_column_is_nullable_text_after_migrating()
+    {
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT data_type, is_nullable FROM information_schema.columns
+            WHERE table_schema = 'axis' AND table_name = 'audit_records' AND column_name = 'actor_name'
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(("text", "YES"), (reader.GetString(0), reader.GetString(1)));
+        Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
     [Fact]
@@ -108,7 +144,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
 
         Assert.Equal(PostgresErrorCodes.RestrictViolation, exception.SqlState);
         Assert.Equal(
-            new AuditRecord("anna", "record.created", fixture.Model.Manifest.Id, null, recordId, """{"version": 1}"""),
+            new AuditRecord("anna", null, "record.created", fixture.Model.Manifest.Id, null, recordId, """{"version": 1}"""),
             Assert.Single(await fixture.AuditRecordsAsync(TenantA, recordId)));
     }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Data.Audit;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -14,7 +15,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
     [Fact]
     public async Task A_create_an_update_a_process_start_and_a_task_decision_are_listed_newest_first_with_their_actor()
     {
-        using var maria = await SignInAsync("maria", TenantA);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
         var department = await fixture.InsertDepartmentAsync(TenantA, "maria");
         var subject = await CreateAsync(maria, TenantA, $$"""{ "values": { "title": "Chairs", "department": "{{department:D}}" } }""");
         await UpdateAsync(maria, subject, TenantA, """{ "version": 1, "values": { "title": "Desks" } }""");
@@ -68,10 +69,17 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
         Assert.Equal(["title"], listed[2].GetProperty("details").GetProperty("fields").EnumerateArray().Select(field => field.GetString()));
         Assert.Equal(JsonValueKind.Null, listed[3].GetProperty("processInstanceId").ValueKind);
 
-        // The worker's entries have no test user, so they have no display name.
+        // The worker's entries have no user, so they have no display name.
         Assert.All(
             items.Where(item => item.GetProperty("actor").GetString() == AuditActors.System),
             item => Assert.Equal(JsonValueKind.Null, item.GetProperty("actorName").ValueKind));
+
+        // The names are stored with the audit records. The fixture configures no test users, so
+        // the name can come only from the user's session.
+        var stored = await fixture.ActorsAsync(TenantA, subject);
+        Assert.Contains(stored, row => row.Actor == AuditActors.System);
+        Assert.All(stored, row => Assert.Equal(row.Actor == AuditActors.System ? null : "Maria Manager", row.ActorName));
+        Assert.Equal(4, stored.Count(row => row.Actor == "maria"));
 
         using var second = await GetJsonAsync(maria, $"{Records}/{subject:D}/history?page=2&pageSize=1", TenantA);
         Assert.Equal(
@@ -83,8 +91,8 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
     [Fact]
     public async Task A_records_history_holds_only_its_own_tenants_audit_records()
     {
-        using var maria = await SignInAsync("maria", TenantA);
-        using var fiona = await SignInAsync("fiona", TenantB);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
         var shared = await CreateAsync(maria, TenantA, """{ "values": { "title": "Shared" } }""");
         await UpdateAsync(maria, shared, TenantA, """{ "version": 1, "values": { "title": "Shared A" } }""");
         await fixture.InsertRequestAsync(TenantB, department: null, id: shared);
@@ -161,14 +169,6 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
         using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
     }
 
-    private async Task<HttpClient> SignInAsync(string user, string tenant)
-    {
-        var client = fixture.CreateClient();
-        using var signIn = RecordApiFixture.Request(HttpMethod.Post, "/api/test-users/sign-in", Host(tenant), $$"""{ "id": "{{user}}" }""");
-        using var response = await client.SendAsync(signIn, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return client;
-    }
 
     private static async Task<Guid> CreateAsync(HttpClient client, string tenant, string body)
     {

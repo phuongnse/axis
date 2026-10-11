@@ -13,8 +13,8 @@ public static class AuditRecords
     private const string InsertSql =
         """
         INSERT INTO "axis"."audit_records"
-            ("id", "occurred_at", "actor", "action", "application_id", "entity_id", "record_id", "process_instance_id", "details")
-        VALUES (@id, now(), @actor, @action, @application, @entity, @record, @process, @details)
+            ("id", "occurred_at", "actor", "actor_name", "action", "application_id", "entity_id", "record_id", "process_instance_id", "details")
+        VALUES (@id, now(), @actor, @actorName, @action, @application, @entity, @record, @process, @details)
         """;
 
     private const string RecordFilter = """WHERE "entity_id" = @entity AND "record_id" = @record""";
@@ -25,7 +25,7 @@ public static class AuditRecords
     /// <summary>Reads one page of the audit records of one record, newest first.</summary>
     internal const string HistoryPageSql =
         $"""
-        SELECT "id", "occurred_at", "actor", "action", "process_instance_id", "details"::text
+        SELECT "id", "occurred_at", "actor", "actor_name", "action", "process_instance_id", "details"::text
         FROM "axis"."audit_records" {RecordFilter}
         ORDER BY "occurred_at" DESC, "id" DESC
         LIMIT @limit OFFSET @offset
@@ -47,6 +47,7 @@ public static class AuditRecords
         await using var command = new NpgsqlCommand(InsertSql, connection, transaction);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("actor", entry.Actor);
+        command.Parameters.Add(new NpgsqlParameter("actorName", NpgsqlDbType.Text) { Value = entry.ActorName is { } name ? name : DBNull.Value });
         command.Parameters.AddWithValue("action", entry.Action);
         command.Parameters.AddWithValue("application", entry.ApplicationId);
         command.Parameters.Add(Uuid("entity", entry.EntityId));
@@ -95,9 +96,10 @@ public static class AuditRecords
                 reader.GetGuid(0),
                 reader.GetFieldValue<DateTimeOffset>(1),
                 reader.GetString(2),
-                reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetGuid(4),
-                reader.GetString(5)));
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetGuid(5),
+                reader.GetString(6)));
         }
 
         return new AuditRecordPage(items, totalCount);

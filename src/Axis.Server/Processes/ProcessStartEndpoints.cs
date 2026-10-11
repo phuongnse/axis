@@ -23,9 +23,9 @@ namespace Axis.Server.Processes;
 /// and process (404), content type (415), body (400), <c>Idempotency-Key</c> (400). Then one
 /// transaction claims the key's receipt, locks and reads the subject record (400), checks the start
 /// condition (400), inserts the instance (409) and its first work item, and appends the audit
-/// record <c>process.started</c>. A repeat with a claimed key returns the stored response, or 422
-/// for another record. A start that fails writes nothing. The problem titles never contain text
-/// from the request.
+/// record <c>process.started</c>, whose actor is the current user or <c>anonymous</c>. A repeat
+/// with a claimed key returns the stored response, or 422 for another record. A start that fails
+/// writes nothing. The problem titles never contain text from the request.
 /// </summary>
 internal static class ProcessStartEndpoints
 {
@@ -91,6 +91,7 @@ internal static class ProcessStartEndpoints
         var response = new ProcessInstanceResponse(instanceId, model.Name, subjectId, active.ReleaseId, ProcessStarts.Running);
         var body = JsonSerializer.Serialize(response, JsonSerializerOptions.Web);
 
+        var user = await CurrentUsers.FindAsync(request.HttpContext, directory);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -162,13 +163,14 @@ internal static class ProcessStartEndpoints
         await AuditRecords.AppendAsync(
             transaction,
             new AuditEntry(
-                directory.FindSignedIn(request.HttpContext.User) ?? AuditActors.Anonymous,
+                user?.Id ?? AuditActors.Anonymous,
                 AuditActions.ProcessStarted,
                 application.Manifest.Id,
                 entity.Id,
                 subjectId,
                 instanceId,
-                new JsonObject { ["processId"] = model.Id, ["releaseId"] = active.ReleaseId }),
+                new JsonObject { ["processId"] = model.Id, ["releaseId"] = active.ReleaseId },
+                user?.DisplayName),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(response, statusCode: StatusCodes.Status201Created);

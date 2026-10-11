@@ -140,9 +140,9 @@ export async function saveRecord(
 }
 
 /**
- * One audit record of a record's history. `actorName` is the test user's display name, or `null`
- * for `system`, `anonymous` or an id that is no longer configured. `details` depends on the action
- * and never holds a field value.
+ * One audit record of a record's history. `actorName` is the display name stored with the audit
+ * record, or `null` for `system`, `anonymous` and audit records written before names were stored.
+ * `details` depends on the action and never holds a field value.
  */
 export interface HistoryItem {
   id: string

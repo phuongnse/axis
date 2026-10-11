@@ -181,8 +181,8 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   session yet: every endpoint is open. Development test users still work
   beside the session, as described below (D21), until
   [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)
-  removes them. Record writes, process starts and tasks take their actor from
-  the test user.
+  removes them. Record writes, process starts and tasks take their user from
+  the session first, and from the test user when there is no session.
 
 ### Sign-in and the session
 
@@ -261,7 +261,9 @@ are marked *(planned for M4)*.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. Without a
   session it is a `401`, as today. Until test users are removed, it falls
-  back to the signed-in test user when there is no session.
+  back to the signed-in test user when there is no session. Record writes,
+  process starts and the task API read the current user the same way, and
+  their audit records store the user's id and display name.
 - **Sign-in needed** *(planned for M4)*. Without a session, these answer a
   `401` problem details response:
   - every route under `/api/apps/{app}/`: records, record history, data
@@ -291,8 +293,9 @@ are marked *(planned for M4)*.
   through Testcontainers, and drive its login page. Tests of the session
   lifetime create the session through a test-only hook and use a test clock.
   Integration tests of other endpoints sign in through a test authentication
-  scheme that only test hosts register *(planned for M4)*. The E2E sign-in
-  journey drives the Keycloak login page. The other E2E journeys sign in
+  scheme that only test hosts register. A request names its user in a
+  header, and the scheme builds the same principal as a session of that user.
+  The E2E sign-in journey drives the Keycloak login page. The other E2E journeys sign in
   through Keycloak *(planned for M4)*.
 - **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
   Keycloak with an imported development realm, `axis`. This part is in place:
@@ -481,9 +484,12 @@ They exist only in development and tests, never in Production.
   details response. The name and roles come from `TestUsers` on every
   request, so an id that is no longer configured is nobody signed in.
   `GET /api/me` exists in every environment.
+- **Actor.** Without a session, record writes, process starts and the task
+  API act as the signed-in test user. Their
+  [audit records](reference/record-api.md#audit-records-and-history) store the
+  test user's id and display name.
 - **Open writes.** Until M4, record writes stay open with nobody signed in.
-  Their [audit records](reference/record-api.md#audit-records-and-history)
-  then have the actor `anonymous`.
+  Their audit records then have the actor `anonymous` and no display name.
 - **Development and E2E users.** `dotnet run` and the E2E server run with
   the purchase request users: an employee, two department managers and a
   finance reviewer. The E2E server runs as `Testing`, so Playwright journeys

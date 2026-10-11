@@ -15,8 +15,8 @@ namespace Axis.Server.Records;
 /// names no active application, entity or record is a 404 before the query or body is checked; a
 /// child entity is no entity here. A create or update writes the record and its child rows in one
 /// transaction. Every create, update and delete that succeeds appends one audit record in its
-/// transaction, with the signed-in test user as the actor, or <c>anonymous</c>. A write that fails
-/// leaves none.
+/// transaction. Its actor is the session user, or else the signed-in test user, with their display
+/// name, or <c>anonymous</c>. A write that fails leaves none.
 /// A body is checked in order: content type (415), then body (400), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
@@ -122,8 +122,9 @@ internal static class RecordEndpoints
     }
 
     // Every audit record that names the record is listed, whoever wrote it: the record API, a
-    // process start, a step or a task decision. The actor's display name comes from the test
-    // users, so it is null for system, anonymous or an id that is no longer configured.
+    // process start, a step or a task decision. The actor's display name is the one stored with
+    // the audit record, so it is null for system, anonymous and audit records written before
+    // names were stored.
     private static async Task<IResult> HistoryAsync(
         string app,
         string entity,
@@ -132,7 +133,6 @@ internal static class RecordEndpoints
         string? pageSize,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
@@ -164,7 +164,7 @@ internal static class RecordEndpoints
                 item.Id,
                 item.OccurredAt.UtcDateTime,
                 item.Actor,
-                directory.Find(item.Actor)?.DisplayName,
+                item.ActorName,
                 item.Action,
                 item.ProcessInstanceId,
                 JsonNode.Parse(item.Details)!))
@@ -207,6 +207,7 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
+        var user = await CurrentUsers.FindAsync(request.HttpContext, directory);
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -223,7 +224,7 @@ internal static class RecordEndpoints
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordWriteOutcome.Written, Record: { } written }
-                    ? RecordAudit(request.HttpContext, directory, AuditActions.RecordCreated, application!, model, written.Id, written.Version)
+                    ? RecordAudit(user, AuditActions.RecordCreated, application!, model, written.Id, written.Version)
                     : null,
                 cancellationToken);
         }
@@ -288,6 +289,7 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
+        var user = await CurrentUsers.FindAsync(request.HttpContext, directory);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -303,7 +305,7 @@ internal static class RecordEndpoints
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordWriteOutcome.Written, Record: { } written }
-                    ? RecordAudit(request.HttpContext, directory, AuditActions.RecordUpdated, application!, model, written.Id, written.Version, SetFields(model, input))
+                    ? RecordAudit(user, AuditActions.RecordUpdated, application!, model, written.Id, written.Version, SetFields(model, input))
                     : null,
                 cancellationToken);
         }
@@ -334,6 +336,7 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
+        var user = await CurrentUsers.FindAsync(httpContext, directory);
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -342,7 +345,7 @@ internal static class RecordEndpoints
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
-                    ? RecordAudit(httpContext, directory, AuditActions.RecordDeleted, application!, model, recordId, version)
+                    ? RecordAudit(user, AuditActions.RecordDeleted, application!, model, recordId, version)
                     : null,
                 cancellationToken);
         }
@@ -397,11 +400,11 @@ internal static class RecordEndpoints
 
     /// <summary>
     /// The audit record of a record write. Its details hold the record's version, and on update
-    /// the names of the fields the body sets. They never hold a field value.
+    /// the names of the fields the body sets. They never hold a field value. Without a
+    /// <paramref name="user"/>, the actor is <c>anonymous</c> and has no display name.
     /// </summary>
     private static AuditEntry RecordAudit(
-        HttpContext httpContext,
-        TestUserDirectory directory,
+        CurrentUserResponse? user,
         string action,
         ApplicationModel application,
         EntityModel model,
@@ -416,13 +419,14 @@ internal static class RecordEndpoints
         }
 
         return new AuditEntry(
-            directory.FindSignedIn(httpContext.User) ?? AuditActors.Anonymous,
+            user?.Id ?? AuditActors.Anonymous,
             action,
             application.Manifest.Id,
             model.Id,
             recordId,
             ProcessInstanceId: null,
-            details);
+            details,
+            user?.DisplayName);
     }
 
     /// <summary>
@@ -479,8 +483,9 @@ internal sealed record RecordListResponse(IReadOnlyList<Record> Items, int Page,
 internal sealed record RecordHistoryResponse(IReadOnlyList<RecordHistoryItem> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>
-/// One audit record of a record. <see cref="ActorName"/> is the test user's display name, or null
-/// when the actor is no configured test user.
+/// One audit record of a record. <see cref="ActorName"/> is the actor's display name as stored with
+/// the audit record, or null for <c>system</c>, <c>anonymous</c> and audit records written before
+/// names were stored.
 /// </summary>
 internal sealed record RecordHistoryItem(
     Guid Id,

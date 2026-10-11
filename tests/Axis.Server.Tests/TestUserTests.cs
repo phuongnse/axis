@@ -150,6 +150,22 @@ public sealed class TestUserTests
     }
 
     [Fact]
+    public async Task A_sign_in_without_the_csrf_header_is_a_403_and_signs_nobody_in()
+    {
+        await using var factory = CreateFactory("Testing", _testUsers);
+        using var client = factory.CreateClient();
+
+        var signIn = await SignInAsync(client, "anna");
+        var me = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, signIn.StatusCode);
+        Assert.Equal("application/problem+json", signIn.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("The request must carry the X-Axis-Csrf header.", await signIn.Content.ReadAsStringAsync(CancellationToken), StringComparison.Ordinal);
+        Assert.False(signIn.Headers.Contains("Set-Cookie"));
+        await AssertNobodySignedInAsync(me);
+    }
+
+    [Fact]
     public async Task The_sign_in_cookie_is_http_only_and_same_site_strict()
     {
         await using var factory = CreateFactory("Testing", _testUsers);

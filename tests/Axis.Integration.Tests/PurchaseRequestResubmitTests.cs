@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Processes.Instances;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -18,8 +19,8 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_returned_request_keeps_its_ended_instance_and_a_resubmission_starts_a_new_one_on_the_active_release()
     {
-        using var anna = await fixture.SignInAsync("anna");
-        using var chau = await fixture.SignInAsync("chau");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var chau = fixture.CreateClient().SignedInAs("chau");
         var subject = await CreateRequestAsync(anna, 500);
         using (var started = await StartAsync(anna, subject))
         {
@@ -70,8 +71,8 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_rejected_request_fails_the_start_condition_and_no_instance_is_created()
     {
-        using var anna = await fixture.SignInAsync("anna");
-        using var chau = await fixture.SignInAsync("chau");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var chau = fixture.CreateClient().SignedInAs("chau");
         var subject = await CreateRequestAsync(anna, 500);
         using (var started = await StartAsync(anna, subject))
         {

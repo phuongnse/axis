@@ -20,7 +20,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, served by the real server on host <c>a.example.test</c>. The
 /// server migrates it and activates the purchase request sample through <c>ActivateOnStartup</c>,
-/// so the sample's department seeds are applied as well. The server knows the test users
+/// so the sample's department seeds are applied as well. The test authentication scheme signs in
 /// <c>anna</c>, an employee, <c>chau</c>, the Operations manager, and <c>dung</c> and <c>hoa</c>,
 /// two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
 /// started, so a test runs the work items itself. A test can instead start real worker hosts with
@@ -70,18 +70,11 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:ConnectionString", _connectionString);
             builder.UseTestOidc(Tenant);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
-            builder.UseSetting("TestUsers:0:Id", "anna");
-            builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");
-            builder.UseSetting("TestUsers:0:Roles:0", "employee");
-            builder.UseSetting("TestUsers:1:Id", "chau");
-            builder.UseSetting("TestUsers:1:DisplayName", "Chau Operations Manager");
-            builder.UseSetting("TestUsers:1:Roles:0", "department-manager");
-            builder.UseSetting("TestUsers:2:Id", "dung");
-            builder.UseSetting("TestUsers:2:DisplayName", "Dung Finance Reviewer");
-            builder.UseSetting("TestUsers:2:Roles:0", "finance-reviewer");
-            builder.UseSetting("TestUsers:3:Id", "hoa");
-            builder.UseSetting("TestUsers:3:DisplayName", "Hoa Finance Reviewer");
-            builder.UseSetting("TestUsers:3:Roles:0", "finance-reviewer");
+            builder.UseTestAuthentication(
+                new TestIdentity("anna", "Anna Employee", "employee"),
+                new TestIdentity("chau", "Chau Operations Manager", "department-manager"),
+                new TestIdentity("dung", "Dung Finance Reviewer", "finance-reviewer"),
+                new TestIdentity("hoa", "Hoa Finance Reviewer", "finance-reviewer"));
         });
 
         // Creating a client starts the server, which migrates the database and activates the sample first.
@@ -146,15 +139,6 @@ public sealed class SampleAppFixture : IAsyncLifetime
         var host = builder.Build();
         await host.StartAsync(CancellationToken);
         return host;
-    }
-
-    /// <summary>A new client of the server signed in as the test user <paramref name="user"/>. The caller disposes it.</summary>
-    public async Task<HttpClient> SignInAsync(string user)
-    {
-        var client = CreateClient();
-        using var response = await SendAsync(client, HttpMethod.Post, "/api/test-users/sign-in", $$"""{ "id": "{{user}}" }""");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return client;
     }
 
     /// <summary>Creates a draft Operations request with one line item of <paramref name="unitPrice"/>, and returns its id.</summary>

@@ -22,8 +22,8 @@ namespace Axis.Integration.Tests;
 /// Two tenant databases in one PostgreSQL container, each with both migrations applied and the
 /// RecordsApp fixture application activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp fixture
-/// activated, and a compiled release of an application that was never activated. The server
-/// knows the test users <c>anna</c> and <c>binh</c>.
+/// activated, and a compiled release of an application that was never activated. The test
+/// authentication scheme signs in <c>anna</c> and <c>binh</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
 {
@@ -60,7 +60,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
     public string ConnectionString(string tenant) => _connectionStrings[tenant];
 
     /// <summary>
-    /// A new client of the server with its own cookies, so signing in on it leaves
+    /// A new client of the server with its own cookies and headers, so signing in on it leaves
     /// <see cref="Client"/> signed out. The caller disposes it.
     /// </summary>
     public HttpClient CreateClient() =>
@@ -112,11 +112,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", ConnectionString(TenantB));
             builder.UseTestOidc("a", "b");
-            builder.UseSetting("TestUsers:0:Id", "anna");
-            builder.UseSetting("TestUsers:0:DisplayName", "Anna Employee");
-            builder.UseSetting("TestUsers:0:Roles:0", "employee");
-            builder.UseSetting("TestUsers:1:Id", "binh");
-            builder.UseSetting("TestUsers:1:DisplayName", "Binh Manager");
+            builder.UseTestAuthentication(
+                new TestIdentity("anna", "Anna Employee", "employee"),
+                new TestIdentity("binh", "Binh Manager"));
         });
         _client = _factory.CreateClient();
     }
@@ -197,7 +195,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
         var records = new List<AuditRecord>();
         await using var command = _dataSources[tenant].CreateCommand(
             """
-            SELECT actor, action, application_id, entity_id, record_id, details::text
+            SELECT actor, actor_name, action, application_id, entity_id, record_id, details::text
             FROM axis.audit_records WHERE record_id = @record ORDER BY occurred_at, id
             """);
         command.Parameters.AddWithValue("record", recordId);
@@ -206,11 +204,12 @@ public sealed class RecordApiFixture : IAsyncLifetime
         {
             records.Add(new AuditRecord(
                 reader.GetString(0),
-                reader.GetString(1),
-                reader.GetGuid(2),
-                reader.IsDBNull(3) ? null : reader.GetGuid(3),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.GetString(2),
+                reader.GetGuid(3),
                 reader.IsDBNull(4) ? null : reader.GetGuid(4),
-                reader.GetString(5)));
+                reader.IsDBNull(5) ? null : reader.GetGuid(5),
+                reader.GetString(6)));
         }
 
         return records;
@@ -358,4 +357,4 @@ public sealed class RecordApiFixture : IAsyncLifetime
 }
 
 /// <summary>An audit record as stored, with its details as the text PostgreSQL renders for <c>jsonb</c>.</summary>
-public sealed record AuditRecord(string Actor, string Action, Guid ApplicationId, Guid? EntityId, Guid? RecordId, string Details);
+public sealed record AuditRecord(string Actor, string? ActorName, string Action, Guid ApplicationId, Guid? EntityId, Guid? RecordId, string Details);

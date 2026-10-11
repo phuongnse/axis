@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Data.Naming;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -24,14 +25,14 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task Ten_concurrent_submits_of_one_request_start_one_instance_and_create_one_manager_task()
     {
-        using var anna = await fixture.SignInAsync("anna");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
         var subject = await CreateRequestAsync(anna, 500);
         var clients = new List<HttpClient>();
         try
         {
             for (var i = 0; i < 10; i++)
             {
-                clients.Add(await fixture.SignInAsync("anna"));
+                clients.Add(fixture.CreateClient().SignedInAs("anna"));
             }
 
             // Half repeat one key, as retries after a lost response do. The rest are separate clicks.
@@ -94,7 +95,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task A_submit_waits_for_an_uncommitted_edit_and_checks_the_start_condition_on_the_edited_request()
     {
-        using var anna = await fixture.SignInAsync("anna");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
         var subject = await CreateRequestAsync(anna, 500);
 
         await using var connection = await fixture.OpenConnectionAsync();
@@ -127,8 +128,8 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task A_title_edit_racing_a_submit_and_the_worker_succeeds_or_conflicts_and_is_never_lost()
     {
-        using var anna = await fixture.SignInAsync("anna");
-        using var editor = await fixture.SignInAsync("anna");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var editor = fixture.CreateClient().SignedInAs("anna");
         for (var round = 0; round < 5; round++)
         {
             var subject = await CreateRequestAsync(anna, 500);
@@ -160,10 +161,10 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task Two_finance_reviewers_completing_one_task_at_once_record_one_decision()
     {
-        using var anna = await fixture.SignInAsync("anna");
-        using var chau = await fixture.SignInAsync("chau");
-        using var dung = await fixture.SignInAsync("dung");
-        using var hoa = await fixture.SignInAsync("hoa");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var hoa = fixture.CreateClient().SignedInAs("hoa");
         var subject = await CreateRequestAsync(anna, 10000);
         var instance = await StartAsync(anna, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -206,7 +207,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task Concurrent_manager_completions_give_one_success_and_a_later_repeat_changes_nothing()
     {
-        using var anna = await fixture.SignInAsync("anna");
+        using var anna = fixture.CreateClient().SignedInAs("anna");
         var subject = await CreateRequestAsync(anna, 500);
         var instance = await StartAsync(anna, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -217,7 +218,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
         {
             for (var i = 0; i < 6; i++)
             {
-                clients.Add(await fixture.SignInAsync("chau"));
+                clients.Add(fixture.CreateClient().SignedInAs("chau"));
             }
 
             var responses = await Task.WhenAll(clients.Take(5).Select(client => CompleteAsync(client, task, """{ "outcome": "approve" }""")));

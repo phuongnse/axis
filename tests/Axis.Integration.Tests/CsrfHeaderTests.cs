@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Server.Tests;
 using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
@@ -31,12 +32,9 @@ public sealed class CsrfHeaderTests(RecordApiFixture fixture) : IClassFixture<Re
     [InlineData("0")]
     [InlineData("")]
     [InlineData("1, 1")]
-    public async Task Writes_of_a_signed_in_test_user_without_the_header_are_a_403_and_change_nothing(string? header)
+    public async Task Writes_of_a_signed_in_user_without_the_header_are_a_403_and_change_nothing(string? header)
     {
-        using var client = fixture.CreateClient();
-        using var signIn = Request(HttpMethod.Post, "/api/test-users/sign-in", HostA, """{ "id": "anna" }""");
-        using var signedIn = await client.SendAsync(signIn, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+        using var client = fixture.CreateClient().SignedInAs("anna");
 
         await AssertWritesRefusedAsync(client, header);
 
@@ -60,23 +58,6 @@ public sealed class CsrfHeaderTests(RecordApiFixture fixture) : IClassFixture<Re
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
-    }
-
-    [Fact]
-    public async Task A_test_user_sign_in_without_the_header_is_a_403_and_signs_nobody_in()
-    {
-        using var client = fixture.CreateClient();
-        using var signIn = Request(HttpMethod.Post, "/api/test-users/sign-in", HostA, """{ "id": "anna" }""");
-        signIn.Headers.Remove(CsrfHeader);
-
-        using var signedIn = await client.SendAsync(signIn, CancellationToken);
-        using var problem = await ReadProblemAsync(signedIn, HttpStatusCode.Forbidden);
-        using var me = Request("/api/me", HostA);
-        using var meResponse = await client.SendAsync(me, CancellationToken);
-
-        Assert.Equal(Title, problem.RootElement.GetProperty("title").GetString());
-        Assert.False(signedIn.Headers.Contains("Set-Cookie"));
-        Assert.Equal(HttpStatusCode.Unauthorized, meResponse.StatusCode);
     }
 
     /// <summary>

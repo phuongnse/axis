@@ -14,10 +14,11 @@ using Npgsql;
 namespace Axis.Server.Processes;
 
 /// <summary>
-/// The task API endpoints that list the signed-in test user's open human tasks, read one task and
-/// complete one. A user may act on a task assigned to their id, or to a role they hold. A request is
-/// checked in order: signed-in user (401), application (404), then for a list the paging (400), and
-/// for a read or a completion the task id and the task's application (404) and who may act (403).
+/// The task API endpoints that list the current user's open human tasks, read one task and
+/// complete one. The current user is the session user, or else the signed-in test user. A user may
+/// act on a task assigned to their id, or to a role they hold. A request is checked in order:
+/// signed-in user (401), application (404), then for a list the paging (400), and for a read or a
+/// completion the task id and the task's application (404) and who may act (403).
 /// A completion then locks the task and checks that it is open (409), then the content type (415),
 /// the body (400) and the record write of its values (400, 409). One transaction writes the values,
 /// closes the task, resumes the instance on the outcome's next step and appends the audit record
@@ -47,7 +48,7 @@ internal static class TaskEndpoints
         TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
-        if (SignedInUser(httpContext, directory) is not { } user)
+        if (await CurrentUsers.FindAsync(httpContext, directory) is not { } user)
         {
             return SignInRequired();
         }
@@ -93,7 +94,7 @@ internal static class TaskEndpoints
         TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
-        if (SignedInUser(httpContext, directory) is not { } user)
+        if (await CurrentUsers.FindAsync(httpContext, directory) is not { } user)
         {
             return SignInRequired();
         }
@@ -136,7 +137,7 @@ internal static class TaskEndpoints
         ITenantContextAccessor tenants,
         CancellationToken cancellationToken)
     {
-        if (SignedInUser(request.HttpContext, directory) is not { } user)
+        if (await CurrentUsers.FindAsync(request.HttpContext, directory) is not { } user)
         {
             return SignInRequired();
         }
@@ -184,7 +185,7 @@ internal static class TaskEndpoints
         NpgsqlTransaction transaction,
         ApplicationModel active,
         ProcessTaskRow? task,
-        TestUser user,
+        CurrentUserResponse user,
         string tenantId,
         CancellationToken cancellationToken)
     {
@@ -264,7 +265,7 @@ internal static class TaskEndpoints
         await ProcessTasks.ResumeAsync(
             transaction,
             task,
-            new TaskCompletion(outcome.Name, outcome.Next, user.Id, readVersion, writtenVersion, fields),
+            new TaskCompletion(outcome.Name, outcome.Next, user.Id, user.DisplayName, readVersion, writtenVersion, fields),
             tenantId,
             cancellationToken);
         return null;
@@ -307,9 +308,6 @@ internal static class TaskEndpoints
         release.TryGetForm(step.Form.Name, out var form)
             ? form
             : throw new InvalidOperationException($"The form of task '{task.Id}' is not in its release.");
-
-    private static TestUser? SignedInUser(HttpContext httpContext, TestUserDirectory directory) =>
-        directory.FindSignedIn(httpContext.User) is { } id ? directory.Find(id) : null;
 
     /// <summary>The model of the task's release, with the task's process and step as that release declares them.</summary>
     private static async Task<(ApplicationModel Release, ProcessModel Process, TaskStepModel Step)> TaskStepAsync(

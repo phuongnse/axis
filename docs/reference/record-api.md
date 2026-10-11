@@ -483,16 +483,18 @@ can be read as its history (D21).
   applied during activation write no audit record.
 - **Actions.** The actions are `record.created`, `record.updated` and
   `record.deleted`.
-- **Actor.** The actor is the signed-in
-  [test user](../architecture.md#development-test-users), or
-  `anonymous` when nobody is signed in. A process
+- **Actor.** The actor is the user of the
+  [session](../architecture.md#sign-in-and-the-session). Without a session,
+  it is the signed-in [test user](../architecture.md#development-test-users),
+  or `anonymous` when nobody is signed in. The audit record also stores the
+  user's display name as it was at that moment. It stores none for
+  `anonymous`. A process
   [operation step](processes.md#running-a-step) that updates its subject
-  record writes `record.updated` with the actor `system` and its instance id.
-  A [task completion](processes.md#completing-a-task) that writes values
-  writes no `record.updated`. Its `task.completed` record names the fields.
-  From M4 *(planned)*, the actor is the user id from the session, and the
-  audit record also stores the user's display name. `anonymous` is then no
-  longer written, because every write needs a session.
+  record writes `record.updated` with the actor `system`, no display name and
+  its instance id. A [task completion](processes.md#completing-a-task) that
+  writes values writes no `record.updated`. Its `task.completed` record names
+  the fields. From M4 *(planned)*, every write needs a session, so
+  `anonymous` is no longer written.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
   A delete holds the version the record had when it was deleted.
   - On update it also has `"fields"`: the declared names of the fields and
@@ -516,12 +518,10 @@ can be read as its history (D21).
     The audit records of one transaction share one time, so their order
     among themselves follows their ids. That order may differ from the order
     they were written in.
-  - Each item has its `id`, `occurredAt`, `actor`, `action`,
-    `processInstanceId` and `details`, as stored. `actorName` is the test
-    user's display name. It is `null` for `system`, `anonymous` or a user id
-    that is no longer configured. From M4 *(planned)*, `actorName` is the
-    display name stored with the audit record. It is `null` for `system` and
-    for audit records written before M4, which have no stored name.
+  - Each item has its `id`, `occurredAt`, `actor`, `actorName`, `action`,
+    `processInstanceId` and `details`, as stored. `actorName` is the display
+    name stored with the audit record. It is `null` for `system`,
+    `anonymous` and audit records written before names were stored.
   - From M4 *(planned)*, the history needs read access to the record. A user
     without a `read` grant on the entity gets a `403`, and a record outside
     every read filter is a `404`. The `fields` of `details` leave out the

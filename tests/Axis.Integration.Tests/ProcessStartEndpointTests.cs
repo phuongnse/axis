@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Server.Tests;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -15,10 +16,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     {
         var subject = await fixture.InsertRequestAsync(status: null);
         var activeRelease = await fixture.ActiveReleaseIdAsync();
-        using var client = fixture.CreateClient();
-        using var signIn = Request(HttpMethod.Post, "/api/test-users/sign-in", ProcessStartFixture.Host, """{ "id": "anna" }""");
-        using var signedIn = await client.SendAsync(signIn, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+        using var client = fixture.CreateClient().SignedInAs("anna");
 
         using var response = await StartAsync(subject, client: client);
 
@@ -49,7 +47,8 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(1L, await fixture.CountAsync(
             """
             SELECT count(*) FROM axis.audit_records
-            WHERE process_instance_id = @id AND record_id = @subject AND actor = 'anna' AND action = 'process.started'
+            WHERE process_instance_id = @id AND record_id = @subject AND actor = 'anna' AND actor_name = 'Anna Employee'
+              AND action = 'process.started'
               AND details = jsonb_build_object('processId', @process::text, 'releaseId', @release::text)
             """,
             ("id", id), ("subject", subject), ("process", process.Id), ("release", activeRelease)));
@@ -118,7 +117,9 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(firstBody, await repeat.Content.ReadAsStringAsync(CancellationToken));
         Assert.Equal(1L, await CountInstancesAsync(subject));
         Assert.Equal(1L, await CountWorkItemsAsync(subject));
-        Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id", ("id", instance)));
+        Assert.Equal(1L, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'anonymous' AND actor_name IS NULL",
+            ("id", instance)));
         Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE record_id = @subject", ("subject", subject)));
         Assert.Equal(1L, await CountReceiptsAsync(subject));
     }

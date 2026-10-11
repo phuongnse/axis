@@ -224,7 +224,7 @@ schema of the tenant database.
   | `id` | `uuid` | A version 7 UUID |
   | `occurred_at` | `timestamptz` | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it |
   | `actor` | `text` | A user id, `system` for the worker, or `anonymous` before M4 when nobody is signed in. M4 stops writing `anonymous` *(planned)* |
-  | `actor_name` | `text`, null | The actor's display name at the time of the action *(planned for M4)* |
+  | `actor_name` | `text`, null | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added |
   | `action` | `text` | The action, such as `record.created` |
   | `application_id` | `uuid` | The application `id` |
   | `entity_id` | `uuid`, null | The entity `id`, when the action concerns a record |
