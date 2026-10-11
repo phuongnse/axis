@@ -123,6 +123,21 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 
+    [Fact]
+    public async Task Sign_out_without_the_csrf_header_is_refused_and_keeps_the_session()
+    {
+        using var client = CreateClient();
+        await SignInAsync(client, "anna", "/");
+
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out", csrfHeader: false);
+        var me = await SendAsync(client, HttpMethod.Get, "/api/me");
+
+        Assert.Equal(HttpStatusCode.Forbidden, signOut.StatusCode);
+        Assert.Equal("application/problem+json", signOut.Content.Headers.ContentType?.MediaType);
+        Assert.False(signOut.Headers.Contains("Set-Cookie"));
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+    }
+
     public ValueTask InitializeAsync()
     {
         var authority = keycloak.Authority.ToString();
@@ -218,10 +233,18 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IClassFixtur
         return await client.SendAsync(request, CancellationToken);
     }
 
-    /// <summary>Sends a request to the server and records the response headers and body.</summary>
-    private async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path)
+    /// <summary>
+    /// Sends a request to the server and records the response headers and body. A method other
+    /// than <c>GET</c> carries the CSRF header unless <paramref name="csrfHeader"/> is false.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, bool csrfHeader = true)
     {
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
+        if (csrfHeader && method != HttpMethod.Get)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
         var response = await client.SendAsync(request, CancellationToken);
         var body = await response.Content.ReadAsStringAsync(CancellationToken);
         _serverResponses.Add($"{response.Headers}\n{response.Content.Headers}\n{body}");

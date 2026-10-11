@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 // Specs run in parallel against one database, so these tests rely only on the seeded departments and
 // suppliers of the purchase request sample, and on the requests they create.
@@ -114,7 +115,10 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(tablePath)
-  await page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('link', { name: 'Open' }).click()
+  await page
+    .getByRole('row', { name: new RegExp(`${title} `) })
+    .getByRole('link', { name: 'Open' })
+    .click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
   await expect(number).toHaveAttribute('readonly')
   await expect(number).toHaveValue(new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
@@ -137,6 +141,7 @@ test('the purchase request list reads a data source, shows department names, and
           lineItems: [{ description: 'Item', quantity: 1, unitPrice: 10 }],
         },
       },
+      headers: csrfHeaders,
     })
     expect(response.status()).toBe(201)
   }
@@ -178,6 +183,7 @@ test('the purchase request list filters by status, and keeps the filter and its 
           lineItems: [{ description: 'Item', quantity: 1, unitPrice: 10 }],
         },
       },
+      headers: csrfHeaders,
     })
     expect(response.status()).toBe(201)
   }
@@ -220,6 +226,7 @@ test('the per-department page shows one row per department with its total, sorts
           lineItems: [{ description: 'Item', quantity: 1, unitPrice }],
         },
       },
+      headers: csrfHeaders,
     })
     expect(response.status()).toBe(201)
   }

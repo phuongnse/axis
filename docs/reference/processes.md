@@ -310,8 +310,9 @@ A request is checked in this order, and the first failure is the response:
 3. The body, `400`.
 4. The `Idempotency-Key` header, `400`.
 
-From M4 *(planned)*, the CSRF header (`403`) and the session (`401`) come
-first, and the `start` grant (`403`) comes right after the process. Read
+A start without the CSRF header is a `403` before any of these checks. From
+M4 *(planned)*, the session (`401`) comes right after the CSRF header, and
+the `start` grant (`403`) comes right after the process. Read
 access to the subject record is checked in the transaction, when the record
 is read.
 
@@ -513,7 +514,9 @@ type follows the record API's
 
 A request is checked in this order, and the first failure is the response:
 `401`, then `404`, then `403`, then `409`, then `415`, then `400`. So a user
-who may not act on a task never learns its state.
+who may not act on a task never learns its state. A completion without the
+[CSRF header](record-api.md#create-update-and-delete) is a `403` before any
+of these checks.
 
 - **`401`.** No test user is signed in. Every task route needs one.
 

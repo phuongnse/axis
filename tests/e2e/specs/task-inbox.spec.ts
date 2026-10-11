@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 async function signInWithPicker(page: Page, name: string) {
   await page.goto('/e2e/tasks')
@@ -16,12 +17,15 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
   request,
 }) => {
   const title = `Inbox ${Date.now()}`
-  const created = await request.post('/api/apps/E2eApp/entities/Note/records', { data: { values: { title } } })
+  const created = await request.post('/api/apps/E2eApp/entities/Note/records', {
+    data: { values: { title } },
+    headers: csrfHeaders,
+  })
   expect(created.status()).toBe(201)
   const note = await created.json()
   const started = await request.post('/api/apps/E2eApp/processes/NoteReview/instances', {
     data: { subjectId: note.id },
-    headers: { 'Idempotency-Key': randomUUID() },
+    headers: { ...csrfHeaders, 'Idempotency-Key': randomUUID() },
   })
   expect(started.status()).toBe(201)
 

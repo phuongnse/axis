@@ -17,6 +17,7 @@ describe('startProcess', () => {
     expect(init?.method).toBe('POST')
     expect(init?.body).toBe(`{"subjectId":"${subjectId}"}`)
     expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('key-1')
+    expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
   })
 
   it.each([400, 404, 409, 422])('returns the problem of a %i as a final answer', async (status) => {

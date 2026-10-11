@@ -1,3 +1,4 @@
+import { apiFetch } from './api'
 import type { RecordProblem } from './records'
 import type { EntityMetadata, FormMetadata } from './site'
 
@@ -76,7 +77,7 @@ export async function fetchTasks(
   query: string,
   signal?: AbortSignal,
 ): Promise<TaskPage | typeof signInRequired> {
-  const response = await fetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal })
+  const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal })
   if (response.status === 401) {
     return signInRequired
   }
@@ -95,7 +96,7 @@ export async function fetchTask(
   id: string,
   signal?: AbortSignal,
 ): Promise<TaskItem | null | typeof signInRequired | typeof assignedElsewhere> {
-  const response = await fetch(`${tasksPath}/${id}`, { signal })
+  const response = await apiFetch(`${tasksPath}/${id}`, { signal })
   if (response.status === 404) {
     return null
   }
@@ -117,7 +118,7 @@ export async function fetchTask(
  * A 400, 403 or 409 comes back as the problem, and any other failure throws.
  */
 export async function completeTask(tasksPath: string, id: string, body: string): Promise<CompleteResult> {
-  const response = await fetch(`${tasksPath}/${id}/complete`, {
+  const response = await apiFetch(`${tasksPath}/${id}/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,

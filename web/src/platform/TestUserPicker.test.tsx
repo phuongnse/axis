@@ -103,7 +103,8 @@ describe('TestUserPicker', () => {
     await waitFor(() => expect(reload).toHaveBeenCalledOnce())
     const [, init] = fetchMock.mock.calls.find(([input]) => input === '/api/test-users/sign-in')!
     expect(init?.method).toBe('POST')
-    expect(init?.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json')
+    expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
     expect(init?.body).toBe('{"id":"anna"}')
   })
 
@@ -117,7 +118,8 @@ describe('TestUserPicker', () => {
     await waitFor(() => expect(reload).toHaveBeenCalledOnce())
     const [, init] = fetchMock.mock.calls.find(([input]) => input === '/api/test-users/sign-out')!
     expect(init?.method).toBe('POST')
-    expect(init?.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json')
+    expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
     expect(init?.body).toBe('{}')
   })
 })

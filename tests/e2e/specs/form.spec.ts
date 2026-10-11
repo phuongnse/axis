@@ -1,11 +1,15 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
 
 // Specs run in parallel against one database, so these tests rely only on the records they create,
 // and fewer than one hundred notes in all for the list check.
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 
 async function createRecord(request: APIRequestContext, entity: string, values: Record<string, unknown>) {
-  const response = await request.post(`/api/apps/E2eApp/entities/${entity}/records`, { data: { values } })
+  const response = await request.post(`/api/apps/E2eApp/entities/${entity}/records`, {
+    data: { values },
+    headers: csrfHeaders,
+  })
   expect(response.status()).toBe(201)
   return (await response.json()) as { id: string }
 }
@@ -190,6 +194,7 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
   await expect(titleInput).toHaveValue(`Conflict ${run} A`)
   const patched = await request.patch(`${notesPath}/${a.id}`, {
     data: { version: 1, values: { title: 'Changed elsewhere' } },
+    headers: csrfHeaders,
   })
   expect(patched.status()).toBe(200)
 

@@ -130,6 +130,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
                 Content = JsonContent.Create(new { version = 1, values = new { title = "Edited" } }),
             };
             request.Headers.Host = HostA;
+            request.Headers.Add("X-Axis-Csrf", "1");
             using var response = await client.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -208,6 +209,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
                 Content = JsonContent.Create(new { version = 1, values = new { done = true } }),
             };
             request.Headers.Host = HostA;
+            request.Headers.Add("X-Axis-Csrf", "1");
             using var response = await client.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -243,6 +245,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
                 Content = JsonContent.Create(new { version = 1, values = new { done = true } }),
             };
             request.Headers.Host = HostA;
+            request.Headers.Add("X-Axis-Csrf", "1");
             using var response = await client.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Equal("First (done)", await GetSummaryAsync(client, _firstSeedId));

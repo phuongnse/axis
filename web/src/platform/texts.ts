@@ -1,10 +1,11 @@
 import { createContext, useContext } from 'react'
+import { apiFetch } from './api'
 
 /** A flat map from text key to text, for one locale. */
 export type TextMap = Record<string, string>
 
 export async function fetchTexts(locale: string, signal?: AbortSignal): Promise<TextMap> {
-  const response = await fetch(`/api/texts/${encodeURIComponent(locale)}`, { signal })
+  const response = await apiFetch(`/api/texts/${encodeURIComponent(locale)}`, { signal })
   if (!response.ok) {
     throw new Error(`Loading the texts of '${locale}' failed with status ${response.status}.`)
   }
@@ -14,7 +15,7 @@ export async function fetchTexts(locale: string, signal?: AbortSignal): Promise<
 
 /** Loads the texts of an application site for one locale. */
 export async function fetchSiteTexts(path: string, locale: string, signal?: AbortSignal): Promise<TextMap> {
-  const response = await fetch(`/api/sites/${encodeURIComponent(path)}/texts/${encodeURIComponent(locale)}`, {
+  const response = await apiFetch(`/api/sites/${encodeURIComponent(path)}/texts/${encodeURIComponent(locale)}`, {
     signal,
   })
   if (!response.ok) {
