@@ -8,6 +8,7 @@ import type { NavigationItem } from './site'
 import { TestUserPicker } from './TestUserPicker'
 import { useText } from './texts'
 import { useThemeMode } from './themeMode'
+import { UserMenu } from './UserMenu'
 
 interface ShellProps {
   titleKey: string
@@ -20,7 +21,7 @@ interface ShellProps {
 
 /**
  * The layout of every site, the platform site and application sites alike: site title and
- * navigation, test user picker, locale switch and theme toggle. Ant Design components and dayjs
+ * navigation, account button, test user picker, locale switch and theme toggle. Ant Design components and dayjs
  * follow the locale.
  */
 export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, children }: ShellProps) {
@@ -53,6 +54,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
           }}
           menuItemRender={(item, dom) => <Link to={item.path ?? '/'}>{dom}</Link>}
           actionsRender={() => [
+            <UserMenu key="account" />,
             <TestUserPicker key="user" />,
             <Segmented
               key="locale"

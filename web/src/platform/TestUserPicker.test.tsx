@@ -9,7 +9,6 @@ const catalogs = [
   {
     texts: {
       'shell.user.label': 'Test user',
-      'shell.user.signIn': 'Sign in',
       'shell.user.signOut': 'Sign out',
     },
     fallbackTexts: {},
@@ -59,7 +58,7 @@ describe('TestUserPicker', () => {
     stubServer({ current: binh })
     renderPicker()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Binh Engineering Manager' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Test user' }))
 
     const menu = await screen.findByRole('menu', { name: 'Test user' })
     expect(menu).toBeInTheDocument()
@@ -69,11 +68,11 @@ describe('TestUserPicker', () => {
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('shows a sign-in prompt and no sign out when nobody is signed in', async () => {
+  it('reads Test user and offers no sign out when nobody is signed in', async () => {
     stubServer()
     renderPicker()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Test user' }))
 
     await screen.findByRole('menu', { name: 'Test user' })
     expect(screen.getAllByRole('menuitemradio')).toHaveLength(3)
@@ -97,7 +96,7 @@ describe('TestUserPicker', () => {
     const fetchMock = stubServer()
     const reload = renderPicker()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Test user' }))
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Anna Employee' }))
 
     await waitFor(() => expect(reload).toHaveBeenCalledOnce())
@@ -112,7 +111,7 @@ describe('TestUserPicker', () => {
     const fetchMock = stubServer({ current: binh })
     const reload = renderPicker()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Binh Engineering Manager' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Test user' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }))
 
     await waitFor(() => expect(reload).toHaveBeenCalledOnce())

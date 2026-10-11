@@ -240,8 +240,9 @@ are marked *(planned for M4)*.
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
     identity provider returns it to `/`. The SPA calls sign-out with `fetch`
     so it can send the CSRF header, and a `fetch` call cannot follow a
-    redirect to the identity provider as a page. The SPA's sign-in and
-    sign-out are *(planned for M4)*.
+    redirect to the identity provider as a page. The shell header's
+    [account button](reference/frontend.md) offers sign-in and
+    sign-out.
 - **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
   - It holds the user id, the display name, the roles and the tenant id.
   - It holds no access, refresh or ID token, and no token reaches the
@@ -290,8 +291,9 @@ are marked *(planned for M4)*.
   through Testcontainers, and drive its login page. Tests of the session
   lifetime create the session through a test-only hook and use a test clock.
   Integration tests of other endpoints sign in through a test authentication
-  scheme that only test hosts register *(planned for M4)*. E2E journeys sign
-  in through Keycloak *(planned for M4)*.
+  scheme that only test hosts register *(planned for M4)*. The E2E sign-in
+  journey drives the Keycloak login page. The other E2E journeys sign in
+  through Keycloak *(planned for M4)*.
 - **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
   Keycloak with an imported development realm, `axis`. This part is in place:
   the realm is `samples/keycloak/axis-realm.json`, and an integration test

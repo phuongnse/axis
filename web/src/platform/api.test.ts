@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiFetch } from './api'
+import { fetchCurrentUser } from './currentUser'
+import { assignLocation } from './navigation'
 
-function stubFetch() {
-  const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response(null, { status: 204 }))
+vi.mock('./navigation')
+
+beforeEach(() => {
+  vi.mocked(assignLocation).mockReset()
+  history.pushState(null, '', '/e2e/notes?page=2')
+})
+
+function stubFetch(status = 204) {
+  const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response(null, { status }))
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
@@ -60,5 +69,41 @@ describe('apiFetch', () => {
       ['/api/x', undefined],
       ['/api/y', { signal }],
     ])
+  })
+
+  it('starts sign-in on a 401, with the current path and query as the return address', async () => {
+    stubFetch(401)
+
+    const response = await apiFetch('/api/x')
+
+    expect(response.status).toBe(401)
+    expect(assignLocation).toHaveBeenCalledExactlyOnceWith('/api/auth/sign-in?returnUrl=%2Fe2e%2Fnotes%3Fpage%3D2')
+  })
+
+  it('does not start sign-in on a 401 when the caller opts out', async () => {
+    stubFetch(401)
+
+    const response = await apiFetch('/api/x', undefined, { signInOnUnauthorized: false })
+
+    expect(response.status).toBe(401)
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('does not start sign-in on a success', async () => {
+    stubFetch(200)
+
+    await apiFetch('/api/x')
+
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+})
+
+describe('fetchCurrentUser', () => {
+  it('returns null on a 401 and does not start sign-in', async () => {
+    const fetchMock = stubFetch(401)
+
+    expect(await fetchCurrentUser()).toBeNull()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/me')
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 })

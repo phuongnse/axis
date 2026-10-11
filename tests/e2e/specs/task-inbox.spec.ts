@@ -4,7 +4,7 @@ import { csrfHeaders } from '../csrf'
 
 async function signInWithPicker(page: Page, name: string) {
   await page.goto('/e2e/tasks')
-  await page.getByRole('banner').getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('banner').getByRole('button', { name: 'Test user' }).click()
   await page.getByRole('menuitemradio', { name }).click()
   await expect(page.getByRole('banner').getByRole('button', { name })).toBeVisible()
 }

@@ -62,6 +62,10 @@ export interface TaskItem {
 /** The outcome of completing a task, or the problem the server reported. */
 export type CompleteResult = { ok: true } | { ok: false; problem: RecordProblem }
 
+// The task API still reads only the test user, so a 401 there must not start sign-in: a person
+// signed in through the identity provider would loop through sign-in forever.
+const taskApiOptions = { signInOnUnauthorized: false }
+
 /** What the task API answers when nobody is signed in. */
 export const signInRequired = 'signInRequired'
 
@@ -77,7 +81,7 @@ export async function fetchTasks(
   query: string,
   signal?: AbortSignal,
 ): Promise<TaskPage | typeof signInRequired> {
-  const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal })
+  const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal }, taskApiOptions)
   if (response.status === 401) {
     return signInRequired
   }
@@ -96,7 +100,7 @@ export async function fetchTask(
   id: string,
   signal?: AbortSignal,
 ): Promise<TaskItem | null | typeof signInRequired | typeof assignedElsewhere> {
-  const response = await apiFetch(`${tasksPath}/${id}`, { signal })
+  const response = await apiFetch(`${tasksPath}/${id}`, { signal }, taskApiOptions)
   if (response.status === 404) {
     return null
   }
@@ -118,11 +122,11 @@ export async function fetchTask(
  * A 400, 403 or 409 comes back as the problem, and any other failure throws.
  */
 export async function completeTask(tasksPath: string, id: string, body: string): Promise<CompleteResult> {
-  const response = await apiFetch(`${tasksPath}/${id}/complete`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  })
+  const response = await apiFetch(
+    `${tasksPath}/${id}/complete`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
+    taskApiOptions,
+  )
   if (response.ok) {
     return { ok: true }
   }
