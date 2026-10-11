@@ -299,8 +299,8 @@ are marked *(planned for M4)*.
   those saved sessions.
 - **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
   Keycloak with an imported development realm, `axis`. This part is in place:
-  the realm is `samples/keycloak/axis-realm.json`, and an integration test
-  fixture starts it through Testcontainers. Under `scripts/dev.sh` and in
+  the realm is `samples/keycloak/axis-realm.json`, and one shared
+  Testcontainers container serves the whole integration run. Under `scripts/dev.sh` and in
   the E2E run, the server signs people in through it. Under Docker Compose
   it does not yet, because the server in its container cannot reach Keycloak
   at the address the browser uses.
@@ -472,6 +472,11 @@ Moved to [reference/frontend.md](reference/frontend.md).
 
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
+
+The integration tests share one Keycloak container with the development realm
+per run. It starts the first time a test needs it, so a run with no such test
+starts none. It is removed when the run ends. A test class never starts its own
+Keycloak. A test that changes realm state must not use the shared container.
 
 Some doc facts are checked by machine. `scripts/lint.sh` checks every relative
 Markdown link and `#anchor` in the repository. Unit tests in

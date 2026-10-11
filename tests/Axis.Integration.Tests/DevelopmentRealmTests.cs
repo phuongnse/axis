@@ -5,8 +5,10 @@ using System.Text.Json;
 namespace Axis.Integration.Tests;
 
 /// <summary>The development realm in samples/keycloak issues tokens for the purchase request users.</summary>
-public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IClassFixture<KeycloakFixture>
+public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
+    private Uri? _authority;
+
     public static TheoryData<string, string, string[]> Users => new()
     {
         { "anna", "Anna Employee", ["employee"] },
@@ -14,6 +16,10 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IClassFixt
         { "chau", "Chau Operations Manager", ["department-manager"] },
         { "dung", "Dung Finance Reviewer", ["finance-reviewer"] },
     };
+
+    public async ValueTask InitializeAsync() => _authority = await keycloak.StartAsync();
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Theory]
     [MemberData(nameof(Users))]
@@ -59,7 +65,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IClassFixt
             ["password"] = password,
             ["scope"] = "openid",
         });
-        return await client.PostAsync(new Uri($"{keycloak.Authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
+        return await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
     }
 
     private static JsonDocument DecodePayload(string token) =>
