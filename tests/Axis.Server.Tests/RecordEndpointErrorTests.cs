@@ -15,7 +15,8 @@ public sealed class RecordEndpointErrorTests
     public async Task Unexpected_error_is_a_500_problem_without_exception_text()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient();
+        // A signed-in request gets past the session check, so it reaches the database.
+        using var client = factory.CreateClient().SignedInAs("anna");
 
         var response = await client.GetAsync(new Uri("/api/apps/Any/entities/Any/records", UriKind.Relative), CancellationToken);
 
@@ -34,5 +35,6 @@ public sealed class RecordEndpointErrorTests
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseTestOidc("default");
+            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
         });
 }

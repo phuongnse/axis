@@ -129,7 +129,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
     [InlineData("{record}/history?page=0&pageSize=101", HttpStatusCode.BadRequest, null, "page,pageSize")]
     public async Task An_unknown_record_is_404_and_invalid_paging_is_400(string path, HttpStatusCode status, string? title, string keys)
     {
-        using var client = fixture.CreateClient();
+        using var client = fixture.CreateClient().SignedInAs("maria");
         if (path.StartsWith("{record}", StringComparison.Ordinal))
         {
             var record = await CreateAsync(client, TenantA, """{ "values": { "title": "Paged" } }""");
@@ -154,7 +154,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
     [Fact]
     public async Task A_deleted_records_history_is_404()
     {
-        using var client = fixture.CreateClient();
+        using var client = fixture.CreateClient().SignedInAs("maria");
         var record = await CreateAsync(client, TenantA, """{ "values": { "title": "Gone" } }""");
         using (var delete = RecordApiFixture.Request(HttpMethod.Delete, $"{Records}/{record:D}", Host(TenantA)))
         using (var deleted = await client.SendAsync(delete, CancellationToken))

@@ -1,0 +1,10 @@
+{
+  "id": "b4af332a-5b75-4c5c-a645-b042debcb198",
+  "kind": "policy",
+  "name": "DataSourceOnlyAccess",
+  "formatVersion": 1,
+  "roles": ["dsonly"],
+  "grants": [
+    { "dataSource": "ActiveItems", "actions": ["read"] }
+  ]
+}

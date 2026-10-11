@@ -1,0 +1,9 @@
+{
+  "id": "67fbd9a1-d0ab-4b5f-a208-f8df3240165d",
+  "kind": "role",
+  "name": "reader",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.reader"
+  }
+}

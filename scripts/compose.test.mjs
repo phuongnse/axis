@@ -73,9 +73,12 @@ test('the stack runs from source', { timeout }, async () => {
   assert.equal(page.status, 200)
   assert.match(await page.text(), /<div id="root"><\/div>/)
 
+  // The record API needs a session. Sign-in through Compose is not wired yet, so the server
+  // answers the purchase request list with a 401 problem.
   const records = await fetch(`${baseUrl}/api/apps/PurchaseRequests/entities/PurchaseRequest/records`)
-  assert.equal(records.status, 200)
-  assert.ok(Array.isArray((await records.json()).items))
+  assert.equal(records.status, 401)
+  assert.equal(records.headers.get('content-type'), 'application/problem+json')
+  assert.equal((await records.json()).status, 401)
 
   // Keycloak serves the development realm. Sign-in through Compose is not wired yet.
   const discovery = await fetch(`${keycloakUrl}/realms/axis/.well-known/openid-configuration`)

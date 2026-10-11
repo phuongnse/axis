@@ -4,6 +4,7 @@
     <Project Path="src/Axis.Core/Axis.Core.csproj" />
     <Project Path="src/Axis.Data/Axis.Data.csproj" />
     <Project Path="src/Axis.Expressions/Axis.Expressions.csproj" />
+    <Project Path="src/Axis.Policy/Axis.Policy.csproj" />
     <Project Path="src/Axis.Presentation/Axis.Presentation.csproj" />
     <Project Path="src/Axis.Processes/Axis.Processes.csproj" />
     <Project Path="src/Axis.Server/Axis.Server.csproj" />

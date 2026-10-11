@@ -1,14 +1,19 @@
 using System.Globalization;
 using Axis.Data.DataSources;
+using Axis.Policy;
 using Axis.Server.Applications;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
+using Axis.Server.Users;
 
 namespace Axis.Server.DataSources;
 
 /// <summary>
 /// The read endpoint of a data source in the active release of an application. Only <c>GET</c>
-/// is routed. A path that names no active application or data source is a 404 before the query
-/// is checked. The paging and sorting rules are those of the record list, except that the default
+/// is routed. A request is checked in order: session (401), then the path (404), then the user's
+/// grants (403), and only then the query. A request without a session is a 401 before the path is
+/// read. A path that names no active application or data source is a 404. Reading the rows takes
+/// a <c>read</c> grant on the data source and a <c>read</c> grant on its root entity. The paging and sorting rules are those of the record list, except that the default
 /// page size and sort are the data source's own. The data source parameters are read by
 /// <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter is a
 /// 400 problem with a fixed title. The problem titles never contain text from the request, SQL or
@@ -41,6 +46,11 @@ internal static class DataSourceEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(context) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         if (await resolver.ResolveAsync(app, cancellationToken) is not { } application)
         {
             return NotFound("No application is active under this name.");
@@ -49,6 +59,11 @@ internal static class DataSourceEndpoints
         if (!application.TryGetDataSource(dataSource, out var model))
         {
             return NotFound("The application has no data source with this name.");
+        }
+
+        if (!PolicyEvaluator.AllowsRead(application, user.Roles, model))
+        {
+            return Grants.Forbidden();
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);

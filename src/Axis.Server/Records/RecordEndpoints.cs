@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Audit;
 using Axis.Data.Records;
+using Axis.Policy;
 using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
@@ -11,13 +12,16 @@ using Npgsql;
 namespace Axis.Server.Records;
 
 /// <summary>
-/// Endpoints for the records of an entity in the active release of an application. A path that
-/// names no active application, entity or record is a 404 before the query or body is checked; a
-/// child entity is no entity here. A create or update writes the record and its child rows in one
-/// transaction. A create by a signed-in user sets the entity's creator fields to the session
-/// user's id, and a create without a session leaves them <c>null</c>. Every create, update and
-/// delete that succeeds appends one audit record in its transaction. Its actor is the session
-/// user, with their display name, or <c>anonymous</c>. A write that fails leaves none.
+/// Endpoints for the records of an entity in the active release of an application. Every request
+/// is checked in order: session (401), then the path (404), then the user's grant for the entity
+/// and the action (403), and only then the query or body. A request without a session is a 401
+/// before the path is read, so it learns nothing about what exists. A path that names no active
+/// application, entity or record is a 404; a child entity is no entity here. A list, a read and a
+/// history need <c>read</c>, and a create, an update and a delete need that action.
+/// A create or update writes the record and its child rows in one transaction. A create sets the
+/// entity's creator fields to the session user's id. Every create, update and delete that
+/// succeeds appends one audit record in its transaction. Its actor is the session user, with their
+/// display name. A write that fails leaves none.
 /// A body is checked in order: content type (415), then body (400), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
@@ -56,10 +60,20 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
-        var (_, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
+        }
+
+        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Read))
+        {
+            return Grants.Forbidden();
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
@@ -101,14 +115,25 @@ internal static class RecordEndpoints
         string app,
         string entity,
         string id,
+        HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
+        }
+
+        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Read))
+        {
+            return Grants.Forbidden();
         }
 
         if (!TryParseId(id, out var recordId))
@@ -132,14 +157,25 @@ internal static class RecordEndpoints
         string id,
         string? page,
         string? pageSize,
+        HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
+        }
+
+        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Read))
+        {
+            return Grants.Forbidden();
         }
 
         if (!TryParseId(id, out var recordId))
@@ -183,10 +219,20 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
+        }
+
+        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Create))
+        {
+            return Grants.Forbidden();
         }
 
         if (!JsonRequest.IsJson(request))
@@ -203,8 +249,7 @@ internal static class RecordEndpoints
         // The creator fields are set before the computed fields and validations, so they see the
         // record as it will be stored.
         var input = parsed.Input!;
-        var user = await CurrentUsers.FindAsync(request.HttpContext);
-        var values = RecordCreator.WithCreator(model, input.Values, user?.Id);
+        var values = RecordCreator.WithCreator(model, input.Values, user.Id);
         var computed = RecordComputer.ComputeCreate(application!, model, values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
@@ -247,10 +292,20 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
+        }
+
+        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Update))
+        {
+            return Grants.Forbidden();
         }
 
         if (!TryParseId(id, out var recordId))
@@ -291,7 +346,6 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
-        var user = await CurrentUsers.FindAsync(request.HttpContext);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -326,10 +380,20 @@ internal static class RecordEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
+        }
+
+        if (!PolicyEvaluator.Allows(application!, user.Roles, model, PolicyAction.Delete))
+        {
+            return Grants.Forbidden();
         }
 
         if (!TryParseId(id, out var recordId))
@@ -337,7 +401,6 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
-        var user = await CurrentUsers.FindAsync(httpContext);
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -401,11 +464,11 @@ internal static class RecordEndpoints
 
     /// <summary>
     /// The audit record of a record write. Its details hold the record's version, and on update
-    /// the names of the fields the body sets. They never hold a field value. Without a
-    /// <paramref name="user"/>, the actor is <c>anonymous</c> and has no display name.
+    /// the names of the fields the body sets. They never hold a field value. Its actor is
+    /// <paramref name="user"/>, with their display name.
     /// </summary>
     private static AuditEntry RecordAudit(
-        CurrentUserResponse? user,
+        CurrentUserResponse user,
         string action,
         ApplicationModel application,
         EntityModel model,
@@ -420,14 +483,14 @@ internal static class RecordEndpoints
         }
 
         return new AuditEntry(
-            user?.Id ?? AuditActors.Anonymous,
+            user.Id,
             action,
             application.Manifest.Id,
             model.Id,
             recordId,
             ProcessInstanceId: null,
             details,
-            user?.DisplayName);
+            user.DisplayName);
     }
 
     /// <summary>

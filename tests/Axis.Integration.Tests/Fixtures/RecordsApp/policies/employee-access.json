@@ -1,0 +1,22 @@
+{
+  "id": "e0ef2843-3042-4d9c-9e1c-3acdb08bbe0c",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "entity": "Item", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Department", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Order", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Ticket", "actions": ["read", "create", "update", "delete"] },
+    { "dataSource": "ActiveItems", "actions": ["read"] },
+    { "dataSource": "ItemTotalsByDepartment", "actions": ["read"] },
+    { "dataSource": "ItemTotals", "actions": ["read"] },
+    { "dataSource": "ItemsByDepartment", "actions": ["read"] },
+    { "dataSource": "ItemsByName", "actions": ["read"] },
+    { "dataSource": "ItemsMatching", "actions": ["read"] },
+    { "dataSource": "ItemsNamed", "actions": ["read"] },
+    { "dataSource": "ItemsOverflow", "actions": ["read"] },
+    { "dataSource": "OverdueTickets", "actions": ["read"] }
+  ]
+}

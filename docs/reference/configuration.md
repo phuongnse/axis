@@ -774,9 +774,10 @@ This section follows
 [D24](../decisions.md#d24-roles-and-policies--agreed), and
 [Authorization](../architecture.md#authorization) describes how the server
 applies it. The `role` and `policy` resources, the check of task assignees
-and the policy checks are built. Matching the roles claim and enforcing
-policies are *(planned for M4)*. Each compile check below is a compile
-error.
+and the policy checks are built. So are matching the roles claim and
+enforcing entity and data source grants on the record API and the data
+source endpoint. Filters, fields and policies on processes are *(planned for
+M4)*. Each compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
 
@@ -816,16 +817,25 @@ A `role` resource declares a role that users can hold:
   usual resource name rule refuses. With one lower-case form, letter case
   never matters.
 - **Claim values.** A role matches a roles claim value exactly. A claim value
-  that names no declared role is ignored. *(Planned for M4.)*
+  that names no declared role is ignored.
 - **Label.** The `label` is required. Its text key joins the `AXC0028`
   check.
 - **Schema.** A name in another form, or a missing `label`, is `AXC0004`.
   Two roles with the same name are `AXC0006`.
 
-A `policy` resource gives roles grants. Nothing enforces a policy yet: the
-filter, fields and combining rules below are *(planned for M4)*. The purchase
-request sample will have three policies. Employees reach their own requests, department managers the
-requests of their department, and finance reviewers the submitted ones:
+A `policy` resource gives roles grants. The record API and the data source
+endpoint enforce entity and data source grants. The filter and fields rules
+below are *(planned for M4)*, and until then a grant with a `filter` or
+`fields` grants nothing. Process grants are not enforced yet *(planned for
+M4)*. The purchase request sample targets the three policies below.
+Employees reach their own requests, department managers the requests of
+their department, and finance reviewers the submitted ones.
+
+For now, the sample's policies leave out every `filter` and `fields`, so
+each role reaches every purchase request. Its employee policy also reads
+`RequestsByDepartment`, because a sample journey opens that page as the
+employee. The filters return when record and field policies are built. The
+target policies are:
 
 ```json
 {

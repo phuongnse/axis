@@ -1,0 +1,10 @@
+{
+  "id": "86ecec0b-136a-4462-9702-1d1555e4ca9e",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "entity": "Task", "actions": ["read", "create", "update", "delete"] }
+  ]
+}

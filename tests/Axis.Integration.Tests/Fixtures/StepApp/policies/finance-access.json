@@ -1,0 +1,11 @@
+{
+  "id": "69da8da8-bb2b-438b-b4be-7ec22481eb9b",
+  "kind": "policy",
+  "name": "FinanceAccess",
+  "formatVersion": 1,
+  "roles": ["finance"],
+  "grants": [
+    { "entity": "Request", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Department", "actions": ["read", "create", "update", "delete"] }
+  ]
+}

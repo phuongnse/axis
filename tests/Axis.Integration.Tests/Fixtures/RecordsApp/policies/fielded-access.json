@@ -1,0 +1,10 @@
+{
+  "id": "1c9d330c-f52c-4e6d-a4c7-c2c802d5a64b",
+  "kind": "policy",
+  "name": "FieldedAccess",
+  "formatVersion": 1,
+  "roles": ["fielded"],
+  "grants": [
+    { "entity": "Item", "actions": ["read", "create"], "fields": ["name"] }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "7d9f722e-7406-4a39-87d5-e99293353a05",
+  "kind": "policy",
+  "name": "DepartmentManagerAccess",
+  "formatVersion": 1,
+  "roles": ["department-manager"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+  ]
+}
