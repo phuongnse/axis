@@ -72,15 +72,15 @@ Later constraints:
 | --- | --- | --- |
 | **Expression** | A typed, side-effect-free formula in Axis's [expression language](../reference/expressions.md), checked at compile time. | M2 |
 | **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations, data source filters and process conditions call rules today. Policy filters follow with policies (M4). | M2 |
-| **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. | M3 |
+| **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. M3 has one built-in operation, `updateRecord`, which sets fields of the subject record inside the step's transaction. Declared capabilities and idempotency, external calls and operations from extension packages come in M5. See [processes](../reference/processes.md#steps). | M3 (basic), M5 |
 | **Extension package** | Versioned C# code, and later React components, that adds operations and widgets under declared capabilities. | M5 |
 
 ## Processes
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. | M3 |
-| **Process instance** | One run of a process. It is pinned to its release and records every step, attempt, input, output and decision. | M3 |
+| **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. In M3 a process names one entity, its subject, and runs for one record of it. | M3 |
+| **Process instance** | One run of a process. It is pinned to its release and records every step occurrence with its input, output, decision and error. | M3 |
 | **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. In M3 the assignee is a user or a role, and the due date is only shown. Queues and escalation come later. See [processes](../reference/processes.md#task-api). | M3 |
 | **Retry policy** | Declared per operation step: attempts, backoff, which errors are retryable, and what happens when attempts run out (alert, manual retry, compensation). | M5 |
 
