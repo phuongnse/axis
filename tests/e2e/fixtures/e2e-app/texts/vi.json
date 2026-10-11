@@ -23,6 +23,7 @@
     "note.dueAt": "Hạn",
     "note.status": "Trạng thái",
     "note.category": "Danh mục",
+    "note.createdBy": "Người tạo",
     "note.lines": "Các dòng",
     "noteLine.description": "Mô tả",
     "noteLine.quantity": "Số lượng",

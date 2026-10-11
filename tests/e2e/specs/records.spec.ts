@@ -26,6 +26,7 @@ test('a record of the E2E application is created and read through the record API
       dueAt: null,
       status: null,
       category: null,
+      createdBy: null,
       lines: [],
     },
     labels: {},

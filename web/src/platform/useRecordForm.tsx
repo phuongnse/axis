@@ -29,19 +29,23 @@ export interface Section {
 
 /**
  * The sections a form shows over its entity. With no form, every field is in one section without
- * a title. A computed or sequence field is set by the server, so it is read-only in any form.
+ * a title. A computed, sequence or creator field is set by the server, so it is read-only in any
+ * form.
  */
 export function sectionsOf(entity: EntityMetadata, form: FormMetadata | null): Section[] {
   if (form === null) {
     return [
-      { titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: field.computed || field.sequence })) },
+      {
+        titleKey: null,
+        fields: entity.fields.map((field) => ({ field, readOnly: field.computed || field.sequence || field.creator })),
+      },
     ]
   }
   return form.sections.map((section) => ({
     titleKey: section.titleKey,
     fields: section.fields.flatMap((entry) => {
       const field = entity.fields.find((candidate) => candidate.name === entry.name)
-      return field ? [{ field, readOnly: entry.readOnly || field.computed || field.sequence }] : []
+      return field ? [{ field, readOnly: entry.readOnly || field.computed || field.sequence || field.creator }] : []
     }),
   }))
 }
@@ -124,7 +128,10 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
         .map(({ field }) => field)
         .filter(
           (field) =>
-            !field.computed && !field.sequence && !sameValue(field, values[field.name], snapshot.initial[field.name]),
+            !field.computed &&
+            !field.sequence &&
+            !field.creator &&
+            !sameValue(field, values[field.name], snapshot.initial[field.name]),
         )
         .map((field) => [field.name, values[field.name]]),
     )
@@ -205,7 +212,7 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
   const input = (field: FieldMetadata, readOnly: boolean): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
-    if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence)) {
+    if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
       // The server sets the value on save, so it is shown as a table cell shows it.
       return <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t })} />
     }

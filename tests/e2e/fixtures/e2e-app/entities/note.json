@@ -15,6 +15,7 @@
     { "name": "dueAt", "type": "date-time", "label": { "textKey": "note.dueAt" } },
     { "name": "status", "type": "enum", "values": ["open", "closed"], "label": { "textKey": "note.status" } },
     { "name": "category", "type": "reference", "target": "Category", "label": { "textKey": "note.category" } },
+    { "name": "createdBy", "type": "text", "maxLength": 100, "creator": true, "label": { "textKey": "note.createdBy" } },
     { "name": "lines", "type": "child-collection", "target": "NoteLine", "label": { "textKey": "note.lines" } }
   ]
 }

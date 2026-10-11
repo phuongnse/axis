@@ -476,6 +476,31 @@ public sealed class RecordInputParserTests
         }
     }
 
+    [Theory]
+    [InlineData("\"anna\"")]
+    [InlineData("null")]
+    public void Creator_field_set_by_the_body_is_an_error_at_its_pointer(string json)
+    {
+        var entity = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e07"),
+            "Ticket",
+            "entities/ticket.json",
+            Field("title", FieldType.Text),
+            Field("requester", FieldType.Text, maxLength: 100) with { Creator = true });
+        var application = Application(entity);
+
+        foreach (var (operation, version) in new[] { (RecordOperation.Create, ""), (RecordOperation.Update, "\"version\": 1, ") })
+        {
+            var body = $$"""{ {{version}}"values": { "title": "Hi", "requester": {{json}} } }""";
+            var result = RecordInputParser.Parse(Encoding.UTF8.GetBytes(body), entity, application, operation);
+
+            Assert.Null(result.Input);
+            Assert.NotNull(result.Errors);
+            Assert.Equal(["/values/requester"], result.Errors.Keys);
+            Assert.Equal(["Cannot be set."], result.Errors["/values/requester"]);
+        }
+    }
+
     /// <summary>An owner whose <c>total</c> is computed, with rows whose <c>code</c> is computed.</summary>
     private static (EntityModel Entity, ApplicationModel Application) ComputedModels()
     {

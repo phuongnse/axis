@@ -31,7 +31,8 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * A child collection that changed is sent as its whole row list, and a row's errors appear on its
  * cells. A computed field, of the record or of a row, is shown read-only with the value the server
  * returned, and never sent. So is a sequence field, which is empty on a new record because the
- * server numbers it on create, and so is a field the form marks read-only. A saved record shows its
+ * server numbers it on create, a creator field, which the server sets to the creating user's id,
+ * and a field the form marks read-only. A saved record shows its
  * history below the form, and a button for each of the widget's actions. A new record has neither.
  * An action saves the changed fields, then starts its process for the record.
  */

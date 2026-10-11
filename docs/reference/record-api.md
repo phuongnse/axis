@@ -187,6 +187,13 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   or update, even to `null`, is a `400` at its pointer with the message
   "Cannot be set.", as for a computed field. See
   [Audit records and sequence counters](storage.md#audit-records-and-sequence-counters).
+- **Creator fields.** A create by a signed-in user sets each `text` field that
+  declares [`creator`](configuration.md#record-creator) to the user id from
+  the session, in the write's transaction. It is set before the computed
+  fields and validations, so they see it. A create without a session leaves
+  it `null`. A body that sets it on create or update, even to `null`, is a
+  `400` at its pointer with the message "Cannot be set.", as for a sequence
+  field.
 
 ## Concurrency
 

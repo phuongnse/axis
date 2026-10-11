@@ -19,6 +19,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
     unique: false,
     computed: false,
     sequence: false,
+    creator: false,
     maxLength: null,
     precision: null,
     scale: null,
@@ -113,6 +114,19 @@ const sequenceWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note whose creator the server sets on create.
+const creatorWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      field('priority', 'integer', 'note.priority'),
+      { ...field('createdBy', 'text', 'note.createdBy'), maxLength: 100, creator: true },
+    ],
+  },
+}
+
 // A note laid out by a form in two sections: code and lines are read-only, and done is left out.
 const sectionsWidget: EntityWidgetMetadata = {
   ...noteWidget,
@@ -160,6 +174,10 @@ function sequenceJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"number":"PR-2026-00042","title":"Buy paper","priority":2},"labels":{}}`
 }
 
+function creatorJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"createdBy":"anna"},"labels":{}}`
+}
+
 function computedJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"amount":1.50,"total":3.00,"lines":[{"description":"Pens","code":"PENS"}]},"labels":{}}`
 }
@@ -194,6 +212,7 @@ const texts = {
   'shell.history.fields': 'Changed',
   'shell.history.action.record.updated': 'Updated',
   'note.number': 'Number',
+  'note.createdBy': 'Created by',
   'note.title': 'Title',
   'note.code': 'Code',
   'note.priority': 'Priority',
@@ -722,6 +741,28 @@ describe('FormWidget', () => {
     await waitFor(() => expect(number).toHaveValue('PR-2026-00042'))
     expect(number).toHaveAttribute('readonly')
     await userEvent.type(number, '9')
+    const priority = screen.getByLabelText('Priority')
+    await userEvent.clear(priority)
+    await userEvent.type(priority, '3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"priority":3}}',
+    })
+  })
+
+  it('shows a creator field read-only with the loaded value on edit, and leaves it out of the body', async () => {
+    const requests = stubFetch({ status: 200, body: creatorJson(1) }, { status: 200, body: creatorJson(2) })
+    renderForm(noteId, creatorWidget)
+
+    const createdBy = await screen.findByLabelText('Created by')
+    await waitFor(() => expect(createdBy).toHaveValue('anna'))
+    expect(createdBy).toHaveAttribute('readonly')
+    await userEvent.type(createdBy, 'x')
+    expect(createdBy).toHaveValue('anna')
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')

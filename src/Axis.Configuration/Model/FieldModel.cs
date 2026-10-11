@@ -6,7 +6,8 @@ namespace Axis.Configuration.Model;
 /// A compiled field. Type-specific properties are set only for the type they belong to:
 /// <see cref="MaxLength"/> for text, <see cref="Precision"/> and <see cref="Scale"/> for decimal,
 /// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
-/// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> for text.
+/// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> and
+/// <see cref="Creator"/> for text.
 /// </summary>
 public sealed record FieldModel
 {
@@ -41,6 +42,12 @@ public sealed record FieldModel
 
     /// <summary>The sequence that numbers the field, or null when it has none.</summary>
     public SequenceModel? Sequence { get; init; }
+
+    /// <summary>
+    /// Whether the server sets the field to the id of the signed-in user who creates the record.
+    /// Clients cannot set it.
+    /// </summary>
+    public bool Creator { get; init; }
 
     /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no

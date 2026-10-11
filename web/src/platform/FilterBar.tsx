@@ -41,6 +41,7 @@ function asField(parameter: DataSourceParameter): FieldMetadata {
     unique: false,
     computed: false,
     sequence: false,
+    creator: false,
     maxLength: null,
     precision: null,
     scale: null,

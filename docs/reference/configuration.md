@@ -963,8 +963,8 @@ user's id, and policies use it, for example `requester == currentUser()`:
   to `null`, is a `400` at its pointer with the message "Cannot be set.". A
   seed value for it is `AXC0033`.
 - **Allowed fields.** `creator` is allowed only on a `text` field. It cannot
-  be combined with `required`, `expression` or `sequence`, and a child
-  entity's field cannot have it. Each is a compile error.
+  be combined with `required: true`, `expression` or `sequence`, and a child
+  entity's field cannot have it. Each is `AXC0013` at `/fields/{i}/creator`.
 
 ## Entity field types and constraints
 
@@ -975,17 +975,17 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | | | | | yes | yes |
-| `integer` | yes | yes | | | | | | yes | |
-| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | |
-| `boolean` | yes | yes | | | | | | yes | |
-| `date` | yes | yes | | | | | | yes | |
-| `date-time` | yes | yes | | | | | | yes | |
-| `enum` | yes | yes | | | | | needed | yes | |
-| `reference` | yes | yes | | | | needed | | | |
-| `child-collection` | | | | | | needed | | | |
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | | | | | yes | yes | yes |
+| `integer` | yes | yes | | | | | | yes | | |
+| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | | |
+| `boolean` | yes | yes | | | | | | yes | | |
+| `date` | yes | yes | | | | | | yes | | |
+| `date-time` | yes | yes | | | | | | yes | | |
+| `enum` | yes | yes | | | | | needed | yes | | |
+| `reference` | yes | yes | | | | needed | | | | |
+| `child-collection` | | | | | | needed | | | | |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
@@ -1002,9 +1002,10 @@ is `AXC0013`.
 - `sequence` names a [sequence](#sequences), ignoring letter case. It cannot
   be combined with `required: true` or `expression`, and a child entity's
   field cannot have it. Each is `AXC0013` at `/fields/{i}/sequence`.
-- `creator` *(planned for M4)* is allowed only on a `text` field. It cannot
-  be combined with `required`, `expression` or `sequence`, and a child
-  entity's field cannot have it. See [Record creator](#record-creator).
+- `creator` is allowed only on a `text` field. It cannot be combined with
+  `required: true`, `expression` or `sequence`, and a child entity's field
+  cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
+  [Record creator](#record-creator).
 
 ## Entity logic
 

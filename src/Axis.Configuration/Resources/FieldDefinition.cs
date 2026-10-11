@@ -32,4 +32,7 @@ public sealed record FieldDefinition
 
     /// <summary>The name of the sequence that numbers the field, or null when it has none.</summary>
     public string? Sequence { get; init; }
+
+    /// <summary>Whether the server sets the field to the id of the user who creates the record, or null when not declared.</summary>
+    public bool? Creator { get; init; }
 }

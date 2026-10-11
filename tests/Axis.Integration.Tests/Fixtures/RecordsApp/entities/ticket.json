@@ -8,7 +8,8 @@
     { "name": "title", "type": "text", "required": true, "maxLength": 100 },
     { "name": "code", "type": "text", "maxLength": 20, "unique": true },
     { "name": "priority", "type": "integer" },
-    { "name": "dueAt", "type": "date-time" }
+    { "name": "dueAt", "type": "date-time" },
+    { "name": "requester", "type": "text", "maxLength": 100, "creator": true }
   ],
   "validations": [
     { "expression": "priority is null or priority > 0", "message": { "textKey": "ticket.priorityPositive" }, "field": "priority" },
