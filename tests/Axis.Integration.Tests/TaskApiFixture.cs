@@ -309,15 +309,9 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
     private NpgsqlDataSource DataSource(string tenant) => _tenants[tenant].DataSource;
 
-    private async Task<Tenant> CreateTenantAsync(string databaseName)
+    private async Task<Tenant> CreateTenantAsync(string databasePrefix)
     {
-        await using (var admin = NpgsqlDataSource.Create(_database.ConnectionString))
-        await using (var create = admin.CreateCommand($"""CREATE DATABASE "{databaseName}" """))
-        {
-            await create.ExecuteNonQueryAsync();
-        }
-
-        var connectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Database = databaseName }.ConnectionString;
+        var connectionString = await _database.CreateDatabaseAsync(databasePrefix);
         await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connectionString).Options);
         await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options);
         await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options))

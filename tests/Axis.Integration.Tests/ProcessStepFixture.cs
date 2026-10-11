@@ -61,13 +61,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _database.InitializeAsync();
-        await using (var admin = NpgsqlDataSource.Create(_database.ConnectionString))
-        await using (var create = admin.CreateCommand("""CREATE DATABASE "steps_a" """))
-        {
-            await create.ExecuteNonQueryAsync();
-        }
-
-        _connectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Database = "steps_a" }.ConnectionString;
+        _connectionString = await _database.CreateDatabaseAsync("steps_a");
         _dataSource = NpgsqlDataSource.Create(_connectionString);
         await using (var configuration = CreateConfigurationContext())
         await using (var data = CreateDataContext())

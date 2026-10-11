@@ -426,14 +426,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         return await command.ExecuteScalarAsync(CancellationToken);
     }
 
-    private async Task<string> CreateDatabaseAsync()
-    {
-        var name = $"startup_{Guid.NewGuid():N}";
-        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
-        await using var command = dataSource.CreateCommand($"""CREATE DATABASE "{name}" """);
-        await command.ExecuteNonQueryAsync(CancellationToken);
-        return new NpgsqlConnectionStringBuilder(database.ConnectionString) { Database = name }.ConnectionString;
-    }
+    private Task<string> CreateDatabaseAsync() => database.CreateDatabaseAsync("startup", CancellationToken);
 
     private TemporaryFolder ApplicationFolder(params string[] fields) =>
         new TemporaryFolder()
