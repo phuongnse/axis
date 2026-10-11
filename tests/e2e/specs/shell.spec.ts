@@ -7,6 +7,8 @@ test('the home page loads and reports a ready server', async ({ page }) => {
   await expect(page).toHaveTitle('Axis')
   await expect(page.getByRole('main').getByText('Welcome to Axis')).toBeVisible()
   await expect(page.getByTestId('server-status')).toContainText('Ready')
+  // Nobody is signed in, so a sign-in prompt shows in place of the site list.
+  await expect(page.getByTestId('sites-sign-in')).toHaveText('Sign in to see the sites.')
 })
 
 test('the shell header offers sign-in through the account button and no test user button', async ({ page }) => {
@@ -77,6 +79,8 @@ test('the home page opens a site in its own shell, in light and dark mode', asyn
 })
 
 test('an unknown site is not found inside the platform shell', async ({ page }) => {
+  // The site endpoints need a session, or the page would start sign-in.
+  await useSession(page, 'anna')
   const response = await page.goto('/no-such-site')
 
   expect(response?.status()).toBe(200)
@@ -85,6 +89,7 @@ test('an unknown site is not found inside the platform shell', async ({ page }) 
 })
 
 test('an unknown page is not found inside the site shell', async ({ page }) => {
+  await useSession(page, 'anna')
   const response = await page.goto('/e2e/no-such-page')
 
   expect(response?.status()).toBe(200)

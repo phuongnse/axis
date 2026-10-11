@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router'
 import { formatValue } from './formatValue'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
-import { fetchTasks, signInRequired, type TaskListItem, type TaskPage } from './tasks'
+import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
 import { useText } from './texts'
 
 interface TaskInboxWidgetProps {
@@ -23,7 +23,6 @@ interface LoadState {
   /** The last page loaded. It stays while the next page loads. */
   page?: TaskPage
   failed: boolean
-  signInRequired: boolean
 }
 
 const pageSizes = tablePageSizes()
@@ -32,8 +31,8 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
 /**
  * Lists the signed-in user's open tasks in the application, in the task API's order: due date
  * first, with no due date last. Each row links to the task's address under the inbox page. Paging
- * lives in the URL as the task API's `page` and `pageSize`, as on a table. With nobody signed in, a
- * sign-in prompt shows in place of the rows.
+ * lives in the URL as the task API's `page` and `pageSize`, as on a table. With nobody signed in, the
+ * task API's 401 starts sign-in.
  */
 export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInboxWidgetProps) {
   const t = useText()
@@ -45,7 +44,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
   const query = useMemo(() => parseTableQuery(searchParams, []), [searchParams])
   const requestQuery = recordQuery(query)
   const requestUrl = `${tasksPath}?${requestQuery}`
-  const [state, setState] = useState<LoadState>({ failed: false, signInRequired: false })
+  const [state, setState] = useState<LoadState>({ failed: false })
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
   const totalCount = loading ? undefined : state.page?.totalCount
@@ -74,19 +73,13 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
     const controller = new AbortController()
     const url = `${tasksPath}?${requestQuery}`
     fetchTasks(tasksPath, requestQuery, controller.signal)
-      .then((page) =>
-        setState(
-          page === signInRequired
-            ? { url, failed: false, signInRequired: true }
-            : { url, page, failed: false, signInRequired: false },
-        ),
-      )
+      .then((page) => setState({ url, page, failed: false }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return
         }
         console.warn(`Loading the tasks of '${tasksPath}' failed`, error)
-        setState({ url, failed: true, signInRequired: false })
+        setState({ url, failed: true })
       })
     return () => controller.abort()
   }, [tasksPath, requestQuery])
@@ -119,9 +112,6 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
     setSearchParams(writeTableQuery(searchParams, { page, pageSize, sort: null }))
   }
 
-  if (state.signInRequired && !loading) {
-    return <Alert data-testid="tasks-sign-in" type="info" message={t('shell.tasks.signIn')} />
-  }
   if (failed) {
     return <Alert data-testid="tasks-error" type="error" message={t('shell.tasks.loadFailed')} />
   }

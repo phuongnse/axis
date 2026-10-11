@@ -100,8 +100,9 @@ realm imported from `samples/keycloak/axis-realm.json`. The realm users are `ann
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
-browser uses. The record API and the data source endpoint need a session, so under Compose they
-answer `401`. See [sign-in and the session](docs/architecture.md#sign-in-and-the-session).
+browser uses. The site endpoints, the record API and the data source endpoint need a session, so
+under Compose they answer `401`, and an application page starts a sign-in that cannot complete yet.
+See [sign-in and the session](docs/architecture.md#sign-in-and-the-session).
 
 For local development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and Node, and
 works on a fresh clone:
