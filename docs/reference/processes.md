@@ -236,7 +236,9 @@ reported in one pass. See
   any task property (`AXC0004`).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). Whether
-  the role exists is not checked, as roles come in M4.
+  the role exists is not checked yet. From M4 it must name a declared
+  [role](configuration.md#roles-and-policies), compared exactly, or it is a
+  compile error *(planned for M4)*.
 - A `user` expression gives `text`, with the same scope as a `when`. A
   problem is reported at `/steps/{i}/assignee/user` with its expression code,
   such as `AXC0048` for a number.
@@ -287,8 +289,18 @@ are problem details, as in the [record API](record-api.md#errors).
   record.
 
 The `201` has no `Location` header, because there is no endpoint to read an
-instance yet. Starts have no authorization check until M4, as with record
-writes.
+instance yet.
+
+From M4 *(planned)*, a start needs a `start` grant on the process and read
+access to the subject record, as
+[Authorization](../architecture.md#authorization) describes. Until then
+starts are open, as record writes are.
+
+- **`403`** *(planned for M4)*. The user has no `start` grant on the process.
+- **Subject outside every read filter** *(planned for M4)*. A subject record
+  the user may not read does not exist for them. It gets the same `400` keyed
+  `/subjectId` as a `subjectId` that names no record, so the user cannot tell
+  the two apart.
 
 A request is checked in this order, and the first failure is the response:
 
@@ -296,6 +308,11 @@ A request is checked in this order, and the first failure is the response:
 2. The content type, `415`.
 3. The body, `400`.
 4. The `Idempotency-Key` header, `400`.
+
+From M4 *(planned)*, the CSRF header (`403`) and the session (`401`) come
+first, and the `start` grant (`403`) comes right after the process. Read
+access to the subject record is checked in the transaction, when the record
+is read.
 
 One transaction then does the rest:
 
@@ -368,6 +385,21 @@ every request, at the moment of action. Policies in M4 add to this check and
 never replace it. From M4 *(planned)*, the user and their roles come from
 the session
 ([D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)).
+
+**Policies on tasks** *(planned for M4)*. These follow
+[D24](../decisions.md#d24-roles-and-policies--agreed).
+
+- The assignee check is enough to list, read and complete a task. The user
+  needs no grant on the subject entity, and its read filters do not apply.
+- The task's `form` and its `entity` leave out the fields the user may not
+  read on the subject entity.
+- A value for a field the user may not read is refused as a field the form
+  does not make editable, with "Cannot be set.".
+- Field write grants do not apply to the values of a task completion. The
+  form decides which fields are editable.
+- `subject.label` follows the record API's
+  [label rule](record-api.md#record-shape): it shows when the user may read
+  the subject entity's display field, and is `null` otherwise.
 
 **List my tasks.** `GET /api/apps/{app}/tasks?page=&pageSize=` lists the
 `open` tasks the user may act on, whatever release their instance is pinned

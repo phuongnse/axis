@@ -155,7 +155,47 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     can hold it.
   - An unknown site, page or locale is a 404 problem with a fixed title. A
     site active only in another tenant does not exist for the request.
-  - The endpoints have no authorization yet, like the record API.
+  - Until M4 the endpoints are open, like the record API.
+  - **Policies** *(planned for M4)*. From M4, policies shape the site and
+    page metadata, as [Authorization](../architecture.md#authorization)
+    describes. This only shapes the UI. The server checks every request.
+    - **Readable pages.** A page is readable when its widget is. A widget
+      over an entity, or over a form of an entity, needs a `read` grant on
+      that entity. A widget over a data source needs what the
+      [data source endpoint](data-sources.md#authorization) needs. A
+      `taskInbox` is always readable.
+    - **Unreadable pages.** The page endpoint answers `403` for a page the
+      user cannot read. Site navigation leaves out entries whose page the
+      user cannot read.
+    - **Fields.** `entity.fields`, a child collection's `fields`, the task
+      form and the form metadata leave out the fields the user may not read.
+      A form section with no field left is left out.
+    - **Actions.** A `startProcess` action is left out of `actions` when the
+      user has no `start` grant on its process.
+    - **Access.** Every `table` and `form` widget gets an `access` object.
+      It says which entity actions the user may take, and which fields each
+      write action covers:
+
+      ```json
+      "access": {
+        "actions": ["read", "update"],
+        "createFields": [],
+        "updateFields": ["title", "department", "supplier", "currency", "lineItems", "status"]
+      }
+      ```
+
+      - `actions` lists the entity actions of the user's grants on the
+        widget's entity, in the order `read`, `create`, `update`, `delete`.
+        On a data source widget it is about the root entity. Record filters
+        are not evaluated here, so `update` means that some record may be
+        updated, not this one.
+      - `createFields` and `updateFields` list the fields the user's
+        `create` and `update` grants cover, in declaration order. Each is
+        `[]` when the action is not in `actions`.
+      - A table shows its create button only with `create`. A form shows a
+        field it may not write as read-only, as on a computed field, and
+        never sends it.
+      - A `taskInbox` has `"access": null`.
 - **Routing.** The SPA routes on the client with `react-router` v7. The
   server answers every other path with the SPA, so each address below
   answers 200.
@@ -359,8 +399,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     is not shown and never sent.
   - Computed fields and sequence fields are always read-only, whatever
     `readOnly` says.
-  - On a page, `readOnly` only shapes the UI until policies arrive in M4,
-    because the record API still accepts those fields. In a task, the server
+  - On a page, `readOnly` only shapes the UI, because the record API still
+    accepts those fields. From M4 *(planned)*, the server enforces field
+    write grants on a page's writes instead, and `readOnly` stays a layout
+    choice. In a task, the server
     enforces it: completing a task rejects a value for a field the form does
     not make editable (see [Task API](processes.md#task-api)).
   - A section's `fields` and the form's `sections` hold at least one entry,
@@ -395,7 +437,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
     sorted ascending by the target's display field, in one column for that
-    field. It pages 20 records at a time and keeps nothing in the URL.
+    field. From M4 *(planned)*, the record API lists only the target records
+    that match the user's read filters. It pages 20 records at a time and keeps nothing in the URL.
     Loading, empty and error states use the table's texts. Clicking a row
     or pressing Enter on it picks the record and closes the dialog. The same
     dialog picks the record of a `reference` filter input.

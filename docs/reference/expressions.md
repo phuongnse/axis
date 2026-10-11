@@ -29,13 +29,13 @@ and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
 [knowledge](../domain/knowledge.md#logic-in-configuration).
 
 One language holds the logic of validation, named rules, computed fields,
-data source filters and process conditions. Later it also holds policy
-filters. It has two back ends:
+data source filters and process conditions. From M4 it also holds policy
+filters *(planned for M4)*. It has two back ends:
 
 - **Interpreter.** It evaluates an expression against one record, in the
   server process.
 - **SQL translation.** It turns an expression into a `WHERE` condition for a
-  data source filter. Only a subset of the language translates. See
+  data source filter, and from M4 for a policy filter *(planned for M4)*. Only a subset of the language translates. See
   [SQL subset](#sql-subset).
 
 Both back ends must give the same result for every expression in the subset.
@@ -291,6 +291,15 @@ Paths in validations and computed fields are not built. There a path is
   It can call the named rules, with fields, paths, parameters and literals as
   arguments. Its child collections type-check in aggregates, but no
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
+- **Scope in a policy filter** *(planned for M4)*. A
+  [policy](configuration.md#roles-and-policies) filter sees the entity's
+  fields, paths through reference fields of up to 3 hops, the named rules and
+  [`currentUser()`](#current-user). It must be boolean and stay inside the
+  [SQL subset](#sql-subset), because record lists and data sources run it as
+  SQL and a single record runs it in the interpreter. So it cannot use an
+  aggregate or `lower`. A rule body cannot call `currentUser()`, so a filter
+  passes the user id to a rule as an argument, such as
+  `IsRequester(requester, currentUser())`.
 - **Scope in a process expression.** A `startCondition` and a decision
   `when` see the subject record's fields, computed ones included, its child
   collections through aggregates, the named rules, and paths through
@@ -357,6 +366,25 @@ computed field, including inside an aggregate's item expression, is
 
 The text functions take `text` only. An enum value is not text to them,
 because no conversion is implicit except integer to decimal.
+
+### Current user
+
+Everything in this section is *(planned for M4)*. It follows
+[D24](../decisions.md#d24-roles-and-policies--agreed).
+
+`currentUser()` gives the signed-in user's id as `text`, as the
+[session](../architecture.md#sign-in-and-the-session) holds it. A policy
+filter uses it to compare a record with the user, such as
+`requester == currentUser()` or `department.manager == currentUser()`.
+
+- **Where.** It is allowed only in a
+  [policy filter](configuration.md#roles-and-policies), including as an
+  argument of a rule call there. Anywhere else, including inside a rule body,
+  it is a compile error. Its code comes with the issue that builds it.
+- **SQL.** It is sent as a bound `text` parameter, never spliced into the
+  SQL text.
+- **One value.** Every call in one request gives the same id, so the
+  interpreter and the SQL translation agree.
 
 ### Aggregates
 
@@ -555,7 +583,8 @@ Rules:
 
 Entity validations, computed fields, rules, data source filters and
 [process](processes.md#resource-shape) conditions are written this way.
-Policy filters *(planned for M4)* will be written the same way.
+From M4, [policy](configuration.md#roles-and-policies) filters are written
+the same way *(planned for M4)*.
 
 An expression is one JSON string:
 

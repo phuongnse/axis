@@ -167,12 +167,14 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - API calls from the SPA are protected against CSRF.
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
-- **Authorization (D12, planned for M4).**
+- **Authorization (D12, D24, planned for M4).**
   - Every API endpoint and engine command calls the policy module with an
     explicit resource and action.
-  - Record filters from policies are added to every data source query.
-  - Field policies remove or mask fields from results and reject writes to
+  - Record filters from policies are added to every record list and data
+    source query.
+  - Field policies leave out fields from results and reject writes to
     protected fields.
+  - See [Authorization](#authorization).
 - **Before M4.** There is no authentication yet: every endpoint is open.
   Development test users stand in for sign-in, as described below (D21),
   until [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)
@@ -274,6 +276,120 @@ Everything in this section is *(planned for M4)*. It follows
     already name these ids.
   - Every user has the same development-only password.
   - The realm maps each user's roles to the `roles` claim.
+
+### Authorization
+
+Everything in this section is *(planned for M4)*. It follows
+[D24](decisions.md#d24-roles-and-policies--agreed) and
+[D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
+The `role` and `policy` resource files are described in
+[configuration](reference/configuration.md#roles-and-policies).
+
+- **Roles.** A user's roles are the roles claim values kept in the
+  [session](#sign-in-and-the-session). A value matches a declared `role` of
+  the application by its exact name. A value that names no declared role is
+  ignored. A user matches a policy when they hold any of its roles.
+- **Grants.** A policy holds grants. Each grant gives actions on one target:
+  `read`, `create`, `update` and `delete` on an entity, `read` on a data
+  source, or `start` on a process. An entity grant may also have a record
+  `filter` and a `fields` list. A user's grants are the grants of every
+  policy they match.
+- **Default-deny.**
+  - A request without a session is a `401`.
+  - A signed-in user with no grant for the action on the resource gets a
+    `403`.
+  - A record outside every read filter does not exist for the user, so it is
+    a `404`, as for an unknown record.
+  - A policy that cannot be evaluated denies.
+- **Reads.** A record is readable when it matches the filter of at least one
+  of the user's `read` grants on its entity. A grant without a `filter`
+  matches every record. Record lists and data sources add the read filters
+  to their SQL. A single record is checked with the interpreter. Both back
+  ends give the same answer, as for every
+  [expression](reference/expressions.md#sql-subset).
+- **Writes.**
+  - A create needs the new record to match the filter of a `create` grant.
+  - An update needs the stored record to be readable, otherwise `404`. It
+    then needs the stored record to match an `update` filter, otherwise
+    `403`. The new record must match an `update` filter too, otherwise
+    `403`.
+  - A delete needs the stored record to be readable, otherwise `404`, and to
+    match a `delete` filter, otherwise `403`.
+  - The new record is the record as it will be stored: the stored values
+    with the body on top, after the creator, sequence and computed fields
+    are set. So a user cannot move a record out of their reach.
+- **Fields on reads.** The user may read the union of the `fields` of their
+  `read` grants on the entity. A `read` grant without `fields` covers every
+  field. The readable fields belong to the entity, not to the record, so
+  they never depend on which grant matched a record. Other fields are left
+  out of records, data source rows, history details, task forms and page
+  metadata. A record's `id` and `version` are always shown.
+- **Fields on writes.** A create may write the union of the `fields` of the
+  user's `create` grants on the entity, and an update the union of their
+  `update` grants. Writing any other field is a `403` keyed at the field's
+  path, such as `/values/decisionComments`.
+- **Child entities.** Grants name only entities that are not child
+  entities. Child rows are read and written through their owner's grants. An
+  owner's `fields` entry for a `child-collection` field covers its rows as a
+  whole. A grant on a child entity is a compile error.
+- **Labels and lookups.** The label of a referenced record shows when the
+  user may read the target entity's display field. The target's record
+  filters do not hide it. Lookups list target records through the record
+  API, so through the user's read filters.
+- **Data sources.** A data source needs a `read` grant on it and a `read`
+  grant on its root entity. The root entity's read filters are added to the
+  data source's own filter in SQL. A data source that projects or aggregates
+  a field the user may not read is a `403` as a whole. See
+  [data sources](reference/data-sources.md#authorization).
+- **Processes and tasks.** A process start needs a `start` grant on the
+  process and read access to the subject record. The task assignee check
+  stays, and it is enough to list, read and complete a task. The task form
+  leaves out fields the user may not read. See
+  [processes](reference/processes.md#task-api).
+- **System work.** The worker, seed data and `updateRecord` steps run as
+  `system`. Policies do not check them.
+- **Failures.** A filter that fails at run time adds no records through its
+  grant. The server logs the policy name and the grant's index, never a
+  record value. In SQL, PostgreSQL cannot fail one branch of an `or`, so the
+  whole query fails with a `400` and returns no rows.
+- **Module.** `Axis.Policy` holds the compiled policies of each release and
+  their evaluation. Every endpoint and engine command calls it with a
+  resource and an action. It answers allow or deny, the read filters to add,
+  and the readable and writable field sets.
+- **Only the server decides.** Page metadata and navigation follow the
+  policies, but they only shape the UI. The server checks every request.
+
+#### Combining grants
+
+The grants of all the user's policies combine with OR. A record is readable
+when any `read` grant's filter is `true` for it. A filter that is `false`,
+`null` or fails adds no records through its grant. So a mistake in one
+policy can never widen access.
+
+Take the purchase request policies in
+[configuration](reference/configuration.md#roles-and-policies), and a user
+who holds both `employee` and `finance-reviewer`. The user's read filters on
+`PurchaseRequest` are `requester == currentUser()` and
+`status == 'submitted'`:
+
+| Request | `requester == currentUser()` | `status == 'submitted'` | Result |
+| --- | --- | --- | --- |
+| Their own draft | `true` | `false` | Readable |
+| Someone else's submitted request | `false` | `true` | Readable |
+| Someone else's draft | `false` | `false` | `404` |
+
+The `false` filters add nothing. Someone else's draft matches neither
+filter, so it does not exist for them.
+
+Equality is [null-safe](reference/expressions.md#null-semantics), so a
+department manager's filter `department.manager == currentUser()` is
+`false`, not `null`, for a request whose department has no manager. That
+grant adds nothing for the request.
+
+A `null` filter adds nothing either. Suppose a policy granted `read` with the
+filter `submittedAt >= dateTime('2026-01-01T00:00:00Z')`. A draft has no
+`submittedAt`, so the filter is `null` for it, and that grant gives no access
+to the draft. Only another grant can make it readable.
 
 ### Development test users
 

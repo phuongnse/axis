@@ -218,9 +218,31 @@ The endpoint is read-only, and only `GET` is routed. `{app}` is the name of an
 active release, and `{dataSource}` a data source in that release. Both match
 ignoring letter case, as in the record API.
 
-The endpoint has no authorization yet. Policy record filters are added to
-every data source query from M4 (see
-[Authentication and authorization](../architecture.md#authentication-and-authorization)).
+### Authorization
+
+Everything in this section is *(planned for M4)*. It follows
+[Authorization](../architecture.md#authorization). Until then the endpoint is
+open.
+
+- **Grants.** The user needs a `read` grant on the data source and a `read`
+  grant on its root entity, otherwise `403`.
+- **Record filters.** The root entity's read filters are combined with OR and
+  added to the data source's own `filter` with AND, in SQL, before any
+  grouping. So rows, groups, measures and `totalCount` cover only the
+  records the user may read.
+- **Fields.** Every projected field must be one the user may read, otherwise
+  the whole data source is a `403`. This covers a field that a measure
+  aggregates, and the field a path through `reference` fields ends at, such
+  as `name` in `department.name`. There are no partial rows, so authors make
+  one data source per audience.
+- **Joined targets.** The record filters of a target that a path joins do not
+  apply. A label in `labels` shows when the user may read the target's display
+  field, as for the record API's [labels](record-api.md#record-shape).
+- **Limit.** The all-or-nothing rule covers only projected and aggregated
+  fields. A data source `filter` or a parameter can still compare a field the
+  user may not read. A parameter can then probe that field's value, by
+  checking which rows come back. Authors keep such fields out of the filters
+  of data sources that users without access to them can read.
 
 ## Query parameters
 
@@ -329,8 +351,15 @@ Every error is problem details (`application/problem+json`). The titles are
 fixed and never contain text from the request.
 
 A request is checked in this order, and the first failure is the response:
-the path, then the query, then the database.
+the path, then the query, then the database. From M4 *(planned)*, the session
+comes before the path, and the grants and the readable fields come between
+the path and the query.
 
+- **`401`** *(planned for M4)*. A request without a session, or with a
+  session from another tenant.
+- **`403`** *(planned for M4)*. The user has no `read` grant on the data
+  source or on its root entity, or may not read one of its projected or
+  aggregated fields. See [Authorization](#authorization).
 - **`404`.** An unknown application, an application with no active release
   and an unknown data source. The path is resolved before the query is
   checked, so a path that names nothing is a 404 whatever its query.
@@ -341,7 +370,9 @@ the path, then the query, then the database.
 - **`400` for the database.** A database data exception while evaluating the
   filter, such as an integer overflow or a date out of range from `addDays`.
   The title is fixed, and the response holds no SQL. Any other database
-  error is a `500`.
+  error is a `500`. From M4 *(planned)*, a run-time failure in a policy read
+  filter is the same `400`, and no rows are returned. PostgreSQL cannot fail
+  one branch of an `or`, so the whole query fails closed.
 - **`500`.** An unexpected error is caught by the exception handler. The
   response has no exception type, message or stack trace.
 
