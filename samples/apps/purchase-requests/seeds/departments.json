@@ -4,9 +4,10 @@
   "name": "Departments",
   "formatVersion": 1,
   "entity": "Department",
+  "sync": true,
   "records": [
-    { "id": "c6a80cfd-75d2-4847-8cc0-f603c2af74fa", "values": { "code": "FIN", "name": "Finance" } },
-    { "id": "15d5bba1-eaf1-431b-9001-e1e3ade50979", "values": { "code": "ENG", "name": "Engineering" } },
-    { "id": "2cec287b-4f8a-4ac4-a38c-08214a1846ae", "values": { "code": "OPS", "name": "Operations" } }
+    { "id": "c6a80cfd-75d2-4847-8cc0-f603c2af74fa", "values": { "code": "FIN", "name": "Finance", "manager": "dung" } },
+    { "id": "15d5bba1-eaf1-431b-9001-e1e3ade50979", "values": { "code": "ENG", "name": "Engineering", "manager": "binh" } },
+    { "id": "2cec287b-4f8a-4ac4-a38c-08214a1846ae", "values": { "code": "OPS", "name": "Operations", "manager": "chau" } }
   ]
 }

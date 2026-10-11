@@ -1,0 +1,9 @@
+{
+  "id": "313225f1-c69f-41bc-b746-12d91f127c39",
+  "kind": "rule",
+  "name": "FinanceThreshold",
+  "formatVersion": 1,
+  "parameters": [],
+  "resultType": "decimal",
+  "expression": "10000"
+}

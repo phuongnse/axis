@@ -43,33 +43,35 @@ what they can see, see
 
 ## Resource shape
 
-The purchase request approval needs one rule and one process. The finance
-threshold is a `rule`, so it is configured, not hard-coded:
+The purchase request approval needs one rule and one process. The purchase
+request sample in `samples/apps/purchase-requests/` holds both. The finance
+threshold is a `rule` with no parameters, so it is configured, not hard-coded:
 
 ```json
 {
-  "id": "c527e0a8-2df0-4c8c-9d5b-190692edb970",
+  "id": "313225f1-c69f-41bc-b746-12d91f127c39",
   "kind": "rule",
-  "name": "NeedsFinanceReview",
+  "name": "FinanceThreshold",
   "formatVersion": 1,
-  "parameters": [{ "name": "total", "type": "decimal" }],
-  "resultType": "boolean",
-  "expression": "total >= 10000"
+  "parameters": [],
+  "resultType": "decimal",
+  "expression": "10000"
 }
 ```
 
-The process submits the request, asks the manager, asks finance at or above
-the threshold, and ends approved, returned or rejected:
+The process submits the request and records when, asks the department
+manager, asks a finance reviewer at or above the threshold, and ends
+approved, returned or rejected:
 
 ```json
 {
-  "id": "2fd8ef90-f17e-437a-8cbd-ae1135e12f68",
+  "id": "4b60c03e-02d0-4329-80c6-75f972190399",
   "kind": "process",
   "name": "PurchaseRequestApproval",
   "formatVersion": 1,
   "entity": "PurchaseRequest",
   "startCondition": {
-    "expression": "status is null or status in ('draft', 'returned')",
+    "expression": "status in ('draft', 'returned') and totalAmount is not null",
     "message": { "textKey": "purchaseRequest.cannotSubmit" }
   },
   "start": "submit",
@@ -78,7 +80,7 @@ the threshold, and ends approved, returned or rejected:
       "name": "submit",
       "type": "operation",
       "operation": "updateRecord",
-      "set": { "status": "'submitted'" },
+      "set": { "status": "'submitted'", "submittedAt": "now()" },
       "next": "managerApproval"
     },
     {
@@ -97,14 +99,14 @@ the threshold, and ends approved, returned or rejected:
     {
       "name": "financeCheck",
       "type": "decision",
-      "branches": [{ "when": "NeedsFinanceReview(totalAmount)", "next": "financeApproval" }],
+      "branches": [{ "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
       "otherwise": "markApproved"
     },
     {
       "name": "financeApproval",
       "type": "task",
       "label": { "textKey": "purchaseRequest.financeApproval" },
-      "assignee": { "role": "finance" },
+      "assignee": { "role": "finance-reviewer" },
       "form": "PurchaseRequestReview",
       "dueIn": "P3D",
       "outcomes": [

@@ -4,5 +4,13 @@
   "name": "PurchaseRequestForm",
   "formatVersion": 1,
   "title": { "textKey": "pages.purchaseRequestForm.title" },
-  "widgets": [{ "type": "form", "entity": "PurchaseRequest" }]
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "PurchaseRequest",
+      "actions": [
+        { "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }
+      ]
+    }
+  ]
 }
