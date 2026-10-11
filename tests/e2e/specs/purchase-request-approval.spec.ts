@@ -1,17 +1,13 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { useSession } from '../sessions'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
 // it creates. They use Operations, whose manager is chau, so that the per-department test keeps the
 // Engineering total fixed.
 const appPath = '/api/apps/PurchaseRequests'
 const recordsPath = `${appPath}/entities/PurchaseRequest/records`
-
-// The page's request context shares its cookies, so this signs the browser in.
-async function signIn(page: Page, id: string) {
-  expect((await page.request.post('/api/test-users/sign-in', { data: { id }, headers: csrfHeaders })).ok()).toBe(true)
-}
 
 /** The id of the seeded department named `name`, read from the record API. */
 async function departmentId(page: Page, name: string) {
@@ -135,11 +131,11 @@ async function expectHistory(page: Page, deciders: string[]) {
 test('a request below the threshold is approved by the department manager from My tasks, with a comment', async ({
   page,
 }) => {
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   const { title, id } = await createRequest(page, 'Approve small', 500)
   await submit(page, id, title)
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   const comment = `Fine ${Date.now()}`
   await decide(page, title, 'Manager approval', 'Approve', comment)
 
@@ -151,17 +147,17 @@ test('a request below the threshold is approved by the department manager from M
 test('a request at the threshold needs the finance reviewer after the manager before it is approved', async ({
   page,
 }) => {
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   const { title, id } = await createRequest(page, 'Approve large', 10000)
   await submit(page, id, title)
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   await decide(page, title, 'Manager approval', 'Approve')
   const read = await page.request.get(`${recordsPath}/${id}`)
   expect(read.ok()).toBe(true)
   expect(((await read.json()) as { values: { status: string } }).values.status).toBe('submitted')
 
-  await signIn(page, 'dung')
+  await useSession(page, 'dung')
   await decide(page, title, 'Finance approval', 'Approve')
 
   await expectStatus(page, id, 'approved')
@@ -169,16 +165,16 @@ test('a request at the threshold needs the finance reviewer after the manager be
 })
 
 test('a returned request is edited and submitted again, and the manager then approves it', async ({ page }) => {
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   const { title, id } = await createRequest(page, 'Return', 500)
   await submit(page, id, title)
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   const comment = `Two desks, please ${Date.now()}`
   await decide(page, title, 'Manager approval', 'Return', comment)
   await expectStatus(page, id, 'returned')
 
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
   await page.getByLabel('Quantity 1', { exact: true }).fill('2')
@@ -186,7 +182,7 @@ test('a returned request is edited and submitted again, and the manager then app
   await page.getByRole('button', { name: 'Submit' }).click()
   await expect(page.getByTestId('form-started')).toBeVisible()
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   await decide(page, title, 'Manager approval', 'Approve')
 
   await expectStatus(page, id, 'approved')
@@ -199,15 +195,15 @@ test('a returned request is edited and submitted again, and the manager then app
 })
 
 test('a rejected request cannot be submitted again, and the manager gets no new task', async ({ page }) => {
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   const { title, id } = await createRequest(page, 'Reject', 500)
   await submit(page, id, title)
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   await decide(page, title, 'Manager approval', 'Reject')
   await expectStatus(page, id, 'rejected')
 
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
   const start = page.waitForResponse((response) =>
@@ -221,7 +217,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   )
   await expect(page.getByTestId('form-started')).toHaveCount(0)
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   const tasks = await page.request.get(`${appPath}/tasks?pageSize=100`)
   expect(tasks.status()).toBe(200)
   const { items } = (await tasks.json()) as { items: { subject: { id: string } }[] }
@@ -229,11 +225,11 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
 })
 
 test('a request waiting for the manager is approved after the worker restarts', async ({ page }) => {
-  await signIn(page, 'anna')
+  await useSession(page, 'anna')
   const { title, id } = await createRequest(page, 'Restart', 500)
   await submit(page, id, title)
 
-  await signIn(page, 'chau')
+  await useSession(page, 'chau')
   await waitForTask(page, title)
   await restartWorker()
   await decide(page, title, 'Manager approval', 'Approve')

@@ -36,7 +36,11 @@ export default defineConfig({
     baseURL,
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Signs the sample users in and saves their sessions. Journeys load them with useSession.
+    { name: 'setup', testMatch: /.*\.setup\.ts/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'] },
+  ],
   webServer: {
     // Playwright runs the command through a shell, so it can redirect the output.
     command: serverLog ? `${serverCommand} >> ${quote(serverLog)} 2>&1` : serverCommand,

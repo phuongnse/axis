@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { useSession } from '../sessions'
 
 // Specs run in parallel against one database, so these tests rely only on the records they create,
 // and fewer than one hundred notes in all for the list check.
@@ -116,18 +117,17 @@ test('line items are added, edited and removed in the form, in light and dark mo
   expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5 }])
 })
 
-// Each test has its own browser context, so the sign-in cookie does not reach other specs.
+// Each test has its own browser context, so the saved session is loaded only into this test's context.
 test('after a signed-in user edits a note, its history shows the update first, in light and dark mode', async ({
   page,
 }) => {
   const run = `${Date.now()}-${test.info().retry}`
   const title = `History ${run}`
   const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
+  await useSession(page, 'binh')
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
-  await page.getByRole('banner').getByRole('button', { name: 'Test user' }).click()
-  await page.getByRole('menuitemradio', { name: 'Binh Engineering Manager' }).click()
   await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager' })).toBeVisible()
-  // The page's request context shares the sign-in cookie, so Binh creates the note.
+  // The page's request context shares the session cookie, so Binh creates the note.
   await createRecord(page.request, 'Note', { title })
   await page.reload()
 
