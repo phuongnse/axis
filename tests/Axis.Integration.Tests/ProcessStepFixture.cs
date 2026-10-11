@@ -53,6 +53,9 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public WorkItemRunner Runner =>
         (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
 
+    /// <summary>The connection string of the tenant database, for a test that builds its own worker hosts.</summary>
+    public string ConnectionString => _connectionString ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     public NpgsqlDataSource DataSource => _dataSource ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     public async ValueTask InitializeAsync()

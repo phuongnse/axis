@@ -24,6 +24,17 @@ public static class TaskQueries
             OR (assignee_kind = '{ProcessTasks.RoleAssignee}' AND assignee = ANY(@roles)))
         """;
 
+    /// <summary>Counts the open tasks of an application that a user may act on.</summary>
+    internal const string ListOpenCountSql = $"SELECT count(*) FROM axis.process_tasks WHERE {MayActWhere}";
+
+    /// <summary>Reads one page of the open tasks of an application that a user may act on.</summary>
+    internal const string ListOpenPageSql =
+        $"""
+        SELECT {Columns} FROM axis.process_tasks WHERE {MayActWhere}
+        ORDER BY due_at ASC NULLS LAST, created_at, id
+        LIMIT @limit OFFSET @offset
+        """;
+
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> open tasks of the
     /// application that <paramref name="userId"/> may act on, whatever release their instance is
@@ -46,19 +57,13 @@ public static class TaskQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
         long totalCount;
-        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.process_tasks WHERE {MayActWhere}", connection))
+        await using (var count = new NpgsqlCommand(ListOpenCountSql, connection))
         {
             AddMayActParameters(count, applicationId, userId, roles);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        await using var command = new NpgsqlCommand(
-            $"""
-            SELECT {Columns} FROM axis.process_tasks WHERE {MayActWhere}
-            ORDER BY due_at ASC NULLS LAST, created_at, id
-            LIMIT @limit OFFSET @offset
-            """,
-            connection);
+        await using var command = new NpgsqlCommand(ListOpenPageSql, connection);
         AddMayActParameters(command, applicationId, userId, roles);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
@@ -120,7 +125,7 @@ public static class TaskQueries
         };
     }
 
-    private static void AddMayActParameters(NpgsqlCommand command, Guid applicationId, string userId, IReadOnlyCollection<string> roles)
+    internal static void AddMayActParameters(NpgsqlCommand command, Guid applicationId, string userId, IReadOnlyCollection<string> roles)
     {
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.Add(new NpgsqlParameter("user", NpgsqlDbType.Text) { Value = userId });

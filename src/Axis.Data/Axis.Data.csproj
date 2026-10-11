@@ -9,4 +9,8 @@
     <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Integration.Tests" />
+  </ItemGroup>
+
 </Project>
