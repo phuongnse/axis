@@ -436,9 +436,9 @@ Take the purchase request policies in
 [configuration](reference/configuration.md#roles-and-policies), and a user
 who holds both `employee` and `finance-reviewer`. The user's read filters on
 `PurchaseRequest` are `requester == currentUser()` and
-`status == 'submitted'`:
+`status in ('submitted', 'approved', 'returned', 'rejected')`:
 
-| Request | `requester == currentUser()` | `status == 'submitted'` | Result |
+| Request | `requester == currentUser()` | `status in ('submitted', 'approved', 'returned', 'rejected')` | Result |
 | --- | --- | --- | --- |
 | Their own draft | `true` | `false` | Readable |
 | Someone else's submitted request | `false` | `true` | Readable |

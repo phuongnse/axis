@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["finance-reviewer"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
     { "entity": "Department", "actions": ["read"] },
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },

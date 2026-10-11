@@ -20,7 +20,7 @@ public sealed class PageAccessTests(SampleAppFixture fixture) : IClassFixture<Sa
 
         var access = widget.GetProperty("access");
         Assert.Equal(["read", "create", "update"], Names(access.GetProperty("actions")));
-        var fields = Names(widget.GetProperty("entity").GetProperty("fields"), "name");
+        List<string?> fields = ["title", "department", "supplier", "currency", "lineItems", "status"];
         Assert.Equal(fields, Names(access.GetProperty("createFields")));
         Assert.Equal(fields, Names(access.GetProperty("updateFields")));
         var action = Assert.Single(widget.GetProperty("actions").EnumerateArray().ToList());

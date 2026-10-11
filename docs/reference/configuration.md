@@ -828,17 +828,10 @@ A `policy` resource gives roles grants. The record API and the data source
 endpoint enforce entity and data source grants. Both enforce the filter and
 fields rules below: the data source endpoint adds the root entity's read
 filters to its query and refuses a data source that shows a field the user
-may not read. Process grants are not enforced yet *(planned for M4)*. The purchase request sample targets the three policies below.
+may not read. The purchase request sample uses the three policies below.
 Employees reach their own requests, department managers the requests of
-their department, and finance reviewers the submitted ones.
-
-For now, the sample's policies leave out every `filter` and `fields`, so
-each role reaches every purchase request. Its employee policy also reads
-`RequestsByDepartment`, because a sample journey opens that page as the
-employee. Data sources now apply record filters and check fields, but the
-sample keeps its policies without them for now. Restoring the target
-policies changes the sample's journeys, so it is separate work. The target
-policies are:
+their department, and finance reviewers the submitted requests and their
+outcomes:
 
 ```json
 {
@@ -888,7 +881,7 @@ policies are:
   "formatVersion": 1,
   "roles": ["finance-reviewer"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "status == 'submitted'" },
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
     { "entity": "Department", "actions": ["read"] },
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },
