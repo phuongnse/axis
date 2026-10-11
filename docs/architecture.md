@@ -132,7 +132,24 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   hyphens;
 - a tenant has no hosts, or a host entry that is blank or only whitespace;
 - a tenant has no connection string, or one that is only whitespace;
-- the same host is listed under two tenants, compared ignoring letter case.
+- the same host is listed under two tenants, compared ignoring letter case;
+- *(planned for M5)* a binding has a `Kind` other than `url` or `secret`, or a
+  blank `Value`.
+
+*(planned for M5)* A tenant also holds its deployment bindings under
+`Bindings`, keyed by name. A release names a binding and never holds its
+value. The server and the worker both read this section, so both must hold
+the same bindings. A secret's `Value` comes from the environment, such as
+`Tenants__default__Bindings__PurchasingSystemToken__Value`. See
+[connectors and deployment bindings](reference/configuration.md#connectors-and-deployment-bindings)
+and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
+
+```json
+"Bindings": {
+  "PurchasingSystemUrl": { "Kind": "url", "Value": "https://purchasing.example.test/api" },
+  "PurchasingSystemToken": { "Kind": "secret", "Value": "<from environment>" }
+}
+```
 
 ### Request resolution
 
@@ -465,7 +482,8 @@ to the draft. Only another grant can make it readable.
   - the step history
   - audit records
   - the next work item
-  - outbox items *(planned for M5)*
+  - staged connector calls and their work items *(planned for M5)*
+  - outbox items for event delivery *(planned for M5)*
 
   A revision mismatch aborts the transaction.
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
@@ -473,7 +491,10 @@ to the draft. Only another grant can make it readable.
   built for work items.
 - **External operations.** These run outside the transaction, using the
   operation identity as their idempotency key. The result is recorded by a
-  following transaction.
+  following transaction. *(planned for M5)* A `callConnector` step stages its
+  call, the worker sends it with retries, and an unknown outcome is
+  reconciled through a lookup. See
+  [connector calls](reference/processes.md#connector-calls).
 - **History.** Every attempt, input, output, decision and error is recorded
   for inspection.
 

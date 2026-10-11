@@ -16,7 +16,8 @@ list the user's tasks, read one task and complete one are built. Completing
 a task resumes its `waiting` instance, see
 [Completing a task](#completing-a-task). A start and the task API follow the
 user's policies, see [Start endpoint](#start-endpoint) and
-[Policies on tasks](#task-api).
+[Policies on tasks](#task-api). Calls to external systems through a
+`callConnector` step are [planned for M5](#connector-calls).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -192,7 +193,9 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   that follows. The step writes the values with the record update rules, so
   computed fields are recomputed and validations run, in the step's
   transaction. A validation failure fails the step. Operations from extension
-  packages and external calls come in M5.
+  packages come in M5. *(planned for M5)* A second built-in operation,
+  `callConnector`, calls an external system outside the step's transaction,
+  see [Connector calls](#connector-calls).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
   `end` step has no `next`.
 
@@ -361,7 +364,7 @@ worker to run its steps.
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed. |
+| `waiting` | The instance waits for a human task to be completed, or for a connector call *(planned for M5)*, see [Connector calls](#connector-calls). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 
@@ -657,8 +660,10 @@ the next step as usual.
   that the token is still the worker's. When a lease expires, another worker
   can claim the item.
 - **Failure.** A failing step rolls back. A following transaction records the
-  error in the history and sets the instance to `failed`. Retry policies come
-  in M5, and operator retry in M7.
+  error in the history and sets the instance to `failed`. No step is retried.
+  *(planned for M5)* A `callConnector` step retries its call under its retry
+  policy, see [Connector calls](#connector-calls). Operator retry comes in
+  M7.
 - **Revision.** An instance's revision is a counter that starts at 1 and goes
   up each time the instance changes. A step changes the instance only at the
   revision it loaded.
@@ -743,6 +748,233 @@ the audit record `process.failed` with
 details `{ "step" }` and the actor `system`. It does nothing when the instance
 has changed since the step loaded it. No step is retried.
 
+## Connector calls
+
+*(planned for M5)* This section follows
+[D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
+None of it is built yet. A `callConnector` step calls one operation of a
+[connector](configuration.md#connectors-and-deployment-bindings), an external
+system such as the purchasing system. The call never runs inside a database
+transaction. The step stages it, the worker sends it later, and a separate
+transaction records the result. A stable operation identity lets every retry
+and every lookup ask about the same call, so a lost response never leads to a
+second purchase order.
+
+### Step shape
+
+After approval, the purchase request process creates a purchase order.
+`markApproved` names the new step as its `next`:
+
+```json
+{
+  "name": "markApproved",
+  "type": "operation",
+  "operation": "updateRecord",
+  "set": { "status": "'approved'" },
+  "next": "createPurchaseOrder"
+},
+{
+  "name": "createPurchaseOrder",
+  "type": "operation",
+  "operation": "callConnector",
+  "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" },
+  "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount" },
+  "output": { "orderNumber": "purchaseOrderNumber" },
+  "retry": { "attempts": 5, "backoff": "PT30S" },
+  "next": "done"
+}
+```
+
+The sample files do not change until the build issues add connectors.
+
+- `connector` names a connector and one of its operations.
+- `input` maps operation inputs to expressions. Each key is an input of the
+  operation. Each value is an expression over the subject record, with the
+  same scope as a decision's `when`.
+- `output` is optional. It maps operation outputs to subject fields. Each key
+  is an output of the operation, and each value names a field of the subject
+  record.
+- `retry` is optional.
+  - `attempts` counts the first attempt. It defaults to 3 and is at most 10.
+  - `backoff` is an ISO 8601 duration, in the same form as a task's `dueIn`.
+    It is the delay before the second attempt, and it doubles each attempt,
+    up to 1 hour. It defaults to `PT30S`.
+- `next` names the step taken when the call succeeds.
+
+The compiler reports these as compile errors. Their codes come with the
+build issue.
+
+- The connector and its operation exist.
+- Each `input` key names an input of the operation, at most once. Every
+  required input has a key.
+- Each `input` expression gives the input's type.
+- Each `output` key names an output of the operation, at most once.
+- Each `output` value names a field of the subject entity that an
+  `updateRecord` `set` may name. The output's type fits the field.
+- `attempts` is from 1 to 10, and `backoff` is a valid duration.
+- A `callConnector` step has `connector`, `input` and `next`, and no `set`.
+  An `updateRecord` step has none of `connector`, `input`, `output` and
+  `retry`.
+
+### Staging and the call
+
+**The step's transaction stages the call.** It runs as other steps do, see
+[Running a step](#running-a-step), and writes these together:
+
+1. It evaluates each `input` expression on the subject record. A required
+   input that gives `null` fails the step.
+2. It inserts the call into `axis.connector_calls` as `pending`, with the
+   evaluated input. The row's id is the call's operation identity, a
+   version 7 UUID. A unique index on instance and step lets a step stage only
+   one call.
+3. It sets the instance to `waiting` on the step.
+4. It writes the step's history row, with output
+   `{ "state": "waiting", "operationId" }`.
+5. It inserts a work item of kind `connector.call` for the call.
+
+While its call is pending, retrying or unknown, the instance stays `waiting`.
+So a second start for the same record is blocked, as with an open task.
+
+**Each attempt.** A worker that claims the `connector.call` item does this:
+
+1. **Mark.** A short transaction marks the call `sending` and counts the
+   attempt. It extends the item's lease to the connector's `timeout` plus
+   `Worker:LeaseDuration`, so no other worker claims the item while the call
+   runs.
+2. **Bindings.** The worker reads the connector's bindings from its host
+   configuration. A missing binding, or an `http` URL outside Development,
+   means the request is never sent.
+3. **Send.** The worker sends the request outside any transaction.
+   - The body is the stored input, as JSON. A `GET` sends no body.
+   - With `idempotency`, the request carries the header
+     `<idempotency>: <operationId>`, such as `Idempotency-Key: 0192f5c3-…`.
+   - Redirects are not followed, and `Retry-After` is ignored.
+4. **Record.** An outcome transaction records the result. Its commit checks
+   the claim token, and it needs the instance still `waiting` on the step at
+   its revision. Otherwise it writes nothing else, and the item is deleted.
+
+A worker can crash after it sends and before it records. Its lease then
+expires, and the next worker finds the call still `sending`. That attempt's
+outcome counts as unknown, see [Call outcomes](#call-outcomes). The worker
+never resends blind.
+
+**A successful call settles.** The outcome transaction does this:
+
+1. It writes the output fields to the subject record with the record update
+   rules, as `updateRecord` does.
+2. It sets the call to `succeeded` and clears its stored input.
+3. It sets the instance to `running` on `next`, with a new revision.
+4. It writes the history row of the step, at the revision the instance
+   waited at. Its output is `{ "operationId", "outcome", "next" }`, plus
+   `subjectVersion` when it wrote output fields.
+5. It writes `record.updated` when it wrote output fields, with the same
+   details as an `updateRecord` step. It writes `connector.called` with the
+   details
+   `{ "connector", "operation", "operationId", "attempts", "outcome", "lastStatus" }`.
+   Both have the actor `system`.
+6. It inserts the work item of the next step and deletes the call's item.
+
+**A retry** sets the call back to `pending` and keeps the item. The item's
+`due_at` is now plus `backoff`·2^(n−1) after attempt n, capped at 1 hour.
+
+**A failed call settles** too. The call becomes `failed` and its stored input
+is cleared. The instance becomes `failed`, with the error in a history row.
+The transaction writes `connector.called` and `process.failed`.
+
+No request or response body is ever stored. The stored input lives only on
+the call row until the call settles. It never appears in history, audit
+records or logs.
+
+### Call outcomes
+
+The platform decides which outcomes are retried. A retry always sends the
+stored input again under the same operation identity.
+
+| Outcome of an attempt | Class | Retried | When attempts run out |
+| --- | --- | --- | --- |
+| `2xx` with a body that fits the output | Succeeded | Not needed | Not needed |
+| `2xx` with a body that does not fit the output | Unknown | Never resent. It goes straight to [reconciliation](#reconciliation), with or without `idempotency` | Does not apply |
+| `3xx` | Failed | No | The instance becomes `failed` at once |
+| `4xx` other than `408` and `429` | Failed | No | The instance becomes `failed` at once |
+| Never sent: DNS failure, connection refused, TLS failure, missing binding | Retryable | Yes | The instance becomes `failed` |
+| `408`, `429` and `503` | Retryable | Yes | The instance becomes `failed` |
+| Timeout, a reset after the request was sent, another `5xx`, or a call found still `sending` | Unknown | With the same key, only when the connector declares `idempotency`. Without it, the call goes to [reconciliation](#reconciliation) | The call goes to [reconciliation](#reconciliation) |
+
+A body fits the output when it is a JSON object with a value of the right type
+for each output, and a value for each required output.
+
+### Reconciliation
+
+An unknown outcome means the system may have acted. The call becomes
+`unknown`, and the worker asks the system what happened. It calls the
+operation's `lookup` with the operation identity as `{idempotencyKey}`.
+
+- **Found.** The lookup answers `200` with a body that fits the output. The
+  call settles as succeeded with that output, as after a successful attempt.
+  Nothing is sent again.
+- **Not found.** The lookup answers `404`, so the system never acted. The
+  call goes back to `pending` and is retried with the same identity. That
+  counts as an attempt. When no attempts are left, the instance becomes
+  `failed`.
+- **Failed lookup.** Any other answer, including a `200` whose body does not
+  fit, and a lookup that is never sent. The call stays `unknown`, and the
+  lookup is tried again. The delay starts at `backoff` and doubles each time,
+  up to 1 hour, with no limit.
+- **No lookup.** The operation declares none. The call stays `unknown`, and
+  the instance stays `waiting`. A history row with output
+  `{ "operationId", "outcome": "unknown" }` makes it visible. An operator
+  resolves it in M7.
+
+An unknown outcome is never retried without the idempotency key or a lookup.
+
+A lookup can only find a call whose key reached the system. The key goes in
+the `idempotency` header, or in an operation path that holds
+`{idempotencyKey}`.
+
+**A late original request.** A lookup can answer not found while the original
+request is still on its way. The call is then sent again. Only the system's
+idempotency key stops the late original from creating a second order. A
+connector without `idempotency` depends on its lookup being correct.
+
+### Lost response
+
+The purchasing system creates the order, but its response is lost. The
+request still ends with exactly one purchase order.
+
+1. The finance reviewer approves request `PR-2026-00042`. `markApproved` runs
+   and queues `createPurchaseOrder`.
+2. The step's transaction evaluates the input, stages call C as `pending`,
+   sets the instance `waiting` and queues a `connector.call` item.
+3. Worker A claims the item. It marks C `sending` with attempt 1.
+4. Worker A sends `POST /purchase-orders` with `Idempotency-Key: C`.
+5. The purchasing system creates `PO-2026-0001` under key C. Its response is
+   lost, and worker A's request times out after `PT30S`.
+6. The timeout is an unknown outcome. The connector declares `idempotency`
+   and 4 of 5 attempts are left, so C goes back to `pending`. The item is due
+   again after `PT30S`.
+7. Worker B claims the item, marks C `sending` with attempt 2, and sends the
+   same body with `Idempotency-Key: C`.
+8. The purchasing system knows key C. It returns the existing
+   `PO-2026-0001` and creates no new order.
+9. The outcome transaction settles C as succeeded. It writes
+   `purchaseOrderNumber = PO-2026-0001`, `record.updated`, and one
+   `connector.called` with `attempts` 2. The instance moves on to `done`.
+10. `done` completes the instance.
+
+The purchasing system holds one order, and the request records its number.
+
+- **Crash after sending.** Worker A crashes after step 5, before it records
+  anything. C is still `sending` when its lease expires. The worker that
+  claims the item next counts attempt 1 as unknown, and the steps go on from
+  step 6.
+- **No `idempotency`, with a lookup.** Suppose the connector declares no
+  `idempotency`, and the create operation's path holds the key instead, such
+  as `/purchase-orders/{idempotencyKey}`. The timeout in step 5 is unknown,
+  and C is not sent again. The worker calls the lookup for key C, and the
+  system answers `200` with `PO-2026-0001`. C settles as succeeded, as in step 9,
+  with no second `POST`. Had the lookup answered `404`, C would be sent again
+  as attempt 2.
+
 ## Worker settings
 
 The worker polls every tenant database in the `Tenants` section of its
@@ -785,7 +1017,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. *(planned for M5)* `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call, and `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -795,7 +1027,10 @@ database, with history in `axis.__processes_migrations` (see
   `claim_token` of its current claim. A step's item also has the
   `process_instance_id` of its instance. A worker claims only items of the
   tenant it polls and only kinds it has a handler for. Lease times use the
-  database clock. Completed and failed items are deleted.
+  database clock. Completed and failed items are deleted. *(planned for M5)*
+  A new kind, `connector.call`, sends or reconciles one connector call. Its
+  item also has the `connector_call_id` of the call, and its `due_at` gives
+  the backoff. See [Connector calls](#connector-calls).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
 - `axis.process_tasks`: one row per task. Times use the database clock. An
@@ -821,6 +1056,26 @@ database, with history in `axis.__processes_migrations` (see
   | `completed_by` | `text`, null | The user who completed the task. Null while it is `open` |
   | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open` |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
+- `axis.connector_calls` *(planned for M5)*: one row per staged connector
+  call, see [Connector calls](#connector-calls). A unique index on
+  (`process_instance_id`, `step`) lets a step stage only one call. Times use
+  the database clock. There is no column for a request or response body.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID, the call's operation identity. Every attempt and every lookup sends it as the idempotency key |
+  | `process_instance_id` | `uuid` | The instance |
+  | `step` | `text` | The declared name of the `callConnector` step |
+  | `release_id` | `uuid` | The release the instance is pinned to |
+  | `connector` | `text` | The connector's name |
+  | `operation` | `text` | The operation's name |
+  | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed` |
+  | `attempts` | `integer` | The attempts made so far, the first one included |
+  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles. Never copied to history, audit records or logs |
+  | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
+  | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
+  | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
+  | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
 
 ## Limits in M3
 

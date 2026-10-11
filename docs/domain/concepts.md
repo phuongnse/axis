@@ -72,7 +72,7 @@ Later constraints:
 | --- | --- | --- |
 | **Expression** | A typed, side-effect-free formula in Axis's [expression language](../reference/expressions.md), checked at compile time. | M2 |
 | **Rule** | A named, reusable expression with declared typed parameters and a result type. Validations, data source filters, process conditions and policy filters call rules. | M2 |
-| **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. M3 has one built-in operation, `updateRecord`, which sets fields of the subject record inside the step's transaction. Declared capabilities and idempotency, external calls and operations from extension packages come in M5. See [processes](../reference/processes.md#steps). | M3 (basic), M5 |
+| **Operation** | A typed unit of work with declared inputs, outputs, capabilities and idempotency, for example "create record", "send email" or "call the purchasing system". Operations are built in or come from extension packages. M3 has one built-in operation, `updateRecord`, which sets fields of the subject record inside the step's transaction. M5 plans a second built-in operation, `callConnector`, which calls one operation of a connector outside the step's transaction, with a stable operation identity as its idempotency key. See [connector calls](../reference/processes.md#connector-calls). Declared capabilities and operations from extension packages also come in M5. See [processes](../reference/processes.md#steps). | M3 (basic), M5 |
 | **Extension package** | Versioned C# code, and later React components, that adds operations and widgets under declared capabilities. | M5 |
 
 ## Processes
@@ -82,7 +82,7 @@ Later constraints:
 | **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. In M3 a process names one entity, its subject, and runs for one record of it. | M3 |
 | **Process instance** | One run of a process. It is pinned to its release and records every step occurrence with its input, output, decision and error. | M3 |
 | **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. In M3 the assignee is a user or a role, and the due date is only shown. Queues and escalation come later. See [processes](../reference/processes.md#task-api). | M3 |
-| **Retry policy** | Declared per operation step: attempts, backoff, which errors are retryable, and what happens when attempts run out (alert, manual retry, compensation). | M5 |
+| **Retry policy** | In M5, a `callConnector` step declares its attempts and its backoff. The platform fixes which errors are retried, and the instance fails when attempts run out. Operator retry comes in M7, and alerts and compensation later. See [call outcomes](../reference/processes.md#call-outcomes). | M5 |
 
 **Step kinds:**
 
@@ -102,7 +102,7 @@ See [processes](../reference/processes.md#steps).
 | --- | --- | --- |
 | **Trigger** | Starts a process or operation from something that happened. There are four kinds, listed below. | M5 |
 | **Event** | A named, typed business event raised by a process or the platform. Subscribers are either synchronous (same transaction) or asynchronous (durable delivery). | M5 |
-| **Connector** | Configuration for calling an external system: endpoint binding, secret reference, timeouts, idempotency and reconciliation contract. | M5 |
+| **Connector** | A `connector` resource for calling an external system. It has a base URL from a `url` binding, auth from a `secret` binding, a timeout and named operations. It can name the idempotency header the system accepts, and each operation can name a lookup that finds an earlier call by its key. See [connectors](../reference/configuration.md#connectors-and-deployment-bindings). | M5 |
 
 **Trigger kinds:**
 
@@ -133,6 +133,6 @@ See [processes](../reference/processes.md#steps).
 | **Role** | A declared `role` resource with a name and a label. A task assigned to a role, and each role a policy names, must name a declared role. Users hold roles through the identity provider's roles claim, and a claim value that names no declared role is ignored. Policies give roles their grants. Every application endpoint matches the claim values. See [roles and policies](../reference/configuration.md#roles-and-policies), and [authorization](../architecture.md#authorization). | M4 |
 | **Policy** | A `policy` resource that gives one or more roles grants on entities, data sources and processes. An entity grant may have a record filter and a list of fields. The grants of all the user's policies combine with OR, and default-deny applies. The resource and its compile checks are built. The record API, the data source endpoint and the process start endpoint enforce its grants, and the record API and the data source endpoint also enforce its record filters and field lists. Site navigation and page metadata follow a signed-in user's grants, and page metadata leaves out the fields the user may not read. See [roles and policies](../reference/configuration.md#roles-and-policies), and [authorization](../architecture.md#authorization). | M4 |
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
-| **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. | M5 |
+| **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. M5 has two kinds, `url` and `secret`. Their values are set per tenant in host configuration until the tenant directory in M9. See [deployment bindings](../reference/configuration.md#deployment-bindings). | M5 |
 | **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. It also holds the actor's display name at the time of the action. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
 | **Test scenario** | A configuration-level test that runs against a temporary tenant: it seeds data, runs actions or processes as given users and asserts the outcomes. | M6 |
