@@ -11,7 +11,7 @@ namespace Axis.Processes.Work;
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "It is the queue of ready work items.")]
 public static class WorkItemQueue
 {
-    private const string ClaimSql = """
+    internal const string ClaimSql = """
         UPDATE axis.process_work_items w
         SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
         FROM (SELECT id FROM axis.process_work_items

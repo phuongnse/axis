@@ -19,6 +19,18 @@ public static class AuditRecords
 
     private const string RecordFilter = """WHERE "entity_id" = @entity AND "record_id" = @record""";
 
+    /// <summary>Counts the audit records of one record.</summary>
+    internal const string HistoryCountSql = $"""SELECT count(*) FROM "axis"."audit_records" {RecordFilter}""";
+
+    /// <summary>Reads one page of the audit records of one record, newest first.</summary>
+    internal const string HistoryPageSql =
+        $"""
+        SELECT "id", "occurred_at", "actor", "action", "process_instance_id", "details"::text
+        FROM "axis"."audit_records" {RecordFilter}
+        ORDER BY "occurred_at" DESC, "id" DESC
+        LIMIT @limit OFFSET @offset
+        """;
+
     /// <summary>
     /// Appends <paramref name="entry"/> in <paramref name="transaction"/>, so the audit record
     /// commits or rolls back with the caller's transaction and never on its own. Its time is the
@@ -62,21 +74,14 @@ public static class AuditRecords
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
         long totalCount;
-        await using (var count = new NpgsqlCommand($"""SELECT count(*) FROM "axis"."audit_records" {RecordFilter}""", connection))
+        await using (var count = new NpgsqlCommand(HistoryCountSql, connection))
         {
             count.Parameters.AddWithValue("entity", entityId);
             count.Parameters.AddWithValue("record", recordId);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        await using var command = new NpgsqlCommand(
-            $"""
-            SELECT "id", "occurred_at", "actor", "action", "process_instance_id", "details"::text
-            FROM "axis"."audit_records" {RecordFilter}
-            ORDER BY "occurred_at" DESC, "id" DESC
-            LIMIT @limit OFFSET @offset
-            """,
-            connection);
+        await using var command = new NpgsqlCommand(HistoryPageSql, connection);
         command.Parameters.AddWithValue("entity", entityId);
         command.Parameters.AddWithValue("record", recordId);
         command.Parameters.AddWithValue("limit", pageSize);
