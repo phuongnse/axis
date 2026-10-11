@@ -365,7 +365,9 @@ sign-in arrives in M4.
 when the task's assignee is a role and the user holds it. In M3 a user's
 roles are the role names of their test user. This is checked on
 every request, at the moment of action. Policies in M4 add to this check and
-never replace it.
+never replace it. From M4 *(planned)*, the user and their roles come from
+the session
+([D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)).
 
 **List my tasks.** `GET /api/apps/{app}/tasks?page=&pageSize=` lists the
 `open` tasks the user may act on, whatever release their instance is pinned

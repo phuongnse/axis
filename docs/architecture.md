@@ -161,11 +161,12 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 
 ## Authentication and authorization
 
-- **Authentication (D9, planned for M4).**
+- **Authentication (D9, D23, planned for M4).**
   - The server is the OIDC confidential client.
   - The browser gets a secure, HttpOnly, SameSite cookie session.
   - API calls from the SPA are protected against CSRF.
   - Tests and local development use Keycloak in a container.
+  - See [Sign-in and the session](#sign-in-and-the-session).
 - **Authorization (D12, planned for M4).**
   - Every API endpoint and engine command calls the policy module with an
     explicit resource and action.
@@ -173,9 +174,113 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - Field policies remove or mask fields from results and reject writes to
     protected fields.
 - **Before M4.** There is no authentication yet: every endpoint is open.
-  Development test users stand in for sign-in, as described below (D21).
+  Development test users stand in for sign-in, as described below (D21),
+  until [D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed)
+  replaces them.
+
+### Sign-in and the session
+
+Everything in this section is *(planned for M4)*. It follows
+[D23](decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed).
+
+- **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
+  server is the confidential client: it exchanges the code for tokens, reads
+  the claims and keeps no token after that (D9).
+- **Tenant settings.** Each tenant in the [`Tenants` section](#tenant-configuration)
+  has an `Oidc` block. `Claims` names the claims that give the user id, the
+  display name and the roles. Each claim name is optional, and the defaults
+  are `sub`, `name` and `roles`.
+
+  ```json
+  "default": {
+    "Hosts": [ "localhost" ],
+    "ConnectionString": "Host=...",
+    "Oidc": {
+      "Authority": "http://localhost:8080/realms/axis",
+      "ClientId": "axis",
+      "ClientSecret": "...",
+      "Claims": { "UserId": "sub", "DisplayName": "name", "Roles": "roles" }
+    }
+  }
+  ```
+
+- **Startup checks.** The server's startup fails, naming every problem as
+  for the tenant configuration, when a tenant has no `Oidc` block, or when
+  its `Authority`, `ClientId` or `ClientSecret` is missing or blank. Only the
+  server reads and checks the block. The worker reads the same `Tenants`
+  section but signs nobody in, so it ignores `Oidc`.
+- **Secret.** The client secret comes from the environment, such as
+  `Tenants__default__Oidc__ClientSecret`. It is never in a committed file,
+  except the development fixtures, which are never valid outside
+  `Development` and tests.
+- **Endpoints.**
+  - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity
+    provider. `returnUrl` must start with a single `/`. A value that does
+    not, or that starts with `//` or `/\`, is a `400` problem details
+    response. A missing `returnUrl` means `/`.
+  - `GET /api/auth/callback` is where the identity provider returns. It
+    creates the session and redirects to `returnUrl`. A callback that fails
+    creates no session.
+  - `POST /api/auth/sign-out` ends the session and returns `200` with
+    `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
+    identity provider returns it to `/`. The SPA calls sign-out with `fetch`
+    so it can send the CSRF header, and a `fetch` call cannot follow a
+    redirect to the identity provider as a page.
+- **Session.** One HttpOnly, Secure, SameSite=Lax cookie.
+  - It holds the user id, the display name, the roles and the tenant id.
+  - It holds no access, refresh or ID token, and no token reaches the
+    browser.
+  - It ends 8 hours after sign-in, or after 1 hour without requests,
+    whichever comes first.
+- **Tenant binding.** A session whose tenant id differs from the tenant
+  [resolved from the host](#request-resolution) counts as no session. So a
+  cookie taken to another tenant's host signs nobody in there.
+- **Roles.** The roles come from the roles claim at sign-in and are kept in
+  the session. A role change at the identity provider applies at the next
+  sign-in.
+- **Current user.** `GET /api/me` keeps its shape,
+  `{ "id", "displayName", "roles" }`, and reads the session. Without a
+  session it is a `401`, as today.
+- **Sign-in needed.** Without a session, these answer a `401` problem
+  details response:
+  - every route under `/api/apps/{app}/`: records, record history, data
+    source rows, process start and tasks. The session is checked before any
+    `404`, so a caller without a session cannot learn which applications or
+    records exist;
+  - `GET /api/sites`, `GET /api/sites/{path}`,
+    `GET /api/sites/{path}/texts/{locale}` and
+    `GET /api/sites/{path}/pages/{page}`. Site texts belong to an
+    application, so they count as application content;
+  - `GET /api/me`.
+
+  These stay open, because the shell needs them before anyone signs in:
+  `GET /api/site`, `GET /api/texts/{locale}`, `GET /api/auth/sign-in`,
+  `GET /api/auth/callback`, every path under `/health` and the SPA's static
+  files. `POST /api/auth/sign-out` needs the CSRF header but no
+  session.
+- **CSRF.** Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must carry
+  `X-Axis-Csrf: 1`, otherwise `403`. The CSRF header is checked first, then
+  the session. See the record API's
+  [CSRF header rule](reference/record-api.md#create-update-and-delete).
+- **Tests.** Integration tests sign in through a test authentication scheme
+  that only test hosts register. Tests of sign-in itself start the
+  development realm in Keycloak through Testcontainers. E2E journeys sign in
+  through Keycloak.
+- **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
+  Keycloak with an imported development realm, `axis`.
+  - It holds the purchase request users with the ids they have today as
+    test users: `anna` the employee, `binh` and `chau` the department
+    managers, and `dung` the finance reviewer. Seed data and E2E journeys
+    already name these ids.
+  - Every user has the same development-only password.
+  - The realm maps each user's roles to the `roles` claim.
 
 ### Development test users
+
+M4 removes `TestUsers`, their endpoints and the SPA picker (D23), and local
+sign-in then goes through Keycloak. See
+[Sign-in and the session](#sign-in-and-the-session). Until then, this section
+holds.
 
 Test users stand in for authentication until OIDC replaces them in M4 (D9).
 They exist only in development and tests, never in Production.
