@@ -395,6 +395,8 @@ record history are built.
   `TestUsers` is set in any other environment, startup fails. OIDC replaces
   them in M4 (D9). See
   [architecture](architecture.md#development-test-users).
+  [D23](#d23-sign-in-through-oidc-and-the-bff-session--agreed) replaces this
+  bullet and the test-user part of **Current user** in M4.
 - **Current user:** `GET /api/me` returns the signed-in test user, or `401`
   when there is none. Before M4, record writes stay open with no signed-in
   user, and the actor is then `anonymous`.
@@ -465,3 +467,63 @@ rule has no milestone. These wait for it:
 One value per transaction keeps every expression in a step consistent with
 the step's own record. An instant needs no time zone, so `now()` can come
 first, and everything that does need one waits for a single rule.
+
+## D23. Sign-in through OIDC and the BFF session — Agreed
+
+M4 replaces the test users with real sign-in through each tenant's identity
+provider. Everything below is *(planned for M4)*. See
+[architecture](architecture.md#sign-in-and-the-session) for the details.
+
+- **Flow:** OIDC authorization code flow with PKCE. The server is the
+  confidential client (D9).
+- **Identity provider per tenant:** each tenant in the `Tenants` section has
+  an `Oidc` block with an authority, a client id and a client secret.
+  - It names the claims that give the user id (default `sub`), the display
+    name (default `name`) and the roles (default `roles`).
+  - Startup fails, naming each problem, when a tenant has no `Oidc` block or
+    an incomplete one.
+  - The client secret comes from the environment, never from a committed
+    file outside development fixtures.
+- **Endpoints:** `GET /api/auth/sign-in?returnUrl=` redirects to the
+  identity provider. A `returnUrl` that is not a local path is a `400`. The
+  callback creates the session and redirects to `returnUrl`.
+  `POST /api/auth/sign-out` ends the session and signs out at the identity
+  provider.
+- **Session:** one HttpOnly, Secure, SameSite=Lax cookie.
+  - It holds the user id, the display name, the roles and the tenant id.
+  - It holds no tokens, and no token reaches the browser.
+  - It ends after 8 hours, or after 1 hour without requests.
+- **Bound to its tenant:** a session used on another tenant's host is no
+  session.
+- **Roles:** read from the roles claim at sign-in. A role change applies at
+  the next sign-in.
+- **Current user:** `GET /api/me` keeps its shape and reads the session.
+- **Sign-in needed:** every endpoint under `/api/apps/`, and the site and
+  page metadata, answer `401` without a session. The platform shell's texts
+  and `/health` stay open.
+- **CSRF:** every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must carry
+  the header `X-Axis-Csrf: 1`, otherwise `403`. This adds to the JSON content
+  type rule and the SameSite cookie. There is no antiforgery token.
+- **Test users go:** `TestUsers`, their endpoints and the SPA picker are
+  removed. Integration tests sign in through a test authentication scheme
+  that only test hosts register. This replaces the test-user part of D21.
+- **Keycloak:** Docker Compose, `scripts/dev.sh` and the E2E run start
+  Keycloak with an imported development realm.
+  - The realm holds the purchase request users, an employee, two department
+    managers and a finance reviewer, with a development-only password.
+  - It maps their roles to the `roles` claim.
+  - It fixes each user's id, so seed data such as a department's manager can
+    name them.
+  - The realm and its client secret are committed as development fixtures.
+    They are never valid outside Development and tests.
+  - Integration tests that cover sign-in start the same realm through
+    Testcontainers.
+- **Audit actor:** the actor is the user id from the session. The display
+  name is stored with the audit record, because Axis has no user directory
+  to look it up later.
+
+*Why:* see [knowledge](domain/knowledge.md#authorization). Policies and
+processes need to know who acts, so test users must give way to real
+identities. Keeping tokens on the server and the session bound to one tenant
+means a stolen or reused cookie cannot act in another tenant. `sub` never
+changes, so it is the default user id, and a tenant can name another claim.

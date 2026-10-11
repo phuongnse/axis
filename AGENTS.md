@@ -92,6 +92,11 @@ and `docker compose logs worker` shows the worker output. Set
 `AXIS_SERVER_PORT` and `AXIS_POSTGRES_PORT` to change the host ports (5206 and 5432). Both
 ports are published on `127.0.0.1` only.
 
+*(Planned for M4.)* Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` will also start
+Keycloak with the imported development realm. To sign in locally, open the site, choose sign
+in, and use one of the realm users, `anna`, `binh`, `chau` or `dung`, with the development
+password. See [sign-in and the session](docs/architecture.md#sign-in-and-the-session).
+
 For local development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and Node, and
 works on a fresh clone:
 

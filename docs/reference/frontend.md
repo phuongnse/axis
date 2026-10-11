@@ -471,7 +471,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       action without a text shows as it is.
     - Who did it is the test user's display name. Without one, it is
       "System" for `system`, "Anonymous" for `anonymous`, or else the raw
-      user id.
+      user id. From M4 it is the stored `actorName` *(planned for M4)*.
     - The time uses the user's locale, with the medium date and time styles.
     - The summary is built from the details. It lists the labels of the
       fields it names, then the task outcome, then the step, joined by " · ".
@@ -627,7 +627,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Test user picker.** In `Development` and `Testing`, the shell header of
   every site shows a [test user](../architecture.md#development-test-users)
   picker before the locale switch. Its button shows the signed-in user's
-  display name, or a sign-in prompt when nobody is signed in.
+  display name, or a sign-in prompt when nobody is signed in. D23 removes the
+  picker in M4 *(planned for M4)*. See
+  [Sign-in and the session](../architecture.md#sign-in-and-the-session).
   - The button opens a menu of the test users in configuration order. Each
     entry is a `menuitemradio`, and the current user has
     `aria-checked="true"`. With someone signed in, the menu ends with a sign

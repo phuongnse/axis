@@ -45,6 +45,9 @@ M3 is complete. See the closed
 [M3 milestone](https://github.com/phuongnse/axis/milestone/3?closed=1) on
 GitHub.
 
+M4 is in progress. See the
+[M4 milestone](https://github.com/phuongnse/axis/milestone/4) on GitHub.
+
 Milestones after M4 may be reordered when business needs require it. M0–M4
 stay in this order.
 
