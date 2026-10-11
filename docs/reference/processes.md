@@ -14,7 +14,9 @@ the `axis.process_instances`, `axis.process_step_history`,
 [Running a step](#running-a-step). The [task API](#task-api) routes that
 list the user's tasks, read one task and complete one are built. Completing
 a task resumes its `waiting` instance, see
-[Completing a task](#completing-a-task).
+[Completing a task](#completing-a-task). A start and the task API follow the
+user's policies, see [Start endpoint](#start-endpoint) and
+[Policies on tasks](#task-api).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -276,11 +278,15 @@ are problem details, as in the [record API](record-api.md#errors).
 
 - **`201`.** The instance was started. The body is the instance:
   `{ "id", "process", "subjectId", "releaseId", "state" }`.
+- **`401`.** Nobody is signed in. The title is the record API's "Sign in to
+  read or write this data.".
 - **`404`.** An unknown application, an application with no active release,
   or an unknown process.
+- **`403`.** The user has no `start` grant on the process. The title is the
+  record API's "You have no grant for this action.".
 - **`400` for a body.** A body that is not `{ "subjectId": "<uuid>" }`, or a
-  `subjectId` that names no record of the subject entity. The error is keyed
-  `/subjectId`.
+  `subjectId` that names no record of the subject entity the user may read.
+  The error is keyed `/subjectId`.
 - **`400` for a start condition.** The subject record fails the
   `startCondition`. The error is keyed `/subjectId` and holds the condition's
   message text key.
@@ -292,27 +298,26 @@ are problem details, as in the [record API](record-api.md#errors).
 The `201` has no `Location` header, because there is no endpoint to read an
 instance yet.
 
-From M4 *(planned)*, a start needs a `start` grant on the process and read
-access to the subject record, as
-[Authorization](../architecture.md#authorization) describes. Until then
-starts are open, as record writes are.
+A start needs a session, a `start` grant on the process and read access to
+the subject record, as [Authorization](../architecture.md#authorization)
+describes.
 
-- **`403`** *(planned for M4)*. The user has no `start` grant on the process.
-- **Subject outside every read filter** *(planned for M4)*. A subject record
-  the user may not read does not exist for them. It gets the same `400` keyed
-  `/subjectId` as a `subjectId` that names no record, so the user cannot tell
-  the two apart.
+- **Subject the user may not read.** A subject record the user may not read
+  does not exist for them. That is a record outside every filter of their
+  `read` grants on the subject entity, or any record when they hold no
+  `read` grant on it. It gets the same `400` keyed `/subjectId` as a
+  `subjectId` that names no record, so the user cannot tell the two apart.
 
 A request is checked in this order, and the first failure is the response:
 
-1. The application and the process, `404`.
-2. The content type, `415`.
-3. The body, `400`.
-4. The `Idempotency-Key` header, `400`.
+1. The session, `401`.
+2. The application and the process, `404`.
+3. The `start` grant on the process, `403`.
+4. The content type, `415`.
+5. The body, `400`.
+6. The `Idempotency-Key` header, `400`.
 
-A start without the CSRF header is a `403` before any of these checks. From
-M4 *(planned)*, the session (`401`) comes right after the CSRF header, and
-the `start` grant (`403`) comes right after the process. Read
+A start without the CSRF header is a `403` before any of these checks. Read
 access to the subject record is checked in the transaction, when the record
 is read.
 
@@ -320,8 +325,9 @@ One transaction then does the rest:
 
 1. With a key, it stores the receipt first. When the key is taken, it rolls
    back and answers from the stored receipt, or with the `422`.
-2. It locks and reads the subject record. A missing one is the `400`. The
-   lock makes the start condition see the latest version, and an edit of the
+2. It locks the subject record, checks that the user may read it, and reads
+   it. A missing one, or one the user may not read, is the `400`. The lock
+   makes the start condition see the latest version, and an edit of the
    record waits until the start commits or rolls back.
 3. It evaluates the `startCondition` on the record, and a failure is the
    `400`.
@@ -332,7 +338,7 @@ One transaction then does the rest:
 5. It inserts the instance's first work item.
 6. It writes the audit record `process.started` for the subject record, with
    details `{ "processId", "releaseId" }`. The actor is the
-   [current user](#task-api) with their display name, or `anonymous`.
+   [current user](#task-api) with their display name.
 
 When any part fails, nothing is written. The instance then waits for the
 worker to run its steps.
@@ -383,15 +389,19 @@ complete it with an outcome. The user is the user of the
 **Who may act.** The user may act on a task when they are its assignee, or
 when the task's assignee is a role and the user holds it. The user's roles
 are the roles kept in their session. This is checked on every request, at
-the moment of action. Policies in M4 add to this check and never replace it.
+the moment of action. Policies add to this check and never replace it.
 
-**Policies on tasks** *(planned for M4)*. These follow
+**Policies on tasks.** These follow
 [D24](../decisions.md#d24-roles-and-policies--agreed).
 
 - The assignee check is enough to list, read and complete a task. The user
   needs no grant on the subject entity, and its read filters do not apply.
 - The task's `form` and its `entity` leave out the fields the user may not
-  read on the subject entity.
+  read on the subject entity. A user with no `read` grant on it reads no
+  field. A form section left with no field is left out too.
+- Which fields the user may read comes from the policies of the active
+  release, so a grant change applies to open tasks at once. The form's
+  layout still comes from the task's release. Fields are matched by name.
 - A value for a field the user may not read is refused as a field the form
   does not make editable, with "Cannot be set.".
 - Field write grants do not apply to the values of a task completion. The
@@ -431,7 +441,8 @@ by `createdAt`, then by `id`.
 ```
 
 - `subject.label` is the value of the subject entity's display field, as the
-  record API's `labels` give it.
+  record API's `labels` give it. It is `null` when the user may not read the
+  display field.
 - `dueAt` is `null` when the step has no `dueIn`.
 
 **Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
@@ -495,8 +506,9 @@ Content-Type: application/json
 
 - `outcome` is required. It names one of the step's outcomes, ignoring
   letter case.
-- `values` is optional. It holds only fields the task's form makes editable,
-  in the record API's [value format](record-api.md#request-bodies-and-values).
+- `values` is optional. It holds only fields the task's form makes editable
+  and the user may read, in the record API's
+  [value format](record-api.md#request-bodies-and-values).
 - `version` is the subject record's version, as the record API reads it. It
   is required when `values` is not empty.
 - The response is `200` with the completed task, in the shape of a single
@@ -565,8 +577,8 @@ of these checks.
 - **`400`.** The body is a validation problem keyed by JSON Pointer. Every
   invalid part is reported in the same response.
   - A missing outcome, or one the step does not have, is keyed `/outcome`.
-  - A value for a field the form does not make editable is keyed
-    `/values/<field>` with the message "Cannot be set.".
+  - A value for a field the form does not make editable, or the user may
+    not read, is keyed `/values/<field>` with the message "Cannot be set.".
   - A missing `version` when `values` is not empty is keyed `/version`.
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown

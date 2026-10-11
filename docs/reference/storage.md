@@ -223,7 +223,7 @@ schema of the tenant database.
   | --- | --- | --- |
   | `id` | `uuid` | A version 7 UUID |
   | `occurred_at` | `timestamptz` | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it |
-  | `actor` | `text` | A user id, `system` for the worker, or `anonymous` for a process start with nobody signed in. The record API needs a session, so it never writes `anonymous`. M4 stops writing it for process starts too *(planned)* |
+  | `actor` | `text` | A user id, or `system` for the worker. The record API and the process start endpoint need a session, so they never write `anonymous`. Only process starts from before M4, with nobody signed in, have it |
   | `actor_name` | `text`, null | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added |
   | `action` | `text` | The action, such as `record.created` |
   | `application_id` | `uuid` | The application `id` |

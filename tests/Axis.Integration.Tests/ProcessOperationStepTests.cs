@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Model;
 using Axis.Data.Audit;
+using Axis.Policy;
 using Axis.Processes.Instances;
 
 namespace Axis.Integration.Tests;
@@ -50,6 +52,30 @@ public sealed class ProcessOperationStepTests(ProcessStepFixture fixture) : ICla
                 ("action", AuditActions.RecordUpdated),
                 ("entity", RequestEntityId),
                 ("record", subjectId)));
+    }
+
+    [Fact]
+    public async Task Operation_step_sets_a_field_that_no_policy_lets_any_role_update()
+    {
+        // The worker runs as system, outside policies, so a field no grant covers is still set.
+        Assert.True(fixture.Model.TryGetEntity("Request", out var request));
+        Assert.NotEmpty(fixture.Model.Roles);
+        foreach (var role in fixture.Model.Roles)
+        {
+            // Null would mean every field.
+            var updatable = PolicyEvaluator.Fields(fixture.Model, [role.Name], request, PolicyAction.Update);
+            Assert.NotNull(updatable);
+            Assert.DoesNotContain("submittedAt", updatable);
+        }
+
+        var subjectId = await fixture.InsertRequestAsync(500m, 1);
+        var instanceId = await fixture.StartAsync("Submit", subjectId, fixture.FirstReleaseId);
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(ProcessStarts.Completed, (await fixture.InstanceAsync(instanceId)).State);
+        var record = await fixture.RequestAsync(subjectId);
+        Assert.NotNull(record.Values["submittedAt"]);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Axis.Configuration.Model;
 using Axis.Core.Tenancy;
 using Axis.Data.Records;
+using Axis.Policy;
 using Axis.Presentation.Sites;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
@@ -25,7 +26,12 @@ namespace Axis.Server.Processes;
 /// <c>task.completed</c>. A completion that fails writes nothing. A task shows its process, step,
 /// outcomes and form as the release its instance is pinned to declares them, and a completion
 /// uses that release too. Its subject label is the record's display field in the active release.
-/// The problem titles never contain text from the request.
+/// The assignee check is the only gate: no entity grant is needed and no record filter applies.
+/// The user's <c>read</c> grants on the subject entity in the active release decide which fields a
+/// task shows. Its form and entity leave out the fields they do not cover, matched by name, and a
+/// form section left with no field is dropped. The subject label is null unless they cover the
+/// display field, and a completion refuses a value for a field they do not cover as one the form
+/// does not make editable. The problem titles never contain text from the request.
 /// </summary>
 internal static class TaskEndpoints
 {
@@ -67,16 +73,23 @@ internal static class TaskEndpoints
         var result = await TaskQueries.ListOpenAsync(
             connection, active.Model.Manifest.Id, user.Id, user.Roles, pageNumber, size, cancellationToken);
         var labels = await ReadLabelsAsync(connection, active.Model, result.Items, cancellationToken);
+        var readable = new Dictionary<Guid, IReadOnlySet<string>?>();
         var items = new List<TaskListItem>(result.Items.Count);
         foreach (var task in result.Items)
         {
             var (release, process, step) = await TaskStepAsync(resolver, task, cancellationToken);
+            if (!readable.TryGetValue(task.SubjectEntityId, out var fields))
+            {
+                fields = Readable(active.Model, user.Roles, task.SubjectEntityId);
+                readable[task.SubjectEntityId] = fields;
+            }
+
             items.Add(new TaskListItem(
                 task.Id,
                 process.Name,
                 step.Name,
                 step.Label.TextKey,
-                Subject(release, task, labels),
+                Subject(release, active.Model, task, labels, fields),
                 task.DueAt?.UtcDateTime,
                 task.CreatedAt.UtcDateTime));
         }
@@ -120,7 +133,7 @@ internal static class TaskEndpoints
             return AssignedToSomeoneElse();
         }
 
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, task, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user.Roles, task, cancellationToken));
     }
 
     // The body is read here rather than bound, so every body problem is reported by JSON Pointer,
@@ -168,7 +181,7 @@ internal static class TaskEndpoints
 
         var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
             ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, completed, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user.Roles, completed, cancellationToken));
     }
 
     /// <summary>
@@ -210,7 +223,8 @@ internal static class TaskEndpoints
         var form = FormOf(release, task, step);
         var entity = release.FindEntity(task.SubjectEntityId)
             ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
-        var body = TaskCompletionBody.Read(await RecordEndpoints.ReadBodyAsync(request, cancellationToken), step, form, entity, release);
+        var readable = Readable(active, user.Roles, task.SubjectEntityId);
+        var body = TaskCompletionBody.Read(await RecordEndpoints.ReadBodyAsync(request, cancellationToken), step, form, entity, release, readable);
         if (body.Errors is { } errors)
         {
             return Results.ValidationProblem(errors);
@@ -268,11 +282,15 @@ internal static class TaskEndpoints
         return null;
     }
 
-    /// <summary>The task as a single read returns it, with its form as its release declares it.</summary>
+    /// <summary>
+    /// The task as a single read returns it, with its form as its release declares it, less the
+    /// fields <paramref name="roles"/> may not read.
+    /// </summary>
     private static async Task<TaskResponse> DescribeAsync(
         ActiveApplicationResolver resolver,
         NpgsqlConnection connection,
         ApplicationModel active,
+        IReadOnlyList<string> roles,
         ProcessTaskRow task,
         CancellationToken cancellationToken)
     {
@@ -280,6 +298,16 @@ internal static class TaskEndpoints
         var (release, process, step) = await TaskStepAsync(resolver, task, cancellationToken);
         var formModel = FormOf(release, task, step);
         var form = ApplicationSites.DescribeForm(release, formModel.Name);
+        var entity = ApplicationSites.DescribeEntity(release, formModel.Entity.Name);
+        var readable = Readable(active, roles, task.SubjectEntityId);
+        var sections = form.Sections;
+        if (readable is not null)
+        {
+            sections = [.. sections
+                .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
+                .Where(section => section.Fields.Count > 0)];
+            entity = entity with { Fields = [.. entity.Fields.Where(field => readable.Contains(field.Name))] };
+        }
 
         return new TaskResponse(
             task.Id,
@@ -291,8 +319,8 @@ internal static class TaskEndpoints
             new TaskAssignee(
                 task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null,
                 task.AssigneeKind == ProcessTasks.RoleAssignee ? task.Assignee : null),
-            Subject(release, task, labels),
-            new TaskForm(form.Name, form.Sections, ApplicationSites.DescribeEntity(release, formModel.Entity.Name)),
+            Subject(release, active, task, labels, readable),
+            new TaskForm(form.Name, sections, entity),
             [.. step.Outcomes.Select(outcome => new TaskOutcome(outcome.Name, outcome.Label.TextKey))],
             task.DueAt?.UtcDateTime,
             task.CreatedAt.UtcDateTime,
@@ -348,12 +376,33 @@ internal static class TaskEndpoints
         return labels;
     }
 
-    private static TaskSubject Subject(ApplicationModel release, ProcessTaskRow task, IReadOnlyDictionary<Guid, string> labels)
+    /// <summary>
+    /// The subject of <paramref name="task"/>, with its label only when <paramref name="readable"/>
+    /// covers the display field of the subject entity in the <paramref name="active"/> release.
+    /// </summary>
+    private static TaskSubject Subject(
+        ApplicationModel release,
+        ApplicationModel active,
+        ProcessTaskRow task,
+        IReadOnlyDictionary<Guid, string> labels,
+        IReadOnlySet<string>? readable)
     {
         var entity = release.FindEntity(task.SubjectEntityId)
             ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
-        return new TaskSubject(entity.Name, task.SubjectId, labels.GetValueOrDefault(task.SubjectId));
+        var labelled = active.FindEntity(task.SubjectEntityId)?.DisplayField is { } displayField
+            && (readable is null || readable.Contains(displayField));
+        return new TaskSubject(entity.Name, task.SubjectId, labelled ? labels.GetValueOrDefault(task.SubjectId) : null);
     }
+
+    /// <summary>
+    /// The declared names of the fields of the subject entity that <paramref name="roles"/> may
+    /// read in the <paramref name="active"/> release, or null for every field. A user with no
+    /// <c>read</c> grant on it, or a subject entity no longer in the release, reads no field.
+    /// </summary>
+    private static IReadOnlySet<string>? Readable(ApplicationModel active, IEnumerable<string> roles, Guid subjectEntityId) =>
+        active.FindEntity(subjectEntityId) is { } entity
+            ? PolicyEvaluator.Fields(active, roles, entity, PolicyAction.Read)
+            : new HashSet<string>(StringComparer.Ordinal);
 
     private static IResult SignInRequired() =>
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to work on tasks.");

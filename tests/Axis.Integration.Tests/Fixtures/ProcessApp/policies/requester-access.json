@@ -1,0 +1,11 @@
+{
+  "id": "7561fc50-e198-40de-a095-418c8edb5415",
+  "kind": "policy",
+  "name": "RequesterAccess",
+  "formatVersion": 1,
+  "roles": ["requester"],
+  "grants": [
+    { "entity": "Request", "actions": ["read"], "filter": "startsWith(title, 'Request')" },
+    { "process": "Submit", "actions": ["start"] }
+  ]
+}

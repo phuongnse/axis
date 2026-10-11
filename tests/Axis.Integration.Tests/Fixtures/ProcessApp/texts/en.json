@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
-    "request.cannotSubmit": "This request cannot be submitted."
+    "request.cannotSubmit": "This request cannot be submitted.",
+    "role.reader": "Reader",
+    "role.requester": "Requester"
   }
 }

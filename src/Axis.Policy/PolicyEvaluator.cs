@@ -3,7 +3,7 @@ using Axis.Configuration.Model;
 namespace Axis.Policy;
 
 /// <summary>
-/// Decides whether a user's roles grant an action on an entity or a data source of an
+/// Decides whether a user's roles grant an action on an entity, a data source or a process of an
 /// application. Access is denied unless a grant allows it. A role counts only when a roles claim
 /// value equals the name of a role the application declares, compared exactly, so any other value
 /// grants nothing. A policy applies when the user holds any of its roles. An entity grant with a
@@ -92,6 +92,13 @@ public static class PolicyEvaluator
         return Grants(application, held).Any(grant => grant.DataSource?.Id == dataSource.Id && grant.Actions.Contains(PolicyAction.Read))
             && application.FindEntity(dataSource.Entity.Id) is { } entity
             && Access(application, held, entity, PolicyAction.Read).Granted;
+    }
+
+    /// <summary>Whether <paramref name="roles"/> grant <c>start</c> on <paramref name="process"/>.</summary>
+    public static bool AllowsStart(ApplicationModel application, IEnumerable<string> roles, ProcessModel process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        return Grants(application, roles).Any(grant => grant.Process?.Id == process.Id && grant.Actions.Contains(PolicyAction.Start));
     }
 
     /// <summary>The grants of every policy that names a role the user holds.</summary>

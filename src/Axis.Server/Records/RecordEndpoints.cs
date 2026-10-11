@@ -596,7 +596,7 @@ internal static class RecordEndpoints
     /// Checks the record with <paramref name="recordId"/> against <paramref name="filters"/> for
     /// <paramref name="user"/>, and logs the policy and grant of each filter that failed for it.
     /// </summary>
-    private static async Task<RecordFilterMatch> MatchAsync(
+    internal static async Task<RecordFilterMatch> MatchAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         ApplicationModel application,

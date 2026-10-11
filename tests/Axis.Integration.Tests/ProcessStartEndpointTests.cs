@@ -118,7 +118,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(1L, await CountInstancesAsync(subject));
         Assert.Equal(1L, await CountWorkItemsAsync(subject));
         Assert.Equal(1L, await fixture.CountAsync(
-            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'anonymous' AND actor_name IS NULL",
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'anna' AND actor_name = 'Anna Employee'",
             ("id", instance)));
         Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE record_id = @subject", ("subject", subject)));
         Assert.Equal(1L, await CountReceiptsAsync(subject));
@@ -220,6 +220,46 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         AssertSubjectError(problem, "No record of the process's entity has this id.");
         await AssertNothingStoredAsync(missing);
+    }
+
+    [Fact]
+    public async Task A_start_with_no_session_is_a_401_and_stores_nothing()
+    {
+        var subject = await fixture.InsertRequestAsync(status: null);
+        using var anonymous = fixture.CreateClient();
+
+        using var response = await StartAsync(subject, key: Guid.NewGuid().ToString(), client: anonymous);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Unauthorized);
+        Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+        await AssertNothingStoredAsync(subject);
+    }
+
+    [Fact]
+    public async Task A_start_by_a_user_without_a_start_grant_is_a_403_and_stores_nothing()
+    {
+        // Olga may read every request, but holds no start grant on the process.
+        var subject = await fixture.InsertRequestAsync(status: null);
+        using var olga = fixture.CreateClient().SignedInAs("olga");
+
+        using var response = await StartAsync(subject, key: Guid.NewGuid().ToString(), client: olga);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
+        await AssertNothingStoredAsync(subject);
+    }
+
+    [Fact]
+    public async Task A_start_on_a_record_outside_the_users_read_filters_is_the_400_of_an_unknown_record_and_stores_nothing()
+    {
+        // Anna reads only the requests whose title starts with "Request".
+        var subject = await fixture.InsertRequestAsync(status: null, title: "Private");
+
+        using var response = await StartAsync(subject, key: Guid.NewGuid().ToString());
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        AssertSubjectError(problem, "No record of the process's entity has this id.");
+        await AssertNothingStoredAsync(subject);
     }
 
     [Theory]
