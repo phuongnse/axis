@@ -35,6 +35,9 @@
     "noteClose.action": "Đóng ghi chú",
     "noteClose.cannotClose": "Chỉ có thể đóng ghi chú đang mở.",
     "category.label": "Danh mục",
-    "category.name": "Tên"
+    "category.name": "Tên",
+    "role.employee": "Nhân viên",
+    "role.departmentManager": "Trưởng phòng",
+    "role.financeReviewer": "Người duyệt tài chính"
   }
 }

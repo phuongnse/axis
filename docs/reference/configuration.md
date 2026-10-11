@@ -18,12 +18,12 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process` or `form`). The manifest is the single `application`
-   resource, stored as `application.json` at the folder root; an `application`
-   resource in any other file is not used as the manifest. Resource IDs are
-   unique across the application, compared as UUIDs. Names are unique per
-   kind, ignoring letter case. The same checks run on a release's stored
-   resources when the server rebuilds its model.
+   `rule`, `sequence`, `process`, `form` or `role`). The manifest is the
+   single `application` resource, stored as `application.json` at the
+   folder root; an `application` resource in any other file is not used as
+   the manifest. Resource IDs are unique across the application, compared as
+   UUIDs. Names are unique per kind, ignoring letter case. The same checks
+   run on a release's stored resources when the server rebuilds its model.
 2. **Resolve.** Every reference must resolve inside the application or its
    declared modules. The entity model is built here: each field's `type`
    becomes a typed field type, every type-specific property is checked against
@@ -169,6 +169,10 @@ flowchart LR
      whose entity is unknown, or that has a parameter with a diagnostic, is
      not checked. See
      [data sources](data-sources.md#compile-checks).
+   - **Roles.** A [role](#roles-and-policies)'s `label` joins the `AXC0028`
+     check, at `/label/textKey`. A process task's `assignee.role` must name a
+     declared role, compared exactly, otherwise it is `AXC0089`. See
+     Processes below.
    - **Processes.** A [process](processes.md#resource-shape)'s `entity` must
      name a loaded entity, ignoring letter case, otherwise it is `AXC0067` at
      `/entity`, and its conditions are not checked. A name whose entity file
@@ -204,12 +208,14 @@ flowchart LR
      Each `set` expression is parsed and type-checked against its field's
      type, with the same scope as a `when`. Each of these is reported at
      `/steps/{i}/set/{field}`. A task step's `assignee` without exactly one
-     of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. From M4 a
-     `role` must name a declared [role](#roles-and-policies) *(planned for
-     M4)*. A `user` expression is parsed and
-     type-checked as `text`, with the same scope as a `when`, and a problem is
-     reported at `/steps/{i}/assignee/user`. A task's `form` that names no
-     loaded form, ignoring letter case, is `AXC0082` at `/steps/{i}/form`. A
+     of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. A `role`
+     that names no declared [role](#roles-and-policies), compared exactly, is
+     `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file was not
+     loaded because of its own errors is not reported again. A `user`
+     expression is parsed and type-checked as `text`, with the same scope
+     as a `when`, and a problem is reported at `/steps/{i}/assignee/user`.
+     A task's `form` that names no loaded form, ignoring letter case, is
+     `AXC0082` at `/steps/{i}/form`. A
      name whose form file was not loaded because of its own errors is not
      reported again. A form over another entity than the process's is
      `AXC0083` at `/steps/{i}/form`. It is not checked when either entity is
@@ -452,6 +458,7 @@ sorted by file and then path.
 | `AXC0086` | A computed field calls `now()`, also inside an aggregate's item expression, such as `count(lines, dueAt < now())`. A stored value cannot depend on the current time. Reported at `/fields/{i}/expression`, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0087` | A `form` widget action's `process` names no loaded process. Reported at `/widgets/{i}/actions/{j}/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
+| `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 
 ## Startup activation
 
@@ -733,11 +740,13 @@ An entity `text` field names the sequence in its `sequence` property:
 
 ## Roles and policies
 
-Everything in this section is *(planned for M4)*. It follows
+This section follows
 [D24](../decisions.md#d24-roles-and-policies--agreed), and
 [Authorization](../architecture.md#authorization) describes how the server
-applies it. Each compile check below is a compile error, and its code comes
-with the issue that builds it.
+applies it. The `role` resource and the check of task assignees are built.
+Policies and matching the roles claim are *(planned for M4)*. Each compile
+check below is a compile error, and its code comes with the issue that
+builds it.
 
 A `role` resource declares a role that users can hold:
 
@@ -777,11 +786,14 @@ A `role` resource declares a role that users can hold:
   usual resource name rule refuses. With one lower-case form, letter case
   never matters.
 - **Claim values.** A role matches a roles claim value exactly. A claim value
-  that names no declared role is ignored.
-- **Label.** The `label` text key joins the `AXC0028` check.
+  that names no declared role is ignored. *(Planned for M4.)*
+- **Label.** The `label` is required. Its text key joins the `AXC0028`
+  check.
+- **Schema.** A name in another form, or a missing `label`, is `AXC0004`.
+  Two roles with the same name are `AXC0006`.
 
-A `policy` resource gives roles grants. The purchase request sample has three
-policies. Employees reach their own requests, department managers the
+A `policy` resource gives roles grants *(planned for M4)*. The purchase
+request sample will have three policies. Employees reach their own requests, department managers the
 requests of their department, and finance reviewers the submitted ones:
 
 ```json
@@ -864,10 +876,14 @@ requests of their department, and finance reviewers the submitted ones:
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](../architecture.md#combining-grants).
 
-Compile checks, each a compile error *(planned for M4)*:
+Compile checks, each a compile error:
 
-- A policy `roles` entry, or a process task's `assignee.role`, that names no
-  declared role, compared exactly.
+- A process task's `assignee.role` that names no declared role, compared
+  exactly, is `AXC0089`.
+
+The policy checks are *(planned for M4)*:
+
+- A policy `roles` entry that names no declared role, compared exactly.
 - A grant without exactly one of `entity`, `dataSource` and `process`.
 - A target that names no loaded entity, data source or process, ignoring
   letter case.

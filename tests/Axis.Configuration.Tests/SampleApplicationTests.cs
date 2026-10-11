@@ -17,12 +17,23 @@ public sealed class SampleApplicationTests
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
         Assert.Equal("PurchaseRequestApproval", Assert.Single(result.Model.Processes).Name);
         Assert.Equal("PurchaseRequestReview", Assert.Single(result.Model.Forms).Name);
+        Assert.Equal(["department-manager", "employee", "finance-reviewer"], result.Model.Roles.Select(role => role.Name));
 
         Assert.True(result.Model.TryGetEntity("PurchaseRequest", out var purchaseRequest));
         Assert.True(purchaseRequest.TryGetField("number", out var number));
         Assert.NotNull(number.Sequence);
         Assert.Equal("PurchaseRequestNumber", number.Sequence.Name);
         Assert.Equal("PR-{yyyy}-{n:5}", number.Sequence.Format);
+    }
+
+    [Fact]
+    public void E2e_fixture_application_compiles_without_diagnostics_and_declares_the_sample_roles()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Fixtures", "e2e-app"));
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal(["department-manager", "employee", "finance-reviewer"], result.Model.Roles.Select(role => role.Name));
     }
 
     [Fact]

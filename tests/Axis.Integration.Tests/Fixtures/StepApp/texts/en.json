@@ -10,6 +10,7 @@
     "request.decide": "Decide on the request",
     "requestDecision.main": "Decision",
     "requestReview.main": "Request",
+    "role.finance": "Finance",
     "task.approve": "Approve",
     "task.reject": "Reject"
   }

@@ -130,7 +130,7 @@ See [processes](../reference/processes.md#steps).
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Role** | A declared `role` resource with a name and a label. Users hold roles through the identity provider's roles claim, and a claim value that names no declared role is ignored. Policies give roles their grants. See [authorization](../architecture.md#authorization) *(planned for M4)*. | M4 |
+| **Role** | A declared `role` resource with a name and a label. A task assigned to a role must name a declared role. Users hold roles through the identity provider's roles claim, and a claim value that names no declared role is ignored. Policies give roles their grants. See [roles and policies](../reference/configuration.md#roles-and-policies), and [authorization](../architecture.md#authorization) *(planned for M4)*. | M4 |
 | **Policy** | A `policy` resource that gives one or more roles grants on entities, data sources and processes. An entity grant may have a record filter and a list of fields. The grants of all the user's policies combine with OR, and default-deny applies. See [authorization](../architecture.md#authorization) *(planned for M4)*. | M4 |
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. | M5 |

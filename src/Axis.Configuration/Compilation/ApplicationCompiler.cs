@@ -15,8 +15,9 @@ namespace Axis.Configuration.Compilation;
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
 /// of every locale, checks the named rules and their calls, checks every entity's fields against
 /// the field type rules and type-checks its computed fields and validations, checks forms, sites,
-/// pages and seeds, checks data sources and their filters, checks processes, their step graphs and
-/// their conditions, and resolves references between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
+/// pages and seeds, checks data sources and their filters, checks role labels, checks processes,
+/// their step graphs, their conditions and the roles their tasks name, and resolves references
+/// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
 /// </summary>
@@ -95,10 +96,18 @@ public static class ApplicationCompiler
 
         ProcessResource? FindProcess(string name) => processesByName.GetValueOrDefault(name);
 
+        // Role names are lower case only and are matched exactly.
+        var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
+
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
+        }
+
+        foreach (var role in loaded.Roles)
+        {
+            CheckTextKey(role.Label, role.File, role.Id, "/label", textKeys, diagnostics);
         }
 
         // Validations, at their top level, data source filters and process conditions call rules.
@@ -128,6 +137,8 @@ public static class ApplicationCompiler
             loaded.UnloadedEntityNames,
             FindForm,
             loaded.UnloadedFormNames,
+            roleNames,
+            loaded.UnloadedRoleNames,
             textKeys,
             rules,
             diagnostics);
@@ -150,6 +161,7 @@ public static class ApplicationCompiler
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
+            Roles = loaded.Roles,
         };
         return result with
         {

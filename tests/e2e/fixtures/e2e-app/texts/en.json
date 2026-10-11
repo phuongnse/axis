@@ -35,6 +35,9 @@
     "noteClose.action": "Close note",
     "noteClose.cannotClose": "Only an open note can be closed.",
     "category.label": "Category",
-    "category.name": "Name"
+    "category.name": "Name",
+    "role.employee": "Employee",
+    "role.departmentManager": "Department manager",
+    "role.financeReviewer": "Finance reviewer"
   }
 }

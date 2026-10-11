@@ -235,10 +235,11 @@ reported in one pass. See
 - An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set` or
   any task property (`AXC0004`).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
-  `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). Whether
-  the role exists is not checked yet. From M4 it must name a declared
-  [role](configuration.md#roles-and-policies), compared exactly, or it is a
-  compile error *(planned for M4)*.
+  `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
+  name a declared [role](configuration.md#roles-and-policies), compared
+  exactly, otherwise it is `AXC0089` at `/steps/{i}/assignee/role`. A name
+  whose role file was not loaded because of its own errors is not reported
+  again.
 - A `user` expression gives `text`, with the same scope as a `when`. A
   problem is reported at `/steps/{i}/assignee/user` with its expression code,
   such as `AXC0048` for a number.
