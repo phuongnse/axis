@@ -176,7 +176,7 @@ test('the purchase request list reads a data source, shows department names, and
   expect((await rowsLoad).status()).toBe(200)
 
   const listPath = /\/purchasing\/purchaserequests\?page=2&pageSize=10&sort=-title$/
-  const first = page.getByRole('row', { name: new RegExp(`${prefix} 01 `) })
+  const first = page.locator('.ant-table-tbody tr.ant-table-row').first()
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
       await page.getByRole('switch', { name: 'Dark mode' }).click()
@@ -188,6 +188,7 @@ test('the purchase request list reads a data source, shows department names, and
     await expect(page.locator('.ant-pagination-item-active')).toHaveText('2')
     await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
     await expect(page.getByRole('columnheader', { name: 'Department' })).toBeVisible()
+    await expect(first).toContainText(`${prefix} 01`)
     await expect(first).toContainText('Finance')
   }
 })
