@@ -32,15 +32,30 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * cells. A computed field, of the record or of a row, is shown read-only with the value the server
  * returned, and never sent. So is a sequence field, which is empty on a new record because the
  * server numbers it on create, a creator field, which the server sets to the creating user's id,
- * and a field the form marks read-only. A saved record shows its
- * history below the form, and a button for each of the widget's actions. A new record has neither.
- * An action saves the changed fields, then starts its process for the record.
+ * and a field the form marks read-only. A field the user's grants do not let them write, as the
+ * widget's access says, is read-only too: on a new record the `create` fields, and on a saved one
+ * the `update` fields. Without the `create` or `update` grant the form has no save button. A saved
+ * record shows its history below the form, and a button for each of the widget's actions, which
+ * lists only the processes the user may start. A new record has neither. An action saves the
+ * changed fields, then starts its process for the record.
  */
 export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const { entity } = widget
-  const sections = useMemo(() => sectionsOf(entity, widget.form), [entity, widget.form])
+  const { access } = widget
+  const writeAction = recordId === null ? 'create' : 'update'
+  const canSave = access === null || access.actions.includes(writeAction)
+  const writable = useMemo(() => {
+    if (access === null) {
+      return undefined
+    }
+    if (!access.actions.includes(writeAction)) {
+      return new Set<string>()
+    }
+    return new Set(writeAction === 'create' ? access.createFields : access.updateFields)
+  }, [access, writeAction])
+  const sections = useMemo(() => sectionsOf(entity, widget.form, writable), [entity, widget.form, writable])
   const form = useRecordForm(entity, sections, locale)
   const { start: startForm, setFormErrors } = form
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
@@ -109,7 +124,7 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
   }
 
   const save = async () => {
-    if (saving || starting) {
+    if (!canSave || saving || starting) {
       return
     }
     setStarted(false)
@@ -224,9 +239,11 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
       <Form layout="vertical" onFinish={save}>
         {form.fields}
         <Flex gap="small">
-          <Button htmlType="submit" type="primary" loading={saving} disabled={starting}>
-            {t('shell.form.save')}
-          </Button>
+          {canSave && (
+            <Button htmlType="submit" type="primary" loading={saving} disabled={starting}>
+              {t('shell.form.save')}
+            </Button>
+          )}
           <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
           {recordId !== null &&
             widget.actions.map((action) => (

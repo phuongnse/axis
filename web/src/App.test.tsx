@@ -3,7 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
-import type { ApplicationSite, EntityMetadata, PageMetadata, SiteListItem, SiteMetadata } from './platform/site'
+import type {
+  ApplicationSite,
+  EntityMetadata,
+  PageMetadata,
+  SiteListItem,
+  SiteMetadata,
+  WidgetAccess,
+} from './platform/site'
 import { ThemeModeProvider } from './platform/theme'
 
 const site: SiteMetadata = {
@@ -108,6 +115,13 @@ const noteEntity: EntityMetadata = {
 
 const tasksPath = '/api/apps/E2eApp/tasks'
 
+const noteFields = noteEntity.fields.map((field) => field.name)
+const noteAccess: WidgetAccess = {
+  actions: ['read', 'create', 'update', 'delete'],
+  createFields: noteFields,
+  updateFields: noteFields,
+}
+
 const pages: Record<string, PageMetadata> = {
   notes: {
     name: 'Notes',
@@ -121,6 +135,7 @@ const pages: Record<string, PageMetadata> = {
         form: null,
         tasksPath: null,
         actions: [],
+        access: noteAccess,
       },
     ],
   },
@@ -128,14 +143,32 @@ const pages: Record<string, PageMetadata> = {
     name: 'NoteForm',
     titleKey: 'pages.noteForm.title',
     widgets: [
-      { type: 'form', formPage: null, entity: noteEntity, dataSource: null, form: null, tasksPath: null, actions: [] },
+      {
+        type: 'form',
+        formPage: null,
+        entity: noteEntity,
+        dataSource: null,
+        form: null,
+        tasksPath: null,
+        actions: [],
+        access: noteAccess,
+      },
     ],
   },
   tasks: {
     name: 'Tasks',
     titleKey: 'pages.tasks.title',
     widgets: [
-      { type: 'taskInbox', formPage: null, entity: null, dataSource: null, form: null, tasksPath, actions: [] },
+      {
+        type: 'taskInbox',
+        formPage: null,
+        entity: null,
+        dataSource: null,
+        form: null,
+        tasksPath,
+        actions: [],
+        access: null,
+      },
     ],
   },
 }

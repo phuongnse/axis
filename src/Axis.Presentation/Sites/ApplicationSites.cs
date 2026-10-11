@@ -69,7 +69,40 @@ public static class ApplicationSites
                 "startProcess",
                 action.Process.Name,
                 action.Label.TextKey,
-                $"/api/apps/{application.Manifest.Name}/processes/{action.Process.Name}/instances"))]);
+                $"/api/apps/{application.Manifest.Name}/processes/{action.Process.Name}/instances"))],
+            FullAccess(application, widget));
+
+    /// <summary>
+    /// The entity a table or form widget is about: its own entity, or the root entity of its data
+    /// source. Null on a task inbox.
+    /// </summary>
+    public static EntityModel? WidgetEntity(ApplicationModel application, WidgetModel widget)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(widget);
+
+        // The compiler resolves every widget entity and data source, so the lookups always succeed.
+        if (widget.Entity is { } entity)
+        {
+            return application.FindEntity(entity.Id);
+        }
+
+        return widget.DataSource is { } reference && application.TryGetDataSource(reference.Name, out var dataSource)
+            ? application.FindEntity(dataSource.Entity.Id)
+            : null;
+    }
+
+    // Without a user to shape it, access lists every entity action and every field.
+    private static WidgetAccess? FullAccess(ApplicationModel application, WidgetModel widget)
+    {
+        if (WidgetEntity(application, widget) is not { } entity)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> fields = [.. entity.Fields.Select(field => field.Name)];
+        return new WidgetAccess(["read", "create", "update", "delete"], fields, fields);
+    }
 
     /// <summary>
     /// The metadata of the form named <paramref name="formName"/>, as a form widget's page metadata

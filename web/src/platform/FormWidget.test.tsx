@@ -33,6 +33,7 @@ const recordsPath = '/api/apps/E2eApp/entities/Note/records'
 const noteId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 
+// Without access the form is not shaped by grants, so every field the form shows can be written.
 const noteWidget: EntityWidgetMetadata = {
   type: 'form',
   formPage: null,
@@ -40,6 +41,7 @@ const noteWidget: EntityWidgetMetadata = {
   form: null,
   tasksPath: null,
   actions: [],
+  access: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -816,6 +818,56 @@ describe('FormWidget', () => {
     })
   })
 
+  it('shows a field the user may not write read-only, from the create fields on a new record and the update fields on a saved one', async () => {
+    const fieldedWidget: EntityWidgetMetadata = {
+      ...noteWidget,
+      access: { actions: ['read', 'create', 'update'], createFields: ['title', 'priority'], updateFields: ['title'] },
+    }
+    const requests = stubFetch(
+      { status: 200, body: noteJson('Buy paper', 1) },
+      { status: 200, body: noteJson('New', 2) },
+    )
+    const { unmount } = renderForm(null, fieldedWidget)
+    expect(screen.getByLabelText('Priority')).not.toHaveAttribute('readonly')
+    expect(screen.getByLabelText('Code')).toHaveAttribute('readonly')
+    unmount()
+
+    renderForm(noteId, fieldedWidget)
+    const title = await screen.findByLabelText('Title')
+    const priority = screen.getByLabelText('Priority')
+    expect(priority).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
+
+    await userEvent.type(priority, '3')
+    await userEvent.clear(title)
+    await userEvent.type(title, 'New')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"title":"New"}}',
+    })
+  })
+
+  it('has no save button and shows every field read-only without the grant for the write', async () => {
+    const readerWidget: EntityWidgetMetadata = {
+      ...noteWidget,
+      access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
+    }
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    const { unmount } = renderForm(null, readerWidget)
+    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    unmount()
+
+    renderForm(noteId, readerWidget)
+    expect(await screen.findByLabelText('Title')).not.toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+  })
+
   it('shows an error on a field the form leaves out above the form', async () => {
     stubFetch({
       status: 400,
@@ -880,6 +932,16 @@ describe('FormWidget', () => {
       renderForm(null, actionWidget)
       expect(await screen.findByLabelText('Title')).toHaveValue('')
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
+    })
+
+    it('keeps the action on a read-only form without a save button', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+
+      renderForm(noteId, { ...actionWidget, access: { actions: ['read'], createFields: [], updateFields: [] } })
+
+      expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
+      expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
     it('starts the process without a save when nothing changed, then shows a message and reloads', async () => {

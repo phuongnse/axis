@@ -2,7 +2,14 @@ import { createEvent, fireEvent, render, screen, waitFor, within } from '@testin
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { DataSourceParameter, EntityWidgetMetadata, FieldMetadata, FieldType, WidgetMetadata } from './site'
+import type {
+  DataSourceParameter,
+  EntityWidgetMetadata,
+  FieldMetadata,
+  FieldType,
+  WidgetAccess,
+  WidgetMetadata,
+} from './site'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 
@@ -27,6 +34,13 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
 
 const recordsPath = '/api/apps/E2eApp/entities/Note/records'
 
+// The table only reads the actions, so the field lists stay empty.
+const everyAction: WidgetAccess = {
+  actions: ['read', 'create', 'update', 'delete'],
+  createFields: [],
+  updateFields: [],
+}
+
 const noteWidget: EntityWidgetMetadata = {
   type: 'table',
   formPage: 'NoteForm',
@@ -34,6 +48,7 @@ const noteWidget: EntityWidgetMetadata = {
   form: null,
   tasksPath: null,
   actions: [],
+  access: everyAction,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -65,6 +80,7 @@ const noteListWidget: WidgetMetadata = {
   form: null,
   tasksPath: null,
   actions: [],
+  access: everyAction,
   dataSource: {
     name: 'NoteList',
     rowsPath,
@@ -279,6 +295,19 @@ describe('TableWidget', () => {
     expect(screen.queryByRole('link', { name: 'Open' })).not.toBeInTheDocument()
   })
 
+  it('has no create button without a create grant, and still links each row to the form page', async () => {
+    stubRecords()
+
+    renderWidget('', {
+      ...noteWidget,
+      access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
+    })
+
+    const row = await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('link', { name: 'New' })).not.toBeInTheDocument()
+    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+  })
+
   it('shows the groups of a grouped data source with measure names as headers and no open link or create button', async () => {
     const departmentTarget = {
       entity: 'Department',
@@ -292,6 +321,7 @@ describe('TableWidget', () => {
       form: null,
       tasksPath: null,
       actions: [],
+      access: everyAction,
       dataSource: {
         name: 'NotesByDepartment',
         rowsPath,
@@ -433,6 +463,7 @@ describe('TableWidget', () => {
       form: null,
       tasksPath: null,
       actions: [],
+      access: everyAction,
     })
 
     const cell = await screen.findByRole('cell', { name: '1250.50' })

@@ -81,10 +81,11 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
 /**
  * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
  * carries the id of its root record, so it opens the same form. A row of a grouped data source is a
- * group with no id, and its table has no form page, so it has no open link or create button. Paging
- * and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing and the
- * back button keep them. A data source table also has a filter bar, whose values live in the URL
- * under the parameter names.
+ * group with no id, and its table has no form page, so it has no open link or create button. The
+ * create button also needs the user's `create` grant on the entity, as the widget's access says.
+ * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
+ * and the back button keep them. A data source table also has a filter bar, whose values live in the
+ * URL under the parameter names.
  */
 export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const t = useText()
@@ -92,6 +93,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { formPage } = widget
   const formPath = formPage && `/${sitePath}/${formPage.toLowerCase()}`
+  const canCreate = Boolean(formPath && widget.access?.actions.includes('create'))
   const createPath = formPath ? `${formPath}/new` : ''
   const createHref = useHref(createPath)
   // The form returns to this address, with its paging and sorting, after save or cancel.
@@ -221,7 +223,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
 
   return (
     <Flex vertical gap="middle">
-      {formPath && (
+      {canCreate && (
         <Flex justify="flex-end">
           <Button
             type="primary"
