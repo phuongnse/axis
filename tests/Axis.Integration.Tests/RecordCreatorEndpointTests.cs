@@ -16,7 +16,7 @@ public sealed class RecordCreatorEndpointTests(RecordApiFixture fixture) : IClas
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task Create_sets_the_creator_field_to_the_signed_in_user_or_null_without_a_session()
+    public async Task Create_sets_the_creator_field_to_the_signed_in_user_and_is_refused_without_a_session()
     {
         await fixture.ResetAsync();
         using var anna = fixture.CreateClient().SignedInAs("anna");
@@ -26,10 +26,10 @@ public sealed class RecordCreatorEndpointTests(RecordApiFixture fixture) : IClas
         using var annasRead = await GetJsonAsync(Id(annas));
         Assert.Equal("anna", Requester(annasRead));
 
-        using var anonymous = await PostAsync(fixture.Client, """{ "title": "Nobody's" }""", HttpStatusCode.Created);
-        Assert.Null(Requester(anonymous));
-        using var anonymousRead = await GetJsonAsync(Id(anonymous));
-        Assert.Null(Requester(anonymousRead));
+        // A create without a session is refused, so no record is ever created without a creator.
+        using var signedOut = fixture.CreateClient();
+        using var refused = await PostAsync(signedOut, """{ "title": "Nobody's" }""", HttpStatusCode.Unauthorized);
+        Assert.Equal(1, (await fixture.TableShapeAsync(TenantA, "Ticket")).RowCount);
     }
 
     [Fact]

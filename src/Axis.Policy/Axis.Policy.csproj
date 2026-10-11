@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
+  </ItemGroup>
+
+</Project>

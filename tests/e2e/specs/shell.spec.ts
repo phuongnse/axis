@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { useSession } from '../sessions'
 
 test('the home page loads and reports a ready server', async ({ page }) => {
   await page.goto('/')
@@ -57,6 +58,8 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
 })
 
 test('the home page opens a site in its own shell, in light and dark mode', async ({ page }) => {
+  // The site opens on its notes page, which reads records, and the record API needs a session.
+  await useSession(page, 'anna')
   await page.goto('/')
 
   await page.getByRole('link', { name: 'E2E notes' }).click()

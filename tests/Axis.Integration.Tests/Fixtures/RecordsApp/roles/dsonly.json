@@ -1,0 +1,9 @@
+{
+  "id": "29584f90-07aa-481a-91e4-58320795f7db",
+  "kind": "role",
+  "name": "dsonly",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.dsonly"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "2ae1b475-8a4a-4267-a9f2-167f0e408bf6",
+  "kind": "role",
+  "name": "filtered",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.filtered"
+  }
+}

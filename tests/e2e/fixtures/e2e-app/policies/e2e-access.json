@@ -1,0 +1,11 @@
+{
+  "id": "be57787e-01f6-4d1f-b673-bf6104010e0d",
+  "kind": "policy",
+  "name": "E2eAccess",
+  "formatVersion": 1,
+  "roles": ["employee", "department-manager", "finance-reviewer"],
+  "grants": [
+    { "entity": "Note", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Category", "actions": ["read", "create", "update", "delete"] }
+  ]
+}

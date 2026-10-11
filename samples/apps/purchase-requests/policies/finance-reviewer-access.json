@@ -1,0 +1,14 @@
+{
+  "id": "d9788ec8-1186-488d-8c83-cbc9e5441d11",
+  "kind": "policy",
+  "name": "FinanceReviewerAccess",
+  "formatVersion": 1,
+  "roles": ["finance-reviewer"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+  ]
+}

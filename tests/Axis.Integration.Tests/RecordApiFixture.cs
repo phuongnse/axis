@@ -23,7 +23,11 @@ namespace Axis.Integration.Tests;
 /// RecordsApp fixture application activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp fixture
 /// activated, and a compiled release of an application that was never activated. The test
-/// authentication scheme signs in <c>anna</c> and <c>binh</c>.
+/// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
+/// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
+/// holds only undeclared role names, <c>fern</c> and <c>fia</c> hold only grants with a filter or
+/// fields, and <c>dora</c> holds only a data source grant. <see cref="Client"/> is signed in as
+/// <c>anna</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
 {
@@ -60,8 +64,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
     public string ConnectionString(string tenant) => _connectionStrings[tenant];
 
     /// <summary>
-    /// A new client of the server with its own cookies and headers, so signing in on it leaves
-    /// <see cref="Client"/> signed out. The caller disposes it.
+    /// A new client of the server with its own cookies and headers, signed out, so signing in on it
+    /// leaves <see cref="Client"/> as it is. The caller disposes it.
     /// </summary>
     public HttpClient CreateClient() =>
         (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient();
@@ -114,9 +118,14 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseTestOidc("a", "b");
             builder.UseTestAuthentication(
                 new TestIdentity("anna", "Anna Employee", "employee"),
-                new TestIdentity("binh", "Binh Manager"));
+                new TestIdentity("binh", "Binh Manager"),
+                new TestIdentity("rita", "Rita Reader", "reader"),
+                new TestIdentity("uma", "Uma Undeclared", "Employee", "auditor"),
+                new TestIdentity("fern", "Fern Filtered", "filtered"),
+                new TestIdentity("fia", "Fia Fielded", "fielded"),
+                new TestIdentity("dora", "Dora Data Source", "dsonly"));
         });
-        _client = _factory.CreateClient();
+        _client = _factory.CreateClient().SignedInAs("anna");
     }
 
     public async ValueTask DisposeAsync()

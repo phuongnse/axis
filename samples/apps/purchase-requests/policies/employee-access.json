@@ -1,0 +1,16 @@
+{
+  "id": "2eeb31d5-47d9-4fb9-bd84-eb7ffdc11f12",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "PurchaseRequest", "actions": ["create", "update"] },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "dataSource": "RequestsByDepartment", "actions": ["read"] },
+    { "process": "PurchaseRequestApproval", "actions": ["start"] }
+  ]
+}

@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { sessionFile } from '../sessions'
+
+// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
+test.use({ storageState: sessionFile('anna') })
 
 // Specs run in parallel against one database, so this test reads only the record it creates.
 test('a record of the E2E application is created and read through the record API', async ({ request }) => {
@@ -26,7 +30,8 @@ test('a record of the E2E application is created and read through the record API
       dueAt: null,
       status: null,
       category: null,
-      createdBy: null,
+      // Every create has a session now, so the creator is the signed-in user.
+      createdBy: 'anna',
       lines: [],
     },
     labels: {},

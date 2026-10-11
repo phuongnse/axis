@@ -1,0 +1,10 @@
+{
+  "id": "a5094310-7b7d-47f9-855e-587dcef6a156",
+  "kind": "policy",
+  "name": "FilteredAccess",
+  "formatVersion": 1,
+  "roles": ["filtered"],
+  "grants": [
+    { "entity": "Item", "actions": ["read", "create"], "filter": "true" }
+  ]
+}

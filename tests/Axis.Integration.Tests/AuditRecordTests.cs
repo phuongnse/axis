@@ -26,7 +26,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
 
         var created = Assert.Single(await fixture.AuditRecordsAsync(TenantA, id));
 
-        Assert.Equal(new AuditRecord("anonymous", null, "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
+        Assert.Equal(new AuditRecord("anna", "Anna Employee", "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
         AssertDetails("""{ "version": 1 }""", created.Details);
 
         // The body names the fields out of declaration order. The computed total changes too, but
@@ -46,14 +46,14 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
         var audits = await fixture.AuditRecordsAsync(TenantA, id);
 
         Assert.Equal(["record.created", "record.updated", "record.deleted"], audits.Select(audit => audit.Action));
-        Assert.All(audits, audit => Assert.Equal(("anonymous", null, fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
+        Assert.All(audits, audit => Assert.Equal(("anna", "Anna Employee", fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
         AssertDetails("""{ "version": 2, "fields": ["name", "quantity", "parts"] }""", audits[1].Details);
         // A deleted record has no new version: the details hold the version it had.
         AssertDetails("""{ "version": 2 }""", audits[2].Details);
     }
 
     [Fact]
-    public async Task The_actor_and_their_name_are_the_signed_in_user_or_anonymous_with_no_name()
+    public async Task The_actor_and_their_name_are_the_signed_in_user()
     {
         using var client = fixture.CreateClient().SignedInAs("anna");
 
@@ -64,24 +64,26 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
             Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         }
 
-        var anonymous = await CreateItemAsync(fixture.Client, HostA, """{ "name": "Lamp" }""");
-
         Assert.Equal(
             [("anna", "Anna Employee", "record.created"), ("anna", "Anna Employee", "record.updated")],
             (await fixture.AuditRecordsAsync(TenantA, annas)).Select(audit => (audit.Actor, audit.ActorName, audit.Action)));
-        var anonymousAudit = Assert.Single(await fixture.AuditRecordsAsync(TenantA, anonymous));
-        Assert.Equal(("anonymous", null), (anonymousAudit.Actor, anonymousAudit.ActorName));
     }
 
-    [Fact]
-    public async Task An_unknown_test_user_counts_as_nobody_signed_in()
+    // A signed-out write is refused before anything is written, so the record API never writes
+    // the anonymous actor. An unknown test user counts as nobody signed in.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("mallory")]
+    public async Task A_create_without_a_session_is_refused_and_writes_no_record_or_audit_record(string? user)
     {
-        using var client = fixture.CreateClient().SignedInAs("mallory");
+        using var client = user is null ? fixture.CreateClient() : fixture.CreateClient().SignedInAs(user);
+        var (_, before) = await fixture.TableShapeAsync(TenantA, "Item");
 
-        var id = await CreateItemAsync(client, HostA, """{ "name": "Shelf" }""");
+        using var request = Request(HttpMethod.Post, Items, HostA, """{ "values": { "name": "Shelf" } }""");
+        using var response = await client.SendAsync(request, CancellationToken);
 
-        var audit = Assert.Single(await fixture.AuditRecordsAsync(TenantA, id));
-        Assert.Equal(("anonymous", null), (audit.Actor, audit.ActorName));
+        await ReadProblemAsync(response, HttpStatusCode.Unauthorized);
+        Assert.Equal(before, (await fixture.TableShapeAsync(TenantA, "Item")).RowCount);
     }
 
     [Fact]

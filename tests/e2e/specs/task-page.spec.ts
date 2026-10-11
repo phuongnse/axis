@@ -3,6 +3,9 @@ import { expect, test, type APIRequest, type APIRequestContext } from '@playwrig
 import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 
+// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
+test.use({ storageState: sessionFile('anna') })
+
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 const tasksPath = '/api/apps/E2eApp/tasks'
 

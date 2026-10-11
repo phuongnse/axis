@@ -1,0 +1,9 @@
+{
+  "id": "a38a54eb-3876-48ca-857f-4be9e34eab6b",
+  "kind": "role",
+  "name": "fielded",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.fielded"
+  }
+}

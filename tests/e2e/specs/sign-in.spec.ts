@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const page100 = '/e2e/notes?pageSize=100'
+// The task inbox keeps its own sign-in prompt, so it stays on the page while nobody is signed in. A
+// page that reads records would start sign-in on its own, before the header's button is clicked.
+const page100 = '/e2e/tasks?pageSize=100'
 
 /** Signs in as Anna on the Keycloak login page from the header's sign-in button. */
 async function signInAsAnna(page: Page) {

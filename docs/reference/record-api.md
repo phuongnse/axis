@@ -11,11 +11,12 @@ the entities of the active release of an application, in the tenant that the
 request host resolves to. A record of another tenant does not exist for the
 request, so it is a 404 like any unknown record.
 
-From M4 *(planned)*, policies are checked on every record endpoint, as
-[Authorization](../architecture.md#authorization) describes. A user needs a
-grant for the action on the entity. A record outside every read filter is a
-`404`, and fields the user may not read are left out. Until then the
-endpoints are open.
+Every record endpoint needs a session and a policy grant for the action on
+the entity, as [Authorization](../architecture.md#authorization) describes.
+Without a session the answer is a `401`, and without a grant a `403`. A
+grant with a `filter` or a `fields` list grants nothing yet. From M4
+*(planned)*, a record outside every read filter is a `404`, and fields the
+user may not read are left out.
 
 ## Routes
 
@@ -190,8 +191,8 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
 - **Creator fields.** A create by a signed-in user sets each `text` field that
   declares [`creator`](configuration.md#record-creator) to the user id from
   the session, in the write's transaction. It is set before the computed
-  fields and validations, so they see it. A create without a session leaves
-  it `null`. A body that sets it on create or update, even to `null`, is a
+  fields and validations, so they see it. A create without a session is a
+  `401`, so the record API never leaves it `null`. A body that sets it on create or update, even to `null`, is a
   `400` at its pointer with the message "Cannot be set.", as for a sequence
   field.
 
@@ -217,12 +218,15 @@ storage: see
 and then in storage (`404` or `409`).
 
 A write without the [CSRF header](#create-update-and-delete) is a `403`
-before any of these checks. From M4 *(planned)*, the session comes next: a
-request without a session is a `401`, before the path. So a caller without a
-session cannot find out which applications or records exist. See
+before any of these checks. The session comes next: a request without a
+session is a `401`, before the path. So a caller without a session cannot
+find out which applications or records exist. See
 [Sign-in and the session](../architecture.md#sign-in-and-the-session).
+After the path, the user needs a grant for the action on the entity, or the
+answer is a `403` before the query or body is read.
 
-From M4 *(planned)*, policies add checks too. The full order is:
+Policies add more checks. Steps 1 to 4 are built, and the rest of the
+policy checks are *(planned for M4)*. The full order is:
 
 1. The CSRF header, `403`.
 2. The session, `401`.
@@ -244,11 +248,15 @@ and value checks need the parsed body, so they come after it. See
 
 - **`403` for the CSRF header.** A `POST`, `PUT`, `PATCH` or `DELETE`
   without `X-Axis-Csrf: 1`.
-- **`401`** *(planned for M4)*. A request without a session, or with a
-  session from another tenant.
-- **`403` without a grant** *(planned for M4)*. The user has no grant for the
-  action on the entity. A list or a single read needs `read`, a create
-  `create`, an update `update` and a delete `delete`. History needs `read`.
+- **`401`.** A request without a session, or with a session from another
+  tenant. It comes before the path, so it is a `401` even for an unknown
+  application. The title is fixed.
+- **`403` without a grant.** The user has no grant for the action on the
+  entity. A list or a single read needs `read`, a create `create`, an update
+  `update` and a delete `delete`. History needs `read`. Only roles claim
+  values that name a declared role of the application count. A grant with a
+  `filter` or a `fields` list grants nothing until record and field policies
+  are built. The title is fixed and names no entity or action.
 - **`404` outside every read filter** *(planned for M4)*. A record that
   matches no read filter of the user is answered like an unknown record.
 - **`403` for a record outside its write filters** *(planned for M4)*. The
@@ -491,16 +499,14 @@ can be read as its history (D21).
 - **Actions.** The actions are `record.created`, `record.updated` and
   `record.deleted`.
 - **Actor.** The actor is the user of the
-  [session](../architecture.md#sign-in-and-the-session), or `anonymous` when
-  nobody is signed in. The audit record also stores the
-  user's display name as it was at that moment. It stores none for
-  `anonymous`. A process
+  [session](../architecture.md#sign-in-and-the-session). Every write needs a
+  session, so the record API never writes `anonymous`. The audit record also
+  stores the user's display name as it was at that moment. A process
   [operation step](processes.md#running-a-step) that updates its subject
   record writes `record.updated` with the actor `system`, no display name and
   its instance id. A [task completion](processes.md#completing-a-task) that
   writes values writes no `record.updated`. Its `task.completed` record names
-  the fields. From M4 *(planned)*, every write needs a session, so
-  `anonymous` is no longer written.
+  the fields.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
   A delete holds the version the record had when it was deleted.
   - On update it also has `"fields"`: the declared names of the fields and
@@ -518,8 +524,8 @@ can be read as its history (D21).
     deleted record, or an id from another tenant is a `404`.
   - `page` and `pageSize` follow the [paging rules](#paging-and-sorting).
     An invalid one is a `400` keyed by its name. There is no `sort` or
-    `search`. The path is checked first, then the paging, then whether the
-    record exists.
+    `search`. The session, the path and the grant are checked first, then
+    the paging, then whether the record exists.
   - Items are ordered by `occurredAt` descending, then by `id` descending.
     The audit records of one transaction share one time, so their order
     among themselves follows their ids. That order may differ from the order
@@ -528,11 +534,11 @@ can be read as its history (D21).
     `processInstanceId` and `details`, as stored. `actorName` is the display
     name stored with the audit record. It is `null` for `system`,
     `anonymous` and audit records written before names were stored.
-  - From M4 *(planned)*, the history needs read access to the record. A user
-    without a `read` grant on the entity gets a `403`, and a record outside
-    every read filter is a `404`. The `fields` of `details` leave out the
-    fields the user may not read. Until then, anyone who can read the
-    record can read its history.
+  - The history needs a session and a `read` grant on the entity. Without a
+    session it is a `401`, and without the grant a `403`, before the record
+    is read. From M4 *(planned)*, a record outside every read filter is a
+    `404`, and the `fields` of `details` leave out the fields the user may
+    not read.
 
 For example:
 

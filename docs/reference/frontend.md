@@ -159,7 +159,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     can hold it.
   - An unknown site, page or locale is a 404 problem with a fixed title. A
     site active only in another tenant does not exist for the request.
-  - Until M4 the endpoints are open, like the record API.
+  - Until M4 the endpoints are open. The record API and the data source
+    endpoint already need a session and a grant. So a page that reads
+    records starts sign-in when nobody is signed in, and its data fails to
+    load for a user without a grant.
   - **Policies** *(planned for M4)*. From M4, policies shape the site and
     page metadata, as [Authorization](../architecture.md#authorization)
     describes. This only shapes the UI. The server checks every request.

@@ -20,8 +20,9 @@ flowchart LR
 ```
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
-  It is the BFF: the OIDC client and the cookie session. Requiring a session
-  on its endpoints is *(planned for M4)*.
+  It is the BFF: the OIDC client and the cookie session. The record API and
+  the data source endpoint require a session. Requiring one on its other
+  endpoints is *(planned for M4)*.
 - **Axis.Worker** executes durable work. So far it runs work items, and
   through them the `decision`, `task`, `operation` and `end` steps of process
   instances. Wait for event, timer and sub-process steps come later. Outbox
@@ -44,7 +45,7 @@ src/
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
   Axis.Processes/         work items, decision, task, operation and end steps, task API; outbox (M5)
-  Axis.Policy/            roles, policies, evaluation (M4)
+  Axis.Policy/            policy evaluation: entity and data source grants; record filters and field sets (M4)
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
@@ -61,10 +62,10 @@ samples/
 Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
-checker, interpreter and SQL translation), `Axis.Presentation` (the platform site, its texts and the
+checker, interpreter and SQL translation), `Axis.Policy` (the evaluation of entity and data source grants),
+`Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
 `decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
-`Axis.Policy` does not exist yet.
 
 ## Module rules
 
@@ -169,19 +170,21 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   - API writes are protected against CSRF by a required header.
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
-- **Authorization (D12, D24, planned for M4).**
-  - Every API endpoint and engine command calls the policy module with an
-    explicit resource and action.
+- **Authorization (D12, D24).**
+  - The record API and the data source endpoint call the policy module with
+    the entity or data source and the action. Every other API endpoint and
+    engine command does so *(planned for M4)*.
   - Record filters from policies are added to every record list and data
-    source query.
+    source query *(planned for M4)*.
   - Field policies leave out fields from results and reject writes to
-    protected fields.
+    protected fields *(planned for M4)*.
   - See [Authorization](#authorization).
-- **Before M4.** People sign in through OIDC, but no endpoint needs a
-  session yet: every endpoint is open. There is no other way to sign in.
-  Record writes, process starts and tasks take their user from the session.
-  Record writes stay open with nobody signed in. Their audit records then
-  have the actor `anonymous` and no display name.
+- **Before M4.** People sign in through OIDC. The record API and the data
+  source endpoint need a session and a grant. The other endpoints do not
+  need a session yet. There is no other way to sign in. Record writes,
+  process starts and tasks take their user from the session. A process
+  start stays open with nobody signed in. Its audit records then have the
+  actor `anonymous` and no display name.
 
 ### Sign-in and the session
 
@@ -262,8 +265,9 @@ are marked *(planned for M4)*.
   session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
   the user's id and display name.
-- **Sign-in needed** *(planned for M4)*. Without a session, these answer a
-  `401` problem details response:
+- **Sign-in needed.** Without a session, these answer a `401` problem
+  details response. It is built for records, record history and data source
+  rows, and for tasks. The others are *(planned for M4)*:
   - every route under `/api/apps/{app}/`: records, record history, data
     source rows, process start and tasks. The session is checked before any
     `404`, so a caller without a session cannot learn which applications or
@@ -282,8 +286,9 @@ are marked *(planned for M4)*.
 - **CSRF.** Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must
   carry `X-Axis-Csrf: 1`, otherwise `403`. The server checks the header
   right after it resolves the tenant and before authentication, so a refused
-  write does no work and does not renew the session cookie. The session
-  check that follows it is *(planned for M4)*. The SPA sends every `/api`
+  write does no work and does not renew the session cookie. On the record
+  API and the data source endpoint, the session check follows it. On the
+  other endpoints it is *(planned for M4)*. The SPA sends every `/api`
   call through one wrapper around `fetch`, which adds the header to its
   writes. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
@@ -303,7 +308,8 @@ are marked *(planned for M4)*.
   fixture starts it through Testcontainers. Under `scripts/dev.sh` and in
   the E2E run, the server signs people in through it. Under Docker Compose
   it does not yet, because the server in its container cannot reach Keycloak
-  at the address the browser uses.
+  at the address the browser uses. So under Compose the record API and the
+  data source endpoint answer `401`.
   - It holds the purchase request users with fixed ids: `anna` the
     employee, `binh` and `chau` the department managers, and `dung` the
     finance reviewer. Seed data and E2E journeys already name these ids.
@@ -314,7 +320,11 @@ are marked *(planned for M4)*.
 
 ### Authorization
 
-The `role` and `policy` resources and their compile checks are built.
+The `role` and `policy` resources and their compile checks are built. For
+the record API and the data source endpoint, so are the session `401`, the
+matching of roles, grants by action and the `403` without a grant. Until
+record and field policies are built, a grant with a `filter` or a `fields`
+list grants nothing, so access is never wider than a policy intends.
 Everything else in this section is *(planned for M4)*. It follows
 [D24](decisions.md#d24-roles-and-policies--agreed) and
 [D12](decisions.md#d12-authorization-is-server-side-and-default-deny--agreed).
@@ -388,10 +398,12 @@ The `role` and `policy` resource files are described in
   grant. The server logs the policy name and the grant's index, never a
   record value. In SQL, PostgreSQL cannot fail one branch of an `or`, so the
   whole query fails with a `400` and returns no rows.
-- **Module.** `Axis.Policy` holds the compiled policies of each release and
-  their evaluation. Every endpoint and engine command calls it with a
-  resource and an action. It answers allow or deny, the read filters to add,
-  and the readable and writable field sets.
+- **Module.** `Axis.Policy` holds the evaluation of the compiled policies of
+  each release. Every endpoint and engine command calls it with a resource
+  and an action. It answers allow or deny, the read filters to add, and the
+  readable and writable field sets. Today it answers allow or deny for an
+  entity or a data source, and the record API and the data source endpoint
+  call it. The read filters and field sets are *(planned for M4)*.
 - **Only the server decides.** Page metadata and navigation follow the
   policies, but they only shape the UI. The server checks every request.
 

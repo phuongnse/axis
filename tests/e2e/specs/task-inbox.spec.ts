@@ -3,6 +3,9 @@ import { expect, test } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 
+// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
+test.use({ storageState: sessionFile('anna') })
+
 // Specs run in parallel against one database, so this test looks only for the task it starts.
 test('the manager a task is assigned to sees it in the inbox in light and dark mode, and another user does not', async ({
   page,

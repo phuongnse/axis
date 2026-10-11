@@ -41,7 +41,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
 
         await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             foreach (var host in new[] { HostA, HostB })
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/apps/{_name}/entities/Note/records");
@@ -124,7 +124,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         var logs = new LogCollector();
         await using (var factory = CreateFactory(a, b, folder.Path, logs))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}")
             {
                 Content = JsonContent.Create(new { version = 1, values = new { title = "Edited" } }),
@@ -144,7 +144,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
 
         await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             foreach (var (host, title, version) in new[] { (HostA, "Edited", 2L), (HostB, "First", 1L) })
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}");
@@ -173,7 +173,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         logs = new LogCollector();
         await using (var factory = CreateFactory(a, b, folder.Path, logs))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             Assert.Equal(("First", false, 1L), await GetRecordAsync(client, HostA, _firstSeedId));
         }
 
@@ -183,7 +183,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         logs = new LogCollector();
         await using (var factory = CreateFactory(a, b, folder.Path, logs))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             foreach (var host in new[] { HostA, HostB })
             {
                 Assert.Equal(("Renamed", false, 2L), await GetRecordAsync(client, host, _firstSeedId));
@@ -203,7 +203,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
 
         await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}")
             {
                 Content = JsonContent.Create(new { version = 1, values = new { done = true } }),
@@ -217,7 +217,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         folder.With("seeds/notes.json", SeedFile("""{ "title": "Renamed" }""", secondValues: null, sync: true));
         await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             Assert.Equal(("Renamed", true, 3L), await GetRecordAsync(client, HostA, _firstSeedId));
             Assert.Equal(("Second", null, 1L), await GetRecordAsync(client, HostA, _secondSeedId));
         }
@@ -237,7 +237,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
 
         await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             Assert.Equal("First", await GetSummaryAsync(client, _firstSeedId));
 
             using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/apps/{_name}/entities/Note/records/{_firstSeedId}")
@@ -255,7 +255,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         folder.With("seeds/notes.json", SeedFile("""{ "title": "Renamed" }""", """{ "title": "Second" }""", sync: true));
         await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             Assert.Equal("Renamed (done)", await GetSummaryAsync(client, _firstSeedId));
             Assert.Equal("Second", await GetSummaryAsync(client, _secondSeedId));
         }
@@ -292,7 +292,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         var logs = new LogCollector();
         await using (var factory = CreateFactory(a, b, folder.Path, logs))
         {
-            using var client = factory.CreateClient();
+            using var client = factory.CreateClient().SignedInAs("anna");
             Assert.Equal(("First", false, 1L), await GetRecordAsync(client, HostA, _firstSeedId));
         }
 
@@ -348,7 +348,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
         await using var factory = CreateFactory(a, b, folder: null, new LogCollector());
 
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient().SignedInAs("anna");
         using var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative), CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -366,6 +366,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", b);
             builder.UseTestOidc("a", "b");
+            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
             if (folder is not null)
             {
                 builder.UseSetting("ActivateOnStartup:0", folder);
@@ -437,7 +438,12 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     private TemporaryFolder ApplicationFolder(params string[] fields) =>
         new TemporaryFolder()
             .With("application.json", $$"""{ "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1 }""")
-            .With("entities/note.json", NoteFile(fields));
+            .With("entities/note.json", NoteFile(fields))
+            .With("roles/employee.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a13", "kind": "role", "name": "employee", "formatVersion": 1, "label": { "textKey": "role.employee" } }""")
+            .With("texts/en.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a14", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "role.employee": "Employee" } }""")
+            .With(
+                "policies/employee-access.json",
+                """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a15", "kind": "policy", "name": "EmployeeAccess", "formatVersion": 1, "roles": ["employee"], "grants": [{ "entity": "Note", "actions": ["read", "create", "update", "delete"] }] }""");
 
     /// <summary>
     /// A seed over <c>Note</c> with the fixed seed ids and the given values, synced when

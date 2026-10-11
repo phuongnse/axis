@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Authentication;
 namespace Axis.Server.Users;
 
 /// <summary>
-/// Finds the current user of a request from the session. Record writes, process starts, task routes
-/// and <c>GET /api/me</c> all read the user here.
+/// Finds the current user of a request from the session. The record routes, the data source
+/// endpoint, process starts, task routes and <c>GET /api/me</c> all read the user here.
 /// </summary>
 internal static class CurrentUsers
 {

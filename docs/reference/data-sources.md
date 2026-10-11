@@ -220,12 +220,15 @@ ignoring letter case, as in the record API.
 
 ### Authorization
 
-Everything in this section is *(planned for M4)*. It follows
-[Authorization](../architecture.md#authorization). Until then the endpoint is
-open.
+It follows [Authorization](../architecture.md#authorization). The session and
+the grants are built. The record filters, fields and joined targets are
+*(planned for M4)*.
 
+- **Session.** A request without a session is a `401`, before the path.
 - **Grants.** The user needs a `read` grant on the data source and a `read`
-  grant on its root entity, otherwise `403`.
+  grant on its root entity, otherwise `403`. Only roles claim values that
+  name a declared role count. An entity grant with a `filter` or a `fields`
+  list grants nothing until record and field policies are built.
 - **Record filters.** The root entity's read filters are combined with OR and
   added to the data source's own `filter` with AND, in SQL, before any
   grouping. So rows, groups, measures and `totalCount` cover only the
@@ -351,14 +354,16 @@ Every error is problem details (`application/problem+json`). The titles are
 fixed and never contain text from the request.
 
 A request is checked in this order, and the first failure is the response:
-the path, then the query, then the database. From M4 *(planned)*, the session
-comes before the path, and the grants and the readable fields come between
-the path and the query.
+the session, then the path, then the grants, then the query, then the
+database. From M4 *(planned)*, the readable fields are checked with the
+grants.
 
-- **`401`** *(planned for M4)*. A request without a session, or with a
-  session from another tenant.
-- **`403`** *(planned for M4)*. The user has no `read` grant on the data
-  source or on its root entity, or may not read one of its projected or
+- **`401`.** A request without a session, or with a session from another
+  tenant. It comes before the path, so it is a `401` even for an unknown
+  application. The title is fixed.
+- **`403`.** The user has no `read` grant on the data source or on its root
+  entity. The title is fixed and names no data source. From M4 *(planned)*,
+  it is also a `403` when the user may not read one of its projected or
   aggregated fields. See [Authorization](#authorization).
 - **`404`.** An unknown application, an application with no active release
   and an unknown data source. The path is resolved before the query is

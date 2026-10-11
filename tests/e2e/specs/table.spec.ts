@@ -1,5 +1,9 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { sessionFile } from '../sessions'
+
+// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
+test.use({ storageState: sessionFile('anna') })
 
 // Specs run in parallel against one database, so these tests rely only on the records they create:
 // at least eleven notes for two pages of ten, and fewer than one hundred for the label check.
