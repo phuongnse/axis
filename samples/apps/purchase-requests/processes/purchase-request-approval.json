@@ -1,0 +1,75 @@
+{
+  "id": "4b60c03e-02d0-4329-80c6-75f972190399",
+  "kind": "process",
+  "name": "PurchaseRequestApproval",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "startCondition": {
+    "expression": "status in ('draft', 'returned') and totalAmount is not null",
+    "message": { "textKey": "purchaseRequest.cannotSubmit" }
+  },
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'submitted'", "submittedAt": "now()" },
+      "next": "managerApproval"
+    },
+    {
+      "name": "managerApproval",
+      "type": "task",
+      "label": { "textKey": "purchaseRequest.managerApproval" },
+      "assignee": { "user": "department.manager" },
+      "form": "PurchaseRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "financeCheck" },
+        { "name": "return", "label": { "textKey": "task.return" }, "next": "markReturned" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "markRejected" }
+      ]
+    },
+    {
+      "name": "financeCheck",
+      "type": "decision",
+      "branches": [{ "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
+      "otherwise": "markApproved"
+    },
+    {
+      "name": "financeApproval",
+      "type": "task",
+      "label": { "textKey": "purchaseRequest.financeApproval" },
+      "assignee": { "role": "finance-reviewer" },
+      "form": "PurchaseRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "markApproved" },
+        { "name": "return", "label": { "textKey": "task.return" }, "next": "markReturned" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "markRejected" }
+      ]
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "done"
+    },
+    {
+      "name": "markReturned",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'returned'" },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'rejected'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

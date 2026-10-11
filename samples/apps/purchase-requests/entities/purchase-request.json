@@ -4,6 +4,7 @@
   "name": "PurchaseRequest",
   "formatVersion": 1,
   "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
   "fields": [
     {
       "name": "number",

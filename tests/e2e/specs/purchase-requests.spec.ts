@@ -208,8 +208,8 @@ test('the per-department page shows one row per department with its total, sorts
   page,
   request,
 }) => {
-  // Engineering < Finance < Operations by total, even with retries and other tests adding Finance
-  // requests in parallel.
+  // Engineering < Finance < Operations by total, even with retries and other tests adding Finance and
+  // Operations requests in parallel.
   const prices = { Engineering: 1, Finance: 100, Operations: 9000000 }
   for (const [name, unitPrice] of Object.entries(prices)) {
     const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
@@ -224,7 +224,8 @@ test('the per-department page shows one row per department with its total, sorts
     expect(response.status()).toBe(201)
   }
 
-  // Only this test writes Engineering and Operations requests, so their totals stay fixed during the run.
+  // Only this test writes Engineering requests, so their total stays fixed during the run. The approval
+  // spec adds Operations requests in parallel, so the Operations total is not checked.
   const groups = await request.get(`${appPath}/data-sources/RequestsByDepartment/rows?pageSize=100`)
   expect(groups.status()).toBe(200)
   const body = (await groups.json()) as {
@@ -235,14 +236,14 @@ test('the per-department page shows one row per department with its total, sorts
     expect(group).toBeDefined()
     return Number(group!.values.total).toFixed(2)
   }
-  const expected = { Engineering: total('Engineering'), Operations: total('Operations') }
+  const engineering = total('Engineering')
 
   await page.goto('/purchasing/requestsbydepartment')
   const rows = page.locator('.ant-table-tbody tr.ant-table-row')
   await expect(rows).toHaveCount(3)
   const row = (name: string) => page.getByRole('row', { name: new RegExp(`^${name} `) })
-  await expect(row('Engineering')).toContainText(expected.Engineering)
-  await expect(row('Operations')).toContainText(expected.Operations)
+  await expect(row('Engineering')).toContainText(engineering)
+  await expect(row('Operations')).toBeVisible()
   await expect(row('Finance')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'New' })).toHaveCount(0)

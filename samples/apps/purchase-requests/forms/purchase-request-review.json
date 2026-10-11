@@ -1,0 +1,28 @@
+{
+  "id": "77c7c183-7283-46a7-b56f-5cf5cec518aa",
+  "kind": "form",
+  "name": "PurchaseRequestReview",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "sections": [
+    {
+      "title": { "textKey": "purchaseRequest.sections.request" },
+      "fields": [
+        { "field": "number", "readOnly": true },
+        { "field": "title", "readOnly": true },
+        { "field": "requester", "readOnly": true },
+        { "field": "department", "readOnly": true },
+        { "field": "supplier", "readOnly": true },
+        { "field": "currency", "readOnly": true },
+        { "field": "lineItems", "readOnly": true },
+        { "field": "totalAmount", "readOnly": true },
+        { "field": "status", "readOnly": true },
+        { "field": "submittedAt", "readOnly": true }
+      ]
+    },
+    {
+      "title": { "textKey": "purchaseRequest.sections.decision" },
+      "fields": [{ "field": "decisionComments" }]
+    }
+  ]
+}

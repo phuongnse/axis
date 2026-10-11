@@ -74,7 +74,8 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
   department, supplier, currency, total amount (computed from line items),
   status, submitted at, decision comments.
 - **Line item**: description, quantity, unit price, amount (computed).
-- **Department** and **supplier**: reference data.
+- **Department** and **supplier**: reference data. A department has a
+  manager, who decides on its requests.
 - **Attachments**: supporting documents on a request.
 
 ### Flow

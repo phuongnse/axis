@@ -7,6 +7,7 @@
   "texts": {
     "site.title": "Purchasing",
     "nav.purchaseRequests": "Purchase requests",
+    "nav.myTasks": "My tasks",
     "nav.requestsByDepartment": "By department",
     "nav.departments": "Departments",
     "nav.suppliers": "Suppliers",
@@ -15,9 +16,11 @@
     "pages.requestsByDepartment.title": "Purchase request totals by department",
     "pages.departments.title": "Departments",
     "pages.suppliers.title": "Suppliers",
+    "pages.myTasks.title": "My tasks",
     "department.label": "Department",
     "department.code": "Code",
     "department.name": "Name",
+    "department.manager": "Manager",
     "supplier.label": "Supplier",
     "supplier.code": "Code",
     "supplier.name": "Name",
@@ -34,12 +37,21 @@
     "purchaseRequest.submittedAt": "Submitted at",
     "purchaseRequest.decisionComments": "Decision comments",
     "purchaseRequest.totalAmountPositive": "Total amount must be greater than zero.",
+    "purchaseRequest.submit": "Submit",
+    "purchaseRequest.cannotSubmit": "Only a draft or returned request with a total can be submitted.",
+    "purchaseRequest.managerApproval": "Manager approval",
+    "purchaseRequest.financeApproval": "Finance approval",
+    "purchaseRequest.sections.request": "Request",
+    "purchaseRequest.sections.decision": "Decision",
     "lineItem.label": "Line item",
     "lineItem.description": "Description",
     "lineItem.quantity": "Quantity",
     "lineItem.unitPrice": "Unit price",
     "lineItem.amount": "Amount",
     "lineItem.quantityPositive": "Quantity must be greater than zero.",
-    "lineItem.unitPriceNotNegative": "Unit price cannot be negative."
+    "lineItem.unitPriceNotNegative": "Unit price cannot be negative.",
+    "task.approve": "Approve",
+    "task.return": "Return",
+    "task.reject": "Reject"
   }
 }

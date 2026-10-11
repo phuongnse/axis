@@ -15,6 +15,8 @@ public sealed class SampleApplicationTests
         Assert.Equal(2, result.Model.Seeds.Count);
         Assert.Equal("purchasing", Assert.Single(result.Model.Sites).Path);
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
+        Assert.Equal("PurchaseRequestApproval", Assert.Single(result.Model.Processes).Name);
+        Assert.Equal("PurchaseRequestReview", Assert.Single(result.Model.Forms).Name);
 
         Assert.True(result.Model.TryGetEntity("PurchaseRequest", out var purchaseRequest));
         Assert.True(purchaseRequest.TryGetField("number", out var number));
