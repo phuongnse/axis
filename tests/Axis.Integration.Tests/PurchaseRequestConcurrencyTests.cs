@@ -145,7 +145,8 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             using var started = await start;
             using var edited = await edit;
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
-            Assert.Contains(edited.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict });
+            // A submit that wins first puts the request outside the employee's update filter, so the edit is 403.
+            Assert.Contains(edited.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict, HttpStatusCode.Forbidden });
 
             var (finalTitle, status, finalVersion) = await ReadAsync(anna, subject);
             Assert.Equal("submitted", status);

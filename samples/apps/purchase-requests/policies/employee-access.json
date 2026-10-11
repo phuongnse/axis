@@ -5,12 +5,16 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"] },
-    { "entity": "PurchaseRequest", "actions": ["create", "update"] },
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "requester == currentUser()" },
+    {
+      "entity": "PurchaseRequest",
+      "actions": ["create", "update"],
+      "filter": "requester == currentUser() and status in ('draft', 'returned')",
+      "fields": ["title", "department", "supplier", "currency", "lineItems", "status"]
+    },
     { "entity": "Department", "actions": ["read"] },
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] },
     { "process": "PurchaseRequestApproval", "actions": ["start"] }
   ]
 }

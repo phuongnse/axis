@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["department-manager"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
     { "entity": "Department", "actions": ["read"] },
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },

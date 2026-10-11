@@ -1,8 +1,9 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
-import { sessionFile } from '../sessions'
+import { sessionFile, useSession } from '../sessions'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
+// anna saves a new request as a draft, because she may write only draft and returned requests.
 test.use({ storageState: sessionFile('anna') })
 
 // Specs run in parallel against one database, so these tests rely only on the seeded departments and
@@ -49,7 +50,8 @@ test('a purchase request is created with line items, shows the computed total, i
   await page.getByRole('link', { name: 'New' }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
-  await page.getByLabel('Requester', { exact: true }).fill('Lan Nguyen')
+  // The server sets the requester to the signed-in user, so the form shows it read-only.
+  await expect(page.getByLabel('Requester', { exact: true })).toHaveAttribute('readonly')
   await choose(page, 'Department', 'Finance')
   await choose(page, 'Supplier', 'Acme Supplies')
   await select(page, 'Currency', 'VND')
@@ -66,7 +68,7 @@ test('a purchase request is created with line items, shows the computed total, i
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  for (const text of ['Lan Nguyen', 'Finance', 'Acme Supplies', 'VND', '2550.90', 'draft']) {
+  for (const text of ['anna', 'Finance', 'Acme Supplies', 'VND', '2550.90', 'draft']) {
     await expect(row).toContainText(text)
   }
   await page.reload()
@@ -116,6 +118,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await page.getByLabel('Description 1', { exact: true }).fill('Paper')
   await page.getByLabel('Quantity 1', { exact: true }).fill('1')
   await page.getByLabel('Unit price 1', { exact: true }).fill('10')
+  await select(page, 'Status', 'draft')
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(tablePath)
@@ -142,6 +145,7 @@ test('the purchase request list reads a data source, shows department names, and
         values: {
           title: `Zz List ${run} ${String(index).padStart(2, '0')}`,
           department: finance,
+          status: 'draft',
           lineItems: [{ description: 'Item', quantity: 1, unitPrice: 10 }],
         },
       },
@@ -177,7 +181,7 @@ test('the purchase request list filters by status, and keeps the filter and its 
 }) => {
   const run = `${Date.now()}-${test.info().retry}`
   const finance = await departmentId(request, 'Finance')
-  for (const status of ['approved', 'rejected']) {
+  for (const status of ['draft', 'returned']) {
     const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
       data: {
         values: {
@@ -193,24 +197,24 @@ test('the purchase request list filters by status, and keeps the filter and its 
   }
 
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
-  const approved = page.getByRole('row', { name: new RegExp(`Zz Status ${run} approved `) })
-  const rejected = page.getByRole('row', { name: new RegExp(`Zz Status ${run} rejected `) })
-  await expect(approved).toBeVisible()
-  await expect(rejected).toBeVisible()
+  const draft = page.getByRole('row', { name: new RegExp(`Zz Status ${run} draft `) })
+  const returned = page.getByRole('row', { name: new RegExp(`Zz Status ${run} returned `) })
+  await expect(draft).toBeVisible()
+  await expect(returned).toBeVisible()
 
   const filters = page.getByTestId('filter-bar')
   await filters.getByLabel('Status', { exact: true }).click()
-  await page.locator('.ant-select-item-option[title="approved"]').click()
+  await page.locator('.ant-select-item-option[title="returned"]').click()
 
-  const filteredPath = /\/purchasing\/purchaserequests\?statusFilter=approved&pageSize=100&sort=-title$/
+  const filteredPath = /\/purchasing\/purchaserequests\?statusFilter=returned&pageSize=100&sort=-title$/
   for (const reload of [false, true]) {
     if (reload) {
       await page.reload()
     }
     await expect(page).toHaveURL(filteredPath)
-    await expect(filters.locator('.ant-select-selection-item')).toHaveText('approved')
-    await expect(approved).toContainText('approved')
-    await expect(rejected).toHaveCount(0)
+    await expect(filters.locator('.ant-select-selection-item')).toHaveText('returned')
+    await expect(returned).toContainText('returned')
+    await expect(draft).toHaveCount(0)
   }
 })
 
@@ -218,26 +222,50 @@ test('the per-department page shows one row per department with its total, sorts
   page,
   request,
 }) => {
-  // Engineering < Finance < Operations by total, even with retries and other tests adding Finance and
-  // Operations requests in parallel.
+  // anna submits one request in each department, so the finance reviewer dung reads them all.
+  // Engineering < Finance < Operations by total, even with retries and other tests adding Operations
+  // requests in parallel.
   const prices = { Engineering: 1, Finance: 100, Operations: 9000000 }
+  const ids: string[] = []
   for (const [name, unitPrice] of Object.entries(prices)) {
     const response = await request.post(`${appPath}/entities/PurchaseRequest/records`, {
       data: {
         values: {
           title: `Zz Group ${Date.now()}-${test.info().retry} ${name}`,
           department: await departmentId(request, name),
+          status: 'draft',
           lineItems: [{ description: 'Item', quantity: 1, unitPrice }],
         },
       },
       headers: csrfHeaders,
     })
     expect(response.status()).toBe(201)
+    const { id } = (await response.json()) as { id: string }
+    const started = await request.post(`${appPath}/processes/PurchaseRequestApproval/instances`, {
+      data: { subjectId: id },
+      headers: csrfHeaders,
+    })
+    expect(started.status()).toBe(201)
+    ids.push(id)
+  }
+  // The worker submits each request some time after its start.
+  for (const id of ids) {
+    await expect
+      .poll(
+        async () => {
+          const read = await request.get(`${appPath}/entities/PurchaseRequest/records/${id}`)
+          return ((await read.json()) as { values: { status: string } }).values.status
+        },
+        { timeout: 30_000 },
+      )
+      .toBe('submitted')
   }
 
-  // Only this test writes Engineering requests, so their total stays fixed during the run. The approval
-  // spec adds Operations requests in parallel, so the Operations total is not checked.
-  const groups = await request.get(`${appPath}/data-sources/RequestsByDepartment/rows?pageSize=100`)
+  // Only this test submits Engineering requests, and no one decides them, so their total stays fixed
+  // during the run. The approval spec adds Operations requests in parallel, so the Operations total is
+  // not checked.
+  await useSession(page, 'dung')
+  const groups = await page.request.get(`${appPath}/data-sources/RequestsByDepartment/rows?pageSize=100`)
   expect(groups.status()).toBe(200)
   const body = (await groups.json()) as {
     items: { id: null; values: { total: number }; labels: { department: string } }[]
@@ -286,6 +314,7 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   await page.getByRole('link', { name: 'New' }).click()
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
   await choose(page, 'Department', 'Finance')
+  await select(page, 'Status', 'draft')
   await page.getByRole('button', { name: 'Add row' }).click()
   await page.getByRole('button', { name: 'Add row' }).click()
   await cell('Description 1').fill('Desk lamp')
@@ -341,6 +370,8 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
 })
 
 test('switching the locale to Vietnamese shows the Vietnamese navigation', async ({ page }) => {
+  // The per-department page is not in the employee's navigation, so this test runs as the finance reviewer.
+  await useSession(page, 'dung')
   // The header actions take room. At the default width they can push the last Vietnamese
   // navigation entry into the overflow menu, so this test uses a wider window.
   await page.setViewportSize({ width: 1440, height: 900 })
