@@ -49,7 +49,6 @@ internal static class ProcessStartEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -91,7 +90,7 @@ internal static class ProcessStartEndpoints
         var response = new ProcessInstanceResponse(instanceId, model.Name, subjectId, active.ReleaseId, ProcessStarts.Running);
         var body = JsonSerializer.Serialize(response, JsonSerializerOptions.Web);
 
-        var user = await CurrentUsers.FindAsync(request.HttpContext, directory);
+        var user = await CurrentUsers.FindAsync(request.HttpContext);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 

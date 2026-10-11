@@ -62,8 +62,8 @@ export interface TaskItem {
 /** The outcome of completing a task, or the problem the server reported. */
 export type CompleteResult = { ok: true } | { ok: false; problem: RecordProblem }
 
-// The task API still reads only the test user, so a 401 there must not start sign-in: a person
-// signed in through the identity provider would loop through sign-in forever.
+// A 401 from the task API must not start sign-in. The task inbox and task page keep their own
+// sign-in prompt until sign-in is needed everywhere in M4.
 const taskApiOptions = { signInOnUnauthorized: false }
 
 /** What the task API answers when nobody is signed in. */

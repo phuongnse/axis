@@ -15,8 +15,8 @@ namespace Axis.Server.Processes;
 
 /// <summary>
 /// The task API endpoints that list the current user's open human tasks, read one task and
-/// complete one. The current user is the session user, or else the signed-in test user. A user may
-/// act on a task assigned to their id, or to a role they hold. A request is checked in order:
+/// complete one. The current user is the session user. A user may act on a task assigned to their
+/// id, or to a role they hold. A request is checked in order:
 /// signed-in user (401), application (404), then for a list the paging (400), and for a read or a
 /// completion the task id and the task's application (404) and who may act (403).
 /// A completion then locks the task and checks that it is open (409), then the content type (415),
@@ -45,10 +45,9 @@ internal static class TaskEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
-        if (await CurrentUsers.FindAsync(httpContext, directory) is not { } user)
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
             return SignInRequired();
         }
@@ -91,10 +90,9 @@ internal static class TaskEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
-        if (await CurrentUsers.FindAsync(httpContext, directory) is not { } user)
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
             return SignInRequired();
         }
@@ -133,11 +131,10 @@ internal static class TaskEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         ITenantContextAccessor tenants,
         CancellationToken cancellationToken)
     {
-        if (await CurrentUsers.FindAsync(request.HttpContext, directory) is not { } user)
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
             return SignInRequired();
         }

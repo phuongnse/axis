@@ -8,6 +8,14 @@ test('the home page loads and reports a ready server', async ({ page }) => {
   await expect(page.getByTestId('server-status')).toContainText('Ready')
 })
 
+test('the shell header offers sign-in through the account button and no test user button', async ({ page }) => {
+  await page.goto('/')
+
+  const banner = page.getByRole('banner')
+  await expect(banner.getByRole('button', { name: 'Sign in' })).toBeVisible()
+  await expect(banner.getByRole('button', { name: 'Test user' })).toHaveCount(0)
+})
+
 test('dark mode can be switched on and survives a reload', async ({ page }) => {
   await page.goto('/')
   const toggle = page.getByRole('switch', { name: 'Dark mode' })

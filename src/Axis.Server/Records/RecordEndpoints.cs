@@ -15,8 +15,8 @@ namespace Axis.Server.Records;
 /// names no active application, entity or record is a 404 before the query or body is checked; a
 /// child entity is no entity here. A create or update writes the record and its child rows in one
 /// transaction. Every create, update and delete that succeeds appends one audit record in its
-/// transaction. Its actor is the session user, or else the signed-in test user, with their display
-/// name, or <c>anonymous</c>. A write that fails leaves none.
+/// transaction. Its actor is the session user, with their display name, or <c>anonymous</c>. A
+/// write that fails leaves none.
 /// A body is checked in order: content type (415), then body (400), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
@@ -180,7 +180,6 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
@@ -207,7 +206,7 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
-        var user = await CurrentUsers.FindAsync(request.HttpContext, directory);
+        var user = await CurrentUsers.FindAsync(request.HttpContext);
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -242,7 +241,6 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
@@ -289,7 +287,7 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(computeErrors);
         }
 
-        var user = await CurrentUsers.FindAsync(request.HttpContext, directory);
+        var user = await CurrentUsers.FindAsync(request.HttpContext);
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -322,7 +320,6 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        TestUserDirectory directory,
         CancellationToken cancellationToken)
     {
         var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
@@ -336,7 +333,7 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
-        var user = await CurrentUsers.FindAsync(httpContext, directory);
+        var user = await CurrentUsers.FindAsync(httpContext);
         var connection = await database.GetConnectionAsync(cancellationToken);
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))

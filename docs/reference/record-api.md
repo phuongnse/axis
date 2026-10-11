@@ -484,9 +484,8 @@ can be read as its history (D21).
 - **Actions.** The actions are `record.created`, `record.updated` and
   `record.deleted`.
 - **Actor.** The actor is the user of the
-  [session](../architecture.md#sign-in-and-the-session). Without a session,
-  it is the signed-in [test user](../architecture.md#development-test-users),
-  or `anonymous` when nobody is signed in. The audit record also stores the
+  [session](../architecture.md#sign-in-and-the-session), or `anonymous` when
+  nobody is signed in. The audit record also stores the
   user's display name as it was at that moment. It stores none for
   `anonymous`. A process
   [operation step](processes.md#running-a-step) that updates its subject

@@ -74,8 +74,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
             items.Where(item => item.GetProperty("actor").GetString() == AuditActors.System),
             item => Assert.Equal(JsonValueKind.Null, item.GetProperty("actorName").ValueKind));
 
-        // The names are stored with the audit records. The fixture configures no test users, so
-        // the name can come only from the user's session.
+        // The names are stored with the audit records. They come from the user's session.
         var stored = await fixture.ActorsAsync(TenantA, subject);
         Assert.Contains(stored, row => row.Actor == AuditActors.System);
         Assert.All(stored, row => Assert.Equal(row.Actor == AuditActors.System ? null : "Maria Manager", row.ActorName));

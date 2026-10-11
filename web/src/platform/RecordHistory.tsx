@@ -29,7 +29,7 @@ function textOr(t: (key: string) => string, key: string, fallback: string): stri
   return text === key ? fallback : text
 }
 
-/** Who did what an entry records: the test user's name, System, Anonymous, or the raw actor id. */
+/** Who did what an entry records: the user's name, System, Anonymous, or the raw actor id. */
 function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string): string {
   if (actorName !== null) {
     return actorName

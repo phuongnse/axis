@@ -16,8 +16,6 @@
   "shell.account.label": "Account",
   "shell.account.signIn": "Sign in",
   "shell.account.signOut": "Sign out",
-  "shell.user.label": "Test user",
-  "shell.user.signOut": "Sign out",
   "shell.home.sites.title": "Sites",
   "shell.home.sites.empty": "No application is active.",
   "shell.home.sites.loadFailed": "The sites could not be loaded.",

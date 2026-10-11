@@ -11,7 +11,6 @@ using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 
@@ -32,44 +31,14 @@ builder.Services.AddTenancy(builder.Configuration);
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
 var oidcTenants = TenantOidcSettings.Load(builder.Configuration);
 
-// Fails startup when test users are configured outside Development and Testing. The directory is
-// registered in every environment, because GET /api/me reads it.
-var testUsers = TestUserDirectory.Load(builder.Configuration, builder.Environment);
-builder.Services.AddSingleton(testUsers);
-
 // The development, E2E and test servers run over http, where a Secure cookie never comes back.
 var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");
 var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 builder.Services.TryAddSingleton(TimeProvider.System);
 
-// Record writes, process starts and tasks read the session first. The test-user cookie stays the
-// default scheme while test users are enabled, so a signed-in test user still counts without one.
-var authentication = builder.Services.AddAuthentication(
-    testUsers.Enabled ? CookieAuthenticationDefaults.AuthenticationScheme : Session.Scheme);
-if (testUsers.Enabled)
-{
-    authentication.AddCookie(options =>
-    {
-        options.Cookie.Name = "Axis.TestUser";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        // The development and E2E servers run over http.
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-        // An API answers with a status code, never a redirect to a sign-in page.
-        options.Events.OnRedirectToLogin = context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return Task.CompletedTask;
-        };
-        options.Events.OnRedirectToAccessDenied = context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return Task.CompletedTask;
-        };
-    });
-}
-
-authentication
+// Record writes, process starts, tasks and GET /api/me read the session. It is the default
+// scheme, so a request that carries a session renews it.
+builder.Services.AddAuthentication(Session.Scheme)
     .AddSession(sessionCookiePolicy)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed);
 
@@ -112,12 +81,6 @@ app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
 app.MapUserEndpoints();
 app.MapAuthEndpoints();
-
-// The sign-in endpoints exist only in Development and Testing. The test user list answers 404 elsewhere.
-if (testUsers.Enabled)
-{
-    app.MapTestUserEndpoints();
-}
 
 app.MapFallbackToFile("index.html");
 
