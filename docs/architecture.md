@@ -378,9 +378,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 
 It follows [D27](decisions.md#d27-inbound-endpoints--agreed). The token
 checks, the tenant binding, the endpoint-only acceptance, the CSRF exemption
-and the development realm's client are built. The endpoint call is not: the
-endpoint routes answer a valid caller with a `404`, because no endpoint
-exists yet. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
+and the development realm's client are built. The `endpoint` resource and its
+compile checks are built too. The endpoint call is not: the endpoint routes
+answer a valid caller with a `404`, because nothing serves an endpoint yet. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
 with a bearer token. This sits next to the browser session: the session
 stays the only way in for people, and a bearer token is the only way in for
 systems.

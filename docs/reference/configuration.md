@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector` or `event`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event` or `endpoint`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -255,14 +255,15 @@ flowchart LR
      [processes](processes.md#compile-checks).
    - **Policies.** Each `roles` entry of a [policy](#roles-and-policies) must
      name a declared role, compared exactly, otherwise it is `AXC0090` at
-     `/roles/{i}`. A grant without exactly one of `entity`, `dataSource` and
-     `process` is `AXC0091` at `/grants/{i}`, and nothing else of it is
-     checked. An action its target's kind does not take is `AXC0091` at
-     `/grants/{i}/actions/{j}`, and a `filter` or `fields` on a `dataSource`
-     or `process` grant is `AXC0091` at `/grants/{i}/filter` or
-     `/grants/{i}/fields`. A target that names no loaded entity, data source
-     or process, ignoring letter case, is `AXC0092` at `/grants/{i}/entity`,
-     `/grants/{i}/dataSource` or `/grants/{i}/process`. A grant on a child
+     `/roles/{i}`. A grant without exactly one of `entity`, `dataSource`,
+     `process` and `endpoint` is `AXC0091` at `/grants/{i}`, and nothing else
+     of it is checked. An action its target's kind does not take is `AXC0091`
+     at `/grants/{i}/actions/{j}`, and a `filter` or `fields` on a
+     `dataSource`, `process` or `endpoint` grant is `AXC0091` at
+     `/grants/{i}/filter` or `/grants/{i}/fields`. A target that names no
+     loaded entity, data source, process or endpoint, ignoring letter case, is
+     `AXC0092` at `/grants/{i}/entity`, `/grants/{i}/dataSource`,
+     `/grants/{i}/process` or `/grants/{i}/endpoint`. A grant on a child
      entity is `AXC0093` at `/grants/{i}/entity`, naming the owner. Its
      `fields` and `filter` are then not checked. A `fields` entry that names
      no field of the entity, ignoring letter case, is `AXC0094` at
@@ -273,8 +274,8 @@ flowchart LR
      `/grants/{i}/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
      outside the SQL subset, such as an aggregate or `lower`, is `AXC0053`.
-     A name whose role, entity, data source or process file was not loaded
-     because of its own errors is not reported again.
+     A name whose role, entity, data source, process or endpoint file was not
+     loaded because of its own errors is not reported again.
    - **Connectors.** A [connector](#connector-resource)'s `timeout` that is not
      a positive ISO 8601 duration of at most `PT2M`, in the form a task's
      `dueIn` takes, is `AXC0099` at `/timeout`. A later operation whose name
@@ -304,6 +305,34 @@ flowchart LR
      `AXC0112` at `/fields/{i}/name`. A field of type `enum`, `reference` or
      `child-collection` is `AXC0113` at `/fields/{i}/type`. A type name that
      is not a field type is `AXC0004`.
+   - **Endpoints.** An [endpoint](#endpoint-resource)'s `entity` must name a
+     loaded entity, ignoring letter case, otherwise it is `AXC0114` at
+     `/entity`. An `entity` that is a child entity is `AXC0115` at `/entity`,
+     naming the owner. Its `process` must name a loaded process, otherwise it
+     is `AXC0116` at `/process`. A process whose subject entity is another
+     entity is `AXC0117` at `/process`. Each input field is checked as an
+     entity field at `/input/{i}`, so a type property on the wrong type is
+     `AXC0013`, a missing `target` or `values` is `AXC0014`, an unknown
+     `target` is `AXC0012`, a `reference` to a child entity is `AXC0040`, and
+     a `reference` to an entity without a `displayField` is `AXC0030`. A
+     later input whose name an earlier input already uses, ignoring letter
+     case, is `AXC0118` at `/input/{i}/name`. A `child-collection` input whose
+     `target` is not a child entity is `AXC0119` at `/input/{i}/target`. A
+     `values` key that names no field of the entity, or a field that an
+     earlier key already maps, ignoring letter case, is `AXC0120` at
+     `/values/{key}`. A key that names a computed field, or a field with a
+     `sequence` or `creator`, is `AXC0121` there. A `child-collection` field
+     whose value is not the name of a `child-collection` input with the same
+     target is `AXC0122` there. Any other value is parsed and type-checked
+     against the field's type over the input fields only, and its first
+     problem is reported at `/values/{key}` with its
+     [expression diagnostic](expressions.md#diagnostics) code. A value is not
+     matched against the input while an input field has a diagnostic. An
+     `output` entry that names no field of the entity is `AXC0123` at
+     `/output/{i}`. A `wait` that is not a valid ISO 8601 duration, is zero,
+     or is above `PT30S` is `AXC0124` at `/wait`. When the entity is unknown,
+     `values` and `output` are not checked. A name whose entity or process
+     file was not loaded because of its own errors is not reported again.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -318,7 +347,10 @@ flowchart LR
    checked, and the connectors in path order, with their timeout, operations,
    typed input and output fields, and each lookup resolved to the declared
    name of its operation, and the events in path order, with their entity
-   resolved, and their typed fields. No model is produced while any error remains.
+   resolved, and their typed fields. It also holds the endpoints in path
+   order, with their entity, process and input targets resolved, their
+   typed input fields, their mapped fields in the entity's order with each
+   expression checked, and their output and wait. No model is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -545,8 +577,8 @@ sorted by file and then path.
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 | `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
-| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource` and `process`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, and a process `start`. Or a `dataSource` or `process` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
-| `AXC0092` | A policy grant's `entity`, `dataSource` or `process` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource` or `/grants/{i}/process`. Not reported when the name is a file that was not loaded because of its own errors. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0092` | A policy grant's `entity`, `dataSource`, `process` or `endpoint` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint`. Not reported when the name is a file that was not loaded because of its own errors. |
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
 | `AXC0095` | An expression that is not a policy filter calls `currentUser()`, such as a validation, a computed field, a data source filter, a process condition or a rule body. A rule argument inside a policy filter may call it. Reported at that expression's path, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
@@ -568,6 +600,17 @@ sorted by file and then path.
 | `AXC0111` | An event's `entity` is a child entity. Reported at `/entity`, naming the owner. |
 | `AXC0112` | An earlier field of the same event already uses this field `name`, ignoring letter case. Reported at `/fields/{i}/name` of the later one, naming the first. |
 | `AXC0113` | An event field's `type` is `enum`, `reference` or `child-collection`. An event field is `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`. Reported at `/fields/{i}/type`. |
+| `AXC0114` | An endpoint's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
+| `AXC0115` | An endpoint's `entity` is a child entity. Reported at `/entity`, naming the owner. |
+| `AXC0116` | An endpoint's `process` names no loaded process. Reported at `/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
+| `AXC0117` | An endpoint's `process` is over another entity than the endpoint's `entity`. Reported at `/process`, naming both entities. |
+| `AXC0118` | An earlier input field of the same endpoint already uses this `name`, ignoring letter case. Reported at `/input/{i}/name` of the later one, naming the first. |
+| `AXC0119` | A `child-collection` input field's `target` is not a child entity. Reported at `/input/{i}/target`. |
+| `AXC0120` | An endpoint's `values` key names no field of the entity, or a field that an earlier key already maps, ignoring letter case. Reported at `/values/{key}`. |
+| `AXC0121` | An endpoint's `values` key names a computed field, or a field with a `sequence` or `creator`, which the server sets. Reported at `/values/{key}`. |
+| `AXC0122` | An endpoint maps a `child-collection` field to something other than the name of a `child-collection` input with the same target. Reported at `/values/{key}`. |
+| `AXC0123` | An endpoint's `output` entry names no field of the entity, ignoring letter case. Reported at `/output/{i}`. |
+| `AXC0124` | An endpoint's `wait` is not a valid ISO 8601 duration, is zero, or is above `PT30S`. Reported at `/wait`. |
 
 ## Startup activation
 
@@ -1160,16 +1203,18 @@ build issue.
 
 ## Inbound endpoints
 
-*(planned for M5)* This section follows
-[D27](../decisions.md#d27-inbound-endpoints--agreed). None of it is built
-yet. An `endpoint` resource lets another system create a record and start a
-process on it in one call. The call, its responses and its errors are in
+*(partly built, M5)* This section follows
+[D27](../decisions.md#d27-inbound-endpoints--agreed). The `endpoint` resource
+and its compile checks are built. Serving the call is not built yet, so no
+request reaches an endpoint. An `endpoint` resource lets another system create
+a record and start a process on it in one call. The call, its responses and its errors are in
 [Inbound endpoints](record-api.md#inbound-endpoints). How a machine caller
 signs in is in [Machine callers](../architecture.md#machine-callers).
 
 ### Endpoint resource
 
-*(planned for M5)* The purchase request sample will hold an endpoint that
+The resource and its compile checks are built. The purchase request sample
+will hold an endpoint that
 lets the purchasing system submit a purchase request, in
 `endpoints/submit-purchase-request.json`:
 
@@ -1266,7 +1311,7 @@ a note, closes it and returns its status, in
 When the worker runs the `close` step within 10 seconds, the call answers
 `201` with `code` and `status`. Otherwise it answers `202` with a status
 location. The sample files, the fixture files and the Keycloak realm do not
-change until the build issues add endpoints.
+change until the build issue that serves endpoints.
 
 A [data change trigger](#trigger-resource) on `create` of the same entity
 that starts the same process would start it inside the endpoint's record
@@ -1274,24 +1319,35 @@ create. The endpoint's own start would then find the instance running, and
 every call would answer `409`. This is a configuration mistake. The compiler
 does not prevent it.
 
-The compiler reports these as compile errors. Their codes come with the
-build issue.
+The compiler reports these as compile errors, all in one pass. The
+[Resolve step](#configuration-pipeline) gives the details.
 
-- The `entity` exists and is not a child entity.
-- The `process` exists, and its subject entity is `entity`.
+- The `entity` exists and is not a child entity: `AXC0114` and `AXC0115`.
+- The `process` exists, and its subject entity is `entity`: `AXC0116` and
+  `AXC0117`.
 - An input field's type is an entity field type, with only that type's
-  properties, and no `expression`, `sequence` or `creator`.
-- A `reference` or `child-collection` input names an existing `target`. A
-  `child-collection` target is a child entity.
-- Each `values` key names a field of `entity` that is not computed, and has
-  no `sequence` or `creator`.
+  properties. A property on the wrong type is `AXC0013`, and a missing
+  `target` or `values` is `AXC0014`. The schema refuses `label`, `unique`,
+  `expression`, `sequence` and `creator` on an input field, as `AXC0004`.
+- Input names are unique, ignoring letter case: `AXC0118`.
+- A `reference` or `child-collection` input names an existing `target`
+  (`AXC0012`). A `reference` target is not a child entity (`AXC0040`). A
+  `child-collection` target is a child entity (`AXC0119`).
+- Each `values` key names a field of `entity`, once (`AXC0120`). The field is
+  not computed, and has no `sequence` or `creator` (`AXC0121`).
 - Each `values` expression sees only the input fields, and gives the field's
-  type.
+  type. It cannot call rules or aggregates, or follow a path. An `enum`
+  input fits an `enum` field when all its values are the field's values. A
+  `reference` input fits a `reference` field with the same target. A
+  problem gets its [expression diagnostic](expressions.md#diagnostics) code,
+  such as `AXC0048`.
 - A `child-collection` field is mapped to a `child-collection` input with the
-  same target.
-- Each `output` entry names a field of `entity`.
-- `output` and `wait` are declared together.
-- `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`.
+  same target, by its name: `AXC0122`.
+- Each `output` entry names a field of `entity`: `AXC0123`.
+- `output` and `wait` are declared together. The schema checks this, so
+  breaking it is `AXC0004`.
+- `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`:
+  `AXC0124`. So `PT0S` is `AXC0124`.
 
 ## Extension packages
 
@@ -1344,7 +1400,9 @@ applies it. The `role` and `policy` resources, the check of task assignees
 and the policy checks are built. So are matching the roles claim and
 enforcing every grant. That covers entity grants with filters and fields on
 the record API, data source grants with root read filters and field checks,
-and process `start` grants. Each compile check below is a compile error.
+and process `start` grants. The `endpoint` grant with its `invoke` action and
+its compile checks are built too, but nothing enforces it until endpoints are
+served. Each compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
 
@@ -1459,10 +1517,11 @@ outcomes:
 - **Roles.** `roles` lists one or more declared roles. A user who holds any
   of them gets every grant of the policy.
 - **Grants.** `grants` lists one or more grants. Each has exactly one target,
-  `entity`, `dataSource` or `process`, and one or more `actions`:
+  `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`.
+  - a `process` takes `start`;
+  - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
   the entity's fields, paths through `reference` fields of up to 3 hops, the
@@ -1482,10 +1541,11 @@ outcomes:
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](../architecture.md#combining-grants).
 
-*(planned for M5)* A policy will also grant inbound
-[endpoints](#endpoint-resource). The target is `endpoint`, and its only
-action is `invoke`. An `endpoint` grant takes no `filter` or `fields`.
-Holding it is enough to call the endpoint: the record create and the process
+A policy also grants inbound [endpoints](#endpoint-resource). The target is
+`endpoint`, and its only action is `invoke`. An `endpoint` grant takes no
+`filter` or `fields`. The grant and its compile checks are built. Enforcing
+it comes with serving endpoints, *(planned for M5)*. Holding it will be
+enough to call the endpoint: the record create and the process
 start inside the call need no `entity` or `process` grant of the caller. The
 purchase request sample will give the purchasing system this policy, in
 `policies/purchasing-system-access.json`:
@@ -1514,9 +1574,8 @@ Its role, in `roles/purchasing-system.json`:
 ```
 
 The caller holds the role through the roles claim of its token, as a user
-does. See [Machine callers](../architecture.md#machine-callers). The compile
-checks of the `endpoint` target and the `invoke` action come with the build
-issue.
+does. See [Machine callers](../architecture.md#machine-callers). The sample
+gains this policy and role when endpoints are served.
 
 Compile checks, each a compile error:
 
@@ -1524,15 +1583,16 @@ Compile checks, each a compile error:
   exactly, is `AXC0089`.
 - A policy `roles` entry that names no declared role, compared exactly, is
   `AXC0090`.
-- A grant without exactly one of `entity`, `dataSource` and `process` is
-  `AXC0091`.
-- A target that names no loaded entity, data source or process, ignoring
-  letter case, is `AXC0092`.
+- A grant without exactly one of `entity`, `dataSource`, `process` and
+  `endpoint` is `AXC0091`.
+- A target that names no loaded entity, data source, process or endpoint,
+  ignoring letter case, is `AXC0092`.
 - An action that the target's kind does not take, such as `start` on an
-  entity, is `AXC0091`.
+  entity or `read` on an endpoint, is `AXC0091`.
 - A grant on a child entity is `AXC0093`. Child rows are read and written
   through their owner's grants.
-- A `filter` or `fields` on a `dataSource` or `process` grant is `AXC0091`.
+- A `filter` or `fields` on a `dataSource`, `process` or `endpoint` grant is
+  `AXC0091`.
 - A `fields` entry that names no field of the entity, ignoring letter case,
   is `AXC0094`.
 - A `filter` that is not boolean is `AXC0048`, and one that uses something
@@ -1542,8 +1602,8 @@ Compile checks, each a compile error:
 - `currentUser()` anywhere but a policy filter is `AXC0095`.
 
 The schema checks the shape of each property: `roles` and `grants` are
-non-empty lists, each action is one of `read`, `create`, `update`, `delete`
-and `start`, and a grant has no other properties. A problem there is
+non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
+`start` and `invoke`, and a grant has no other properties. A problem there is
 `AXC0004`.
 
 ### Record creator

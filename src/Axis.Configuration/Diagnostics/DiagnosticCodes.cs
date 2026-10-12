@@ -113,4 +113,16 @@ public static class DiagnosticCodes
     public const string EventOverChildEntity = "AXC0111";
     public const string DuplicateEventFieldName = "AXC0112";
     public const string InvalidEventFieldType = "AXC0113";
+
+    public const string UnknownEndpointEntity = "AXC0114";
+    public const string EndpointOverChildEntity = "AXC0115";
+    public const string UnknownEndpointProcess = "AXC0116";
+    public const string EndpointProcessOverOtherEntity = "AXC0117";
+    public const string DuplicateEndpointInputName = "AXC0118";
+    public const string InvalidEndpointInputTarget = "AXC0119";
+    public const string UnknownEndpointValueField = "AXC0120";
+    public const string ReadOnlyEndpointValueField = "AXC0121";
+    public const string InvalidEndpointCollectionValue = "AXC0122";
+    public const string UnknownEndpointOutputField = "AXC0123";
+    public const string InvalidEndpointWait = "AXC0124";
 }

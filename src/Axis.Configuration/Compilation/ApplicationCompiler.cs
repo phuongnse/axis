@@ -19,7 +19,8 @@ namespace Axis.Configuration.Compilation;
 /// their step graphs, their conditions, the roles their tasks name and the connector operations
 /// their steps call, checks policies, their
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
-/// lookups, checks events, their entities and their payload fields, and resolves references
+/// lookups, checks events, their entities and their payload fields, checks endpoints, their
+/// entities, processes, input fields, mappings, output and wait, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -108,6 +109,15 @@ public static class ApplicationCompiler
 
         ConnectorResource? FindConnector(string name) => connectorsByName.GetValueOrDefault(name);
 
+        // Endpoint names follow the same rule too.
+        var endpointsByName = new Dictionary<string, EndpointResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var endpoint in loaded.Endpoints)
+        {
+            endpointsByName.TryAdd(endpoint.Name, endpoint);
+        }
+
+        EndpointResource? FindEndpoint(string name) => endpointsByName.GetValueOrDefault(name);
+
         // Role names are lower case only and are matched exactly.
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
@@ -167,6 +177,8 @@ public static class ApplicationCompiler
             loaded.UnloadedDataSourceNames,
             FindProcess,
             loaded.UnloadedProcessNames,
+            FindEndpoint,
+            loaded.UnloadedEndpointNames,
             rules,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
@@ -175,6 +187,15 @@ public static class ApplicationCompiler
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
             loaded.UnloadedEntityNames,
+            diagnostics);
+        EndpointChecker.Check(
+            loaded.Endpoints,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            FindProcess,
+            loaded.UnloadedProcessNames,
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, report),
             diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
@@ -196,9 +217,10 @@ public static class ApplicationCompiler
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
             Roles = loaded.Roles,
-            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, rules)).ToList(),
+            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
             Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
+            Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
         };
         return result with
         {

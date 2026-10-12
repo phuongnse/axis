@@ -12,7 +12,8 @@ namespace Axis.Configuration.Compilation;
 /// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
 /// are given, which for now is the top level of a validation, a data source filter, a process
-/// condition and a policy filter. A policy filter uses a data source scope with no parameters. A
+/// condition and a policy filter. A policy filter uses a data source scope with no parameters. An
+/// endpoint's mapping scope holds only the endpoint's input fields, typed as parameters. A
 /// data source scope adds the data source's parameters after the fields, has the named
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
 /// process scope resolves paths the same way. No other scope resolves paths.
@@ -128,6 +129,19 @@ public static class ExpressionScopes
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity));
     }
+
+    /// <summary>
+    /// The scope of an endpoint's mapping expression: the input fields only, typed as data source
+    /// parameters are. An enum input declares its own values, and a reference input holds a target
+    /// id but no row. A child-collection input has no type, so it is not in the scope. The scope has
+    /// no rules, no collections and resolves no paths.
+    /// </summary>
+    internal static ExpressionScope ForEndpointInput(IEnumerable<EndpointInputDefinition> input) =>
+        Build(
+            input.Select(field => (field.Name, ParameterTypeOf(field.Name, FieldTypes.Parse(field.Type), field.Values, field.Target))),
+            rules: null,
+            collections: null,
+            referenceFields: null);
 
     /// <summary>The expression type of a field's value, or null for a child collection.</summary>
     public static ExpressionType? TypeOf(FieldModel field)

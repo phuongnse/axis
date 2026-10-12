@@ -8,9 +8,10 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Checks the policies of an application and builds the checked ones. Each role a policy names is
 /// a declared role, matched exactly. Each grant has exactly one target: an <c>entity</c>, a
-/// <c>dataSource</c> or a <c>process</c>. Its actions are ones that target takes: <c>read</c>,
-/// <c>create</c>, <c>update</c> and <c>delete</c> for an entity, <c>read</c> for a data source and
-/// <c>start</c> for a process. Only an entity grant has a <c>filter</c> or <c>fields</c>. The target
+/// <c>dataSource</c>, a <c>process</c> or an <c>endpoint</c>. Its actions are ones that target
+/// takes: <c>read</c>, <c>create</c>, <c>update</c> and <c>delete</c> for an entity, <c>read</c> for
+/// a data source, <c>start</c> for a process and <c>invoke</c> for an endpoint. Only an entity grant
+/// has a <c>filter</c> or <c>fields</c>. The target
 /// is loaded, ignoring letter case, and an entity target is not a child entity. Each of its
 /// <c>fields</c> is a field of the entity, ignoring letter case. Its <c>filter</c> parses,
 /// type-checks as a boolean over the entity's fields, paths through reference fields and the named
@@ -24,6 +25,7 @@ internal static class PolicyChecker
     private static readonly PolicyAction[] _entityActions = [PolicyAction.Read, PolicyAction.Create, PolicyAction.Update, PolicyAction.Delete];
     private static readonly PolicyAction[] _dataSourceActions = [PolicyAction.Read];
     private static readonly PolicyAction[] _processActions = [PolicyAction.Start];
+    private static readonly PolicyAction[] _endpointActions = [PolicyAction.Invoke];
 
     /// <summary>
     /// Checks <paramref name="policies"/>, which come in path order. <paramref name="roleNames"/>
@@ -41,6 +43,8 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedDataSourceNames,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
+        Func<string, EndpointResource?> findEndpoint,
+        IReadOnlySet<string> unloadedEndpointNames,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
@@ -70,6 +74,8 @@ internal static class PolicyChecker
                     unloadedDataSourceNames,
                     findProcess,
                     unloadedProcessNames,
+                    findEndpoint,
+                    unloadedEndpointNames,
                     rules,
                     Report);
             }
@@ -86,6 +92,7 @@ internal static class PolicyChecker
         IReadOnlyList<EntityModel> entities,
         Func<string, DataSourceResource?> findDataSource,
         Func<string, ProcessResource?> findProcess,
+        Func<string, EndpointResource?> findEndpoint,
         IEnumerable<ExpressionRule> rules)
     {
         EntityModel? Find(string name) =>
@@ -97,18 +104,25 @@ internal static class PolicyChecker
             if (grant.DataSource is { } dataSourceName)
             {
                 var dataSource = findDataSource(dataSourceName)!;
-                return new GrantModel(null, new DataSourceReference(dataSource.Id, dataSource.Name), null, actions, null, null);
+                return new GrantModel(null, new DataSourceReference(dataSource.Id, dataSource.Name), null, null, actions, null, null);
             }
 
             if (grant.Process is { } processName)
             {
                 var process = findProcess(processName)!;
-                return new GrantModel(null, null, new ProcessReference(process.Id, process.Name), actions, null, null);
+                return new GrantModel(null, null, new ProcessReference(process.Id, process.Name), null, actions, null, null);
+            }
+
+            if (grant.Endpoint is { } endpointName)
+            {
+                var endpoint = findEndpoint(endpointName)!;
+                return new GrantModel(null, null, null, new EndpointReference(endpoint.Id, endpoint.Name), actions, null, null);
             }
 
             var entity = Find(grant.Entity!)!;
             return new GrantModel(
                 new EntityReference(entity.Id, entity.Name),
+                null,
                 null,
                 null,
                 actions,
@@ -140,16 +154,18 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedDataSourceNames,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
+        Func<string, EndpointResource?> findEndpoint,
+        IReadOnlySet<string> unloadedEndpointNames,
         IEnumerable<ExpressionRule> rules,
         Action<string, string, string> report)
     {
-        var targets = new[] { grant.Entity, grant.DataSource, grant.Process }.Count(target => target is not null);
+        var targets = new[] { grant.Entity, grant.DataSource, grant.Process, grant.Endpoint }.Count(target => target is not null);
         if (targets != 1)
         {
             // Without exactly one target the actions, the filter and the fields mean nothing.
             report(
                 DiagnosticCodes.InvalidGrant,
-                $"A grant names exactly one target: an 'entity', a 'dataSource' or a 'process'. This one names {targets}.",
+                $"A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names {targets}.",
                 path);
             return;
         }
@@ -158,7 +174,8 @@ internal static class PolicyChecker
         {
             { Entity: { } entity } => ("entity", "An entity grant", entity, _entityActions),
             { DataSource: { } dataSource } => ("dataSource", "A data source grant", dataSource, _dataSourceActions),
-            _ => ("process", "A process grant", grant.Process!, _processActions),
+            { Process: { } process } => ("process", "A process grant", process, _processActions),
+            _ => ("endpoint", "An endpoint grant", grant.Endpoint!, _endpointActions),
         };
 
         for (var index = 0; index < grant.Actions.Count; index++)
@@ -203,6 +220,14 @@ internal static class PolicyChecker
                 if (findProcess(name) is null && !unloadedProcessNames.Contains(name))
                 {
                     report(DiagnosticCodes.UnknownGrantTarget, $"The process '{name}' was not found. No loaded process has that name.", $"{path}/process");
+                }
+
+                return;
+
+            case "endpoint":
+                if (findEndpoint(name) is null && !unloadedEndpointNames.Contains(name))
+                {
+                    report(DiagnosticCodes.UnknownGrantTarget, $"The endpoint '{name}' was not found. No loaded endpoint has that name.", $"{path}/endpoint");
                 }
 
                 return;
@@ -256,7 +281,8 @@ internal static class PolicyChecker
             "update" => PolicyAction.Update,
             "delete" => PolicyAction.Delete,
             "start" => PolicyAction.Start,
-            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete and start."),
+            "invoke" => PolicyAction.Invoke,
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, start and invoke."),
         };
 
     private static string Name(PolicyAction action) => action.ToString().ToLowerInvariant();

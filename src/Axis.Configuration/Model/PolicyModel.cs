@@ -23,8 +23,9 @@ public sealed record PolicyModel
 }
 
 /// <summary>
-/// A compiled grant. Exactly one of <see cref="Entity"/>, a root entity, <see cref="DataSource"/>
-/// and <see cref="Process"/> is set, and every action is one its target takes. Only an entity
+/// A compiled grant. Exactly one of <see cref="Entity"/>, a root entity, <see cref="DataSource"/>,
+/// <see cref="Process"/> and <see cref="Endpoint"/> is set, and every action is one its target
+/// takes. Nothing enforces an endpoint grant yet. Only an entity
 /// grant has a <see cref="Filter"/>, a boolean expression over the entity's fields and paths
 /// through reference fields, inside the SQL subset, that can call <c>currentUser()</c>, and
 /// <see cref="Fields"/>, the entity's field names as declared, or null for every field.
@@ -33,14 +34,15 @@ public sealed record GrantModel(
     EntityReference? Entity,
     DataSourceReference? DataSource,
     ProcessReference? Process,
+    EndpointReference? Endpoint,
     IReadOnlyList<PolicyAction> Actions,
     ExpressionModel? Filter,
     IReadOnlyList<string>? Fields);
 
 /// <summary>
 /// What a grant allows. An entity grant takes <see cref="Read"/>, <see cref="Create"/>,
-/// <see cref="Update"/> and <see cref="Delete"/>, a data source grant <see cref="Read"/>, and a
-/// process grant <see cref="Start"/>.
+/// <see cref="Update"/> and <see cref="Delete"/>, a data source grant <see cref="Read"/>, a
+/// process grant <see cref="Start"/>, and an endpoint grant <see cref="Invoke"/>.
 /// </summary>
 public enum PolicyAction
 {
@@ -49,4 +51,5 @@ public enum PolicyAction
     Update,
     Delete,
     Start,
+    Invoke,
 }

@@ -24,6 +24,7 @@ internal static class ResourceSchemas
         [ResourceKinds.Policy] = Load("policy.schema.json"),
         [ResourceKinds.Connector] = Load("connector.schema.json"),
         [ResourceKinds.Event] = Load("event.schema.json"),
+        [ResourceKinds.Endpoint] = Load("endpoint.schema.json"),
     };
 
     public static bool TryGet(string kind, out JsonSchema schema) =>
