@@ -1092,6 +1092,141 @@ build issue.
   a literal value of its type.
 - Each `type` has only its own properties.
 
+## Inbound endpoints
+
+*(planned for M5)* This section follows
+[D27](../decisions.md#d27-inbound-endpoints--agreed). None of it is built
+yet. An `endpoint` resource lets another system create a record and start a
+process on it in one call. The call, its responses and its errors are in
+[Inbound endpoints](record-api.md#inbound-endpoints). How a machine caller
+signs in is in [Machine callers](../architecture.md#machine-callers).
+
+### Endpoint resource
+
+*(planned for M5)* The purchase request sample will hold an endpoint that
+lets the purchasing system submit a purchase request, in
+`endpoints/submit-purchase-request.json`:
+
+```json
+{
+  "id": "bc241668-fe85-45a4-b7cf-d36da8d56b71",
+  "kind": "endpoint",
+  "name": "SubmitPurchaseRequest",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "process": "PurchaseRequestApproval",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    { "name": "supplier", "type": "reference", "target": "Supplier" },
+    { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"] },
+    { "name": "lineItems", "type": "child-collection", "target": "LineItem" }
+  ],
+  "values": {
+    "title": "title",
+    "department": "department",
+    "supplier": "supplier",
+    "currency": "currency",
+    "lineItems": "lineItems",
+    "status": "'draft'"
+  }
+}
+```
+
+The new request is a `draft` with line items, so it passes the process's
+`startCondition`. The process's `submit` step then moves it to `submitted`.
+The request's `requester` is its [creator](#record-creator) field, so it gets
+the caller's id.
+
+- **Entity and process.** `entity` names the entity of the record the call
+  creates. It is not a child entity. `process` names the process the call
+  starts on that record, and its subject entity is `entity`.
+- **Input.** `input` lists the typed input fields of the call's body.
+  - Their types are the
+    [entity field types](#entity-field-types-and-constraints), including
+    `reference` and `child-collection`, with the same constraints, such as
+    `required`, `maxLength`, `values` and `target`.
+  - `expression`, `sequence` and `creator` are not allowed on an input field.
+  - Names are unique within the endpoint, ignoring letter case.
+- **Values.** `values` maps subject fields to expressions over the input.
+  - Each key names a writable field of `entity`: not computed, and with no
+    `sequence` or `creator`.
+  - Each value is an [expression](expressions.md) that sees only the input
+    fields, and gives the field's type. A literal is a valid expression, such
+    as `"'draft'"`.
+  - A `child-collection` field takes a `child-collection` input with the same
+    target, by its name. The input's rows become the record's rows.
+  - Fields that `values` leaves out are `null`, as in a record API create.
+- **Output.** `output` is optional. It lists field names of `entity` that a
+  `201` returns when the instance completes within `wait`.
+- **Wait.** `wait` is an ISO 8601 duration, more than zero and at most
+  `PT30S`. It is how long the call waits for the instance to complete.
+- **Together.** `output` and `wait` are declared together, or neither is.
+
+An endpoint without `output` answers `201` as soon as the record and the
+instance are stored. The approval process always waits for a manager, so
+`SubmitPurchaseRequest` declares no output.
+
+An endpoint whose process finishes without a human task can return output.
+The E2E fixture application in `tests/e2e/fixtures/e2e-app` has a `Note`
+entity and a `NoteClose` process that closes a note. An endpoint that creates
+a note, closes it and returns its status, in
+`endpoints/import-closed-note.json`:
+
+```json
+{
+  "id": "83244ba2-b26f-4348-aa7a-0e39eb992fd3",
+  "kind": "endpoint",
+  "name": "ImportClosedNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "NoteClose",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "code", "type": "text", "maxLength": 50 },
+    { "name": "amount", "type": "decimal", "precision": 18, "scale": 2 }
+  ],
+  "values": {
+    "title": "title",
+    "code": "code",
+    "amount": "amount",
+    "status": "'open'"
+  },
+  "output": ["code", "status"],
+  "wait": "PT10S"
+}
+```
+
+When the worker runs the `close` step within 10 seconds, the call answers
+`201` with `code` and `status`. Otherwise it answers `202` with a status
+location. The sample files, the fixture files and the Keycloak realm do not
+change until the build issues add endpoints.
+
+A [data change trigger](#trigger-resource) on `create` of the same entity
+that starts the same process would start it inside the endpoint's record
+create. The endpoint's own start would then find the instance running, and
+every call would answer `409`. This is a configuration mistake. The compiler
+does not prevent it.
+
+The compiler reports these as compile errors. Their codes come with the
+build issue.
+
+- The `entity` exists and is not a child entity.
+- The `process` exists, and its subject entity is `entity`.
+- An input field's type is an entity field type, with only that type's
+  properties, and no `expression`, `sequence` or `creator`.
+- A `reference` or `child-collection` input names an existing `target`. A
+  `child-collection` target is a child entity.
+- Each `values` key names a field of `entity` that is not computed, and has
+  no `sequence` or `creator`.
+- Each `values` expression sees only the input fields, and gives the field's
+  type.
+- A `child-collection` field is mapped to a `child-collection` input with the
+  same target.
+- Each `output` entry names a field of `entity`.
+- `output` and `wait` are declared together.
+- `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`.
+
 ## Roles and policies
 
 This section follows
@@ -1238,6 +1373,42 @@ outcomes:
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](../architecture.md#combining-grants).
+
+*(planned for M5)* A policy will also grant inbound
+[endpoints](#endpoint-resource). The target is `endpoint`, and its only
+action is `invoke`. An `endpoint` grant takes no `filter` or `fields`.
+Holding it is enough to call the endpoint: the record create and the process
+start inside the call need no `entity` or `process` grant of the caller. The
+purchase request sample will give the purchasing system this policy, in
+`policies/purchasing-system-access.json`:
+
+```json
+{
+  "id": "1a742db5-543d-4e8d-8c66-61bf42a1b93b",
+  "kind": "policy",
+  "name": "PurchasingSystemAccess",
+  "formatVersion": 1,
+  "roles": ["purchasing-system"],
+  "grants": [{ "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
+}
+```
+
+Its role, in `roles/purchasing-system.json`:
+
+```json
+{
+  "id": "ae4c47b6-4ece-4666-ae0a-4e7b6731bf7d",
+  "kind": "role",
+  "name": "purchasing-system",
+  "formatVersion": 1,
+  "label": { "textKey": "role.purchasingSystem" }
+}
+```
+
+The caller holds the role through the roles claim of its token, as a user
+does. See [Machine callers](../architecture.md#machine-callers). The compile
+checks of the `endpoint` target and the `invoke` action come with the build
+issue.
 
 Compile checks, each a compile error:
 

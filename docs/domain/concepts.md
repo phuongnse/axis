@@ -103,6 +103,7 @@ See [processes](../reference/processes.md#steps).
 | **Trigger** | A `trigger` resource starts a process for one record when something happens. M5 has three kinds, listed below. See [triggers](../reference/configuration.md#events-and-triggers). | M5 |
 | **Event** | An `event` resource: a named event about one entity, with typed payload fields. A `raiseEvent` step raises it for its subject record. Event triggers start processes from it, in the same transaction (sync) or through durable delivery (async). Events raised by the platform come later. | M5 |
 | **Connector** | A `connector` resource for calling an external system. It has a base URL from a `url` binding, auth from a `secret` binding, a timeout and named operations. It can name the idempotency header the system accepts, and each operation can name a lookup that finds an earlier call by its key. See [connectors](../reference/configuration.md#connectors-and-deployment-bindings). | M5 |
+| **Endpoint** | An `endpoint` resource that lets another system, signed in with a bearer token, create a record and start a process on it in one call. It has typed input fields, the entity it creates, a mapping from input to fields and the process it starts. It can return output fields when the process completes within a short wait. *(planned for M5)* See [endpoints](../reference/configuration.md#endpoint-resource). | M5 |
 
 **Trigger kinds:**
 
@@ -112,8 +113,8 @@ See [processes](../reference/processes.md#steps).
 - **Schedule:** a cron schedule in an IANA time zone. It fans out over the
   records of a data source.
 
-Inbound endpoints are their own resource, not a trigger kind, and get their
-own decision.
+Inbound endpoints are their own resource, not a trigger kind. See
+[D27](../decisions.md#d27-inbound-endpoints--agreed).
 
 ## Presentation
 
@@ -132,7 +133,7 @@ own decision.
 | Concept | Meaning | From |
 | --- | --- | --- |
 | **Role** | A declared `role` resource with a name and a label. A task assigned to a role, and each role a policy names, must name a declared role. Users hold roles through the identity provider's roles claim, and a claim value that names no declared role is ignored. Policies give roles their grants. Every application endpoint matches the claim values. See [roles and policies](../reference/configuration.md#roles-and-policies), and [authorization](../architecture.md#authorization). | M4 |
-| **Policy** | A `policy` resource that gives one or more roles grants on entities, data sources and processes. An entity grant may have a record filter and a list of fields. The grants of all the user's policies combine with OR, and default-deny applies. The resource and its compile checks are built. The record API, the data source endpoint and the process start endpoint enforce its grants, and the record API and the data source endpoint also enforce its record filters and field lists. Site navigation and page metadata follow a signed-in user's grants, and page metadata leaves out the fields the user may not read. See [roles and policies](../reference/configuration.md#roles-and-policies), and [authorization](../architecture.md#authorization). | M4 |
+| **Policy** | A `policy` resource that gives one or more roles grants on entities, data sources and processes, and, from M5, `invoke` on endpoints. An entity grant may have a record filter and a list of fields. The grants of all the user's policies combine with OR, and default-deny applies. The resource and its compile checks are built. The record API, the data source endpoint and the process start endpoint enforce its grants, and the record API and the data source endpoint also enforce its record filters and field lists. Site navigation and page metadata follow a signed-in user's grants, and page metadata leaves out the fields the user may not read. See [roles and policies](../reference/configuration.md#roles-and-policies), and [authorization](../architecture.md#authorization). | M4 |
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. M5 has two kinds, `url` and `secret`. Their values are set per tenant in host configuration until the tenant directory in M9. See [deployment bindings](../reference/configuration.md#deployment-bindings). | M5 |
 | **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. It also holds the actor's display name at the time of the action. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
