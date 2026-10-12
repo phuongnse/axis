@@ -105,6 +105,38 @@ public static class AuditRecords
         return new AuditRecordPage(items, totalCount);
     }
 
+    /// <summary>
+    /// Returns whether <paramref name="actor"/> started the instance <paramref name="instanceId"/>
+    /// on the record <paramref name="recordId"/> of the entity <paramref name="entityId"/> through
+    /// the endpoint <paramref name="endpoint"/>, as its <c>process.started</c> audit record says.
+    /// </summary>
+    public static async Task<bool> IsProcessStartedByAsync(
+        NpgsqlConnection connection,
+        Guid entityId,
+        Guid recordId,
+        Guid instanceId,
+        string actor,
+        string endpoint,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await using var command = new NpgsqlCommand(
+            $"""
+            SELECT EXISTS (
+                SELECT 1 FROM "axis"."audit_records" {RecordFilter}
+                  AND "action" = @action AND "process_instance_id" = @instance
+                  AND "actor" = @actor AND "details"->>'endpoint' = @endpoint)
+            """,
+            connection);
+        command.Parameters.AddWithValue("entity", entityId);
+        command.Parameters.AddWithValue("record", recordId);
+        command.Parameters.AddWithValue("action", AuditActions.ProcessStarted);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("actor", actor);
+        command.Parameters.AddWithValue("endpoint", endpoint);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     private static NpgsqlParameter Uuid(string name, Guid? value) =>
         new(name, NpgsqlDbType.Uuid) { Value = value is { } id ? id : DBNull.Value };
 }

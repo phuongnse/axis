@@ -56,6 +56,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("last_status");
 
+                    b.Property<int>("Lookups")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("lookups");
+
                     b.Property<string>("Operation")
                         .IsRequired()
                         .HasColumnType("text")
@@ -91,6 +97,49 @@ namespace Axis.Processes.Storage.Migrations
                         .HasDatabaseName("ux_connector_calls_process_instance_id_step");
 
                     b.ToTable("connector_calls", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.EndpointReceiptRow", b =>
+                {
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<Guid>("EndpointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("endpoint_id");
+
+                    b.Property<string>("Caller")
+                        .HasColumnType("text")
+                        .HasColumnName("caller");
+
+                    b.Property<string>("Key")
+                        .HasColumnType("text")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<byte[]>("InputHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("input_hash");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.HasKey("ApplicationId", "EndpointId", "Caller", "Key")
+                        .HasName("pk_endpoint_receipts");
+
+                    b.ToTable("endpoint_receipts", "axis");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.EventRow", b =>

@@ -31,6 +31,12 @@ public sealed class ConnectorCallRow
     public required int Attempts { get; init; }
 
     /// <summary>
+    /// The failed lookups since the call last became <c>unknown</c>. It sets the wait before the
+    /// next lookup, and is reset when the call goes back to <c>pending</c>.
+    /// </summary>
+    public int Lookups { get; init; }
+
+    /// <summary>
     /// The evaluated input as JSON text, sent again by every retry, or <see langword="null"/> once
     /// the call settled. It is never copied to history, audit records or logs.
     /// </summary>

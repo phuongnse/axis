@@ -39,26 +39,36 @@ internal sealed class TenantDatabase(ITenantConnectionFactory connections) : IAs
             .UseNpgsql(await GetConnectionAsync(cancellationToken))
             .Options);
 
-    public async ValueTask DisposeAsync()
+    /// <summary>
+    /// Disposes the scope's contexts and returns its connection to the pool. The next use opens a
+    /// fresh pooled connection, so a request can hold none while it waits.
+    /// </summary>
+    public async ValueTask ReleaseConnectionAsync()
     {
         if (_configuration is not null)
         {
             await _configuration.DisposeAsync();
+            _configuration = null;
         }
 
         if (_data is not null)
         {
             await _data.DisposeAsync();
+            _data = null;
         }
 
         if (_processes is not null)
         {
             await _processes.DisposeAsync();
+            _processes = null;
         }
 
         if (_connection is not null)
         {
             await _connection.DisposeAsync();
+            _connection = null;
         }
     }
+
+    public ValueTask DisposeAsync() => ReleaseConnectionAsync();
 }

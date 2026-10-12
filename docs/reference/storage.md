@@ -31,7 +31,10 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `axis.connector_calls` (one row per staged connector call),
     `axis.events` (one row per event occurrence that a step raised),
     `axis.process_start_receipts` (the stored response of each
-    `Idempotency-Key` of a start) and `axis.process_work_items` (the work that
+    `Idempotency-Key` of a start), `axis.endpoint_receipts` (the record and
+    instance of each endpoint call's `Idempotency-Key`, unique per
+    application, endpoint, caller and key, with a hash of the input) and
+    `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.
     See [processes](processes.md#tables).
   - `Axis.Data` also owns `axis.audit_records`, with history in

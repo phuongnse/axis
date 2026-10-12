@@ -1,0 +1,19 @@
+{
+  "id": "7067a8d9-c3d2-40cb-a01d-7527279127cb",
+  "kind": "endpoint",
+  "name": "ImportReviewedNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "ReviewNote",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" }
+  ],
+  "values": {
+    "title": "title",
+    "quantity": "quantity",
+    "status": "'open'"
+  },
+  "output": ["title", "status"],
+  "wait": "PT3S"
+}

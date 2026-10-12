@@ -1,14 +1,10 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Unicode;
 using Axis.Configuration.Model;
 using Axis.Core.Tenancy;
-using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
-using Axis.Processes.Storage;
-using Axis.Processes.Work;
 using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Records;
@@ -37,7 +33,7 @@ internal static class ProcessStartEndpoints
 
     private const string SubjectIdPointer = "/" + SubjectIdProperty;
 
-    private const string IdempotencyKeyHeader = "Idempotency-Key";
+    internal const string IdempotencyKeyHeader = "Idempotency-Key";
 
     private const int MaxIdempotencyKeyLength = 255;
 
@@ -89,10 +85,7 @@ internal static class ProcessStartEndpoints
 
         if (!TryReadIdempotencyKey(request.Headers[IdempotencyKeyHeader], out var key))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [IdempotencyKeyHeader] = [$"Must be 1 to {MaxIdempotencyKeyLength} characters."],
-            });
+            return IdempotencyKeyProblem();
         }
 
         if (!application.TryGetEntity(model.Entity.Name, out var entity))
@@ -138,59 +131,29 @@ internal static class ProcessStartEndpoints
             return SubjectProblem("No record of the process's entity has this id.");
         }
 
-        // Only true passes: false, null and a run-time error all fail the start. now() is this
-        // transaction's start time.
-        if (model.StartCondition is { } condition)
-        {
-            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordExpressions.EvaluateAsync(connection, application, entity, record, condition.Expression, now, cancellationToken);
-            if (result.Value is not true)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return SubjectProblem(condition.Message.TextKey);
-            }
-        }
-
-        var instance = new ProcessInstanceRow
-        {
-            Id = instanceId,
-            ApplicationId = application.Manifest.Id,
-            ProcessId = model.Id,
-            SubjectEntityId = entity.Id,
-            SubjectId = subjectId,
-            ReleaseId = active.ReleaseId,
-            State = ProcessStarts.Running,
-            Revision = 1,
-            Step = model.Start,
-        };
-        if (!await ProcessStarts.TryInsertInstanceAsync(transaction, instance, cancellationToken))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return Results.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "A running or waiting instance of this process already exists for this record.");
-        }
-
-        await WorkItemQueue.EnqueueAsync(
+        var started = await ProcessStarter.StartAsync(
             connection,
             transaction,
             tenantId,
-            ProcessStarts.StepWorkItemKind,
-            DateTimeOffset.UtcNow,
-            cancellationToken,
-            processInstanceId: instanceId);
-        await AuditRecords.AppendAsync(
-            transaction,
-            new AuditEntry(
-                user.Id,
-                AuditActions.ProcessStarted,
-                application.Manifest.Id,
-                entity.Id,
-                subjectId,
-                instanceId,
-                new JsonObject { ["processId"] = model.Id, ["releaseId"] = active.ReleaseId },
-                user.DisplayName),
+            application,
+            active.ReleaseId,
+            model,
+            entity,
+            subjectId,
+            record,
+            instanceId,
+            user.Id,
+            user.DisplayName,
+            details: null,
             cancellationToken);
+        if (started.Outcome != ProcessStartOutcome.Started)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return started.Outcome == ProcessStartOutcome.ConditionFailed
+                ? SubjectProblem(started.TextKey!)
+                : ProcessStarter.AlreadyRunning();
+        }
+
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(response, statusCode: StatusCodes.Status201Created);
     }
@@ -210,6 +173,13 @@ internal static class ProcessStartEndpoints
         key = values.Count == 1 ? values[0] : null;
         return key is { Length: > 0 and <= MaxIdempotencyKeyLength };
     }
+
+    /// <summary>The 400 for an <c>Idempotency-Key</c> header that <see cref="TryReadIdempotencyKey"/> refuses.</summary>
+    internal static IResult IdempotencyKeyProblem() =>
+        Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [IdempotencyKeyHeader] = [$"Must be 1 to {MaxIdempotencyKeyLength} characters."],
+        });
 
     /// <summary>
     /// Reads a body that is exactly <c>{ "subjectId": "&lt;uuid&gt;" }</c>. Only the hyphenated

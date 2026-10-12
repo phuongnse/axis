@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,9 +19,18 @@ namespace Axis.Processes.Instances;
 /// extends the item's lease by the connector's timeout. The request then carries the stored input,
 /// the auth from the tenant's secret binding and the operation identity as its idempotency key. An
 /// outcome transaction records the result. A <c>2xx</c> whose body fits the output writes the
-/// output fields, settles the call <c>succeeded</c> and resumes the instance on <c>next</c>. Any
-/// other result settles the call <c>failed</c> and fails the instance. A call found already
-/// <c>sending</c> is never sent again. Each transaction checks the claim token, and the outcome
+/// output fields, settles the call <c>succeeded</c> and resumes the instance on <c>next</c>. A
+/// retryable error, and an unknown outcome on a connector that declares <c>idempotency</c>, set the
+/// call back to <c>pending</c> and keep the item, due again after the step's backoff, while attempts
+/// are left. Any other unknown outcome leaves the call <c>unknown</c> and the instance waiting. When
+/// the operation declares a lookup, the item is kept and due at once, and reconciles the call: the
+/// lookup asks the system with the operation identity. Found settles the call as succeeded with the
+/// lookup's output. Not found sets it back to <c>pending</c> for its next attempt, or fails it when
+/// no attempts are left. A failed lookup keeps it <c>unknown</c>, and the lookup is tried again after
+/// a doubling backoff. Without a lookup, the item is deleted and a history row shows the call. Any
+/// other error, or a retryable one with no attempts left, settles the call <c>failed</c> and fails
+/// the instance. A call found already <c>sending</c> is never sent again at once: its earlier
+/// attempt counts as an unknown outcome. Each transaction checks the claim token, and the outcome
 /// needs the instance still waiting on the step at the revision the attempt saw. No request or
 /// response body and no secret value is stored or logged.
 /// </summary>
@@ -32,9 +42,12 @@ internal sealed partial class ConnectorCallHandler(
     ILogger<ConnectorCallHandler> logger) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
-    internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome, so it is not sent again.";
+    internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
 
     private const string DateFormat = "yyyy-MM-dd";
+
+    /// <summary>The longest wait between two attempts.</summary>
+    private static readonly TimeSpan _maxBackoff = TimeSpan.FromHours(1);
 
     public string Kind => ProcessStarts.ConnectorCallWorkItemKind;
 
@@ -45,12 +58,14 @@ internal sealed partial class ConnectorCallHandler(
 
         Attempt attempt;
         Target? target = null;
+        ConnectorOperationModel? lookup = null;
         string? error = null;
+        var sending = false;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             var call = item.ConnectorCallId is { } callId ? await ConnectorCalls.LoadAsync(transaction, callId, cancellationToken) : null;
             var instance = call is null ? null : await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
-            if (call is not { State: ConnectorCalls.Pending or ConnectorCalls.Sending }
+            if (call is not { State: ConnectorCalls.Pending or ConnectorCalls.Sending or ConnectorCalls.Unknown }
                 || instance is not { State: ProcessStarts.Waiting }
                 || instance.Step != call.Step)
             {
@@ -68,24 +83,46 @@ internal sealed partial class ConnectorCallHandler(
             }
 
             attempt = new Attempt(call, instance.Revision, call.Attempts, instance.Now);
-            if (call.State == ConnectorCalls.Sending)
+            try
             {
-                // A worker crashed after it marked the call, so its request may have reached the system.
-                error = UnknownOutcome;
+                target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, cancellationToken);
             }
-            else
+            catch (InvalidOperationException exception)
             {
-                try
-                {
-                    target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, cancellationToken);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    error = exception.Message;
-                }
+                error = exception.Message;
             }
 
-            if (target is not null)
+            // A worker crashed after it marked the call, so its request may have reached the system.
+            sending = call.State == ConnectorCalls.Sending;
+            if (target is not null && call.State == ConnectorCalls.Unknown)
+            {
+                lookup = FindLookup(target);
+                if (lookup is null)
+                {
+                    // Only a call whose operation declares a lookup keeps its item, so this should not happen.
+                    LogDiscarded(item.Id, item.ConnectorCallId, call.State, instance.State);
+                    if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        LogLostClaim(item.Id, item.ConnectorCallId);
+                        return WorkItemOutcome.LostClaim;
+                    }
+
+                    await transaction.CommitAsync(cancellationToken);
+                    return WorkItemOutcome.Completed;
+                }
+
+                // A lookup is no attempt, so nothing is counted. No other worker claims the item while it runs.
+                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, target.Connector.Timeout + item.Lease, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    LogLostClaim(item.Id, item.ConnectorCallId);
+                    return WorkItemOutcome.LostClaim;
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            else if (target is not null && !sending)
             {
                 var attempts = await ConnectorCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
                     ?? throw new InvalidOperationException($"The connector call '{call.Id}' is no longer pending.");
@@ -109,12 +146,121 @@ internal sealed partial class ConnectorCallHandler(
 
         if (target is null)
         {
+            // Retrying cannot add what the release lacks.
             return await FailAsync(item, connection, attempt, null, error!, cancellationToken);
         }
 
+        if (lookup is not null)
+        {
+            return await ReconcileAsync(item, connection, attempt, target, lookup, cancellationToken);
+        }
+
+        if (sending)
+        {
+            // The attempt the crashed worker made is already counted.
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Unknown, null, UnknownOutcome, cancellationToken);
+        }
+
         var connector = target.Connector;
-        string baseUrl;
-        SecretValue? secret = null;
+        if (ResolveEndpoint(item, connector, out var baseUrl, out var secret) is { } bindingError)
+        {
+            // The request is never sent.
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, null, bindingError, cancellationToken);
+        }
+
+        var answer = await SendAsync(target, attempt.Call, baseUrl, secret, cancellationToken);
+        if (answer.Error is { } sendError)
+        {
+            return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, cancellationToken);
+        }
+
+        if (Fit(answer.Body!, target) is not { } values)
+        {
+            // The system answered with success, so it may have acted. The call is never sent again.
+            return await LeaveUnknownAsync(
+                item,
+                connection,
+                attempt,
+                target,
+                answer.Status,
+                $"The response did not fit the output of the operation '{target.Operation.Name}' of the connector '{connector.Name}'.",
+                cancellationToken);
+        }
+
+        return await SucceedAsync(item, connection, attempt, target, answer.Status!.Value, values, cancellationToken);
+    }
+
+    /// <summary>
+    /// The wait before the attempt after attempt <paramref name="attempts"/>: the policy's backoff,
+    /// doubled for each attempt after the first, and at most an hour.
+    /// </summary>
+    internal static TimeSpan Backoff(RetryPolicyModel policy, int attempts)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+
+        // The delay stays below the cap before it doubles, so it cannot overflow.
+        var delay = policy.Backoff;
+        for (var attempt = 1; attempt < attempts && delay < _maxBackoff; attempt++)
+        {
+            delay += delay;
+        }
+
+        return delay < _maxBackoff ? delay : _maxBackoff;
+    }
+
+    /// <summary>
+    /// Asks the system about the <c>unknown</c> call through <paramref name="lookup"/>, with the
+    /// operation identity as its key. A <c>200</c> whose body fits the output settles the call as
+    /// succeeded. A <c>404</c> sets it back to <c>pending</c> for its next attempt, after the
+    /// step's backoff, or fails it when no attempts are left. Anything else, and a lookup that is
+    /// never sent, is a failed lookup that keeps the call <c>unknown</c>. A lookup counts no attempt.
+    /// </summary>
+    private async Task<WorkItemOutcome> ReconcileAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        ConnectorOperationModel lookup,
+        CancellationToken cancellationToken)
+    {
+        var connector = target.Connector;
+        if (ResolveEndpoint(item, connector, out var baseUrl, out var secret) is { } bindingError)
+        {
+            return await KeepUnknownAsync(item, connection, attempt, target, null, bindingError, cancellationToken);
+        }
+
+        var answer = await SendAsync(target with { Operation = lookup }, attempt.Call, baseUrl, secret, cancellationToken);
+        if (answer is { Status: (int)HttpStatusCode.OK, Error: null } && Fit(answer.Body!, target) is { } values)
+        {
+            // The system acted on the call, so it is not sent again.
+            return await SucceedAsync(item, connection, attempt, target, answer.Status.Value, values, cancellationToken);
+        }
+
+        if (answer.Status == (int)HttpStatusCode.NotFound)
+        {
+            // The system never acted, so the call is sent again under the same identity.
+            var notFound = $"The lookup '{lookup.Name}' of the connector '{connector.Name}' found no call.";
+            var policy = target.Step.Retry;
+            return attempt.Attempts < policy.Attempts
+                ? await RetryAsync(item, connection, attempt, answer.Status, notFound, Backoff(policy, attempt.Attempts), cancellationToken)
+                : await FailAsync(item, connection, attempt, answer.Status, $"{notFound} No attempts are left.", cancellationToken);
+        }
+
+        var error = answer.Error
+            ?? (answer.Status == (int)HttpStatusCode.OK
+                ? $"The lookup '{lookup.Name}' of the connector '{connector.Name}' answered with a body that did not fit the output."
+                : $"The lookup '{lookup.Name}' of the connector '{connector.Name}' answered with the status {answer.Status}.");
+        return await KeepUnknownAsync(item, connection, attempt, target, answer.Status, error, cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the connector's base URL and auth secret from the tenant's bindings. Returns the
+    /// error when a binding is missing or of the wrong kind, or when the URL is not <c>https</c> and
+    /// the host does not allow <c>http</c>, or <see langword="null"/>.
+    /// </summary>
+    private string? ResolveEndpoint(ClaimedWorkItem item, ConnectorModel connector, out string baseUrl, out SecretValue? secret)
+    {
+        secret = null;
         try
         {
             baseUrl = bindings.Resolve(connector.BaseUrlBinding).Value;
@@ -125,40 +271,20 @@ internal sealed partial class ConnectorCallHandler(
         }
         catch (InvalidOperationException exception)
         {
-            // A missing binding, or one of the wrong kind: the request is never sent.
-            return await FailAsync(item, connection, attempt, null, exception.Message, cancellationToken);
+            baseUrl = "";
+            return exception.Message;
         }
 
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !settings.AllowHttp))
-        {
-            return await FailAsync(
-                item,
-                connection,
-                attempt,
-                null,
-                $"Tenant '{item.TenantId}' binding '{connector.BaseUrlBinding}' is not an https URL. Only Development allows http.",
-                cancellationToken);
-        }
-
-        var answer = await SendAsync(target, attempt.Call, baseUrl, secret, cancellationToken);
-        if (answer.Error is { } sendError)
-        {
-            return await FailAsync(item, connection, attempt, answer.Status, sendError, cancellationToken);
-        }
-
-        if (Fit(answer.Body!, target) is not { } values)
-        {
-            return await FailAsync(
-                item,
-                connection,
-                attempt,
-                answer.Status,
-                $"The response did not fit the output of the operation '{target.Operation.Name}' of the connector '{connector.Name}'.",
-                cancellationToken);
-        }
-
-        return await SucceedAsync(item, connection, attempt, target, answer.Status!.Value, values, cancellationToken);
+        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || settings.AllowHttp)
+            ? null
+            : $"Tenant '{item.TenantId}' binding '{connector.BaseUrlBinding}' is not an https URL. Only Development allows http.";
     }
+
+    /// <summary>The operation that looks up a call of the target's operation, or <see langword="null"/> when it declares none.</summary>
+    private static ConnectorOperationModel? FindLookup(Target target) =>
+        target.Operation.Lookup is { } name
+            ? target.Connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase))
+            : null;
 
     /// <summary>Finds the step, the subject entity, the connector and the operation of the call on its release.</summary>
     /// <exception cref="InvalidOperationException">The release lacks one of them.</exception>
@@ -183,7 +309,7 @@ internal sealed partial class ConnectorCallHandler(
 
     /// <summary>
     /// Sends the call's request and reads a <c>2xx</c> body. Any other status, a timeout or an
-    /// exception is an error. An error names no header value and no body.
+    /// exception is an error, with its class. An error names no header value and no body.
     /// </summary>
     private async Task<Answer> SendAsync(Target target, LoadedConnectorCall call, string baseUrl, SecretValue? secret, CancellationToken cancellationToken)
     {
@@ -220,15 +346,21 @@ internal sealed partial class ConnectorCallHandler(
             using var response = await client.SendAsync(request, timeout.Token);
             var status = (int)response.StatusCode;
             return response.IsSuccessStatusCode
-                ? new Answer(status, await response.Content.ReadAsStringAsync(timeout.Token), null)
-                : new Answer(status, null, $"The operation '{operation.Name}' of the connector '{connector.Name}' answered with the status {status}.");
+                ? new Answer(status, await response.Content.ReadAsStringAsync(timeout.Token), null, ErrorClass.Failed)
+                : new Answer(
+                    status,
+                    null,
+                    $"The operation '{operation.Name}' of the connector '{connector.Name}' answered with the status {status}.",
+                    Classify(status));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            // The request may have reached the system.
             return new Answer(
                 null,
                 null,
-                $"The operation '{operation.Name}' of the connector '{connector.Name}' timed out after {connector.Timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds.");
+                $"The operation '{operation.Name}' of the connector '{connector.Name}' timed out after {connector.Timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds.",
+                ErrorClass.Unknown);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -238,9 +370,28 @@ internal sealed partial class ConnectorCallHandler(
                 message = message.Replace(value, SecretValue.Placeholder, StringComparison.Ordinal);
             }
 
-            return new Answer(null, null, $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {message}");
+            // Only a failed name lookup, connection or TLS handshake proves the request never left.
+            var errorClass = exception is HttpRequestException
+            {
+                HttpRequestError: HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError,
+            }
+                ? ErrorClass.Retryable
+                : ErrorClass.Unknown;
+            return new Answer(null, null, $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {message}", errorClass);
         }
     }
+
+    /// <summary>
+    /// The class of an answer that is not a <c>2xx</c>. <c>408</c>, <c>429</c> and <c>503</c> are
+    /// retryable, another <c>5xx</c> leaves the outcome unknown, and anything else fails at once.
+    /// </summary>
+    private static ErrorClass Classify(int status) =>
+        status switch
+        {
+            (int)HttpStatusCode.RequestTimeout or (int)HttpStatusCode.TooManyRequests or (int)HttpStatusCode.ServiceUnavailable => ErrorClass.Retryable,
+            >= 500 and < 600 => ErrorClass.Unknown,
+            _ => ErrorClass.Failed,
+        };
 
     /// <summary>
     /// Reads the outputs from a <c>2xx</c> body. The body fits when it is a JSON object with a value
@@ -475,6 +626,189 @@ internal sealed partial class ConnectorCallHandler(
     }
 
     /// <summary>
+    /// Records an attempt that ended with <paramref name="error"/> of <paramref name="errorClass"/>.
+    /// A retryable error is retried while attempts are left, and an unknown outcome only when the
+    /// connector also declares <c>idempotency</c>. An unknown outcome that is not retried leaves the
+    /// call <c>unknown</c>, to be looked up when the operation declares a lookup. Anything else
+    /// fails the call.
+    /// </summary>
+    private Task<WorkItemOutcome> SettleAttemptAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        ErrorClass errorClass,
+        int? status,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var policy = target.Step.Retry;
+        var attemptsLeft = attempt.Attempts < policy.Attempts;
+        return errorClass switch
+        {
+            ErrorClass.Retryable when attemptsLeft =>
+                RetryAsync(item, connection, attempt, status, error, Backoff(policy, attempt.Attempts), cancellationToken),
+            ErrorClass.Unknown when attemptsLeft && target.Connector.Idempotency is not null =>
+                RetryAsync(item, connection, attempt, status, error, Backoff(policy, attempt.Attempts), cancellationToken),
+            ErrorClass.Unknown => LeaveUnknownAsync(item, connection, attempt, target, status, error, cancellationToken),
+            _ => FailAsync(item, connection, attempt, status, error, cancellationToken),
+        };
+    }
+
+    /// <summary>
+    /// Sets the call back to <c>pending</c> with the attempt's status and error, and keeps the item,
+    /// due again after <paramref name="delay"/>. The next attempt sends the stored input under the
+    /// same operation identity. It writes no history row and no audit record.
+    /// </summary>
+    private async Task<WorkItemOutcome> RetryAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        int? status,
+        string error,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
+        if (!IsWaitingAt(instance, call, attempt))
+        {
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, call.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
+        }
+
+        await ConnectorCalls.RetryAsync(transaction, call.Id, status, error, cancellationToken);
+        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, call.Id);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        LogRetrying(call.Id, call.ProcessInstanceId, attempt.Attempts, status, error, delay);
+        return WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>
+    /// Leaves the call <c>unknown</c> with the attempt's status and error, and keeps its stored input.
+    /// The instance stays waiting. When the operation declares a lookup, the item is kept and due at
+    /// once, so a worker asks the system what happened, and the history row waits until the call
+    /// settles. Without one, the item is deleted, and a history row with the outcome <c>unknown</c>
+    /// makes the call visible. It writes no audit record, because the call has not settled.
+    /// </summary>
+    private async Task<WorkItemOutcome> LeaveUnknownAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        int? status,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        var lookup = FindLookup(target) is not null;
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
+        var waiting = IsWaitingAt(instance, call, attempt);
+        var claimed = waiting && lookup
+            ? await WorkItemQueue.RescheduleAsync(connection, transaction, item, TimeSpan.Zero, cancellationToken)
+            : await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken);
+        if (!claimed)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, call.Id);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        if (!waiting)
+        {
+            LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
+        }
+
+        await ConnectorCalls.MarkUnknownAsync(transaction, call.Id, status, error, cancellationToken);
+        if (lookup)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            LogLookingUp(call.Id, call.ProcessInstanceId, attempt.Attempts, status, error);
+            return WorkItemOutcome.Rescheduled;
+        }
+
+        await ProcessSteps.InsertHistoryAsync(
+            transaction,
+            new StepOccurrence(
+                instance!.Id,
+                call.Step,
+                attempt.Revision,
+                new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = null },
+                new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Unknown },
+                null,
+                error,
+                attempt.StartedAt),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        LogUnknown(call.Id, instance.Id, attempt.Attempts, status, error);
+        return WorkItemOutcome.Completed;
+    }
+
+    /// <summary>
+    /// Keeps the <c>unknown</c> call after a failed lookup, with its status and error, and counts the
+    /// failed lookup. The item is due again after the step's backoff, doubled for each failed lookup
+    /// before this one. It writes no history row and no audit record.
+    /// </summary>
+    private async Task<WorkItemOutcome> KeepUnknownAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        int? status,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
+        if (!IsWaitingAt(instance, call, attempt))
+        {
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, call.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
+        }
+
+        var lookups = await ConnectorCalls.FailLookupAsync(transaction, call.Id, status, error, cancellationToken)
+            ?? throw new InvalidOperationException($"The connector call '{call.Id}' is no longer unknown.");
+        var delay = Backoff(target.Step.Retry, lookups);
+        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, call.Id);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        LogLookupFailed(call.Id, call.ProcessInstanceId, lookups, status, error, delay);
+        return WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>
     /// Settles the call <c>failed</c> with <paramref name="error"/> and fails its instance, with a
     /// history row and the audit records <c>connector.called</c> and <c>process.failed</c>.
     /// </summary>
@@ -570,6 +904,18 @@ internal sealed partial class ConnectorCallHandler(
     [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} failed with the status {Status}: {Error}")]
     private partial void LogFailed(Guid callId, Guid instanceId, int? status, string error);
 
+    [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} will be retried after {Delay}: attempt {Attempts} ended with the status {Status}: {Error}")]
+    private partial void LogRetrying(Guid callId, Guid instanceId, int attempts, int? status, string error, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} has an unknown outcome after {Attempts} attempts, with the status {Status}, and is not sent again: {Error}")]
+    private partial void LogUnknown(Guid callId, Guid instanceId, int attempts, int? status, string error);
+
+    [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} has an unknown outcome after {Attempts} attempts, with the status {Status}, and is looked up: {Error}")]
+    private partial void LogLookingUp(Guid callId, Guid instanceId, int attempts, int? status, string error);
+
+    [LoggerMessage(LogLevel.Warning, "The lookup of connector call {CallId} of process instance {InstanceId} failed {Lookups} times in a row and will be tried again after {Delay}. The last ended with the status {Status}: {Error}")]
+    private partial void LogLookupFailed(Guid callId, Guid instanceId, int lookups, int? status, string error, TimeSpan delay);
+
     /// <summary>
     /// The attempt a worker makes: the call, the instance revision it waits at, the attempts made
     /// with this one, and the time of the mark transaction, which starts the step's history row.
@@ -584,6 +930,22 @@ internal sealed partial class ConnectorCallHandler(
         ConnectorModel Connector,
         ConnectorOperationModel Operation);
 
-    /// <summary>The status of an answered request, the body of a <c>2xx</c>, or the error of any other result.</summary>
-    private sealed record Answer(int? Status, string? Body, string? Error);
+    /// <summary>
+    /// The status of an answered request, the body of a <c>2xx</c>, or the error of any other result
+    /// with its class.
+    /// </summary>
+    private sealed record Answer(int? Status, string? Body, string? Error, ErrorClass Class);
+
+    /// <summary>How an attempt that did not succeed is handled.</summary>
+    private enum ErrorClass
+    {
+        /// <summary>The call fails at once.</summary>
+        Failed,
+
+        /// <summary>The request is known not to have acted, so the call is retried while attempts are left.</summary>
+        Retryable,
+
+        /// <summary>The system may have acted. The call is retried only with <c>idempotency</c>.</summary>
+        Unknown,
+    }
 }

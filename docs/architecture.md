@@ -379,8 +379,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 It follows [D27](decisions.md#d27-inbound-endpoints--agreed). The token
 checks, the tenant binding, the endpoint-only acceptance, the CSRF exemption
 and the development realm's client are built. The `endpoint` resource and its
-compile checks are built too. The endpoint call is not: the endpoint routes
-answer a valid caller with a `404`, because nothing serves an endpoint yet. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
+compile checks are built too, and so are the endpoint call with its `output`
+and `wait`, its `Idempotency-Key`, and the status location. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
 with a bearer token. This sits next to the browser session: the session
 stays the only way in for people, and a bearer token is the only way in for
 systems.
@@ -607,8 +607,9 @@ to the draft. Only another grant can make it readable.
   operation identity as their idempotency key. The result is recorded by a
   following transaction. A `callConnector` step stages its call in its
   transaction, and the worker sends it and records its result in a
-  following transaction. *(planned for M5)* Retries, and reconciling an
-  unknown outcome through a lookup. See
+  following transaction. An attempt that is safe to retry is retried under
+  the step's retry policy, with the same identity. An unknown outcome is
+  reconciled through the operation's lookup. See
   [connector calls](reference/processes.md#connector-calls). A package
   operation step is staged and run the same way, see
   [package operations](reference/processes.md#package-operations).

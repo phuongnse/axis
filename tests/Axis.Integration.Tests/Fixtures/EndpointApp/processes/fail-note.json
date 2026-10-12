@@ -1,0 +1,18 @@
+{
+  "id": "4918f8fb-f272-42fd-9279-30336e887ce9",
+  "kind": "process",
+  "name": "FailNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "start": "empty",
+  "steps": [
+    {
+      "name": "empty",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "quantity": "0" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

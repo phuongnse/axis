@@ -116,6 +116,35 @@ public static class WorkItemQueue
     }
 
     /// <summary>
+    /// Keeps the item and makes it due <paramref name="delay"/> after the database's current time,
+    /// in the transaction, if the claim is still current. The claim and its lease are released, so
+    /// any worker can claim the item once it is due. Returns <see langword="false"/> when another
+    /// worker has claimed it since, so the caller must roll back.
+    /// </summary>
+    public static async Task<bool> RescheduleAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ClaimedWorkItem item,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(item);
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_work_items
+            SET due_at = now() + @delay, claim_token = NULL, lease_expires_at = NULL
+            WHERE id = @id AND claim_token = @token
+            """,
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("delay", NpgsqlDbType.Interval, delay);
+        command.Parameters.AddWithValue("id", item.Id);
+        command.Parameters.AddWithValue("token", item.ClaimToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
     /// Deletes the item in the transaction if the claim is still current. Returns
     /// <see langword="false"/> when another worker has claimed it since, so the caller must roll back.
     /// </summary>

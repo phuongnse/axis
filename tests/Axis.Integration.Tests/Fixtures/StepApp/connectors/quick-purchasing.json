@@ -1,0 +1,23 @@
+{
+  "id": "26cb8369-bb6d-4d80-9760-7972451dfb71",
+  "kind": "connector",
+  "name": "QuickPurchasing",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "timeout": "PT1S",
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/quick-orders",
+      "input": [
+        { "name": "reference", "type": "text", "required": true },
+        { "name": "amount", "type": "decimal", "required": true },
+        { "name": "note", "type": "text" }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}

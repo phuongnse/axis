@@ -612,7 +612,7 @@ secret value that hides itself from text, JSON and logs, the `connector`
 resource with its compile checks and the activation check are built. Outside
 Development, startup fails when a secret comes from a configuration file.
 Calling a connector, using secrets in its calls and the call-time HTTPS check
-are built. Retries and reconciliation are planned. See
+are built. Retries are built. Reconciliation is built. See
 [configuration](reference/configuration.md#connectors-and-deployment-bindings)
 for bindings and the `connector` resource, and
 [processes](reference/processes.md#connector-calls) for the call, its
@@ -849,7 +849,8 @@ matches how D24 treats a policy filter that fails: it counts as false.
 M5 lets other systems create a record and start a process in one call. The
 bearer token checks are built, with the tenant binding, the CSRF exemption
 and the development realm's `purchasing-system` client. The endpoint resource,
-the grant and the call are not built yet. See
+the `invoke` grant, the call with its `output` and `wait`, its
+`Idempotency-Key`, and the status location are built. See
 [configuration](reference/configuration.md#endpoint-resource) for the
 `endpoint` resource and its policy grant, and
 [record API](reference/record-api.md#inbound-endpoints) for the call, its

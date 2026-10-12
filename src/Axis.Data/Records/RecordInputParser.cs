@@ -8,17 +8,18 @@ using Messages = Axis.Data.Records.RecordInputMessages;
 namespace Axis.Data.Records;
 
 /// <summary>
-/// Parses a record request body against an entity model. Every problem is reported in one pass,
-/// keyed by RFC 6901 JSON Pointer into the body; a valid body becomes typed values in the
-/// entity's field declaration order. The parser has no database access.
+/// Parses a record request body against an entity model, or an endpoint call's body against the
+/// endpoint's input fields. Every problem is reported in one pass, keyed by RFC 6901 JSON Pointer
+/// into the body; a valid body becomes typed values in the entity's field declaration order. The
+/// parser has no database access.
 /// </summary>
 public static partial class RecordInputParser
 {
     private const string ValuesProperty = "values";
 
-    private const string VersionProperty = "version";
+    private const string InputProperty = "input";
 
-    private const string ValuesPointer = "/" + ValuesProperty;
+    private const string VersionProperty = "version";
 
     private const string VersionPointer = "/" + VersionProperty;
 
@@ -45,6 +46,52 @@ public static partial class RecordInputParser
     {
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(application);
+
+        return Parse(utf8Body, entity, application, operation, ValuesProperty);
+    }
+
+    /// <summary>
+    /// Parses an endpoint call's body, <c>{ "input": { … } }</c>, against the input fields of
+    /// <paramref name="endpoint"/>, by the rules of a create body with <c>input</c> in place of
+    /// <c>values</c>. So errors are keyed <c>/input/&lt;name&gt;</c>, or
+    /// <c>/input/&lt;collection&gt;/&lt;index&gt;/&lt;field&gt;</c> for a row of a child-collection
+    /// input, whose rows are checked against its target child entity. The values are keyed by the
+    /// input names, in their declaration order, and the rows name the input as their collection.
+    /// </summary>
+    public static RecordInputResult ParseEndpointInput(ReadOnlyMemory<byte> utf8Body, EndpointModel endpoint, ApplicationModel application)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentNullException.ThrowIfNull(application);
+
+        // The input fields act as the fields of an entity, so the body is read exactly as a create.
+        var inputEntity = new EntityModel
+        {
+            Id = endpoint.Id,
+            Name = endpoint.Name,
+            File = endpoint.File,
+            Fields = [.. endpoint.Input.Select(input => new FieldModel
+            {
+                Name = input.Name,
+                Type = input.Type,
+                Required = input.Required,
+                MaxLength = input.MaxLength,
+                Precision = input.Precision,
+                Scale = input.Scale,
+                Values = input.Values,
+                Target = input.Target,
+            })],
+        };
+        return Parse(utf8Body, inputEntity, application, RecordOperation.Create, InputProperty);
+    }
+
+    private static RecordInputResult Parse(
+        ReadOnlyMemory<byte> utf8Body,
+        EntityModel entity,
+        ApplicationModel application,
+        RecordOperation operation,
+        string valuesProperty)
+    {
+        var valuesPointer = "/" + valuesProperty;
 
         // Checked up front so invalid bytes are a body error wherever they sit, not a value error.
         if (!Utf8.IsValid(utf8Body.Span))
@@ -92,39 +139,38 @@ public static partial class RecordInputParser
                     continue;
                 }
 
-                switch (name)
+                if (name == valuesProperty && property.Value.ValueKind == JsonValueKind.Object)
                 {
-                    case ValuesProperty when property.Value.ValueKind == JsonValueKind.Object:
-                        values = property.Value;
-                        if (!ReadValues(property.Value, ValuesPointer, entity, application, parsed, rows, errors))
-                        {
-                            return MalformedBody();
-                        }
-
-                        break;
-                    case ValuesProperty:
-                        AddError(errors, pointer, Messages.MustBeObject);
-                        break;
-                    case VersionProperty when operation == RecordOperation.Update:
-                        if (TryReadVersion(property.Value, out var number))
-                        {
-                            version = number;
-                        }
-                        else
-                        {
-                            AddError(errors, pointer, Messages.Version);
-                        }
-
-                        break;
-                    default:
-                        AddError(errors, pointer, Messages.UnknownProperty);
-                        break;
+                    values = property.Value;
+                    if (!ReadValues(property.Value, valuesPointer, entity, application, parsed, rows, errors))
+                    {
+                        return MalformedBody();
+                    }
+                }
+                else if (name == valuesProperty)
+                {
+                    AddError(errors, pointer, Messages.MustBeObject);
+                }
+                else if (name == VersionProperty && operation == RecordOperation.Update)
+                {
+                    if (TryReadVersion(property.Value, out var number))
+                    {
+                        version = number;
+                    }
+                    else
+                    {
+                        AddError(errors, pointer, Messages.Version);
+                    }
+                }
+                else
+                {
+                    AddError(errors, pointer, Messages.UnknownProperty);
                 }
             }
 
-            if (!names.Contains(ValuesProperty))
+            if (!names.Contains(valuesProperty))
             {
-                AddError(errors, ValuesPointer, Messages.Required);
+                AddError(errors, valuesPointer, Messages.Required);
             }
 
             if (operation == RecordOperation.Update && !names.Contains(VersionProperty))
@@ -135,7 +181,7 @@ public static partial class RecordInputParser
             // Required fields are checked only when values is an object, so a missing values is one error.
             if (operation == RecordOperation.Create && values is { } valuesElement)
             {
-                AddMissingRequired(valuesElement, ValuesPointer, entity, errors);
+                AddMissingRequired(valuesElement, valuesPointer, entity, errors);
             }
 
             if (errors.Count > 0)

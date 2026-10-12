@@ -1,0 +1,19 @@
+{
+  "id": "d889244a-2093-467d-8018-d0f6c115fbc5",
+  "kind": "process",
+  "name": "ReviewNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "note.review" },
+      "assignee": { "role": "importer" },
+      "form": "NoteReview",
+      "outcomes": [{ "name": "accept", "label": { "textKey": "task.accept" }, "next": "done" }]
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

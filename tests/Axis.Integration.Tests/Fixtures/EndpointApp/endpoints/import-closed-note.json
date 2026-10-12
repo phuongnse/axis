@@ -1,0 +1,19 @@
+{
+  "id": "abea08bd-b162-4054-a97c-7e49d3e2a7e3",
+  "kind": "endpoint",
+  "name": "ImportClosedNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "CloseNow",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" }
+  ],
+  "values": {
+    "title": "title",
+    "quantity": "quantity",
+    "status": "'open'"
+  },
+  "output": ["title", "status"],
+  "wait": "PT10S"
+}

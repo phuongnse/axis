@@ -16,6 +16,13 @@ public static class ConnectorCalls
     /// <summary>The state of a call whose attempt a worker is sending.</summary>
     public const string Sending = "sending";
 
+    /// <summary>
+    /// The state of a call whose last attempt has an unknown outcome and that is not sent again,
+    /// so the system may have acted. When its operation declares a lookup, the worker asks the
+    /// system about it. Without one, it waits for an operator.
+    /// </summary>
+    public const string Unknown = "unknown";
+
     /// <summary>The state of a call that settled with an answer that fits its output.</summary>
     public const string Succeeded = "succeeded";
 
@@ -55,7 +62,7 @@ public static class ConnectorCalls
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT process_instance_id, step, release_id, connector, operation, state, attempts, input::text
+            SELECT process_instance_id, step, release_id, connector, operation, state, attempts, input::text, lookups
             FROM axis.connector_calls WHERE id = @id FOR UPDATE
             """,
             Connection(transaction),
@@ -76,7 +83,8 @@ public static class ConnectorCalls
             reader.GetString(4),
             reader.GetString(5),
             reader.GetInt32(6),
-            await reader.IsDBNullAsync(7, cancellationToken) ? null : reader.GetString(7));
+            await reader.IsDBNullAsync(7, cancellationToken) ? null : reader.GetString(7),
+            reader.GetInt32(8));
     }
 
     /// <summary>
@@ -97,6 +105,51 @@ public static class ConnectorCalls
         command.Parameters.AddWithValue("sending", Sending);
         command.Parameters.AddWithValue("pending", Pending);
         return await command.ExecuteScalarAsync(cancellationToken) is int attempts ? attempts : null;
+    }
+
+    /// <summary>
+    /// Sets the call <paramref name="id"/> back to <c>pending</c> for its next attempt, with the last
+    /// attempt's or lookup's status and error, and resets its failed lookups. Its stored input is
+    /// kept, so the retry sends it again.
+    /// </summary>
+    internal static async Task RetryAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.connector_calls SET state = @state, lookups = 0, last_status = @status, last_error = @error WHERE id = @id",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", Pending);
+        AddLast(command, lastStatus, lastError);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the call <paramref name="id"/> to <c>unknown</c>, with the last attempt's status and
+    /// error. Its stored input is kept, since a later retry or reconciliation may still need it.
+    /// </summary>
+    internal static Task MarkUnknownAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken) =>
+        SetStateAsync(transaction, id, Unknown, lastStatus, lastError, cancellationToken);
+
+    /// <summary>
+    /// Counts a failed lookup of the <c>unknown</c> call <paramref name="id"/>, with its status and
+    /// error. Returns the failed lookups since the call became <c>unknown</c>, this one included, or
+    /// <see langword="null"/> when the call is not unknown.
+    /// </summary>
+    internal static async Task<int?> FailLookupAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.connector_calls SET lookups = lookups + 1, last_status = @status, last_error = @error
+            WHERE id = @id AND state = @unknown
+            RETURNING lookups
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("unknown", Unknown);
+        AddLast(command, lastStatus, lastError);
+        return await command.ExecuteScalarAsync(cancellationToken) is int lookups ? lookups : null;
     }
 
     /// <summary>
@@ -122,9 +175,32 @@ public static class ConnectorCalls
             transaction);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("state", state);
+        AddLast(command, lastStatus, lastError);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task SetStateAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string state,
+        int? lastStatus,
+        string? lastError,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.connector_calls SET state = @state, last_status = @status, last_error = @error WHERE id = @id",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        AddLast(command, lastStatus, lastError);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static void AddLast(NpgsqlCommand command, int? lastStatus, string? lastError)
+    {
         command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)lastStatus ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)lastError ?? DBNull.Value });
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
@@ -151,6 +227,7 @@ internal sealed record NewConnectorCall(
 /// <param name="Operation">The operation's declared name.</param>
 /// <param name="Attempts">The attempts made so far.</param>
 /// <param name="Input">The stored input as JSON text, or <see langword="null"/> once the call settled.</param>
+/// <param name="Lookups">The failed lookups since the call became <c>unknown</c>.</param>
 internal sealed record LoadedConnectorCall(
     Guid Id,
     Guid ProcessInstanceId,
@@ -160,4 +237,5 @@ internal sealed record LoadedConnectorCall(
     string Operation,
     string State,
     int Attempts,
-    string? Input);
+    string? Input,
+    int Lookups);

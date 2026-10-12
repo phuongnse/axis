@@ -1,0 +1,20 @@
+{
+  "id": "21a3eadd-455c-48e0-9d8c-abef7985c062",
+  "kind": "process",
+  "name": "QuickOrder",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "createOrder",
+  "steps": [
+    {
+      "name": "createOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "QuickPurchasing", "operation": "createOrder" },
+      "input": { "reference": "title", "amount": "amount", "note": "comment" },
+      "output": { "orderNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
