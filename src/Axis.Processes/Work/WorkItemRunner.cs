@@ -7,9 +7,11 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Processes.Work;
 
 /// <summary>
-/// Claims work items of the registered handler kinds and runs each in one transaction under the
-/// item's tenant context. The transaction commits only while the claim is still current, so a
-/// worker that lost its claim commits nothing.
+/// Claims work items of the registered handler kinds and runs each under the item's tenant context.
+/// A <see cref="IWorkItemHandler"/> runs in one transaction, which commits only while the claim is
+/// still current, so a worker that lost its claim commits nothing. An
+/// <see cref="IExternalWorkItemHandler"/> runs with no transaction open, and checks the claim in
+/// each transaction it opens.
 /// </summary>
 public sealed partial class WorkItemRunner
 {
@@ -17,14 +19,16 @@ public sealed partial class WorkItemRunner
     private readonly ITenantContextAccessor _accessor;
     private readonly ILogger<WorkItemRunner> _logger;
     private readonly Dictionary<string, IWorkItemHandler> _handlers = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IExternalWorkItemHandler> _externalHandlers = new(StringComparer.Ordinal);
     private readonly string[] _kinds;
 
-    /// <exception cref="InvalidOperationException">Two handlers have the same kind.</exception>
+    /// <exception cref="InvalidOperationException">Two handlers of either sort have the same kind.</exception>
     public WorkItemRunner(
         ITenantConnectionFactory connections,
         ITenantContextAccessor accessor,
         IEnumerable<IWorkItemHandler> handlers,
-        ILogger<WorkItemRunner> logger)
+        ILogger<WorkItemRunner> logger,
+        IEnumerable<IExternalWorkItemHandler>? externalHandlers = null)
     {
         ArgumentNullException.ThrowIfNull(handlers);
         _connections = connections;
@@ -34,11 +38,19 @@ public sealed partial class WorkItemRunner
         {
             if (!_handlers.TryAdd(handler.Kind, handler))
             {
-                throw new InvalidOperationException($"More than one work item handler is registered for kind '{handler.Kind}'.");
+                throw DuplicateKind(handler.Kind);
             }
         }
 
-        _kinds = [.. _handlers.Keys.Order(StringComparer.Ordinal)];
+        foreach (var handler in externalHandlers ?? [])
+        {
+            if (_handlers.ContainsKey(handler.Kind) || !_externalHandlers.TryAdd(handler.Kind, handler))
+            {
+                throw DuplicateKind(handler.Kind);
+            }
+        }
+
+        _kinds = [.. _handlers.Keys.Concat(_externalHandlers.Keys).Order(StringComparer.Ordinal)];
     }
 
     /// <summary>
@@ -90,12 +102,15 @@ public sealed partial class WorkItemRunner
     /// deletion. When it throws, its writes roll back, and a following transaction deletes the item
     /// and calls the handler's failure callback. Both commit only if the claim is still current.
     /// Cancellation rolls back with no failure callback, so the item is claimed again after its lease.
+    /// An external handler gets the open connection with no transaction, and reports its own outcome.
     /// </summary>
     /// <exception cref="InvalidOperationException">No handler is registered for the item's kind.</exception>
     public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);
-        if (!_handlers.TryGetValue(item.Kind, out var handler))
+        _handlers.TryGetValue(item.Kind, out var handler);
+        IExternalWorkItemHandler? externalHandler = null;
+        if (handler is null && !_externalHandlers.TryGetValue(item.Kind, out externalHandler))
         {
             throw new InvalidOperationException($"No work item handler is registered for kind '{item.Kind}'.");
         }
@@ -105,6 +120,11 @@ public sealed partial class WorkItemRunner
         try
         {
             await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
+            if (handler is null)
+            {
+                return await externalHandler!.ExecuteAsync(item, connection, cancellationToken);
+            }
+
             Exception? error = null;
             await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
             {
@@ -167,6 +187,9 @@ public sealed partial class WorkItemRunner
         await ExecuteAsync(item, cancellationToken);
         return true;
     }
+
+    private static InvalidOperationException DuplicateKind(string kind) =>
+        new($"More than one work item handler is registered for kind '{kind}'.");
 
     [LoggerMessage(LogLevel.Warning, "Work item {ItemId} of kind {Kind} for tenant {TenantId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, string kind, string tenantId);

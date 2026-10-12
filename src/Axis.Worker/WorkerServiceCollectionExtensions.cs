@@ -7,7 +7,8 @@ public static class WorkerServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the tenancy and processes services and the background service that runs the due
-    /// work items of every configured tenant.
+    /// work items of every configured tenant. Only a worker that runs in Development sends connector
+    /// calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">The tenant or worker configuration is invalid.</exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -27,7 +28,7 @@ public static class WorkerServiceCollectionExtensions
         }
 
         services.AddTenancy(configuration, environment);
-        services.AddProcesses();
+        services.AddProcesses(environment.IsDevelopment());
         services.AddSingleton(options);
         services.AddHostedService<WorkerService>();
         return services;

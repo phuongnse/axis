@@ -126,6 +126,64 @@ internal static class ProcessSteps
         return await command.ExecuteScalarAsync(cancellationToken) is long revision ? revision : null;
     }
 
+    /// <summary>
+    /// Moves an instance that is <c>waiting</c> on the <c>callConnector</c> step <paramref name="step"/>
+    /// at <paramref name="revision"/> back to <c>running</c> on <paramref name="next"/>, with the next
+    /// revision. Returns <see langword="false"/> when the instance changed since.
+    /// </summary>
+    public static async Task<bool> TryResumeCallAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string step,
+        long revision,
+        string next,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_instances
+            SET state = @running, step = @next, revision = revision + 1
+            WHERE id = @id AND state = @waiting AND step = @step AND revision = @revision
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("step", step);
+        command.Parameters.AddWithValue("revision", revision);
+        command.Parameters.AddWithValue("next", next);
+        command.Parameters.AddWithValue("running", ProcessStarts.Running);
+        command.Parameters.AddWithValue("waiting", ProcessStarts.Waiting);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Marks an instance that is <c>waiting</c> on <paramref name="step"/> at <paramref name="revision"/>
+    /// <c>failed</c>, with the next revision and its end time. Returns <see langword="false"/> when
+    /// the instance changed since.
+    /// </summary>
+    public static async Task<bool> TryFailWaitingAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string step,
+        long revision,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_instances
+            SET state = @failed, revision = revision + 1, ended_at = now()
+            WHERE id = @id AND state = @waiting AND step = @step AND revision = @revision
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("step", step);
+        command.Parameters.AddWithValue("revision", revision);
+        command.Parameters.AddWithValue("failed", ProcessStarts.Failed);
+        command.Parameters.AddWithValue("waiting", ProcessStarts.Waiting);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
     /// <summary>Adds the history row of a step occurrence. It finishes at the database's current time.</summary>
     public static async Task InsertHistoryAsync(NpgsqlTransaction transaction, StepOccurrence occurrence, CancellationToken cancellationToken)
     {

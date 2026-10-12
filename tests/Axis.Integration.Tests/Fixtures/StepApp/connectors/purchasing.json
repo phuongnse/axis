@@ -4,6 +4,8 @@
   "name": "Purchasing",
   "formatVersion": 1,
   "baseUrl": { "binding": "PurchasingUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "idempotency": "Idempotency-Key",
   "operations": [
     {
       "name": "createOrder",

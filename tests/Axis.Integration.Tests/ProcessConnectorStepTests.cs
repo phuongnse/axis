@@ -19,7 +19,7 @@ public sealed class ProcessConnectorStepTests(ProcessStepFixture fixture) : ICla
         var subjectId = await fixture.InsertRequestAsync(500m, 1);
         var instanceId = await fixture.StartAsync("Order", subjectId, fixture.FirstReleaseId);
 
-        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
 
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await fixture.InstanceAsync(instanceId));
         var call = Assert.Single(await CallsAsync(instanceId));
@@ -34,7 +34,7 @@ public sealed class ProcessConnectorStepTests(ProcessStepFixture fixture) : ICla
         Assert.Equal(500m, input["amount"]!.GetValue<decimal>());
         Assert.Null(input["note"]);
 
-        // The call's item names it and is never claimed, because no worker handles its kind yet.
+        // The call's item names it and is still unclaimed, because only the step's item ran.
         var item = Assert.Single(await WorkItemsAsync(instanceId));
         Assert.Equal((ProcessStarts.ConnectorCallWorkItemKind, (Guid?)call.Id, false), (item.Kind, item.ConnectorCallId, item.Claimed));
     }
@@ -45,7 +45,7 @@ public sealed class ProcessConnectorStepTests(ProcessStepFixture fixture) : ICla
         var subjectId = await fixture.InsertRequestAsync(500m, 1);
         var instanceId = await fixture.StartAsync("Order", subjectId, fixture.FirstReleaseId);
 
-        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
 
         var callId = Assert.Single(await CallsAsync(instanceId)).Id;
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
@@ -81,13 +81,13 @@ public sealed class ProcessConnectorStepTests(ProcessStepFixture fixture) : ICla
         var instanceId = await fixture.StartAsync("Order", subjectId, fixture.FirstReleaseId);
 
         // The first worker claims the step's item and crashes before it runs it.
-        var crashed = await fixture.Runner.ClaimAsync(ProcessStepFixture.TenantId, _shortLease, CancellationToken);
+        var crashed = await fixture.ClaimAsync(ProcessStarts.StepWorkItemKind, _shortLease, CancellationToken);
         Assert.Equal(instanceId, crashed?.ProcessInstanceId);
         Assert.Empty(await CallsAsync(instanceId));
         Assert.Equal((ProcessStarts.Running, 1L, "createOrder", false), await fixture.InstanceAsync(instanceId));
 
         await Task.Delay(_afterShortLease, CancellationToken);
-        Assert.True(await fixture.RunNextAsync(CancellationToken));
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
 
         var call = Assert.Single(await CallsAsync(instanceId));
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await fixture.InstanceAsync(instanceId));
@@ -107,7 +107,8 @@ public sealed class ProcessConnectorStepTests(ProcessStepFixture fixture) : ICla
         var first = await fixture.StartAsync("Order", firstSubject, fixture.FirstReleaseId);
         var second = await fixture.StartAsync("Order", secondSubject, fixture.FirstReleaseId);
 
-        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
 
         var firstId = Assert.Single(await CallsAsync(first)).Id;
         Assert.Equal(firstId, Assert.Single(await CallsAsync(first)).Id);
@@ -125,7 +126,7 @@ public sealed class ProcessConnectorStepTests(ProcessStepFixture fixture) : ICla
         var subjectId = await fixture.InsertRequestAsync(null, 1);
         var instanceId = await fixture.StartAsync("Order", subjectId, fixture.FirstReleaseId);
 
-        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
 
         Assert.Equal((ProcessStarts.Failed, 2L, "createOrder", true), await fixture.InstanceAsync(instanceId));
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
