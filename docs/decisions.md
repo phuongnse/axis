@@ -607,10 +607,11 @@ depend on which grant matched a record.
 ## D25. Connectors, deployment bindings and secrets — Agreed
 
 M5 lets a process call external systems. The `Bindings` block in host
-configuration, its startup check, resolving a binding at run time, the
-`connector` resource with its compile checks and the activation check are
-built. Calling a connector and keeping secrets out of logs and records are
-not built yet. See
+configuration, its startup checks, resolving a binding at run time, the
+secret value that hides itself from text, JSON and logs, the `connector`
+resource with its compile checks and the activation check are built. Outside
+Development, startup fails when a secret comes from a configuration file.
+Calling a connector and using secrets in its calls are not built yet. See
 [configuration](reference/configuration.md#connectors-and-deployment-bindings)
 for bindings and the `connector` resource, and
 [processes](reference/processes.md#connector-calls) for the call, its
@@ -630,8 +631,8 @@ retries and reconciliation.
 - **Activation check:** activating a release for a tenant fails with a
   diagnostic naming the tenant and the binding, when a binding the release
   uses is missing or of the wrong kind.
-- **Secret values:** they come from the environment, never from a committed
-  file outside development fixtures. They never appear in a release, step
+- **Secret values:** they come from the environment. Only in Development may
+  a committed file hold one, and elsewhere startup fails. They never appear in a release, step
   history, audit record, log or problem details. There is no secret store
   such as a vault yet.
 - **Resolved at run time:** the worker reads the binding when it makes a

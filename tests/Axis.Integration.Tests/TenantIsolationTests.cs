@@ -85,7 +85,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
             ["Tenants:b:Bindings:PurchasingSystemUrl:Kind"] = "url",
             ["Tenants:b:Bindings:PurchasingSystemUrl:Value"] = "https://b.example.test/api",
         });
-        builder.Services.AddTenancy(builder.Configuration);
+        builder.Services.AddTenancy(builder.Configuration, builder.Environment);
         _app = builder.Build();
         _app.UseTenantResolution();
         _app.MapPost("/rows", async (string value, ITenantConnectionFactory connections, CancellationToken cancellationToken) =>

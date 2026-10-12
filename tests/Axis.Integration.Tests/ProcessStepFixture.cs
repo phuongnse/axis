@@ -16,6 +16,7 @@ using Axis.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting.Internal;
 using Npgsql;
 using NpgsqlTypes;
 using Record = Axis.Data.Records.Record;
@@ -83,7 +84,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
                 [$"Tenants:{TenantId}:ConnectionString"] = _connectionString,
             })
             .Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings).BuildServiceProvider();
+        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()

@@ -804,10 +804,11 @@ An entity `text` field names the sequence in its `sequence` property:
 
 This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
-The `Bindings` block, its startup check, resolving a binding at run time, the
-`connector` resource with its [compile checks](#configuration-pipeline) and
-the activation check are built. *(planned for M5)* Calling a connector and
-keeping secrets out of logs and records are not built yet. A `connector` resource
+The `Bindings` block, its startup checks, resolving a binding at run time,
+the secret value that hides itself from text, JSON and logs, the `connector`
+resource with its [compile checks](#configuration-pipeline) and the activation
+check are built. *(planned for M5)* Calling a connector and using secrets in
+its calls are not built yet. A `connector` resource
 describes an external system that a process can call. Its URL and its secret
 are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
 reconciles is in [Connector calls](processes.md#connector-calls).
@@ -825,10 +826,22 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   `Value`. The server and the worker must both hold them.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
-  `Tenants__default__Bindings__PurchasingSystemToken__Value`. It never comes
-  from a committed file outside development fixtures.
+  `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
+  argument or a mounted secret file works too. Only in Development may a
+  committed `appsettings` file hold one.
+- **Secret source check.** Outside Development, startup fails when the
+  source that wins for a secret's `Value` is a configuration file, such as
+  `appsettings.json`. The message names the tenant, the binding and the file,
+  never the value. A file may still hold a placeholder that an environment
+  variable overrides, as in the example below.
 - **Never shown.** A secret's value never appears in a release, step
   history, audit record, log or problem details.
+- **Resolving a secret.** A `secret` binding resolves to a secret value. Its
+  text, its JSON and anything logged with it show `[secret]`, never the value
+  or a part of it. Code reads the plain value only by asking for it at the
+  moment of a call. A secret is never read back from JSON. Asking for a
+  `secret` binding as a plain binding fails with a message that names the
+  binding.
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
   kind (`AXC0100`). The binding diagnostic names the tenant and the binding.

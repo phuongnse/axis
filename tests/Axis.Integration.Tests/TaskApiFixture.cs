@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting.Internal;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -92,7 +93,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 [$"Tenants:{TenantB}:ConnectionString"] = b.ConnectionString,
             })
             .Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings).BuildServiceProvider();
+        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()
