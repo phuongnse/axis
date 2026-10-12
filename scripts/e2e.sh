@@ -8,6 +8,9 @@
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
 # can restart it: it writes the restart file, then stops the worker process. The run fails if the
 # worker exits without a restart request, or never finds the tenant database migrated.
+# The purchasing system stub from tests/Axis.PurchasingStub runs from the build output on
+# $AXIS_E2E_PURCHASING_PORT (default 5281). Specs find it at $AXIS_E2E_PURCHASING_URL. The run
+# fails if it never answers.
 # A Compose smoke test then builds the image and runs the stack on free ports. It is skipped
 # when $NEXKIT_BASE_SHA shows that nothing it covers changed.
 set -euo pipefail
@@ -20,6 +23,7 @@ password="e2e-$RANDOM$RANDOM"
 keycloak_image="quay.io/keycloak/keycloak:26.4"
 keycloak_container="axis-e2e-keycloak-$$"
 
+purchasing_pid=""
 worker_pid=""
 worker_dir="$(mktemp -d)"
 export AXIS_E2E_WORKER_PID_FILE="$worker_dir/worker.pid"
@@ -38,6 +42,10 @@ stop_worker() {
 
 cleanup() {
   stop_worker
+  if [ -n "$purchasing_pid" ]; then
+    kill "$purchasing_pid" 2>/dev/null || true
+    wait "$purchasing_pid" 2>/dev/null || true
+  fi
   docker rm -f "$container" >/dev/null 2>&1 || true
   docker rm -f "$keycloak_container" >/dev/null 2>&1 || true
 }
@@ -83,6 +91,37 @@ fi
 
 scripts/build.sh
 
+mkdir -p artifacts/logs
+purchasing_log="$root/artifacts/logs/e2e-purchasing.log"
+: >"$purchasing_log"
+export AXIS_E2E_PURCHASING_URL="http://127.0.0.1:${AXIS_E2E_PURCHASING_PORT:-5281}"
+ASPNETCORE_URLS="$AXIS_E2E_PURCHASING_URL" \
+  dotnet tests/Axis.PurchasingStub/bin/Release/net10.0/Axis.PurchasingStub.dll >>"$purchasing_log" 2>&1 &
+purchasing_pid=$!
+
+ready=0
+reason="did not answer after 30 seconds"
+for _ in $(seq 1 30); do
+  if curl -fs -o /dev/null "$AXIS_E2E_PURCHASING_URL/health"; then
+    ready=1
+    break
+  fi
+  if ! kill -0 "$purchasing_pid" 2>/dev/null; then
+    reason="stopped before it answered"
+    break
+  fi
+  sleep 1
+done
+
+if [ "$ready" -ne 1 ]; then
+  {
+    echo "The purchasing system stub at $AXIS_E2E_PURCHASING_URL $reason."
+    echo "Last 100 lines of artifacts/logs/e2e-purchasing.log:"
+    tail -n 100 "$purchasing_log"
+  } >&2
+  exit 1
+fi
+
 discovery="http://127.0.0.1:$keycloak_port/realms/axis/.well-known/openid-configuration"
 timeout="${AXIS_E2E_KEYCLOAK_TIMEOUT:-180}"
 ready=0
@@ -108,7 +147,6 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
-mkdir -p artifacts/logs
 export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
 export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
 export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"

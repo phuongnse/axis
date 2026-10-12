@@ -149,12 +149,19 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       recursive: true,
       filter: (source) => !excluded.has(path.basename(source)),
     })
-    ports = { postgres: await freePort(), keycloak: await freePort(), server: await freePort(), web: await freePort() }
+    ports = {
+      postgres: await freePort(),
+      keycloak: await freePort(),
+      purchasing: await freePort(),
+      server: await freePort(),
+      web: await freePort(),
+    }
     env = {
       ...process.env,
       COMPOSE_PROJECT_NAME: project,
       AXIS_POSTGRES_PORT: String(ports.postgres),
       AXIS_KEYCLOAK_PORT: String(ports.keycloak),
+      AXIS_PURCHASING_PORT: String(ports.purchasing),
       AXIS_SERVER_PORT: String(ports.server),
       AXIS_WEB_PORT: String(ports.web),
       MSBUILDDISABLENODEREUSE: '1',
@@ -185,6 +192,10 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(keycloakStart >= 0, run.stdout)
     assert.ok(keycloakStart < run.stdout.indexOf('[server]'), `Server output before Keycloak started:\n${run.stdout}`)
 
+    // The purchasing system stub answers on its port.
+    const purchasing = await fetch(`http://localhost:${ports.purchasing}/health`)
+    assert.equal(purchasing.status, 200)
+
     // The worker starts only after the server has migrated the tenant databases.
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
     const listening = run.stdout.indexOf('Now listening on')
@@ -211,6 +222,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     })
     assert.match(services, /postgres/)
     assert.match(services, /keycloak/)
+    assert.match(services, /purchasing/)
   })
 
   it('skips the install on the second run', async () => {
