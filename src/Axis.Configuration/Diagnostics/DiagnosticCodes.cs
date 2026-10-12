@@ -92,4 +92,11 @@ public static class DiagnosticCodes
     public const string UnknownGrantTarget = "AXC0092";
     public const string GrantOnChildEntity = "AXC0093";
     public const string UnknownGrantField = "AXC0094";
+
+    public const string DuplicateConnectorName = "AXC0096";
+    public const string InvalidOperationPath = "AXC0097";
+    public const string InvalidOperationLookup = "AXC0098";
+    public const string InvalidConnectorTimeout = "AXC0099";
+    public const string MissingDeploymentBinding = "AXC0100";
+    public const string InsecureBaseUrl = "AXC0101";
 }

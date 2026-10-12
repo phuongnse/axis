@@ -168,7 +168,7 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         await using var data = CreateDataContext();
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("a"));
         Assert.Empty(activated.Diagnostics);
         return (compiled.Release!.Id, compiled.Model!);
     }

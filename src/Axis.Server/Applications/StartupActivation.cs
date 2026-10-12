@@ -21,6 +21,7 @@ internal sealed partial class StartupActivation(
     TenantOptions tenants,
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
+    IHostEnvironment environment,
     ILogger<StartupActivation> logger) : IHostedLifecycleService
 {
     public async Task StartingAsync(CancellationToken cancellationToken)
@@ -62,6 +63,7 @@ internal sealed partial class StartupActivation(
         await configuration.Database.MigrateAsync(cancellationToken);
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
+        var bindings = Bindings(tenantId);
 
         foreach (var folder in options.Folders)
         {
@@ -74,7 +76,7 @@ internal sealed partial class StartupActivation(
                     throw Failure("does not compile", compiled.Diagnostics, folder, tenantId);
                 }
 
-                var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, cancellationToken);
+                var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, cancellationToken);
                 if (activated.Diagnostics.Count > 0)
                 {
                     LogDiagnostics(activated.Diagnostics, folder, tenantId);
@@ -100,6 +102,24 @@ internal sealed partial class StartupActivation(
                 throw;
             }
         }
+    }
+
+    /// <summary>
+    /// The tenant's bindings as activation checks them. A secret's value stays behind, and a url
+    /// binding may use http only in Development.
+    /// </summary>
+    private ActivationBindings Bindings(string tenantId)
+    {
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, binding) in tenants.Tenants[tenantId].Bindings)
+        {
+            // The tenant check at startup already refused a binding without a kind, or a url binding that is not an absolute URL.
+            bindings[name] = new ActivationBinding(
+                binding.Kind!,
+                binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Value!, UriKind.Absolute) : null);
+        }
+
+        return new ActivationBindings(tenantId, bindings, AllowHttp: environment.IsDevelopment());
     }
 
     private void LogDiagnostics(IReadOnlyList<Diagnostic> diagnostics, string folder, string tenantId)

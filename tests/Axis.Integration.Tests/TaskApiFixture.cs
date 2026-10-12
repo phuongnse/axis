@@ -325,7 +325,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
         var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"));
         Assert.Empty(activated.Diagnostics);
         _model ??= compiled.Model;
         return new Tenant(connectionString, NpgsqlDataSource.Create(connectionString), compiled.Release!.Id);

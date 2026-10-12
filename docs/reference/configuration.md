@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role` or `policy`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy` or `connector`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -250,6 +250,26 @@ flowchart LR
      outside the SQL subset, such as an aggregate or `lower`, is `AXC0053`.
      A name whose role, entity, data source or process file was not loaded
      because of its own errors is not reported again.
+   - **Connectors.** A [connector](#connector-resource)'s `timeout` that is not
+     a positive ISO 8601 duration of at most `PT2M`, in the form a task's
+     `dueIn` takes, is `AXC0099` at `/timeout`. A later operation whose name
+     an earlier operation of the connector already uses, ignoring letter case,
+     is `AXC0096` at `/operations/{i}/name`. So is a later input or output
+     field whose name an earlier field of the same list already uses, ignoring
+     letter case, at `/operations/{i}/input/{j}/name` or
+     `/operations/{i}/output/{j}/name`. A `path` with an unbalanced `{` or
+     `}`, or a placeholder other than `{idempotencyKey}`, matched exactly, is
+     `AXC0097` at `/operations/{i}/path`. A placeholder is refused even when it
+     matches an input name, because inputs go in the JSON body. A `lookup` is
+     `AXC0098` at `/operations/{i}/lookup` when it names no operation of the
+     connector, ignoring letter case, or names its own operation. It is also
+     `AXC0098` when the operation it names is not a `GET`, has no
+     `{idempotencyKey}` in its path, or has other outputs than the operation
+     it serves. Outputs are the same when they have the same names, ignoring
+     letter case and order, with the same type and `required`. The message
+     says which. A `GET` with `input` fields, and an `auth` without the
+     properties its `type` needs or with others, are `AXC0004`. Bindings are
+     checked at activation, not here.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -259,9 +279,11 @@ flowchart LR
    path order with their entity, projected fields and parameter targets
    resolved and their filter checked. It also holds the processes in path
    order, with their entity resolved, each transition resolved to the
-   declared name of its step and their conditions checked, and the
+   declared name of its step and their conditions checked, the
    policies in path order, with each grant's target resolved and its filter
-   checked. No model is produced while any error remains.
+   checked, and the connectors in path order, with their timeout, operations,
+   typed input and output fields, and each lookup resolved to the declared
+   name of its operation. No model is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -341,6 +363,10 @@ flowchart LR
      active under the manifest name; if one is, it returns `AXC0020` and
      changes nothing. It then checks each site path; it returns one `AXC0031`
      for every site whose path another application holds, and changes
+     nothing. It then checks the deployment bindings of every connector
+     against the tenant's. It returns one `AXC0100` for every binding the
+     tenant lacks or holds with another kind, and outside Development one
+     `AXC0101` for every base URL binding that is not `https`, and changes
      nothing. It then provisions the entity tables (see
      [Storage](storage.md#storage)); when provisioning returns diagnostics, they are
      returned and the active release is untouched. Only then is the release
@@ -489,6 +515,12 @@ sorted by file and then path.
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
 | `AXC0095` | An expression that is not a policy filter calls `currentUser()`, such as a validation, a computed field, a data source filter, a process condition or a rule body. A rule argument inside a policy filter may call it. Reported at that expression's path, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
+| `AXC0096` | An earlier operation of the same connector already uses this `name`, or an earlier field of the same operation's `input` or `output` already uses this field `name`, ignoring letter case. Reported at `/operations/{i}/name`, `/operations/{i}/input/{j}/name` or `/operations/{i}/output/{j}/name` of the later one. |
+| `AXC0097` | A connector operation's `path` has an unbalanced `{` or `}`, or a placeholder other than `{idempotencyKey}`, such as `{orderId}`. Reported at `/operations/{i}/path`. |
+| `AXC0098` | A connector operation's `lookup` names no operation of the connector, ignoring letter case, or names its own operation. Or the operation it names is not a `GET`, has no `{idempotencyKey}` in its `path`, or has other outputs than the operation it serves. The message says which. Reported at `/operations/{i}/lookup`. |
+| `AXC0099` | A connector's `timeout` is not a positive ISO 8601 duration of at most `PT2M`, in the form a task's `dueIn` takes, such as `PT30S`. Reported at `/timeout`. |
+| `AXC0100` | The tenant a release is activated for lacks a binding a connector names, or holds it with another kind. `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding. Reported by activation at `/baseUrl/binding`, `/auth/token/binding` or `/auth/value/binding` of the connector file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
+| `AXC0101` | Outside Development, a connector's `baseUrl` binding is not an `https` URL. Reported by activation at `/baseUrl/binding` of the connector file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
 
 ## Startup activation
 
@@ -772,10 +804,11 @@ An entity `text` field names the sequence in its `sequence` property:
 
 This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
-The `Bindings` block, its startup checks, resolving a binding at run time
-and the secret value that hides itself from text, JSON and logs are built.
-*(planned for M5)* Connectors, using secrets in their calls and the activation
-check are not built yet. A `connector` resource
+The `Bindings` block, its startup checks, resolving a binding at run time,
+the secret value that hides itself from text, JSON and logs, the `connector`
+resource with its [compile checks](#configuration-pipeline) and the activation
+check are built. *(planned for M5)* Calling a connector and using secrets in
+its calls are not built yet. A `connector` resource
 describes an external system that a process can call. Its URL and its secret
 are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
 reconciles is in [Connector calls](processes.md#connector-calls).
@@ -811,7 +844,11 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   binding.
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
-  kind. The binding diagnostic names the tenant and the binding.
+  kind (`AXC0100`). The binding diagnostic names the tenant and the binding.
+  Activation checks bindings before it provisions anything, and reports every
+  bad binding at once. Startup activation passes in each tenant's bindings,
+  so a bad binding stops the start. A tenant is checked only when a release
+  is activated for it.
 - **Startup check.** A binding whose `Kind` is missing or is not `url` or
   `secret`, whose `Value` is blank, or a `url` binding whose value is not an
   absolute `http` or `https` URL, fails startup like the other
@@ -820,7 +857,8 @@ reconciles is in [Connector calls](processes.md#connector-calls).
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
-  must be `https`. This is checked at activation and again at call time.
+  must be `https`. Activation checks each connector's base URL binding
+  (`AXC0101`). *(planned for M5)* The call checks it again.
 
 The purchasing system's bindings for tenant `default` look like this:
 
@@ -890,7 +928,8 @@ The purchase request sample will hold the purchasing system connector in
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
   - `path` is a path template. `{idempotencyKey}` is the only placeholder in
     M5. Other placeholders come later.
-  - `input` fields are sent as a JSON body. A `GET` sends no body.
+  - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
+    with `input` fields is a schema error.
   - `output` fields are read from the JSON response.
   - Input and output field types are the
     [rule parameter types](#resource-file-shape): `text`, `integer`,
@@ -906,7 +945,8 @@ The purchase request sample will hold the purchasing system connector in
 
 The sample's `PurchaseRequest` entity will gain a `purchaseOrderNumber`
 `text` field, which the call writes. The sample files do not change until
-the build issues add connectors.
+connector calls are built, because Development, Compose and E2E hold no
+purchasing bindings yet and the sample would no longer activate.
 
 ## Events and triggers
 

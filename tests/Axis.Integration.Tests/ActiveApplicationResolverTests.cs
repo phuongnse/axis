@@ -161,6 +161,6 @@ public sealed class ActiveApplicationResolverTests(DataDatabaseFixture database)
     {
         await using var configuration = database.CreateConfigurationContext();
         await using var data = database.CreateContext();
-        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, CancellationToken);
+        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken);
     }
 }
