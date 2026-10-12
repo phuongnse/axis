@@ -108,4 +108,9 @@ public static class DiagnosticCodes
     public const string UnknownOutputField = "AXC0107";
     public const string InvalidOutputField = "AXC0108";
     public const string InvalidRetryBackoff = "AXC0109";
+
+    public const string UnknownEventEntity = "AXC0110";
+    public const string EventOverChildEntity = "AXC0111";
+    public const string DuplicateEventFieldName = "AXC0112";
+    public const string InvalidEventFieldType = "AXC0113";
 }

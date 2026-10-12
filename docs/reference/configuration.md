@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy` or `connector`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector` or `event`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -295,6 +295,15 @@ flowchart LR
      says which. A `GET` with `input` fields, and an `auth` without the
      properties its `type` needs or with others, are `AXC0004`. Bindings are
      checked at activation, not here.
+   - **Events.** An [event](#event-resource)'s `entity` must name a loaded
+     entity, ignoring letter case, otherwise it is `AXC0110` at `/entity`. It
+     is not reported when the name is an entity file that was not loaded
+     because of its own errors. An `entity` that is a child entity is
+     `AXC0111` at `/entity`, naming the owner. A later field whose name an
+     earlier field of the event already uses, ignoring letter case, is
+     `AXC0112` at `/fields/{i}/name`. A field of type `enum`, `reference` or
+     `child-collection` is `AXC0113` at `/fields/{i}/type`. A type name that
+     is not a field type is `AXC0004`.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -308,7 +317,8 @@ flowchart LR
    policies in path order, with each grant's target resolved and its filter
    checked, and the connectors in path order, with their timeout, operations,
    typed input and output fields, and each lookup resolved to the declared
-   name of its operation. No model is produced while any error remains.
+   name of its operation, and the events in path order, with their entity
+   resolved, and their typed fields. No model is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -554,6 +564,10 @@ sorted by file and then path.
 | `AXC0107` | A value of a `callConnector` step's `output` names no field of the subject entity, or a field an earlier output of the step already writes, ignoring letter case. Reported at `/steps/{i}/output/{key}`. |
 | `AXC0108` | A value of a `callConnector` step's `output` names a computed field, a sequence field or a child collection, or a field whose type does not fit the output's. An output fits a field of the same type, and an `integer` output also fits a `decimal` field. Reported at `/steps/{i}/output/{key}`. |
 | `AXC0109` | A `callConnector` step's retry `backoff` is not a positive ISO 8601 duration in the form `dueIn` accepts, such as `PT30S` or `P1D`. Reported at `/steps/{i}/retry/backoff`. |
+| `AXC0110` | An event's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
+| `AXC0111` | An event's `entity` is a child entity. Reported at `/entity`, naming the owner. |
+| `AXC0112` | An earlier field of the same event already uses this field `name`, ignoring letter case. Reported at `/fields/{i}/name` of the later one, naming the first. |
+| `AXC0113` | An event field's `type` is `enum`, `reference` or `child-collection`. An event field is `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`. Reported at `/fields/{i}/type`. |
 
 ## Startup activation
 
@@ -983,9 +997,11 @@ purchasing bindings yet and the sample would no longer activate.
 
 ## Events and triggers
 
-*(planned for M5)* This section follows
-[D26](../decisions.md#d26-events-and-triggers--agreed). None of it is built
-yet. An `event` resource names something that happened to one record. A
+This section follows
+[D26](../decisions.md#d26-events-and-triggers--agreed). The `event` resource
+and its [compile checks](#configuration-pipeline) are built: an event file
+loads, is checked and is part of the release. *(planned for M5)* Raising an
+event and triggers are not built yet. An `event` resource names something that happened to one record. A
 `trigger` resource starts a process for one record when something happens:
 an event is raised, a record is created or updated, or a schedule is due. How
 a trigger starts a process, and when it skips the start, is in
@@ -1019,7 +1035,11 @@ An event about a note that was closed, in `events/note-closed.json`:
 - `fields` lists the typed payload fields. Their types are the
   [rule parameter types](#resource-file-shape): `text`, `integer`, `decimal`,
   `boolean`, `date` and `date-time`.
+- `fields` is required, but the list may be empty.
 - Field names are unique within the event, ignoring letter case.
+- An unknown entity is `AXC0110`, a child entity `AXC0111`, a repeated field
+  name `AXC0112` and an `enum`, `reference` or `child-collection` field
+  `AXC0113`. A type name that is not a field type is `AXC0004`.
 - A [raise event step](processes.md#raise-event-step) raises the event for its
   subject record. Events raised by the platform itself come later.
 

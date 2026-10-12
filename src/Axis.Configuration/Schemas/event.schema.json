@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "entity", "fields"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "event" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "entity": { "$ref": "#/$defs/name" },
+    "fields": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/field" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": {
+          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "child-collection"]
+        }
+      }
+    }
+  }
+}

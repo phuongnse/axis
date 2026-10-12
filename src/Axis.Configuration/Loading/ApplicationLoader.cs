@@ -114,6 +114,7 @@ public static class ApplicationLoader
         var roles = new List<RoleResource>();
         var policies = new List<PolicyResource>();
         var connectors = new List<ConnectorResource>();
+        var events = new List<EventResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -252,6 +253,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Connector:
                         connectors.Add(root.Deserialize<ConnectorResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Event:
+                        events.Add(root.Deserialize<EventResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -284,6 +288,7 @@ public static class ApplicationLoader
         {
             Connectors = connectors,
             UnloadedConnectorNames = unloadedConnectorNames,
+            Events = events,
         };
     }
 
@@ -447,7 +452,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}' or '{ResourceKinds.Connector}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}' or '{ResourceKinds.Event}'.",
                 file,
                 "/kind",
                 resourceId));
