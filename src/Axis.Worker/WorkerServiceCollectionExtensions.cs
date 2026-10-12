@@ -10,7 +10,7 @@ public static class WorkerServiceCollectionExtensions
     /// work items of every configured tenant.
     /// </summary>
     /// <exception cref="InvalidOperationException">The tenant or worker configuration is invalid.</exception>
-    public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -26,7 +26,7 @@ public static class WorkerServiceCollectionExtensions
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.PollInterval)}' must be positive.");
         }
 
-        services.AddTenancy(configuration);
+        services.AddTenancy(configuration, environment);
         services.AddProcesses();
         services.AddSingleton(options);
         services.AddHostedService<WorkerService>();

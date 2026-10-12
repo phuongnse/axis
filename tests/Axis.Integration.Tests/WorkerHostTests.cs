@@ -18,6 +18,9 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     private const string RecordKind = "test.record";
     private const string ThrowKind = "test.throw";
     private const string BindingKind = "test.binding";
+    private const string PlainSecretKind = "test.plain-secret";
+    private const string SecretCallKind = "test.secret-call";
+    private const string TokenValue = "s3cr3t-4f9b-x7q2";
 
     private static readonly TimeSpan _shortLease = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan _longLease = TimeSpan.FromSeconds(30);
@@ -166,6 +169,38 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     }
 
     [Fact]
+    public async Task Work_items_that_fail_while_resolving_or_using_a_secret_log_errors_without_any_part_of_the_value()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_secret_failures");
+        await EnqueueAsync(tenantA, "a", PlainSecretKind);
+        await EnqueueAsync(tenantA, "a", SecretCallKind);
+        var bindings = new Dictionary<string, string?>
+        {
+            ["Tenants:a:Bindings:PurchasingSystemToken:Kind"] = "secret",
+            ["Tenants:a:Bindings:PurchasingSystemToken:Value"] = TokenValue,
+        };
+
+        var logs = new LogCollector();
+        using (var host = BuildHost("worker", logs, bindings, ("a", tenantA)))
+        {
+            await host.StartAsync(CancellationToken);
+            await WaitUntilAsync(async () => await CountAsync(tenantA, "axis.process_work_items") == 0);
+            await host.StopAsync(CancellationToken);
+        }
+
+        var errors = logs.Entries.Where(entry => entry.StartsWith("Error", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, errors.Count);
+        Assert.Contains(errors, entry => entry.Contains("binding 'PurchasingSystemToken' is a secret", StringComparison.Ordinal));
+        Assert.Contains(errors, entry => entry.Contains("Call refused with token [secret]", StringComparison.Ordinal));
+        Assert.All(logs.Entries, entry =>
+        {
+            Assert.DoesNotContain(TokenValue, entry, StringComparison.Ordinal);
+            Assert.DoesNotContain(TokenValue[..4], entry, StringComparison.Ordinal);
+            Assert.DoesNotContain(TokenValue[^4..], entry, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
     public async Task Throwing_handler_rolls_back_its_writes_and_its_failure_callback_runs_once_and_the_item_is_gone()
     {
         var tenantA = await CreateTenantDatabaseAsync("worker_failure");
@@ -230,10 +265,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         builder.Configuration.AddInMemoryCollection(settings);
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
-        builder.Services.AddAxisWorker(builder.Configuration);
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         builder.Services.AddSingleton<IWorkItemHandler>(services =>
             new RecordingHandler(worker, services.GetRequiredService<ITenantContextAccessor>()));
         builder.Services.AddSingleton<IWorkItemHandler, BindingHandler>();
+        builder.Services.AddSingleton<IWorkItemHandler, PlainSecretHandler>();
+        builder.Services.AddSingleton<IWorkItemHandler, SecretCallHandler>();
         return builder.Build();
     }
 
@@ -378,6 +415,36 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             command.Parameters.AddWithValue("tenant", accessor.Current!.TenantId);
             command.Parameters.AddWithValue("worker", bindings.Resolve("PurchasingSystemUrl").Value);
             await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    /// <summary>Asks for the secret <c>PurchasingSystemToken</c> as a plain binding, which throws.</summary>
+    private sealed class PlainSecretHandler(IDeploymentBindings bindings) : IWorkItemHandler
+    {
+        public string Kind => PlainSecretKind;
+
+        public Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
+        {
+            bindings.Resolve("PurchasingSystemToken");
+            return Task.CompletedTask;
+        }
+
+        public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    /// <summary>Resolves the secret <c>PurchasingSystemToken</c>, then fails as a refused call that names it.</summary>
+    private sealed class SecretCallHandler(IDeploymentBindings bindings) : IWorkItemHandler
+    {
+        public string Kind => SecretCallKind;
+
+        public Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
+        {
+            var secret = bindings.ResolveSecret("PurchasingSystemToken");
+            throw new InvalidOperationException($"Call refused with token {secret}");
         }
 
         public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>

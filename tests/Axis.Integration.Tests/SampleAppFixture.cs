@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -86,7 +87,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
                 [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
             })
             .Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings).BuildServiceProvider();
+        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()
@@ -134,7 +135,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
         });
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
-        builder.Services.AddAxisWorker(builder.Configuration);
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         var host = builder.Build();
         await host.StartAsync(CancellationToken);
         return host;

@@ -26,7 +26,7 @@ builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionStr
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
-builder.Services.AddTenancy(builder.Configuration);
+builder.Services.AddTenancy(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
 var oidcTenants = TenantOidcSettings.Load(builder.Configuration);

@@ -87,7 +87,7 @@ public sealed class ProcessEnginePerformanceTests(ProcessStepFixture fixture) : 
         });
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
-        builder.Services.AddAxisWorker(builder.Configuration);
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         return builder.Build();
     }
 }

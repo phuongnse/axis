@@ -138,15 +138,25 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - the same host is listed under two tenants, compared ignoring letter case;
 - a binding has a missing `Kind` or one other than `url` or `secret`, a blank
   `Value`, or is a `url` binding whose value is not an absolute `http` or
-  `https` URL. The message names the tenant and the binding, never the value.
+  `https` URL. The message names the tenant and the binding, never the value;
+- outside Development, the configuration source that wins for a `secret`
+  binding's `Value` is a file, such as `appsettings.json`. Environment
+  variables, command-line arguments, mounted secret files and in-memory
+  sources are allowed. The message names the tenant, the binding and the file,
+  never the value.
 
 A tenant also holds its deployment bindings under `Bindings`, keyed by name
 and matched ignoring letter case. A release names a binding and never holds
 its value. The server and the worker both read this section, so both must hold
 the same bindings. `IDeploymentBindings` resolves a binding for the tenant of
-the current request or work item only. Without a tenant context, or for a name
-the tenant lacks, it throws an `InvalidOperationException` that names the
-binding and no value. A secret's `Value` comes from the environment, such as
+the current request or work item only. Its `Resolve` returns a `url` binding,
+and its `ResolveSecret` returns a `secret` binding as a `SecretValue`. A
+`SecretValue` shows `[secret]` as text, as JSON and in logs. Its `Reveal`
+returns the plain value at the moment of a call, and it is never read from
+JSON. Without a tenant context, for a name the tenant lacks, or for a binding
+of the other kind, both throw an `InvalidOperationException` that names the
+binding and no value. So `Resolve` never hands out a plain secret. A secret's
+`Value` comes from the environment, such as
 `Tenants__default__Bindings__PurchasingSystemToken__Value`. See
 [connectors and deployment bindings](reference/configuration.md#connectors-and-deployment-bindings)
 and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
