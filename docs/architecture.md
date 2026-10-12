@@ -607,8 +607,9 @@ to the draft. Only another grant can make it readable.
   operation identity as their idempotency key. The result is recorded by a
   following transaction. A `callConnector` step stages its call in its
   transaction, and the worker sends it and records its result in a
-  following transaction. *(planned for M5)* Retries, and reconciling an
-  unknown outcome through a lookup. See
+  following transaction. An attempt that is safe to retry is retried under
+  the step's retry policy, with the same identity. *(planned for M5)*
+  Reconciling an unknown outcome through a lookup. See
   [connector calls](reference/processes.md#connector-calls). A package
   operation step is staged and run the same way, see
   [package operations](reference/processes.md#package-operations).

@@ -99,7 +99,9 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
 
         Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync("a", CancellationToken));
 
+        // A 400 is not retried: one request, and no work item left to send another.
         Assert.Single(fixture.Stub.RequestsWithKey(callId));
+        Assert.Null(await fixture.DueAtAsync("a", callId));
         Assert.Equal((ProcessStarts.Failed, 3L, "createOrder", true), await tenant.InstanceAsync(instanceId));
         var call = await CallAsync(tenant, callId);
         Assert.Equal((ConnectorCalls.Failed, 1, (int?)400, (string?)null), (call.State, call.Attempts, call.LastStatus, call.Input));
@@ -145,7 +147,7 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
         var (_, failed) = await fixture.StageAsync("a", CancellationToken);
-        fixture.Stub.Respond(500, """{"error":"down"}""");
+        fixture.Stub.Respond(400, """{"error":"refused"}""");
         Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync("a", CancellationToken));
 
         // Both requests carried the token, so it was in use.
@@ -187,22 +189,265 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
     }
 
     [Fact]
-    public async Task Worker_outside_Development_sends_nothing_to_an_http_url_and_fails_the_call_naming_the_binding()
+    public async Task Worker_outside_Development_sends_nothing_to_an_http_url_and_retries_the_call_naming_the_binding()
     {
         var tenant = fixture.Tenant("a");
         var (_, instanceId) = await fixture.StageAsync("a", CancellationToken);
         var callId = await CallIdAsync(tenant, instanceId);
 
-        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallOutsideDevelopmentAsync("a", CancellationToken));
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOutsideDevelopmentAsync("a", CancellationToken));
 
         Assert.Empty(fixture.Stub.RequestsWithKey(callId));
         var call = await CallAsync(tenant, callId);
-        Assert.Equal((ConnectorCalls.Failed, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal((ConnectorCalls.Pending, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("Tenant 'a' binding 'PurchasingUrl' is not an https URL. Only Development allows http.", call.LastError);
+        Assert.DoesNotContain(fixture.Stub.BaseUrl, call.LastError, StringComparison.Ordinal);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+
+        // A worker whose host allows the URL sends the retry.
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+        Assert.Single(fixture.Stub.RequestsWithKey(callId));
+        call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Succeeded, 2, (int?)200, (string?)null), (call.State, call.Attempts, call.LastStatus, call.LastError));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Status_503_twice_then_200_succeeds_after_three_attempts_with_one_key_and_a_doubling_backoff()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken);
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.RespondMany((503, """{"error":"busy"}"""), (503, """{"error":"busy"}"""));
+
+        // The step's backoff is the default PT30S, so attempt n waits 30s·2^(n−1).
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(30));
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Pending, 1, (int?)503), (call.State, call.Attempts, call.LastStatus));
+        Assert.Contains("503", call.LastError, StringComparison.Ordinal);
+        Assert.NotNull(call.Input);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+
+        await fixture.MakeDueAsync("a", callId);
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(60));
+        Assert.Equal((ConnectorCalls.Pending, 2), await StateAsync(tenant, callId));
+
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var requests = fixture.Stub.RequestsWithKey(callId);
+        Assert.Equal(3, requests.Count);
+        Assert.Single(requests.Select(request => request.Body).Distinct());
+        Assert.Equal(
+            (ConnectorCalls.Succeeded, 3, (int?)200, (string?)null, (string?)null),
+            await CallAsync(tenant, callId));
+        Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
+
+        // Only the settled call writes a history row and a connector.called record.
+        Assert.Equal(2, (await tenant.HistoryAsync(instanceId)).Count);
+        Assert.Equal(3, JsonNode.Parse(await CalledDetailsAsync(tenant, instanceId))!["attempts"]!.GetValue<int>());
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Status_503_until_attempts_run_out_fails_the_instance_with_the_last_error_and_counts_the_attempts()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken);
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.RespondMany((503, "{}"), (503, "{}"), (503, "{}"));
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync("a", CancellationToken));
+
+        Assert.Equal(3, fixture.Stub.RequestsWithKey(callId).Count);
+        Assert.Null(await fixture.DueAtAsync("a", callId));
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Failed, 3, (int?)503, (string?)null), (call.State, call.Attempts, call.LastStatus, call.Input));
+        Assert.Equal("The operation 'createOrder' of the connector 'Purchasing' answered with the status 503.", call.LastError);
         Assert.Equal((ProcessStarts.Failed, 3L, "createOrder", true), await tenant.InstanceAsync(instanceId));
-        var error = (await tenant.HistoryAsync(instanceId))[1].Error;
-        Assert.Equal("Tenant 'a' binding 'PurchasingUrl' is not an https URL. Only Development allows http.", error);
-        Assert.Equal(error, call.LastError);
-        Assert.DoesNotContain(fixture.Stub.BaseUrl, error, StringComparison.Ordinal);
+
+        var row = (await tenant.HistoryAsync(instanceId))[1];
+        Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject
+            {
+                ["connector"] = "Purchasing",
+                ["operation"] = "createOrder",
+                ["operationId"] = callId,
+                ["attempts"] = 3,
+                ["outcome"] = "failed",
+                ["lastStatus"] = 503,
+            },
+            JsonNode.Parse(await CalledDetailsAsync(tenant, instanceId))));
+    }
+
+    [Fact]
+    public async Task Timeout_on_a_connector_with_idempotency_is_retried_with_the_same_key()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, "QuickOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+
+        var held = fixture.Stub.Hold();
+        try
+        {
+            // QuickPurchasing times out after PT1S, while the stub holds its answer.
+            Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
+        }
+        finally
+        {
+            held.Release();
+        }
+
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Pending, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("The operation 'createOrder' of the connector 'QuickPurchasing' timed out after 1 seconds.", call.LastError);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var requests = fixture.Stub.RequestsWithKey(callId);
+        Assert.Equal(2, requests.Count);
+        Assert.All(requests, request => Assert.Equal("/tenant-a/quick-orders", request.Path));
+        Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
+        Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Timeout_on_a_connector_without_idempotency_sends_nothing_again_and_leaves_the_call_unknown()
+    {
+        var tenant = fixture.Tenant("a");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "LedgerOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+
+        var held = fixture.Stub.Hold();
+        try
+        {
+            // Ledger times out after PT1S and declares no idempotency.
+            Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+        }
+        finally
+        {
+            held.Release();
+        }
+
+        // Ledger sends no key, so its request is found by its path and its reference.
+        var reference = $"Request {subjectId:N}";
+        var request = Assert.Single(fixture.Stub.Requests, candidate =>
+            candidate.Path == "/tenant-a/ledger" && candidate.Body.Contains(reference, StringComparison.Ordinal));
+        Assert.Empty(request.IdempotencyKey);
+
+        // The call keeps its input for reconciliation, and has no work item left to send it again.
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Unknown, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("The operation 'createOrder' of the connector 'Ledger' timed out after 1 seconds.", call.LastError);
+        Assert.NotNull(call.Input);
+        Assert.Null(await fixture.DueAtAsync("a", callId));
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+
+        var row = (await tenant.HistoryAsync(instanceId))[1];
+        Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
+            JsonNode.Parse(row.Output!)));
+        Assert.DoesNotContain(reference, row.Input, StringComparison.Ordinal);
+        Assert.Equal(AuditActions.ConnectorCallStaged, Assert.Single(await tenant.SystemAuditActionsAsync(instanceId)));
+    }
+
+    [Fact]
+    public async Task Status_200_whose_body_does_not_fit_leaves_the_call_unknown_even_with_idempotency()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken);
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.Respond(200, "[]");
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        Assert.Single(fixture.Stub.RequestsWithKey(callId));
+        Assert.Null(await fixture.DueAtAsync("a", callId));
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Unknown, 1, (int?)200), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("The response did not fit the output of the operation 'createOrder' of the connector 'Purchasing'.", call.LastError);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
+            JsonNode.Parse((await tenant.HistoryAsync(instanceId))[1].Output!)));
+        Assert.Equal(AuditActions.ConnectorCallStaged, Assert.Single(await tenant.SystemAuditActionsAsync(instanceId)));
+    }
+
+    [Fact]
+    public async Task Worker_restart_between_attempts_keeps_the_attempt_count_and_the_due_time()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken);
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.Respond(503, "{}");
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
+        var dueAt = await fixture.DueAtAsync("a", callId);
+        Assert.NotNull(dueAt);
+
+        await fixture.RestartWorkerAsync();
+
+        // The new worker sees what the old one stored, and claims nothing before the due time.
+        Assert.Equal((ConnectorCalls.Pending, 1), await StateAsync(tenant, callId));
+        Assert.Equal(dueAt, await fixture.DueAtAsync("a", callId));
+        Assert.True(dueAt > await fixture.DatabaseNowAsync("a"));
+        Assert.Null(await fixture.RunCallAsync("a", CancellationToken));
+        Assert.Single(fixture.Stub.RequestsWithKey(callId));
+
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+        Assert.Equal(2, fixture.Stub.RequestsWithKey(callId).Count);
+        Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
+        Assert.Equal(2, JsonNode.Parse(await CalledDetailsAsync(tenant, instanceId))!["attempts"]!.GetValue<int>());
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Call_found_still_sending_on_a_connector_with_idempotency_waits_out_the_backoff_and_is_sent_again_with_the_same_key()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken);
+        var callId = await CallIdAsync(tenant, instanceId);
+
+        // A worker marked the call and crashed before it recorded an outcome.
+        await tenant.ScalarAsync("UPDATE axis.connector_calls SET state = 'sending', attempts = 1 WHERE id = @id", ("id", callId));
+
+        // The attempt already counted has an unknown outcome, so nothing is sent at once.
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(30));
+        Assert.Empty(fixture.Stub.RequestsWithKey(callId));
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Pending, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal(ConnectorCallHandler.UnknownOutcome, call.LastError);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+        Assert.Single(fixture.Stub.RequestsWithKey(callId));
+        Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    /// <summary>
+    /// Runs the call's item and checks it is rescheduled to <paramref name="delay"/> after the
+    /// database time of the run, read before and after it.
+    /// </summary>
+    private async Task RunAndAssertRescheduledAsync(Guid callId, TimeSpan delay)
+    {
+        var before = await fixture.DatabaseNowAsync("a");
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
+        var after = await fixture.DatabaseNowAsync("a");
+        var dueAt = await fixture.DueAtAsync("a", callId);
+        Assert.NotNull(dueAt);
+        Assert.InRange(dueAt.Value, before + delay, after + delay);
     }
 
     private static async Task<Guid> CallIdAsync(ProcessStepFixture tenant, Guid instanceId) =>
@@ -222,6 +467,13 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
             reader.IsDBNull(2) ? null : reader.GetInt32(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetString(4));
+    }
+
+    /// <summary>The call's state and attempts.</summary>
+    private static async Task<(string State, int Attempts)> StateAsync(ProcessStepFixture tenant, Guid callId)
+    {
+        var call = await CallAsync(tenant, callId);
+        return (call.State, call.Attempts);
     }
 
     private static async Task<string> CalledDetailsAsync(ProcessStepFixture tenant, Guid instanceId) =>

@@ -16,6 +16,12 @@ public static class ConnectorCalls
     /// <summary>The state of a call whose attempt a worker is sending.</summary>
     public const string Sending = "sending";
 
+    /// <summary>
+    /// The state of a call whose last attempt has an unknown outcome and that is not sent again,
+    /// so the system may have acted. It waits for reconciliation.
+    /// </summary>
+    public const string Unknown = "unknown";
+
     /// <summary>The state of a call that settled with an answer that fits its output.</summary>
     public const string Succeeded = "succeeded";
 
@@ -100,6 +106,20 @@ public static class ConnectorCalls
     }
 
     /// <summary>
+    /// Sets the call <paramref name="id"/> back to <c>pending</c> for its next attempt, with the last
+    /// attempt's status and error. Its stored input is kept, so the retry sends it again.
+    /// </summary>
+    internal static Task RetryAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken) =>
+        SetStateAsync(transaction, id, Pending, lastStatus, lastError, cancellationToken);
+
+    /// <summary>
+    /// Sets the call <paramref name="id"/> to <c>unknown</c>, with the last attempt's status and
+    /// error. Its stored input is kept, since a later retry or reconciliation may still need it.
+    /// </summary>
+    internal static Task MarkUnknownAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken) =>
+        SetStateAsync(transaction, id, Unknown, lastStatus, lastError, cancellationToken);
+
+    /// <summary>
     /// Settles the call <paramref name="id"/> as <paramref name="state"/>, <c>succeeded</c> or
     /// <c>failed</c>, at the transaction's time, with the last attempt's status and error. Its
     /// stored input is cleared.
@@ -118,6 +138,25 @@ public static class ConnectorCalls
             SET state = @state, last_status = @status, last_error = @error, input = NULL, settled_at = now()
             WHERE id = @id
             """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)lastStatus ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)lastError ?? DBNull.Value });
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task SetStateAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string state,
+        int? lastStatus,
+        string? lastError,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.connector_calls SET state = @state, last_status = @status, last_error = @error WHERE id = @id",
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("id", id);

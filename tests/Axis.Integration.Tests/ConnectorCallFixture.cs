@@ -14,7 +14,8 @@ namespace Axis.Integration.Tests;
 /// Development for both tenants. Each tenant's <c>PurchasingUrl</c> binding points at its own path
 /// on the stub, <c>/tenant-a</c> or <c>/tenant-b</c>, and its <c>PurchasingToken</c> secret holds
 /// its own token. A second worker with the same bindings runs as Production, so it refuses the
-/// stub's <c>http</c> URL. The hosts are never started, so a test runs the work items itself.
+/// stub's <c>http</c> URL. The hosts are never started, so a test runs the work items itself, and
+/// a test can build the Development worker again to stand for a restart.
 /// </summary>
 public sealed class ConnectorCallFixture : IAsyncLifetime
 {
@@ -28,6 +29,7 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
 
     private readonly Dictionary<string, string> _tokens = new(StringComparer.Ordinal);
     private ConnectorStub? _stub;
+    private IConfiguration? _settings;
     private ServiceProvider? _development;
     private ServiceProvider? _production;
 
@@ -56,9 +58,9 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
             values[$"Tenants:{tenantId}:Bindings:PurchasingToken:Value"] = _tokens[tenantId];
         }
 
-        var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-        _development = Worker(settings, "Development");
-        _production = Worker(settings, "Production");
+        _settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        _development = Worker(_settings, "Development");
+        _production = Worker(_settings, "Production");
     }
 
     public async ValueTask DisposeAsync()
@@ -102,16 +104,42 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
     public Task<WorkItemOutcome?> RunCallOutsideDevelopmentAsync(string tenantId, CancellationToken cancellationToken) =>
         RunAsync(_production, tenantId, ProcessStarts.ConnectorCallWorkItemKind, cancellationToken);
 
-    /// <summary>Starts the Order process for a new request of <paramref name="tenantId"/> and runs its step, which stages the call.</summary>
-    public async Task<(Guid SubjectId, Guid InstanceId)> StageAsync(string tenantId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Starts <paramref name="process"/> for a new request of <paramref name="tenantId"/> and runs its
+    /// step, which stages the call.
+    /// </summary>
+    public async Task<(Guid SubjectId, Guid InstanceId)> StageAsync(string tenantId, CancellationToken cancellationToken, string process = "Order")
     {
         var tenant = Tenant(tenantId);
         var subjectId = await tenant.InsertRequestAsync(500m, 1);
-        var instanceId = await tenant.StartAsync("Order", subjectId, tenant.FirstReleaseId);
+        var instanceId = await tenant.StartAsync(process, subjectId, tenant.FirstReleaseId);
         Assert.Equal(WorkItemOutcome.Completed, await RunStepAsync(tenantId, cancellationToken));
         Assert.Equal(ProcessStarts.Waiting, (await tenant.InstanceAsync(instanceId)).State);
         return (subjectId, instanceId);
     }
+
+    /// <summary>Disposes the Development worker and builds a new one with the same settings, as a restart does.</summary>
+    public async Task RestartWorkerAsync()
+    {
+        if (_development is not null)
+        {
+            await _development.DisposeAsync();
+        }
+
+        _development = Worker(_settings ?? throw new InvalidOperationException("The fixture is not initialized."), "Development");
+    }
+
+    /// <summary>Makes the work item of the call <paramref name="callId"/> due now, so a test need not wait out its backoff.</summary>
+    public Task MakeDueAsync(string tenantId, Guid callId) =>
+        Tenant(tenantId).ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE connector_call_id = @id", ("id", callId));
+
+    /// <summary>The due time of the work item of the call <paramref name="callId"/>, or <see langword="null"/> when it has none.</summary>
+    public async Task<DateTime?> DueAtAsync(string tenantId, Guid callId) =>
+        (DateTime?)await Tenant(tenantId).ScalarAsync("SELECT due_at FROM axis.process_work_items WHERE connector_call_id = @id", ("id", callId));
+
+    /// <summary>The current time by the clock of the tenant database.</summary>
+    public async Task<DateTime> DatabaseNowAsync(string tenantId) =>
+        (DateTime)(await Tenant(tenantId).ScalarAsync("SELECT now()"))!;
 
     private ServiceProvider Worker(IConfiguration settings, string environment) =>
         new ServiceCollection()

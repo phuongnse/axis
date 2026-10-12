@@ -1,0 +1,22 @@
+{
+  "id": "88bb6ad9-8b63-440b-9d50-99563a4875f0",
+  "kind": "connector",
+  "name": "Ledger",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "timeout": "PT1S",
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/ledger",
+      "input": [
+        { "name": "reference", "type": "text", "required": true },
+        { "name": "amount", "type": "decimal", "required": true },
+        { "name": "note", "type": "text" }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}

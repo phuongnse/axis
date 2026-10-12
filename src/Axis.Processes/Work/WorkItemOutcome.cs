@@ -11,4 +11,7 @@ public enum WorkItemOutcome
 
     /// <summary>Another worker holds the item now. Nothing this worker wrote for it committed.</summary>
     LostClaim,
+
+    /// <summary>The handler kept the item and made it due again later. Its writes and the new due time committed.</summary>
+    Rescheduled,
 }

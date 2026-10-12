@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,9 +19,13 @@ namespace Axis.Processes.Instances;
 /// extends the item's lease by the connector's timeout. The request then carries the stored input,
 /// the auth from the tenant's secret binding and the operation identity as its idempotency key. An
 /// outcome transaction records the result. A <c>2xx</c> whose body fits the output writes the
-/// output fields, settles the call <c>succeeded</c> and resumes the instance on <c>next</c>. Any
-/// other result settles the call <c>failed</c> and fails the instance. A call found already
-/// <c>sending</c> is never sent again. Each transaction checks the claim token, and the outcome
+/// output fields, settles the call <c>succeeded</c> and resumes the instance on <c>next</c>. A
+/// retryable error, and an unknown outcome on a connector that declares <c>idempotency</c>, set the
+/// call back to <c>pending</c> and keep the item, due again after the step's backoff, while attempts
+/// are left. Any other unknown outcome leaves the call <c>unknown</c> and the instance waiting. Any
+/// other error, or a retryable one with no attempts left, settles the call <c>failed</c> and fails
+/// the instance. A call found already <c>sending</c> is never sent again at once: its earlier
+/// attempt counts as an unknown outcome. Each transaction checks the claim token, and the outcome
 /// needs the instance still waiting on the step at the revision the attempt saw. No request or
 /// response body and no secret value is stored or logged.
 /// </summary>
@@ -32,9 +37,12 @@ internal sealed partial class ConnectorCallHandler(
     ILogger<ConnectorCallHandler> logger) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
-    internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome, so it is not sent again.";
+    internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
 
     private const string DateFormat = "yyyy-MM-dd";
+
+    /// <summary>The longest wait between two attempts.</summary>
+    private static readonly TimeSpan _maxBackoff = TimeSpan.FromHours(1);
 
     public string Kind => ProcessStarts.ConnectorCallWorkItemKind;
 
@@ -46,6 +54,7 @@ internal sealed partial class ConnectorCallHandler(
         Attempt attempt;
         Target? target = null;
         string? error = null;
+        var sending = false;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             var call = item.ConnectorCallId is { } callId ? await ConnectorCalls.LoadAsync(transaction, callId, cancellationToken) : null;
@@ -68,24 +77,18 @@ internal sealed partial class ConnectorCallHandler(
             }
 
             attempt = new Attempt(call, instance.Revision, call.Attempts, instance.Now);
-            if (call.State == ConnectorCalls.Sending)
+            try
             {
-                // A worker crashed after it marked the call, so its request may have reached the system.
-                error = UnknownOutcome;
+                target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, cancellationToken);
             }
-            else
+            catch (InvalidOperationException exception)
             {
-                try
-                {
-                    target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, cancellationToken);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    error = exception.Message;
-                }
+                error = exception.Message;
             }
 
-            if (target is not null)
+            // A worker crashed after it marked the call, so its request may have reached the system.
+            sending = call.State == ConnectorCalls.Sending;
+            if (target is not null && !sending)
             {
                 var attempts = await ConnectorCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
                     ?? throw new InvalidOperationException($"The connector call '{call.Id}' is no longer pending.");
@@ -109,7 +112,14 @@ internal sealed partial class ConnectorCallHandler(
 
         if (target is null)
         {
+            // Retrying cannot add what the release lacks.
             return await FailAsync(item, connection, attempt, null, error!, cancellationToken);
+        }
+
+        if (sending)
+        {
+            // The attempt the crashed worker made is already counted.
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Unknown, null, UnknownOutcome, cancellationToken);
         }
 
         var connector = target.Connector;
@@ -126,15 +136,17 @@ internal sealed partial class ConnectorCallHandler(
         catch (InvalidOperationException exception)
         {
             // A missing binding, or one of the wrong kind: the request is never sent.
-            return await FailAsync(item, connection, attempt, null, exception.Message, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, null, exception.Message, cancellationToken);
         }
 
         if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !settings.AllowHttp))
         {
-            return await FailAsync(
+            return await SettleAttemptAsync(
                 item,
                 connection,
                 attempt,
+                target,
+                ErrorClass.Retryable,
                 null,
                 $"Tenant '{item.TenantId}' binding '{connector.BaseUrlBinding}' is not an https URL. Only Development allows http.",
                 cancellationToken);
@@ -143,12 +155,13 @@ internal sealed partial class ConnectorCallHandler(
         var answer = await SendAsync(target, attempt.Call, baseUrl, secret, cancellationToken);
         if (answer.Error is { } sendError)
         {
-            return await FailAsync(item, connection, attempt, answer.Status, sendError, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, cancellationToken);
         }
 
         if (Fit(answer.Body!, target) is not { } values)
         {
-            return await FailAsync(
+            // The system answered with success, so it may have acted. The call is never sent again.
+            return await LeaveUnknownAsync(
                 item,
                 connection,
                 attempt,
@@ -158,6 +171,24 @@ internal sealed partial class ConnectorCallHandler(
         }
 
         return await SucceedAsync(item, connection, attempt, target, answer.Status!.Value, values, cancellationToken);
+    }
+
+    /// <summary>
+    /// The wait before the attempt after attempt <paramref name="attempts"/>: the policy's backoff,
+    /// doubled for each attempt after the first, and at most an hour.
+    /// </summary>
+    internal static TimeSpan Backoff(RetryPolicyModel policy, int attempts)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+
+        // The delay stays below the cap before it doubles, so it cannot overflow.
+        var delay = policy.Backoff;
+        for (var attempt = 1; attempt < attempts && delay < _maxBackoff; attempt++)
+        {
+            delay += delay;
+        }
+
+        return delay < _maxBackoff ? delay : _maxBackoff;
     }
 
     /// <summary>Finds the step, the subject entity, the connector and the operation of the call on its release.</summary>
@@ -183,7 +214,7 @@ internal sealed partial class ConnectorCallHandler(
 
     /// <summary>
     /// Sends the call's request and reads a <c>2xx</c> body. Any other status, a timeout or an
-    /// exception is an error. An error names no header value and no body.
+    /// exception is an error, with its class. An error names no header value and no body.
     /// </summary>
     private async Task<Answer> SendAsync(Target target, LoadedConnectorCall call, string baseUrl, SecretValue? secret, CancellationToken cancellationToken)
     {
@@ -220,15 +251,21 @@ internal sealed partial class ConnectorCallHandler(
             using var response = await client.SendAsync(request, timeout.Token);
             var status = (int)response.StatusCode;
             return response.IsSuccessStatusCode
-                ? new Answer(status, await response.Content.ReadAsStringAsync(timeout.Token), null)
-                : new Answer(status, null, $"The operation '{operation.Name}' of the connector '{connector.Name}' answered with the status {status}.");
+                ? new Answer(status, await response.Content.ReadAsStringAsync(timeout.Token), null, ErrorClass.Failed)
+                : new Answer(
+                    status,
+                    null,
+                    $"The operation '{operation.Name}' of the connector '{connector.Name}' answered with the status {status}.",
+                    Classify(status));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            // The request may have reached the system.
             return new Answer(
                 null,
                 null,
-                $"The operation '{operation.Name}' of the connector '{connector.Name}' timed out after {connector.Timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds.");
+                $"The operation '{operation.Name}' of the connector '{connector.Name}' timed out after {connector.Timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds.",
+                ErrorClass.Unknown);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -238,9 +275,28 @@ internal sealed partial class ConnectorCallHandler(
                 message = message.Replace(value, SecretValue.Placeholder, StringComparison.Ordinal);
             }
 
-            return new Answer(null, null, $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {message}");
+            // Only a failed name lookup, connection or TLS handshake proves the request never left.
+            var errorClass = exception is HttpRequestException
+            {
+                HttpRequestError: HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError,
+            }
+                ? ErrorClass.Retryable
+                : ErrorClass.Unknown;
+            return new Answer(null, null, $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {message}", errorClass);
         }
     }
+
+    /// <summary>
+    /// The class of an answer that is not a <c>2xx</c>. <c>408</c>, <c>429</c> and <c>503</c> are
+    /// retryable, another <c>5xx</c> leaves the outcome unknown, and anything else fails at once.
+    /// </summary>
+    private static ErrorClass Classify(int status) =>
+        status switch
+        {
+            (int)HttpStatusCode.RequestTimeout or (int)HttpStatusCode.TooManyRequests or (int)HttpStatusCode.ServiceUnavailable => ErrorClass.Retryable,
+            >= 500 and < 600 => ErrorClass.Unknown,
+            _ => ErrorClass.Failed,
+        };
 
     /// <summary>
     /// Reads the outputs from a <c>2xx</c> body. The body fits when it is a JSON object with a value
@@ -475,6 +531,128 @@ internal sealed partial class ConnectorCallHandler(
     }
 
     /// <summary>
+    /// Records an attempt that ended with <paramref name="error"/> of <paramref name="errorClass"/>.
+    /// A retryable error is retried while attempts are left, and an unknown outcome only when the
+    /// connector also declares <c>idempotency</c>. An unknown outcome that is not retried leaves the
+    /// call <c>unknown</c>. Anything else fails the call.
+    /// </summary>
+    private Task<WorkItemOutcome> SettleAttemptAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        ErrorClass errorClass,
+        int? status,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var policy = target.Step.Retry;
+        var attemptsLeft = attempt.Attempts < policy.Attempts;
+        return errorClass switch
+        {
+            ErrorClass.Retryable when attemptsLeft =>
+                RetryAsync(item, connection, attempt, status, error, Backoff(policy, attempt.Attempts), cancellationToken),
+            ErrorClass.Unknown when attemptsLeft && target.Connector.Idempotency is not null =>
+                RetryAsync(item, connection, attempt, status, error, Backoff(policy, attempt.Attempts), cancellationToken),
+            ErrorClass.Unknown => LeaveUnknownAsync(item, connection, attempt, status, error, cancellationToken),
+            _ => FailAsync(item, connection, attempt, status, error, cancellationToken),
+        };
+    }
+
+    /// <summary>
+    /// Sets the call back to <c>pending</c> with the attempt's status and error, and keeps the item,
+    /// due again after <paramref name="delay"/>. The next attempt sends the stored input under the
+    /// same operation identity. It writes no history row and no audit record.
+    /// </summary>
+    private async Task<WorkItemOutcome> RetryAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        int? status,
+        string error,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
+        if (!IsWaitingAt(instance, call, attempt))
+        {
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, call.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
+        }
+
+        await ConnectorCalls.RetryAsync(transaction, call.Id, status, error, cancellationToken);
+        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, call.Id);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        LogRetrying(call.Id, call.ProcessInstanceId, attempt.Attempts, status, error, delay);
+        return WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>
+    /// Leaves the call <c>unknown</c> with the attempt's status and error, and deletes its item. The
+    /// instance stays waiting, and a history row with the outcome <c>unknown</c> makes the call
+    /// visible. Its stored input is kept for reconciliation. It writes no audit record, because the
+    /// call has not settled.
+    /// </summary>
+    private async Task<WorkItemOutcome> LeaveUnknownAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        int? status,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, call.Id);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
+        if (!IsWaitingAt(instance, call, attempt))
+        {
+            LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
+        }
+
+        await ConnectorCalls.MarkUnknownAsync(transaction, call.Id, status, error, cancellationToken);
+        await ProcessSteps.InsertHistoryAsync(
+            transaction,
+            new StepOccurrence(
+                instance!.Id,
+                call.Step,
+                attempt.Revision,
+                new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = null },
+                new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Unknown },
+                null,
+                error,
+                attempt.StartedAt),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        LogUnknown(call.Id, instance.Id, attempt.Attempts, status, error);
+        return WorkItemOutcome.Completed;
+    }
+
+    /// <summary>
     /// Settles the call <c>failed</c> with <paramref name="error"/> and fails its instance, with a
     /// history row and the audit records <c>connector.called</c> and <c>process.failed</c>.
     /// </summary>
@@ -570,6 +748,12 @@ internal sealed partial class ConnectorCallHandler(
     [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} failed with the status {Status}: {Error}")]
     private partial void LogFailed(Guid callId, Guid instanceId, int? status, string error);
 
+    [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} will be retried after {Delay}: attempt {Attempts} ended with the status {Status}: {Error}")]
+    private partial void LogRetrying(Guid callId, Guid instanceId, int attempts, int? status, string error, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Connector call {CallId} of process instance {InstanceId} has an unknown outcome after {Attempts} attempts, with the status {Status}, and is not sent again: {Error}")]
+    private partial void LogUnknown(Guid callId, Guid instanceId, int attempts, int? status, string error);
+
     /// <summary>
     /// The attempt a worker makes: the call, the instance revision it waits at, the attempts made
     /// with this one, and the time of the mark transaction, which starts the step's history row.
@@ -584,6 +768,22 @@ internal sealed partial class ConnectorCallHandler(
         ConnectorModel Connector,
         ConnectorOperationModel Operation);
 
-    /// <summary>The status of an answered request, the body of a <c>2xx</c>, or the error of any other result.</summary>
-    private sealed record Answer(int? Status, string? Body, string? Error);
+    /// <summary>
+    /// The status of an answered request, the body of a <c>2xx</c>, or the error of any other result
+    /// with its class.
+    /// </summary>
+    private sealed record Answer(int? Status, string? Body, string? Error, ErrorClass Class);
+
+    /// <summary>How an attempt that did not succeed is handled.</summary>
+    private enum ErrorClass
+    {
+        /// <summary>The call fails at once.</summary>
+        Failed,
+
+        /// <summary>The request is known not to have acted, so the call is retried while attempts are left.</summary>
+        Retryable,
+
+        /// <summary>The system may have acted. The call is retried only with <c>idempotency</c>.</summary>
+        Unknown,
+    }
 }
