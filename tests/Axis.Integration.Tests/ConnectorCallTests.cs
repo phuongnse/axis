@@ -436,6 +436,161 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
     }
 
+    [Fact]
+    public async Task Dropped_connection_is_reconciled_through_the_lookup_which_settles_the_call_with_the_stored_output_and_sends_nothing_again()
+    {
+        var tenant = fixture.Tenant("a");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "TrackedOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.DropNext();
+
+        // TrackedPurchasing declares no idempotency, so the unknown outcome goes to its lookup at once.
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.Zero);
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Unknown, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.NotNull(call.LastError);
+        Assert.NotNull(call.Input);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+        Assert.Single(await tenant.HistoryAsync(instanceId));
+
+        // The stub stored the create request before it dropped the connection, so the lookup finds it.
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var create = Assert.Single(fixture.Stub.CreateRequestsFor(callId));
+        Assert.Equal(("POST", $"/tenant-a/tracked-orders/{callId:D}"), (create.Method, create.Path));
+        var lookup = Assert.Single(fixture.Stub.RequestsFor(callId), request => request.Method == "GET");
+        Assert.Equal(
+            ($"/tenant-a/tracked-orders/by-key/{callId:D}", $"Bearer {fixture.Token("a")}", ""),
+            (lookup.Path, lookup.Authorization, lookup.Body));
+        Assert.Equal(
+            (ConnectorCalls.Succeeded, 1, (int?)200, (string?)null, (string?)null),
+            await CallAsync(tenant, callId));
+        Assert.Equal("PO-1", (await tenant.RequestAsync(subjectId)).Values["comment"]!.GetValue<string>());
+        Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
+
+        var row = (await tenant.HistoryAsync(instanceId))[1];
+        Assert.Equal(("createOrder", 2L, (string?)null), (row.Step, row.Revision, row.Error));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["operationId"] = callId, ["outcome"] = "succeeded", ["next"] = "done", ["subjectVersion"] = 2 },
+            JsonNode.Parse(row.Output!)));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject
+            {
+                ["connector"] = "TrackedPurchasing",
+                ["operation"] = "createOrder",
+                ["operationId"] = callId,
+                ["attempts"] = 1,
+                ["outcome"] = "succeeded",
+                ["lastStatus"] = 200,
+            },
+            JsonNode.Parse(await CalledDetailsAsync(tenant, instanceId))));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Lookup_that_finds_no_call_sends_the_call_once_more_with_the_same_operation_identity()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, "TrackedOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+
+        // A 500 leaves the outcome unknown, and the stub stores no order for it.
+        fixture.Stub.Respond(500, "{}");
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.Zero);
+        Assert.Equal((ConnectorCalls.Unknown, 1), await StateAsync(tenant, callId));
+
+        // The lookup answers 404, so the call waits out the step's backoff for its next attempt.
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(30));
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Pending, 1, (int?)404), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("The lookup 'findOrder' of the connector 'TrackedPurchasing' found no call.", call.LastError);
+        Assert.Single(fixture.Stub.CreateRequestsFor(callId));
+
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var creates = fixture.Stub.CreateRequestsFor(callId);
+        Assert.Equal(2, creates.Count);
+        Assert.All(creates, request => Assert.Equal($"/tenant-a/tracked-orders/{callId:D}", request.Path));
+        Assert.Single(creates.Select(request => request.Body).Distinct());
+        Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
+        Assert.Equal(2, JsonNode.Parse(await CalledDetailsAsync(tenant, instanceId))!["attempts"]!.GetValue<int>());
+        Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Failed_lookup_keeps_the_call_unknown_and_is_tried_again_after_a_doubling_backoff_across_a_worker_restart()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, "TrackedOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.DropNext();
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.Zero);
+
+        fixture.Stub.Respond(500, "{}");
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(30));
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Unknown, 1, (int?)500), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("The operation 'findOrder' of the connector 'TrackedPurchasing' answered with the status 500.", call.LastError);
+        Assert.Equal(1, await LookupsAsync(tenant, callId));
+        Assert.Single(await tenant.HistoryAsync(instanceId));
+        var dueAt = await fixture.DueAtAsync("a", callId);
+
+        await fixture.RestartWorkerAsync();
+
+        // The new worker claims nothing before the due time, and the count of failed lookups survives.
+        Assert.Equal(dueAt, await fixture.DueAtAsync("a", callId));
+        Assert.True(dueAt > await fixture.DatabaseNowAsync("a"));
+        Assert.Null(await fixture.RunCallAsync("a", CancellationToken));
+
+        await fixture.MakeDueAsync("a", callId);
+        fixture.Stub.Respond(500, "{}");
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(60));
+        Assert.Equal(2, await LookupsAsync(tenant, callId));
+        Assert.Equal((ConnectorCalls.Unknown, 1), await StateAsync(tenant, callId));
+
+        await fixture.MakeDueAsync("a", callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+        Assert.Single(fixture.Stub.CreateRequestsFor(callId));
+        Assert.Equal(3, fixture.Stub.RequestsFor(callId).Count(request => request.Method == "GET"));
+        Assert.Equal((ConnectorCalls.Succeeded, 1), await StateAsync(tenant, callId));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Dropped_connection_on_a_connector_without_lookup_leaves_the_call_unknown_and_never_sends_it_again()
+    {
+        var tenant = fixture.Tenant("a");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "LedgerOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.DropNext();
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Unknown, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
+        Assert.NotNull(call.LastError);
+        Assert.Null(await fixture.DueAtAsync("a", callId));
+        Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+        var row = (await tenant.HistoryAsync(instanceId))[1];
+        Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
+            JsonNode.Parse(row.Output!)));
+
+        // Neither this worker nor a restarted one finds anything to send.
+        Assert.Null(await fixture.RunCallAsync("a", CancellationToken));
+        await fixture.RestartWorkerAsync();
+        Assert.Null(await fixture.RunCallAsync("a", CancellationToken));
+
+        // Ledger sends no key, so its request is found by its path and its reference.
+        var reference = $"Request {subjectId:N}";
+        Assert.Single(fixture.Stub.Requests, candidate =>
+            candidate.Path == "/tenant-a/ledger" && candidate.Body.Contains(reference, StringComparison.Ordinal));
+        Assert.Equal((ConnectorCalls.Unknown, 1), await StateAsync(tenant, callId));
+    }
+
     /// <summary>
     /// Runs the call's item and checks it is rescheduled to <paramref name="delay"/> after the
     /// database time of the run, read before and after it.
@@ -468,6 +623,10 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
             reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetString(4));
     }
+
+    /// <summary>The failed lookups of the call since it became <c>unknown</c>.</summary>
+    private static async Task<int> LookupsAsync(ProcessStepFixture tenant, Guid callId) =>
+        (int)(await tenant.ScalarAsync("SELECT lookups FROM axis.connector_calls WHERE id = @id", ("id", callId)))!;
 
     /// <summary>The call's state and attempts.</summary>
     private static async Task<(string State, int Attempts)> StateAsync(ProcessStepFixture tenant, Guid callId)
