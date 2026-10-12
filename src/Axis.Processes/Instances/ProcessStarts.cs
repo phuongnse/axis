@@ -7,7 +7,7 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Writes the rows of a process start over a connection to a tenant database: the receipt of an
 /// <c>Idempotency-Key</c> and the instance. The caller runs them in one transaction with the
-/// instance's first work item.
+/// instance's first work item. It also reads an instance back, for the endpoint status location.
 /// </summary>
 public static class ProcessStarts
 {
@@ -130,9 +130,32 @@ public static class ProcessStarts
         }
     }
 
+    /// <summary>Returns the instance <paramref name="id"/>, or <see langword="null"/> when there is none.</summary>
+    public static async Task<ProcessInstanceState?> FindInstanceAsync(
+        NpgsqlConnection connection,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT application_id, process_id, subject_entity_id, subject_id, state
+            FROM axis.process_instances WHERE id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new ProcessInstanceState(id, reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetGuid(3), reader.GetString(4))
+            : null;
+    }
+
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }
 
 /// <summary>A stored start response: the subject record it started for, its status code and its body as JSON text.</summary>
 public sealed record ProcessStartReceipt(Guid SubjectId, int StatusCode, string Body);
+
+/// <summary>An instance's application, process, subject record and state.</summary>
+public sealed record ProcessInstanceState(Guid Id, Guid ApplicationId, Guid ProcessId, Guid SubjectEntityId, Guid SubjectId, string State);

@@ -1,0 +1,18 @@
+{
+  "id": "854000e5-27a7-4ee8-8855-23fceaf13574",
+  "kind": "process",
+  "name": "CloseNow",
+  "formatVersion": 1,
+  "entity": "Note",
+  "start": "close",
+  "steps": [
+    {
+      "name": "close",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'closed'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

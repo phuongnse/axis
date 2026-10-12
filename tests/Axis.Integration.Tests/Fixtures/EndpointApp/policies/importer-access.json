@@ -4,5 +4,10 @@
   "name": "ImporterAccess",
   "formatVersion": 1,
   "roles": ["importer"],
-  "grants": [{ "endpoint": "ImportNote", "actions": ["invoke"] }]
+  "grants": [
+    { "endpoint": "ImportNote", "actions": ["invoke"] },
+    { "endpoint": "ImportClosedNote", "actions": ["invoke"] },
+    { "endpoint": "ImportReviewedNote", "actions": ["invoke"] },
+    { "endpoint": "ImportFailingNote", "actions": ["invoke"] }
+  ]
 }

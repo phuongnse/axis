@@ -379,9 +379,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 It follows [D27](decisions.md#d27-inbound-endpoints--agreed). The token
 checks, the tenant binding, the endpoint-only acceptance, the CSRF exemption
 and the development realm's client are built. The `endpoint` resource and its
-compile checks are built too, and so is the endpoint call. The call's
-idempotency, its `output` with `wait`, and the status location are not
-*(planned for M5)*: the status location answers a valid caller with a `404`. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
+compile checks are built too, and so are the endpoint call with its `output`
+and `wait`, and the status location. The call's idempotency is not
+*(planned for M5)*. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
 with a bearer token. This sits next to the browser session: the session
 stays the only way in for people, and a bearer token is the only way in for
 systems.

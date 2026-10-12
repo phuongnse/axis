@@ -7,7 +7,10 @@
   "texts": {
     "note.cannotClose": "Only an open note can be closed.",
     "note.quantityPositive": "The quantity must be at least 1.",
+    "note.review": "Review the note",
+    "noteReview.main": "Note",
     "role.importer": "Importer",
-    "role.reader": "Reader"
+    "role.reader": "Reader",
+    "task.accept": "Accept"
   }
 }
