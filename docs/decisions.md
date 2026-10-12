@@ -845,8 +845,10 @@ matches how D24 treats a policy filter that fails: it counts as false.
 
 ## D27. Inbound endpoints — Agreed
 
-M5 lets other systems create a record and start a process in one call. None
-of this is built yet. See
+M5 lets other systems create a record and start a process in one call. The
+bearer token checks are built, with the tenant binding, the CSRF exemption
+and the development realm's `purchasing-system` client. The endpoint resource,
+the grant and the call are not built yet. See
 [configuration](reference/configuration.md#endpoint-resource) for the
 `endpoint` resource and its policy grant, and
 [record API](reference/record-api.md#inbound-endpoints) for the call, its

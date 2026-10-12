@@ -4,7 +4,10 @@ using System.Text.Json;
 
 namespace Axis.Integration.Tests;
 
-/// <summary>The development realm in samples/keycloak issues tokens for the purchase request users.</summary>
+/// <summary>
+/// The development realm in samples/keycloak issues tokens for the purchase request users, and for
+/// the purchasing system that calls the sample's endpoints.
+/// </summary>
 public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
     private Uri? _authority;
@@ -51,6 +54,34 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         using var error = JsonDocument.Parse(body);
         Assert.Equal("invalid_grant", error.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Issues_the_purchasing_system_a_client_credentials_token_for_the_endpoints()
+    {
+        using var client = new HttpClient();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = KeycloakFixture.PurchasingClientId,
+            ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
+        });
+        using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
+
+        using var tokens = JsonDocument.Parse(body);
+        using var payload = DecodePayload(tokens.RootElement.GetProperty("access_token").GetString()!);
+        var claims = payload.RootElement;
+        Assert.Equal("purchasing-system", claims.GetProperty("sub").GetString());
+        Assert.Equal("purchasing-system", claims.GetProperty("azp").GetString());
+        var audience = claims.GetProperty("aud");
+        var audiences = audience.ValueKind == JsonValueKind.Array
+            ? audience.EnumerateArray().Select(value => value.GetString()).ToList()
+            : [audience.GetString()];
+        Assert.Contains("axis-endpoints", audiences);
+        Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
+        Assert.Equal(["purchasing-system"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
     }
 
     // The password grant gets a token without a login page.

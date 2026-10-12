@@ -15,6 +15,10 @@
         {
           "name": "finance-reviewer",
           "clientRole": true
+        },
+        {
+          "name": "purchasing-system",
+          "clientRole": true
         }
       ]
     }
@@ -54,6 +58,47 @@
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "purchasing-system",
+      "name": "Purchasing system",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "purchasing-system-development-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "axis",
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "axis-endpoints audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "axis-endpoints",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
           }
         }
       ]
@@ -167,6 +212,17 @@
       "clientRoles": {
         "axis": [
           "finance-reviewer"
+        ]
+      }
+    },
+    {
+      "id": "purchasing-system",
+      "username": "service-account-purchasing-system",
+      "enabled": true,
+      "serviceAccountClientId": "purchasing-system",
+      "clientRoles": {
+        "axis": [
+          "purchasing-system"
         ]
       }
     }

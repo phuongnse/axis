@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -8,8 +9,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Axis.Server.Tests;
 
 /// <summary>
-/// The server signs people in only through each tenant's identity provider. It registers the
-/// session cookie scheme and one OpenID Connect scheme per tenant, and nothing else.
+/// The server signs people in only through each tenant's identity provider, and checks machine
+/// callers' bearer tokens only against it. It registers the session cookie scheme, one OpenID Connect
+/// scheme and one JWT bearer scheme per tenant, and the two policy schemes that choose between them,
+/// and nothing else. The default scheme picks the bearer token on endpoint paths and the session
+/// everywhere else.
 /// </summary>
 public sealed class AuthenticationSchemeTests
 {
@@ -17,7 +21,7 @@ public sealed class AuthenticationSchemeTests
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
     [Fact]
-    public async Task A_production_host_registers_only_the_session_cookie_and_the_tenant_oidc_scheme()
+    public async Task A_production_host_registers_only_the_session_cookie_and_the_tenant_oidc_and_bearer_schemes()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -37,14 +41,29 @@ public sealed class AuthenticationSchemeTests
             schemes,
             scheme =>
             {
+                Assert.Equal("Axis.EndpointCaller", scheme.Name);
+                Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
+                Assert.Equal("Axis.Request", scheme.Name);
+                Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
                 Assert.Equal("Axis.Session", scheme.Name);
                 Assert.Equal(typeof(CookieAuthenticationHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
+                Assert.Equal("endpoint-default", scheme.Name);
+                Assert.Equal(typeof(JwtBearerHandler), scheme.HandlerType);
             },
             scheme =>
             {
                 Assert.Equal("oidc-default", scheme.Name);
                 Assert.Equal(typeof(OpenIdConnectHandler), scheme.HandlerType);
             });
-        Assert.Equal("Axis.Session", (await provider.GetDefaultAuthenticateSchemeAsync())?.Name);
+        Assert.Equal("Axis.Request", (await provider.GetDefaultAuthenticateSchemeAsync())?.Name);
     }
 }

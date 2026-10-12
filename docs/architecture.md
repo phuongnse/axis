@@ -209,8 +209,8 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
   - API writes are protected against CSRF by a required header.
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
-  - *(planned for M5)* Other systems call inbound endpoints with a bearer
-    token instead of the session. See [Machine callers](#machine-callers).
+  - Other systems call inbound endpoints with a bearer token instead of the
+    session. See [Machine callers](#machine-callers).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the
@@ -244,7 +244,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 - **Tenant settings.** Each tenant in the [`Tenants` section](#tenant-configuration)
   has an `Oidc` block. `Claims` names the claims that give the user id, the
   display name and the roles. Each claim name is optional, and the defaults
-  are `sub`, `name` and `roles`.
+  are `sub`, `name` and `roles`. The optional `EndpointAudience` is for
+  [machine callers](#machine-callers).
 
   ```json
   "default": {
@@ -319,8 +320,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     or pages exist;
   - `GET /api/me`.
 
-  *(planned for M5)* Inbound endpoints under `/api/apps/{app}/endpoints/`
-  are the exception. They take a bearer token and no session, see
+  Inbound endpoints under `/api/apps/{app}/endpoints/` are the exception.
+  They take a bearer token and no session, see
   [Machine callers](#machine-callers).
 
   These stay open, because the shell needs them before anyone signs in:
@@ -338,12 +339,14 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   call through one wrapper around `fetch`, which adds the header to its
   writes. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
-  *(planned for M5)* `POST /api/apps/{app}/endpoints/{name}` is exempt from
-  the header, because it takes a bearer token and no session cookie. See
+  Paths under `/api/apps/{app}/endpoints/` are exempt from the header,
+  because they take a bearer token and no session cookie. See
   [Machine callers](#machine-callers).
 - **Tests.** Tests of sign-in itself start the development realm in Keycloak
   through Testcontainers, and drive its login page. Tests of the session
   lifetime create the session through a test-only hook and use a test clock.
+  Tests of [machine callers](#machine-callers) get client credentials tokens
+  from the same container, and expire them with a test clock.
   Integration tests of other endpoints sign in through a test authentication
   scheme that only test hosts register. A request names its user in a
   header, and the scheme builds the same principal as a session of that user.
@@ -367,12 +370,17 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
     only the sample roles.
+  - The confidential client `purchasing-system` stands in for the
+    purchasing system as a [machine caller](#machine-callers). Its service
+    account gets tokens through the client credentials grant.
 
 ### Machine callers
 
-*(planned for M5)* It follows
-[D27](decisions.md#d27-inbound-endpoints--agreed). None of it is built yet.
-Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
+It follows [D27](decisions.md#d27-inbound-endpoints--agreed). The token
+checks, the tenant binding, the endpoint-only acceptance, the CSRF exemption
+and the development realm's client are built. The endpoint call is not: the
+endpoint routes answer a valid caller with a `404`, because no endpoint
+exists yet. Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
 with a bearer token. This sits next to the browser session: the session
 stays the only way in for people, and a bearer token is the only way in for
 systems.
@@ -415,9 +423,13 @@ systems.
 - **Endpoint routes only.** The server accepts a bearer token only on
   `POST /api/apps/{app}/endpoints/{name}` and its status location. Everywhere
   else a bearer token is ignored, so it never reaches the record API, the
-  data source endpoint or the task API.
-- **No session.** On endpoint routes the session cookie is ignored, so the
-  CSRF header does not apply. A browser cannot attach a bearer token on its
+  data source endpoint or the task API. The request's default
+  authentication is the bearer token on paths under
+  `/api/apps/{app}/endpoints/`, and the session everywhere else.
+- **Clock.** The expiry is checked against the server's clock service, with
+  the usual 5 minutes of clock skew, so tests can replace the clock.
+- **No session.** On endpoint routes the session cookie is ignored and not
+  renewed, so the CSRF header does not apply. A browser cannot attach a bearer token on its
   own, so a cross-site page cannot call an endpoint for a signed-in user.
 - **Not bound to the sender.** A leaked token works until it expires.
   Sender-constrained tokens (DPoP) stay a later FAPI 2.0 step under D9.
@@ -429,9 +441,14 @@ systems.
   - a roles mapper on the `purchasing-system` client that writes the `axis`
     client roles to the `roles` claim;
   - an audience mapper on the `purchasing-system` client that adds
-    `axis-endpoints` to the token's audience.
+    `axis-endpoints` to the token's audience;
+  - the service account user with the fixed id `purchasing-system`, which is
+    the token's `sub` and so the caller id.
 
-  The realm file does not change until the build issues add endpoints.
+  The client secret is `purchasing-system-development-secret`, for
+  development only. Only `appsettings.Development.json` sets
+  `Oidc:EndpointAudience`. The E2E and Compose settings do not, so endpoint
+  calls there are a `401`.
 
 ### Authorization
 
