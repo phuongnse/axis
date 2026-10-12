@@ -19,8 +19,9 @@ user's policies, see [Start endpoint](#start-endpoint) and
 [Policies on tasks](#task-api). A `callConnector` step, which calls an
 external system, is checked and compiled. Its step stages the call and leaves
 the instance `waiting`. The worker then sends the call and records its
-result, see [Connector calls](#connector-calls). Retries and reconciliation
-are planned for M5. So are package operation steps, which
+result, see [Connector calls](#connector-calls). Retries under the step's
+retry policy are built too. Reconciliation of a call whose outcome is unknown
+is planned for M5. So are package operation steps, which
 run an operation from an extension package, see
 [Package operations](#package-operations). So are events and triggers, which
 start processes when something happens, see
