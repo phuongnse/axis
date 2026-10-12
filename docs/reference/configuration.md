@@ -1273,6 +1273,48 @@ build issue.
 - `output` and `wait` are declared together.
 - `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`.
 
+## Extension packages
+
+*(planned for M5)* This section follows
+[D28](../decisions.md#d28-extension-packages--agreed). None of it is built
+yet. An application declares the [extension packages](extension-packages.md)
+it uses in its manifest, `application.json`. Each entry names a package id
+and a version range:
+
+```json
+{
+  "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
+  "kind": "application",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "packages": [{ "id": "purchasing-tools", "version": "^1.0.0" }]
+}
+```
+
+`purchasing-tools` is an illustrative package. The sample files do not change
+until the build issues add packages.
+
+- `packages` is optional. Each package id appears at most once.
+- `version` is a version range in one of three forms. Versions are plain
+  `major.minor.patch`, and pre-release versions come later.
+  - `1.0.0` is that exact version.
+  - `^1.0.0` is any version from `1.0.0` with the same major version, so
+    `1.4.2` but not `2.0.0`.
+  - `~1.0.0` is any version from `1.0.0` with the same minor version, so
+    `1.0.3` but not `1.1.0`.
+- **Pinning.** Compilation picks the highest installed version in each range
+  and pins that exact version in the release. A process step is checked
+  against the pinned version's manifest.
+- **Diagnostics.** A range that no installed version meets is a compile
+  error. Activating a release whose pinned version is not installed fails, as
+  does a package whose manifest does not match its assembly. Their codes come
+  with the build issue.
+- An application uses only the packages it declares, even though every
+  tenant sees the same installed packages. Installation is in
+  [Installation](extension-packages.md#installation).
+- How a process calls a package operation is in
+  [Package operations](processes.md#package-operations).
+
 ## Roles and policies
 
 This section follows

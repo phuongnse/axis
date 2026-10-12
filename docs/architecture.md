@@ -28,8 +28,10 @@ flowchart LR
   instances. Wait for event, timer and sub-process steps come later.
   *(planned for M5)* It will deliver events to async event triggers, and run
   schedule triggers and their fan-out, see
-  [events and triggers](reference/processes.md#events-and-triggers). It loads
-  the same modules as the server.
+  [events and triggers](reference/processes.md#events-and-triggers).
+  *(planned for M5)* It will load the installed extension packages and run
+  their operations, see [extension packages](reference/extension-packages.md).
+  It loads the same modules as the server.
 - **Platform database** stores installation-level data: the tenant directory
   and platform settings *(tenant directory planned for M9; tenants come from
   server configuration until then)*.
@@ -50,16 +52,19 @@ src/
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
+  Axis.Extensions/        contracts for extension packages: operation interface, operation context (M5)
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
 tests/
   Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
+  packages/               test-only extension package that covers the capability limits (M5)
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
+  packages/               one sample extension package (M5)
 ```
 
 Projects are created when the first issue needs them. The solution holds
@@ -586,7 +591,9 @@ to the draft. Only another grant can make it readable.
   following transaction. *(planned for M5)* A `callConnector` step stages its
   call, the worker sends it with retries, and an unknown outcome is
   reconciled through a lookup. See
-  [connector calls](reference/processes.md#connector-calls).
+  [connector calls](reference/processes.md#connector-calls). A package
+  operation step is staged and run the same way, see
+  [package operations](reference/processes.md#package-operations).
 - **History.** Every attempt, input, output, decision and error is recorded
   for inspection.
 

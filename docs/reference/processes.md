@@ -18,8 +18,10 @@ a task resumes its `waiting` instance, see
 user's policies, see [Start endpoint](#start-endpoint) and
 [Policies on tasks](#task-api). A `callConnector` step, which calls an
 external system, is checked and compiled. Running it is
-[planned for M5](#connector-calls). So are events
-and triggers, which start processes when something happens, see
+[planned for M5](#connector-calls). So are package operation steps, which
+run an operation from an extension package, see
+[Package operations](#package-operations). So are events and triggers, which
+start processes when something happens, see
 [Events and triggers](#events-and-triggers).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -195,8 +197,10 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   maps fields of the subject record to expressions, and `next` names the step
   that follows. The step writes the values with the record update rules, so
   computed fields are recomputed and validations run, in the step's
-  transaction. A validation failure fails the step. Operations from extension
-  packages come in M5. A second built-in operation, `callConnector`, calls an
+  transaction. A validation failure fails the step. *(planned for M5)* An
+  `operation` of the form `<package>/<operation>` runs an operation from an
+  extension package outside the step's transaction, see
+  [Package operations](#package-operations). A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked and compiled.
   *(planned for M5)* Running it comes later, and until then an instance that
@@ -377,7 +381,7 @@ worker to run its steps.
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed, or for a connector call *(planned for M5)*, see [Connector calls](#connector-calls). |
+| `waiting` | The instance waits for a human task to be completed, or for a connector call or a package operation call *(planned for M5)*, see [Connector calls](#connector-calls) and [Package operations](#package-operations). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 
@@ -675,8 +679,9 @@ the next step as usual.
 - **Failure.** A failing step rolls back. A following transaction records the
   error in the history and sets the instance to `failed`. No step is retried.
   *(planned for M5)* A `callConnector` step retries its call under its retry
-  policy, see [Connector calls](#connector-calls). Operator retry comes in
-  M7.
+  policy, see [Connector calls](#connector-calls). So does a package
+  operation step, see [Package operations](#package-operations). Operator
+  retry comes in M7.
 - **Revision.** An instance's revision is a counter that starts at 1 and goes
   up each time the instance changes. A step changes the instance only at the
   revision it loaded.
@@ -1008,6 +1013,122 @@ The purchasing system holds one order, and the request records its number.
   system answers `200` with `PO-2026-0001`. C settles as succeeded, as in step 9,
   with no second `POST`. Had the lookup answered `404`, C would be sent again
   as attempt 2.
+
+## Package operations
+
+*(planned for M5)* This section follows
+[D28](../decisions.md#d28-extension-packages--agreed). None of it is built
+yet. A package operation step runs one operation of an
+[extension package](extension-packages.md), custom C# code that the operator
+installs. The step runs like a [connector call](#connector-calls): it stages
+the call, the worker runs the operation outside any database transaction, and
+a separate transaction records the result. This holds for every package
+operation, even a pure one, so there is one rule for all of them.
+
+### Package step shape
+
+The examples use an illustrative package, `purchasing-tools`, with the
+operation `normalizeSupplierCode` from the
+[manifest example](extension-packages.md#manifest), and an illustrative
+`supplierCode` text field on the subject. They are not the sample package,
+whose operation is chosen in the issue that builds it.
+
+```json
+{
+  "name": "normalizeSupplier",
+  "type": "operation",
+  "operation": "purchasing-tools/normalizeSupplierCode",
+  "input": { "code": "supplier.code" },
+  "output": { "code": "supplierCode" },
+  "retry": { "attempts": 3, "backoff": "PT30S" },
+  "next": "financeCheck"
+}
+```
+
+- `operation` is `<package>/<operation>`. The `/` marks a package operation.
+  The part before it is a package id, and the part after it is an operation
+  of that package.
+- `input` maps operation inputs to expressions over the subject record, as
+  for `callConnector`.
+- `output` is optional. It maps operation outputs to subject fields, as for
+  `callConnector`.
+- `retry` is optional, with the same `attempts` and `backoff` as for
+  `callConnector`.
+- `next` names the step taken when the call succeeds.
+
+The compiler reports these as compile errors. Their codes come with the build
+issue.
+
+- The package is one of the application's
+  [`packages`](configuration.md#extension-packages).
+- The operation is in the manifest of the version the release pins.
+- `input`, `output` and `retry` are checked as for a `callConnector` step,
+  see [Step shape](#step-shape), against the operation's fields in the
+  manifest.
+- A package operation step has `input` and `next`, and no `set` or
+  `connector`.
+
+### Staging a package call
+
+The steps are those of [Staging and the call](#staging-and-the-call), with
+the operation in place of the HTTP request:
+
+- **Staging.** The step's transaction evaluates the input, stores the call
+  as `pending` with a stable operation identity and the evaluated input, sets
+  the instance to `waiting` on the step, and queues a work item. A unique
+  index on instance and step lets a step stage only one call. The table and
+  the work item kind come with the build issue.
+- **Mark.** Before each attempt, a short transaction marks the call
+  `sending`, counts the attempt and extends the item's lease past the
+  operation's `timeout`.
+- **Run.** The worker loads the pinned package version and runs the
+  operation with the stored input, outside any transaction. The context's
+  `OperationId` is the operation identity, the same on every attempt. The
+  worker passes a cancellation token that is cancelled at the `timeout`.
+- **Record.** An outcome transaction records the result, as for a connector
+  call. On success it writes the output fields with the record update rules,
+  sets the instance to `running` on `next`, writes the history row and the
+  audit records, and queues the next step.
+- **Stored input.** It is cleared when the call settles, and never appears in
+  history, audit records or logs.
+
+A worker can crash after it runs the operation and before it records the
+result. The next worker then finds the call still `sending`, and that
+attempt's outcome counts as unknown.
+
+### Package call outcomes
+
+The platform decides which outcomes are retried. A retry runs the operation
+again with the stored input under the same operation identity.
+
+| Outcome of an attempt | Class | Retried | When attempts run out |
+| --- | --- | --- | --- |
+| The output fits the manifest | Succeeded | Not needed | Not needed |
+| The output does not fit the manifest | Failed | No | The instance becomes `failed` at once |
+| A `RetryableException` | Retryable | Yes | The instance becomes `failed` |
+| Any other exception, or a request to the context for an undeclared capability | Failed | No | The instance becomes `failed` at once |
+| The pinned version is missing on the worker, or fails to load | Retryable | Yes | The instance becomes `failed` |
+| A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true`. Otherwise the call stays `unknown` | The call stays `unknown` |
+
+- **Fits.** An output fits when it has a value of the right
+  [.NET type](extension-packages.md#contracts) for each output, and a value
+  for each required output.
+- **Undeclared capability.** The attempt fails even if the operation catches
+  the exception that the context throws.
+- **Left unknown.** A call whose operation is not `idempotent`, or whose
+  attempts ran out after an unknown outcome, stays `unknown`. The instance
+  stays `waiting`. The operation may have acted, so the platform neither
+  runs it again nor fails the instance. A history row with output
+  `{ "operationId", "outcome": "unknown" }` makes it visible. Packages have no
+  lookup, so an operator resolves it in M7.
+- **Audit.** Each settled call writes one audit record `operation.called`,
+  with actor `system` and details
+  `{ "package", "version", "operation", "operationId", "attempts", "outcome" }`.
+  When it writes output fields, it also writes `record.updated`, as
+  `updateRecord` does. A failed call also writes `process.failed`.
+- **Exceptions.** History holds the exception type of a failed attempt, such
+  as `System.FormatException`, never its message. A message can hold input
+  values or secrets.
 
 ## Events and triggers
 
