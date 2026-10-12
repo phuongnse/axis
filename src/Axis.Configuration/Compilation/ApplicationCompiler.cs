@@ -19,7 +19,7 @@ namespace Axis.Configuration.Compilation;
 /// their step graphs, their conditions, the roles their tasks name and the connector operations
 /// their steps call, checks policies, their
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
-/// lookups, and resolves references
+/// lookups, checks events, their entities and their payload fields, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -170,6 +170,12 @@ public static class ApplicationCompiler
             rules,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
+        EventChecker.Check(
+            loaded.Events,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -192,6 +198,7 @@ public static class ApplicationCompiler
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, rules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
+            Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
         };
         return result with
         {

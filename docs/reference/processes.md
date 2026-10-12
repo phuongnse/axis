@@ -1132,9 +1132,10 @@ again with the stored input under the same operation identity.
 
 ## Events and triggers
 
-*(planned for M5)* This section follows
-[D26](../decisions.md#d26-events-and-triggers--agreed). None of it is built
-yet. A `raiseEvent` step raises an [event](configuration.md#event-resource)
+This section follows
+[D26](../decisions.md#d26-events-and-triggers--agreed). Only the
+[event resource](configuration.md#event-resource) and its compile checks are
+built. *(planned for M5)* The rest is not built yet. A `raiseEvent` step raises an [event](configuration.md#event-resource)
 for its subject record. A [trigger](configuration.md#trigger-resource) starts
 a process for one record when an event is raised, when a record is created or
 updated, or when a schedule is due. Every start happens at most once for the

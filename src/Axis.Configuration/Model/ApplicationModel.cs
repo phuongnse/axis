@@ -5,7 +5,7 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled application: its manifest, every entity, site, page, seed, data source, process,
-/// form and policy with references resolved, its connectors, its roles and its texts.
+/// form, policy and event with references resolved, its connectors, its roles and its texts.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -42,6 +42,9 @@ public sealed record ApplicationModel
 
     /// <summary>The application's connectors, in path order.</summary>
     public IReadOnlyList<ConnectorModel> Connectors { get; init; } = [];
+
+    /// <summary>The application's events, in path order.</summary>
+    public IReadOnlyList<EventModel> Events { get; init; } = [];
 
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)
