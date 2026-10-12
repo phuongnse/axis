@@ -56,6 +56,15 @@ change with a NexKit release or a settings change.
   jq '{default_profile, triage: .stages.triage, profiles}' .nexkit/config.json
   ```
 
+- **Caches NexKit restores before setup:** the `cache` key of
+  `.nexkit/config.json`. The `actions/cache` steps in `.github/workflows/ci.yml`
+  save them on `main` and must match them. The rule is in
+  [delivery.md](../../../docs/delivery.md#decisions).
+
+  ```bash
+  jq '.cache' .nexkit/config.json
+  ```
+
 - **Required checks on `main`:** the active rules for the branch.
 
   ```bash
@@ -182,6 +191,9 @@ returns 404, upgrade `gh` and try again.
 - Tests cover the change, including denied access where it applies.
 - The required checks on `main` are green.
 - No edits in paths NexKit may not change, unless the pull request is hand-made.
+- If the pull request changes what `scripts/setup.sh` downloads, such as a new
+  toolchain or a lock file in a new place, the `cache` entries and the CI cache
+  steps must follow. Tell the owner and propose that hand-made pull request.
 - While `merge.auto` is on, NexKit has merged by the time you look: review the
   merged pull request the same way, and raise problems with the owner. While it
   is off, NexKit mentions the owner when a pull request is ready.
@@ -197,6 +209,7 @@ returns 404, upgrade `gh` and try again.
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that profile is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | A run is paused at the Claude usage limit (⏸️) | Nothing: NexKit runs the same command again after the reset. If it stops a second time with an unknown reset time, repeat the command. |
+| The *Restore caches* step reports a missed cache | Nothing for one run: setup installs from scratch, and the next successful CI run on `main` saves the cache. An older cache restored after a lock file changed is normal too. If every run misses, compare the `cache` entries with the CI cache steps and check that CI on `main` succeeds, because `actions/cache` saves only after a successful job. |
 | The review job errored | Comment `/nexkit review` to retry. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
 | NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
