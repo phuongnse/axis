@@ -21,8 +21,8 @@ a field no grant covers is a `403`.
 
 [Inbound endpoints](#inbound-endpoints) are the one exception to the
 session rule. Another system calls them with a bearer token, and they take
-no session. The bearer token check and the endpoint call are built. The
-call's `Idempotency-Key`, `output` with `wait`, and the status location are
+no session. The bearer token check, the endpoint call with its `output` and
+`wait`, and the status location are built. The call's `Idempotency-Key` is
 not *(planned for M5)*.
 
 ## Routes
@@ -522,12 +522,10 @@ answered with `400`:
 This section follows [D27](../decisions.md#d27-inbound-endpoints--agreed).
 The bearer token check, its `401`, the CSRF exemption and the call are built.
 The call creates the record and starts the process, with the order of checks,
-the responses without output and the audit records below. Three parts are
-*(planned for M5)*: [Idempotency](#idempotency), `output` with `wait`, and the
-[status location](#status-location). Until they are built, the call ignores
-`Idempotency-Key`, an endpoint with `output` answers `201` at once without
-output, and the status location answers a caller with a valid token with a
-`404`. An [`endpoint` resource](configuration.md#endpoint-resource) lets
+the responses, `output` with `wait`, the audit records and the
+[status location](#status-location) below. [Idempotency](#idempotency) is
+*(planned for M5)*. Until it is built, the call ignores `Idempotency-Key`. An
+[`endpoint` resource](configuration.md#endpoint-resource) lets
 another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as
 [Machine callers](../architecture.md#machine-callers) describes. Endpoints
@@ -608,6 +606,12 @@ One transaction then does the rest:
 When any part fails, nothing is written. After the commit, an endpoint with
 `wait` checks the instance's state until it completes or `wait` runs out.
 
+- **No connection held.** The call holds no transaction and no database
+  connection while it waits. It reads the state every 200 ms, each time over
+  a pooled connection that it returns at once.
+- **Failure ends the wait.** A failed instance never completes, so the call
+  stops waiting as soon as it reads `failed`.
+
 - **Actor.** The actor of both audit records is the caller's id, from the
   token's user id claim (`sub`). The display name is stored with them, see
   [Machine callers](../architecture.md#machine-callers).
@@ -648,7 +652,9 @@ the note's `code` and `status`:
 
 **`202`.** The endpoint declares `output` and `wait`, and the instance did
 not complete within `wait`. The body has no `output`, and `Location` names
-the status location:
+the status location. `Location` uses the declared names of the application
+and the endpoint, not the letter case of the request. `state` is `running`
+or `waiting`, or `failed` when the instance failed:
 
 ```http
 HTTP/1.1 202 Accepted
@@ -771,8 +777,11 @@ state of an instance that an endpoint call started.
   endpoint, checked in the same order as the call: `401`, then `404` for the
   path, then `403`.
 - **Own calls only.** Only the caller who made the call can read it. Another
-  caller's instance, an instance of another endpoint, and an unknown one are
-  all `404`. So one system cannot read another system's output.
+  caller's instance, an instance of another endpoint, an unknown one and an
+  `{instanceId}` that is not a UUID are all `404`, titled "No instance of
+  this endpoint exists with this id.". So one system cannot read another
+  system's output. The caller and the endpoint come from the instance's
+  `process.started` audit record.
 - **`200`.** The body is the call's body: `recordId`, `instanceId` and
   `state`. `output` is there only when the instance is `completed`.
 - **Output as contract.** The output values are read as the endpoint's

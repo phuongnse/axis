@@ -1,0 +1,8 @@
+{
+  "id": "cac13844-f893-4636-bdcc-aaf942aaf4e7",
+  "kind": "form",
+  "name": "NoteReview",
+  "formatVersion": 1,
+  "entity": "Note",
+  "sections": [{ "title": { "textKey": "noteReview.main" }, "fields": [{ "field": "title" }] }]
+}

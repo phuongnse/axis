@@ -1,0 +1,19 @@
+{
+  "id": "f0c64e2b-fc17-41f7-b5e1-947c258dd5ab",
+  "kind": "endpoint",
+  "name": "ImportFailingNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "FailNote",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" }
+  ],
+  "values": {
+    "title": "title",
+    "quantity": "quantity",
+    "status": "'open'"
+  },
+  "output": ["title", "status"],
+  "wait": "PT10S"
+}
