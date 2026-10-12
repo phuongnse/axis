@@ -595,7 +595,7 @@ to the draft. Only another grant can make it readable.
   - the step history
   - audit records
   - the next work item
-  - staged connector calls and their work items *(planned for M5)*
+  - staged connector calls and their work items
   - event occurrences, their delivery work items and sync trigger starts
     *(planned for M5)*
 
@@ -605,9 +605,9 @@ to the draft. Only another grant can make it readable.
   built for work items.
 - **External operations.** These run outside the transaction, using the
   operation identity as their idempotency key. The result is recorded by a
-  following transaction. *(planned for M5)* A `callConnector` step stages its
-  call, the worker sends it with retries, and an unknown outcome is
-  reconciled through a lookup. See
+  following transaction. A `callConnector` step stages its call in its
+  transaction. *(planned for M5)* The worker sends it with retries, and an
+  unknown outcome is reconciled through a lookup. See
   [connector calls](reference/processes.md#connector-calls). A package
   operation step is staged and run the same way, see
   [package operations](reference/processes.md#package-operations).
@@ -615,7 +615,8 @@ to the draft. Only another grant can make it readable.
   for inspection.
 
 The step transactions, the revision check and the history are built for
-`decision`, `task`, `operation` and `end` steps, see
+`decision`, `task`, `operation` and `end` steps, and for the staging of
+`callConnector` steps, see
 [Running a step](reference/processes.md#running-a-step).
 The process resource, the start endpoint, the instance and task states, the
 task API, the worker settings and the tables are in

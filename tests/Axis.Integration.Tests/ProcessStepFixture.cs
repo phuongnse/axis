@@ -103,10 +103,23 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// The deployment bindings StepApp needs on <paramref name="tenantId"/>: the base URL of its
+    /// Purchasing connector, which no test calls.
+    /// </summary>
+    public static ActivationBindings StepAppBindings(string tenantId) =>
+        new(
+            tenantId,
+            new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["PurchasingUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
+            },
+            AllowHttp: false);
+
+    /// <summary>
     /// Inserts a request with a new title, <paramref name="amount"/>, <paramref name="divisor"/> and
     /// an optional <paramref name="department"/>, and returns its id.
     /// </summary>
-    public async Task<Guid> InsertRequestAsync(decimal amount, long divisor, Guid? department = null)
+    public async Task<Guid> InsertRequestAsync(decimal? amount, long divisor, Guid? department = null)
     {
         var id = Guid.NewGuid();
         await using var command = DataSource.CreateCommand(
@@ -116,7 +129,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             """);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("title", $"Request {id:N}");
-        command.Parameters.AddWithValue("amount", amount);
+        command.Parameters.Add(new NpgsqlParameter("amount", NpgsqlDbType.Numeric) { Value = (object?)amount ?? DBNull.Value });
         command.Parameters.AddWithValue("divisor", divisor);
         command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
@@ -366,7 +379,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await using var data = CreateDataContext();
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None(TenantId));
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, StepAppBindings(TenantId));
         Assert.Empty(activated.Diagnostics);
         return (compiled.Release!.Id, compiled.Model!);
     }

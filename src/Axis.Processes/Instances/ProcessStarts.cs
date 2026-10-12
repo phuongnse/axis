@@ -14,10 +14,13 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that runs the next step of an instance.</summary>
     public const string StepWorkItemKind = "process.step";
 
+    /// <summary>The kind of the work item that sends or reconciles one staged connector call.</summary>
+    public const string ConnectorCallWorkItemKind = "connector.call";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 
-    /// <summary>The state of an instance that waits for a human task to be completed.</summary>
+    /// <summary>The state of an instance that waits for a human task to be completed or a connector call to settle.</summary>
     public const string Waiting = "waiting";
 
     /// <summary>The state of an instance that reached an <c>end</c> step.</summary>

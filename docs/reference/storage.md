@@ -28,6 +28,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
+    `axis.connector_calls` (one row per staged connector call),
     `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start) and `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.

@@ -23,6 +23,9 @@ public sealed class WorkItemRow
     /// <summary>The token of the current claim, or <see langword="null"/> when the item was never claimed.</summary>
     public Guid? ClaimToken { get; init; }
 
-    /// <summary>The process instance the item runs a step of, or <see langword="null"/> for other work.</summary>
+    /// <summary>The process instance the item runs a step or a connector call of, or <see langword="null"/> for other work.</summary>
     public Guid? ProcessInstanceId { get; init; }
+
+    /// <summary>The connector call a <c>connector.call</c> item sends, or <see langword="null"/> for other work.</summary>
+    public Guid? ConnectorCallId { get; init; }
 }

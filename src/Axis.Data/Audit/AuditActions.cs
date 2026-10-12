@@ -20,4 +20,6 @@ public static class AuditActions
     public const string TaskCreated = "task.created";
 
     public const string TaskCompleted = "task.completed";
+
+    public const string ConnectorCallStaged = "connector.callStaged";
 }

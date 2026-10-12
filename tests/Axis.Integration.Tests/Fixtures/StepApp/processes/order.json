@@ -1,0 +1,20 @@
+{
+  "id": "b7e4a1d9-3c5f-4a82-9e6b-2d1f0a8c7e35",
+  "kind": "process",
+  "name": "Order",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "createOrder",
+  "steps": [
+    {
+      "name": "createOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Purchasing", "operation": "createOrder" },
+      "input": { "reference": "title", "amount": "amount", "note": "comment" },
+      "output": { "orderNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

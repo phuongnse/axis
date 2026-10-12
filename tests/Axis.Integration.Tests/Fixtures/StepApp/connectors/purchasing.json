@@ -1,0 +1,20 @@
+{
+  "id": "6f1c2b8e-4d7a-4e93-a5b1-0c9d8e7f6a52",
+  "kind": "connector",
+  "name": "Purchasing",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/orders",
+      "input": [
+        { "name": "reference", "type": "text", "required": true },
+        { "name": "amount", "type": "decimal", "required": true },
+        { "name": "note", "type": "text" }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}

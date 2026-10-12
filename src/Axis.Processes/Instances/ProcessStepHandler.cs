@@ -11,16 +11,23 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Runs the current step of a process instance on the release the instance is pinned to. The step
 /// commits in the work item's transaction: an operation's record write, a task step's open human
-/// task, the new instance state and revision, a step history row, its <c>system</c> audit records
-/// and the next work item. A task step leaves the instance <c>waiting</c>, with no next work item.
-/// A step that finds the instance at another revision than it loaded writes nothing. A step that throws is
-/// rolled back, and the failure callback then records the error in the history and marks the
-/// instance <c>failed</c>.
+/// task, a <c>callConnector</c> step's staged call, the new instance state and revision, a step
+/// history row, its <c>system</c> audit records and the next work item. A task step leaves the
+/// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
+/// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
+/// inside the transaction. A step that finds the instance at another revision than it loaded writes
+/// nothing. A step that throws is rolled back, and the failure callback then records the error in
+/// the history and marks the instance <c>failed</c>.
 /// </summary>
 internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
     /// <summary>The decision recorded when no branch was true.</summary>
     internal const string Otherwise = "otherwise";
+
+    private const string DateFormat = "yyyy-MM-dd";
+
+    // PostgreSQL stores microseconds, so six fraction digits show every stored value exactly.
+    private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
 
     public string Kind => ProcessStarts.StepWorkItemKind;
 
@@ -118,6 +125,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         string action;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
+        NewConnectorCall? call = null;
         switch (step)
         {
             case DecisionStepModel decisionStep:
@@ -177,6 +185,34 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 details = new JsonObject { ["step"] = step.Name, ["taskId"] = task.Id };
                 action = AuditActions.TaskCreated;
                 break;
+            case CallConnectorStepModel callStep:
+                if (!process.TryGetStep(callStep.Next, out _))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{callStep.Next}'.", instance, input);
+                }
+
+                var (connector, operation) = FindOperation(model, callStep, instance, input);
+                call = new NewConnectorCall(
+                    Guid.CreateVersion7(),
+                    instance.Id,
+                    step.Name,
+                    instance.ReleaseId,
+                    connector.Name,
+                    operation.Name,
+                    await StageAsync(context, model, entity, record, callStep, operation, instance, input, cancellationToken));
+                state = ProcessStarts.Waiting;
+                nextStep = step.Name;
+                decision = null;
+                output = new JsonObject { ["state"] = ProcessStarts.Waiting, ["operationId"] = call.Id };
+                details = new JsonObject
+                {
+                    ["step"] = step.Name,
+                    ["connector"] = connector.Name,
+                    ["operation"] = operation.Name,
+                    ["operationId"] = call.Id,
+                };
+                action = AuditActions.ConnectorCallStaged;
+                break;
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
@@ -219,6 +255,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
             await ProcessTasks.InsertAsync(context.Transaction, task, cancellationToken);
         }
 
+        if (call is not null)
+        {
+            await ConnectorCalls.InsertAsync(context.Transaction, call, cancellationToken);
+        }
+
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
             new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now),
@@ -242,6 +283,19 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 DateTimeOffset.UtcNow,
                 cancellationToken,
                 processInstanceId: instance.Id);
+        }
+
+        if (call is not null)
+        {
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.ConnectorCallWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                processInstanceId: instance.Id,
+                connectorCallId: call.Id);
         }
     }
 
@@ -342,6 +396,69 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         }
 
         return (ProcessTasks.UserAssignee, id);
+    }
+
+    /// <summary>Finds the connector and the operation a <c>callConnector</c> step names, ignoring letter case.</summary>
+    private static (ConnectorModel Connector, ConnectorOperationModel Operation) FindOperation(
+        ApplicationModel model,
+        CallConnectorStepModel step,
+        LoadedInstance instance,
+        JsonObject input)
+    {
+        var connector = model.Connectors.FirstOrDefault(candidate => string.Equals(candidate.Name, step.Connector, StringComparison.OrdinalIgnoreCase))
+            ?? throw Failure($"The release has no connector '{step.Connector}'.", instance, input);
+        var operation = connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, step.Operation, StringComparison.OrdinalIgnoreCase))
+            ?? throw Failure($"The connector '{connector.Name}' has no operation '{step.Operation}'.", instance, input);
+        return (connector, operation);
+    }
+
+    /// <summary>
+    /// Evaluates each input of a <c>callConnector</c> step, in the step's order, into the body the
+    /// call stores. Dates and date-times take the record API's text forms, and an optional input
+    /// that gives null is stored as null. An input that fails at run time, or a required input that
+    /// gives null, fails the step.
+    /// </summary>
+    private static async Task<JsonObject> StageAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        EntityModel entity,
+        Record record,
+        CallConnectorStepModel step,
+        ConnectorOperationModel operation,
+        LoadedInstance instance,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        var body = new JsonObject();
+        foreach (var mapping in step.Input)
+        {
+            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, mapping.Value, instance.Now, cancellationToken);
+            if (result.Error is { } error)
+            {
+                throw Failure(error.Message, instance, input);
+            }
+
+            var required = operation.Input.Any(field => field.Required && string.Equals(field.Name, mapping.Input, StringComparison.OrdinalIgnoreCase));
+            if (result.Value is null && required)
+            {
+                throw Failure($"The required input '{mapping.Input}' of the step '{step.Name}' gave no value.", instance, input);
+            }
+
+            body[mapping.Input] = result.Value switch
+            {
+                null => null,
+                string text => JsonValue.Create(text),
+                long number => JsonValue.Create(number),
+                decimal number => JsonValue.Create(number),
+                bool flag => JsonValue.Create(flag),
+                DateOnly date => JsonValue.Create(date.ToString(DateFormat, CultureInfo.InvariantCulture)),
+                DateTimeOffset time => JsonValue.Create(time.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
+                Guid id => JsonValue.Create(id.ToString("D")),
+                var other => throw Failure($"The input '{mapping.Input}' of the step '{step.Name}' gave a value of type '{other.GetType().Name}'.", instance, input),
+            };
+        }
+
+        return body;
     }
 
     /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
