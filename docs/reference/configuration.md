@@ -200,14 +200,36 @@ flowchart LR
      `/steps/{i}/branches/{j}/when` with its
      [expression diagnostic](expressions.md#diagnostics) code. The
      `startCondition` message joins the `AXC0028` check. An operation step
-     whose `operation` is not `updateRecord`, matched exactly, is `AXC0078`
-     at `/steps/{i}/operation`, and its `set` is not checked. Each key of an
+     whose `operation` is not `updateRecord` or `callConnector`, matched
+     exactly, is `AXC0078` at `/steps/{i}/operation`, and its other
+     properties are not checked. Each key of an
      `updateRecord` `set` must name a field of the entity, ignoring letter
      case, that no earlier key of the step names, otherwise it is `AXC0079`.
      A computed field, a sequence field or a child collection is `AXC0080`.
      Each `set` expression is parsed and type-checked against its field's
      type, with the same scope as a `when`. Each of these is reported at
-     `/steps/{i}/set/{field}`. A task step's `assignee` without exactly one
+     `/steps/{i}/set/{field}`. A `callConnector` step's `connector` `name`
+     that names no loaded [connector](#connectors-and-deployment-bindings),
+     ignoring letter case, is `AXC0102` at `/steps/{i}/connector/name`. A
+     name whose connector file was not loaded because of its own errors is
+     not reported again. An `operation` that names no operation of that
+     connector, ignoring letter case, is `AXC0103` at
+     `/steps/{i}/connector/operation`. With either, the step's `input` and
+     `output` are not checked. An `input` key that names no input of the
+     operation, ignoring letter case, or an input an earlier key already
+     names, is `AXC0104`. Each `input` expression is parsed and type-checked
+     against its input's type, with the same scope as a `when`. Each of these
+     is reported at `/steps/{i}/input/{key}`. A required input that no key
+     names is `AXC0105` at `/steps/{i}/input`. An `output` key that names no
+     output of the operation, or an output an earlier key already names, is
+     `AXC0106`. An `output` value that names no field of the entity,
+     ignoring letter case, or a field an earlier output already writes, is
+     `AXC0107`. A computed field, a sequence field, a child collection, or a
+     field whose type does not fit the output's is `AXC0108`. An output fits
+     a field of the same type, and an `integer` output also fits a `decimal`
+     field. Each of these is reported at `/steps/{i}/output/{key}`. A retry
+     `backoff` that is not a positive whole-number duration is `AXC0109` at
+     `/steps/{i}/retry/backoff`. A task step's `assignee` without exactly one
      of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. A `role`
      that names no declared [role](#roles-and-policies), compared exactly, is
      `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file was not
@@ -224,9 +246,12 @@ flowchart LR
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
      `label` join the `AXC0028` check. A decision with no branches, an
-     operation without `operation`, `set` or `next`, a task without `label`,
-     `assignee`, `form` or an outcome, and an `end` step with `branches`,
-     `otherwise` or any other property, are `AXC0004`. See
+     operation without `operation` or `next`, an `updateRecord` step without
+     `set` or with `connector`, `input`, `output` or `retry`, a
+     `callConnector` step without `connector` or `input` or with `set`, a
+     retry `attempts` outside 1 to 10, a task without `label`, `assignee`,
+     `form` or an outcome, and an `end` step with `branches`, `otherwise` or
+     any other property, are `AXC0004`. See
      [processes](processes.md#compile-checks).
    - **Policies.** Each `roles` entry of a [policy](#roles-and-policies) must
      name a declared role, compared exactly, otherwise it is `AXC0090` at
@@ -497,7 +522,7 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord`, matched exactly. Reported at `/steps/{i}/operation`. Its `set` is then not checked. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord` or `callConnector`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
 | `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
@@ -521,6 +546,14 @@ sorted by file and then path.
 | `AXC0099` | A connector's `timeout` is not a positive ISO 8601 duration of at most `PT2M`, in the form a task's `dueIn` takes, such as `PT30S`. Reported at `/timeout`. |
 | `AXC0100` | The tenant a release is activated for lacks a binding a connector names, or holds it with another kind. `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding. Reported by activation at `/baseUrl/binding`, `/auth/token/binding` or `/auth/value/binding` of the connector file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
 | `AXC0101` | Outside Development, a connector's `baseUrl` binding is not an `https` URL. Reported by activation at `/baseUrl/binding` of the connector file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
+| `AXC0102` | A process `callConnector` step's `connector` `name` names no loaded connector, ignoring letter case. Reported at `/steps/{i}/connector/name`. Not reported when the name is a connector file that was not loaded because of its own errors. Its `input` and `output` are then not checked. |
+| `AXC0103` | A process `callConnector` step's `connector` `operation` names no operation of its connector, ignoring letter case. Reported at `/steps/{i}/connector/operation`. Its `input` and `output` are then not checked. |
+| `AXC0104` | A key of a `callConnector` step's `input` names no input of the operation, or an input an earlier key of the step already names, ignoring letter case. Reported at `/steps/{i}/input/{key}`. |
+| `AXC0105` | A required input of the operation a `callConnector` step calls has no key in the step's `input`. Reported at `/steps/{i}/input`, once for each missing input. |
+| `AXC0106` | A key of a `callConnector` step's `output` names no output of the operation, or an output an earlier key of the step already names, ignoring letter case. Reported at `/steps/{i}/output/{key}`. |
+| `AXC0107` | A value of a `callConnector` step's `output` names no field of the subject entity, or a field an earlier output of the step already writes, ignoring letter case. Reported at `/steps/{i}/output/{key}`. |
+| `AXC0108` | A value of a `callConnector` step's `output` names a computed field, a sequence field or a child collection, or a field whose type does not fit the output's. An output fits a field of the same type, and an `integer` output also fits a `decimal` field. Reported at `/steps/{i}/output/{key}`. |
+| `AXC0109` | A `callConnector` step's retry `backoff` is not a positive ISO 8601 duration in the form `dueIn` accepts, such as `PT30S` or `P1D`. Reported at `/steps/{i}/retry/backoff`. |
 
 ## Startup activation
 

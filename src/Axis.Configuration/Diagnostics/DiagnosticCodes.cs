@@ -99,4 +99,13 @@ public static class DiagnosticCodes
     public const string InvalidConnectorTimeout = "AXC0099";
     public const string MissingDeploymentBinding = "AXC0100";
     public const string InsecureBaseUrl = "AXC0101";
+
+    public const string UnknownConnector = "AXC0102";
+    public const string UnknownConnectorOperation = "AXC0103";
+    public const string UnknownConnectorInput = "AXC0104";
+    public const string MissingConnectorInput = "AXC0105";
+    public const string UnknownConnectorOutput = "AXC0106";
+    public const string UnknownOutputField = "AXC0107";
+    public const string InvalidOutputField = "AXC0108";
+    public const string InvalidRetryBackoff = "AXC0109";
 }

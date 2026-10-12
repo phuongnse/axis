@@ -12,6 +12,33 @@ public sealed class ProcessCompilerTests
     private const string OrderId = "11111111-1111-4111-8111-111111111111";
     private const string ProcessId = "77777777-7777-4777-8777-777777777701";
     private const string OrderReviewFormId = "99999999-9999-4999-8999-999999999901";
+    private const string PurchasingId = "33333333-3333-4333-8333-333333333301";
+
+    /// <summary>
+    /// The connector <c>Purchasing</c>, whose POST operation <c>createOrder</c> takes the required
+    /// inputs <c>reference</c> (text) and <c>amount</c> (decimal) and the optional <c>note</c> (text),
+    /// and gives the outputs <c>orderNumber</c> (text), <c>flag</c> (boolean) and <c>count</c> (integer).
+    /// </summary>
+    private const string Purchasing = $$"""
+        { "id": "{{PurchasingId}}", "kind": "connector", "name": "Purchasing", "formatVersion": 1,
+          "baseUrl": { "binding": "PurchasingUrl" },
+          "operations": [
+            { "name": "createOrder", "method": "POST", "path": "/orders",
+              "input": [
+                { "name": "reference", "type": "text", "required": true },
+                { "name": "amount", "type": "decimal", "required": true },
+                { "name": "note", "type": "text" }
+              ],
+              "output": [
+                { "name": "orderNumber", "type": "text" },
+                { "name": "flag", "type": "boolean" },
+                { "name": "count", "type": "integer" }
+              ] }
+          ] }
+        """;
+
+    private const string CallCreateOrder = """ "connector": { "name": "Purchasing", "operation": "createOrder" }, """;
+    private const string CreateOrderInput = """ "input": { "reference": "status", "amount": "amount" }, """;
 
     private const string Texts = """
         { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
@@ -321,8 +348,8 @@ public sealed class ProcessCompilerTests
     }
 
     [Theory]
-    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operation is 'updateRecord'.")]
-    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operation is 'updateRecord'.")]
+    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord' and 'callConnector'.")]
+    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord' and 'callConnector'.")]
     [InlineData("updateRecord", """{ "nope": "'x'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/nope", "The field 'nope' was not found. The entity 'Order' has no field with that name.")]
     [InlineData("updateRecord", """{ "status": "'x'", "STATUS": "'y'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/STATUS", "The field 'status' is already set by 'status' in this step.")]
     [InlineData("updateRecord", """{ "large": "true" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/large", "The field 'large' is computed, so an operation cannot set it.")]
@@ -362,6 +389,193 @@ public sealed class ProcessCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((code, "/steps/0/set/status"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_connector_call_compiles_with_declared_names_inputs_in_operation_order_and_the_retry_defaults()
+    {
+        using var folder = Folder(
+            Process("Order", """
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector",
+                    "connector": { "name": "PURCHASING", "operation": "CreateOrder" },
+                    "input": { "Note": "'urgent'", "AMOUNT": "amount * 2", "reference": "status" },
+                    "output": { "COUNT": "Amount", "orderNumber": "STATUS" },
+                    "next": "DONE" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var call = Assert.IsType<CallConnectorStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(("call", "Purchasing", "createOrder", "done"), (call.Name, call.Connector, call.Operation, call.Next));
+        Assert.Equal(
+            [("reference", "status"), ("amount", "amount * 2"), ("note", "'urgent'")],
+            call.Input.Select(input => (input.Input, input.Value.Expression)));
+        Assert.Equal(20m, Evaluate(call.Input[1].Value, 10m));
+        Assert.Equal([new ConnectorOutputModel("orderNumber", "status"), new ConnectorOutputModel("count", "amount")], call.Output);
+        Assert.Equal(new RetryPolicyModel(3, TimeSpan.FromSeconds(30)), call.Retry);
+    }
+
+    [Fact]
+    public void A_connector_call_keeps_its_written_retry_policy_and_may_have_no_inputs_or_outputs()
+    {
+        var connector = Purchasing.Replace(
+            """{ "name": "reference", "type": "text", "required": true },""", "").Replace(
+            """{ "name": "amount", "type": "decimal", "required": true },""", "");
+        using var folder = Folder(
+            Process("Order", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector", {{CallCreateOrder}}
+                    "input": {}, "retry": { "attempts": 10, "backoff": "PT1M" }, "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            connector);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var call = Assert.IsType<CallConnectorStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Empty(call.Input);
+        Assert.Empty(call.Output);
+        Assert.Equal(new RetryPolicyModel(10, TimeSpan.FromMinutes(1)), call.Retry);
+    }
+
+    [Theory]
+    [InlineData(
+        """ "connector": { "name": "Billing", "operation": "createOrder" }, """ + CreateOrderInput,
+        DiagnosticCodes.UnknownConnector, "/steps/0/connector/name", "The connector 'Billing' was not found. No loaded connector has that name.")]
+    [InlineData(
+        """ "connector": { "name": "Purchasing", "operation": "cancelOrder" }, """ + CreateOrderInput,
+        DiagnosticCodes.UnknownConnectorOperation, "/steps/0/connector/operation", "The operation 'cancelOrder' was not found. The connector 'Purchasing' has no operation with that name.")]
+    [InlineData(
+        CallCreateOrder + """ "input": { "reference": "status", "amount": "'many'" }, """,
+        ExpressionDiagnosticCodes.ResultTypeMismatch, "/steps/0/input/amount", "The expression must be decimal, but it is text.")]
+    [InlineData(
+        CallCreateOrder + """ "input": { "reference": "status", "amount": "amount", "nope": "1" }, """,
+        DiagnosticCodes.UnknownConnectorInput, "/steps/0/input/nope", "The input 'nope' was not found. The operation 'createOrder' has no input with that name.")]
+    [InlineData(
+        CallCreateOrder + """ "input": { "reference": "status", "amount": "amount", "AMOUNT": "1" }, """,
+        DiagnosticCodes.UnknownConnectorInput, "/steps/0/input/AMOUNT", "The input 'amount' is already given by 'amount' in this step.")]
+    [InlineData(
+        CallCreateOrder + """ "input": { "amount": "amount" }, """,
+        DiagnosticCodes.MissingConnectorInput, "/steps/0/input", "The input 'reference' is required by the operation 'createOrder', but the step does not give it.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "nope": "status" }, """,
+        DiagnosticCodes.UnknownConnectorOutput, "/steps/0/output/nope", "The output 'nope' was not found. The operation 'createOrder' has no output with that name.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "orderNumber": "status", "ORDERNUMBER": "submittedAt" }, """,
+        DiagnosticCodes.UnknownConnectorOutput, "/steps/0/output/ORDERNUMBER", "The output 'orderNumber' is already written by 'orderNumber' in this step.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "orderNumber": "nope" }, """,
+        DiagnosticCodes.UnknownOutputField, "/steps/0/output/orderNumber", "The field 'nope' was not found. The entity 'Order' has no field with that name.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "count": "amount", "orderNumber": "AMOUNT" }, """,
+        DiagnosticCodes.UnknownOutputField, "/steps/0/output/orderNumber", "The field 'amount' is already written by the output 'count' in this step.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "flag": "large" }, """,
+        DiagnosticCodes.InvalidOutputField, "/steps/0/output/flag", "The field 'large' is computed, so an output cannot write it.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "orderNumber": "number" }, """,
+        DiagnosticCodes.InvalidOutputField, "/steps/0/output/orderNumber", "The field 'number' is numbered by a sequence, so an output cannot write it.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "count": "lines" }, """,
+        DiagnosticCodes.InvalidOutputField, "/steps/0/output/count", "The field 'lines' is a child collection, so an output cannot write it.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "flag": "status" }, """,
+        DiagnosticCodes.InvalidOutputField, "/steps/0/output/flag", "The output 'flag' is boolean, so it cannot be written to the field 'status', which is text.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "output": { "orderNumber": "customer" }, """,
+        DiagnosticCodes.InvalidOutputField, "/steps/0/output/orderNumber", "The output 'orderNumber' is text, so it cannot be written to the field 'customer', which is reference.")]
+    [InlineData(
+        CallCreateOrder + CreateOrderInput + """ "retry": { "backoff": "P1M" }, """,
+        DiagnosticCodes.InvalidRetryBackoff, "/steps/0/retry/backoff", "The duration 'P1M' is not valid. 'backoff' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P1D', 'PT30S' or 'P1DT12H'. Years and months are not allowed.")]
+    public void A_connector_call_problem_is_reported_at_its_path_in_the_step_and_gives_no_model(
+        string properties, string code, string path, string message)
+    {
+        using var folder = Folder(
+            Process("Order", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector", {{properties}} "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_connector_call_over_an_unknown_entity_still_checks_its_connector_and_retry()
+    {
+        using var folder = Folder(
+            Process("Nope", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector",
+                    "connector": { "name": "Billing", "operation": "createOrder" },
+                    "input": { "anything": "nope" }, "output": { "anything": "nope" }, "retry": { "backoff": "soon" }, "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownProcessEntity, "/entity"),
+                (DiagnosticCodes.UnknownConnector, "/steps/0/connector/name"),
+                (DiagnosticCodes.InvalidRetryBackoff, "/steps/0/retry/backoff"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+    }
+
+    [Fact]
+    public void A_connector_whose_file_was_not_loaded_is_not_reported_again_by_a_call()
+    {
+        using var folder = Folder(
+            Process("Order", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector", {{CallCreateOrder}} {{CreateOrderInput}} "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            Purchasing.Replace("\"method\": \"POST\"", "\"method\": \"SEND\""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(
+            (DiagnosticCodes.SchemaViolation, "connectors/purchasing.json"), (diagnostic.Code, diagnostic.File)));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData(
+        """{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "set": { "status": "'x'" }, "next": "done" }""",
+        "/steps/0/set")]
+    [InlineData(
+        """{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "connector": { "name": "Purchasing", "operation": "createOrder" }, "next": "done" }""",
+        "/steps/0/connector")]
+    public void A_set_on_a_connector_call_and_a_connector_on_an_update_are_schema_violations(string step, string path)
+    {
+        using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"), Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
     }
 
     [Fact]
@@ -407,6 +621,25 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "form": "OrderReview" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
     [InlineData("""{ "name": "submit", "type": "end", "dueIn": "P3D" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "input": { "amount": "1" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "output": { "count": "amount" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "retry": { "attempts": 2 }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "input": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing" }, "input": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder", "version": "2" }, "input": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": { "amount": "" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "output": { "count": "not a name" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "attempts": 0 }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "attempts": 11 }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "attempts": 2.5 }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "backoff": "" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "delay": "PT1S" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "retry": { "attempts": 2 } }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "input": {} }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "connector": { "name": "Purchasing", "operation": "createOrder" } }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "output": {} }""")]
     public void A_step_shape_the_schema_refuses_is_a_schema_violation(string step)
     {
         using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"));
@@ -708,10 +941,12 @@ public sealed class ProcessCompilerTests
     /// An application with an <c>Order</c> entity that references a <c>Customer</c>, owns <c>OrderLine</c> rows and
     /// takes its number from the <c>OrderNumber</c> sequence, a <c>Customer</c> that references the customer who
     /// referred it, the rule <c>NeedsReview</c>, the forms <c>OrderReview</c> over <c>Order</c> and <c>CustomerCard</c>
-    /// over <c>Customer</c>, the role <c>finance</c>, and <paramref name="process"/>.
+    /// over <c>Customer</c>, the role <c>finance</c>, <paramref name="process"/>, and
+    /// <paramref name="connector"/> as <c>connectors/purchasing.json</c> when it is given.
     /// </summary>
-    private static TemporaryFolder Folder(string process) =>
-        new TemporaryFolder()
+    private static TemporaryFolder Folder(string process, string? connector = null)
+    {
+        var folder = new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
             .With("texts/en.json", Texts)
             .With("rules/needs-review.json", NeedsReview)
@@ -753,4 +988,6 @@ public sealed class ProcessCompilerTests
                   "sections": [ { "title": { "textKey": "order.review" }, "fields": [ { "field": "name" } ] } ] }
                 """)
             .With("processes/order-review.json", process);
+        return connector is null ? folder : folder.With("connectors/purchasing.json", connector);
+    }
 }

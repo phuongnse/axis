@@ -74,5 +74,11 @@ public sealed record ApplicationLoadResult(
     /// <summary>The <c>connector</c> resources, in path order.</summary>
     public IReadOnlyList<ConnectorResource> Connectors { get; init; } = [];
 
+    /// <summary>
+    /// The <c>name</c> of every <c>connector</c> file that was not loaded because of its own errors,
+    /// compared ignoring letter case. A reference to one of these names is not reported again either.
+    /// </summary>
+    public IReadOnlySet<string> UnloadedConnectorNames { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 }

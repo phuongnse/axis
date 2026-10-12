@@ -8,7 +8,9 @@ namespace Axis.Configuration.Model;
 /// steps. Every transition names a step of the process by its declared name, every condition
 /// is a boolean expression checked over the subject entity's fields and the named rules, every
 /// value an operation sets is checked against its field's type over the same scope, and a task's
-/// <c>user</c> assignee is a <c>text</c> expression over that scope too.
+/// <c>user</c> assignee is a <c>text</c> expression over that scope too. Every input a connector
+/// call sends is checked against the input's type over that scope, and every output it writes
+/// names a field that fits the output's type.
 /// </summary>
 public sealed record ProcessModel
 {
@@ -77,7 +79,7 @@ public sealed record TaskAssigneeModel(ExpressionModel? User, string? Role);
 public sealed record TaskOutcomeModel(string Name, TextReference Label, string Next);
 
 /// <summary>
-/// An operation step. M3 has one operation, <c>updateRecord</c>: it sets each field in
+/// An <c>updateRecord</c> operation step: it sets each field in
 /// <see cref="Set"/> on the subject record through the record update rules, then moves to
 /// <see cref="Next"/>.
 /// </summary>
@@ -88,6 +90,40 @@ public sealed record OperationStepModel(string Name, string Operation, IReadOnly
 /// over the subject record that gives its value, checked against the field's type.
 /// </summary>
 public sealed record RecordAssignmentModel(string Field, ExpressionModel Value);
+
+/// <summary>
+/// A <c>callConnector</c> operation step: it calls <see cref="Operation"/> of
+/// <see cref="Connector"/>, both by their declared names, with <see cref="Input"/>, writes
+/// <see cref="Output"/> to the subject record, and moves to <see cref="Next"/> when the call
+/// succeeds. <see cref="Retry"/> says how often and how soon a failed attempt is tried again.
+/// </summary>
+public sealed record CallConnectorStepModel(
+    string Name,
+    string Connector,
+    string Operation,
+    IReadOnlyList<ConnectorInputModel> Input,
+    IReadOnlyList<ConnectorOutputModel> Output,
+    RetryPolicyModel Retry,
+    string Next) : ProcessStepModel(Name);
+
+/// <summary>
+/// An input a <c>callConnector</c> step sends: the input's declared name, and the expression over
+/// the subject record that gives its value, checked against the input's type. The inputs of a step
+/// are in the operation's declaration order.
+/// </summary>
+public sealed record ConnectorInputModel(string Input, ExpressionModel Value);
+
+/// <summary>
+/// An output a <c>callConnector</c> step writes: the output's declared name and the declared name
+/// of the subject field it is written to. The outputs of a step are in the operation's declaration order.
+/// </summary>
+public sealed record ConnectorOutputModel(string Output, string Field);
+
+/// <summary>
+/// The retry policy of a <c>callConnector</c> step: <see cref="Attempts"/> counts the first
+/// attempt, and <see cref="Backoff"/> is the delay before the second one.
+/// </summary>
+public sealed record RetryPolicyModel(int Attempts, TimeSpan Backoff);
 
 /// <summary>An end step. An instance that reaches it is completed.</summary>
 public sealed record EndStepModel(string Name) : ProcessStepModel(Name);

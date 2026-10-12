@@ -14,25 +14,35 @@ namespace Axis.Configuration.Compilation;
 /// <c>end</c> step and is in no cycle. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
-/// of at most 3 hops. An operation step runs <c>updateRecord</c>, and each field its <c>set</c>
-/// names is a field of the subject entity, named once, that is not computed, numbered by a
-/// sequence or a child collection. Each <c>set</c> expression type-checks against its field's type
-/// over the same scope as a condition. A task step's assignee is exactly one of a <c>user</c>, a
+/// of at most 3 hops. An operation step runs <c>updateRecord</c> or <c>callConnector</c>. Each
+/// field an <c>updateRecord</c> <c>set</c> names is a field of the subject entity, named once, that
+/// is not computed, numbered by a sequence or a child collection. Each <c>set</c> expression
+/// type-checks against its field's type over the same scope as a condition. A <c>callConnector</c>
+/// step names a loaded connector and one of its operations. Its inputs are inputs of the operation,
+/// named once, that cover every required input, and each input expression type-checks against the
+/// input's type over the same scope. Its outputs are outputs of the operation, named once, each
+/// written to its own subject field that an <c>updateRecord</c> could set and whose type fits the
+/// output's. Its retry <c>backoff</c> is a positive fixed duration. A task step's assignee is exactly one of a <c>user</c>, a
 /// <c>text</c> expression over the same scope, and a <c>role</c>, which names a declared role
 /// exactly. Its form is a loaded form over the subject entity, its <c>dueIn</c> is a positive fixed
 /// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
 /// transition. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
-/// unknown step is not also reported as having no path to an end, and a form, entity or role file
-/// that was not loaded because of its own errors is not reported again.
+/// unknown step is not also reported as having no path to an end, and a form, entity, role or
+/// connector file that was not loaded because of its own errors is not reported again.
 /// </summary>
 internal static class ProcessChecker
 {
+    private const int DefaultRetryAttempts = 3;
+
+    private static readonly TimeSpan _defaultRetryBackoff = TimeSpan.FromSeconds(30);
+
     /// <summary>
     /// Checks <paramref name="processes"/>, which come in path order. <paramref name="ownerOf"/>
     /// names the owner of a child entity, or gives null for a root entity.
     /// <paramref name="roleNames"/> holds the declared role names, compared exactly.
+    /// <paramref name="findConnector"/> finds a loaded connector by name, ignoring letter case.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -43,6 +53,8 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedFormNames,
         IReadOnlySet<string> roleNames,
         IReadOnlySet<string> unloadedRoleNames,
+        Func<string, ConnectorResource?> findConnector,
+        IReadOnlySet<string> unloadedConnectorNames,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -82,8 +94,9 @@ internal static class ProcessChecker
             {
                 scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
                 CheckConditions(process, scope, Report);
-                CheckOperations(process, entity, scope, Report);
             }
+
+            CheckOperations(process, entity, scope, findConnector, unloadedConnectorNames, Report);
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, roleNames, unloadedRoleNames, Report);
 
@@ -111,10 +124,17 @@ internal static class ProcessChecker
     /// condition is compiled over the subject entity's fields, its child collections, the named rules
     /// and paths through reference fields. The fields an operation sets are in the entity's
     /// declaration order, so a release rebuilt from its stored files has the same model. A task's
-    /// form is resolved and its <c>dueIn</c> becomes a fixed duration.
+    /// form is resolved and its <c>dueIn</c> becomes a fixed duration. A connector call holds the
+    /// declared names of its connector, its operation, its inputs and outputs and their fields. Its
+    /// inputs and outputs are in the operation's declaration order, and its retry policy has the
+    /// defaults filled in.
     /// </summary>
     public static ProcessModel Build(
-        ProcessResource process, Func<string, EntityResource?> findEntity, Func<string, FormResource?> findForm, IEnumerable<ExpressionRule> rules)
+        ProcessResource process,
+        Func<string, EntityResource?> findEntity,
+        Func<string, FormResource?> findForm,
+        Func<string, ConnectorResource?> findConnector,
+        IEnumerable<ExpressionRule> rules)
     {
         var entity = findEntity(process.Entity)!;
         var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
@@ -155,6 +175,34 @@ internal static class ProcessChecker
                 step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList());
         }
 
+        // A checked call names a loaded connector and operation, and each input, output and field once.
+        CallConnectorStepModel BuildConnectorCall(ProcessStepDefinition step)
+        {
+            var connector = findConnector(step.Connector!.Name)!;
+            var operation = FindOperation(connector, step.Connector.Operation)!;
+            var inputs = new Dictionary<string, string>(step.Input!, StringComparer.OrdinalIgnoreCase);
+            var outputs = new Dictionary<string, string>(step.Output ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+            TimeSpan? backoff = step.Retry?.Backoff is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
+            return new CallConnectorStepModel(
+                step.Name,
+                connector.Name,
+                operation.Name,
+                [
+                    .. operation.Input
+                        .Where(input => inputs.ContainsKey(input.Name))
+                        .Select(input => new ConnectorInputModel(
+                            input.Name,
+                            ExpressionModel.Compile(inputs[input.Name], scope, ExpressionScopes.TypeOf(input.Type)))),
+                ],
+                [
+                    .. operation.Output
+                        .Where(output => outputs.ContainsKey(output.Name))
+                        .Select(output => new ConnectorOutputModel(output.Name, FindField(entity, outputs[output.Name])!.Name)),
+                ],
+                new RetryPolicyModel(step.Retry?.Attempts ?? DefaultRetryAttempts, backoff ?? _defaultRetryBackoff),
+                Resolve(step.Next!));
+        }
+
         return new ProcessModel
         {
             Id = process.Id,
@@ -173,6 +221,7 @@ internal static class ProcessChecker
                         step.Branches!.Select(branch => new DecisionBranchModel(Compile(branch.When), Resolve(branch.Next))).ToList(),
                         Resolve(step.Otherwise!)),
                     ProcessStepDefinition.TaskStep => BuildTask(step),
+                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
                     ProcessStepDefinition.OperationStep => new OperationStepModel(
                         step.Name,
                         step.Operation!,
@@ -415,13 +464,21 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks each operation step: its operation is <c>updateRecord</c>, matched exactly as a step
-    /// <c>type</c> is, and each <c>set</c> key names a field of <paramref name="entity"/>, ignoring
-    /// letter case, that no earlier key of the step names and that can be set. Its expression then
-    /// fits the field's type over <paramref name="scope"/>. The <c>set</c> of an unknown operation
-    /// is not checked, as its meaning depends on the operation.
+    /// Checks each operation step: its operation is <c>updateRecord</c> or <c>callConnector</c>,
+    /// matched exactly as a step <c>type</c> is. A connector call is checked by
+    /// <see cref="CheckConnectorCall"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
+    /// of <paramref name="entity"/>, ignoring letter case, that no earlier key of the step names and
+    /// that can be set. Its expression then fits the field's type over <paramref name="scope"/>. The
+    /// <c>set</c> is not checked when the subject entity is unknown. The other properties of an
+    /// unknown operation are not checked, as their meaning depends on the operation.
     /// </summary>
-    private static void CheckOperations(ProcessResource process, EntityResource entity, ExpressionScope scope, Action<string, string, string> report)
+    private static void CheckOperations(
+        ProcessResource process,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, ConnectorResource?> findConnector,
+        IReadOnlySet<string> unloadedConnectorNames,
+        Action<string, string, string> report)
     {
         for (var index = 0; index < process.Steps.Count; index++)
         {
@@ -431,12 +488,24 @@ internal static class ProcessChecker
                 continue;
             }
 
+            if (string.Equals(step.Operation, ProcessStepDefinition.CallConnector, StringComparison.Ordinal))
+            {
+                CheckConnectorCall(step, index, entity, scope, findConnector, unloadedConnectorNames, report);
+                continue;
+            }
+
             if (!string.Equals(step.Operation, ProcessStepDefinition.UpdateRecord, StringComparison.Ordinal))
             {
                 report(
                     DiagnosticCodes.UnknownOperation,
-                    $"The operation '{step.Operation}' was not found. The built-in operation is '{ProcessStepDefinition.UpdateRecord}'.",
+                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}' and '{ProcessStepDefinition.CallConnector}'.",
                     $"/steps/{index}/operation");
+                continue;
+            }
+
+            // The fields cannot be checked without the entity.
+            if (entity is null || scope is null)
+            {
                 continue;
             }
 
@@ -445,7 +514,7 @@ internal static class ProcessChecker
             foreach (var (key, expression) in step.Set ?? new Dictionary<string, string>())
             {
                 var path = $"/steps/{index}/set/{key}";
-                var field = entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+                var field = FindField(entity, key);
                 if (field is null)
                 {
                     report(
@@ -464,11 +533,7 @@ internal static class ProcessChecker
                     continue;
                 }
 
-                var reason = field.Expression is not null ? "is computed"
-                    : field.Sequence is not null ? "is numbered by a sequence"
-                    : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"
-                    : null;
-                if (reason is not null)
+                if (ReadOnlyReason(field) is { } reason)
                 {
                     report(DiagnosticCodes.ReadOnlySetField, $"The field '{field.Name}' {reason}, so an operation cannot set it.", path);
                     continue;
@@ -485,6 +550,204 @@ internal static class ProcessChecker
             }
         }
     }
+
+    /// <summary>
+    /// Checks a <c>callConnector</c> step: its connector is loaded, unless its file was not loaded
+    /// because of its own errors, and its operation is an operation of that connector, both
+    /// ignoring letter case. Only then are its inputs and outputs checked: each key names an input
+    /// or output of the operation, ignoring letter case, that no earlier key names. Every required
+    /// input has a key, and each input expression fits the input's type over
+    /// <paramref name="scope"/>. Each output is written to a field of <paramref name="entity"/>,
+    /// ignoring letter case, that no earlier output writes, that an <c>updateRecord</c> could set
+    /// and whose type fits the output's: the same type, or a decimal field for an integer output.
+    /// The expressions and fields are not checked when the subject entity is unknown. The retry
+    /// <c>backoff</c>, when set, is a positive fixed duration.
+    /// </summary>
+    private static void CheckConnectorCall(
+        ProcessStepDefinition step,
+        int index,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, ConnectorResource?> findConnector,
+        IReadOnlySet<string> unloadedConnectorNames,
+        Action<string, string, string> report)
+    {
+        var path = $"/steps/{index}";
+        var reference = step.Connector!;
+        if (findConnector(reference.Name) is not { } connector)
+        {
+            // A connector file that was not loaded because of its own errors is not reported again.
+            if (!unloadedConnectorNames.Contains(reference.Name))
+            {
+                report(
+                    DiagnosticCodes.UnknownConnector,
+                    $"The connector '{reference.Name}' was not found. No loaded connector has that name.",
+                    $"{path}/connector/name");
+            }
+        }
+        else if (FindOperation(connector, reference.Operation) is not { } operation)
+        {
+            report(
+                DiagnosticCodes.UnknownConnectorOperation,
+                $"The operation '{reference.Operation}' was not found. The connector '{connector.Name}' has no operation with that name.",
+                $"{path}/connector/operation");
+        }
+        else
+        {
+            CheckConnectorInputs(step, path, operation, scope, report);
+            CheckConnectorOutputs(step, path, operation, entity, report);
+        }
+
+        if (step.Retry?.Backoff is { } backoff && !IsoDuration.TryParse(backoff, out _))
+        {
+            report(
+                DiagnosticCodes.InvalidRetryBackoff,
+                $"The duration '{backoff}' is not valid. 'backoff' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P1D', 'PT30S' or 'P1DT12H'. Years and months are not allowed.",
+                $"{path}/retry/backoff");
+        }
+    }
+
+    private static void CheckConnectorInputs(
+        ProcessStepDefinition step, string path, ConnectorOperationDefinition operation, ExpressionScope? scope, Action<string, string, string> report)
+    {
+        // The key that first named each input, by the input's declared name.
+        var namedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, expression) in step.Input!)
+        {
+            var keyPath = $"{path}/input/{key}";
+            var input = operation.Input.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (input is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownConnectorInput,
+                    $"The input '{key}' was not found. The operation '{operation.Name}' has no input with that name.",
+                    keyPath);
+                continue;
+            }
+
+            if (!namedBy.TryAdd(input.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownConnectorInput,
+                    $"The input '{input.Name}' is already given by '{namedBy[input.Name]}' in this step.",
+                    keyPath);
+                continue;
+            }
+
+            // The expression cannot be checked without the entity.
+            if (scope is null)
+            {
+                continue;
+            }
+
+            var parsed = ExpressionParser.Parse(expression);
+            ExpressionDiagnostic? problem = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(input.Type)).Diagnostic
+                : parsed.Diagnostic;
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, keyPath);
+            }
+        }
+
+        foreach (var input in operation.Input)
+        {
+            if (input.Required && !namedBy.ContainsKey(input.Name))
+            {
+                report(
+                    DiagnosticCodes.MissingConnectorInput,
+                    $"The input '{input.Name}' is required by the operation '{operation.Name}', but the step does not give it.",
+                    $"{path}/input");
+            }
+        }
+    }
+
+    private static void CheckConnectorOutputs(
+        ProcessStepDefinition step, string path, ConnectorOperationDefinition operation, EntityResource? entity, Action<string, string, string> report)
+    {
+        // The key that first named each output, by the output's declared name, and the key that
+        // first wrote each field, by the field's declared name.
+        var namedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var writtenBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, fieldName) in step.Output ?? new Dictionary<string, string>())
+        {
+            var keyPath = $"{path}/output/{key}";
+            var output = operation.Output.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (output is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownConnectorOutput,
+                    $"The output '{key}' was not found. The operation '{operation.Name}' has no output with that name.",
+                    keyPath);
+                continue;
+            }
+
+            if (!namedBy.TryAdd(output.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownConnectorOutput,
+                    $"The output '{output.Name}' is already written by '{namedBy[output.Name]}' in this step.",
+                    keyPath);
+                continue;
+            }
+
+            // The field cannot be checked without the entity.
+            if (entity is null)
+            {
+                continue;
+            }
+
+            var field = FindField(entity, fieldName);
+            if (field is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownOutputField,
+                    $"The field '{fieldName}' was not found. The entity '{entity.Name}' has no field with that name.",
+                    keyPath);
+                continue;
+            }
+
+            if (!writtenBy.TryAdd(field.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownOutputField,
+                    $"The field '{field.Name}' is already written by the output '{writtenBy[field.Name]}' in this step.",
+                    keyPath);
+                continue;
+            }
+
+            if (ReadOnlyReason(field) is { } reason)
+            {
+                report(DiagnosticCodes.InvalidOutputField, $"The field '{field.Name}' {reason}, so an output cannot write it.", keyPath);
+                continue;
+            }
+
+            var outputType = FieldTypes.Parse(output.Type);
+            var fieldType = FieldTypes.Parse(field.Type);
+            if (outputType != fieldType && !(outputType == FieldType.Integer && fieldType == FieldType.Decimal))
+            {
+                report(
+                    DiagnosticCodes.InvalidOutputField,
+                    $"The output '{output.Name}' is {output.Type}, so it cannot be written to the field '{field.Name}', which is {field.Type}.",
+                    keyPath);
+            }
+        }
+    }
+
+    /// <summary>Finds the first field of <paramref name="entity"/> with <paramref name="name"/>, ignoring letter case.</summary>
+    private static FieldDefinition? FindField(EntityResource entity, string name) =>
+        entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Finds the first operation of <paramref name="connector"/> with <paramref name="name"/>, ignoring letter case.</summary>
+    private static ConnectorOperationDefinition? FindOperation(ConnectorResource connector, string name) =>
+        connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Why a process cannot write <paramref name="field"/>, or null when it can.</summary>
+    private static string? ReadOnlyReason(FieldDefinition field) =>
+        field.Expression is not null ? "is computed"
+        : field.Sequence is not null ? "is numbered by a sequence"
+        : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"
+        : null;
 
     /// <summary>
     /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, a
