@@ -106,8 +106,12 @@ python3 "$KIT/bin/nexkit" status
 ```
 
 Split an issue that reports `too_large`. Create each part with
-`gh issue create --milestone "<parent's milestone>"`, then add the parts to the
-parent in order:
+`gh issue create --title "<part's behaviour>" --milestone "<parent's milestone>"`,
+then add the parts to the parent in order. Title each part by the behaviour it
+delivers, as for any issue. Never reuse the parent's title, whole or as a
+prefix: write `Connector call steps pass compile checks`, not
+`Call connector step: compile checks and model`. The sub-issue link already
+shows the parent.
 
 ```bash
 CHILD_ID=$(gh api repos/{owner}/{repo}/issues/<child> --jq .id)
@@ -141,7 +145,8 @@ returns 404, upgrade `gh` and try again.
   treated as **Agreed**.
 - The decisions and risks the owner must judge are in their own short sections.
 - A `too_large` result leads to sub-issues of the parent, in order and in the
-  parent's milestone.
+  parent's milestone. Each part's title names its own behaviour and does not
+  reuse the parent's title, whole or as a prefix.
 - Every change agreed after the plan was posted, from the review or from the
   owner while approving, however small, is commented in the same issue and
   `/nexkit plan` is run again. No follow-up issues.

@@ -141,7 +141,10 @@ them.
    that lives only in a comment is missing from both. Re-planning also lets
    the plan agent find other places the change affects, such as another doc
    that must say the same. Do not open follow-up issues. When the plan reports
-   `too_large`, split the issue into parts. Add each part as a GitHub
+   `too_large`, split the issue into parts. Each part is written like any
+   issue, and its title names the behaviour that part delivers. It does not
+   reuse the parent's title, whole or as a `<parent>: <part>` prefix, because
+   the sub-issue link already shows the parent. Add each part as a GitHub
    sub-issue of the parent, in order and in the parent's milestone. NexKit
    closes the parent when all parts are done.
 4. **Implement.** The local agent posts `/nexkit go` on the latest plan, as
