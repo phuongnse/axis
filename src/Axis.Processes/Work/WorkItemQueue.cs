@@ -19,7 +19,7 @@ public static class WorkItemQueue
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id
+        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id
         """;
 
     /// <summary>
@@ -86,7 +86,33 @@ public static class WorkItemQueue
             reader.GetString(2),
             reader.GetGuid(3),
             reader.GetFieldValue<DateTimeOffset>(4),
-            await reader.IsDBNullAsync(5, cancellationToken) ? null : reader.GetGuid(5));
+            await reader.IsDBNullAsync(5, cancellationToken) ? null : reader.GetGuid(5),
+            await reader.IsDBNullAsync(6, cancellationToken) ? null : reader.GetGuid(6),
+            lease);
+    }
+
+    /// <summary>
+    /// Sets the item's lease to end <paramref name="length"/> after the database's current time, in
+    /// the transaction, if the claim is still current. Returns <see langword="false"/> when another
+    /// worker has claimed it since, so the caller must roll back.
+    /// </summary>
+    public static async Task<bool> ExtendLeaseAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ClaimedWorkItem item,
+        TimeSpan length,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(item);
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.process_work_items SET lease_expires_at = now() + @length WHERE id = @id AND claim_token = @token",
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("length", NpgsqlDbType.Interval, length);
+        command.Parameters.AddWithValue("id", item.Id);
+        command.Parameters.AddWithValue("token", item.ClaimToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     /// <summary>

@@ -163,7 +163,10 @@ cleanup() {
   rm -rf "$state"
 }
 trap cleanup EXIT
-trap 'log "Stopping"; stop; exit 130' INT TERM
+# A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
+# between starting a process and saving its pid.
+interrupted=0
+trap 'interrupted=1' INT TERM
 
 # Starts the server under dotnet watch. dotnet watch reads the terminal unless it is
 # non-interactive. The launch profile sets Development, and --urls overrides its URL. Each
@@ -191,6 +194,11 @@ log "Server on http://localhost:$server_port, SPA on http://localhost:$web_port,
 
 code=0
 while :; do
+  if [ "$interrupted" -eq 1 ]; then
+    log "Stopping"
+    code=130
+    break
+  fi
   if [ -e "$state/server-exited-$generation" ] || ! kill -0 "$server" 2>/dev/null; then
     log "The server exited. Stopping the worker and the SPA."
     code=1
@@ -209,7 +217,9 @@ while :; do
   # Restart the server when the application configuration changes. An editor or git may write
   # several files in a row, so wait until two checks 0.5 seconds apart agree. The worker keeps
   # running, because it needs only the migrated databases.
-  if [ "$(fingerprint)" != "$watched" ]; then
+  # A signal sent to the process group also ends the fingerprint subshell, which must not count
+  # as a change.
+  if [ "$(fingerprint)" != "$watched" ] && [ "$interrupted" -eq 0 ]; then
     current="$(fingerprint)"
     while sleep 0.5; do
       latest="$(fingerprint)"
@@ -232,7 +242,7 @@ while :; do
     worker=$!
     disown "$worker"
   fi
-  sleep 1
+  sleep 1 || true
 done
 stop
 exit "$code"

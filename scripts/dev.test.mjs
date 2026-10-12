@@ -51,6 +51,11 @@ function startDev(extraEnv = {}) {
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   })
+  return track(child)
+}
+
+/** Collects the output and the exit of a child, and remembers it for the final cleanup. */
+function track(child) {
   const run = { child, stdout: '', stderr: '', exitCode: undefined, exited: undefined }
   child.stdout.on('data', (chunk) => (run.stdout += chunk))
   child.stderr.on('data', (chunk) => (run.stderr += chunk))
@@ -132,13 +137,59 @@ function interrupt(run) {
   process.kill(-run.child.pid, 'SIGINT')
 }
 
+/**
+ * Every process of the copy: its command line contains the copy's path, or its working directory
+ * is inside the copy. dev.sh runs each job in its own process group, and the output prefixer
+ * subshells and dotnet watch carry the path only in their working directory.
+ */
+function copyProcs() {
+  const rows = execFileSync('ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' })
+    .split('\n')
+    .map((line) => line.trim().match(/^(\d+)\s+(.*)$/))
+    .filter(Boolean)
+    .map(([, pid, command]) => ({ pid: Number(pid), command }))
+    .filter((row) => row.pid !== process.pid)
+  const cwds = new Map()
+  if (fs.existsSync('/proc/self')) {
+    for (const { pid } of rows) {
+      try {
+        cwds.set(pid, fs.readlinkSync(`/proc/${pid}/cwd`))
+      } catch {
+        // The process is gone, or belongs to someone else.
+      }
+    }
+  } else {
+    try {
+      let pid
+      for (const line of execFileSync('lsof', ['-d', 'cwd', '-Fpn'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')) {
+        if (line.startsWith('p')) pid = Number(line.slice(1))
+        else if (line.startsWith('n') && pid !== undefined) cwds.set(pid, line.slice(1))
+      }
+    } catch {
+      // lsof is missing, or it exited non-zero after listing what it could.
+    }
+  }
+  const inCopy = (dir) => dir === copy || dir.startsWith(`${copy}${path.sep}`)
+  return rows.filter((row) => row.command.includes(copy) || (cwds.has(row.pid) && inCopy(cwds.get(row.pid))))
+}
+
+/** Kills everything a run left behind, then closes its pipes so that Node does not wait for them. */
 function killLeftovers(run) {
-  if (run.exitCode !== undefined) return
   try {
     process.kill(-run.child.pid, 'SIGKILL')
   } catch {
     // Already gone.
   }
+  for (const { pid } of copyProcs()) {
+    try {
+      process.kill(pid, 'SIGKILL')
+    } catch {
+      // Already gone.
+    }
+  }
+  run.child.stdout.destroy()
+  run.child.stderr.destroy()
+  run.child.unref()
 }
 
 describe('scripts/dev.sh', { concurrency: false }, () => {
@@ -233,6 +284,24 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     await exitsWithin(run, 60_000)
   })
 
+  it('stops everything when SIGINT arrives while the worker starts', async () => {
+    const run = startDev()
+    let sent = false
+    run.child.stdout.on('data', () => {
+      if (!sent && /\[dev\] .*Starting the worker/.test(run.stdout)) {
+        sent = true
+        interrupt(run)
+      }
+    })
+    assert.equal(await exitsWithin(run, 60_000), 130)
+    assert.ok(sent, run.stdout)
+    await sleep(500)
+    assert.deepEqual(
+      copyProcs().filter((p) => processPattern.test(p.command)),
+      [],
+    )
+  })
+
   it('keeps running when an edit that hot reload cannot apply restarts the server', async () => {
     // Making a sealed class unsealed is a rude edit: dotnet watch stops the app, builds and
     // starts it again. It prints "Exited" on the way, which must not end the session.
@@ -325,6 +394,24 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.match(run.stdout, /Now listening on/)
     await sleep(500)
     assert.deepEqual(leftoverProcs(), [])
+  })
+
+  it('the cleanup stops processes of the copy that a run leaves behind', async () => {
+    // A stand-in for a leftover worker: it ignores SIGINT, runs in its own process group, lives in
+    // the copy and keeps the run's stdout open.
+    const child = spawn('bash', ['-c', "set -m; (trap '' INT; exec sleep 600) & exit 0"], {
+      cwd: path.join(copy, 'src/Axis.Worker'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    })
+    const run = track(child)
+    await sleep(500)
+    assert.notDeepEqual(copyProcs(), [])
+    assert.equal(run.exitCode, undefined, 'The stand-in did not hold the pipe open.')
+    killLeftovers(run)
+    await exitsWithin(run, 10_000)
+    await sleep(500)
+    assert.deepEqual(copyProcs(), [])
   })
 
   it('exits non-zero at once when Docker is not running', async () => {

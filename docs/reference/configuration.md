@@ -915,8 +915,8 @@ This section follows
 The `Bindings` block, its startup checks, resolving a binding at run time,
 the secret value that hides itself from text, JSON and logs, the `connector`
 resource with its [compile checks](#configuration-pipeline) and the activation
-check are built. *(planned for M5)* Calling a connector and using secrets in
-its calls are not built yet. A `connector` resource
+check are built. Calling a connector and using secrets in its calls are built
+too. *(planned for M5)* Retries and reconciliation are not built yet. A `connector` resource
 describes an external system that a process can call. Its URL and its secret
 are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
 reconciles is in [Connector calls](processes.md#connector-calls).
@@ -966,7 +966,8 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   call, so changing a secret needs no new release.
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
   must be `https`. Activation checks each connector's base URL binding
-  (`AXC0101`). *(planned for M5)* The call checks it again.
+  (`AXC0101`). The call checks it again: a worker outside Development never
+  sends a call to an `http` URL, and fails the call instead.
 
 The purchasing system's bindings for tenant `default` look like this:
 

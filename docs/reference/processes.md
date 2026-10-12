@@ -19,8 +19,9 @@ a task resumes its `waiting` instance, see
 user's policies, see [Start endpoint](#start-endpoint) and
 [Policies on tasks](#task-api). A `callConnector` step, which calls an
 external system, is checked and compiled. Its step stages the call and leaves
-the instance `waiting`. Sending the call is
-[planned for M5](#connector-calls). A `raiseEvent` step, which raises an
+the instance `waiting`. The worker then sends the call and records its
+result, see [Connector calls](#connector-calls). Retries and reconciliation
+are planned for M5. A `raiseEvent` step, which raises an
 event about the subject record, is checked, compiled and run. Its step stores
 the event in `axis.events`, see [Raise event step](#raise-event-step).
 Package operation steps, which run an operation from an extension package,
@@ -206,11 +207,10 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   extension package outside the step's transaction, see
   [Package operations](#package-operations). A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
-  [Connector calls](#connector-calls). Its step is checked and compiled.
-  *(planned for M5)* Running it comes later, and until then an instance that
-  reaches it fails. A third built-in operation, `raiseEvent`, raises an
-  event for the subject record in the step's transaction, see
-  [Raise event step](#raise-event-step).
+  [Connector calls](#connector-calls). Its step is checked, compiled, staged
+  and sent. *(planned for M5)* Retries and reconciliation come later. A third
+  built-in operation, `raiseEvent`, raises an event for the subject record in
+  the step's transaction, see [Raise event step](#raise-event-step).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
   `end` step has no `next`.
 
@@ -700,6 +700,10 @@ the next step as usual.
   The item is not retried. A worker that crashes or stops before it commits
   calls no failure callback. Its item is claimed again after the lease
   expires.
+- **Calls outside a transaction.** A `connector.call` item runs with no
+  transaction open while its request is in flight. It opens its own short
+  transactions, before and after the request, and each checks the claim
+  token. See [Staging and the call](#staging-and-the-call).
 - **Restarts.** An instance that waits on a task has no work item, so it
   needs no running worker. One that waits on a connector call has the call's
   `connector.call` item. A task decision is accepted while no worker runs: it
@@ -712,11 +716,11 @@ the next step as usual.
 ### Running a step
 
 The worker runs the `decision`, `task`, `operation` and `end` steps. A
-`callConnector` operation step stages its call, see
-[Staging and the call](#staging-and-the-call). A `raiseEvent` operation step
-stores its event, see [Raise event step](#raise-event-step). Each work item
-of kind `process.step` runs the current step of its instance in one
-transaction:
+`callConnector` operation step stages its call, and a `connector.call` item
+sends it, see [Staging and the call](#staging-and-the-call). A `raiseEvent`
+operation step stores its event, see [Raise event step](#raise-event-step).
+Each work item of kind `process.step` runs the current step of its instance in
+one transaction:
 
 1. It loads the instance. An instance that is missing or not `running` is
    skipped, and the item is deleted with no other write.
@@ -802,10 +806,12 @@ has changed since the step loaded it. No step is retried.
 
 This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
-The step shape, the compile checks and staging are built. *(planned for M5)*
-Each attempt, the call outcomes and reconciliation are planned. Until they are
-built, no worker claims a `connector.call` item, so an instance that reaches a
-`callConnector` step stays `waiting` and no request is sent. A `callConnector`
+The step shape, the compile checks, staging, each attempt and settling a
+successful or failed call are built. Until retries and unknown outcomes are
+built, every result other than a `2xx` whose body fits the output fails the
+call and the instance at once, see [Call outcomes](#call-outcomes). A call
+found still `sending` is not sent again, and fails the same way.
+*(planned for M5)* Retries, unknown outcomes and reconciliation. A `callConnector`
 step calls one operation of a [connector](configuration.md#connectors-and-deployment-bindings), an external
 system such as the purchasing system. The call never runs inside a database
 transaction. The step stages it, the worker sends it later, and a separate
@@ -912,7 +918,7 @@ and `next`.
 While its call is pending, retrying or unknown, the instance stays `waiting`.
 So a second start for the same record is blocked, as with an open task.
 
-**Each attempt.** *(planned for M5)* A worker that claims the `connector.call` item does this:
+**Each attempt.** A worker that claims the `connector.call` item does this:
 
 1. **Mark.** A short transaction marks the call `sending` and counts the
    attempt. It extends the item's lease to the connector's `timeout` plus
@@ -920,11 +926,17 @@ So a second start for the same record is blocked, as with an open task.
    runs.
 2. **Bindings.** The worker reads the connector's bindings from its host
    configuration. A missing binding, or an `http` URL outside Development,
-   means the request is never sent.
+   means the request is never sent. Only a worker that runs in Development
+   allows `http`. The error of an `http` URL names the tenant and the
+   binding, never the URL. Until retries are built, the call then fails at
+   once.
 3. **Send.** The worker sends the request outside any transaction.
    - The body is the stored input, as JSON. A `GET` sends no body.
+   - The auth sends the secret as `Authorization: Bearer <secret>`, or in
+     the named header.
    - With `idempotency`, the request carries the header
      `<idempotency>: <operationId>`, such as `Idempotency-Key: 0192f5c3-…`.
+   - The request is cancelled after the connector's `timeout`.
    - Redirects are not followed, and `Retry-After` is ignored.
 4. **Record.** An outcome transaction records the result. Its commit checks
    the claim token, and it needs the instance still `waiting` on the step at
@@ -933,12 +945,15 @@ So a second start for the same record is blocked, as with an open task.
 A worker can crash after it sends and before it records. Its lease then
 expires, and the next worker finds the call still `sending`. That attempt's
 outcome counts as unknown, see [Call outcomes](#call-outcomes). The worker
-never resends blind.
+never resends blind. *(planned for M5)* Until unknown outcomes are built, the
+call fails with an error that says the earlier attempt's outcome is unknown.
 
 **A successful call settles.** The outcome transaction does this:
 
 1. It writes the output fields to the subject record with the record update
-   rules, as `updateRecord` does.
+   rules, as `updateRecord` does. An optional output that the body leaves
+   out leaves its field unchanged, and an explicit `null` writes `null`. A
+   refused write, such as a failed validation, fails the call instead.
 2. It sets the call to `succeeded` and clears its stored input.
 3. It sets the instance to `running` on `next`, with a new revision.
 4. It writes the history row of the step, at the revision the instance
@@ -955,8 +970,11 @@ never resends blind.
 `due_at` is now plus `backoff`·2^(n−1) after attempt n, capped at 1 hour.
 
 **A failed call settles** too. The call becomes `failed` and its stored input
-is cleared. The instance becomes `failed`, with the error in a history row.
-The transaction writes `connector.called` and `process.failed`.
+is cleared, with the last status and the error on the call row. The instance
+becomes `failed`, with the error in a history row whose output is
+`{ "operationId", "outcome": "failed" }`. The transaction writes
+`connector.called`, with the same details as a successful call, and
+`process.failed`, both with the actor `system`.
 
 No request or response body is ever stored. The stored input lives only on
 the call row until the call settles. It never appears in history, audit
@@ -1410,7 +1428,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call. *(planned for M5)* `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. *(planned for M5)* `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1423,8 +1441,8 @@ database, with history in `axis.__processes_migrations` (see
   database clock. Completed and failed items are deleted. A `connector.call`
   item sends or reconciles one connector call. It has the
   `process_instance_id` of the call's instance and the `connector_call_id` of
-  the call. See [Connector calls](#connector-calls). *(planned for M5)* A
-  worker handles the kind, and the item's `due_at` gives the backoff.
+  the call. See [Connector calls](#connector-calls). *(planned for M5)* The
+  item's `due_at` gives the backoff.
   *(planned for M5)* Three more kinds come with [events and triggers](#events-and-triggers):
   - `event.deliver` delivers one event occurrence to the `async` event
     triggers. Its item also has the `event_id` of the occurrence.

@@ -24,9 +24,10 @@ using Record = Axis.Data.Records.Record;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// One tenant database, <c>a</c>, with the configuration, data and processes migrations applied
-/// and the StepApp fixture activated. It holds the worker's services, built from the worker's own
-/// registration, with the host never started, so a test runs the work items itself.
+/// One tenant database, <c>a</c> unless another tenant is given, with the configuration, data and
+/// processes migrations applied and the StepApp fixture activated. It holds the worker's services,
+/// built from the worker's own registration with no deployment bindings, with the host never
+/// started, so a test runs the work items itself.
 /// </summary>
 public sealed class ProcessStepFixture : IAsyncLifetime
 {
@@ -39,10 +40,24 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     private static readonly TimeSpan _lockWaitTimeout = TimeSpan.FromSeconds(30);
 
     private readonly PostgreSqlFixture _database = new();
+    private readonly string _tenantId;
     private string? _connectionString;
     private NpgsqlDataSource? _dataSource;
     private ServiceProvider? _services;
     private ApplicationModel? _model;
+
+    public ProcessStepFixture()
+        : this(TenantId)
+    {
+    }
+
+    internal ProcessStepFixture(string tenantId)
+    {
+        _tenantId = tenantId;
+    }
+
+    /// <summary>The tenant whose database the fixture holds.</summary>
+    public string Tenant => _tenantId;
 
     /// <summary>The compiled model of the StepApp fixture.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
@@ -62,7 +77,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _database.InitializeAsync();
-        _connectionString = await _database.CreateDatabaseAsync("steps_a");
+        _connectionString = await _database.CreateDatabaseAsync($"steps_{_tenantId}");
         _dataSource = NpgsqlDataSource.Create(_connectionString);
         await using (var configuration = CreateConfigurationContext())
         await using (var data = CreateDataContext())
@@ -80,8 +95,8 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         var settings = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [$"Tenants:{TenantId}:Hosts:0"] = $"{TenantId}.example.test",
-                [$"Tenants:{TenantId}:ConnectionString"] = _connectionString,
+                [$"Tenants:{_tenantId}:Hosts:0"] = $"{_tenantId}.example.test",
+                [$"Tenants:{_tenantId}:ConnectionString"] = _connectionString,
             })
             .Build();
         _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
@@ -104,7 +119,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
 
     /// <summary>
     /// The deployment bindings StepApp needs on <paramref name="tenantId"/>: the base URL of its
-    /// Purchasing connector, which no test calls.
+    /// Purchasing connector and the secret that holds its bearer token.
     /// </summary>
     public static ActivationBindings StepAppBindings(string tenantId) =>
         new(
@@ -112,6 +127,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
             {
                 ["PurchasingUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
+                ["PurchasingToken"] = new(ActivationBinding.SecretKind, null),
             },
             AllowHttp: false);
 
@@ -215,7 +231,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await WorkItemQueue.EnqueueAsync(
             connection,
             transaction,
-            TenantId,
+            _tenantId,
             ProcessStarts.StepWorkItemKind,
             DateTimeOffset.UtcNow.AddMinutes(-1),
             CancellationToken.None,
@@ -227,14 +243,37 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>Claims and runs the tenant's due work items until none is left.</summary>
     public async Task RunUntilIdleAsync(CancellationToken cancellationToken)
     {
-        while (await Runner.RunNextAsync(TenantId, _lease, cancellationToken))
+        while (await Runner.RunNextAsync(_tenantId, _lease, cancellationToken))
         {
         }
     }
 
     /// <summary>Claims and runs the tenant's next due work item. Returns <see langword="false"/> when there is none.</summary>
     public Task<bool> RunNextAsync(CancellationToken cancellationToken) =>
-        Runner.RunNextAsync(TenantId, _lease, cancellationToken);
+        Runner.RunNextAsync(_tenantId, _lease, cancellationToken);
+
+    /// <summary>
+    /// Claims and runs the tenant's next due <c>process.step</c> item, so no staged connector call
+    /// is sent. Returns <see langword="false"/> when there is none.
+    /// </summary>
+    public async Task<bool> RunNextStepAsync(CancellationToken cancellationToken)
+    {
+        var item = await ClaimAsync(ProcessStarts.StepWorkItemKind, _lease, cancellationToken);
+        if (item is null)
+        {
+            return false;
+        }
+
+        await Runner.ExecuteAsync(item, cancellationToken);
+        return true;
+    }
+
+    /// <summary>Claims the tenant's next due item of <paramref name="kind"/> for <paramref name="lease"/>, or returns <see langword="null"/>.</summary>
+    public async Task<ClaimedWorkItem?> ClaimAsync(string kind, TimeSpan lease, CancellationToken cancellationToken)
+    {
+        await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
+        return await WorkItemQueue.ClaimAsync(connection, _tenantId, [kind], lease, cancellationToken);
+    }
 
     /// <summary>
     /// Compiles and activates a copy of StepApp whose Review process names its end steps
@@ -379,7 +418,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await using var data = CreateDataContext();
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, StepAppBindings(TenantId));
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, StepAppBindings(_tenantId));
         Assert.Empty(activated.Diagnostics);
         return (compiled.Release!.Id, compiled.Model!);
     }
