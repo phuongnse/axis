@@ -19,9 +19,10 @@ outside every read filter is a `404`. A grant with a `fields` list covers
 only those fields: fields the user may not read are left out, and a write of
 a field no grant covers is a `403`.
 
-*(planned for M5)* [Inbound endpoints](#inbound-endpoints) are the one
-exception to the session rule. Another system calls them with a bearer token,
-and they take no session.
+[Inbound endpoints](#inbound-endpoints) are the one exception to the
+session rule. Another system calls them with a bearer token, and they take
+no session. The bearer token check is built. The endpoint call is not
+*(planned for M5)*.
 
 ## Routes
 
@@ -177,8 +178,8 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   set a custom header without a CORS preflight, which Axis does not allow.
   This adds to the content type rule and the SameSite session cookie. See
   [D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed).
-  *(planned for M5)* `POST /api/apps/{app}/endpoints/{name}` is exempt from
-  the header and takes no session. See [Inbound endpoints](#inbound-endpoints).
+  `POST /api/apps/{app}/endpoints/{name}` is exempt from the header and
+  takes no session. See [Inbound endpoints](#inbound-endpoints).
 - **One transaction.** A create or update writes the record and the rows of
   its child collections in one transaction. When any write fails, nothing is
   written, neither the owner nor any row. A delete also runs in a
@@ -233,7 +234,7 @@ session is a `401`, before the path. So a caller without a session cannot
 find out which applications or records exist. See
 [Sign-in and the session](../architecture.md#sign-in-and-the-session).
 After the path, the user needs a grant for the action on the entity, or the
-answer is a `403` before the query or body is read. *(planned for M5)*
+answer is a `403` before the query or body is read.
 `POST /api/apps/{app}/endpoints/{name}` is exempt from the CSRF header and
 takes no session. Its own order is in [Inbound endpoints](#inbound-endpoints).
 
@@ -517,8 +518,10 @@ answered with `400`:
 
 ## Inbound endpoints
 
-*(planned for M5)* This section follows
-[D27](../decisions.md#d27-inbound-endpoints--agreed). None of it is built
+This section follows [D27](../decisions.md#d27-inbound-endpoints--agreed).
+The bearer token check, its `401` and the CSRF exemption are built. The rest
+is *(planned for M5)*: until the endpoint call is built, both endpoint routes
+answer a caller with a valid token with a `404`, because no endpoint exists
 yet. An [`endpoint` resource](configuration.md#endpoint-resource) lets
 another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as

@@ -1,3 +1,5 @@
+using Axis.Server.Authentication;
+
 namespace Axis.Server.Http;
 
 /// <summary>The CSRF header rule from D23 for unsafe requests under <c>/api</c>.</summary>
@@ -9,12 +11,17 @@ internal static class CsrfHeader
     /// Refuses a <c>POST</c>, <c>PUT</c>, <c>PATCH</c> or <c>DELETE</c> under <c>/api</c> with a
     /// <c>403</c> unless it carries exactly one <c>X-Axis-Csrf: 1</c> header. A cross-site page
     /// cannot set a custom header without a CORS preflight, and Axis allows no cross-origin requests.
+    /// Endpoint paths are exempt: they take a bearer token and no cookie, and a browser cannot
+    /// attach a bearer token on its own.
     /// </summary>
     public static IApplicationBuilder UseCsrfHeader(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
             var request = context.Request;
-            if (request.Path.StartsWithSegments("/api") && IsUnsafe(request.Method) && !HasHeader(request))
+            if (request.Path.StartsWithSegments("/api")
+                && !EndpointCaller.IsEndpointPath(request.Path)
+                && IsUnsafe(request.Method)
+                && !HasHeader(request))
             {
                 await Results.Problem(
                         statusCode: StatusCodes.Status403Forbidden,

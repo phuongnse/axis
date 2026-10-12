@@ -3,6 +3,7 @@ using Axis.Presentation.Texts;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.DataSources;
+using Axis.Server.Endpoints;
 using Axis.Server.Health;
 using Axis.Server.Http;
 using Axis.Server.Presentation;
@@ -37,10 +38,12 @@ var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : 
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 // Record writes, process starts, tasks and GET /api/me read the session. It is the default
-// scheme, so a request that carries a session renews it.
-builder.Services.AddAuthentication(Session.Scheme)
+// everywhere except endpoint paths, so a request that carries a session renews it. On endpoint
+// paths the default is the caller's bearer token, so a session cookie there is never read or renewed.
+builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(sessionCookiePolicy)
-    .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed);
+    .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
+    .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed);
 
 // Off unless folders are listed, which is the Production default.
 var startupFolders = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
@@ -79,6 +82,7 @@ app.MapRecordEndpoints();
 app.MapProcessEndpoints();
 app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
+app.MapInboundEndpoints();
 app.MapUserEndpoints();
 app.MapAuthEndpoints();
 

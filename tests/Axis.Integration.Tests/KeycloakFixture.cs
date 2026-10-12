@@ -15,6 +15,8 @@ public sealed class KeycloakFixture : IAsyncDisposable
     public const string ClientId = "axis";
     public const string ClientSecret = "axis-development-secret";
     public const string Password = "axis";
+    public const string PurchasingClientId = "purchasing-system";
+    public const string PurchasingClientSecret = "purchasing-system-development-secret";
 
     // The start takes no test's cancellation token, so cancelling one test does not fail the other.
     private readonly Lazy<Task<KeycloakContainer>> _container = new(StartContainerAsync);
