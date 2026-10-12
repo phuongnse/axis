@@ -16,4 +16,22 @@ public sealed class TenantSettings
     public List<string> Hosts { get; } = [];
 
     public string? ConnectionString { get; set; }
+
+    /// <summary>The tenant's deployment bindings keyed by binding name, matched ignoring letter case.</summary>
+    public Dictionary<string, DeploymentBindingSettings> Bindings { get; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+/// <summary>The kind and value of one deployment binding of a tenant.</summary>
+public sealed class DeploymentBindingSettings
+{
+    public string? Kind { get; set; }
+
+    public string? Value { get; set; }
+}
+
+/// <summary>The kinds a deployment binding can have.</summary>
+public static class DeploymentBindingKinds
+{
+    public const string Url = "url";
+    public const string Secret = "secret";
 }

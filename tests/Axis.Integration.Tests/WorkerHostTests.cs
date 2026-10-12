@@ -17,6 +17,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
 {
     private const string RecordKind = "test.record";
     private const string ThrowKind = "test.throw";
+    private const string BindingKind = "test.binding";
 
     private static readonly TimeSpan _shortLease = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan _longLease = TimeSpan.FromSeconds(30);
@@ -137,6 +138,34 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     }
 
     [Fact]
+    public async Task Each_tenant_resolves_its_own_value_of_the_same_binding_inside_its_work_items()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_bindings_a");
+        var tenantB = await CreateTenantDatabaseAsync("worker_bindings_b");
+        var itemA = await EnqueueAsync(tenantA, "a", BindingKind);
+        var itemB = await EnqueueAsync(tenantB, "b", BindingKind);
+        var bindings = new Dictionary<string, string?>
+        {
+            ["Tenants:a:Bindings:PurchasingSystemUrl:Kind"] = "url",
+            ["Tenants:a:Bindings:PurchasingSystemUrl:Value"] = "https://a.example.test/api",
+            ["Tenants:b:Bindings:PurchasingSystemUrl:Kind"] = "url",
+            ["Tenants:b:Bindings:PurchasingSystemUrl:Value"] = "https://b.example.test/api",
+        };
+
+        var logs = new LogCollector();
+        using (var host = BuildHost("worker", logs, bindings, ("a", tenantA), ("b", tenantB)))
+        {
+            await host.StartAsync(CancellationToken);
+            await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1 && await CountAsync(tenantB, "test_runs") == 1);
+            await host.StopAsync(CancellationToken);
+        }
+
+        Assert.Equal([new Run(itemA, "a", "https://a.example.test/api")], await RunsAsync(tenantA));
+        Assert.Equal([new Run(itemB, "b", "https://b.example.test/api")], await RunsAsync(tenantB));
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Throwing_handler_rolls_back_its_writes_and_its_failure_callback_runs_once_and_the_item_is_gone()
     {
         var tenantA = await CreateTenantDatabaseAsync("worker_failure");
@@ -181,10 +210,17 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
     }
 
-    private static IHost BuildHost(string worker, LogCollector logs, params (string TenantId, string ConnectionString)[] tenants)
+    private static IHost BuildHost(string worker, LogCollector logs, params (string TenantId, string ConnectionString)[] tenants) =>
+        BuildHost(worker, logs, [], tenants);
+
+    private static IHost BuildHost(
+        string worker,
+        LogCollector logs,
+        Dictionary<string, string?> extraSettings,
+        params (string TenantId, string ConnectionString)[] tenants)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
-        var settings = new Dictionary<string, string?> { ["Worker:PollInterval"] = "00:00:00.05" };
+        var settings = new Dictionary<string, string?>(extraSettings) { ["Worker:PollInterval"] = "00:00:00.05" };
         foreach (var (tenantId, connectionString) in tenants)
         {
             settings[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
@@ -197,11 +233,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         builder.Services.AddAxisWorker(builder.Configuration);
         builder.Services.AddSingleton<IWorkItemHandler>(services =>
             new RecordingHandler(worker, services.GetRequiredService<ITenantContextAccessor>()));
+        builder.Services.AddSingleton<IWorkItemHandler, BindingHandler>();
         return builder.Build();
     }
 
     private static RecordingHandler HandlerOf(IHost host) =>
-        (RecordingHandler)host.Services.GetRequiredService<IWorkItemHandler>();
+        host.Services.GetServices<IWorkItemHandler>().OfType<RecordingHandler>().Single();
 
     private static HandBuiltWorker CreateRunner(string name, string connectionString)
     {
@@ -319,6 +356,27 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             command.Parameters.AddWithValue("item", context.Item.Id);
             command.Parameters.AddWithValue("tenant", accessor.Current!.TenantId);
             command.Parameters.AddWithValue("worker", worker);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    /// <summary>Records each run in <c>test_runs</c> with the current tenant's <c>PurchasingSystemUrl</c> as the worker.</summary>
+    private sealed class BindingHandler(IDeploymentBindings bindings, ITenantContextAccessor accessor) : IWorkItemHandler
+    {
+        public string Kind => BindingKind;
+
+        public async Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
+        {
+            await using var command = new NpgsqlCommand(
+                "INSERT INTO test_runs (item_id, tenant_id, worker) VALUES (@item, @tenant, @worker)",
+                context.Connection,
+                context.Transaction);
+            command.Parameters.AddWithValue("item", context.Item.Id);
+            command.Parameters.AddWithValue("tenant", accessor.Current!.TenantId);
+            command.Parameters.AddWithValue("worker", bindings.Resolve("PurchasingSystemUrl").Value);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
