@@ -849,8 +849,8 @@ matches how D24 treats a policy filter that fails: it counts as false.
 M5 lets other systems create a record and start a process in one call. The
 bearer token checks are built, with the tenant binding, the CSRF exemption
 and the development realm's `purchasing-system` client. The endpoint resource,
-the `invoke` grant, the call with its `output` and `wait`, and the status
-location are built. The `Idempotency-Key` is not built yet. See
+the `invoke` grant, the call with its `output` and `wait`, its
+`Idempotency-Key`, and the status location are built. See
 [configuration](reference/configuration.md#endpoint-resource) for the
 `endpoint` resource and its policy grant, and
 [record API](reference/record-api.md#inbound-endpoints) for the call, its

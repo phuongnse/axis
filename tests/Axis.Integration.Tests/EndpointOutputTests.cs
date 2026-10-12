@@ -163,10 +163,54 @@ public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassF
         Assert.Equal("failed", statusJson.RootElement.GetProperty("state").GetString());
     }
 
-    /// <summary>Sends a call and runs the worker until the call answers.</summary>
-    private async Task<HttpResponseMessage> CallWithWorkerAsync(string endpoint, string body)
+    [Fact]
+    public async Task A_repeat_never_waits_and_answers_202_until_the_instance_completes_then_201_with_the_output()
     {
-        var call = CallAsync(endpoint, body);
+        const string Key = "reviewed-repeat";
+        const string Body = """{ "input": { "title": "Repeat review" } }""";
+        using var first = await CallWithWorkerAsync("ImportReviewedNote", Body, Key);
+        using var firstJson = await ReadJsonAsync(first, HttpStatusCode.Accepted);
+        var recordId = firstJson.RootElement.GetProperty("recordId").GetGuid();
+        var instanceId = firstJson.RootElement.GetProperty("instanceId").GetGuid();
+
+        // The endpoint waits up to three seconds, and a repeat answers at once.
+        var started = Stopwatch.GetTimestamp();
+        using (var waiting = await CallAsync("ImportReviewedNote", Body, Key))
+        {
+            Assert.True(Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(3));
+            using var json = await ReadJsonAsync(waiting, HttpStatusCode.Accepted);
+            Assert.Equal(["recordId", "instanceId", "state"], json.RootElement.EnumerateObject().Select(property => property.Name));
+            Assert.Equal(recordId, json.RootElement.GetProperty("recordId").GetGuid());
+            Assert.Equal(instanceId, json.RootElement.GetProperty("instanceId").GetGuid());
+            Assert.Equal("waiting", json.RootElement.GetProperty("state").GetString());
+            Assert.Equal($"{Endpoints}/ImportReviewedNote/instances/{instanceId:D}", waiting.Headers.Location?.ToString());
+        }
+
+        var task = await fixture.TaskIdAsync(instanceId);
+        using (var ivy = fixture.CreateClient().SignedInAs("ivy"))
+        using (var complete = RecordApiFixture.Request(HttpMethod.Post, $"/api/apps/EndpointApp/tasks/{task:D}/complete", Host, """{ "outcome": "accept" }"""))
+        using (var completed = await ivy.SendAsync(complete, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        }
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        using var done = await CallAsync("ImportReviewedNote", Body, Key);
+        using var doneJson = await ReadJsonAsync(done, HttpStatusCode.Created);
+        var root = doneJson.RootElement;
+        Assert.Null(done.Headers.Location);
+        Assert.Equal(recordId, root.GetProperty("recordId").GetGuid());
+        Assert.Equal(instanceId, root.GetProperty("instanceId").GetGuid());
+        Assert.Equal("completed", root.GetProperty("state").GetString());
+        Assert.Equal("Repeat review", root.GetProperty("output").GetProperty("title").GetString());
+        Assert.Equal("open", root.GetProperty("output").GetProperty("status").GetString());
+    }
+
+    /// <summary>Sends a call and runs the worker until the call answers.</summary>
+    private async Task<HttpResponseMessage> CallWithWorkerAsync(string endpoint, string body, string? key = null)
+    {
+        var call = CallAsync(endpoint, body, key);
         while (!call.IsCompleted)
         {
             await fixture.RunUntilIdleAsync(CancellationToken);
@@ -176,8 +220,11 @@ public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassF
         return await call;
     }
 
-    /// <summary>Sends a call to <paramref name="endpoint"/> as <c>importer-system</c>, without the CSRF header.</summary>
-    private async Task<HttpResponseMessage> CallAsync(string endpoint, string body)
+    /// <summary>
+    /// Sends a call to <paramref name="endpoint"/> as <c>importer-system</c>, without the CSRF header,
+    /// with <paramref name="key"/> as its <c>Idempotency-Key</c> unless it is null.
+    /// </summary>
+    private async Task<HttpResponseMessage> CallAsync(string endpoint, string body, string? key = null)
     {
         using var client = fixture.CreateClient().CallingAs("importer-system");
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"{Endpoints}/{endpoint}", UriKind.Relative))
@@ -185,6 +232,11 @@ public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassF
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
         };
         request.Headers.Host = Host;
+        if (key is not null)
+        {
+            request.Headers.TryAddWithoutValidation("Idempotency-Key", key);
+        }
+
         return await client.SendAsync(request, CancellationToken);
     }
 

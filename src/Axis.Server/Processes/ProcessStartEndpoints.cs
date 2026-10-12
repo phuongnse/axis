@@ -33,7 +33,7 @@ internal static class ProcessStartEndpoints
 
     private const string SubjectIdPointer = "/" + SubjectIdProperty;
 
-    private const string IdempotencyKeyHeader = "Idempotency-Key";
+    internal const string IdempotencyKeyHeader = "Idempotency-Key";
 
     private const int MaxIdempotencyKeyLength = 255;
 
@@ -85,10 +85,7 @@ internal static class ProcessStartEndpoints
 
         if (!TryReadIdempotencyKey(request.Headers[IdempotencyKeyHeader], out var key))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [IdempotencyKeyHeader] = [$"Must be 1 to {MaxIdempotencyKeyLength} characters."],
-            });
+            return IdempotencyKeyProblem();
         }
 
         if (!application.TryGetEntity(model.Entity.Name, out var entity))
@@ -176,6 +173,13 @@ internal static class ProcessStartEndpoints
         key = values.Count == 1 ? values[0] : null;
         return key is { Length: > 0 and <= MaxIdempotencyKeyLength };
     }
+
+    /// <summary>The 400 for an <c>Idempotency-Key</c> header that <see cref="TryReadIdempotencyKey"/> refuses.</summary>
+    internal static IResult IdempotencyKeyProblem() =>
+        Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [IdempotencyKeyHeader] = [$"Must be 1 to {MaxIdempotencyKeyLength} characters."],
+        });
 
     /// <summary>
     /// Reads a body that is exactly <c>{ "subjectId": "&lt;uuid&gt;" }</c>. Only the hyphenated

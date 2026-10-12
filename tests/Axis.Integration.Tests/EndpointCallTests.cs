@@ -3,18 +3,22 @@ using System.Text;
 using System.Text.Json;
 using Axis.Data.Naming;
 using Axis.Server.Tests;
+using Microsoft.Extensions.Primitives;
 using static Axis.Integration.Tests.EndpointCallFixture;
 
 namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The endpoint call: a caller with the <c>invoke</c> grant creates a note through
-/// <c>ImportNote</c> and starts <c>Close</c> on it, in one transaction. Every request goes
-/// without the CSRF header, as another system sends it.
+/// <c>ImportNote</c> and starts <c>Close</c> on it, in one transaction, and a repeat with the same
+/// <c>Idempotency-Key</c> creates nothing. Every request goes without the CSRF header, as another
+/// system sends it.
 /// </summary>
 public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixture<EndpointCallFixture>
 {
     private const string Call = "/api/apps/EndpointApp/endpoints/ImportNote";
+
+    private static readonly string[] _repeatedKey = ["first", "second"];
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -179,9 +183,141 @@ public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixtu
         Assert.Equal("Bearer", known.Headers.WwwAuthenticate.ToString());
     }
 
-    /// <summary>Sends a call without the CSRF header, as <paramref name="caller"/>, or as nobody when it is null.</summary>
+    [Fact]
+    public async Task A_repeat_with_the_same_key_and_input_returns_the_first_response_and_creates_nothing()
+    {
+        const string Key = "repeat-same-input";
+        using var first = await CallAsync("""{ "input": { "title": "Repeated", "quantity": 1, "status": "open", "lines": [{ "text": "Legs" }] } }""", key: Key);
+        var firstBody = await first.Content.ReadAsStringAsync(CancellationToken);
+        Assert.True(first.StatusCode == HttpStatusCode.Created, firstBody);
+        var before = await CountWritesAsync();
+
+        // The same JSON value, with other whitespace and property order, is the same input.
+        using var repeat = await CallAsync("""{"input":{"status":"open","lines":[{"text":"Legs"}],"quantity":1,"title":"Repeated"}}""", key: Key);
+
+        var repeatBody = await repeat.Content.ReadAsStringAsync(CancellationToken);
+        Assert.True(repeat.StatusCode == HttpStatusCode.Created, repeatBody);
+        Assert.Equal("application/json", repeat.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(firstBody, repeatBody);
+        Assert.Equal(before, await CountWritesAsync());
+        Assert.Equal(1L, await CountNotesAsync("Repeated"));
+        using var json = JsonDocument.Parse(firstBody);
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.endpoint_receipts
+            WHERE key = @key AND caller = 'importer-system' AND record_id = @record AND instance_id = @instance
+            """,
+            ("key", Key),
+            ("record", json.RootElement.GetProperty("recordId").GetGuid()),
+            ("instance", json.RootElement.GetProperty("instanceId").GetGuid())));
+    }
+
+    [Fact]
+    public async Task The_same_key_with_a_different_input_is_a_422_and_nothing_is_written()
+    {
+        const string Key = "repeat-other-input";
+        using var first = await CallAsync("""{ "input": { "title": "First input", "status": "open" } }""", key: Key);
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var before = await CountWritesAsync();
+
+        using var repeat = await CallAsync("""{ "input": { "title": "Second input", "status": "open" } }""", key: Key);
+
+        await AssertProblemAsync(repeat, HttpStatusCode.UnprocessableEntity, "This idempotency key was used with a different input.");
+        Assert.Equal(before, await CountWritesAsync());
+        Assert.Equal(0L, await CountNotesAsync("Second input"));
+    }
+
+    [Fact]
+    public async Task Two_callers_with_the_same_key_and_input_each_create_their_own_record()
+    {
+        const string Key = "shared-by-two-callers";
+        const string Body = """{ "input": { "title": "Two callers", "status": "open" } }""";
+
+        using var first = await CallAsync(Body, key: Key);
+        using var second = await CallAsync(Body, caller: "other-importer", key: Key);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync(CancellationToken));
+        using var secondJson = JsonDocument.Parse(await second.Content.ReadAsStringAsync(CancellationToken));
+        Assert.NotEqual(
+            firstJson.RootElement.GetProperty("recordId").GetGuid(),
+            secondJson.RootElement.GetProperty("recordId").GetGuid());
+        Assert.Equal(2L, await CountNotesAsync("Two callers"));
+        Assert.Equal(2L, await fixture.CountAsync("SELECT count(*) FROM axis.endpoint_receipts WHERE key = @key", ("key", Key)));
+    }
+
+    [Fact]
+    public async Task Two_concurrent_calls_with_the_same_key_create_one_record_and_get_the_same_response()
+    {
+        const string Key = "concurrent-calls";
+        const string Body = """{ "input": { "title": "Concurrent", "status": "open" } }""";
+
+        var responses = await Task.WhenAll(CallAsync(Body, key: Key), CallAsync(Body, key: Key));
+
+        try
+        {
+            var bodies = new List<string>();
+            foreach (var response in responses)
+            {
+                var body = await response.Content.ReadAsStringAsync(CancellationToken);
+                Assert.True(response.StatusCode == HttpStatusCode.Created, body);
+                bodies.Add(body);
+            }
+
+            Assert.Equal(bodies[0], bodies[1]);
+            Assert.Equal(1L, await CountNotesAsync("Concurrent"));
+            using var json = JsonDocument.Parse(bodies[0]);
+            Assert.Equal(1L, await fixture.CountAsync(
+                "SELECT count(*) FROM axis.process_instances WHERE subject_id = @record",
+                ("record", json.RootElement.GetProperty("recordId").GetGuid())));
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    public static TheoryData<string[]> InvalidKeys => new() { new[] { new string('k', 256) }, _repeatedKey };
+
+    // An empty key is checked in IdempotencyKeyTests: the in-memory test server drops an empty header.
+    [Theory]
+    [MemberData(nameof(InvalidKeys))]
+    public async Task An_idempotency_key_that_is_too_long_or_repeated_is_a_400_and_nothing_is_written(string[] key)
+    {
+        var before = await CountWritesAsync();
+
+        using var response = await CallAsync("""{ "input": { "title": "Invalid key", "status": "open" } }""", key: key);
+
+        using var problem = await AssertProblemAsync(response, HttpStatusCode.BadRequest, "One or more validation errors occurred.");
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(["Idempotency-Key"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Equal(["Must be 1 to 255 characters."], errors.GetProperty("Idempotency-Key").EnumerateArray().Select(error => error.GetString()));
+        Assert.Equal(before, await CountWritesAsync());
+    }
+
+    [Fact]
+    public async Task A_body_error_is_reported_before_an_invalid_idempotency_key()
+    {
+        using var response = await CallAsync("""{ "input": { "status": "open" } }""", key: new string('k', 256));
+
+        using var problem = await AssertProblemAsync(response, HttpStatusCode.BadRequest, "One or more validation errors occurred.");
+        Assert.Equal(["/input/title"], problem.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+    }
+
+    /// <summary>
+    /// Sends a call without the CSRF header, as <paramref name="caller"/>, or as nobody when it is
+    /// null, with an <c>Idempotency-Key</c> header for each value of <paramref name="key"/>.
+    /// </summary>
     private async Task<HttpResponseMessage> CallAsync(
-        string body, string? caller = "importer-system", string path = Call, string contentType = "application/json")
+        string body,
+        string? caller = "importer-system",
+        string path = Call,
+        string contentType = "application/json",
+        StringValues key = default)
     {
         using var client = fixture.CreateClient();
         if (caller is not null)
@@ -194,16 +330,25 @@ public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixtu
             Content = new StringContent(body, Encoding.UTF8, contentType),
         };
         request.Headers.Host = Host;
+        if (key.Count > 0)
+        {
+            request.Headers.TryAddWithoutValidation("Idempotency-Key", (IEnumerable<string>)key);
+        }
+
         return await client.SendAsync(request, CancellationToken);
     }
 
-    /// <summary>The notes, note lines, instances, work items and audit records stored now.</summary>
-    private async Task<(long Notes, long Lines, long Instances, long WorkItems, long Audits)> CountWritesAsync() =>
+    /// <summary>The notes, note lines, instances, work items, audit records and endpoint receipts stored now.</summary>
+    private async Task<(long Notes, long Lines, long Instances, long WorkItems, long Audits, long Receipts)> CountWritesAsync() =>
         (await fixture.CountAsync($"SELECT count(*) FROM {fixture.NoteTable}"),
             await fixture.CountAsync($"SELECT count(*) FROM {fixture.NoteLineTable}"),
             await fixture.CountAsync("SELECT count(*) FROM axis.process_instances"),
             await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items"),
-            await fixture.CountAsync("SELECT count(*) FROM axis.audit_records"));
+            await fixture.CountAsync("SELECT count(*) FROM axis.audit_records"),
+            await fixture.CountAsync("SELECT count(*) FROM axis.endpoint_receipts"));
+
+    private Task<long> CountNotesAsync(string title) =>
+        fixture.CountAsync($"SELECT count(*) FROM {fixture.NoteTable} WHERE {Column("title")} = @title", ("title", title));
 
     private static async Task<JsonDocument> AssertProblemAsync(HttpResponseMessage response, HttpStatusCode statusCode, string title)
     {

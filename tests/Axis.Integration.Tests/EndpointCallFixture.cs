@@ -16,8 +16,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the configuration, data and processes migrations applied
 /// and the EndpointApp fixture activated, served by the real server on host <c>a.example.test</c>.
-/// The test endpoint caller scheme signs in <c>importer-system</c>, which holds <c>importer</c>,
-/// and <c>reader-system</c>, which holds <c>reader</c>. No worker runs, so a started instance stays
+/// The test endpoint caller scheme signs in <c>importer-system</c> and <c>other-importer</c>, which
+/// hold <c>importer</c>, and <c>reader-system</c>, which holds <c>reader</c>. No worker runs, so a started instance stays
 /// <c>running</c>.
 /// </summary>
 public sealed class EndpointCallFixture : IAsyncLifetime
@@ -84,6 +84,7 @@ public sealed class EndpointCallFixture : IAsyncLifetime
             builder.UseTestOidc("a");
             builder.UseTestEndpointCallers(
                 new TestIdentity("importer-system", "Importer System", "importer"),
+                new TestIdentity("other-importer", "Other Importer", "importer"),
                 new TestIdentity("reader-system", "Reader System", "reader"));
         });
     }
