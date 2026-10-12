@@ -13,6 +13,7 @@ public sealed class PolicyCompilerTests
     private const string RequestId = "11111111-1111-4111-8111-111111111101";
     private const string DataSourceId = "99999999-9999-4999-8999-999999999901";
     private const string ProcessId = "77777777-7777-4777-8777-777777777701";
+    private const string EndpointId = "bc241668-fe85-45a4-b7cf-d36da8d56b71";
     private const string PolicyFile = "policies/requests.json";
 
     private const string Texts = """
@@ -99,7 +100,8 @@ public sealed class PolicyCompilerTests
               { "entity": "Nope", "actions": ["read"] },
               { "dataSource": "Nope", "actions": ["read"] },
               { "process": "Nope", "actions": ["start"] },
-              { "entity": "Request", "actions": ["read"], "fields": ["owner", "nope"] }
+              { "entity": "Request", "actions": ["read"], "fields": ["owner", "nope"] },
+              { "endpoint": "Nope", "actions": ["invoke"] }
             ]
             """));
 
@@ -112,6 +114,7 @@ public sealed class PolicyCompilerTests
                 (DiagnosticCodes.UnknownGrantTarget, "/grants/1/dataSource", "The data source 'Nope' was not found. No loaded data source has that name."),
                 (DiagnosticCodes.UnknownGrantTarget, "/grants/2/process", "The process 'Nope' was not found. No loaded process has that name."),
                 (DiagnosticCodes.UnknownGrantField, "/grants/3/fields/1", "The field 'nope' was not found. The entity 'Request' has no field with that name."),
+                (DiagnosticCodes.UnknownGrantTarget, "/grants/4/endpoint", "The endpoint 'Nope' was not found. No loaded endpoint has that name."),
                 (DiagnosticCodes.UnknownPolicyRole, "/roles/1", "The role 'Manager' was not found. No declared role has that name."),
                 (DiagnosticCodes.UnknownPolicyRole, "/roles/2", "The role 'nobody' was not found. No declared role has that name."),
             ],
@@ -137,8 +140,13 @@ public sealed class PolicyCompilerTests
     [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update' and 'delete'.")]
     [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read'.")]
     [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start'.")]
-    [InlineData("""{ "actions": ["read"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource' or a 'process'. This one names 0.")]
-    [InlineData("""{ "entity": "Request", "dataSource": "RequestList", "actions": ["read"], "filter": "nope" }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource' or a 'process'. This one names 2.")]
+    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start'.")]
+    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
+    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "fields": ["owner"] }""", "/grants/0/fields", "An endpoint grant has no 'fields'. Only an entity grant limits fields.")]
+    [InlineData("""{ "process": "RequestReview", "endpoint": "SubmitRequest", "actions": ["start"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
+    [InlineData("""{ "actions": ["read"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 0.")]
+    [InlineData("""{ "entity": "Request", "dataSource": "RequestList", "actions": ["read"], "filter": "nope" }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
     [InlineData("""{ "dataSource": "RequestList", "actions": ["read"], "filter": "true" }""", "/grants/0/filter", "A data source grant has no 'filter'. Only an entity grant limits rows.")]
     [InlineData("""{ "process": "RequestReview", "actions": ["start"], "fields": ["owner"] }""", "/grants/0/fields", "A process grant has no 'fields'. Only an entity grant limits fields.")]
     public void A_badly_shaped_grant_is_an_invalid_grant_at_its_path(string grant, string path, string message)
@@ -150,6 +158,39 @@ public sealed class PolicyCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.InvalidGrant, PolicyFile, path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
         Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_invoke_grant_on_an_endpoint_compiles_with_the_endpoint_resolved()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "endpoint": "submitrequest", "actions": ["invoke"] }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var grant = Assert.Single(Assert.Single(result.Model!.Policies).Grants);
+        Assert.Equal(
+            (null, null, null, new EndpointReference(Guid.Parse(EndpointId), "SubmitRequest"), null, null),
+            (grant.Entity, grant.DataSource, grant.Process, grant.Endpoint, grant.Filter, grant.Fields));
+        Assert.Equal([PolicyAction.Invoke], grant.Actions);
+
+        // An endpoint grant reaches no record and starts no process on its own.
+        Assert.True(result.Model.TryGetEntity("Request", out var request));
+        Assert.False(PolicyEvaluator.Access(result.Model, ["employee"], request, PolicyAction.Read).Granted);
+        Assert.True(result.Model.TryGetProcess("RequestReview", out var process));
+        Assert.False(PolicyEvaluator.AllowsStart(result.Model, ["employee"], process));
+    }
+
+    [Fact]
+    public void An_endpoint_whose_file_was_not_loaded_is_not_reported_again()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "endpoint": "Broken", "actions": ["invoke"] }]"""))
+            .With("endpoints/broken.json", """{ "id": "bc241668-fe85-45a4-b7cf-d36da8d56b79", "kind": "endpoint", "name": "Broken", "formatVersion": 1 }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.SchemaViolation, "endpoints/broken.json"), (diagnostic.Code, diagnostic.File)));
     }
 
     [Fact]
@@ -356,7 +397,8 @@ public sealed class PolicyCompilerTests
     /// <summary>
     /// An application with the roles <c>employee</c> and <c>manager</c>, a root entity <c>Request</c> that
     /// references a <c>Department</c> and owns <c>RequestLine</c> rows, the data source <c>RequestList</c>
-    /// and the process <c>RequestReview</c> over it, the rule <c>IsOwner</c>, and <paramref name="policy"/>.
+    /// and the process <c>RequestReview</c> over it, the endpoint <c>SubmitRequest</c> that starts it,
+    /// the rule <c>IsOwner</c>, and <paramref name="policy"/>.
     /// </summary>
     private static TemporaryFolder Folder(string policy) =>
         new TemporaryFolder()
@@ -380,5 +422,9 @@ public sealed class PolicyCompilerTests
             .With("data-sources/request-list.json", RequestList())
             .With("processes/request-review.json", RequestReview())
             .With("rules/is-owner.json", IsOwner("owner == user"))
+            .With("endpoints/submit-request.json", $$"""
+                { "id": "{{EndpointId}}", "kind": "endpoint", "name": "SubmitRequest", "formatVersion": 1, "entity": "Request",
+                  "process": "RequestReview", "input": [{ "name": "owner", "type": "text" }], "values": { "owner": "owner" } }
+                """)
             .With(PolicyFile, policy);
 }

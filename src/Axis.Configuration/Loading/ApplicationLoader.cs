@@ -115,6 +115,7 @@ public static class ApplicationLoader
         var policies = new List<PolicyResource>();
         var connectors = new List<ConnectorResource>();
         var events = new List<EventResource>();
+        var endpoints = new List<EndpointResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -126,6 +127,7 @@ public static class ApplicationLoader
         var unloadedFormNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedConnectorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedEndpointNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Role names are lower case only and are matched exactly.
         var unloadedRoleNames = new HashSet<string>(StringComparer.Ordinal);
@@ -204,6 +206,11 @@ public static class ApplicationLoader
                 unloadedConnectorNames.Add(unloadedConnectorName);
             }
 
+            if (kind == ResourceKinds.Endpoint && !schemaValid && ReadName(root) is { } unloadedEndpointName)
+            {
+                unloadedEndpointNames.Add(unloadedEndpointName);
+            }
+
             if (schemaValid)
             {
                 // Sources come in path order, so the contents do too. A file that fails
@@ -256,6 +263,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Event:
                         events.Add(root.Deserialize<EventResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Endpoint:
+                        endpoints.Add(root.Deserialize<EndpointResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -289,6 +299,8 @@ public static class ApplicationLoader
             Connectors = connectors,
             UnloadedConnectorNames = unloadedConnectorNames,
             Events = events,
+            Endpoints = endpoints,
+            UnloadedEndpointNames = unloadedEndpointNames,
         };
     }
 
@@ -452,7 +464,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}' or '{ResourceKinds.Event}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}' or '{ResourceKinds.Endpoint}'.",
                 file,
                 "/kind",
                 resourceId));

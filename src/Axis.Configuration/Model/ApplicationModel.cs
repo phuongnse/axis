@@ -46,6 +46,9 @@ public sealed record ApplicationModel
     /// <summary>The application's events, in path order.</summary>
     public IReadOnlyList<EventModel> Events { get; init; } = [];
 
+    /// <summary>The application's endpoints, in path order.</summary>
+    public IReadOnlyList<EndpointModel> Endpoints { get; init; } = [];
+
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)
     {
