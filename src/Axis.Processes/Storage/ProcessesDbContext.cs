@@ -127,6 +127,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Operation).HasColumnName("operation");
             call.Property(c => c.State).HasColumnName("state");
             call.Property(c => c.Attempts).HasColumnName("attempts");
+            call.Property(c => c.Lookups).HasColumnName("lookups").HasDefaultValue(0);
             call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
             call.Property(c => c.LastStatus).HasColumnName("last_status");
             call.Property(c => c.LastError).HasColumnName("last_error");

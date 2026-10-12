@@ -1,0 +1,30 @@
+{
+  "id": "309dfdd4-3140-4478-8615-dc8f6ef244a8",
+  "kind": "connector",
+  "name": "TrackedPurchasing",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "timeout": "PT1S",
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/tracked-orders/{idempotencyKey}",
+      "input": [
+        { "name": "reference", "type": "text", "required": true },
+        { "name": "amount", "type": "decimal", "required": true },
+        { "name": "note", "type": "text" }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }],
+      "lookup": "findOrder"
+    },
+    {
+      "name": "findOrder",
+      "method": "GET",
+      "path": "/tracked-orders/by-key/{idempotencyKey}",
+      "input": [],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }]
+    }
+  ]
+}

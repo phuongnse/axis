@@ -56,6 +56,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("last_status");
 
+                    b.Property<int>("Lookups")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("lookups");
+
                     b.Property<string>("Operation")
                         .IsRequired()
                         .HasColumnType("text")

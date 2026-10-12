@@ -20,8 +20,8 @@ user's policies, see [Start endpoint](#start-endpoint) and
 external system, is checked and compiled. Its step stages the call and leaves
 the instance `waiting`. The worker then sends the call and records its
 result, see [Connector calls](#connector-calls). Retries under the step's
-retry policy are built too. Reconciliation of a call whose outcome is unknown
-is planned for M5. So are package operation steps, which
+retry policy are built too, and so is reconciliation of a call whose outcome
+is unknown. Package operation steps are planned for M5. They
 run an operation from an extension package, see
 [Package operations](#package-operations). So are events and triggers, which
 start processes when something happens, see
@@ -206,7 +206,7 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   [Package operations](#package-operations). A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked, compiled, staged
-  and sent, and its call is retried. *(planned for M5)* Reconciliation comes later. *(planned for M5)* A third
+  and sent, its call is retried, and an unknown outcome is reconciled. *(planned for M5)* A third
   built-in operation, `raiseEvent`, raises an event for the subject record,
   see [Raise event step](#raise-event-step).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
@@ -796,10 +796,8 @@ has changed since the step loaded it. No step is retried.
 This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 The step shape, the compile checks, staging, each attempt, retries, unknown
-outcomes and settling a successful or failed call are built, see
-[Call outcomes](#call-outcomes). *(planned for M5)* Reconciliation. Until it is
-built, every call left `unknown` stays as under "No lookup" in
-[Reconciliation](#reconciliation). A `callConnector`
+outcomes, reconciliation and settling a successful or failed call are built,
+see [Call outcomes](#call-outcomes) and [Reconciliation](#reconciliation). A `callConnector`
 step calls one operation of a [connector](configuration.md#connectors-and-deployment-bindings), an external
 system such as the purchasing system. The call never runs inside a database
 transaction. The step stages it, the worker sends it later, and a separate
@@ -959,10 +957,12 @@ that starts later sees them. A retry writes no history row and no audit record.
 
 **An unknown call** is one whose outcome is unknown and that is not retried,
 see [Call outcomes](#call-outcomes). The call becomes `unknown`, with the last
-status and the error on the call row, and keeps its stored input. Its item is
-deleted, and the instance stays `waiting`. A history row with output
-`{ "operationId", "outcome": "unknown" }` and the error makes it visible. No
-`connector.called` is written, because the call has not settled.
+status and the error on the call row, and keeps its stored input. The instance
+stays `waiting`. When the operation declares a `lookup`, the item is kept and
+due at once, so a worker [reconciles](#reconciliation) the call. Without one,
+the item is deleted, and a history row with output
+`{ "operationId", "outcome": "unknown" }` and the error makes the call visible.
+No `connector.called` is written, because the call has not settled.
 
 **A failed call settles** too. The call becomes `failed` and its stored input
 is cleared, with the last status and the error on the call row. The instance
@@ -1004,16 +1004,26 @@ operation's `lookup` with the operation identity as `{idempotencyKey}`.
   Nothing is sent again.
 - **Not found.** The lookup answers `404`, so the system never acted. The
   call goes back to `pending` and is retried with the same identity. That
-  counts as an attempt. When no attempts are left, the instance becomes
-  `failed`.
-- **Failed lookup.** Any other answer, including a `200` whose body does not
-  fit, and a lookup that is never sent. The call stays `unknown`, and the
-  lookup is tried again. The delay starts at `backoff` and doubles each time,
-  up to 1 hour, with no limit.
+  counts as an attempt. The retry is due after the step's backoff for the
+  attempts made, as any retry is. When no attempts are left, the instance
+  becomes `failed`.
+- **Failed lookup.** Any other answer, including another `2xx`, a `200` whose
+  body does not fit, and a lookup that is never sent. The call stays
+  `unknown`, with the lookup's status and error, and the lookup is tried again.
+  The delay starts at `backoff` and doubles each time, up to 1 hour, with no
+  limit. The call row counts the failed lookups in `lookups`, so the delay
+  survives a worker restart. The count is reset when the call goes back to
+  `pending`.
 - **No lookup.** The operation declares none. The call stays `unknown`, and
   the instance stays `waiting`. A history row with output
   `{ "operationId", "outcome": "unknown" }` makes it visible. An operator
   resolves it in M7.
+
+The first lookup runs at once after the unknown outcome. Only a failed lookup
+waits. The same `connector.call` item runs each lookup, under the same claim
+and fencing rules as an attempt. A lookup counts no attempt. No history row is
+written while the call waits for its lookup. The call row shows it as
+`unknown`, and the history row comes when the call settles.
 
 An unknown outcome is never retried without the idempotency key or a lookup.
 
@@ -1468,6 +1478,7 @@ database, with history in `axis.__processes_migrations` (see
   | `operation` | `text` | The operation's name |
   | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed` |
   | `attempts` | `integer` | The attempts made so far, the first one included |
+  | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
   | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles. Never copied to history, audit records or logs |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |

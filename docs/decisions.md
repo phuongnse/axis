@@ -612,7 +612,7 @@ secret value that hides itself from text, JSON and logs, the `connector`
 resource with its compile checks and the activation check are built. Outside
 Development, startup fails when a secret comes from a configuration file.
 Calling a connector, using secrets in its calls and the call-time HTTPS check
-are built. Retries are built. Reconciliation is planned. See
+are built. Retries are built. Reconciliation is built. See
 [configuration](reference/configuration.md#connectors-and-deployment-bindings)
 for bindings and the `connector` resource, and
 [processes](reference/processes.md#connector-calls) for the call, its

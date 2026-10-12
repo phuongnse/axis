@@ -1,0 +1,21 @@
+{
+  "id": "ea46dac1-866d-4135-b3a6-2d3fa13dec4a",
+  "kind": "process",
+  "name": "TrackedOrder",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "createOrder",
+  "steps": [
+    {
+      "name": "createOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "TrackedPurchasing", "operation": "createOrder" },
+      "input": { "reference": "title", "amount": "amount", "note": "comment" },
+      "output": { "orderNumber": "comment" },
+      "retry": { "attempts": 3, "backoff": "PT30S" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
