@@ -115,6 +115,39 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Connector_binding_check_stops_the_start_outside_development_and_keeps_the_active_release()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, DoneField);
+        var active = await StartAsync(a, b, folder);
+
+        folder.With("connectors/purchasing-system.json", $$"""
+            { "id": "{{Guid.NewGuid()}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
+              "baseUrl": { "binding": "PurchasingSystemUrl" },
+              "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+              "operations": [ { "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders" } ] }
+            """);
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(a, b, folder.Path, logs, new Dictionary<string, string>
+        {
+            ["Tenants:a:Bindings:PurchasingSystemUrl:Kind"] = "url",
+            ["Tenants:a:Bindings:PurchasingSystemUrl:Value"] = "http://purchasing.example.test/api",
+            ["Tenants:a:Bindings:PurchasingSystemToken:Kind"] = "secret",
+            ["Tenants:a:Bindings:PurchasingSystemToken:Value"] = "token-value-never-logged",
+        });
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains(folder.Path, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.InsecureBaseUrl, StringComparison.Ordinal)
+            && entry.Contains("connectors/purchasing-system.json", StringComparison.Ordinal)
+            && entry.Contains("PurchasingSystemUrl", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("token-value-never-logged", StringComparison.Ordinal));
+        Assert.Equal(active, [(await ActiveAsync(a))?.ReleaseId, (await ActiveAsync(b))?.ReleaseId]);
+    }
+
+    [Fact]
     public async Task Seed_records_are_inserted_once_and_a_record_edited_between_starts_keeps_its_edit()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
@@ -356,7 +389,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(DBNull.Value, await ScalarAsync(b, "SELECT to_regclass('axis.releases')::text"));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string a, string b, string? folder, LogCollector logs) =>
+    private static WebApplicationFactory<Program> CreateFactory(
+        string a, string b, string? folder, LogCollector logs, IReadOnlyDictionary<string, string>? settings = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -370,6 +404,11 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
             if (folder is not null)
             {
                 builder.UseSetting("ActivateOnStartup:0", folder);
+            }
+
+            foreach (var (key, value) in settings ?? new Dictionary<string, string>())
+            {
+                builder.UseSetting(key, value);
             }
 
             builder.ConfigureLogging(logging => logging.AddProvider(logs));

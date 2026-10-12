@@ -18,6 +18,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     private readonly Guid _orderId = Guid.NewGuid();
     private readonly string _name = $"App{Guid.NewGuid():N}";
     private readonly string _sitePath = $"site-{Guid.NewGuid():N}";
+    private readonly Guid _connectorId = Guid.NewGuid();
 
     private const string NumberField = """{ "name": "number", "type": "text", "required": true, "maxLength": 20 }""";
     private const string NoteField = """{ "name": "note", "type": "text" }""";
@@ -36,7 +37,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration, CancellationToken);
         Assert.NotNull(compiled.Release);
 
-        var first = await ReleaseActivator.ActivateAsync(compiled, store, data, CancellationToken);
+        var first = await ReleaseActivator.ActivateAsync(compiled, store, data, ActivationBindings.None("default"), CancellationToken);
 
         Assert.Empty(first.Diagnostics);
         var table = Assert.Single(await ReadTablesAsync(_orderId));
@@ -47,7 +48,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Equal(1L, await CountActiveRowsAsync(_applicationId, _name));
         var recordsBefore = await ReadRecordsAsync(_applicationId);
 
-        var again = await ReleaseActivator.ActivateAsync(compiled, store, data, CancellationToken);
+        var again = await ReleaseActivator.ActivateAsync(compiled, store, data, ActivationBindings.None("default"), CancellationToken);
 
         Assert.Empty(again.Diagnostics);
         AssertSameTables([table], await ReadTablesAsync(_orderId));
@@ -103,6 +104,90 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Equal(before, await FindActiveAsync(_applicationId));
     }
 
+    [Theory]
+    [InlineData(null, "secret", "/baseUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemUrl'. Add a 'url' binding with that name to the tenant.")]
+    [InlineData("secret", "secret", "/baseUrl/binding", "Tenant 'acme' binding 'PurchasingSystemUrl' is a 'secret' binding. It is used here as a 'url' binding.")]
+    [InlineData("url", null, "/auth/token/binding", "Tenant 'acme' has no binding 'PurchasingSystemToken'. Add a 'secret' binding with that name to the tenant.")]
+    [InlineData("url", "url", "/auth/token/binding", "Tenant 'acme' binding 'PurchasingSystemToken' is a 'url' binding. It is used here as a 'secret' binding.")]
+    public async Task A_connector_binding_the_tenant_lacks_or_holds_with_another_kind_is_a_diagnostic_and_changes_nothing(
+        string? urlKind, string? tokenKind, string path, string message)
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField);
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        var before = await FindActiveAsync(_applicationId);
+        folder
+            .With("entities/order.json", OrderFile(_orderId, NumberField, NoteField))
+            .With("connectors/purchasing-system.json", PurchasingConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase);
+        if (urlKind is not null)
+        {
+            bindings["PurchasingSystemUrl"] = new ActivationBinding(urlKind, urlKind == "url" ? new Uri("https://purchasing.example.test/api") : null);
+        }
+
+        if (tokenKind is not null)
+        {
+            bindings["PurchasingSystemToken"] = new ActivationBinding(tokenKind, tokenKind == "url" ? new Uri("https://token.example.test") : null);
+        }
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", path, _connectorId, message),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId, diagnostic.Message));
+        Assert.Equal(before, await FindActiveAsync(_applicationId));
+        Assert.Equal(["id", "version", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+    }
+
+    [Fact]
+    public async Task Every_binding_a_tenant_lacks_is_reported_and_nothing_is_provisioned_or_activated()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", PurchasingConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme"));
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingDeploymentBinding, "/auth/token/binding"),
+                (DiagnosticCodes.MissingDeploymentBinding, "/baseUrl/binding"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)).Order());
+        Assert.Empty(await ReadTablesAsync(_orderId));
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task An_http_base_url_is_refused_unless_http_is_allowed()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField);
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        var before = await FindActiveAsync(_applicationId);
+        folder.With("connectors/purchasing-system.json", PurchasingConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["purchasingsystemurl"] = new(ActivationBinding.UrlKind, new Uri("http://purchasing.example.test/api")),
+            ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
+        };
+
+        var refused = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(refused.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InsecureBaseUrl, "connectors/purchasing-system.json", "/baseUrl/binding",
+                "Tenant 'acme' binding 'PurchasingSystemUrl' is not an https URL. Only Development allows http."),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Equal(before, await FindActiveAsync(_applicationId));
+
+        var allowed = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: true));
+
+        Assert.Empty(allowed.Diagnostics);
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
     [Fact]
     public async Task Name_active_for_another_application_in_another_letter_case_returns_one_diagnostic_and_changes_nothing()
     {
@@ -127,7 +212,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         // provisions the tables and is then refused the name.
         await using var configuration = database.CreateConfigurationContext();
         await using var data = database.CreateContext();
-        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, CancellationToken);
+        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), CancellationToken);
 
         AssertNameActiveForOtherApplication(hiding);
         Assert.Single(await ReadTablesAsync(_orderId));
@@ -227,7 +312,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         // concurrently, provisions the tables and is then refused the path by the unique index.
         await using var configuration = database.CreateConfigurationContext();
         await using var data = database.CreateContext();
-        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, CancellationToken);
+        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), CancellationToken);
 
         AssertSitePathActiveForOtherApplication(hiding, siteId);
         Assert.Single(await ReadTablesAsync(_orderId));
@@ -339,6 +424,14 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         { "id": "{{id}}", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [ {{string.Join(", ", fields)}} ] }
         """;
 
+    private static string PurchasingConnector(Guid id) =>
+        $$"""
+        { "id": "{{id}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
+          "baseUrl": { "binding": "PurchasingSystemUrl" },
+          "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+          "operations": [ { "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders" } ] }
+        """;
+
     private static TemporaryFolder ApplicationFolder(Guid applicationId, string name, Guid orderId, params string[] fields) =>
         new TemporaryFolder()
             .With("application.json", Manifest(applicationId, name))
@@ -378,11 +471,14 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         return compiled;
     }
 
-    private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled)
+    private Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled) =>
+        ActivateAsync(compiled, ActivationBindings.None("default"));
+
+    private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled, ActivationBindings bindings)
     {
         await using var configuration = database.CreateConfigurationContext();
         await using var data = database.CreateContext();
-        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, CancellationToken);
+        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, CancellationToken);
     }
 
     /// <summary>The active release read through a fresh store.</summary>
