@@ -124,6 +124,7 @@ public static class ApplicationLoader
         var unloadedSequenceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedFormNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedConnectorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Role names are lower case only and are matched exactly.
         var unloadedRoleNames = new HashSet<string>(StringComparer.Ordinal);
@@ -195,6 +196,11 @@ public static class ApplicationLoader
             if (kind == ResourceKinds.Role && !schemaValid && ReadName(root) is { } unloadedRoleName)
             {
                 unloadedRoleNames.Add(unloadedRoleName);
+            }
+
+            if (kind == ResourceKinds.Connector && !schemaValid && ReadName(root) is { } unloadedConnectorName)
+            {
+                unloadedConnectorNames.Add(unloadedConnectorName);
             }
 
             if (schemaValid)
@@ -277,6 +283,7 @@ public static class ApplicationLoader
             unloadedRoleNames)
         {
             Connectors = connectors,
+            UnloadedConnectorNames = unloadedConnectorNames,
         };
     }
 

@@ -89,6 +89,8 @@ internal static class ModelAssert
     /// <summary>
     /// A step's name, its type, and for a decision each branch's condition and target, then its
     /// <c>otherwise</c>. For an operation, each field it sets with its expression, then its <c>next</c>.
+    /// For a connector call, its connector and operation, each input with its expression, each
+    /// output with its field, its retry policy, then its <c>next</c>.
     /// </summary>
     private static string Describe(ProcessStepModel step) =>
         step switch
@@ -97,6 +99,8 @@ internal static class ModelAssert
                 $"{decision.Name} decision [{string.Join(", ", decision.Branches.Select(branch => $"{branch.When.Expression} → {branch.Next}"))}] otherwise {decision.Otherwise}",
             OperationStepModel operation =>
                 $"{operation.Name} {operation.Operation} [{string.Join(", ", operation.Set.Select(assignment => $"{assignment.Field} = {assignment.Value.Expression}"))}] next {operation.Next}",
+            CallConnectorStepModel call =>
+                $"{call.Name} callConnector {call.Connector}.{call.Operation} [{string.Join(", ", call.Input.Select(input => $"{input.Input} = {input.Value.Expression}"))}] [{string.Join(", ", call.Output.Select(output => $"{output.Output} → {output.Field}"))}] retry {call.Retry.Attempts} {call.Retry.Backoff} next {call.Next}",
             _ => $"{step.Name} {step.GetType().Name}",
         };
 }

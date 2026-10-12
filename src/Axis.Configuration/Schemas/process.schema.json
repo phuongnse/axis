@@ -66,6 +66,33 @@
           "propertyNames": { "$ref": "#/$defs/name" },
           "additionalProperties": { "type": "string", "minLength": 1 }
         },
+        "connector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "operation"],
+          "properties": {
+            "name": { "$ref": "#/$defs/name" },
+            "operation": { "$ref": "#/$defs/name" }
+          }
+        },
+        "input": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "output": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/name" }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "attempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "backoff": { "type": "string", "minLength": 1 }
+          }
+        },
         "next": { "$ref": "#/$defs/name" },
         "label": { "$ref": "#/$defs/textReference" },
         "assignee": { "$ref": "#/$defs/assignee" },
@@ -85,6 +112,10 @@
             "properties": {
               "operation": false,
               "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
               "next": false,
               "label": false,
               "assignee": false,
@@ -98,13 +129,23 @@
           "if": { "required": ["type"], "properties": { "type": { "const": "task" } } },
           "then": {
             "required": ["label", "assignee", "form", "outcomes"],
-            "properties": { "branches": false, "otherwise": false, "operation": false, "set": false, "next": false }
+            "properties": {
+              "branches": false,
+              "otherwise": false,
+              "operation": false,
+              "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "next": false
+            }
           }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "operation" } } },
           "then": {
-            "required": ["operation", "set", "next"],
+            "required": ["operation", "next"],
             "properties": {
               "branches": false,
               "otherwise": false,
@@ -124,6 +165,10 @@
               "otherwise": false,
               "operation": false,
               "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
               "next": false,
               "label": false,
               "assignee": false,
@@ -131,6 +176,26 @@
               "dueIn": false,
               "outcomes": false
             }
+          }
+        },
+        {
+          "if": {
+            "required": ["type", "operation"],
+            "properties": { "type": { "const": "operation" }, "operation": { "const": "updateRecord" } }
+          },
+          "then": {
+            "required": ["set"],
+            "properties": { "connector": false, "input": false, "output": false, "retry": false }
+          }
+        },
+        {
+          "if": {
+            "required": ["type", "operation"],
+            "properties": { "type": { "const": "operation" }, "operation": { "const": "callConnector" } }
+          },
+          "then": {
+            "required": ["connector", "input"],
+            "properties": { "set": false }
           }
         }
       ]

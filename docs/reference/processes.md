@@ -16,8 +16,9 @@ list the user's tasks, read one task and complete one are built. Completing
 a task resumes its `waiting` instance, see
 [Completing a task](#completing-a-task). A start and the task API follow the
 user's policies, see [Start endpoint](#start-endpoint) and
-[Policies on tasks](#task-api). Calls to external systems through a
-`callConnector` step are [planned for M5](#connector-calls). So are events
+[Policies on tasks](#task-api). A `callConnector` step, which calls an
+external system, is checked and compiled. Running it is
+[planned for M5](#connector-calls). So are events
 and triggers, which start processes when something happens, see
 [Events and triggers](#events-and-triggers).
 
@@ -195,9 +196,11 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   that follows. The step writes the values with the record update rules, so
   computed fields are recomputed and validations run, in the step's
   transaction. A validation failure fails the step. Operations from extension
-  packages come in M5. *(planned for M5)* A second built-in operation,
-  `callConnector`, calls an external system outside the step's transaction,
-  see [Connector calls](#connector-calls). *(planned for M5)* A third
+  packages come in M5. A second built-in operation, `callConnector`, calls an
+  external system outside the step's transaction, see
+  [Connector calls](#connector-calls). Its step is checked and compiled.
+  *(planned for M5)* Running it comes later, and until then an instance that
+  reaches it fails. *(planned for M5)* A third
   built-in operation, `raiseEvent`, raises an event for the subject record,
   see [Raise event step](#raise-event-step).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
@@ -226,8 +229,8 @@ reported in one pass. See
   such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord`, matched exactly as a step `type` is
-  (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord` or `callConnector`, matched exactly as a
+  step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
   The field is not computed, not numbered by a sequence and not a child
@@ -235,14 +238,20 @@ reported in one pass. See
 - Each `set` expression fits its field's type, with the same scope as a
   `when`. A problem is reported at `/steps/{i}/set/{field}` with its
   expression code, such as `AXC0048` for a value of the wrong type.
-- An operation has `operation`, a `set` with at least one field and `next`,
-  and no `branches` or `otherwise`. A decision has no `operation`, `set` or
-  `next`. Neither has a task's `label`, `assignee`, `form`, `dueIn` or
-  `outcomes` (`AXC0004`).
+- A `callConnector` step's checks are listed under
+  [Connector calls](#connector-calls) (`AXC0102` to `AXC0109`).
+- An operation has `operation` and `next`, and no `branches` or `otherwise`.
+  An `updateRecord` step has a `set` with at least one field, and no
+  `connector`, `input`, `output` or `retry`. A `callConnector` step has
+  `connector` and `input`, and no `set`. A decision has no `operation`,
+  `set`, `connector`, `input`, `output`, `retry` or `next`. Neither an
+  operation nor a decision has a task's `label`, `assignee`, `form`, `dueIn`
+  or `outcomes` (`AXC0004`).
 - A task has `label`, `assignee`, `form` and at least one outcome, and no
-  `branches`, `otherwise`, `operation`, `set` or `next` (`AXC0004`).
-- An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set` or
-  any task property (`AXC0004`).
+  `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
+  `output`, `retry` or `next` (`AXC0004`).
+- An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set`,
+  `connector`, `input`, `output`, `retry` or any task property (`AXC0004`).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
   name a declared [role](configuration.md#roles-and-policies), compared
@@ -756,7 +765,9 @@ has changed since the step loaded it. No step is retried.
 
 *(planned for M5)* This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
-None of it is built yet. A `callConnector` step calls one operation of a
+The step shape and compile checks are built. Staging and the call are
+planned, and until they are built an instance that reaches a `callConnector`
+step fails. A `callConnector` step calls one operation of a
 [connector](configuration.md#connectors-and-deployment-bindings), an external
 system such as the purchasing system. The call never runs inside a database
 transaction. The step stages it, the worker sends it later, and a separate
@@ -805,20 +816,39 @@ The sample files do not change until the build issues add connectors.
     up to 1 hour. It defaults to `PT30S`.
 - `next` names the step taken when the call succeeds.
 
-The compiler reports these as compile errors. Their codes come with the
-build issue.
+The compiler reports these as compile errors. Every name is matched
+ignoring letter case, and the compiled step holds the declared names.
 
-- The connector and its operation exist.
-- Each `input` key names an input of the operation, at most once. Every
-  required input has a key.
-- Each `input` expression gives the input's type.
-- Each `output` key names an output of the operation, at most once.
-- Each `output` value names a field of the subject entity that an
-  `updateRecord` `set` may name. The output's type fits the field.
-- `attempts` is from 1 to 10, and `backoff` is a valid duration.
+- The connector exists (`AXC0102` at `/steps/{i}/connector/name`). A name
+  whose connector file was not loaded because of its own errors is not
+  reported again.
+- The operation is an operation of the connector (`AXC0103` at
+  `/steps/{i}/connector/operation`). With either error, `input` and `output`
+  are not checked.
+- Each `input` key names an input of the operation, at most once (`AXC0104`
+  at `/steps/{i}/input/{key}`). Every required input has a key (`AXC0105` at
+  `/steps/{i}/input`). `input` may be empty when the operation has no
+  required input.
+- Each `input` expression gives the input's type. A problem is reported at
+  `/steps/{i}/input/{key}` with its expression code, such as `AXC0048` for a
+  value of the wrong type.
+- Each `output` key names an output of the operation, at most once (`AXC0106`
+  at `/steps/{i}/output/{key}`).
+- Each `output` value names a field of the subject entity that no other
+  output of the step writes (`AXC0107`). The field is one an `updateRecord`
+  `set` may name, so it is not computed, not numbered by a sequence and not a
+  child collection. The output's type fits the field: it is the same type,
+  or an `integer` output into a `decimal` field (`AXC0108`). Each is reported
+  at `/steps/{i}/output/{key}`.
+- `attempts` is from 1 to 10 (`AXC0004`), and `backoff` is a valid duration
+  (`AXC0109` at `/steps/{i}/retry/backoff`).
 - A `callConnector` step has `connector`, `input` and `next`, and no `set`.
   An `updateRecord` step has none of `connector`, `input`, `output` and
-  `retry`.
+  `retry` (`AXC0004`).
+
+The compiled step holds the connector, the operation, the inputs in the
+operation's order, the outputs, the retry policy with its defaults filled in,
+and `next`.
 
 ### Staging and the call
 

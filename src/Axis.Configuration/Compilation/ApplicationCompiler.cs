@@ -16,7 +16,8 @@ namespace Axis.Configuration.Compilation;
 /// of every locale, checks the named rules and their calls, checks every entity's fields against
 /// the field type rules and type-checks its computed fields and validations, checks forms, sites,
 /// pages and seeds, checks data sources and their filters, checks role labels, checks processes,
-/// their step graphs, their conditions and the roles their tasks name, checks policies, their
+/// their step graphs, their conditions, the roles their tasks name and the connector operations
+/// their steps call, checks policies, their
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
 /// lookups, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
@@ -98,6 +99,15 @@ public static class ApplicationCompiler
 
         ProcessResource? FindProcess(string name) => processesByName.GetValueOrDefault(name);
 
+        // Connector names follow the same rule too.
+        var connectorsByName = new Dictionary<string, ConnectorResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var connector in loaded.Connectors)
+        {
+            connectorsByName.TryAdd(connector.Name, connector);
+        }
+
+        ConnectorResource? FindConnector(string name) => connectorsByName.GetValueOrDefault(name);
+
         // Role names are lower case only and are matched exactly.
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
@@ -141,6 +151,8 @@ public static class ApplicationCompiler
             loaded.UnloadedFormNames,
             roleNames,
             loaded.UnloadedRoleNames,
+            FindConnector,
+            loaded.UnloadedConnectorNames,
             textKeys,
             rules,
             diagnostics);
@@ -175,7 +187,7 @@ public static class ApplicationCompiler
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, rules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, rules)).ToList(),
