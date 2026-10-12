@@ -4,7 +4,8 @@ namespace Axis.Configuration.Model;
 /// A compiled policy: the declared roles it applies to and its grants, each with its target
 /// resolved. The record API and the data source endpoint enforce its entity and data source
 /// grants. The record API applies a grant's filter and fields, and the data source endpoint counts
-/// only a grant with neither.
+/// only a grant with neither. The process start enforces its process grants, and the endpoint call
+/// its endpoint grants.
 /// </summary>
 public sealed record PolicyModel
 {
@@ -25,10 +26,10 @@ public sealed record PolicyModel
 /// <summary>
 /// A compiled grant. Exactly one of <see cref="Entity"/>, a root entity, <see cref="DataSource"/>,
 /// <see cref="Process"/> and <see cref="Endpoint"/> is set, and every action is one its target
-/// takes. Nothing enforces an endpoint grant yet. Only an entity
-/// grant has a <see cref="Filter"/>, a boolean expression over the entity's fields and paths
-/// through reference fields, inside the SQL subset, that can call <c>currentUser()</c>, and
-/// <see cref="Fields"/>, the entity's field names as declared, or null for every field.
+/// takes. Only an entity grant has a <see cref="Filter"/>, a boolean expression over the entity's
+/// fields and paths through reference fields, inside the SQL subset, that can call
+/// <c>currentUser()</c>, and <see cref="Fields"/>, the entity's field names as declared, or null
+/// for every field.
 /// </summary>
 public sealed record GrantModel(
     EntityReference? Entity,

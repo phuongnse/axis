@@ -1,0 +1,10 @@
+{
+  "id": "3355c973-cd13-464e-afa0-9d76b50a1f00",
+  "kind": "entity",
+  "name": "NoteLine",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "text", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "hours", "type": "integer" }
+  ]
+}

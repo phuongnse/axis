@@ -1,0 +1,17 @@
+{
+  "id": "314cda53-2cc0-4444-a91a-2f026e0ea3ac",
+  "kind": "entity",
+  "name": "Note",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" },
+    { "name": "status", "type": "text" },
+    { "name": "lines", "type": "child-collection", "target": "NoteLine" },
+    { "name": "createdBy", "type": "text", "maxLength": 100, "creator": true }
+  ],
+  "validations": [
+    { "expression": "quantity is null or quantity >= 1", "message": { "textKey": "note.quantityPositive" }, "field": "quantity" }
+  ]
+}

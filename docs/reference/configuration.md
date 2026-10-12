@@ -1204,9 +1204,9 @@ build issue.
 ## Inbound endpoints
 
 *(partly built, M5)* This section follows
-[D27](../decisions.md#d27-inbound-endpoints--agreed). The `endpoint` resource
-and its compile checks are built. Serving the call is not built yet, so no
-request reaches an endpoint. An `endpoint` resource lets another system create
+[D27](../decisions.md#d27-inbound-endpoints--agreed). The `endpoint` resource,
+its compile checks and the call are built. `output` with `wait` is not built
+yet, so an endpoint that declares them answers at once without output. An `endpoint` resource lets another system create
 a record and start a process on it in one call. The call, its responses and its errors are in
 [Inbound endpoints](record-api.md#inbound-endpoints). How a machine caller
 signs in is in [Machine callers](../architecture.md#machine-callers).
@@ -1310,8 +1310,8 @@ a note, closes it and returns its status, in
 
 When the worker runs the `close` step within 10 seconds, the call answers
 `201` with `code` and `status`. Otherwise it answers `202` with a status
-location. The sample files, the fixture files and the Keycloak realm do not
-change until the build issue that serves endpoints.
+location. The sample files, the E2E fixture files and the Keycloak realm do
+not hold these endpoints yet. Later build issues add them.
 
 A [data change trigger](#trigger-resource) on `create` of the same entity
 that starts the same process would start it inside the endpoint's record
@@ -1401,8 +1401,8 @@ and the policy checks are built. So are matching the roles claim and
 enforcing every grant. That covers entity grants with filters and fields on
 the record API, data source grants with root read filters and field checks,
 and process `start` grants. The `endpoint` grant with its `invoke` action and
-its compile checks are built too, but nothing enforces it until endpoints are
-served. Each compile check below is a compile error.
+its compile checks are built too, and the endpoint call enforces it. Each
+compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
 
@@ -1543,11 +1543,10 @@ outcomes:
 
 A policy also grants inbound [endpoints](#endpoint-resource). The target is
 `endpoint`, and its only action is `invoke`. An `endpoint` grant takes no
-`filter` or `fields`. The grant and its compile checks are built. Enforcing
-it comes with serving endpoints, *(planned for M5)*. Holding it will be
-enough to call the endpoint: the record create and the process
-start inside the call need no `entity` or `process` grant of the caller. The
-purchase request sample will give the purchasing system this policy, in
+`filter` or `fields`. The grant, its compile checks and its enforcement are
+built. Holding it is enough to call the endpoint: the record create and the
+process start inside the call need no `entity` or `process` grant of the
+caller. The purchase request sample will give the purchasing system this policy, in
 `policies/purchasing-system-access.json`:
 
 ```json
@@ -1575,7 +1574,8 @@ Its role, in `roles/purchasing-system.json`:
 
 The caller holds the role through the roles claim of its token, as a user
 does. See [Machine callers](../architecture.md#machine-callers). The sample
-gains this policy and role when endpoints are served.
+gains this policy and role when it gains the `SubmitPurchaseRequest`
+endpoint, in a later build issue.
 
 Compile checks, each a compile error:
 

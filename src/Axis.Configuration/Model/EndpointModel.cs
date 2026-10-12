@@ -2,7 +2,7 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled endpoint: an inbound call that creates a record of a root entity from typed input
-/// fields and starts a process on it. Nothing serves it yet.
+/// fields and starts a process on it.
 /// </summary>
 public sealed record EndpointModel
 {

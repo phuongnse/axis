@@ -364,6 +364,10 @@ One transaction then does the rest:
 When any part fails, nothing is written. The instance then waits for the
 worker to run its steps.
 
+An [endpoint call](record-api.md#inbound-endpoints) starts its process on the
+record it creates by steps 3 to 6, in the call's transaction. Its actor is the
+caller, and its details add the endpoint's name.
+
 **`Idempotency-Key`.** The header is optional.
 
 - A value must be non-empty and at most 255 characters, otherwise the

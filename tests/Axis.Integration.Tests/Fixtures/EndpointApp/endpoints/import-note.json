@@ -1,0 +1,20 @@
+{
+  "id": "4c583fd5-9986-45f2-84c0-afc6490988b8",
+  "kind": "endpoint",
+  "name": "ImportNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "Close",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" },
+    { "name": "status", "type": "text", "required": true },
+    { "name": "lines", "type": "child-collection", "target": "NoteLine" }
+  ],
+  "values": {
+    "title": "title",
+    "quantity": "quantity",
+    "status": "status",
+    "lines": "lines"
+  }
+}
