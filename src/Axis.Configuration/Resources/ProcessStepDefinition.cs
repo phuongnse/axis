@@ -23,6 +23,9 @@ public sealed record ProcessStepDefinition
     /// <summary>The built-in operation that calls an operation of a connector.</summary>
     public const string CallConnector = "callConnector";
 
+    /// <summary>The built-in operation that raises an event about the subject record.</summary>
+    public const string RaiseEvent = "raiseEvent";
+
     public required string Name { get; init; }
 
     /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>.</summary>
@@ -34,7 +37,7 @@ public sealed record ProcessStepDefinition
     /// <summary>The step a decision takes when no branch is true, or null for any other step.</summary>
     public string? Otherwise { get; init; }
 
-    /// <summary>The operation an operation step runs, such as <c>updateRecord</c> or <c>callConnector</c>, or null for any other step.</summary>
+    /// <summary>The operation an operation step runs, such as <c>updateRecord</c>, <c>callConnector</c> or <c>raiseEvent</c>, or null for any other step.</summary>
     public string? Operation { get; init; }
 
     /// <summary>
@@ -60,6 +63,15 @@ public sealed record ProcessStepDefinition
 
     /// <summary>The retry policy of a <c>callConnector</c> step, or null for the defaults or for any other step.</summary>
     public RetryDefinition? Retry { get; init; }
+
+    /// <summary>The event a <c>raiseEvent</c> step raises, or null for any other step.</summary>
+    public string? Event { get; init; }
+
+    /// <summary>
+    /// The payload fields of the event a <c>raiseEvent</c> step raises, each to an expression, in
+    /// file order, or null for any other step.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Fields { get; init; }
 
     /// <summary>The step an operation step leads to, or null for any other step.</summary>
     public string? Next { get; init; }

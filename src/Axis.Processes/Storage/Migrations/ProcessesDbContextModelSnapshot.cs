@@ -93,6 +93,57 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("connector_calls", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.EventRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<Guid>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
+
+                    b.Property<DateTimeOffset>("RaisedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("raised_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_events");
+
+                    b.HasIndex("ProcessInstanceId")
+                        .HasDatabaseName("ix_events_process_instance_id");
+
+                    b.ToTable("events", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.ProcessInstanceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -397,6 +448,16 @@ namespace Axis.Processes.Storage.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_connector_calls_process_instances_process_instance_id");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.EventRow", b =>
+                {
+                    b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_events_process_instances_process_instance_id");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.ProcessStepHistoryRow", b =>

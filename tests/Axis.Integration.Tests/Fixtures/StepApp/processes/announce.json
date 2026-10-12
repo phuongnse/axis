@@ -1,0 +1,19 @@
+{
+  "id": "03cf4baf-d93f-4f34-ae71-d2a10e188647",
+  "kind": "process",
+  "name": "Announce",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "announce",
+  "steps": [
+    {
+      "name": "announce",
+      "type": "operation",
+      "operation": "raiseEvent",
+      "event": "RequestNoted",
+      "fields": { "title": "title", "ratio": "amount / divisor" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

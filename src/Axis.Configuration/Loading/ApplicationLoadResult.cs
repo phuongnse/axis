@@ -83,6 +83,12 @@ public sealed record ApplicationLoadResult(
     /// <summary>The <c>event</c> resources, in path order.</summary>
     public IReadOnlyList<EventResource> Events { get; init; } = [];
 
+    /// <summary>
+    /// The <c>name</c> of every <c>event</c> file that was not loaded because of its own errors,
+    /// compared ignoring letter case. A reference to one of these names is not reported again either.
+    /// </summary>
+    public IReadOnlySet<string> UnloadedEventNames { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>The <c>endpoint</c> resources, in path order.</summary>
     public IReadOnlyList<EndpointResource> Endpoints { get; init; } = [];
 

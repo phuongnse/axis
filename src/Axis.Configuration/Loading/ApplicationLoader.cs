@@ -128,6 +128,7 @@ public static class ApplicationLoader
         var unloadedProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedConnectorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unloadedEndpointNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unloadedEventNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Role names are lower case only and are matched exactly.
         var unloadedRoleNames = new HashSet<string>(StringComparer.Ordinal);
@@ -204,6 +205,11 @@ public static class ApplicationLoader
             if (kind == ResourceKinds.Connector && !schemaValid && ReadName(root) is { } unloadedConnectorName)
             {
                 unloadedConnectorNames.Add(unloadedConnectorName);
+            }
+
+            if (kind == ResourceKinds.Event && !schemaValid && ReadName(root) is { } unloadedEventName)
+            {
+                unloadedEventNames.Add(unloadedEventName);
             }
 
             if (kind == ResourceKinds.Endpoint && !schemaValid && ReadName(root) is { } unloadedEndpointName)
@@ -299,6 +305,7 @@ public static class ApplicationLoader
             Connectors = connectors,
             UnloadedConnectorNames = unloadedConnectorNames,
             Events = events,
+            UnloadedEventNames = unloadedEventNames,
             Endpoints = endpoints,
             UnloadedEndpointNames = unloadedEndpointNames,
         };

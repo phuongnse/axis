@@ -9,9 +9,10 @@ model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
-`axis.process_work_items` and `axis.connector_calls` tables are built too.
-So is the engine that runs `decision`, `task`, `operation` and `end` steps,
-see [Running a step](#running-a-step). The [task API](#task-api) routes that
+`axis.process_work_items`, `axis.connector_calls` and `axis.events` tables
+are built too. So is the engine that runs `decision`, `task`, `operation`
+and `end` steps, see [Running a step](#running-a-step). The
+[task API](#task-api) routes that
 list the user's tasks, read one task and complete one are built. Completing
 a task resumes its `waiting` instance, see
 [Completing a task](#completing-a-task). A start and the task API follow the
@@ -19,10 +20,12 @@ user's policies, see [Start endpoint](#start-endpoint) and
 [Policies on tasks](#task-api). A `callConnector` step, which calls an
 external system, is checked and compiled. Its step stages the call and leaves
 the instance `waiting`. Sending the call is
-[planned for M5](#connector-calls). So are package operation steps, which
-run an operation from an extension package, see
-[Package operations](#package-operations). So are events and triggers, which
-start processes when something happens, see
+[planned for M5](#connector-calls). A `raiseEvent` step, which raises an
+event about the subject record, is checked, compiled and run. Its step stores
+the event in `axis.events`, see [Raise event step](#raise-event-step).
+Package operation steps, which run an operation from an extension package,
+are planned for M5, see [Package operations](#package-operations). So are
+triggers, which start processes when something happens, see
 [Events and triggers](#events-and-triggers).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -205,9 +208,9 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked and compiled.
   *(planned for M5)* Running it comes later, and until then an instance that
-  reaches it fails. *(planned for M5)* A third
-  built-in operation, `raiseEvent`, raises an event for the subject record,
-  see [Raise event step](#raise-event-step).
+  reaches it fails. A third built-in operation, `raiseEvent`, raises an
+  event for the subject record in the step's transaction, see
+  [Raise event step](#raise-event-step).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
   `end` step has no `next`.
 
@@ -234,8 +237,8 @@ reported in one pass. See
   such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord` or `callConnector`, matched exactly as a
-  step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord`, `callConnector` or `raiseEvent`,
+  matched exactly as a step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
   The field is not computed, not numbered by a sequence and not a child
@@ -245,18 +248,23 @@ reported in one pass. See
   expression code, such as `AXC0048` for a value of the wrong type.
 - A `callConnector` step's checks are listed under
   [Connector calls](#connector-calls) (`AXC0102` to `AXC0109`).
+- A `raiseEvent` step's checks are listed under
+  [Raise event step](#raise-event-step) (`AXC0125` to `AXC0128`).
 - An operation has `operation` and `next`, and no `branches` or `otherwise`.
   An `updateRecord` step has a `set` with at least one field, and no
-  `connector`, `input`, `output` or `retry`. A `callConnector` step has
-  `connector` and `input`, and no `set`. A decision has no `operation`,
-  `set`, `connector`, `input`, `output`, `retry` or `next`. Neither an
-  operation nor a decision has a task's `label`, `assignee`, `form`, `dueIn`
-  or `outcomes` (`AXC0004`).
+  `connector`, `input`, `output`, `retry`, `event` or `fields`. A
+  `callConnector` step has `connector` and `input`, and no `set`, `event` or
+  `fields`. A `raiseEvent` step has `event` and `fields`, and no `set`,
+  `connector`, `input`, `output` or `retry`. A decision has no `operation`,
+  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields` or
+  `next`. Neither an operation nor a decision has a task's `label`,
+  `assignee`, `form`, `dueIn` or `outcomes` (`AXC0004`).
 - A task has `label`, `assignee`, `form` and at least one outcome, and no
   `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
-  `output`, `retry` or `next` (`AXC0004`).
+  `output`, `retry`, `event`, `fields` or `next` (`AXC0004`).
 - An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set`,
-  `connector`, `input`, `output`, `retry` or any task property (`AXC0004`).
+  `connector`, `input`, `output`, `retry`, `event`, `fields` or any task
+  property (`AXC0004`).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
   name a declared [role](configuration.md#roles-and-policies), compared
@@ -705,8 +713,10 @@ the next step as usual.
 
 The worker runs the `decision`, `task`, `operation` and `end` steps. A
 `callConnector` operation step stages its call, see
-[Staging and the call](#staging-and-the-call). Each work item of kind
-`process.step` runs the current step of its instance in one transaction:
+[Staging and the call](#staging-and-the-call). A `raiseEvent` operation step
+stores its event, see [Raise event step](#raise-event-step). Each work item
+of kind `process.step` runs the current step of its instance in one
+transaction:
 
 1. It loads the instance. An instance that is missing or not `running` is
    skipped, and the item is deleted with no other write.
@@ -715,8 +725,8 @@ The worker runs the `decision`, `task`, `operation` and `end` steps. A
 3. It reads the subject record and runs the step. An `updateRecord`
    operation first locks the subject record's row, so it reads the latest
    stored version, and a user's write of the same record waits until the
-   step's transaction ends. A `callConnector` step only reads the record, so
-   it takes no lock.
+   step's transaction ends. A `callConnector` or `raiseEvent` step only
+   reads the record, so it takes no lock.
    - A **decision** evaluates its branches in order and takes the first `when`
      that is true. A `when` that gives `null` counts as false. When no branch
      is true, it takes `otherwise`. The instance stays `running` on the next
@@ -726,6 +736,9 @@ The worker runs the `decision`, `task`, `operation` and `end` steps. A
    - A **`callConnector`** operation evaluates each `input` expression on the
      record. A required input that gives `null` fails the step. The instance
      becomes `waiting` on the step.
+   - A **`raiseEvent`** operation evaluates each `fields` expression on the
+     record. A payload field that gives `null` is stored as `null`. The
+     instance stays `running` on its `next` step.
    - A **task** evaluates its assignee. A `user` expression gives the user id,
      and one that gives `null`, blank text or a run-time error fails the step.
      A `role` is the role name. The instance becomes `waiting` on the task
@@ -748,6 +761,9 @@ The worker runs the `decision`, `task`, `operation` and `end` steps. A
    A `callConnector` step then inserts its call into `axis.connector_calls`
    as `pending`, see [Staging and the call](#staging-and-the-call).
 
+   A `raiseEvent` step then inserts its occurrence into `axis.events`, see
+   [Raise event step](#raise-event-step).
+
    An `updateRecord` operation then writes the values the way a record
    update does. Each value must fit its field, and a `null` for a required
    field is refused. Computed fields are recomputed, validations run, and the
@@ -759,22 +775,22 @@ The worker runs the `decision`, `task`, `operation` and `end` steps. A
      subject record, with the instance id. Its details are
      `{ "version", "fields" }`, as the
      [record API](record-api.md#audit-records-and-history) writes them.
-   - A decision and an `updateRecord` operation write `process.stepCompleted`
-     with details `{ "step", "next" }`.
+   - A decision, an `updateRecord` operation and a `raiseEvent` operation
+     write `process.stepCompleted` with details `{ "step", "next" }`.
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
    - A `callConnector` step writes `connector.callStaged` with details
      `{ "step", "connector", "operation", "operationId" }`.
    - An end step writes `process.completed` with details `{ "step" }`.
-7. A decision and an `updateRecord` operation insert the work item of the
-   next step. A task step inserts none, because the instance waits for the
-   task. A `callConnector` step inserts a `connector.call` item for its call
-   instead.
+7. A decision, an `updateRecord` operation and a `raiseEvent` operation
+   insert the work item of the next step. A task step inserts none, because
+   the instance waits for the task. A `callConnector` step inserts a
+   `connector.call` item for its call instead.
 
 Any exception in the step, such as a `when` that divides by zero, a missing
 subject record, a record write that a validation refuses or a task assignee
 that gives no user, rolls all of it back. So the record keeps its values and
-version, and no task or connector call is stored. The error of a refused write
-names each field pointer and message, such as
+version, and no task, connector call or event occurrence is stored. The
+error of a refused write names each field pointer and message, such as
 `The record update was rejected: /values/amount: request.amountNegative`. A
 following transaction then sets the instance to `failed` with its `ended_at`
 time and the next revision, writes a history row with the error, and writes
@@ -1155,12 +1171,16 @@ again with the stored input under the same operation identity.
 ## Events and triggers
 
 This section follows
-[D26](../decisions.md#d26-events-and-triggers--agreed). Only the
+[D26](../decisions.md#d26-events-and-triggers--agreed). The
 [event resource](configuration.md#event-resource) and its compile checks are
-built. *(planned for M5)* The rest is not built yet. A `raiseEvent` step raises an [event](configuration.md#event-resource)
-for its subject record. A [trigger](configuration.md#trigger-resource) starts
-a process for one record when an event is raised, when a record is created or
-updated, or when a schedule is due. Every start happens at most once for the
+built. So is the `raiseEvent` step, which stores each occurrence, see
+[Raise event step](#raise-event-step). *(planned for M5)* Delivering an
+occurrence to triggers, and the triggers themselves, are not built yet. Until
+then, a raised event starts nothing. A `raiseEvent` step raises an
+[event](configuration.md#event-resource) for its subject record. A
+[trigger](configuration.md#trigger-resource) starts a process for one record
+when an event is raised, when a record is created or updated, or when a
+schedule is due. Every start happens at most once for the
 same cause, even after a worker crash.
 
 ### Raise event step
@@ -1192,29 +1212,44 @@ The fixture files do not change until the build issues add events.
 - `fields` maps payload fields to expressions over the subject record.
 - `next` names the step that follows.
 
-The compiler reports these as compile errors. Their codes come with the
-build issue.
+The compiler reports these as compile errors.
 
-- The event exists, and its entity is the subject entity.
-- Each payload field of the event has exactly one key in `fields`, and each
-  key names a payload field.
+- `event` names a loaded event, ignoring letter case (`AXC0125` at
+  `/steps/{i}/event`). A name whose event file was not loaded because of its
+  own errors is not reported again. The event's entity is the subject entity
+  (`AXC0126` at `/steps/{i}/event`). That is not checked when either entity
+  is unknown.
+- With a known event, each key of `fields` names a payload field of the
+  event, ignoring letter case, that no earlier key of the step names
+  (`AXC0127` at `/steps/{i}/fields/{key}`). Each payload field of the event
+  has a key (`AXC0128` at `/steps/{i}/fields`, once for each missing field).
+  A field with no key is an error, not an implicit `null`.
 - Each expression fits its payload field's type, with the same scope as a
-  decision's `when`.
+  decision's `when`. A problem is reported at `/steps/{i}/fields/{key}` with
+  its expression code, such as `AXC0048` for a value of the wrong type.
 - A `raiseEvent` step has `event`, `fields` and `next`, and no `set`,
-  `connector` or `input`.
+  `connector`, `input`, `output` or `retry` (`AXC0004`).
+
+A compiled step holds the event's declared name, and its payload in the
+event's declaration order.
 
 **The step's transaction** runs as other steps do, see
 [Running a step](#running-a-step), and writes these together:
 
-1. It evaluates each `fields` expression on the subject record.
+1. It evaluates each `fields` expression on the subject record. Dates and
+   date-times take the text forms of the
+   [record API](record-api.md#record-shape). A run-time error, such as a
+   division by zero, fails the step, and no occurrence is stored.
 2. It stores the occurrence in `axis.events`, with the subject record, the
    payload and the release the instance is pinned to. The occurrence is kept
    even when no trigger listens, so a later wait for event step can match
-   early events.
-3. It runs the start of each `sync` event trigger for the event, see
-   [Starts from triggers](#starts-from-triggers).
-4. It queues one `event.deliver` work item for the occurrence, even when no
-   `async` trigger listens yet. See [Event delivery](#event-delivery).
+   early events. A step that finds the instance at another revision stores
+   none, so a step run again after a lost lease stores one occurrence.
+3. *(planned for M5)* It runs the start of each `sync` event trigger for the
+   event, see [Starts from triggers](#starts-from-triggers).
+4. *(planned for M5)* It queues one `event.deliver` work item for the
+   occurrence, even when no `async` trigger listens yet. See
+   [Event delivery](#event-delivery).
 5. It writes the step's history row, with output `{ "next", "eventId" }`.
 6. It writes `process.stepCompleted`, as other operations do. Raising an
    event writes no audit record of its own.
@@ -1375,7 +1410,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call. *(planned for M5)* `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. *(planned for M5)* `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call. *(planned for M5)* `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1444,9 +1479,10 @@ database, with history in `axis.__processes_migrations` (see
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
-- `axis.events` *(planned for M5)*: one row per event occurrence, see
+- `axis.events`: one row per event occurrence, see
   [Raise event step](#raise-event-step). Rows are append-only and kept, even
-  when no trigger listens.
+  when no trigger listens. An index on `process_instance_id` finds the
+  events an instance raised.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

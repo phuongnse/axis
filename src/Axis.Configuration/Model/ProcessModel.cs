@@ -10,7 +10,8 @@ namespace Axis.Configuration.Model;
 /// value an operation sets is checked against its field's type over the same scope, and a task's
 /// <c>user</c> assignee is a <c>text</c> expression over that scope too. Every input a connector
 /// call sends is checked against the input's type over that scope, and every output it writes
-/// names a field that fits the output's type.
+/// names a field that fits the output's type. Every payload field a raised event carries is checked
+/// against the field's type over that scope.
 /// </summary>
 public sealed record ProcessModel
 {
@@ -124,6 +125,20 @@ public sealed record ConnectorOutputModel(string Output, string Field);
 /// attempt, and <see cref="Backoff"/> is the delay before the second one.
 /// </summary>
 public sealed record RetryPolicyModel(int Attempts, TimeSpan Backoff);
+
+/// <summary>
+/// A <c>raiseEvent</c> operation step: it raises <see cref="Event"/>, by its declared name, about
+/// the subject record with the payload <see cref="Fields"/> gives, stores the occurrence, and moves
+/// to <see cref="Next"/>.
+/// </summary>
+public sealed record RaiseEventStepModel(string Name, string Event, IReadOnlyList<EventPayloadModel> Fields, string Next) : ProcessStepModel(Name);
+
+/// <summary>
+/// A payload field a <c>raiseEvent</c> step gives: the field's declared name, and the expression
+/// over the subject record that gives its value, checked against the field's type. The fields of a
+/// step are in the event's declaration order.
+/// </summary>
+public sealed record EventPayloadModel(string Field, ExpressionModel Value);
 
 /// <summary>An end step. An instance that reaches it is completed.</summary>
 public sealed record EndStepModel(string Name) : ProcessStepModel(Name);

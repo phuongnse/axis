@@ -109,6 +109,15 @@ public static class ApplicationCompiler
 
         ConnectorResource? FindConnector(string name) => connectorsByName.GetValueOrDefault(name);
 
+        // Event names follow the same rule too.
+        var eventsByName = new Dictionary<string, EventResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var @event in loaded.Events)
+        {
+            eventsByName.TryAdd(@event.Name, @event);
+        }
+
+        EventResource? FindEvent(string name) => eventsByName.GetValueOrDefault(name);
+
         // Endpoint names follow the same rule too.
         var endpointsByName = new Dictionary<string, EndpointResource>(StringComparer.OrdinalIgnoreCase);
         foreach (var endpoint in loaded.Endpoints)
@@ -163,6 +172,8 @@ public static class ApplicationCompiler
             loaded.UnloadedRoleNames,
             FindConnector,
             loaded.UnloadedConnectorNames,
+            FindEvent,
+            loaded.UnloadedEventNames,
             textKeys,
             rules,
             diagnostics);
@@ -214,7 +225,7 @@ public static class ApplicationCompiler
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, rules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules)).ToList(),

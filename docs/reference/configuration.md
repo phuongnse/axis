@@ -200,9 +200,9 @@ flowchart LR
      `/steps/{i}/branches/{j}/when` with its
      [expression diagnostic](expressions.md#diagnostics) code. The
      `startCondition` message joins the `AXC0028` check. An operation step
-     whose `operation` is not `updateRecord` or `callConnector`, matched
-     exactly, is `AXC0078` at `/steps/{i}/operation`, and its other
-     properties are not checked. Each key of an
+     whose `operation` is not `updateRecord`, `callConnector` or
+     `raiseEvent`, matched exactly, is `AXC0078` at `/steps/{i}/operation`,
+     and its other properties are not checked. Each key of an
      `updateRecord` `set` must name a field of the entity, ignoring letter
      case, that no earlier key of the step names, otherwise it is `AXC0079`.
      A computed field, a sequence field or a child collection is `AXC0080`.
@@ -229,11 +229,23 @@ flowchart LR
      a field of the same type, and an `integer` output also fits a `decimal`
      field. Each of these is reported at `/steps/{i}/output/{key}`. A retry
      `backoff` that is not a positive whole-number duration is `AXC0109` at
-     `/steps/{i}/retry/backoff`. A task step's `assignee` without exactly one
-     of `user` and `role` is `AXC0081` at `/steps/{i}/assignee`. A `role`
-     that names no declared [role](#roles-and-policies), compared exactly, is
-     `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file was not
-     loaded because of its own errors is not reported again. A `user`
+     `/steps/{i}/retry/backoff`. A `raiseEvent` step's `event` that names no
+     loaded [event](#event-resource), ignoring letter case, is `AXC0125` at
+     `/steps/{i}/event`. A name whose event file was not loaded because of
+     its own errors is not reported again. An event about another entity
+     than the process's is `AXC0126` at `/steps/{i}/event`. It is not
+     checked when either entity is unknown. With an unknown event, the
+     step's `fields` are not checked. A `fields` key that names no payload
+     field of the event, ignoring letter case, or a field an earlier key
+     already names, is `AXC0127`. Each `fields` expression is parsed and
+     type-checked against its payload field's type, with the same scope as a
+     `when`. Each of these is reported at `/steps/{i}/fields/{key}`. A
+     payload field that no key names is `AXC0128` at `/steps/{i}/fields`. A
+     task step's `assignee` without exactly one of `user` and `role` is
+     `AXC0081` at `/steps/{i}/assignee`. A `role` that names no declared
+     [role](#roles-and-policies), compared exactly, is `AXC0089` at
+     `/steps/{i}/assignee/role`. A name whose role file was not loaded
+     because of its own errors is not reported again. A `user`
      expression is parsed and type-checked as `text`, with the same scope
      as a `when`, and a problem is reported at `/steps/{i}/assignee/user`.
      A task's `form` that names no loaded form, ignoring letter case, is
@@ -249,9 +261,11 @@ flowchart LR
      operation without `operation` or `next`, an `updateRecord` step without
      `set` or with `connector`, `input`, `output` or `retry`, a
      `callConnector` step without `connector` or `input` or with `set`, a
-     retry `attempts` outside 1 to 10, a task without `label`, `assignee`,
-     `form` or an outcome, and an `end` step with `branches`, `otherwise` or
-     any other property, are `AXC0004`. See
+     `raiseEvent` step without `event` or `fields` or with `set`,
+     `connector`, `input`, `output` or `retry`, an `event` or `fields` on
+     any other step, a retry `attempts` outside 1 to 10, a task without
+     `label`, `assignee`, `form` or an outcome, and an `end` step with
+     `branches`, `otherwise` or any other property, are `AXC0004`. See
      [processes](processes.md#compile-checks).
    - **Policies.** Each `roles` entry of a [policy](#roles-and-policies) must
      name a declared role, compared exactly, otherwise it is `AXC0090` at
@@ -564,7 +578,7 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord` or `callConnector`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector` or `raiseEvent`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
 | `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
@@ -611,6 +625,10 @@ sorted by file and then path.
 | `AXC0122` | An endpoint maps a `child-collection` field to something other than the name of a `child-collection` input with the same target. Reported at `/values/{key}`. |
 | `AXC0123` | An endpoint's `output` entry names no field of the entity, ignoring letter case. Reported at `/output/{i}`. |
 | `AXC0124` | An endpoint's `wait` is not a valid ISO 8601 duration, is zero, or is above `PT30S`. Reported at `/wait`. |
+| `AXC0125` | A `raiseEvent` step's `event` names no loaded event, ignoring letter case. Reported at `/steps/{i}/event`. Not reported when the name is an event file that was not loaded because of its own errors. |
+| `AXC0126` | A `raiseEvent` step's `event` is about another entity than the process's. Reported at `/steps/{i}/event`, naming both entities. Not checked when either entity is unknown. |
+| `AXC0127` | A key of a `raiseEvent` step's `fields` names no payload field of the event, or a field an earlier key of the step already names, ignoring letter case. Reported at `/steps/{i}/fields/{key}`. |
+| `AXC0128` | A payload field of the event that no key of a `raiseEvent` step's `fields` names. Reported at `/steps/{i}/fields`, once for each missing field. |
 
 ## Startup activation
 
