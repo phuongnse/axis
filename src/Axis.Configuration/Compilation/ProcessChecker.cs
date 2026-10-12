@@ -14,23 +14,26 @@ namespace Axis.Configuration.Compilation;
 /// <c>end</c> step and is in no cycle. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
-/// of at most 3 hops. An operation step runs <c>updateRecord</c> or <c>callConnector</c>. Each
-/// field an <c>updateRecord</c> <c>set</c> names is a field of the subject entity, named once, that
-/// is not computed, numbered by a sequence or a child collection. Each <c>set</c> expression
-/// type-checks against its field's type over the same scope as a condition. A <c>callConnector</c>
-/// step names a loaded connector and one of its operations. Its inputs are inputs of the operation,
+/// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c> or
+/// <c>raiseEvent</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
+/// entity, named once, that is not computed, numbered by a sequence or a child collection. Each
+/// <c>set</c> expression type-checks against its field's type over the same scope as a condition.
+/// A <c>callConnector</c> step names a loaded connector and one of its operations. Its inputs are inputs of the operation,
 /// named once, that cover every required input, and each input expression type-checks against the
 /// input's type over the same scope. Its outputs are outputs of the operation, named once, each
 /// written to its own subject field that an <c>updateRecord</c> could set and whose type fits the
-/// output's. Its retry <c>backoff</c> is a positive fixed duration. A task step's assignee is exactly one of a <c>user</c>, a
+/// output's. Its retry <c>backoff</c> is a positive fixed duration. A <c>raiseEvent</c> step names
+/// a loaded event about the subject entity. Each of its <c>fields</c> keys names a payload field of
+/// the event, named once, every payload field has a key, and each expression type-checks against
+/// the payload field's type over the same scope. A task step's assignee is exactly one of a <c>user</c>, a
 /// <c>text</c> expression over the same scope, and a <c>role</c>, which names a declared role
 /// exactly. Its form is a loaded form over the subject entity, its <c>dueIn</c> is a positive fixed
 /// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
 /// transition. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
-/// unknown step is not also reported as having no path to an end, and a form, entity, role or
-/// connector file that was not loaded because of its own errors is not reported again.
+/// unknown step is not also reported as having no path to an end, and a form, entity, role,
+/// connector or event file that was not loaded because of its own errors is not reported again.
 /// </summary>
 internal static class ProcessChecker
 {
@@ -42,7 +45,8 @@ internal static class ProcessChecker
     /// Checks <paramref name="processes"/>, which come in path order. <paramref name="ownerOf"/>
     /// names the owner of a child entity, or gives null for a root entity.
     /// <paramref name="roleNames"/> holds the declared role names, compared exactly.
-    /// <paramref name="findConnector"/> finds a loaded connector by name, ignoring letter case.
+    /// <paramref name="findConnector"/> finds a loaded connector by name, ignoring letter case, and
+    /// <paramref name="findEvent"/> a loaded event.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -55,6 +59,8 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedRoleNames,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
+        Func<string, EventResource?> findEvent,
+        IReadOnlySet<string> unloadedEventNames,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -96,7 +102,7 @@ internal static class ProcessChecker
                 CheckConditions(process, scope, Report);
             }
 
-            CheckOperations(process, entity, scope, findConnector, unloadedConnectorNames, Report);
+            CheckOperations(process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, Report);
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, roleNames, unloadedRoleNames, Report);
 
@@ -127,13 +133,15 @@ internal static class ProcessChecker
     /// form is resolved and its <c>dueIn</c> becomes a fixed duration. A connector call holds the
     /// declared names of its connector, its operation, its inputs and outputs and their fields. Its
     /// inputs and outputs are in the operation's declaration order, and its retry policy has the
-    /// defaults filled in.
+    /// defaults filled in. A raised event holds the event's declared name, and its payload is in the
+    /// event's declaration order.
     /// </summary>
     public static ProcessModel Build(
         ProcessResource process,
         Func<string, EntityResource?> findEntity,
         Func<string, FormResource?> findForm,
         Func<string, ConnectorResource?> findConnector,
+        Func<string, EventResource?> findEvent,
         IEnumerable<ExpressionRule> rules)
     {
         var entity = findEntity(process.Entity)!;
@@ -203,6 +211,22 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
+        // A checked raise names a loaded event and gives each of its payload fields once.
+        RaiseEventStepModel BuildRaiseEvent(ProcessStepDefinition step)
+        {
+            var @event = findEvent(step.Event!)!;
+            var fields = new Dictionary<string, string>(step.Fields!, StringComparer.OrdinalIgnoreCase);
+            return new RaiseEventStepModel(
+                step.Name,
+                @event.Name,
+                [
+                    .. @event.Fields.Select(field => new EventPayloadModel(
+                        field.Name,
+                        ExpressionModel.Compile(fields[field.Name], scope, ExpressionScopes.TypeOf(field.Type)))),
+                ],
+                Resolve(step.Next!));
+        }
+
         return new ProcessModel
         {
             Id = process.Id,
@@ -222,6 +246,7 @@ internal static class ProcessChecker
                         Resolve(step.Otherwise!)),
                     ProcessStepDefinition.TaskStep => BuildTask(step),
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
+                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.RaiseEvent => BuildRaiseEvent(step),
                     ProcessStepDefinition.OperationStep => new OperationStepModel(
                         step.Name,
                         step.Operation!,
@@ -464,9 +489,9 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks each operation step: its operation is <c>updateRecord</c> or <c>callConnector</c>,
-    /// matched exactly as a step <c>type</c> is. A connector call is checked by
-    /// <see cref="CheckConnectorCall"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
+    /// Checks each operation step: its operation is <c>updateRecord</c>, <c>callConnector</c> or
+    /// <c>raiseEvent</c>, matched exactly as a step <c>type</c> is. A connector call is checked by
+    /// <see cref="CheckConnectorCall"/>, and a raised event by <see cref="CheckRaiseEvent"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
     /// of <paramref name="entity"/>, ignoring letter case, that no earlier key of the step names and
     /// that can be set. Its expression then fits the field's type over <paramref name="scope"/>. The
     /// <c>set</c> is not checked when the subject entity is unknown. The other properties of an
@@ -476,8 +501,11 @@ internal static class ProcessChecker
         ProcessResource process,
         EntityResource? entity,
         ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
+        Func<string, EventResource?> findEvent,
+        IReadOnlySet<string> unloadedEventNames,
         Action<string, string, string> report)
     {
         for (var index = 0; index < process.Steps.Count; index++)
@@ -494,11 +522,17 @@ internal static class ProcessChecker
                 continue;
             }
 
+            if (string.Equals(step.Operation, ProcessStepDefinition.RaiseEvent, StringComparison.Ordinal))
+            {
+                CheckRaiseEvent(step, index, entity, scope, findEntity, findEvent, unloadedEventNames, report);
+                continue;
+            }
+
             if (!string.Equals(step.Operation, ProcessStepDefinition.UpdateRecord, StringComparison.Ordinal))
             {
                 report(
                     DiagnosticCodes.UnknownOperation,
-                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}' and '{ProcessStepDefinition.CallConnector}'.",
+                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}' and '{ProcessStepDefinition.RaiseEvent}'.",
                     $"/steps/{index}/operation");
                 continue;
             }
@@ -730,6 +764,102 @@ internal static class ProcessChecker
                     DiagnosticCodes.InvalidOutputField,
                     $"The output '{output.Name}' is {output.Type}, so it cannot be written to the field '{field.Name}', which is {field.Type}.",
                     keyPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks a <c>raiseEvent</c> step: its event is loaded, unless its file was not loaded because
+    /// of its own errors, ignoring letter case, and the event is about <paramref name="entity"/>.
+    /// Only when the event is found are its <c>fields</c> checked: each key names a payload field of
+    /// the event, ignoring letter case, that no earlier key names, and each expression fits the
+    /// field's type over <paramref name="scope"/>. Every payload field then has a key. The
+    /// expressions and the event's entity are not checked when the subject entity is unknown, and
+    /// the event's entity is not checked when the event's own entity is unknown.
+    /// </summary>
+    private static void CheckRaiseEvent(
+        ProcessStepDefinition step,
+        int index,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
+        Func<string, EventResource?> findEvent,
+        IReadOnlySet<string> unloadedEventNames,
+        Action<string, string, string> report)
+    {
+        var path = $"/steps/{index}";
+        var eventName = step.Event!;
+        if (findEvent(eventName) is not { } @event)
+        {
+            // An event file that was not loaded because of its own errors is not reported again.
+            if (!unloadedEventNames.Contains(eventName))
+            {
+                report(
+                    DiagnosticCodes.UnknownStepEvent,
+                    $"The event '{eventName}' was not found. No loaded event has that name.",
+                    $"{path}/event");
+            }
+
+            return;
+        }
+
+        if (entity is not null && findEntity(@event.Entity) is { } eventEntity && !ReferenceEquals(eventEntity, entity))
+        {
+            report(
+                DiagnosticCodes.StepEventOverOtherEntity,
+                $"The event '{@event.Name}' is about the entity '{eventEntity.Name}'. A step can raise only an event about the process's entity '{entity.Name}'.",
+                $"{path}/event");
+        }
+
+        // The key that first named each payload field, by the field's declared name.
+        var namedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, expression) in step.Fields!)
+        {
+            var keyPath = $"{path}/fields/{key}";
+            var field = @event.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (field is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownEventPayloadField,
+                    $"The field '{key}' was not found. The event '{@event.Name}' has no payload field with that name.",
+                    keyPath);
+                continue;
+            }
+
+            if (!namedBy.TryAdd(field.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownEventPayloadField,
+                    $"The field '{field.Name}' is already given by '{namedBy[field.Name]}' in this step.",
+                    keyPath);
+                continue;
+            }
+
+            // The expression cannot be checked without the entity, nor against a field type that
+            // the event check already reports.
+            if (scope is null || !EventChecker.IsScalar(FieldTypes.Parse(field.Type)))
+            {
+                continue;
+            }
+
+            var parsed = ExpressionParser.Parse(expression);
+            ExpressionDiagnostic? problem = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field.Type)).Diagnostic
+                : parsed.Diagnostic;
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, keyPath);
+            }
+        }
+
+        foreach (var field in @event.Fields)
+        {
+            if (!namedBy.ContainsKey(field.Name))
+            {
+                report(
+                    DiagnosticCodes.MissingEventPayloadField,
+                    $"The field '{field.Name}' is a payload field of the event '{@event.Name}', but the step does not give it.",
+                    $"{path}/fields");
             }
         }
     }

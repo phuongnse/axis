@@ -5,7 +5,7 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, their human tasks, their staged connector calls, the receipts of starts and of
+/// their steps, their human tasks, their staged connector calls, the events they raised, the receipts of starts and of
 /// endpoint calls that carried an <c>Idempotency-Key</c>, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
@@ -25,6 +25,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ProcessTaskRow> Tasks => Set<ProcessTaskRow>();
 
     public DbSet<ConnectorCallRow> ConnectorCalls => Set<ConnectorCallRow>();
+
+    public DbSet<EventRow> Events => Set<EventRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
@@ -144,6 +146,27 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)
                 .HasConstraintName("fk_connector_calls_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<EventRow>(@event =>
+        {
+            @event.ToTable("events");
+            @event.HasKey(e => e.Id).HasName("pk_events");
+            @event.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
+            @event.Property(e => e.ApplicationId).HasColumnName("application_id");
+            @event.Property(e => e.Event).HasColumnName("event");
+            @event.Property(e => e.ReleaseId).HasColumnName("release_id");
+            @event.Property(e => e.EntityId).HasColumnName("entity_id");
+            @event.Property(e => e.SubjectId).HasColumnName("subject_id");
+            @event.Property(e => e.Payload).HasColumnName("payload").HasColumnType("jsonb");
+            @event.Property(e => e.ProcessInstanceId).HasColumnName("process_instance_id");
+            @event.Property(e => e.RaisedAt).HasColumnName("raised_at").HasDefaultValueSql("now()");
+            @event.HasIndex(e => e.ProcessInstanceId).HasDatabaseName("ix_events_process_instance_id");
+            @event.HasOne<ProcessInstanceRow>()
+                .WithMany()
+                .HasForeignKey(e => e.ProcessInstanceId)
+                .HasConstraintName("fk_events_process_instances_process_instance_id")
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

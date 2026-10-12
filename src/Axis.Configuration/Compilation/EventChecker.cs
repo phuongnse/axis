@@ -86,6 +86,7 @@ internal static class EventChecker
         };
     }
 
-    private static bool IsScalar(FieldType type) =>
+    /// <summary>Whether <paramref name="type"/> is a type an event field may have.</summary>
+    internal static bool IsScalar(FieldType type) =>
         type is FieldType.Text or FieldType.Integer or FieldType.Decimal or FieldType.Boolean or FieldType.Date or FieldType.DateTime;
 }

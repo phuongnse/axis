@@ -29,6 +29,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
     `axis.connector_calls` (one row per staged connector call),
+    `axis.events` (one row per event occurrence that a step raised),
     `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start), `axis.endpoint_receipts` (the record and
     instance of each endpoint call's `Idempotency-Key`, unique per

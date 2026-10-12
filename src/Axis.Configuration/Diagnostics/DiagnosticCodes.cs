@@ -125,4 +125,9 @@ public static class DiagnosticCodes
     public const string InvalidEndpointCollectionValue = "AXC0122";
     public const string UnknownEndpointOutputField = "AXC0123";
     public const string InvalidEndpointWait = "AXC0124";
+
+    public const string UnknownStepEvent = "AXC0125";
+    public const string StepEventOverOtherEntity = "AXC0126";
+    public const string UnknownEventPayloadField = "AXC0127";
+    public const string MissingEventPayloadField = "AXC0128";
 }

@@ -37,6 +37,12 @@ public sealed class ProcessCompilerTests
           ] }
         """;
 
+    /// <summary>The event <c>OrderPlaced</c> about an <c>Order</c>, with the payload fields <c>amount</c> (decimal) and <c>status</c> (text).</summary>
+    private const string OrderPlaced = """
+        { "id": "12121212-1212-4212-8212-121212121201", "kind": "event", "name": "OrderPlaced", "formatVersion": 1, "entity": "Order",
+          "fields": [ { "name": "amount", "type": "decimal" }, { "name": "status", "type": "text" } ] }
+        """;
+
     private const string CallCreateOrder = """ "connector": { "name": "Purchasing", "operation": "createOrder" }, """;
     private const string CreateOrderInput = """ "input": { "reference": "status", "amount": "amount" }, """;
 
@@ -348,8 +354,8 @@ public sealed class ProcessCompilerTests
     }
 
     [Theory]
-    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord' and 'callConnector'.")]
-    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord' and 'callConnector'.")]
+    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord', 'callConnector' and 'raiseEvent'.")]
+    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord', 'callConnector' and 'raiseEvent'.")]
     [InlineData("updateRecord", """{ "nope": "'x'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/nope", "The field 'nope' was not found. The entity 'Order' has no field with that name.")]
     [InlineData("updateRecord", """{ "status": "'x'", "STATUS": "'y'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/STATUS", "The field 'status' is already set by 'status' in this step.")]
     [InlineData("updateRecord", """{ "large": "true" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/large", "The field 'large' is computed, so an operation cannot set it.")]
@@ -579,6 +585,150 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_raised_event_compiles_with_its_declared_name_and_its_payload_in_event_order()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "orderPLACED",
+                "fields": { "STATUS": "status", "Amount": "amount * 2" }, "next": "DONE" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "announce"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var raise = Assert.IsType<RaiseEventStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(("announce", "OrderPlaced", "done"), (raise.Name, raise.Event, raise.Next));
+        Assert.Equal(
+            [("amount", "amount * 2"), ("status", "status")],
+            raise.Fields.Select(field => (field.Field, field.Value.Expression)));
+        Assert.Equal(20m, Evaluate(raise.Fields[0].Value, 10m));
+        Assert.Equal("text", raise.Fields[1].Value.Check.Type?.ToString());
+    }
+
+    [Theory]
+    [InlineData(
+        "Nope", """{ "amount": "amount", "status": "status" }""",
+        DiagnosticCodes.UnknownStepEvent, "/steps/0/event", "The event 'Nope' was not found. No loaded event has that name.")]
+    [InlineData(
+        "CustomerJoined", """{ "name": "status" }""",
+        DiagnosticCodes.StepEventOverOtherEntity, "/steps/0/event", "The event 'CustomerJoined' is about the entity 'Customer'. A step can raise only an event about the process's entity 'Order'.")]
+    [InlineData(
+        "OrderPlaced", """{ "amount": "'many'", "status": "status" }""",
+        ExpressionDiagnosticCodes.ResultTypeMismatch, "/steps/0/fields/amount", "The expression must be decimal, but it is text.")]
+    [InlineData(
+        "OrderPlaced", """{ "amount": "amount", "status": "status", "nope": "1" }""",
+        DiagnosticCodes.UnknownEventPayloadField, "/steps/0/fields/nope", "The field 'nope' was not found. The event 'OrderPlaced' has no payload field with that name.")]
+    [InlineData(
+        "OrderPlaced", """{ "amount": "amount", "status": "status", "AMOUNT": "1" }""",
+        DiagnosticCodes.UnknownEventPayloadField, "/steps/0/fields/AMOUNT", "The field 'amount' is already given by 'amount' in this step.")]
+    [InlineData(
+        "OrderPlaced", """{ "amount": "amount" }""",
+        DiagnosticCodes.MissingEventPayloadField, "/steps/0/fields", "The field 'status' is a payload field of the event 'OrderPlaced', but the step does not give it.")]
+    public void A_raised_event_problem_is_reported_at_its_path_in_the_step_and_gives_no_model(
+        string @event, string fields, string code, string path, string message)
+    {
+        using var folder = Folder(Process("Order", $$"""
+            [
+              { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "{{@event}}", "fields": {{fields}}, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "announce"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("customer.nope", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData("status +", ExpressionDiagnosticCodes.SyntaxError)]
+    public void A_payload_expression_gets_the_usual_expression_diagnostics_at_its_field(string expression, string code)
+    {
+        using var folder = Folder(Process("Order", $$"""
+            [
+              { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced",
+                "fields": { "amount": "amount", "status": "{{expression}}" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "announce"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "/steps/0/fields/status"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_raised_event_over_an_unknown_entity_still_checks_its_event_and_payload_keys()
+    {
+        using var folder = Folder(Process("Nope", """
+            [
+              { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced",
+                "fields": { "amount": "nope", "nope": "nope" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "announce"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownProcessEntity, "/entity"),
+                (DiagnosticCodes.MissingEventPayloadField, "/steps/0/fields"),
+                (DiagnosticCodes.UnknownEventPayloadField, "/steps/0/fields/nope"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+    }
+
+    [Fact]
+    public void An_event_whose_file_was_not_loaded_is_not_reported_again_by_a_raise()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "OrderShipped", "fields": {}, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "announce"))
+            .With("events/order-shipped.json", """{ "id": "12121212-1212-4212-8212-121212121209", "kind": "event", "name": "OrderShipped", "formatVersion": 1 }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(
+            (DiagnosticCodes.SchemaViolation, "events/order-shipped.json"), (diagnostic.Code, diagnostic.File)));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData(
+        """{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": {}, "set": { "status": "'x'" }, "next": "done" }""",
+        "/steps/0/set")]
+    [InlineData(
+        """{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": {}, "input": {}, "next": "done" }""",
+        "/steps/0/input")]
+    [InlineData(
+        """{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "event": "OrderPlaced", "next": "done" }""",
+        "/steps/0/event")]
+    [InlineData(
+        """{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "fields": {}, "next": "done" }""",
+        "/steps/0/fields")]
+    public void A_property_of_another_operation_on_a_raise_and_an_event_on_another_operation_are_schema_violations(string step, string path)
+    {
+        using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"), Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void An_operation_next_joins_the_step_graph_checks()
     {
         using var folder = Folder(Process("Order", """
@@ -640,6 +790,15 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "input": {} }""")]
     [InlineData("""{ "name": "submit", "type": "end", "connector": { "name": "Purchasing", "operation": "createOrder" } }""")]
     [InlineData("""{ "name": "submit", "type": "end", "output": {} }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "fields": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": { "amount": "" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": { "not a name": "1" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": {}, "retry": { "attempts": 2 }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": {}, "output": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "event": "OrderPlaced" }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "fields": {} }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "event": "OrderPlaced" }""")]
     public void A_step_shape_the_schema_refuses_is_a_schema_violation(string step)
     {
         using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"));
@@ -941,7 +1100,8 @@ public sealed class ProcessCompilerTests
     /// An application with an <c>Order</c> entity that references a <c>Customer</c>, owns <c>OrderLine</c> rows and
     /// takes its number from the <c>OrderNumber</c> sequence, a <c>Customer</c> that references the customer who
     /// referred it, the rule <c>NeedsReview</c>, the forms <c>OrderReview</c> over <c>Order</c> and <c>CustomerCard</c>
-    /// over <c>Customer</c>, the role <c>finance</c>, <paramref name="process"/>, and
+    /// over <c>Customer</c>, the role <c>finance</c>, the events <c>OrderPlaced</c> about <c>Order</c> and
+    /// <c>CustomerJoined</c> about <c>Customer</c>, <paramref name="process"/>, and
     /// <paramref name="connector"/> as <c>connectors/purchasing.json</c> when it is given.
     /// </summary>
     private static TemporaryFolder Folder(string process, string? connector = null)
@@ -986,6 +1146,11 @@ public sealed class ProcessCompilerTests
             .With("forms/customer-card.json", """
                 { "id": "99999999-9999-4999-8999-999999999902", "kind": "form", "name": "CustomerCard", "formatVersion": 1, "entity": "Customer",
                   "sections": [ { "title": { "textKey": "order.review" }, "fields": [ { "field": "name" } ] } ] }
+                """)
+            .With("events/order-placed.json", OrderPlaced)
+            .With("events/customer-joined.json", """
+                { "id": "12121212-1212-4212-8212-121212121202", "kind": "event", "name": "CustomerJoined", "formatVersion": 1, "entity": "Customer",
+                  "fields": [ { "name": "name", "type": "text" } ] }
                 """)
             .With("processes/order-review.json", process);
         return connector is null ? folder : folder.With("connectors/purchasing.json", connector);

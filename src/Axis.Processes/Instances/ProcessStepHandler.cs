@@ -11,8 +11,9 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Runs the current step of a process instance on the release the instance is pinned to. The step
 /// commits in the work item's transaction: an operation's record write, a task step's open human
-/// task, a <c>callConnector</c> step's staged call, the new instance state and revision, a step
-/// history row, its <c>system</c> audit records and the next work item. A task step leaves the
+/// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence,
+/// the new instance state and revision, a step history row, its <c>system</c> audit records and
+/// the next work item. An event occurrence is delivered to no trigger yet. A task step leaves the
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
 /// inside the transaction. A step that finds the instance at another revision than it loaded writes
@@ -126,6 +127,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
         NewConnectorCall? call = null;
+        NewEvent? occurrence = null;
         switch (step)
         {
             case DecisionStepModel decisionStep:
@@ -213,6 +215,30 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 };
                 action = AuditActions.ConnectorCallStaged;
                 break;
+            case RaiseEventStepModel raiseStep:
+                if (!process.TryGetStep(raiseStep.Next, out var following))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{raiseStep.Next}'.", instance, input);
+                }
+
+                var raised = model.Events.FirstOrDefault(candidate => string.Equals(candidate.Name, raiseStep.Event, StringComparison.OrdinalIgnoreCase))
+                    ?? throw Failure($"The release has no event '{raiseStep.Event}'.", instance, input);
+                occurrence = new NewEvent(
+                    Guid.CreateVersion7(),
+                    instance.ApplicationId,
+                    raised.Name,
+                    instance.ReleaseId,
+                    raised.Entity.Id,
+                    instance.SubjectId,
+                    await PayloadAsync(context, model, entity, record, raiseStep, instance, input, cancellationToken),
+                    instance.Id);
+                state = ProcessStarts.Running;
+                nextStep = following.Name;
+                decision = null;
+                output = new JsonObject { ["next"] = following.Name, ["eventId"] = occurrence.Id };
+                details = new JsonObject { ["step"] = step.Name, ["next"] = following.Name };
+                action = AuditActions.ProcessStepCompleted;
+                break;
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
@@ -258,6 +284,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         if (call is not null)
         {
             await ConnectorCalls.InsertAsync(context.Transaction, call, cancellationToken);
+        }
+
+        if (occurrence is not null)
+        {
+            await ProcessEvents.InsertAsync(context.Transaction, occurrence, cancellationToken);
         }
 
         await ProcessSteps.InsertHistoryAsync(
@@ -444,22 +475,60 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 throw Failure($"The required input '{mapping.Input}' of the step '{step.Name}' gave no value.", instance, input);
             }
 
-            body[mapping.Input] = result.Value switch
-            {
-                null => null,
-                string text => JsonValue.Create(text),
-                long number => JsonValue.Create(number),
-                decimal number => JsonValue.Create(number),
-                bool flag => JsonValue.Create(flag),
-                DateOnly date => JsonValue.Create(date.ToString(DateFormat, CultureInfo.InvariantCulture)),
-                DateTimeOffset time => JsonValue.Create(time.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
-                Guid id => JsonValue.Create(id.ToString("D")),
-                var other => throw Failure($"The input '{mapping.Input}' of the step '{step.Name}' gave a value of type '{other.GetType().Name}'.", instance, input),
-            };
+            body[mapping.Input] = ToJson(result.Value, $"input '{mapping.Input}'", step, instance, input);
         }
 
         return body;
     }
+
+    /// <summary>
+    /// Evaluates each payload field of a <c>raiseEvent</c> step, in the event's declaration order,
+    /// into the payload the occurrence stores. Dates and date-times take the record API's text
+    /// forms, and a field that gives null is stored as null. A field that fails at run time fails
+    /// the step.
+    /// </summary>
+    private static async Task<JsonObject> PayloadAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        EntityModel entity,
+        Record record,
+        RaiseEventStepModel step,
+        LoadedInstance instance,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        var payload = new JsonObject();
+        foreach (var field in step.Fields)
+        {
+            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, field.Value, instance.Now, cancellationToken);
+            if (result.Error is { } error)
+            {
+                throw Failure(error.Message, instance, input);
+            }
+
+            payload[field.Field] = ToJson(result.Value, $"field '{field.Field}'", step, instance, input);
+        }
+
+        return payload;
+    }
+
+    /// <summary>
+    /// A value an expression gave, in the record API's JSON form. <paramref name="name"/> names
+    /// what gave it, such as <c>input 'amount'</c>, for the error of a value with no JSON form.
+    /// </summary>
+    private static JsonValue? ToJson(object? value, string name, ProcessStepModel step, LoadedInstance instance, JsonObject input) =>
+        value switch
+        {
+            null => null,
+            string text => JsonValue.Create(text),
+            long number => JsonValue.Create(number),
+            decimal number => JsonValue.Create(number),
+            bool flag => JsonValue.Create(flag),
+            DateOnly date => JsonValue.Create(date.ToString(DateFormat, CultureInfo.InvariantCulture)),
+            DateTimeOffset time => JsonValue.Create(time.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
+            Guid id => JsonValue.Create(id.ToString("D")),
+            var other => throw Failure($"The {name} of the step '{step.Name}' gave a value of type '{other.GetType().Name}'.", instance, input),
+        };
 
     /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
     internal static string Describe(RecordWriteResult result) =>

@@ -1,0 +1,11 @@
+{
+  "id": "6495fa36-34de-4850-bacf-6df3f86a325d",
+  "kind": "event",
+  "name": "RequestNoted",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "ratio", "type": "decimal" }
+  ]
+}

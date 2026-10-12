@@ -93,6 +93,12 @@
             "backoff": { "type": "string", "minLength": 1 }
           }
         },
+        "event": { "$ref": "#/$defs/name" },
+        "fields": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
         "next": { "$ref": "#/$defs/name" },
         "label": { "$ref": "#/$defs/textReference" },
         "assignee": { "$ref": "#/$defs/assignee" },
@@ -116,6 +122,8 @@
               "input": false,
               "output": false,
               "retry": false,
+              "event": false,
+              "fields": false,
               "next": false,
               "label": false,
               "assignee": false,
@@ -138,6 +146,8 @@
               "input": false,
               "output": false,
               "retry": false,
+              "event": false,
+              "fields": false,
               "next": false
             }
           }
@@ -169,6 +179,8 @@
               "input": false,
               "output": false,
               "retry": false,
+              "event": false,
+              "fields": false,
               "next": false,
               "label": false,
               "assignee": false,
@@ -185,7 +197,7 @@
           },
           "then": {
             "required": ["set"],
-            "properties": { "connector": false, "input": false, "output": false, "retry": false }
+            "properties": { "connector": false, "input": false, "output": false, "retry": false, "event": false, "fields": false }
           }
         },
         {
@@ -195,7 +207,17 @@
           },
           "then": {
             "required": ["connector", "input"],
-            "properties": { "set": false }
+            "properties": { "set": false, "event": false, "fields": false }
+          }
+        },
+        {
+          "if": {
+            "required": ["type", "operation"],
+            "properties": { "type": { "const": "operation" }, "operation": { "const": "raiseEvent" } }
+          },
+          "then": {
+            "required": ["event", "fields"],
+            "properties": { "set": false, "connector": false, "input": false, "output": false, "retry": false }
           }
         }
       ]
