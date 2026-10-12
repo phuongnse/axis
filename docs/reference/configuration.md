@@ -895,6 +895,163 @@ The sample's `PurchaseRequest` entity will gain a `purchaseOrderNumber`
 `text` field, which the call writes. The sample files do not change until
 the build issues add connectors.
 
+## Events and triggers
+
+*(planned for M5)* This section follows
+[D26](../decisions.md#d26-events-and-triggers--agreed). None of it is built
+yet. An `event` resource names something that happened to one record. A
+`trigger` resource starts a process for one record when something happens:
+an event is raised, a record is created or updated, or a schedule is due. How
+a trigger starts a process, and when it skips the start, is in
+[Events and triggers](processes.md#events-and-triggers).
+
+The examples use the E2E fixture application in `tests/e2e/fixtures/e2e-app`,
+with its `Note` entity, its `NoteRows` data source and its `NoteReview` and
+`NoteClose` processes. The fixture files do not change until the build issues
+add events and triggers.
+
+### Event resource
+
+An event about a note that was closed, in `events/note-closed.json`:
+
+```json
+{
+  "id": "f86ca48b-4afc-4060-9e40-c423522ea71d",
+  "kind": "event",
+  "name": "NoteClosed",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [
+    { "name": "priority", "type": "integer" },
+    { "name": "amount", "type": "decimal" }
+  ]
+}
+```
+
+- `entity` names the entity the event is about. It is not a child entity.
+  Each occurrence names one record of it.
+- `fields` lists the typed payload fields. Their types are the
+  [rule parameter types](#resource-file-shape): `text`, `integer`, `decimal`,
+  `boolean`, `date` and `date-time`.
+- Field names are unique within the event, ignoring letter case.
+- A [raise event step](processes.md#raise-event-step) raises the event for its
+  subject record. Events raised by the platform itself come later.
+
+### Trigger resource
+
+Every trigger file has `"kind": "trigger"`. Its trigger kind goes in `type`:
+`event`, `dataChange` or `schedule`. `kind` stays the resource kind, as with
+steps, fields and widgets, see [processes](processes.md#resource-shape).
+Every trigger names the `process` it starts, and each start is for one record
+of the process's subject entity.
+
+**Event trigger.** It starts `NoteReview` for each closed note of priority 3
+or more, in `triggers/review-closed-notes.json`:
+
+```json
+{
+  "id": "e348a793-af68-42ce-83b5-336a9b10c7f6",
+  "kind": "trigger",
+  "name": "ReviewClosedNotes",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "NoteClosed",
+  "when": "priority >= 3",
+  "mode": "async",
+  "process": "NoteReview"
+}
+```
+
+- `event` names the event. Its entity is the process's subject entity, and
+  the start is for the record the occurrence names.
+- `when` is optional. It is a boolean expression over the payload fields.
+- `mode` is `async` or `sync`, and defaults to `async`.
+  - `async`: the worker delivers the occurrence later, and starts the process
+    at most once per occurrence and trigger.
+  - `sync`: the start commits in the transaction of the step that raised the
+    event, so both commit or neither does.
+
+**Data change trigger.** It starts `NoteReview` when a note is created, or
+when its `amount` changes, and the amount is 1000 or more, in
+`triggers/review-large-notes.json`:
+
+```json
+{
+  "id": "3cefd292-6c4c-4061-83e6-673993c51421",
+  "kind": "trigger",
+  "name": "ReviewLargeNotes",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Note",
+  "on": ["create", "update"],
+  "fields": ["amount"],
+  "when": "amount >= 1000",
+  "process": "NoteReview"
+}
+```
+
+- `entity` names the entity whose records are watched. It is the process's
+  subject entity.
+- `on` is a non-empty list of `create` and `update`. `delete` comes later,
+  because a deleted record cannot be a subject.
+- `fields` is optional. On an update, the trigger fires only when one of the
+  named fields changed. A create always passes it.
+- `when` is optional. It is a boolean expression over the new record, with
+  the same scope as a process's `when`.
+- It fires on every committed write through the record command: the record
+  API, a task form save, an `updateRecord` step and a connector output.
+
+**Schedule trigger.** It starts `NoteClose` every night at 02:00 in Ho Chi
+Minh City, for each note the `NoteRows` data source returns, in
+`triggers/close-notes-nightly.json`:
+
+```json
+{
+  "id": "26dfa49f-47d1-495d-b021-dabb0d9cbda8",
+  "kind": "trigger",
+  "name": "CloseNotesNightly",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 2 * * *",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "dataSource": "NoteRows",
+  "parameters": {},
+  "process": "NoteClose"
+}
+```
+
+- `schedule` is a standard 5-field cron expression: minute, hour, day of the
+  month, month and day of the week.
+- `timeZone` is required. It is an IANA time zone id, such as
+  `Asia/Ho_Chi_Minh`. It does not settle the application time zone rule of
+  [D22](../decisions.md#d22-current-time-and-time-zones--agreed).
+- `dataSource` names a [data source](data-sources.md) that is not grouped.
+  Its root entity is the process's subject entity. Each occurrence starts the
+  process for every row it returns, in record id order. The data source's
+  `pageSize` and `sort` do not apply.
+- `parameters` maps the data source's declared parameters to literal values.
+  It may be left out when there are none.
+
+The compiler reports these as compile errors. Their codes come with the
+build issue.
+
+- The `process` exists.
+- The subject entity matches. The event's entity, the `entity`, or the data
+  source's root entity is the process's subject entity.
+- The `event` exists.
+- An event trigger's `when` sees only the payload fields and gives a boolean.
+- A data change trigger's `when` has the scope of a process expression over
+  the new record, and gives a boolean.
+- `on` is non-empty and holds only `create` and `update`.
+- Each name in `fields` names a field of the entity that is not computed.
+- `mode` is `async` or `sync`.
+- `schedule` is a valid cron expression.
+- `timeZone` is a known IANA time zone id.
+- The `dataSource` exists and is not grouped.
+- Each `parameters` key names a declared parameter of the data source, with
+  a literal value of its type.
+- Each `type` has only its own properties.
+
 ## Roles and policies
 
 This section follows

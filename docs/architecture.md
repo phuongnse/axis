@@ -25,9 +25,11 @@ flowchart LR
   endpoints require a session.
 - **Axis.Worker** executes durable work. So far it runs work items, and
   through them the `decision`, `task`, `operation` and `end` steps of process
-  instances. Wait for event, timer and sub-process steps come later. Outbox
-  delivery, triggers and schedules come later *(planned for M5)*. It loads the
-  same modules as the server.
+  instances. Wait for event, timer and sub-process steps come later.
+  *(planned for M5)* It will deliver events to async event triggers, and run
+  schedule triggers and their fan-out, see
+  [events and triggers](reference/processes.md#events-and-triggers). It loads
+  the same modules as the server.
 - **Platform database** stores installation-level data: the tenant directory
   and platform settings *(tenant directory planned for M9; tenants come from
   server configuration until then)*.
@@ -44,7 +46,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items, decision, task, operation and end steps, task API; outbox (M5)
+  Axis.Processes/         work items, decision, task, operation and end steps, task API; events and triggers (M5)
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
@@ -488,7 +490,8 @@ to the draft. Only another grant can make it readable.
   - audit records
   - the next work item
   - staged connector calls and their work items *(planned for M5)*
-  - outbox items for event delivery *(planned for M5)*
+  - event occurrences, their delivery work items and sync trigger starts
+    *(planned for M5)*
 
   A revision mismatch aborts the transaction.
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
