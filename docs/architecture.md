@@ -606,8 +606,9 @@ to the draft. Only another grant can make it readable.
 - **External operations.** These run outside the transaction, using the
   operation identity as their idempotency key. The result is recorded by a
   following transaction. A `callConnector` step stages its call in its
-  transaction. *(planned for M5)* The worker sends it with retries, and an
-  unknown outcome is reconciled through a lookup. See
+  transaction, and the worker sends it and records its result in a
+  following transaction. *(planned for M5)* Retries, and reconciling an
+  unknown outcome through a lookup. See
   [connector calls](reference/processes.md#connector-calls). A package
   operation step is staged and run the same way, see
   [package operations](reference/processes.md#package-operations).
@@ -615,8 +616,8 @@ to the draft. Only another grant can make it readable.
   for inspection.
 
 The step transactions, the revision check and the history are built for
-`decision`, `task`, `operation` and `end` steps, and for the staging of
-`callConnector` steps, see
+`decision`, `task`, `operation` and `end` steps, and for the staging and the
+call of `callConnector` steps, see
 [Running a step](reference/processes.md#running-a-step).
 The process resource, the start endpoint, the instance and task states, the
 task API, the worker settings and the tables are in

@@ -462,7 +462,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
     }
 
     /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
-    private static string Describe(RecordWriteResult result) =>
+    internal static string Describe(RecordWriteResult result) =>
         result.Errors is { Count: > 0 } errors
             ? string.Join(", ", errors.Select(error => $"{error.Key}: {string.Join(" ", error.Value)}"))
             : result.Outcome.ToString();

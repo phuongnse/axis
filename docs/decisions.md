@@ -611,7 +611,8 @@ configuration, its startup checks, resolving a binding at run time, the
 secret value that hides itself from text, JSON and logs, the `connector`
 resource with its compile checks and the activation check are built. Outside
 Development, startup fails when a secret comes from a configuration file.
-Calling a connector and using secrets in its calls are not built yet. See
+Calling a connector, using secrets in its calls and the call-time HTTPS check
+are built. Retries and reconciliation are planned. See
 [configuration](reference/configuration.md#connectors-and-deployment-bindings)
 for bindings and the `connector` resource, and
 [processes](reference/processes.md#connector-calls) for the call, its

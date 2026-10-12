@@ -7,14 +7,22 @@ namespace Axis.Processes;
 public static class ProcessesServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the work item runner and the handler that runs process steps. The runner runs the
-    /// registered <see cref="IWorkItemHandler"/> services and needs the tenancy services.
+    /// Registers the work item runner, the handler that runs process steps and the handler that
+    /// sends connector calls. The runner runs the registered <see cref="IWorkItemHandler"/> and
+    /// <see cref="IExternalWorkItemHandler"/> services and needs the tenancy services.
     /// </summary>
-    public static IServiceCollection AddProcesses(this IServiceCollection services)
+    /// <param name="allowHttpConnectorUrls">
+    /// Whether a connector call may go to an <c>http</c> base URL. Pass <see langword="true"/> only
+    /// in Development.
+    /// </param>
+    public static IServiceCollection AddProcesses(this IServiceCollection services, bool allowHttpConnectorUrls)
     {
         services.AddSingleton<WorkItemRunner>();
         services.AddSingleton<ReleaseModelCache>();
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
+        services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
+        services.AddSingleton<ConnectorClient>();
+        services.AddSingleton<IExternalWorkItemHandler, ConnectorCallHandler>();
         return services;
     }
 }
