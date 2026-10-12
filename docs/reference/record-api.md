@@ -1,7 +1,7 @@
 # Record API
 
 Detailed reference for the record API: routes, record shape, paging, writes,
-concurrency, errors and request bodies. The conventions of
+concurrency, errors, request bodies and, from M5, inbound endpoints. The conventions of
 [architecture.md](../architecture.md) apply: sections marked
 *(planned for Mx)* are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
@@ -18,6 +18,10 @@ grant with a `filter` reaches only the records that match it, so a record
 outside every read filter is a `404`. A grant with a `fields` list covers
 only those fields: fields the user may not read are left out, and a write of
 a field no grant covers is a `403`.
+
+*(planned for M5)* [Inbound endpoints](#inbound-endpoints) are the one
+exception to the session rule. Another system calls them with a bearer token,
+and they take no session.
 
 ## Routes
 
@@ -173,6 +177,8 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   set a custom header without a CORS preflight, which Axis does not allow.
   This adds to the content type rule and the SameSite session cookie. See
   [D23](../decisions.md#d23-sign-in-through-oidc-and-the-bff-session--agreed).
+  *(planned for M5)* `POST /api/apps/{app}/endpoints/{name}` is exempt from
+  the header and takes no session. See [Inbound endpoints](#inbound-endpoints).
 - **One transaction.** A create or update writes the record and the rows of
   its child collections in one transaction. When any write fails, nothing is
   written, neither the owner nor any row. A delete also runs in a
@@ -227,7 +233,9 @@ session is a `401`, before the path. So a caller without a session cannot
 find out which applications or records exist. See
 [Sign-in and the session](../architecture.md#sign-in-and-the-session).
 After the path, the user needs a grant for the action on the entity, or the
-answer is a `403` before the query or body is read.
+answer is a `403` before the query or body is read. *(planned for M5)*
+`POST /api/apps/{app}/endpoints/{name}` is exempt from the CSRF header and
+takes no session. Its own order is in [Inbound endpoints](#inbound-endpoints).
 
 Policies add more checks. The full order is:
 
@@ -506,6 +514,261 @@ answered with `400`:
   }
 }
 ```
+
+## Inbound endpoints
+
+*(planned for M5)* This section follows
+[D27](../decisions.md#d27-inbound-endpoints--agreed). None of it is built
+yet. An [`endpoint` resource](configuration.md#endpoint-resource) lets
+another system create a record and start a process on it in one call. The
+caller signs in with a bearer token, as
+[Machine callers](../architecture.md#machine-callers) describes. Endpoints
+are the one exception to the session and CSRF rules above.
+
+### The call
+
+The purchasing system submits a purchase request through the sample's
+`SubmitPurchaseRequest` endpoint:
+
+```http
+POST /api/apps/PurchaseRequests/endpoints/SubmitPurchaseRequest
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs…
+Content-Type: application/json
+Idempotency-Key: po-import-20261012-0042
+
+{
+  "input": {
+    "title": "Standing desks",
+    "department": "0192f4a7-3c1d-7e2f-9a4b-5c6d7e8f9a0b",
+    "currency": "VND",
+    "lineItems": [
+      { "description": "Desk", "quantity": 2, "unitPrice": 1250.45 }
+    ]
+  }
+}
+```
+
+- **Address.** `{app}` and `{name}` match ignoring letter case, as `{app}`
+  and `{entity}` do on the record routes.
+- **Bearer token.** `Authorization: Bearer <token>` is required. A session
+  cookie is ignored, so it neither signs the caller in nor causes an error.
+- **No CSRF header.** The call needs no `X-Axis-Csrf` header. A browser
+  cannot send a bearer token on its own, so a cross-site page cannot make the
+  call for a signed-in user.
+- **Content type.** `Content-Type: application/json`, by the
+  [record API's rule](#create-update-and-delete).
+- **Body.** `{ "input": { … } }`. `input` is parsed against the endpoint's
+  input fields by the [record API's body rules](#request-bodies-and-values),
+  with `input` in place of `values`. Any other body property is an error at
+  `/<property>`.
+- **`Idempotency-Key`.** The header is optional. See
+  [Idempotency](#idempotency).
+- **No other grants.** The caller needs the `invoke` grant on the endpoint.
+  Entity and process grants are not checked, because the record create and
+  the process start are part of the endpoint's contract.
+
+### Order of checks
+
+A call is checked in this order, and the first failure is the response:
+
+1. The bearer token, `401` with `WWW-Authenticate: Bearer`. It comes before
+   the path, so a caller without a valid token cannot learn which
+   applications or endpoints exist.
+2. The application and the endpoint, `404`.
+3. The `invoke` grant on the endpoint, `403`.
+4. The content type, `415`.
+5. The body, `400` keyed `/input/…`.
+6. The `Idempotency-Key` header, `400`. A value must be non-empty and at
+   most 255 characters.
+
+One transaction then does the rest:
+
+1. With a key, it stores the receipt first. When the key is taken, it rolls
+   back and answers as [Idempotency](#idempotency) describes.
+2. It maps the input to values and creates the record through the record
+   create command. So references, sequences, computed fields and validations
+   apply, as in a [record API create](#create-update-and-delete). The
+   creator field gets the caller's id. Errors are a `400` keyed
+   `/values/<field>`, and a unique-value conflict is a `409`.
+3. It evaluates the process's `startCondition` on the new record. A failure
+   is a `400` keyed `/input`, with the condition's message text key.
+4. It inserts the instance, pinned to the active release, with its first
+   work item, as the [process start](processes.md#start-endpoint) does. An
+   instance already running for the record is a `409`.
+5. It writes the audit records `record.created` and `process.started`.
+
+When any part fails, nothing is written. After the commit, an endpoint with
+`wait` checks the instance's state until it completes or `wait` runs out.
+
+- **Actor.** The actor of both audit records is the caller's id, from the
+  token's user id claim (`sub`). The display name is stored with them, see
+  [Machine callers](../architecture.md#machine-callers).
+- **Details.** Both details add `"endpoint": "<name>"`. So
+  `record.created` holds `{ "version": 1, "endpoint": "SubmitPurchaseRequest" }`,
+  and `process.started` holds
+  `{ "processId", "releaseId", "endpoint": "SubmitPurchaseRequest" }`.
+
+### Responses
+
+Errors are problem details (`application/problem+json`), and their titles are
+fixed, as in [Errors](#errors).
+
+**`201` without output.** The record and the instance are stored. An
+endpoint without `output` answers at once, and the instance is still
+`running`:
+
+```json
+{
+  "recordId": "0192f5b1-7a2c-7d3e-8f4a-5b6c7d8e9f01",
+  "instanceId": "0192f5b1-7a40-7b1c-9d2e-3f4a5b6c7d8e",
+  "state": "running"
+}
+```
+
+**`201` with output.** The endpoint declares `output` and `wait`, and the
+instance completed within `wait`. The fixture's `ImportClosedNote` returns
+the note's `code` and `status`:
+
+```json
+{
+  "recordId": "0192f5c0-1b2c-7d3e-8f4a-5b6c7d8e9f02",
+  "instanceId": "0192f5c0-1b40-7c2d-9e3f-4a5b6c7d8e9f",
+  "state": "completed",
+  "output": { "code": "N-1001", "status": "closed" }
+}
+```
+
+**`202`.** The endpoint declares `output` and `wait`, and the instance did
+not complete within `wait`. The body has no `output`, and `Location` names
+the status location:
+
+```http
+HTTP/1.1 202 Accepted
+Location: /api/apps/E2eApp/endpoints/ImportClosedNote/instances/0192f5c0-1b40-7c2d-9e3f-4a5b6c7d8e9f
+Content-Type: application/json
+
+{
+  "recordId": "0192f5c0-1b2c-7d3e-8f4a-5b6c7d8e9f02",
+  "instanceId": "0192f5c0-1b40-7c2d-9e3f-4a5b6c7d8e9f",
+  "state": "running"
+}
+```
+
+**`400`.** The input does not fit the schema, the record create refuses the
+values, or the start condition fails. Nothing is written.
+
+- Input that does not fit the endpoint's input fields is keyed
+  `/input/<name>`, or `/input/<collection>/<index>/<field>` for a row.
+- A `reference` value that names no record, and a failed validation, are
+  keyed `/values/<field>`, or by a row path such as
+  `/values/lineItems/0/quantity`. The mapping from input to fields need not
+  be one-to-one, so these errors point at the record's own fields.
+- A start condition that fails is keyed `/input`.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "/input/title": ["Must be at most 200 characters."],
+    "/input/lineItems/0/quantity": ["Must be an integral number within the signed 64-bit range."]
+  }
+}
+```
+
+**`401`.** No `Authorization` header, a token that is not a bearer token,
+or a token whose signature, issuer, audience or expiry fails. A tenant
+without `Oidc:EndpointAudience` answers `401` to every call. The response
+carries `WWW-Authenticate: Bearer`, and it never says which check failed:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer
+Content-Type: application/problem+json
+
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+  "title": "A valid bearer token is needed to call this endpoint.",
+  "status": 401
+}
+```
+
+**`403`.** The caller has no `invoke` grant on the endpoint. Only roles
+claim values that name a declared role of the application count. The title
+is the record API's:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.4",
+  "title": "You have no grant for this action.",
+  "status": 403
+}
+```
+
+- **`404`.** An unknown application, an application with no active release,
+  or an unknown endpoint.
+- **`409`.** A value repeats a `unique` field of another record, keyed
+  `/values/<field>` as in the record API. Or an instance of the process
+  already runs for the new record.
+- **`415`.** A body without `Content-Type: application/json`.
+- **`422`.** The `Idempotency-Key` was used before by the same caller on the
+  same endpoint with a different input.
+
+### Idempotency
+
+A key is unique per endpoint and caller. Two callers can use the same key
+without meeting.
+
+- **Repeat.** A repeat with the same key and the same input returns the same
+  record and instance. It creates no record and starts no instance.
+- **Never waits.** A repeat follows the instance's state at that moment. For
+  an endpoint with `output`, it is a `201` with output when the instance has
+  completed, otherwise a `202` with the status location. For an endpoint
+  without `output`, it is the `201` the first call gave, with the current
+  state.
+- **Different input.** The same key with a different input is a `422`.
+- **Only stored on success.** A call that fails stores no receipt. It can be
+  retried with the same key after the input is fixed.
+- **Concurrent repeats.** They are serialized by the receipt's unique key, so
+  only one of them creates a record.
+
+A repeat of the `202` call above, after the worker closed the note:
+
+```json
+{
+  "recordId": "0192f5c0-1b2c-7d3e-8f4a-5b6c7d8e9f02",
+  "instanceId": "0192f5c0-1b40-7c2d-9e3f-4a5b6c7d8e9f",
+  "state": "completed",
+  "output": { "code": "N-1001", "status": "closed" }
+}
+```
+
+A repeat of the same key with a different input:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc4918#section-11.2",
+  "title": "This idempotency key was used with a different input.",
+  "status": 422
+}
+```
+
+### Status location
+
+`GET /api/apps/{app}/endpoints/{name}/instances/{instanceId}` reads the
+state of an instance that an endpoint call started.
+
+- **Checks.** It needs a bearer token and the `invoke` grant on the
+  endpoint, checked in the same order as the call: `401`, then `404` for the
+  path, then `403`.
+- **Own calls only.** Only the caller who made the call can read it. Another
+  caller's instance, an instance of another endpoint, and an unknown one are
+  all `404`. So one system cannot read another system's output.
+- **`200`.** The body is the call's body: `recordId`, `instanceId` and
+  `state`. `output` is there only when the instance is `completed`.
+- **Output as contract.** The output values are read as the endpoint's
+  contract, outside field grants, as the call's own `201` does.
 
 ## Audit records and history
 

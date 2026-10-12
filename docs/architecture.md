@@ -194,6 +194,8 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
   - API writes are protected against CSRF by a required header.
   - Tests and local development use Keycloak in a container.
   - See [Sign-in and the session](#sign-in-and-the-session).
+  - *(planned for M5)* Other systems call inbound endpoints with a bearer
+    token instead of the session. See [Machine callers](#machine-callers).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the
@@ -302,6 +304,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     or pages exist;
   - `GET /api/me`.
 
+  *(planned for M5)* Inbound endpoints under `/api/apps/{app}/endpoints/`
+  are the exception. They take a bearer token and no session, see
+  [Machine callers](#machine-callers).
+
   These stay open, because the shell needs them before anyone signs in:
   `GET /api/site`, `GET /api/texts/{locale}`, `GET /api/auth/sign-in`,
   `GET /api/auth/callback`, every path under `/health` and the SPA's static
@@ -317,6 +323,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   call through one wrapper around `fetch`, which adds the header to its
   writes. See the record API's
   [CSRF header rule](reference/record-api.md#create-update-and-delete).
+  *(planned for M5)* `POST /api/apps/{app}/endpoints/{name}` is exempt from
+  the header, because it takes a bearer token and no session cookie. See
+  [Machine callers](#machine-callers).
 - **Tests.** Tests of sign-in itself start the development realm in Keycloak
   through Testcontainers, and drive its login page. Tests of the session
   lifetime create the session through a test-only hook and use a test clock.
@@ -343,6 +352,71 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
     only the sample roles.
+
+### Machine callers
+
+*(planned for M5)* It follows
+[D27](decisions.md#d27-inbound-endpoints--agreed). None of it is built yet.
+Other systems call [inbound endpoints](reference/record-api.md#inbound-endpoints)
+with a bearer token. This sits next to the browser session: the session
+stays the only way in for people, and a bearer token is the only way in for
+systems.
+
+- **Client credentials.** A caller is a system, not a browser. It gets an
+  OAuth 2.0 access token from the tenant's `Oidc` authority through the
+  client credentials grant, and sends it as `Authorization: Bearer <token>`.
+- **Tenant setting.** The expected audience is a new tenant setting,
+  `Oidc:EndpointAudience`. In the development tenant its value is
+  `axis-endpoints`:
+
+  ```json
+  "Oidc": {
+    "Authority": "http://localhost:8080/realms/axis",
+    "EndpointAudience": "axis-endpoints"
+  }
+  ```
+
+  The setting is optional. A tenant without it accepts no bearer token, so
+  every endpoint call there is a `401`. The server's
+  [startup checks](#sign-in-and-the-session) do not change. The worker
+  ignores it, as it ignores the rest of `Oidc`.
+- **Token checks.** The server checks each token against the tenant
+  [resolved from the host](#request-resolution). Any failure is a `401`
+  with `WWW-Authenticate: Bearer`, which never says which check failed.
+  - The signature, with the keys the authority publishes (its JWKS).
+  - The issuer, which must equal the tenant's `Authority`. So another
+    tenant's token is a `401`.
+  - The audience, which must contain the tenant's `Oidc:EndpointAudience`.
+  - The expiry.
+- **Roles.** The caller's roles come from the configured roles claim
+  (`Claims:Roles`), matched against the declared roles as for users.
+- **Caller id.** The caller's id comes from the configured user id claim
+  (`Claims:UserId`, default `sub`). It is the audit actor and the new
+  record's creator.
+- **Display name.** The audit display name comes from the configured display
+  name claim. When the token has none, it is the token's client id (`azp`).
+  Keycloak service-account tokens have no `name` claim, and a bare id would
+  be hard to read in a record's history.
+- **Endpoint routes only.** The server accepts a bearer token only on
+  `POST /api/apps/{app}/endpoints/{name}` and its status location. Everywhere
+  else a bearer token is ignored, so it never reaches the record API, the
+  data source endpoint or the task API.
+- **No session.** On endpoint routes the session cookie is ignored, so the
+  CSRF header does not apply. A browser cannot attach a bearer token on its
+  own, so a cross-site page cannot call an endpoint for a signed-in user.
+- **Not bound to the sender.** A leaked token works until it expires.
+  Sender-constrained tokens (DPoP) stay a later FAPI 2.0 step under D9.
+- **Keycloak.** The development realm gets what the purchase request sample
+  needs:
+  - a confidential client `purchasing-system` with a service account, for
+    the client credentials grant;
+  - the `axis` client role `purchasing-system`, held by that service account;
+  - a roles mapper on the `purchasing-system` client that writes the `axis`
+    client roles to the `roles` claim;
+  - an audience mapper on the `purchasing-system` client that adds
+    `axis-endpoints` to the token's audience.
+
+  The realm file does not change until the build issues add endpoints.
 
 ### Authorization
 
