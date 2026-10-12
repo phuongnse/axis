@@ -1,0 +1,8 @@
+{
+  "id": "9ad1c254-d1b9-4b3c-aea2-45b4eca67a9f",
+  "kind": "policy",
+  "name": "ReaderAccess",
+  "formatVersion": 1,
+  "roles": ["reader"],
+  "grants": [{ "entity": "Note", "actions": ["read"] }]
+}

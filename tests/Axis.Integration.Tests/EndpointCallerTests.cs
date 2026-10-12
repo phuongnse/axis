@@ -20,17 +20,19 @@ namespace Axis.Integration.Tests;
 /// Other systems call inbound endpoints with a client credentials token from the tenant's identity
 /// provider. Tenant a at localhost and tenant c at c.example.test use the development realm, but only
 /// tenant a expects the endpoint audience. Tenant b at b.example.test uses Keycloak's master realm, so
-/// it has another issuer. No endpoint exists yet, so a valid caller gets a <c>404</c>.
+/// it has another issuer. The database is unreachable, so the paths name an application that the
+/// name rule refuses: the call finds it without a query, and a valid caller gets a <c>404</c>.
 /// </summary>
 public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
-    // Port 1 on loopback refuses connections immediately. No test here touches a database.
+    // Port 1 on loopback refuses connections immediately. No test here touches a database: the
+    // application name in the paths has an underscore, so it is no application without a query.
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
     private const string HostA = "localhost";
     private const string HostB = "b.example.test";
     private const string HostC = "c.example.test";
-    private const string EndpointPath = "/api/apps/PurchaseRequests/endpoints/SubmitPurchaseRequest";
-    private const string StatusPath = "/api/apps/PurchaseRequests/endpoints/SubmitPurchaseRequest/instances/1";
+    private const string EndpointPath = "/api/apps/Purchase_Requests/endpoints/SubmitPurchaseRequest";
+    private const string StatusPath = "/api/apps/Purchase_Requests/endpoints/SubmitPurchaseRequest/instances/1";
 
     private readonly TestClock _clock = new();
     private readonly ConcurrentQueue<EndpointCallerIdentity?> _callers = new();

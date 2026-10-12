@@ -21,8 +21,9 @@ a field no grant covers is a `403`.
 
 [Inbound endpoints](#inbound-endpoints) are the one exception to the
 session rule. Another system calls them with a bearer token, and they take
-no session. The bearer token check is built. The endpoint call is not
-*(planned for M5)*.
+no session. The bearer token check and the endpoint call are built. The
+call's `Idempotency-Key`, `output` with `wait`, and the status location are
+not *(planned for M5)*.
 
 ## Routes
 
@@ -519,10 +520,14 @@ answered with `400`:
 ## Inbound endpoints
 
 This section follows [D27](../decisions.md#d27-inbound-endpoints--agreed).
-The bearer token check, its `401` and the CSRF exemption are built. The rest
-is *(planned for M5)*: until the endpoint call is built, both endpoint routes
-answer a caller with a valid token with a `404`, because no endpoint exists
-yet. An [`endpoint` resource](configuration.md#endpoint-resource) lets
+The bearer token check, its `401`, the CSRF exemption and the call are built.
+The call creates the record and starts the process, with the order of checks,
+the responses without output and the audit records below. Three parts are
+*(planned for M5)*: [Idempotency](#idempotency), `output` with `wait`, and the
+[status location](#status-location). Until they are built, the call ignores
+`Idempotency-Key`, an endpoint with `output` answers `201` at once without
+output, and the status location answers a caller with a valid token with a
+`404`. An [`endpoint` resource](configuration.md#endpoint-resource) lets
 another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as
 [Machine callers](../architecture.md#machine-callers) describes. Endpoints
@@ -794,9 +799,11 @@ can be read as its history (D21).
   record writes `record.updated` with the actor `system`, no display name and
   its instance id. A [task completion](processes.md#completing-a-task) that
   writes values writes no `record.updated`. Its `task.completed` record names
-  the fields.
+  the fields. An [endpoint call](#inbound-endpoints) writes `record.created`
+  with the caller as the actor, and the caller's display name.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
-  A delete holds the version the record had when it was deleted.
+  A delete holds the version the record had when it was deleted. An endpoint
+  call's `record.created` also has `"endpoint"`, the endpoint's name.
   - On update it also has `"fields"`: the declared names of the fields and
     child collections the body sets, in declaration order. A field sent with
     its stored value is listed too. Computed fields are never listed.

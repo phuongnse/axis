@@ -1,0 +1,13 @@
+{
+  "id": "e1e6623a-1a42-4d43-8c4a-1eed72bbcf37",
+  "kind": "process",
+  "name": "Close",
+  "formatVersion": 1,
+  "entity": "Note",
+  "startCondition": {
+    "expression": "status == 'open'",
+    "message": { "textKey": "note.cannotClose" }
+  },
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

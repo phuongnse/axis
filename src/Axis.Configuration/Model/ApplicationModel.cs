@@ -80,6 +80,13 @@ public sealed record ApplicationModel
         return process is not null;
     }
 
+    /// <summary>Finds an endpoint by name, ignoring letter case.</summary>
+    public bool TryGetEndpoint(string name, [NotNullWhen(true)] out EndpointModel? endpoint)
+    {
+        endpoint = Endpoints.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        return endpoint is not null;
+    }
+
     /// <summary>Finds a form by name, ignoring letter case.</summary>
     public bool TryGetForm(string name, [NotNullWhen(true)] out FormModel? form)
     {
