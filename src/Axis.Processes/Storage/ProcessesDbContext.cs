@@ -5,8 +5,8 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, their human tasks, their staged connector calls, the receipts of starts that carried an
-/// <c>Idempotency-Key</c>, and the work that workers claim and run. The caller supplies the connection to the tenant database.
+/// their steps, their human tasks, their staged connector calls, the receipts of starts and of
+/// endpoint calls that carried an <c>Idempotency-Key</c>, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
 {
@@ -27,6 +27,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ConnectorCallRow> ConnectorCalls => Set<ConnectorCallRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
+
+    public DbSet<EndpointReceiptRow> EndpointReceipts => Set<EndpointReceiptRow>();
 
     public DbSet<WorkItemRow> WorkItems => Set<WorkItemRow>();
 
@@ -156,6 +158,20 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             receipt.Property(r => r.InstanceId).HasColumnName("instance_id");
             receipt.Property(r => r.StatusCode).HasColumnName("status_code");
             receipt.Property(r => r.Body).HasColumnName("body").HasColumnType("jsonb");
+            receipt.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<EndpointReceiptRow>(receipt =>
+        {
+            receipt.ToTable("endpoint_receipts");
+            receipt.HasKey(r => new { r.ApplicationId, r.EndpointId, r.Caller, r.Key }).HasName("pk_endpoint_receipts");
+            receipt.Property(r => r.ApplicationId).HasColumnName("application_id");
+            receipt.Property(r => r.EndpointId).HasColumnName("endpoint_id");
+            receipt.Property(r => r.Caller).HasColumnName("caller");
+            receipt.Property(r => r.Key).HasColumnName("key");
+            receipt.Property(r => r.RecordId).HasColumnName("record_id");
+            receipt.Property(r => r.InstanceId).HasColumnName("instance_id");
+            receipt.Property(r => r.InputHash).HasColumnName("input_hash").HasColumnType("bytea");
             receipt.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         });
 

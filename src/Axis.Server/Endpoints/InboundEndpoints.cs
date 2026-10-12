@@ -23,8 +23,9 @@ namespace Axis.Server.Endpoints;
 /// They take no session and no CSRF header. A request without a valid token is a <c>401</c> with
 /// <c>WWW-Authenticate: Bearer</c>, which never says which check failed.
 /// A call is checked in order: bearer token (401), application and endpoint (404), the caller's
-/// <c>invoke</c> grant on the endpoint (403), content type (415), and the body against the
-/// endpoint's input fields (400 keyed <c>/input/…</c>). One transaction then creates the record
+/// <c>invoke</c> grant on the endpoint (403), content type (415), the body against the
+/// endpoint's input fields (400 keyed <c>/input/…</c>), and <c>Idempotency-Key</c> (400). One
+/// transaction then claims the key's receipt, unique per endpoint and caller, and creates the record
 /// from the mapped values through the record create command, with the caller's id in its creator
 /// fields, and starts the endpoint's process on it as the process start does. A refused value, a
 /// failed validation and a missing reference are a 400 keyed <c>/values/…</c>, and a failed start
@@ -35,6 +36,8 @@ namespace Axis.Server.Endpoints;
 /// until it completes, fails or <c>wait</c> runs out, holding no connection between checks. A
 /// completed instance is a <c>201</c> with the output fields, and any other a <c>202</c> with the
 /// status location in <c>Location</c>.
+/// A repeat with a claimed key and the same input creates nothing and answers from the receipt with
+/// the instance's state now, without waiting. The same key with another input is a <c>422</c>.
 /// The status location is checked in the same order up to the grant, then answers <c>404</c> for
 /// an instance that this endpoint did not start for this caller, as its <c>process.started</c>
 /// audit record says. Otherwise it is a <c>200</c> with the instance's state, and the output
@@ -42,7 +45,9 @@ namespace Axis.Server.Endpoints;
 /// </summary>
 internal static class InboundEndpoints
 {
-    private const string InputPointer = "/input";
+    private const string InputProperty = "input";
+
+    private const string InputPointer = "/" + InputProperty;
 
     // The worker polls once a second, so checking more often gains little.
     private static readonly TimeSpan _pollInterval = TimeSpan.FromMilliseconds(200);
@@ -88,10 +93,16 @@ internal static class InboundEndpoints
             return JsonRequest.UnsupportedMediaType();
         }
 
-        var parsed = RecordInputParser.ParseEndpointInput(await RecordEndpoints.ReadBodyAsync(request, cancellationToken), endpoint, application);
+        var body = await RecordEndpoints.ReadBodyAsync(request, cancellationToken);
+        var parsed = RecordInputParser.ParseEndpointInput(body, endpoint, application);
         if (parsed.Errors is { } errors)
         {
             return Results.ValidationProblem(errors);
+        }
+
+        if (!ProcessStartEndpoints.TryReadIdempotencyKey(request.Headers[ProcessStartEndpoints.IdempotencyKeyHeader], out var key))
+        {
+            return ProcessStartEndpoints.IdempotencyKeyProblem();
         }
 
         var entity = application.FindEntity(endpoint.Entity.Id)
@@ -118,9 +129,27 @@ internal static class InboundEndpoints
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var details = new JsonObject { ["endpoint"] = endpoint.Name };
+        var recordId = Guid.CreateVersion7();
         var instanceId = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The receipt is claimed first, so a repeat answers from it even when a validation would
+        // now refuse the input, and a concurrent repeat waits on the receipt's key. The parser
+        // has checked the body, so its input is an object.
+        if (key is not null)
+        {
+            var input = JsonNode.Parse(body)![InputProperty]!.ToJsonString();
+            if (!await EndpointReceipts.TryClaimAsync(
+                transaction, application.Manifest.Id, endpoint.Id, caller.Id, key, recordId, instanceId, input, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                var receipt = await EndpointReceipts.FindAsync(
+                    connection, application.Manifest.Id, endpoint.Id, caller.Id, key, input, cancellationToken)
+                    ?? throw new InvalidOperationException("The receipt of a claimed Idempotency-Key could not be found.");
+                return await RepeatAsync(connection, application, entity, endpoint, receipt, cancellationToken);
+            }
+        }
 
         // The validations run in the write transaction, so their now() is its start time.
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
@@ -130,7 +159,7 @@ internal static class InboundEndpoints
             return Results.ValidationProblem(failures);
         }
 
-        var result = await RecordCommands.CreateAsync(connection, application, entity, computed.Values, computed.Rows, cancellationToken: cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, application, entity, computed.Values, computed.Rows, recordId, cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -205,6 +234,43 @@ internal static class InboundEndpoints
         }
 
         return Results.Accepted(StatusLocation(application, endpoint, instanceId), new EndpointCallResponse(record.Id, instanceId, state));
+    }
+
+    /// <summary>
+    /// The answer to a repeat of a claimed key, built from its receipt and the instance's state now.
+    /// A repeat never waits. An input other than the first call's is a <c>422</c>.
+    /// </summary>
+    private static async Task<IResult> RepeatAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        EndpointModel endpoint,
+        EndpointReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        if (!receipt.SameInput)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                title: "This idempotency key was used with a different input.");
+        }
+
+        var state = (await ProcessStarts.FindInstanceAsync(connection, receipt.InstanceId, cancellationToken)
+            ?? throw new InvalidOperationException("The instance of an endpoint receipt could not be found.")).State;
+        if (endpoint.Output is null)
+        {
+            return Results.Json(new EndpointCallResponse(receipt.RecordId, receipt.InstanceId, state), statusCode: StatusCodes.Status201Created);
+        }
+
+        if (state == ProcessStarts.Completed)
+        {
+            var output = await ReadOutputAsync(connection, application, entity, endpoint, receipt.RecordId, cancellationToken);
+            return Results.Json(new EndpointCallResponse(receipt.RecordId, receipt.InstanceId, state, output), statusCode: StatusCodes.Status201Created);
+        }
+
+        return Results.Accepted(
+            StatusLocation(application, endpoint, receipt.InstanceId),
+            new EndpointCallResponse(receipt.RecordId, receipt.InstanceId, state));
     }
 
     // It takes the request rather than the context, so it binds as a route handler and its result is written.

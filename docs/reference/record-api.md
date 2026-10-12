@@ -522,9 +522,9 @@ answered with `400`:
 This section follows [D27](../decisions.md#d27-inbound-endpoints--agreed).
 The bearer token check, its `401`, the CSRF exemption and the call are built.
 The call creates the record and starts the process, with the order of checks,
-the responses, `output` with `wait`, the audit records and the
-[status location](#status-location) below. [Idempotency](#idempotency) is
-*(planned for M5)*. Until it is built, the call ignores `Idempotency-Key`. An
+the responses, `output` with `wait`, the audit records,
+[idempotency](#idempotency) and the [status location](#status-location)
+below. An
 [`endpoint` resource](configuration.md#endpoint-resource) lets
 another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as
@@ -741,7 +741,11 @@ without meeting.
   completed, otherwise a `202` with the status location. For an endpoint
   without `output`, it is the `201` the first call gave, with the current
   state.
-- **Different input.** The same key with a different input is a `422`.
+- **Different input.** The same key with a different input is a `422`, and
+  nothing is written. The receipt stores a SHA-256 hash of the input, not a
+  copy of it. The same JSON value counts as the same input, whatever its
+  whitespace and property order. A number written another way, such as `1`
+  and `1.0`, is a different input.
 - **Only stored on success.** A call that fails stores no receipt. It can be
   retried with the same key after the input is fixed.
 - **Concurrent repeats.** They are serialized by the receipt's unique key, so

@@ -99,6 +99,49 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("connector_calls", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.EndpointReceiptRow", b =>
+                {
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<Guid>("EndpointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("endpoint_id");
+
+                    b.Property<string>("Caller")
+                        .HasColumnType("text")
+                        .HasColumnName("caller");
+
+                    b.Property<string>("Key")
+                        .HasColumnType("text")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<byte[]>("InputHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("input_hash");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.HasKey("ApplicationId", "EndpointId", "Caller", "Key")
+                        .HasName("pk_endpoint_receipts");
+
+                    b.ToTable("endpoint_receipts", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.ProcessInstanceRow", b =>
                 {
                     b.Property<Guid>("Id")

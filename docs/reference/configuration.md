@@ -1206,8 +1206,8 @@ build issue.
 
 *(partly built, M5)* This section follows
 [D27](../decisions.md#d27-inbound-endpoints--agreed). The `endpoint` resource,
-its compile checks, the call with its `output` and `wait`, and the status
-location are built. Idempotency is not built yet. An `endpoint` resource lets another system create
+its compile checks, the call with its `output` and `wait`, its idempotency, and the
+status location are built. An `endpoint` resource lets another system create
 a record and start a process on it in one call. The call, its responses and its errors are in
 [Inbound endpoints](record-api.md#inbound-endpoints). How a machine caller
 signs in is in [Machine callers](../architecture.md#machine-callers).

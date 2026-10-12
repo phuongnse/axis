@@ -9,7 +9,8 @@ model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
-`axis.process_work_items` and `axis.connector_calls` tables are built too.
+`axis.endpoint_receipts`, `axis.process_work_items` and
+`axis.connector_calls` tables are built too.
 So is the engine that runs `decision`, `task`, `operation` and `end` steps,
 see [Running a step](#running-a-step). The [task API](#task-api) routes that
 list the user's tasks, read one task and complete one are built. Completing
@@ -1440,6 +1441,9 @@ database, with history in `axis.__processes_migrations` (see
     id it handled.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
+- `axis.endpoint_receipts`: the record and instance of each endpoint call's
+  `Idempotency-Key`, unique per application, endpoint, caller and key, with a
+  hash of the input. See [Idempotency](record-api.md#idempotency).
 - `axis.process_tasks`: one row per task. Times use the database clock. An
   index on application, state, assignee kind and assignee finds the open tasks
   of a user id or a role name.
