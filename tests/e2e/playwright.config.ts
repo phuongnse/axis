@@ -11,6 +11,10 @@ const keycloakUrl = process.env.AXIS_E2E_KEYCLOAK_URL
 if (!keycloakUrl) {
   throw new Error('AXIS_E2E_KEYCLOAK_URL must hold the address of Keycloak. Run scripts/e2e.sh.')
 }
+const purchasingUrl = process.env.AXIS_E2E_PURCHASING_URL
+if (!purchasingUrl) {
+  throw new Error('AXIS_E2E_PURCHASING_URL must hold the address of the purchasing system stub. Run scripts/e2e.sh.')
+}
 
 // scripts/e2e.sh keeps the server output in a log file and the JUnit results with the other suites.
 const serverCommand = 'dotnet run --project ../../src/Axis.Server --no-launch-profile --no-build -c Release'
@@ -49,7 +53,9 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       ASPNETCORE_URLS: baseURL,
-      ASPNETCORE_ENVIRONMENT: 'Testing',
+      // Only Development lets a connector call the stub over http. Every setting the run needs is
+      // set here, so it does not depend on which appsettings files the server finds.
+      ASPNETCORE_ENVIRONMENT: 'Development',
       ConnectionStrings__Platform: connectionString,
       // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
       Tenants__default__Hosts__0: '127.0.0.1',
@@ -58,6 +64,12 @@ export default defineConfig({
       Tenants__default__Oidc__Authority: `${keycloakUrl}/realms/axis`,
       Tenants__default__Oidc__ClientId: 'axis',
       Tenants__default__Oidc__ClientSecret: 'axis-development-secret',
+      // The purchase request sample activates only with its purchasing system bindings. The stub
+      // ignores the token. The worker gets the same bindings from scripts/e2e.sh.
+      Tenants__default__Bindings__PurchasingSystemUrl__Kind: 'url',
+      Tenants__default__Bindings__PurchasingSystemUrl__Value: purchasingUrl,
+      Tenants__default__Bindings__PurchasingSystemToken__Kind: 'secret',
+      Tenants__default__Bindings__PurchasingSystemToken__Value: 'e2e-token',
       ActivateOnStartup__0: e2eApp,
       ActivateOnStartup__1: purchaseRequests,
     },

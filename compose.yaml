@@ -55,6 +55,8 @@ services:
       ConnectionStrings__Platform: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
+      # The purchasing system stub on the Compose network. The token is in appsettings.Development.json.
+      Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
     ports:
       - "127.0.0.1:${AXIS_SERVER_PORT:-5206}:8080"
     # Healthy only once activation has finished and the server answers.
@@ -66,7 +68,8 @@ services:
       start_period: 120s
       start_interval: 2s
 
-  # Waits until the server has migrated the tenant database, then runs its due work items.
+  # Waits until the server has migrated the tenant database, then runs its due work items. It
+  # calls the purchasing system stub when a purchase request is approved.
   worker:
     build:
       context: .
@@ -74,9 +77,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      purchasing:
+        condition: service_healthy
     environment:
       DOTNET_ENVIRONMENT: Development
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
+      Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
 
   # The purchasing system stub from tests/Axis.PurchasingStub. It keeps its orders in memory.
   purchasing:
