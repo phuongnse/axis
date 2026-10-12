@@ -768,6 +768,129 @@ An entity `text` field names the sequence in its `sequence` property:
   because the server always assigns its value. A child entity's field cannot
   have a `sequence` either. Each of these is `AXC0013`.
 
+## Connectors and deployment bindings
+
+*(planned for M5)* This section follows
+[D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
+None of it is built yet. A `connector` resource describes an external system
+that a process can call. Its URL and its secret are deployment bindings, so a
+release holds only their names. How a process calls a connector, retries and
+reconciles is in [Connector calls](processes.md#connector-calls).
+
+### Deployment bindings
+
+- **Binding.** A named setting that a release refers to by name and never
+  holds as a value. M5 has two kinds: `url` and `secret`.
+- **No binding resource.** No resource kind declares bindings. A connector
+  names one as `{ "binding": "<name>" }`. Where the name is used decides its
+  kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
+- **Where values live.** Each tenant holds its values in
+  `Tenants:{id}:Bindings:{name}` of the host configuration, until the tenant
+  directory in M9. Each binding has a `Kind`, `url` or `secret`, and a
+  `Value`. The server and the worker must both hold them.
+- **Secrets from the environment.** A secret's value is set with an
+  environment variable, such as
+  `Tenants__default__Bindings__PurchasingSystemToken__Value`. It never comes
+  from a committed file outside development fixtures.
+- **Never shown.** A secret's value never appears in a release, step
+  history, audit record, log or problem details.
+- **Activation check.** Activating a release for a tenant fails when a
+  binding the release uses is missing for that tenant, or is of the wrong
+  kind. The binding diagnostic names the tenant and the binding.
+- **Startup check.** A binding whose `Kind` is not `url` or `secret`, or
+  whose `Value` is blank, fails startup like the other
+  [tenant checks](../architecture.md#tenant-configuration).
+- **Resolved at run time.** The worker reads a binding each time it makes a
+  call, so changing a secret needs no new release.
+- **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
+  must be `https`. This is checked at activation and again at call time.
+
+The purchasing system's bindings for tenant `default` look like this:
+
+```json
+"Tenants": {
+  "default": {
+    "Hosts": [ "localhost" ],
+    "ConnectionString": "Host=...",
+    "Bindings": {
+      "PurchasingSystemUrl": { "Kind": "url", "Value": "https://purchasing.example.test/api" },
+      "PurchasingSystemToken": { "Kind": "secret", "Value": "<from environment>" }
+    }
+  }
+}
+```
+
+### Connector resource
+
+The purchase request sample will hold the purchasing system connector in
+`connectors/purchasing-system.json`:
+
+```json
+{
+  "id": "409bc638-0aec-4084-ada2-e3baed50057d",
+  "kind": "connector",
+  "name": "PurchasingSystem",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingSystemUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+  "timeout": "PT30S",
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "createPurchaseOrder",
+      "method": "POST",
+      "path": "/purchase-orders",
+      "input": [
+        { "name": "requestNumber", "type": "text", "required": true },
+        { "name": "supplierCode", "type": "text" },
+        { "name": "amount", "type": "decimal", "required": true }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }],
+      "lookup": "findPurchaseOrder"
+    },
+    {
+      "name": "findPurchaseOrder",
+      "method": "GET",
+      "path": "/purchase-orders/by-key/{idempotencyKey}",
+      "input": [],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }]
+    }
+  ]
+}
+```
+
+- `baseUrl` names a `url` binding. An operation's `path` is added to it.
+- `auth` is optional. Its `type` is one of these:
+  - `none`, the same as no `auth`;
+  - `bearer`, with `token`, a `secret` binding sent as
+    `Authorization: Bearer <value>`;
+  - `header`, with `name`, the header name, and `value`, a `secret` binding.
+- `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
+  `PT2M`.
+- `idempotency` names the request header that carries the idempotency key.
+  It is absent when the system does not support one.
+- `operations` lists the named operations.
+  - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
+  - `path` is a path template. `{idempotencyKey}` is the only placeholder in
+    M5. Other placeholders come later.
+  - `input` fields are sent as a JSON body. A `GET` sends no body.
+  - `output` fields are read from the JSON response.
+  - Input and output field types are the
+    [rule parameter types](#resource-file-shape): `text`, `integer`,
+    `decimal`, `boolean`, `date` and `date-time`.
+- `lookup` is optional and set per operation. It names another operation of
+  the same connector that finds an earlier call by its idempotency key.
+  - The lookup is a `GET` whose `path` holds `{idempotencyKey}`.
+  - It has no inputs, and the same outputs as the operation it serves.
+  - A `200` means found, and its body gives the output. A `404` means not
+    found. Anything else is a failed lookup.
+- The worker never follows a redirect. A `3xx` response fails the call, so
+  the secret never goes to another host.
+
+The sample's `PurchaseRequest` entity will gain a `purchaseOrderNumber`
+`text` field, which the call writes. The sample files do not change until
+the build issues add connectors.
+
 ## Roles and policies
 
 This section follows
