@@ -17,7 +17,9 @@ a task resumes its `waiting` instance, see
 [Completing a task](#completing-a-task). A start and the task API follow the
 user's policies, see [Start endpoint](#start-endpoint) and
 [Policies on tasks](#task-api). Calls to external systems through a
-`callConnector` step are [planned for M5](#connector-calls).
+`callConnector` step are [planned for M5](#connector-calls). So are events
+and triggers, which start processes when something happens, see
+[Events and triggers](#events-and-triggers).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -195,7 +197,9 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   transaction. A validation failure fails the step. Operations from extension
   packages come in M5. *(planned for M5)* A second built-in operation,
   `callConnector`, calls an external system outside the step's transaction,
-  see [Connector calls](#connector-calls).
+  see [Connector calls](#connector-calls). *(planned for M5)* A third
+  built-in operation, `raiseEvent`, raises an event for the subject record,
+  see [Raise event step](#raise-event-step).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
   `end` step has no `next`.
 
@@ -975,6 +979,186 @@ The purchasing system holds one order, and the request records its number.
   with no second `POST`. Had the lookup answered `404`, C would be sent again
   as attempt 2.
 
+## Events and triggers
+
+*(planned for M5)* This section follows
+[D26](../decisions.md#d26-events-and-triggers--agreed). None of it is built
+yet. A `raiseEvent` step raises an [event](configuration.md#event-resource)
+for its subject record. A [trigger](configuration.md#trigger-resource) starts
+a process for one record when an event is raised, when a record is created or
+updated, or when a schedule is due. Every start happens at most once for the
+same cause, even after a worker crash.
+
+### Raise event step
+
+`NoteClose` in the E2E fixture can announce that a note was closed. `close`
+names the new step as its `next`:
+
+```json
+{
+  "name": "close",
+  "type": "operation",
+  "operation": "updateRecord",
+  "set": { "status": "'closed'" },
+  "next": "announceClosed"
+},
+{
+  "name": "announceClosed",
+  "type": "operation",
+  "operation": "raiseEvent",
+  "event": "NoteClosed",
+  "fields": { "priority": "priority", "amount": "amount" },
+  "next": "end"
+}
+```
+
+The fixture files do not change until the build issues add events.
+
+- `event` names the event to raise.
+- `fields` maps payload fields to expressions over the subject record.
+- `next` names the step that follows.
+
+The compiler reports these as compile errors. Their codes come with the
+build issue.
+
+- The event exists, and its entity is the subject entity.
+- Each payload field of the event has exactly one key in `fields`, and each
+  key names a payload field.
+- Each expression fits its payload field's type, with the same scope as a
+  decision's `when`.
+- A `raiseEvent` step has `event`, `fields` and `next`, and no `set`,
+  `connector` or `input`.
+
+**The step's transaction** runs as other steps do, see
+[Running a step](#running-a-step), and writes these together:
+
+1. It evaluates each `fields` expression on the subject record.
+2. It stores the occurrence in `axis.events`, with the subject record, the
+   payload and the release the instance is pinned to. The occurrence is kept
+   even when no trigger listens, so a later wait for event step can match
+   early events.
+3. It runs the start of each `sync` event trigger for the event, see
+   [Starts from triggers](#starts-from-triggers).
+4. It queues one `event.deliver` work item for the occurrence, even when no
+   `async` trigger listens yet. See [Event delivery](#event-delivery).
+5. It writes the step's history row, with output `{ "next", "eventId" }`.
+6. It writes `process.stepCompleted`, as other operations do. Raising an
+   event writes no audit record of its own.
+7. It inserts the work item of the next step.
+
+### Starts from triggers
+
+A start from a trigger follows the [start endpoint](#start-endpoint)'s
+transaction, steps 2 to 6. It runs as `system`, so no policy is checked. The
+user whose write fired a trigger needs no `start` grant.
+
+1. It locks the subject record and reads it. A record that no longer exists
+   skips the start.
+2. It skips the start when a `running` or `waiting` instance of the process
+   exists for the record. This is no error, and it is the guard against
+   loops. The instance insert relies on the partial unique index of
+   `axis.process_instances`, so a concurrent start is skipped too, and never
+   fails the transaction.
+3. It evaluates the process's `startCondition`. A `false`, a `null` or a
+   run-time error skips the start.
+4. It inserts the instance as `running` at revision 1, pinned to the release
+   active at the start, as every start does.
+5. It inserts the instance's first work item.
+6. It writes the audit record `process.started`, with the actor `system`. Its
+   details are `{ "processId", "releaseId", "trigger" }`, where `trigger` is
+   the trigger's name. A start from an event adds `"eventId"`.
+
+A trigger's `when` is evaluated before these steps. A `false`, a `null` or a
+run-time error there skips the start too. A skip never fails the write or
+the step that fired the trigger, which still commits.
+
+Every skip is logged at Information level with the trigger, the record and
+the reason. A run-time error is logged with its message. A skip is never
+tried again, so a process never starts long after its cause.
+
+Triggers come from the release that is active when the trigger fires. For an
+`async` event trigger, that is when the event is delivered, not when it was
+raised.
+
+| Trigger | Start commits in | Skipped when |
+| --- | --- | --- |
+| Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
+| Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Data change | The write's transaction: a record API create or update, a task form save, an `updateRecord` step, or a connector output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Schedule | The transaction of the fan-out batch that holds the record | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
+
+A `when` or a `startCondition` is not true when it gives `false` or `null`,
+or hits a run-time error.
+
+A data change trigger sees the record as the write left it. A create always
+passes `fields`, because every field is new. Suppose `NoteClose` had a data
+change trigger on `Note` updates. Its own `close` step would fire it, and the
+start would be skipped, because `NoteClose` already runs for the note.
+
+### Event delivery
+
+An `event.deliver` work item delivers one occurrence to the `async` event
+triggers of the active release:
+
+1. The worker reads the triggers for the event's name. With none, the item is
+   deleted with no other write.
+2. For each trigger, one transaction does this:
+   1. It inserts a receipt into `axis.trigger_starts`, keyed by the trigger,
+      the event id and the subject record. When that key is taken, the
+      trigger already handled the occurrence and is skipped.
+   2. It evaluates the trigger's `when` on the stored payload, then runs the
+      [start](#starts-from-triggers).
+   3. It records on the receipt whether the start happened or was skipped.
+3. The item is deleted.
+
+A worker that crashes before a commit leaves no receipt for that trigger. The
+next worker claims the item after its lease expires and runs it once. The
+receipts of the triggers that committed make it skip them.
+
+### Schedules
+
+**Schedule state.** Activating a release writes the schedule state of each
+schedule trigger for the tenant, in `axis.trigger_schedules`. The next
+occurrence is computed from the activation time. Triggers that the release
+removes lose their state and their work item.
+
+**Occurrences.** Each schedule trigger has one `trigger.schedule` work item,
+due at its next occurrence. Workers claim it with `FOR UPDATE SKIP LOCKED`,
+so only one worker runs each occurrence per tenant. The claim's transaction
+does this:
+
+1. It records the occurrence as the trigger's last occurrence. When several
+   occurrences were missed, for example while no worker ran, only the latest
+   one runs.
+2. It queues a `trigger.fanOut` work item for the occurrence.
+3. It computes the next occurrence after now, and sets the item's `due_at` to
+   it.
+
+**Daylight saving.** Occurrences follow the trigger's `timeZone`. A local
+time that does not exist runs at the next valid local time. A local time that
+happens twice runs once, at the first. For example, in `Europe/Berlin`,
+`30 2 * * *` runs at 03:00 on the day clocks go forward, and once at the
+first 02:30 on the day they go back.
+
+**Fan-out.** A `trigger.fanOut` item starts the process for the records of
+the data source:
+
+1. It reads the trigger and its data source from the release that was active
+   at the occurrence.
+2. It runs the data source as `system`, with the trigger's fixed parameters.
+   It reads 100 records at a time, ordered by record id, after the stored
+   cursor. The data source's `pageSize` and `sort` do not apply.
+3. For each record, it inserts a receipt into `axis.trigger_starts`, keyed by
+   the trigger, the occurrence time and the record. When that key is taken,
+   the record is skipped. Otherwise it runs the
+   [start](#starts-from-triggers).
+4. The batch's transaction stores the new cursor and the item for the next
+   batch with the starts. When the data source has no more records, the item is deleted.
+
+A worker that crashes in the middle of a batch commits none of it. The next
+worker runs the batch again from the stored cursor. The receipts make each
+record start at most once per occurrence.
+
 ## Worker settings
 
 The worker polls every tenant database in the `Tenants` section of its
@@ -1017,7 +1201,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. *(planned for M5)* `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call, and `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. *(planned for M5)* `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call, and `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. *(planned for M5)* `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1030,7 +1214,16 @@ database, with history in `axis.__processes_migrations` (see
   database clock. Completed and failed items are deleted. *(planned for M5)*
   A new kind, `connector.call`, sends or reconciles one connector call. Its
   item also has the `connector_call_id` of the call, and its `due_at` gives
-  the backoff. See [Connector calls](#connector-calls).
+  the backoff. See [Connector calls](#connector-calls). *(planned for M5)*
+  Three more kinds come with [events and triggers](#events-and-triggers):
+  - `event.deliver` delivers one event occurrence to the `async` event
+    triggers. Its item also has the `event_id` of the occurrence.
+  - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
+    also has the `trigger_id`, and its `due_at` is the next occurrence.
+  - `trigger.fanOut` starts the process for the records of one occurrence.
+    Its item also has the `trigger_id`, the `release_id` that was active at
+    the occurrence, the `occurrence_at` time and the `cursor`, the last record
+    id it handled.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
 - `axis.process_tasks`: one row per task. Times use the database clock. An
@@ -1076,6 +1269,43 @@ database, with history in `axis.__processes_migrations` (see
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
+- `axis.events` *(planned for M5)*: one row per event occurrence, see
+  [Raise event step](#raise-event-step). Rows are append-only and kept, even
+  when no trigger listens.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID, the event's id |
+  | `application_id` | `uuid` | The application |
+  | `event` | `text` | The event's name |
+  | `release_id` | `uuid` | The release the raising instance is pinned to |
+  | `entity_id` | `uuid` | The event's entity |
+  | `subject_id` | `uuid` | The record the occurrence names |
+  | `payload` | `jsonb` | The evaluated payload fields |
+  | `process_instance_id` | `uuid` | The instance that raised the event |
+  | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
+- `axis.trigger_schedules` *(planned for M5)*: the schedule state, one row per
+  schedule trigger of the tenant, see [Schedules](#schedules). Activation
+  writes it.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `trigger_id` | `uuid` | The trigger |
+  | `release_id` | `uuid` | The release that wrote the state |
+  | `next_occurrence_at` | `timestamptz` | The next occurrence |
+  | `last_occurrence_at` | `timestamptz`, null | The last occurrence that ran. Null before the first |
+- `axis.trigger_starts` *(planned for M5)*: one receipt per trigger, cause and
+  record, see [Starts from triggers](#starts-from-triggers). A unique index on
+  (`trigger_id`, `source`, `subject_id`) makes each start happen at most once.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `trigger_id` | `uuid` | The trigger |
+  | `source` | `text` | The event id for an event trigger, or the occurrence time for a schedule trigger |
+  | `subject_id` | `uuid` | The record |
+  | `outcome` | `text` | `started` or `skipped` |
+  | `process_instance_id` | `uuid`, null | The instance it started. Null when skipped |
+  | `created_at` | `timestamptz` | The start of the transaction, `now()` |
 
 ## Limits in M3
 

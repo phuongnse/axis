@@ -100,19 +100,20 @@ See [processes](../reference/processes.md#steps).
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Trigger** | Starts a process or operation from something that happened. There are four kinds, listed below. | M5 |
-| **Event** | A named, typed business event raised by a process or the platform. Subscribers are either synchronous (same transaction) or asynchronous (durable delivery). | M5 |
+| **Trigger** | A `trigger` resource starts a process for one record when something happens. M5 has three kinds, listed below. See [triggers](../reference/configuration.md#events-and-triggers). | M5 |
+| **Event** | An `event` resource: a named event about one entity, with typed payload fields. A `raiseEvent` step raises it for its subject record. Event triggers start processes from it, in the same transaction (sync) or through durable delivery (async). Events raised by the platform come later. | M5 |
 | **Connector** | A `connector` resource for calling an external system. It has a base URL from a `url` binding, auth from a `secret` binding, a timeout and named operations. It can name the idempotency header the system accepts, and each operation can name a lookup that finds an earlier call by its key. See [connectors](../reference/configuration.md#connectors-and-deployment-bindings). | M5 |
 
 **Trigger kinds:**
 
-- **Data change:** a record was created, updated or deleted. The trigger can
-  read which fields changed.
-- **Event:** a named business event was raised.
-- **Schedule:** a time-zone-aware recurrence. It can fan out over the records
-  a data source returns.
-- **Endpoint:** an authenticated inbound HTTP call with a typed input schema. It
-  can return a process output.
+- **Data change:** a record was created or updated, optionally only when
+  named fields changed. Delete comes later.
+- **Event:** a named event was raised.
+- **Schedule:** a cron schedule in an IANA time zone. It fans out over the
+  records of a data source.
+
+Inbound endpoints are their own resource, not a trigger kind, and get their
+own decision.
 
 ## Presentation
 
