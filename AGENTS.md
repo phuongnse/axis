@@ -6,7 +6,8 @@
   before any product or architecture work.
 - [docs/architecture.md](docs/architecture.md) is the target structure.
   [docs/reference/](docs/reference/) holds the detailed behaviour: configuration,
-  storage, record API, frontend, expressions, data sources and processes.
+  storage, record API, frontend, expressions, data sources, processes and
+  extension packages.
 - [docs/domain/concepts.md](docs/domain/concepts.md) defines the vocabulary. Use those
   terms in code, APIs and UI.
 - [docs/domain/knowledge.md](docs/domain/knowledge.md) explains why the design rules exist.
