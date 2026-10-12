@@ -8,16 +8,17 @@ built with `decision`, `task`, `operation` and `end` steps, and so are their
 model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
 the `axis.process_instances`, `axis.process_step_history`,
-`axis.process_tasks`, `axis.process_start_receipts` and
-`axis.process_work_items` tables are built too. So is the engine that runs
-`decision`, `task`, `operation` and `end` steps, see
-[Running a step](#running-a-step). The [task API](#task-api) routes that
+`axis.process_tasks`, `axis.process_start_receipts`,
+`axis.process_work_items` and `axis.connector_calls` tables are built too.
+So is the engine that runs `decision`, `task`, `operation` and `end` steps,
+see [Running a step](#running-a-step). The [task API](#task-api) routes that
 list the user's tasks, read one task and complete one are built. Completing
 a task resumes its `waiting` instance, see
 [Completing a task](#completing-a-task). A start and the task API follow the
 user's policies, see [Start endpoint](#start-endpoint) and
 [Policies on tasks](#task-api). A `callConnector` step, which calls an
-external system, is checked and compiled. Running it is
+external system, is checked and compiled. Its step stages the call and leaves
+the instance `waiting`. Sending the call is
 [planned for M5](#connector-calls). So are package operation steps, which
 run an operation from an extension package, see
 [Package operations](#package-operations). So are events and triggers, which
@@ -381,7 +382,7 @@ worker to run its steps.
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed, or for a connector call or a package operation call *(planned for M5)*, see [Connector calls](#connector-calls) and [Package operations](#package-operations). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](#connector-calls). *(planned for M5)* It also waits for a package operation call, see [Package operations](#package-operations). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 
@@ -691,9 +692,10 @@ the next step as usual.
   The item is not retried. A worker that crashes or stops before it commits
   calls no failure callback. Its item is claimed again after the lease
   expires.
-- **Restarts.** A `waiting` instance has no work item, so it needs no running
-  worker. A task decision is accepted while no worker runs: it queues the
-  next step's work item. The next worker to start runs that step. A step that
+- **Restarts.** An instance that waits on a task has no work item, so it
+  needs no running worker. One that waits on a connector call has the call's
+  `connector.call` item. A task decision is accepted while no worker runs: it
+  queues the next step's work item. The next worker to start runs that step. A step that
   a worker never committed leaves no trace, and the worker that claims it after
   the lease runs it once.
 - **History.** Every step occurrence records its input, its output, the
@@ -701,23 +703,29 @@ the next step as usual.
 
 ### Running a step
 
-The worker runs the `decision`, `task`, `operation` and `end` steps. Each work
-item of kind `process.step` runs the current step of its instance in one
-transaction:
+The worker runs the `decision`, `task`, `operation` and `end` steps. A
+`callConnector` operation step stages its call, see
+[Staging and the call](#staging-and-the-call). Each work item of kind
+`process.step` runs the current step of its instance in one transaction:
 
 1. It loads the instance. An instance that is missing or not `running` is
    skipped, and the item is deleted with no other write.
 2. It reads the release the instance is pinned to, so an instance keeps the
    step graph it started with after a new release is activated.
-3. It reads the subject record and runs the step. An operation first locks
-   the subject record's row, so it reads the latest stored version, and a
-   user's write of the same record waits until the step's transaction ends.
+3. It reads the subject record and runs the step. An `updateRecord`
+   operation first locks the subject record's row, so it reads the latest
+   stored version, and a user's write of the same record waits until the
+   step's transaction ends. A `callConnector` step only reads the record, so
+   it takes no lock.
    - A **decision** evaluates its branches in order and takes the first `when`
      that is true. A `when` that gives `null` counts as false. When no branch
      is true, it takes `otherwise`. The instance stays `running` on the next
      step.
-   - An **operation** evaluates each `set` expression on the record. The
-     instance stays `running` on its `next` step.
+   - An **`updateRecord`** operation evaluates each `set` expression on the
+     record. The instance stays `running` on its `next` step.
+   - A **`callConnector`** operation evaluates each `input` expression on the
+     record. A required input that gives `null` fails the step. The instance
+     becomes `waiting` on the step.
    - A **task** evaluates its assignee. A `user` expression gives the user id,
      and one that gives `null`, blank text or a run-time error fails the step.
      A `role` is the role name. The instance becomes `waiting` on the task
@@ -737,27 +745,35 @@ transaction:
    `due_at` is the transaction time, `now()`, plus `dueIn`, or null without
    `dueIn`. `dueIn` is added as a fixed length of time.
 
-   An operation then writes the values the way a record update does. Each
-   value must fit its field, and a `null` for a required field is refused.
-   Computed fields are recomputed, validations run, and the record's version
-   goes up by one. A refused write is an error, keyed and worded as in the
+   A `callConnector` step then inserts its call into `axis.connector_calls`
+   as `pending`, see [Staging and the call](#staging-and-the-call).
+
+   An `updateRecord` operation then writes the values the way a record
+   update does. Each value must fit its field, and a `null` for a required
+   field is refused. Computed fields are recomputed, validations run, and the
+   record's version goes up by one. A refused write is an error, keyed and worded as in the
    [record API](record-api.md#child-rows-computed-fields-and-validations).
 6. It writes the step's history row and its audit records, all with the actor
    `system`:
-   - An operation first writes `record.updated` for the subject record, with
-     the instance id. Its details are `{ "version", "fields" }`, as the
+   - An `updateRecord` operation first writes `record.updated` for the
+     subject record, with the instance id. Its details are
+     `{ "version", "fields" }`, as the
      [record API](record-api.md#audit-records-and-history) writes them.
-   - A decision and an operation write `process.stepCompleted` with details
-     `{ "step", "next" }`.
+   - A decision and an `updateRecord` operation write `process.stepCompleted`
+     with details `{ "step", "next" }`.
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
+   - A `callConnector` step writes `connector.callStaged` with details
+     `{ "step", "connector", "operation", "operationId" }`.
    - An end step writes `process.completed` with details `{ "step" }`.
-7. A decision and an operation insert the work item of the next step. A task
-   step inserts none, because the instance waits for the task.
+7. A decision and an `updateRecord` operation insert the work item of the
+   next step. A task step inserts none, because the instance waits for the
+   task. A `callConnector` step inserts a `connector.call` item for its call
+   instead.
 
 Any exception in the step, such as a `when` that divides by zero, a missing
 subject record, a record write that a validation refuses or a task assignee
 that gives no user, rolls all of it back. So the record keeps its values and
-version, and no task is stored. The error of a refused write
+version, and no task or connector call is stored. The error of a refused write
 names each field pointer and message, such as
 `The record update was rejected: /values/amount: request.amountNegative`. A
 following transaction then sets the instance to `failed` with its `ended_at`
@@ -768,12 +784,13 @@ has changed since the step loaded it. No step is retried.
 
 ## Connector calls
 
-*(planned for M5)* This section follows
+This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
-The step shape and compile checks are built. Staging and the call are
-planned, and until they are built an instance that reaches a `callConnector`
-step fails. A `callConnector` step calls one operation of a
-[connector](configuration.md#connectors-and-deployment-bindings), an external
+The step shape, the compile checks and staging are built. *(planned for M5)*
+Each attempt, the call outcomes and reconciliation are planned. Until they are
+built, no worker claims a `connector.call` item, so an instance that reaches a
+`callConnector` step stays `waiting` and no request is sent. A `callConnector`
+step calls one operation of a [connector](configuration.md#connectors-and-deployment-bindings), an external
 system such as the purchasing system. The call never runs inside a database
 transaction. The step stages it, the worker sends it later, and a separate
 transaction records the result. A stable operation identity lets every retry
@@ -861,20 +878,25 @@ and `next`.
 [Running a step](#running-a-step), and writes these together:
 
 1. It evaluates each `input` expression on the subject record. A required
-   input that gives `null` fails the step.
-2. It inserts the call into `axis.connector_calls` as `pending`, with the
-   evaluated input. The row's id is the call's operation identity, a
-   version 7 UUID. A unique index on instance and step lets a step stage only
-   one call.
-3. It sets the instance to `waiting` on the step.
+   input that gives `null` fails the step. An optional input that gives
+   `null` is stored as `null`. Dates and date-times are stored in the text
+   forms of the [record API](record-api.md).
+2. It sets the instance to `waiting` on the step.
+3. It inserts the call into `axis.connector_calls` as `pending`, with
+   0 attempts and the evaluated input. The row's id is the call's operation
+   identity, a version 7 UUID. A unique index on instance and step lets a
+   step stage only one call.
 4. It writes the step's history row, with output
    `{ "state": "waiting", "operationId" }`.
-5. It inserts a work item of kind `connector.call` for the call.
+5. It writes the audit record `connector.callStaged` with the actor `system`
+   and details `{ "step", "connector", "operation", "operationId" }`.
+6. It inserts a work item of kind `connector.call` for the call, due at once.
+   The item names the instance and the call.
 
 While its call is pending, retrying or unknown, the instance stays `waiting`.
 So a second start for the same record is blocked, as with an open task.
 
-**Each attempt.** A worker that claims the `connector.call` item does this:
+**Each attempt.** *(planned for M5)* A worker that claims the `connector.call` item does this:
 
 1. **Mark.** A short transaction marks the call `sending` and counts the
    attempt. It extends the item's lease to the connector's `timeout` plus
@@ -1352,7 +1374,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. *(planned for M5)* `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call, and `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. *(planned for M5)* `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call. *(planned for M5)* `{ "operationId", "outcome", "next" }` when the call settles, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. *(planned for M5)* `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1362,11 +1384,12 @@ database, with history in `axis.__processes_migrations` (see
   `claim_token` of its current claim. A step's item also has the
   `process_instance_id` of its instance. A worker claims only items of the
   tenant it polls and only kinds it has a handler for. Lease times use the
-  database clock. Completed and failed items are deleted. *(planned for M5)*
-  A new kind, `connector.call`, sends or reconciles one connector call. Its
-  item also has the `connector_call_id` of the call, and its `due_at` gives
-  the backoff. See [Connector calls](#connector-calls). *(planned for M5)*
-  Three more kinds come with [events and triggers](#events-and-triggers):
+  database clock. Completed and failed items are deleted. A `connector.call`
+  item sends or reconciles one connector call. It has the
+  `process_instance_id` of the call's instance and the `connector_call_id` of
+  the call. See [Connector calls](#connector-calls). *(planned for M5)* A
+  worker handles the kind, and the item's `due_at` gives the backoff.
+  *(planned for M5)* Three more kinds come with [events and triggers](#events-and-triggers):
   - `event.deliver` delivers one event occurrence to the `async` event
     triggers. Its item also has the `event_id` of the occurrence.
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
@@ -1400,7 +1423,7 @@ database, with history in `axis.__processes_migrations` (see
   | `completed_by` | `text`, null | The user who completed the task. Null while it is `open` |
   | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open` |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
-- `axis.connector_calls` *(planned for M5)*: one row per staged connector
+- `axis.connector_calls`: one row per staged connector
   call, see [Connector calls](#connector-calls). A unique index on
   (`process_instance_id`, `step`) lets a step stage only one call. Times use
   the database clock. There is no column for a request or response body.

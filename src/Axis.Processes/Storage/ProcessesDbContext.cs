@@ -5,8 +5,8 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, their human tasks, the receipts of starts that carried an <c>Idempotency-Key</c>, and the work that
-/// workers claim and run. The caller supplies the connection to the tenant database.
+/// their steps, their human tasks, their staged connector calls, the receipts of starts that carried an
+/// <c>Idempotency-Key</c>, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
 {
@@ -23,6 +23,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ProcessStepHistoryRow> StepHistory => Set<ProcessStepHistoryRow>();
 
     public DbSet<ProcessTaskRow> Tasks => Set<ProcessTaskRow>();
+
+    public DbSet<ConnectorCallRow> ConnectorCalls => Set<ConnectorCallRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
@@ -113,6 +115,35 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<ConnectorCallRow>(call =>
+        {
+            call.ToTable("connector_calls");
+            call.HasKey(c => c.Id).HasName("pk_connector_calls");
+            call.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
+            call.Property(c => c.ProcessInstanceId).HasColumnName("process_instance_id");
+            call.Property(c => c.Step).HasColumnName("step");
+            call.Property(c => c.ReleaseId).HasColumnName("release_id");
+            call.Property(c => c.Connector).HasColumnName("connector");
+            call.Property(c => c.Operation).HasColumnName("operation");
+            call.Property(c => c.State).HasColumnName("state");
+            call.Property(c => c.Attempts).HasColumnName("attempts");
+            call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
+            call.Property(c => c.LastStatus).HasColumnName("last_status");
+            call.Property(c => c.LastError).HasColumnName("last_error");
+            call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            call.Property(c => c.SettledAt).HasColumnName("settled_at");
+
+            // A step stages at most one call.
+            call.HasIndex(c => new { c.ProcessInstanceId, c.Step })
+                .IsUnique()
+                .HasDatabaseName("ux_connector_calls_process_instance_id_step");
+            call.HasOne<ProcessInstanceRow>()
+                .WithMany()
+                .HasForeignKey(c => c.ProcessInstanceId)
+                .HasConstraintName("fk_connector_calls_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ProcessStartReceiptRow>(receipt =>
         {
             receipt.ToTable("process_start_receipts");
@@ -138,12 +169,19 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.LeaseExpiresAt).HasColumnName("lease_expires_at");
             item.Property(i => i.ClaimToken).HasColumnName("claim_token");
             item.Property(i => i.ProcessInstanceId).HasColumnName("process_instance_id");
+            item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
+            item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");
             item.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(i => i.ProcessInstanceId)
                 .HasConstraintName("fk_process_work_items_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            item.HasOne<ConnectorCallRow>()
+                .WithMany()
+                .HasForeignKey(i => i.ConnectorCallId)
+                .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id")
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

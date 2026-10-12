@@ -24,7 +24,8 @@ public static class WorkItemQueue
 
     /// <summary>
     /// Adds a ready work item and returns its id. <paramref name="processInstanceId"/> names the
-    /// process instance the item runs a step of, when it does.
+    /// process instance the item runs a step or a connector call of, when it does, and
+    /// <paramref name="connectorCallId"/> the connector call it sends.
     /// </summary>
     public static async Task<Guid> EnqueueAsync(
         NpgsqlConnection connection,
@@ -33,14 +34,15 @@ public static class WorkItemQueue
         string kind,
         DateTimeOffset dueAt,
         CancellationToken cancellationToken,
-        Guid? processInstanceId = null)
+        Guid? processInstanceId = null,
+        Guid? connectorCallId = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id)
-            VALUES (@id, @tenant, @kind, @due, @instance)
+            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id)
+            VALUES (@id, @tenant, @kind, @due, @instance, @call)
             """,
             connection,
             transaction);
@@ -49,6 +51,7 @@ public static class WorkItemQueue
         command.Parameters.AddWithValue("kind", kind);
         command.Parameters.AddWithValue("due", dueAt.ToUniversalTime());
         command.Parameters.Add(new NpgsqlParameter("instance", NpgsqlDbType.Uuid) { Value = (object?)processInstanceId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("call", NpgsqlDbType.Uuid) { Value = (object?)connectorCallId ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return id;
     }

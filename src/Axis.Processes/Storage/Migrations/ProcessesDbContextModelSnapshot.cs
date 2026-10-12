@@ -23,6 +23,76 @@ namespace Axis.Processes.Storage.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Axis.Processes.Storage.ConnectorCallRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("Connector")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("connector");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Input")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("input");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<int?>("LastStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_status");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operation");
+
+                    b.Property<Guid>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Step")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("step");
+
+                    b.HasKey("Id")
+                        .HasName("pk_connector_calls");
+
+                    b.HasIndex("ProcessInstanceId", "Step")
+                        .IsUnique()
+                        .HasDatabaseName("ux_connector_calls_process_instance_id_step");
+
+                    b.ToTable("connector_calls", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.ProcessInstanceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -278,6 +348,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("claim_token");
 
+                    b.Property<Guid?>("ConnectorCallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connector_call_id");
+
                     b.Property<DateTimeOffset>("DueAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
@@ -303,6 +377,9 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_process_work_items");
 
+                    b.HasIndex("ConnectorCallId")
+                        .HasDatabaseName("ix_process_work_items_connector_call_id");
+
                     b.HasIndex("DueAt")
                         .HasDatabaseName("ix_process_work_items_due_at");
 
@@ -310,6 +387,16 @@ namespace Axis.Processes.Storage.Migrations
                         .HasDatabaseName("ix_process_work_items_process_instance_id");
 
                     b.ToTable("process_work_items", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.ConnectorCallRow", b =>
+                {
+                    b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_connector_calls_process_instances_process_instance_id");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.ProcessStepHistoryRow", b =>
@@ -334,6 +421,12 @@ namespace Axis.Processes.Storage.Migrations
 
             modelBuilder.Entity("Axis.Processes.Storage.WorkItemRow", b =>
                 {
+                    b.HasOne("Axis.Processes.Storage.ConnectorCallRow", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectorCallId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id");
+
                     b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
                         .WithMany()
                         .HasForeignKey("ProcessInstanceId")
