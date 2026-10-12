@@ -113,6 +113,7 @@ public static class ApplicationLoader
         var forms = new List<FormResource>();
         var roles = new List<RoleResource>();
         var policies = new List<PolicyResource>();
+        var connectors = new List<ConnectorResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -242,6 +243,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Policy:
                         policies.Add(root.Deserialize<PolicyResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Connector:
+                        connectors.Add(root.Deserialize<ConnectorResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -270,7 +274,10 @@ public static class ApplicationLoader
             unloadedSequenceNames,
             unloadedFormNames,
             unloadedProcessNames,
-            unloadedRoleNames);
+            unloadedRoleNames)
+        {
+            Connectors = connectors,
+        };
     }
 
     /// <summary>
@@ -433,7 +440,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}' or '{ResourceKinds.Policy}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}' or '{ResourceKinds.Connector}'.",
                 file,
                 "/kind",
                 resourceId));

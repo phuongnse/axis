@@ -159,7 +159,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
         await using var data = database.CreateContext();
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration, CancellationToken);
         Assert.Empty(compiled.Diagnostics);
-        Assert.Empty((await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, CancellationToken)).Diagnostics);
+        Assert.Empty((await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken)).Diagnostics);
         return compiled.Model!;
     }
 }

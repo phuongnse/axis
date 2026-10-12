@@ -7,7 +7,8 @@ namespace Axis.Data;
 
 /// <summary>
 /// Makes a compiled release the active release of its application: it checks that no other
-/// application is active under the manifest name or holds one of its site paths, provisions the
+/// application is active under the manifest name or holds one of its site paths, checks that the
+/// tenant has every deployment binding its connectors name with the right kind, provisions the
 /// entity tables and then sets the active release with its site paths.
 /// <para>
 /// Provisioning runs in its own transaction, and the active release and its site paths are written
@@ -22,17 +23,20 @@ public static class ReleaseActivator
 {
     /// <summary>
     /// Activates the release in <paramref name="compiled"/>, which must have a release and a model
-    /// with the same application id. Call it outside an explicit transaction.
+    /// with the same application id, for the tenant whose deployment bindings are
+    /// <paramref name="bindings"/>. Call it outside an explicit transaction.
     /// </summary>
     public static async Task<ActivationResult> ActivateAsync(
         ReleaseCompilationResult compiled,
         IActiveReleaseStore store,
         DataDbContext data,
+        ActivationBindings bindings,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(compiled);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(bindings);
         if (compiled.Release is not { } release || compiled.Model is not { } model)
         {
             throw new ArgumentException("Only a compilation result with a release and a model can be activated.", nameof(compiled));
@@ -66,6 +70,13 @@ public static class ReleaseActivator
             return new ActivationResult(takenPaths);
         }
 
+        // Checked before provisioning, so a refused release leaves no new tables behind.
+        var badBindings = CheckBindings(model, bindings);
+        if (badBindings.Count > 0)
+        {
+            return new ActivationResult(badBindings);
+        }
+
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, cancellationToken);
         if (provisioned.Diagnostics.Count > 0)
         {
@@ -82,6 +93,65 @@ public static class ReleaseActivator
             ActiveReleaseConflict.SitePath => new ActivationResult([SitePathActiveForOtherApplication(model.Sites.Single(site => site.Path == set.SitePath))]),
             _ => throw new InvalidOperationException($"Unknown active release conflict '{set.Conflict}'."),
         };
+    }
+
+    /// <summary>
+    /// Reports every connector binding the tenant lacks or holds with another kind, and every base
+    /// URL that is not <c>https</c> when <c>http</c> is not allowed. A message names the tenant
+    /// and the binding, never its value.
+    /// </summary>
+    private static List<Diagnostic> CheckBindings(ApplicationModel model, ActivationBindings bindings)
+    {
+        var diagnostics = new List<Diagnostic>();
+        foreach (var connector in model.Connectors)
+        {
+            void Report(string code, string message, string path) =>
+                diagnostics.Add(new Diagnostic(code, message, connector.File, path, connector.Id));
+
+            var baseUrl = CheckBinding(connector.BaseUrlBinding, ActivationBinding.UrlKind, "/baseUrl/binding", bindings, Report);
+            if (baseUrl is not null && !bindings.AllowHttp && baseUrl.Url?.Scheme != Uri.UriSchemeHttps)
+            {
+                Report(
+                    DiagnosticCodes.InsecureBaseUrl,
+                    $"Tenant '{bindings.TenantId}' binding '{connector.BaseUrlBinding}' is not an https URL. Only Development allows http.",
+                    "/baseUrl/binding");
+            }
+
+            if (connector.Auth is { } auth)
+            {
+                CheckBinding(auth.Binding, ActivationBinding.SecretKind, auth.BindingPath, bindings, Report);
+            }
+        }
+
+        return diagnostics;
+    }
+
+    /// <summary>Gives the binding named <paramref name="name"/> when the tenant has it with <paramref name="kind"/>, otherwise reports it.</summary>
+    private static ActivationBinding? CheckBinding(
+        string name, string kind, string path, ActivationBindings bindings, Action<string, string, string> report)
+    {
+        var binding = bindings.Bindings.TryGetValue(name, out var exact)
+            ? exact
+            : bindings.Bindings.FirstOrDefault(pair => string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
+        if (binding is null)
+        {
+            report(
+                DiagnosticCodes.MissingDeploymentBinding,
+                $"Tenant '{bindings.TenantId}' has no binding '{name}'. Add a '{kind}' binding with that name to the tenant.",
+                path);
+            return null;
+        }
+
+        if (binding.Kind != kind)
+        {
+            report(
+                DiagnosticCodes.MissingDeploymentBinding,
+                $"Tenant '{bindings.TenantId}' binding '{name}' is a '{binding.Kind}' binding. It is used here as a '{kind}' binding.",
+                path);
+            return null;
+        }
+
+        return binding;
     }
 
     private static Diagnostic NameActiveForOtherApplication(ApplicationModel model) =>

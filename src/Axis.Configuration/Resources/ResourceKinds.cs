@@ -15,4 +15,5 @@ public static class ResourceKinds
     public const string Form = "form";
     public const string Role = "role";
     public const string Policy = "policy";
+    public const string Connector = "connector";
 }

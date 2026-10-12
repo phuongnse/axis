@@ -607,9 +607,10 @@ depend on which grant matched a record.
 ## D25. Connectors, deployment bindings and secrets — Agreed
 
 M5 lets a process call external systems. The `Bindings` block in host
-configuration, its startup check and resolving a binding at run time are
-built. Connectors, the activation check and keeping secrets out of logs and
-records are not built yet. See
+configuration, its startup check, resolving a binding at run time, the
+`connector` resource with its compile checks and the activation check are
+built. Calling a connector and keeping secrets out of logs and records are
+not built yet. See
 [configuration](reference/configuration.md#connectors-and-deployment-bindings)
 for bindings and the `connector` resource, and
 [processes](reference/processes.md#connector-calls) for the call, its
