@@ -1,5 +1,6 @@
 # Builds Axis from source and runs the server with the purchase request sample. The server is
-# the last stage, so it is the default target. The worker stage runs the worker host.
+# the last stage, so it is the default target. The worker stage runs the worker host, and the
+# purchasing stage runs the purchasing system stub from tests/Axis.PurchasingStub.
 # For local use: the Development environment and the sample credentials are not for production.
 
 # The SPA. Vite writes it to ../src/Axis.Server/wwwroot, the server's web root.
@@ -27,6 +28,20 @@ WORKDIR /app
 COPY --from=build /worker .
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
+
+# The purchasing system stub, a test fixture that stands in for the sample's purchasing system.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS purchasing-build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
+COPY tests/Axis.PurchasingStub/ tests/Axis.PurchasingStub/
+RUN dotnet publish tests/Axis.PurchasingStub/Axis.PurchasingStub.csproj -c Release -o /purchasing
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS purchasing
+WORKDIR /app
+COPY --from=purchasing-build /purchasing .
+USER $APP_UID
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Axis.PurchasingStub.dll"]
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # The runtime image has no HTTP client, and Compose uses curl for the server health check.

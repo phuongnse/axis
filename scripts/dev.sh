@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# Runs Axis locally: PostgreSQL and Keycloak in Docker, the server and the worker under dotnet
-# watch and the SPA on Vite, in one terminal. The server starts once PostgreSQL accepts
-# connections and Keycloak's development realm answers. The server signs people in through that
-# realm at /api/auth/sign-in. The SPA does not offer it yet.
+# Runs Axis locally: PostgreSQL, Keycloak and the purchasing system stub in Docker, the server
+# and the worker under dotnet watch and the SPA on Vite, in one terminal. The server starts once
+# PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
+# server signs people in through that realm at /api/auth/sign-in. The SPA does not offer it yet.
 # The worker starts once the server has migrated the tenant databases. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
 # activates the edited configuration. The worker and the SPA keep running. Ctrl+C stops the
-# server, the worker and the SPA. PostgreSQL and Keycloak keep running.
-# AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_SERVER_PORT and AXIS_WEB_PORT move the ports
-# (5432, 8080, 5206, 5173).
+# server, the worker and the SPA. PostgreSQL, Keycloak and the purchasing system stub keep
+# running.
+# AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_SERVER_PORT and
+# AXIS_WEB_PORT move the ports (5432, 8080, 5207, 5206, 5173).
 # Works with the bash 3.2 that ships with macOS.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 postgres_port="${AXIS_POSTGRES_PORT:-5432}"
 keycloak_port="${AXIS_KEYCLOAK_PORT:-8080}"
+purchasing_port="${AXIS_PURCHASING_PORT:-5207}"
 server_port="${AXIS_SERVER_PORT:-5206}"
 web_port="${AXIS_WEB_PORT:-5173}"
 
@@ -37,10 +39,11 @@ if [ ! -d web/node_modules ] || ! cmp -s web/package-lock.json "$marker"; then
   cp web/package-lock.json "$marker"
 fi
 
-# The health checks make --wait return once PostgreSQL accepts connections and the realm answers.
-log "Starting PostgreSQL on port $postgres_port and Keycloak on port $keycloak_port"
-AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" \
-  docker compose up -d --wait --wait-timeout 180 postgres keycloak
+# The health checks make --wait return once PostgreSQL accepts connections, the realm answers
+# and the purchasing system stub answers. --build rebuilds the stub's image when it changed.
+log "Starting PostgreSQL on port $postgres_port, Keycloak on port $keycloak_port and the purchasing system stub on port $purchasing_port"
+AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PURCHASING_PORT="$purchasing_port" \
+  docker compose up -d --build --wait --wait-timeout 180 postgres keycloak purchasing
 if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis;Password=axis"
   # The worker reads the same tenant connection string, so this export moves it too.
@@ -184,7 +187,7 @@ start_server
 web=$!
 disown "$web"
 
-log "Server on http://localhost:$server_port, SPA on http://localhost:$web_port, Keycloak on http://localhost:$keycloak_port. Press Ctrl+C to stop."
+log "Server on http://localhost:$server_port, SPA on http://localhost:$web_port, Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port. Press Ctrl+C to stop."
 
 code=0
 while :; do

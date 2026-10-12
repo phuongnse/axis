@@ -21,7 +21,9 @@ the commands.
 
 Run `docker compose up --build`. It needs only Docker. It builds Axis from source
 and starts PostgreSQL, Keycloak with the development realm at http://localhost:8080,
-the server with the purchase request sample at http://localhost:5206, and the worker.
+the server with the purchase request sample at http://localhost:5206, the worker,
+and a purchasing system stub at http://localhost:5207 that stands in for the
+external purchasing system.
 The SPA signs people in through Keycloak at `/api/auth/sign-in`, but sign-in through
 Compose is not wired yet. Every application page needs a session, so under Compose
 opening a sample page starts a sign-in that cannot complete yet. See

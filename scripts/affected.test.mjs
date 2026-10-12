@@ -52,6 +52,12 @@ describe('matches', () => {
     assert.equal(matches(path, smokeSuites.compose), false)
   })
 
+  test('covers the purchasing system stub for both suites', () => {
+    for (const matchers of Object.values(smokeSuites)) {
+      assert.equal(matches('tests/Axis.PurchasingStub/PurchasingStubApp.cs', matchers), true)
+    }
+  })
+
   test('covers scripts/lib for both suites', () => {
     for (const matchers of Object.values(smokeSuites)) {
       assert.equal(matches('scripts/lib/x.mjs', matchers), true)

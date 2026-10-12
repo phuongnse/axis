@@ -17,6 +17,7 @@ const timeout = 20 * 60 * 1000
 let env
 let baseUrl
 let keycloakUrl
+let purchasingUrl
 
 const freePort = () =>
   new Promise((resolve, reject) => {
@@ -40,15 +41,18 @@ before(async () => {
   const serverPort = await freePort()
   const postgresPort = await freePort()
   const keycloakPort = await freePort()
+  const purchasingPort = await freePort()
   env = {
     ...process.env,
     AXIS_SERVER_PORT: String(serverPort),
     AXIS_POSTGRES_PORT: String(postgresPort),
     AXIS_KEYCLOAK_PORT: String(keycloakPort),
+    AXIS_PURCHASING_PORT: String(purchasingPort),
   }
   // The sample's tenant host is localhost.
   baseUrl = `http://localhost:${serverPort}`
   keycloakUrl = `http://localhost:${keycloakPort}`
+  purchasingUrl = `http://localhost:${purchasingPort}`
 })
 
 after(() => {
@@ -61,6 +65,7 @@ test('the stack runs from source', { timeout }, async () => {
     compose(['logs', 'server'], { stdio: 'inherit' })
     compose(['logs', 'worker'], { stdio: 'inherit' })
     compose(['logs', 'keycloak'], { stdio: 'inherit' })
+    compose(['logs', 'purchasing'], { stdio: 'inherit' })
     assert.fail(`docker compose up exited with ${up.status}`)
   }
 
@@ -84,6 +89,10 @@ test('the stack runs from source', { timeout }, async () => {
   const discovery = await fetch(`${keycloakUrl}/realms/axis/.well-known/openid-configuration`)
   assert.equal(discovery.status, 200)
   assert.match((await discovery.json()).issuer, /\/realms\/axis$/)
+
+  // The purchasing system stub answers.
+  const purchasing = await fetch(`${purchasingUrl}/health`)
+  assert.equal(purchasing.status, 200)
 
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
@@ -123,8 +132,8 @@ test('a broken application folder stops the server', { timeout }, () => {
   }
 })
 
-test('the default ports are 5206, 5432 and 8080 on 127.0.0.1', () => {
-  const { AXIS_SERVER_PORT, AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, ...rest } = env
+test('the default ports are 5206, 5432, 8080 and 5207 on 127.0.0.1', () => {
+  const { AXIS_SERVER_PORT, AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, ...rest } = env
   const config = compose(['--env-file', '/dev/null', 'config', '--format', 'json'], { env: rest })
   assert.equal(config.status, 0, config.stderr)
   const { services } = JSON.parse(config.stdout)
@@ -133,4 +142,5 @@ test('the default ports are 5206, 5432 and 8080 on 127.0.0.1', () => {
   assert.deepEqual(published('server'), ['127.0.0.1:5206->8080'])
   assert.deepEqual(published('postgres'), ['127.0.0.1:5432->5432'])
   assert.deepEqual(published('keycloak'), ['127.0.0.1:8080->8080'])
+  assert.deepEqual(published('purchasing'), ['127.0.0.1:5207->8080'])
 })

@@ -73,26 +73,29 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
-| `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built server and the worker, runs Playwright in Chromium, then runs the Compose smoke test, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. The one
 exception is a smoke test that NexKit's `NEXKIT_BASE_SHA` shows no change can affect. It is
 skipped and the summary lists it as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local
 runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
-goes to `artifacts/logs/e2e-server.log`, and the E2E worker output to
-`artifacts/logs/e2e-worker.log`. `scripts/test-report.mjs` then prints a
+goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
+`artifacts/logs/e2e-worker.log`, and the purchasing system stub output to
+`artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a
 summary per suite and the failed tests with their `file:line`. On GitHub Actions
 the summary goes to the job summary and each failed test becomes an error
 annotation.
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
-with the purchase request sample at http://localhost:5206, and the worker. It needs only
+with the purchase request sample at http://localhost:5206, the worker, and the purchasing
+system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
+the purchasing system that the sample will call. It needs only
 Docker. `docker compose logs server` shows the activation diagnostics,
 and `docker compose logs worker` shows the worker output. The Keycloak admin console login is
-`admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT` and `AXIS_KEYCLOAK_PORT` to
-change the host ports (5206, 5432 and 8080). All three ports are published on `127.0.0.1`
-only.
+`admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
+`AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports
+are published on `127.0.0.1` only.
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
@@ -110,8 +113,9 @@ works on a fresh clone:
 - It installs the SPA packages when `web/node_modules` is missing or
   `web/package-lock.json` changed since the last install. It installs no
   Playwright browser.
-- It starts PostgreSQL and Keycloak with Docker Compose. It waits until
-  PostgreSQL accepts connections and Keycloak's `axis` realm answers.
+- It starts PostgreSQL, Keycloak and the purchasing system stub with Docker
+  Compose. It waits until PostgreSQL accepts connections, Keycloak's `axis`
+  realm answers and the stub answers. The first run builds the stub's image.
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
@@ -125,14 +129,15 @@ works on a fresh clone:
   when it restarts the server. The worker and the SPA keep running. If the edited
   configuration does not activate, the server exits on its own and the script stops
   with a non-zero code.
-- `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT`, `AXIS_SERVER_PORT` and
-  `AXIS_WEB_PORT` move the four ports. The defaults are 5432, 8080, 5206 and
-  5173. When `AXIS_POSTGRES_PORT` is set, the script points the server's
+- `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT`, `AXIS_PURCHASING_PORT`,
+  `AXIS_SERVER_PORT` and `AXIS_WEB_PORT` move the five ports. The defaults are
+  5432, 8080, 5207, 5206 and 5173. When `AXIS_POSTGRES_PORT` is set, the script points the server's
   connection strings and the worker's `Tenants__default__ConnectionString` at
   that port. When `AXIS_KEYCLOAK_PORT` is set, it points the server's
   `Tenants__default__Oidc__Authority` at Keycloak on that port.
 - Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running with
-  its data, and Keycloak keeps running. Run `docker compose down` to stop them.
+  its data, and Keycloak and the purchasing system stub keep running. Run
+  `docker compose down` to stop them.
   If any of the three exits on its own, the others stop too and the script
   exits non-zero.
 - To run the worker on its own, run `dotnet run --project src/Axis.Worker`. It

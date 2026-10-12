@@ -52,6 +52,7 @@ web/                      React + TypeScript SPA (Vite), Ant Design, ProComponen
 tests/
   Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
+  Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
 samples/
@@ -559,3 +560,33 @@ lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
 the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
 the worker process, and the script starts a new one. A worker that stops with
 no restart request fails the run.
+
+The E2E run also starts the purchasing system stub from the build output, and
+fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
+output goes to `artifacts/logs/e2e-purchasing.log`.
+
+### Purchasing system stub
+
+`tests/Axis.PurchasingStub` stands in for the external purchasing system that
+the purchase request sample's connector will call. It is a test fixture, not
+platform code, and references nothing under `src/`. The E2E run,
+`scripts/dev.sh` and Docker Compose start it. Its orders live in memory only.
+
+- `POST /purchase-orders` with an `Idempotency-Key` header and a body with
+  `requestNumber`, `supplierCode` and `amount` creates an order. It answers
+  `201` with an `orderNumber` such as `PO-2026-0001`. A repeat with the same
+  key answers `200` with the same order and stores nothing new. A create
+  without the key, `requestNumber` or `amount` is a `400`.
+- `GET /purchase-orders/by-key/{idempotencyKey}` answers `200` with the
+  `orderNumber`, or `404` when the key is unknown.
+- `GET /purchase-orders` lists every stored order in creation order.
+- `POST /test/drop-next` drops the response of the next create.
+  `POST /test/drop/{idempotencyKey}` drops the response of the first create
+  with that key. A dropped create stores the order, then closes the connection
+  without answering. Each drop happens once, so the retry gets the stored order
+  back, as in the [lost response](reference/processes.md#lost-response) flow.
+  `drop-next` affects the whole stub, so specs that run in parallel should drop
+  by key.
+- `GET /health` answers `200`.
+
+The stub ignores the `Authorization` header.

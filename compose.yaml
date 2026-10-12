@@ -1,11 +1,13 @@
 # Runs the whole Axis stack from source: PostgreSQL, Keycloak with the development realm at
 # http://localhost:8080, the server with the purchase request sample, at http://localhost:5206,
-# and the worker. Sign-in is not wired here yet: the server in its container cannot reach
-# Keycloak at the address the browser uses. For development, scripts/dev.sh starts only
-# PostgreSQL and Keycloak from here and runs the server, the worker and the SPA with hot reload.
+# the worker, and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
+# yet: the server in its container cannot reach Keycloak at the address the browser uses. For
+# development, scripts/dev.sh starts only PostgreSQL, Keycloak and the purchasing system stub from
+# here and runs the server, the worker and the SPA with hot reload.
 # The development settings are in src/Axis.Server/appsettings.Development.json.
-# All three ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206),
-# AXIS_POSTGRES_PORT (default 5432) and AXIS_KEYCLOAK_PORT (default 8080) change the host ports.
+# All four ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206),
+# AXIS_POSTGRES_PORT (default 5432), AXIS_KEYCLOAK_PORT (default 8080) and AXIS_PURCHASING_PORT
+# (default 5207) change the host ports.
 services:
   postgres:
     image: postgres:18-alpine
@@ -75,6 +77,21 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
+
+  # The purchasing system stub from tests/Axis.PurchasingStub. It keeps its orders in memory.
+  purchasing:
+    build:
+      context: .
+      target: purchasing
+    ports:
+      - "127.0.0.1:${AXIS_PURCHASING_PORT:-5207}:8080"
+    # The image has bash but no curl.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
 volumes:
   axis-postgres:
