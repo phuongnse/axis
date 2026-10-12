@@ -13,7 +13,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// An external system for connector call tests, over real HTTP on a free local port. It records
 /// every request it gets on any path, and answers <c>200 {"orderNumber":"PO-1"}</c> unless a test
-/// sets the next answer. A test can also hold the next response until it releases it.
+/// lines up the next answers. A test can also hold the next response until it releases it.
 /// </summary>
 public sealed class ConnectorStub : IAsyncDisposable
 {
@@ -22,7 +22,7 @@ public sealed class ConnectorStub : IAsyncDisposable
     private readonly ConcurrentQueue<StubRequest> _requests = new();
     private readonly Lock _lock = new();
     private readonly WebApplication _app;
-    private (int Status, string Body)? _next;
+    private readonly Queue<(int Status, string Body)> _next = new();
     private HeldResponse? _held;
 
     private ConnectorStub(WebApplication app) => _app = app;
@@ -47,11 +47,21 @@ public sealed class ConnectorStub : IAsyncDisposable
     }
 
     /// <summary>Sets the answer to the next request. Later requests get the default answer again.</summary>
-    public void Respond(int status, string body)
+    public void Respond(int status, string body) => RespondMany((status, body));
+
+    /// <summary>
+    /// Sets the answers to the next requests, one each in order, in place of any answers still lined
+    /// up. Later requests get the default answer again.
+    /// </summary>
+    public void RespondMany(params (int Status, string Body)[] answers)
     {
         lock (_lock)
         {
-            _next = (status, body);
+            _next.Clear();
+            foreach (var answer in answers)
+            {
+                _next.Enqueue(answer);
+            }
         }
     }
 
@@ -96,7 +106,7 @@ public sealed class ConnectorStub : IAsyncDisposable
         HeldResponse? held;
         lock (_lock)
         {
-            (next, _next) = (_next, null);
+            next = _next.TryDequeue(out var answer) ? answer : null;
             (held, _held) = (_held, null);
         }
 
@@ -106,10 +116,10 @@ public sealed class ConnectorStub : IAsyncDisposable
             await held.Released;
         }
 
-        var (status, answer) = next ?? (StatusCodes.Status200OK, DefaultBody);
+        var (status, text) = next ?? (StatusCodes.Status200OK, DefaultBody);
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync(answer, context.RequestAborted);
+        await context.Response.WriteAsync(text, context.RequestAborted);
     }
 }
 

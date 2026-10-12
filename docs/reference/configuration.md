@@ -898,7 +898,7 @@ The `Bindings` block, its startup checks, resolving a binding at run time,
 the secret value that hides itself from text, JSON and logs, the `connector`
 resource with its [compile checks](#configuration-pipeline) and the activation
 check are built. Calling a connector and using secrets in its calls are built
-too. *(planned for M5)* Retries and reconciliation are not built yet. A `connector` resource
+too, and so are retries. *(planned for M5)* Reconciliation is not built yet. A `connector` resource
 describes an external system that a process can call. Its URL and its secret
 are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
 reconciles is in [Connector calls](processes.md#connector-calls).
