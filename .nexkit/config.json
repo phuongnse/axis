@@ -32,6 +32,38 @@
       "timeout_minutes": 20
     }
   ],
+  "cache": [
+    {
+      "name": "nuget",
+      "paths": [
+        "~/.nuget/packages"
+      ],
+      "key_files": [
+        "Directory.Packages.props",
+        "**/*.csproj",
+        ".config/dotnet-tools.json"
+      ]
+    },
+    {
+      "name": "npm",
+      "paths": [
+        "~/.npm"
+      ],
+      "key_files": [
+        "web/package-lock.json",
+        "tests/e2e/package-lock.json"
+      ]
+    },
+    {
+      "name": "playwright",
+      "paths": [
+        "~/.cache/ms-playwright"
+      ],
+      "key_files": [
+        "tests/e2e/package-lock.json"
+      ]
+    }
+  ],
   "stages": {
     "plan": {
       "timeout_minutes": 20

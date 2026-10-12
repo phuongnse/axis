@@ -65,6 +65,16 @@ models, are not copied here. Look them up where they live.
   lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
   doubt runs the test. CI sets no base, so CI on `main` always runs both. The
   test summary lists a skipped suite as skipped.
+- **NexKit restores the dependency caches that CI on `main` saves.** Before
+  `scripts/setup.sh`, NexKit's implement, fix and check runs restore the
+  NuGet, npm and Playwright browser caches, so setup installs only what
+  changed. NexKit never saves a cache, because those runs execute code the
+  agent wrote. The CI workflow saves them on `main`, under the keys NexKit
+  looks for. The entries are in NexKit's [`cache` setting][nexkit-caches],
+  and the CI workflow has one `actions/cache` step for each, with the same
+  paths and key files in the same order. A change to what setup downloads
+  updates both in the same hand-made pull request. A missed cache never fails
+  a run; setup then installs from scratch.
 - **Everything goes through NexKit, except changes in paths NexKit may not
   change.** Those paths are set by NexKit's
   [`protected_paths` setting][nexkit-config].
@@ -223,3 +233,4 @@ These rules apply to issues, plans, pull request descriptions and reviews.
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
 [nexkit-auto-merge]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#automatic-merge
+[nexkit-caches]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#caches
