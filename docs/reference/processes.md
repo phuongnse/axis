@@ -1213,9 +1213,11 @@ This section follows
 [D26](../decisions.md#d26-events-and-triggers--agreed). The
 [event resource](configuration.md#event-resource) and its compile checks are
 built. So is the `raiseEvent` step, which stores each occurrence, see
-[Raise event step](#raise-event-step). *(planned for M5)* Delivering an
-occurrence to triggers, and the triggers themselves, are not built yet. Until
-then, a raised event starts nothing. A `raiseEvent` step raises an
+[Raise event step](#raise-event-step). The event
+[trigger resource](configuration.md#trigger-resource) and its compile checks
+are built too. *(planned for M5)* Delivering an occurrence to triggers is not
+built yet, nor are `sync` mode, data change triggers and schedule triggers.
+Until then, a raised event starts nothing. A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a

@@ -25,6 +25,7 @@ internal static class ResourceSchemas
         [ResourceKinds.Connector] = Load("connector.schema.json"),
         [ResourceKinds.Event] = Load("event.schema.json"),
         [ResourceKinds.Endpoint] = Load("endpoint.schema.json"),
+        [ResourceKinds.Trigger] = Load("trigger.schema.json"),
     };
 
     public static bool TryGet(string kind, out JsonSchema schema) =>

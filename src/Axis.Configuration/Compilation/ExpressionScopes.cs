@@ -13,7 +13,8 @@ namespace Axis.Configuration.Compilation;
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
 /// are given, which for now is the top level of a validation, a data source filter, a process
 /// condition and a policy filter. A policy filter uses a data source scope with no parameters. An
-/// endpoint's mapping scope holds only the endpoint's input fields, typed as parameters. A
+/// endpoint's mapping scope holds only the endpoint's input fields, typed as parameters. An event
+/// trigger's <c>when</c> scope holds only the event's scalar payload fields. A
 /// data source scope adds the data source's parameters after the fields, has the named
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
 /// process scope resolves paths the same way. No other scope resolves paths.
@@ -139,6 +140,20 @@ public static class ExpressionScopes
     internal static ExpressionScope ForEndpointInput(IEnumerable<EndpointInputDefinition> input) =>
         Build(
             input.Select(field => (field.Name, ParameterTypeOf(field.Name, FieldTypes.Parse(field.Type), field.Values, field.Target))),
+            rules: null,
+            collections: null,
+            referenceFields: null);
+
+    /// <summary>
+    /// The scope of an event trigger's <c>when</c>: the event's payload fields only. A field whose
+    /// type is not scalar has a diagnostic of its own, so it is not in the scope. The scope has no
+    /// rules, no collections and resolves no paths.
+    /// </summary>
+    internal static ExpressionScope ForEventPayload(IEnumerable<EventFieldDefinition> fields) =>
+        Build(
+            fields
+                .Where(field => EventChecker.IsScalar(FieldTypes.Parse(field.Type)))
+                .Select(field => (field.Name, (ExpressionType?)TypeOf(field.Type))),
             rules: null,
             collections: null,
             referenceFields: null);

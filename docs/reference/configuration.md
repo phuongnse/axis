@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event` or `endpoint`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint` or `trigger`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -347,6 +347,21 @@ flowchart LR
      or is above `PT30S` is `AXC0124` at `/wait`. When the entity is unknown,
      `values` and `output` are not checked. A name whose entity or process
      file was not loaded because of its own errors is not reported again.
+   - **Triggers.** A [trigger](#trigger-resource)'s `process` must name a
+     loaded process, ignoring letter case, otherwise it is `AXC0129` at
+     `/process`. Its `event` must name a loaded event, ignoring letter case,
+     otherwise it is `AXC0130` at `/event`. An event about another entity than
+     the process's subject entity is `AXC0131` at `/event`, naming both
+     entities. It is not checked when either entity is unknown. `when` is
+     parsed and type-checked as a boolean over the event's payload fields
+     only. It calls no rules, follows no reference paths and uses no
+     aggregates, but built-in functions such as `now()` are allowed. Its
+     first problem is reported at `/when` with its
+     [expression diagnostic](expressions.md#diagnostics) code. `when` is not
+     checked when the event is unknown. A name whose process or event file was
+     not loaded because of its own errors is not reported again. For now a
+     `type` other than `event`, a `mode` other than `async`, and a property
+     that belongs to another trigger type are `AXC0004`.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -364,7 +379,9 @@ flowchart LR
    resolved, and their typed fields. It also holds the endpoints in path
    order, with their entity, process and input targets resolved, their
    typed input fields, their mapped fields in the entity's order with each
-   expression checked, and their output and wait. No model is produced while any error remains.
+   expression checked, and their output and wait. It also holds the triggers
+   in path order, with their event and process resolved and their `when`
+   checked. No model is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -629,6 +646,9 @@ sorted by file and then path.
 | `AXC0126` | A `raiseEvent` step's `event` is about another entity than the process's. Reported at `/steps/{i}/event`, naming both entities. Not checked when either entity is unknown. |
 | `AXC0127` | A key of a `raiseEvent` step's `fields` names no payload field of the event, or a field an earlier key of the step already names, ignoring letter case. Reported at `/steps/{i}/fields/{key}`. |
 | `AXC0128` | A payload field of the event that no key of a `raiseEvent` step's `fields` names. Reported at `/steps/{i}/fields`, once for each missing field. |
+| `AXC0129` | A trigger's `process` names no loaded process, ignoring letter case. Reported at `/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
+| `AXC0130` | A trigger's `event` names no loaded event, ignoring letter case. Reported at `/event`. Not reported when the name is an event file that was not loaded because of its own errors. |
+| `AXC0131` | A trigger's `event` is about another entity than the process's subject entity. Reported at `/event`, naming both entities. Not checked when either entity is unknown. |
 
 ## Startup activation
 
@@ -1062,8 +1082,12 @@ purchasing bindings yet and the sample would no longer activate.
 This section follows
 [D26](../decisions.md#d26-events-and-triggers--agreed). The `event` resource
 and its [compile checks](#configuration-pipeline) are built: an event file
-loads, is checked and is part of the release. *(planned for M5)* Raising an
-event and triggers are not built yet. An `event` resource names something that happened to one record. A
+loads, is checked and is part of the release. A
+[raise event step](processes.md#raise-event-step) raises it. The event
+`trigger` resource and its compile checks are built too: an event trigger file
+loads, is checked and is part of the release. *(planned for M5)* Delivering raised events to
+triggers, `sync` mode, data change triggers and schedule triggers are not
+built yet, so a trigger starts nothing. An `event` resource names something that happened to one record. A
 `trigger` resource starts a process for one record when something happens:
 an event is raised, a record is created or updated, or a schedule is due. How
 a trigger starts a process, and when it skips the start, is in
@@ -1200,8 +1224,15 @@ Minh City, for each note the `NoteRows` data source returns, in
 - `parameters` maps the data source's declared parameters to literal values.
   It may be left out when there are none.
 
-The compiler reports these as compile errors. Their codes come with the
-build issue.
+The compiler reports these as compile errors. The event trigger checks are
+built, with the codes in the [pipeline](#configuration-pipeline): an unknown
+`process` is `AXC0129`, an unknown `event` is `AXC0130`, an event about
+another entity than the process's subject is `AXC0131`, and a `when` problem
+has its expression code at `/when`. For now the schema accepts only
+`"type": "event"` and `"mode": "async"`, so `dataChange`, `schedule`, `sync`
+and the properties of other types are `AXC0004`. *(planned for M5)* The other
+checks, and their codes, come with the build issues of their trigger types and
+of `sync`.
 
 - The `process` exists.
 - The subject entity matches. The event's entity, the `entity`, or the data

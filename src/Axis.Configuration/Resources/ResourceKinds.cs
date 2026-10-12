@@ -18,4 +18,5 @@ public static class ResourceKinds
     public const string Connector = "connector";
     public const string Event = "event";
     public const string Endpoint = "endpoint";
+    public const string Trigger = "trigger";
 }

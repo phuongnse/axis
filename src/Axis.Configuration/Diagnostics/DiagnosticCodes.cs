@@ -130,4 +130,8 @@ public static class DiagnosticCodes
     public const string StepEventOverOtherEntity = "AXC0126";
     public const string UnknownEventPayloadField = "AXC0127";
     public const string MissingEventPayloadField = "AXC0128";
+
+    public const string UnknownTriggerProcess = "AXC0129";
+    public const string UnknownTriggerEvent = "AXC0130";
+    public const string TriggerEventOverOtherEntity = "AXC0131";
 }
