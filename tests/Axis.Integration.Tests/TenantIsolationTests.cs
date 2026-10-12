@@ -41,6 +41,13 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
     }
 
     [Fact]
+    public async Task Each_tenant_resolves_its_own_value_of_the_same_binding()
+    {
+        Assert.Equal("https://a.example.test/api", await GetStringAsync("/bindings/PurchasingSystemUrl", "a.example.test"));
+        Assert.Equal("https://b.example.test/api", await GetStringAsync("/bindings/PurchasingSystemUrl", "b.example.test"));
+    }
+
+    [Fact]
     public async Task Ready_returns_200_for_an_unknown_host()
     {
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -73,6 +80,10 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
             ["Tenants:a:ConnectionString"] = tenantA,
             ["Tenants:b:Hosts:0"] = "b.example.test",
             ["Tenants:b:ConnectionString"] = tenantB,
+            ["Tenants:a:Bindings:PurchasingSystemUrl:Kind"] = "url",
+            ["Tenants:a:Bindings:PurchasingSystemUrl:Value"] = "https://a.example.test/api",
+            ["Tenants:b:Bindings:PurchasingSystemUrl:Kind"] = "url",
+            ["Tenants:b:Bindings:PurchasingSystemUrl:Value"] = "https://b.example.test/api",
         });
         builder.Services.AddTenancy(builder.Configuration);
         _app = builder.Build();
@@ -102,6 +113,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
 
             return values;
         });
+        _app.MapGet("/bindings/{name}", (string name, IDeploymentBindings bindings) => bindings.Resolve(name).Value);
         await _app.StartAsync(CancellationToken);
         _client = _app.GetTestClient();
     }
@@ -128,6 +140,14 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         using var response = await Client.SendAsync(request, CancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<List<string>>(CancellationToken) ?? [];
+    }
+
+    private async Task<string> GetStringAsync(string path, string host)
+    {
+        using var request = Request(HttpMethod.Get, path, host);
+        using var response = await Client.SendAsync(request, CancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(CancellationToken);
     }
 
     private static HttpRequestMessage Request(HttpMethod method, string path, string host)

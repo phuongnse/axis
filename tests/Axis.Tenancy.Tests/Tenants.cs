@@ -17,4 +17,11 @@ internal static class Tenants
 
         return options;
     }
+
+    /// <summary>Adds a deployment binding to a tenant of <paramref name="options"/> and returns the options.</summary>
+    public static TenantOptions WithBinding(this TenantOptions options, string tenantId, string name, string? kind, string? value)
+    {
+        options.Tenants[tenantId].Bindings[name] = new DeploymentBindingSettings { Kind = kind, Value = value };
+        return options;
+    }
 }

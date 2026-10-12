@@ -133,13 +133,17 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - a tenant has no hosts, or a host entry that is blank or only whitespace;
 - a tenant has no connection string, or one that is only whitespace;
 - the same host is listed under two tenants, compared ignoring letter case;
-- *(planned for M5)* a binding has a `Kind` other than `url` or `secret`, or a
-  blank `Value`.
+- a binding has a missing `Kind` or one other than `url` or `secret`, a blank
+  `Value`, or is a `url` binding whose value is not an absolute `http` or
+  `https` URL. The message names the tenant and the binding, never the value.
 
-*(planned for M5)* A tenant also holds its deployment bindings under
-`Bindings`, keyed by name. A release names a binding and never holds its
-value. The server and the worker both read this section, so both must hold
-the same bindings. A secret's `Value` comes from the environment, such as
+A tenant also holds its deployment bindings under `Bindings`, keyed by name
+and matched ignoring letter case. A release names a binding and never holds
+its value. The server and the worker both read this section, so both must hold
+the same bindings. `IDeploymentBindings` resolves a binding for the tenant of
+the current request or work item only. Without a tenant context, or for a name
+the tenant lacks, it throws an `InvalidOperationException` that names the
+binding and no value. A secret's `Value` comes from the environment, such as
 `Tenants__default__Bindings__PurchasingSystemToken__Value`. See
 [connectors and deployment bindings](reference/configuration.md#connectors-and-deployment-bindings)
 and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).

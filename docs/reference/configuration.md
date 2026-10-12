@@ -770,11 +770,13 @@ An entity `text` field names the sequence in its `sequence` property:
 
 ## Connectors and deployment bindings
 
-*(planned for M5)* This section follows
+This section follows
 [D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
-None of it is built yet. A `connector` resource describes an external system
-that a process can call. Its URL and its secret are deployment bindings, so a
-release holds only their names. How a process calls a connector, retries and
+The `Bindings` block, its startup check and resolving a binding at run time
+are built. *(planned for M5)* Connectors, the activation check and keeping
+secrets out of logs and records are not built yet. A `connector` resource
+describes an external system that a process can call. Its URL and its secret
+are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
 reconciles is in [Connector calls](processes.md#connector-calls).
 
 ### Deployment bindings
@@ -797,9 +799,11 @@ reconciles is in [Connector calls](processes.md#connector-calls).
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
   kind. The binding diagnostic names the tenant and the binding.
-- **Startup check.** A binding whose `Kind` is not `url` or `secret`, or
-  whose `Value` is blank, fails startup like the other
-  [tenant checks](../architecture.md#tenant-configuration).
+- **Startup check.** A binding whose `Kind` is missing or is not `url` or
+  `secret`, whose `Value` is blank, or a `url` binding whose value is not an
+  absolute `http` or `https` URL, fails startup like the other
+  [tenant checks](../architecture.md#tenant-configuration). The message names
+  the tenant and the binding, never the value.
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
