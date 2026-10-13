@@ -1,0 +1,19 @@
+{
+  "id": "9581def0-2719-44e3-99d4-2d62a5d54282",
+  "kind": "process",
+  "name": "Flag",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "flag",
+  "steps": [
+    {
+      "name": "flag",
+      "type": "operation",
+      "operation": "raiseEvent",
+      "event": "RequestFlagged",
+      "fields": { "title": "title", "ratio": "amount / divisor" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

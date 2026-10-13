@@ -12,11 +12,15 @@ public enum TriggerMode
 {
     /// <summary>The worker delivers the occurrence later, and starts the process at most once per occurrence and trigger.</summary>
     Async,
+
+    /// <summary>The <c>raiseEvent</c> step that raises the event starts the process in its own transaction, so both commit or neither does.</summary>
+    Sync,
 }
 
 /// <summary>
 /// A compiled trigger: it starts a process when something happens. For now every trigger is an
-/// event trigger in async mode, which starts the process for the record a raised event names.
+/// event trigger, which starts the process for the record a raised event names, either later in
+/// async mode or in the raising step's transaction in sync mode.
 /// </summary>
 public sealed record TriggerModel
 {

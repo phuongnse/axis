@@ -66,6 +66,17 @@ public sealed class TriggerCompilerTests
     }
 
     [Fact]
+    public void A_trigger_in_sync_mode_compiles_to_sync()
+    {
+        using var folder = Folder().With("triggers/review.json", Trigger("ReviewClosedNotes", "NoteClosed", "NoteReview", """, "mode": "sync" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(TriggerMode.Sync, Assert.Single(result.Model!.Triggers).Mode);
+    }
+
+    [Fact]
     public void Process_and_event_mistakes_are_each_a_diagnostic_at_their_path_in_one_pass()
     {
         using var folder = Folder()
@@ -137,7 +148,8 @@ public sealed class TriggerCompilerTests
 
     [Theory]
     [InlineData(""" "type": "dataChange", "event": "NoteClosed" """)]
-    [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "sync" """)]
+    [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "Sync" """)]
+    [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "later" """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "entity": "Note" """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "when": "" """)]
     [InlineData(""" "type": "event" """)]

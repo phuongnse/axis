@@ -1,0 +1,10 @@
+{
+  "id": "4ebaad52-a6a4-49f8-ab91-e0c03418e012",
+  "kind": "trigger",
+  "name": "ReviewFlaggedRequests",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "RequestFlagged",
+  "mode": "sync",
+  "process": "RoleApprove"
+}

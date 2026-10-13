@@ -1,12 +1,5 @@
-using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
-using Axis.Configuration.Releases;
-using Axis.Configuration.Storage;
-using Axis.Data.Audit;
-using Axis.Data.Records;
-using Axis.Expressions.Evaluation;
 using Axis.Processes.Work;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -35,7 +28,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
         ArgumentNullException.ThrowIfNull(connection);
 
         StoredEvent? occurrence;
-        Delivery? delivery = null;
+        EventTriggers? delivery = null;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             occurrence = item.EventId is { } eventId ? await ProcessEvents.LoadAsync(transaction, eventId, cancellationToken) : null;
@@ -90,37 +83,27 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
     /// event, ignoring letter case. Returns <see langword="null"/> when there is no active release or
     /// no such trigger.
     /// </summary>
-    private async Task<Delivery?> FindDeliveryAsync(
+    private async Task<EventTriggers?> FindDeliveryAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         StoredEvent occurrence,
         CancellationToken cancellationToken)
     {
-        ActiveRelease? active;
-        await using (var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>()
-            .UseNpgsql(connection)
-            .Options))
-        {
-            await configuration.Database.UseTransactionAsync(transaction, cancellationToken);
-            active = await new ActiveReleaseStore(configuration).FindByApplicationIdAsync(occurrence.ApplicationId, cancellationToken);
-        }
-
-        if (active is null)
+        var found = await EventTriggerStarts.FindAsync(
+            new WorkItemContext(item, connection, transaction),
+            models,
+            occurrence.ApplicationId,
+            occurrence.Event,
+            TriggerMode.Async,
+            cancellationToken);
+        if (found is null)
         {
             LogNoActiveRelease(occurrence.Id, occurrence.ApplicationId);
             return null;
         }
 
-        var model = await models.GetAsync(new WorkItemContext(item, connection, transaction), active.ReleaseId, cancellationToken);
-        List<TriggerModel> triggers =
-        [
-            .. model.Triggers.Where(trigger =>
-                trigger is { Type: TriggerType.Event, Mode: TriggerMode.Async, Event: { } @event }
-                && string.Equals(@event.Name, occurrence.Event, StringComparison.OrdinalIgnoreCase)),
-        ];
-        var declared = model.Events.FirstOrDefault(candidate => string.Equals(candidate.Name, occurrence.Event, StringComparison.OrdinalIgnoreCase));
-        return triggers.Count == 0 || declared is null ? null : new Delivery(active.ReleaseId, model, declared, triggers);
+        return found.Triggers.Count == 0 ? null : found;
     }
 
     /// <summary>
@@ -130,7 +113,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
     private async Task<bool> DeliverAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Delivery delivery,
+        EventTriggers delivery,
         StoredEvent occurrence,
         TriggerModel trigger,
         CancellationToken cancellationToken)
@@ -164,12 +147,11 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
     private static async Task<string?> StartAsync(
         ClaimedWorkItem item,
         NpgsqlTransaction transaction,
-        Delivery delivery,
+        EventTriggers delivery,
         StoredEvent occurrence,
         TriggerModel trigger,
         CancellationToken cancellationToken)
     {
-        var connection = transaction.Connection!;
         var source = occurrence.Id.ToString("D");
 
         // The receipt goes first, so a concurrent or repeated delivery waits on its key and then skips.
@@ -178,101 +160,16 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
             return "the trigger already handled the occurrence";
         }
 
-        if (trigger.When is { } when && await EvaluateWhenAsync(connection, delivery.Event, occurrence, when, cancellationToken) is { } notTrue)
+        // A delivery has a trigger only when the active release declares the event.
+        var (instanceId, skipped) = await EventTriggerStarts.StartAsync(
+            transaction, item.TenantId, delivery.Model, delivery.ReleaseId, delivery.Event!, occurrence, trigger, cancellationToken);
+        if (instanceId is { } started)
         {
-            return notTrue;
+            await TriggerStarts.MarkStartedAsync(transaction, trigger.Id, source, occurrence.SubjectId, started, cancellationToken);
         }
 
-        var model = delivery.Model;
-        var process = model.Processes.FirstOrDefault(candidate => candidate.Id == trigger.Process.Id)
-            ?? throw new InvalidOperationException($"The release has no process '{trigger.Process.Name}'.");
-        var entity = model.FindEntity(process.Entity.Id)
-            ?? throw new InvalidOperationException($"The release has no entity '{process.Entity.Name}'.");
-
-        // The lock makes the read below and the start condition see the latest version, and a
-        // concurrent write of the record waits until this start commits.
-        if (!await RecordCommands.LockAsync(connection, entity, occurrence.SubjectId, cancellationToken)
-            || await RecordQueries.GetAsync(connection, model, entity, occurrence.SubjectId, cancellationToken) is not { } record)
-        {
-            return "the record no longer exists";
-        }
-
-        var instanceId = Guid.CreateVersion7();
-        var started = await ProcessStarter.StartAsync(
-            connection,
-            transaction,
-            item.TenantId,
-            model,
-            delivery.ReleaseId,
-            process,
-            entity,
-            occurrence.SubjectId,
-            record,
-            instanceId,
-            AuditActors.System,
-            actorName: null,
-            new JsonObject { ["trigger"] = trigger.Name, ["eventId"] = occurrence.Id },
-            cancellationToken);
-        switch (started.Outcome)
-        {
-            case ProcessStartOutcome.Started:
-                await TriggerStarts.MarkStartedAsync(transaction, trigger.Id, source, occurrence.SubjectId, instanceId, cancellationToken);
-                return null;
-            case ProcessStartOutcome.AlreadyRunning:
-                return "the process already runs for the record";
-            default:
-                return started.Error is { } error ? $"the start condition failed: {Clause(error)}" : "the start condition is not true";
-        }
+        return skipped;
     }
-
-    /// <summary>
-    /// Evaluates the trigger's <c>when</c> on the stored payload, read with the field types of the
-    /// active release's event. Returns why it is not true, or <see langword="null"/> when it is. A
-    /// payload value that does not fit its type counts as a run-time error.
-    /// </summary>
-    private static async Task<string?> EvaluateWhenAsync(
-        NpgsqlConnection connection,
-        EventModel @event,
-        StoredEvent occurrence,
-        ExpressionModel when,
-        CancellationToken cancellationToken)
-    {
-        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var field in @event.Fields)
-        {
-            // The payload was written under the release that raised the event, so a field it lacks reads as null.
-            var node = occurrence.Payload.FirstOrDefault(entry => string.Equals(entry.Key, field.Name, StringComparison.OrdinalIgnoreCase)).Value;
-            bool exact;
-            object? value;
-            try
-            {
-                exact = RecordClrValues.TryFromStored(field.Type, node, out value);
-            }
-            catch (Exception exception) when (exception is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
-            {
-                return $"the when failed: the payload field '{field.Name}' does not hold a value of its type";
-            }
-
-            if (!exact)
-            {
-                return $"the when failed: the payload field '{field.Name}' holds a decimal that cannot be read without rounding";
-            }
-
-            values[field.Name] = value;
-        }
-
-        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-        var result = ExpressionInterpreter.Evaluate(when.Syntax, when.Check, new ExpressionValues(values), null, now);
-        if (result.Error is { } error)
-        {
-            return $"the when failed: {Clause(error.Message)}";
-        }
-
-        return result.Value is true ? null : "the when is not true";
-    }
-
-    /// <summary>An error message without its closing period, to fit inside the log line.</summary>
-    private static string Clause(string message) => message.TrimEnd('.');
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of event {EventId}: {Reason}.")]
     private partial void LogSkipped(string trigger, string process, Guid subjectId, Guid eventId, string reason);
@@ -285,7 +182,4 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
 
     [LoggerMessage(LogLevel.Warning, "Event delivery work item {ItemId} for event {EventId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, Guid? eventId);
-
-    /// <summary>What an occurrence is delivered with: the active release, its model, its declaration of the event and the triggers on it.</summary>
-    private sealed record Delivery(Guid ReleaseId, ApplicationModel Model, EventModel Event, IReadOnlyList<TriggerModel> Triggers);
 }

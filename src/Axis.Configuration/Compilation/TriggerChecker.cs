@@ -8,7 +8,7 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the triggers of an application and builds the checked ones. For now the schema accepts
-/// only an event trigger in async mode. A trigger names a loaded process and a loaded event, and
+/// only an event trigger, in async or sync mode. A trigger names a loaded process and a loaded event, and
 /// the event is about the process's subject entity. Its <c>when</c> is a boolean that sees only
 /// the event's payload fields. Every problem of a trigger is reported in one pass. A process or
 /// event whose file did not load is not reported again, the entity match is not checked when
@@ -101,9 +101,9 @@ internal static class TriggerChecker
             Name = trigger.Name,
             File = trigger.File,
 
-            // The schema accepts only an event trigger in async mode for now.
+            // The schema accepts only an event trigger for now. A trigger without a mode is async.
             Type = TriggerType.Event,
-            Mode = TriggerMode.Async,
+            Mode = trigger.Mode == "sync" ? TriggerMode.Sync : TriggerMode.Async,
             Event = new EventReference(@event.Id, @event.Name),
             Process = new ProcessReference(process.Id, process.Name),
             When = trigger.When is { } when

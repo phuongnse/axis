@@ -1,0 +1,11 @@
+{
+  "id": "ac276265-1e71-455a-bc2e-f97092728962",
+  "kind": "event",
+  "name": "RequestFlagged",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "ratio", "type": "decimal" }
+  ]
+}
