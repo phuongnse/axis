@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Expressions;
@@ -21,10 +22,11 @@ namespace Axis.Configuration.Compilation;
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
 /// lookups, checks events, their entities and their payload fields, checks endpoints, their
 /// entities, processes, input fields, mappings, output and wait, checks triggers, their
-/// processes, events and conditions, and resolves references
+/// processes, events and conditions, checks the extension packages of the manifest and pins each
+/// to the highest installed version in its range, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
-/// sorted list. An application without errors also gets its content hash. Both inputs give the
-/// same result for the same resources.
+/// sorted list. An application without errors also gets its content hash, which covers its pins.
+/// Both inputs give the same result for the same resources and installed packages.
 /// </summary>
 public static class ApplicationCompiler
 {
@@ -34,13 +36,22 @@ public static class ApplicationCompiler
     /// <summary>The largest precision PostgreSQL accepts for <c>numeric(p, s)</c>.</summary>
     public const int MaxPrecision = 1000;
 
-    public static CompilationResult Compile(string folderPath) => Compile(ApplicationLoader.Load(folderPath));
+    /// <summary>
+    /// Compiles the folder at <paramref name="folderPath"/> against <paramref name="installedPackages"/>.
+    /// Null means no package is installed.
+    /// </summary>
+    public static CompilationResult Compile(string folderPath, IReadOnlyCollection<PackageVersion>? installedPackages = null) =>
+        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? []);
 
-    /// <summary>Compiles resources held in memory, such as the stored resources of a release.</summary>
+    /// <summary>
+    /// Compiles resources held in memory, such as the stored resources of a release, against
+    /// <paramref name="installedPackages"/>. Null means no package is installed.
+    /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
-    public static CompilationResult Compile(IReadOnlyList<ResourceContent> resources) => Compile(ApplicationLoader.Load(resources));
+    public static CompilationResult Compile(IReadOnlyList<ResourceContent> resources, IReadOnlyCollection<PackageVersion>? installedPackages = null) =>
+        Compile(ApplicationLoader.Load(resources), installedPackages ?? []);
 
-    private static CompilationResult Compile(ApplicationLoadResult loaded)
+    private static CompilationResult Compile(ApplicationLoadResult loaded, IReadOnlyCollection<PackageVersion> installedPackages)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
@@ -132,9 +143,11 @@ public static class ApplicationCompiler
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
+        IReadOnlyList<PinnedPackageModel> packages = [];
         if (loaded.Application is { } application)
         {
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
+            packages = PackageChecker.Check(application, installedPackages, diagnostics);
         }
 
         foreach (var role in loaded.Roles)
@@ -242,11 +255,12 @@ public static class ApplicationCompiler
             Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEvent, FindProcess)).ToList(),
+            Packages = packages,
         };
         return result with
         {
             Model = model,
-            ContentHash = ContentHash.Compute(loaded.Resources),
+            ContentHash = ContentHash.Compute(loaded.Resources, packages),
             Resources = loaded.Resources,
         };
     }

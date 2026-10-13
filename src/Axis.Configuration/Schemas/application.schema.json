@@ -9,7 +9,11 @@
     "kind": { "const": "application" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "label": { "$ref": "#/$defs/textReference" }
+    "label": { "$ref": "#/$defs/textReference" },
+    "packages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/package" }
+    }
   },
   "$defs": {
     "id": {
@@ -28,6 +32,15 @@
       "required": ["textKey"],
       "properties": {
         "textKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 100 },
+        "version": { "type": "string", "minLength": 1 }
       }
     }
   }

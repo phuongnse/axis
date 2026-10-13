@@ -13,7 +13,9 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   table, `axis.__<module>_migrations`, so the contexts sharing the schema do
   not collide.
   - `Axis.Configuration` owns `axis.releases`, `axis.release_resources`,
-    `axis.active_releases` (the active release of each application `id`,
+    `axis.release_packages` (the extension package versions each release
+    pins, as release id, package id and version, unique per release and
+    package), `axis.active_releases` (the active release of each application `id`,
     with its name, unique ignoring letter case) and `axis.active_sites` (the
     site paths of each active release, as application `id` and path, unique
     on path), with history in `axis.__configuration_migrations`. The caller

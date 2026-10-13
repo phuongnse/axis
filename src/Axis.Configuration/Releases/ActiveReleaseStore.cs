@@ -62,6 +62,7 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
         var release = await context.Releases
             .AsNoTracking()
             .Include(r => r.Resources)
+            .Include(r => r.Packages)
             .SingleOrDefaultAsync(r => r.Id == releaseId, cancellationToken);
 
         // Database collation may not be ordinal, so resources are put in path order here.

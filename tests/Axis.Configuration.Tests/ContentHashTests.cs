@@ -1,4 +1,8 @@
+using System.Security.Cryptography;
+using System.Text;
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 
 namespace Axis.Configuration.Tests;
@@ -26,6 +30,50 @@ public sealed class ContentHashTests
         Assert.Equal(
             "448373c479c7611326f9d5831449b9a1cb309ff1f06f9f32d1a46ca6f3f11486",
             ContentHash.Compute([new ResourceContent("b/c.json", "[]"), new ResourceContent("a.json", """{"x":1}""")]));
+    }
+
+    [Fact]
+    public void Pinned_packages_are_hashed_after_the_resources_in_id_order()
+    {
+        ResourceContent[] resources = [new("a.json", """{"x":1}""")];
+        PinnedPackageModel[] pins = [new("b", "^2.0.0", "2.0.0"), new("a", "1.0.0", "1.0.0")];
+
+        var hash = ContentHash.Compute(resources, pins);
+
+        Assert.Equal(
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("a.json\n{\"x\":1}\n/packages/a\n1.0.0\n/packages/b\n2.0.0\n"))),
+            hash);
+        Assert.NotEqual(hash, ContentHash.Compute(resources, [pins[0] with { Version = "2.1.0" }, pins[1]]));
+        Assert.Equal(ContentHash.Compute(resources), ContentHash.Compute(resources, []));
+    }
+
+    [Fact]
+    public void An_application_without_packages_keeps_the_hash_of_its_resources()
+    {
+        using var folder = SampleFolder();
+
+        var result = ApplicationCompiler.Compile(folder.Path, [new PackageVersion("test-package", "1.0.0")]);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(ContentHash.Compute(result.Resources), result.ContentHash);
+    }
+
+    [Fact]
+    public void A_pin_to_another_installed_version_changes_the_hash()
+    {
+        using var folder = new TemporaryFolder().With("application.json", """
+            { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1,
+              "packages": [{ "id": "test-package", "version": "^1.0.0" }] }
+            """);
+
+        var first = ApplicationCompiler.Compile(folder.Path, [new PackageVersion("test-package", "1.0.0"), new PackageVersion("test-package", "1.2.0")]);
+        var second = ApplicationCompiler.Compile(folder.Path, [new PackageVersion("test-package", "1.3.0"), new PackageVersion("test-package", "1.2.0")]);
+
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        Assert.Equal(first.Resources.Select(resource => resource.Content), second.Resources.Select(resource => resource.Content));
+        Assert.Equal(ContentHash.Compute(first.Resources, first.Model!.Packages), first.ContentHash);
+        Assert.NotEqual(first.ContentHash, second.ContentHash);
     }
 
     [Fact]
