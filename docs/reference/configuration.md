@@ -649,6 +649,13 @@ sorted by file and then path.
 | `AXC0129` | A trigger's `process` names no loaded process, ignoring letter case. Reported at `/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
 | `AXC0130` | A trigger's `event` names no loaded event, ignoring letter case. Reported at `/event`. Not reported when the name is an event file that was not loaded because of its own errors. |
 | `AXC0131` | A trigger's `event` is about another entity than the process's subject entity. Reported at `/event`, naming both entities. Not checked when either entity is unknown. |
+| `AXC0132` | An extension package manifest, `axis-package.json`, is missing, cannot be read, is not valid JSON or does not match its schema. Reported at startup by the host, at the failing JSON Pointer. |
+| `AXC0133` | An extension package's folder names differ from its manifest's `id` or `version`. Reported at startup by the host, at `/id` or `/version`. |
+| `AXC0134` | An extension package's `assembly` file is missing or cannot be loaded. Reported at startup by the host, at `/assembly`. |
+| `AXC0135` | An extension package assembly's informational version, without build metadata after a `+`, differs from the manifest's `version`. Reported at startup by the host, at `/version`. |
+| `AXC0136` | An extension package operation's `type` is not a class in the package assembly that implements `IOperation`, is not abstract and has a public parameterless constructor. Reported at startup by the host, at `/operations/{i}/type`. |
+| `AXC0137` | An extension package operation name, or a field name in one operation's `input` or `output`, is already used, ignoring letter case. Reported at startup by the host, at the `name` of the later one. |
+| `AXC0138` | An extension package operation's `timeout` is not a positive ISO 8601 duration of at most `PT2M`. Reported at startup by the host, at `/operations/{i}/timeout`. |
 
 ## Startup activation
 
@@ -1267,7 +1274,7 @@ signs in is in [Machine callers](../architecture.md#machine-callers).
 ### Endpoint resource
 
 The resource and its compile checks are built. The purchase request sample
-will hold an endpoint that
+holds an endpoint that
 lets the purchasing system submit a purchase request, in
 `endpoints/submit-purchase-request.json`:
 
@@ -1363,8 +1370,8 @@ a note, closes it and returns its status, in
 
 When the worker runs the `close` step within 10 seconds, the call answers
 `201` with `code` and `status`. Otherwise it answers `202` with a status
-location. The sample files, the E2E fixture files and the Keycloak realm do
-not hold these endpoints yet. Later build issues add them.
+location. The purchase request sample holds `SubmitPurchaseRequest`. The E2E
+fixture application does not hold `ImportClosedNote`.
 
 A [data change trigger](#trigger-resource) on `create` of the same entity
 that starts the same process would start it inside the endpoint's record
@@ -1436,8 +1443,10 @@ until the build issues add packages.
   against the pinned version's manifest.
 - **Diagnostics.** A range that no installed version meets is a compile
   error. Activating a release whose pinned version is not installed fails, as
-  does a package whose manifest does not match its assembly. Their codes come
-  with the build issue.
+  does a package whose manifest does not match its assembly. The codes for
+  ranges and pinning come with the build issue. A manifest that does not
+  match its package is already reported at host startup, as `AXC0132` to
+  `AXC0138`, see [Loading](extension-packages.md#loading).
 - An application uses only the packages it declares, even though every
   tenant sees the same installed packages. Installation is in
   [Installation](extension-packages.md#installation).
@@ -1599,7 +1608,7 @@ A policy also grants inbound [endpoints](#endpoint-resource). The target is
 `filter` or `fields`. The grant, its compile checks and its enforcement are
 built. Holding it is enough to call the endpoint: the record create and the
 process start inside the call need no `entity` or `process` grant of the
-caller. The purchase request sample will give the purchasing system this policy, in
+caller. The purchase request sample gives the purchasing system this policy, in
 `policies/purchasing-system-access.json`:
 
 ```json
@@ -1627,8 +1636,7 @@ Its role, in `roles/purchasing-system.json`:
 
 The caller holds the role through the roles claim of its token, as a user
 does. See [Machine callers](../architecture.md#machine-callers). The sample
-gains this policy and role when it gains the `SubmitPurchaseRequest`
-endpoint, in a later build issue.
+holds this policy and role with its `SubmitPurchaseRequest` endpoint.
 
 Compile checks, each a compile error:
 

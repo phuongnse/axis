@@ -4,6 +4,7 @@
     <Project Path="src/Axis.Core/Axis.Core.csproj" />
     <Project Path="src/Axis.Data/Axis.Data.csproj" />
     <Project Path="src/Axis.Expressions/Axis.Expressions.csproj" />
+    <Project Path="src/Axis.Extensions/Axis.Extensions.csproj" />
     <Project Path="src/Axis.Policy/Axis.Policy.csproj" />
     <Project Path="src/Axis.Presentation/Axis.Presentation.csproj" />
     <Project Path="src/Axis.Processes/Axis.Processes.csproj" />
@@ -19,5 +20,9 @@
     <Project Path="tests/Axis.PurchasingStub/Axis.PurchasingStub.csproj" />
     <Project Path="tests/Axis.Server.Tests/Axis.Server.Tests.csproj" />
     <Project Path="tests/Axis.Tenancy.Tests/Axis.Tenancy.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/packages/">
+    <Project Path="tests/packages/TestPackage.V1/TestPackage.V1.csproj" />
+    <Project Path="tests/packages/TestPackage.V2/TestPackage.V2.csproj" />
   </Folder>
 </Solution>

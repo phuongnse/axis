@@ -1,0 +1,7 @@
+{
+  "id": "ae4c47b6-4ece-4666-ae0a-4e7b6731bf7d",
+  "kind": "role",
+  "name": "purchasing-system",
+  "formatVersion": 1,
+  "label": { "textKey": "role.purchasingSystem" }
+}

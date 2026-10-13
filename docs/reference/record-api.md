@@ -22,8 +22,7 @@ a field no grant covers is a `403`.
 [Inbound endpoints](#inbound-endpoints) are the one exception to the
 session rule. Another system calls them with a bearer token, and they take
 no session. The bearer token check, the endpoint call with its `output` and
-`wait`, and the status location are built. The call's `Idempotency-Key` is
-not *(planned for M5)*.
+`wait`, the call's `Idempotency-Key` and the status location are built.
 
 ## Routes
 

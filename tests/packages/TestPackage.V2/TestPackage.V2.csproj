@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Version 2.0.0 of the test-only extension package. Both versions build the same source, so each runs its own copy of the same code. -->
+  <PropertyGroup>
+    <AssemblyName>Axis.TestPackage</AssemblyName>
+    <RootNamespace>TestPackage</RootNamespace>
+    <Version>2.0.0</Version>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\TestPackage\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Not copied: the host shares its own Axis.Extensions with every package. -->
+    <ProjectReference Include="..\..\..\src\Axis.Extensions\Axis.Extensions.csproj" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="axis-package.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

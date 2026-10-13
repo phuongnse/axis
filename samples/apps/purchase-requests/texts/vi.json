@@ -56,6 +56,7 @@
     "task.reject": "Từ chối",
     "role.employee": "Nhân viên",
     "role.departmentManager": "Trưởng phòng",
-    "role.financeReviewer": "Người duyệt tài chính"
+    "role.financeReviewer": "Người duyệt tài chính",
+    "role.purchasingSystem": "Hệ thống mua hàng"
   }
 }
