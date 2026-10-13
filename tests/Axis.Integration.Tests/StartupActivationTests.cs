@@ -376,6 +376,54 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Start_compiles_against_the_installed_packages_and_pins_the_highest_version_in_range()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var packages = new TemporaryFolder().Install(1, 2);
+        using var folder = ApplicationFolder(TitleField)
+            .With("application.json", $$"""
+                { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
+                  "packages": [{ "id": "{{TestPackages.Id}}", "version": "^1.0.0" }] }
+                """);
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), new Dictionary<string, string>
+        {
+            ["Extensions:Path"] = packages.Path,
+        }))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        var active = await ActiveAsync(a);
+        Assert.NotNull(active);
+        Assert.Equal(
+            $"{TestPackages.Id} 1.0.0",
+            await ScalarAsync(a, $"SELECT package_id || ' ' || version FROM axis.release_packages WHERE release_id = '{active.ReleaseId}'"));
+        Assert.Equal(1L, await ScalarAsync(a, "SELECT count(*) FROM axis.release_packages"));
+    }
+
+    [Fact]
+    public async Task Package_that_is_not_installed_stops_the_start_with_its_diagnostic()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField)
+            .With("application.json", $$"""
+                { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
+                  "packages": [{ "id": "{{TestPackages.Id}}", "version": "^1.0.0" }] }
+                """);
+        var logs = new LogCollector();
+
+        await using var factory = CreateFactory(a, b, folder.Path, logs);
+
+        Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.UnknownPackage, StringComparison.Ordinal)
+            && entry.Contains("application.json /packages/0/id", StringComparison.Ordinal));
+        Assert.Null(await ActiveAsync(a));
+    }
+
+    [Fact]
     public async Task Without_the_setting_the_server_starts_and_leaves_the_tenant_database_unmigrated()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());

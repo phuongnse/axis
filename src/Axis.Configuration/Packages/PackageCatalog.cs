@@ -32,12 +32,16 @@ public sealed class PackageCatalog
     {
         Packages = packages;
         Diagnostics = diagnostics;
+        Versions = [.. packages.Select(package => new PackageVersion(package.Manifest.Id, package.Manifest.Version))];
     }
 
     public static PackageCatalog Empty { get; } = new([], []);
 
     /// <summary>The loaded packages, by id and then by version.</summary>
     public IReadOnlyList<InstalledPackage> Packages { get; }
+
+    /// <summary>The id and version of each loaded package, in the order of <see cref="Packages"/>.</summary>
+    public IReadOnlyList<PackageVersion> Versions { get; }
 
     /// <summary>The problems of the packages that were left out.</summary>
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
@@ -93,7 +97,7 @@ public sealed class PackageCatalog
         packages.Sort((left, right) =>
             string.CompareOrdinal(left.Manifest.Id, right.Manifest.Id) is var byId and not 0
                 ? byId
-                : CompareVersions(left.Manifest.Version, right.Manifest.Version));
+                : PackageVersions.Compare(left.Manifest.Version, right.Manifest.Version));
         return new PackageCatalog(packages, DiagnosticOrder.Sort(diagnostics));
     }
 
@@ -352,24 +356,6 @@ public sealed class PackageCatalog
     {
         var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         return version?.Split('+')[0];
-    }
-
-    /// <summary>Compares two <c>major.minor.patch</c> versions without leading zeros, part by part.</summary>
-    private static int CompareVersions(string left, string right)
-    {
-        var leftParts = left.Split('.');
-        var rightParts = right.Split('.');
-        for (var index = 0; index < leftParts.Length; index++)
-        {
-            var byLength = leftParts[index].Length.CompareTo(rightParts[index].Length);
-            var byPart = byLength != 0 ? byLength : string.CompareOrdinal(leftParts[index], rightParts[index]);
-            if (byPart != 0)
-            {
-                return byPart;
-            }
-        }
-
-        return 0;
     }
 
     private static string[]? ListFolders(string folder)

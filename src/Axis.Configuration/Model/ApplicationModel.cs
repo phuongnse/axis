@@ -5,8 +5,8 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled application: its manifest, every entity, site, page, seed, data source, process,
-/// form, policy, event, endpoint and trigger with references resolved, its connectors, its roles
-/// and its texts.
+/// form, policy, event, endpoint and trigger with references resolved, its connectors, its roles,
+/// its texts and the extension package versions it pins.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -52,6 +52,9 @@ public sealed record ApplicationModel
 
     /// <summary>The application's triggers, in path order.</summary>
     public IReadOnlyList<TriggerModel> Triggers { get; init; } = [];
+
+    /// <summary>The extension package versions the application pins, one per <c>packages</c> entry, in the order written.</summary>
+    public IReadOnlyList<PinnedPackageModel> Packages { get; init; } = [];
 
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)

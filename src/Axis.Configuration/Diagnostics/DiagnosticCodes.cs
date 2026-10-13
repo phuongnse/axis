@@ -142,4 +142,9 @@ public static class DiagnosticCodes
     public const string InvalidPackageOperationType = "AXC0136";
     public const string DuplicatePackageName = "AXC0137";
     public const string InvalidPackageTimeout = "AXC0138";
+
+    public const string UnknownPackage = "AXC0139";
+    public const string InvalidPackageRange = "AXC0140";
+    public const string NoPackageVersionInRange = "AXC0141";
+    public const string DuplicateApplicationPackage = "AXC0142";
 }

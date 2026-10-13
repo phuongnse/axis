@@ -1,5 +1,7 @@
 using System.Data.Common;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
@@ -45,7 +47,8 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
             migrations,
             migration => Assert.EndsWith("_CreateReleases", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_CreateActiveReleases", migration, StringComparison.Ordinal),
-            migration => Assert.EndsWith("_CreateActiveSites", migration, StringComparison.Ordinal));
+            migration => Assert.EndsWith("_CreateActiveSites", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_CreateReleasePackages", migration, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -219,6 +222,91 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
         Assert.Equal(2, await CountReleasesAsync());
     }
 
+    [Fact]
+    public async Task Installing_a_newer_version_keeps_the_stored_pin_and_a_new_compile_pins_the_newer_version()
+    {
+        using var folder = PinningFolder();
+
+        var first = await CompileAsync(folder, [new("test-package", "1.0.0"), new("test-package", "1.2.0")]);
+        var second = await CompileAsync(folder, [new("test-package", "1.0.0"), new("test-package", "1.2.0"), new("test-package", "1.3.0")]);
+
+        Assert.Empty(first.Diagnostics);
+        Assert.NotNull(first.Release);
+        var stored = await ReadReleaseAsync(first.Release.Id);
+        var pin = Assert.Single(stored.Packages);
+        Assert.Equal(("test-package", "1.2.0"), (pin.PackageId, pin.Version));
+        Assert.Equal(new PinnedPackageModel("test-package", "^1.0.0", "1.2.0"), Assert.Single(ReleaseCompiler.BuildModel(stored).Packages));
+
+        Assert.Empty(second.Diagnostics);
+        Assert.NotNull(second.Release);
+        Assert.NotEqual(first.Release.Id, second.Release.Id);
+        Assert.NotEqual(first.Release.ContentHash, second.Release.ContentHash);
+        var newer = await ReadReleaseAsync(second.Release.Id);
+        Assert.Equal([("test-package", "1.3.0")], newer.Packages.Select(package => (package.PackageId, package.Version)));
+        Assert.Equal(
+            stored.Resources.Select(resource => (resource.Path, resource.Content)),
+            newer.Resources.Select(resource => (resource.Path, resource.Content)));
+        Assert.Equal(2, await CountReleasesAsync());
+
+        var again = await CompileAsync(folder, [new("test-package", "1.2.0"), new("test-package", "1.3.0")]);
+        Assert.Equal(second.Release.Id, again.Release?.Id);
+        Assert.Equal("1.3.0", Assert.Single(again.Release!.Packages).Version);
+    }
+
+    [Fact]
+    public async Task Release_read_back_through_the_active_release_store_holds_its_pins()
+    {
+        using var folder = PinningFolder();
+        var compiled = await CompileAsync(folder, [new("test-package", "1.2.0")]);
+        Assert.NotNull(compiled.Release);
+
+        await using var context = database.CreateContext();
+        var stored = await new ActiveReleaseStore(context).GetReleaseAsync(compiled.Release.Id, CancellationToken);
+
+        Assert.NotNull(stored);
+        Assert.Equal("1.2.0", Assert.Single(stored.Packages).Version);
+        Assert.Equal("1.2.0", Assert.Single(ReleaseCompiler.BuildModel(stored).Packages).Version);
+    }
+
+    public static TheoryData<string> PinUpdateAttempts => ["modify pin", "remove pin", "add pin"];
+
+    [Theory]
+    [MemberData(nameof(PinUpdateAttempts))]
+    public async Task Stored_pins_cannot_be_changed(string attempt)
+    {
+        using var folder = PinningFolder();
+        var compiled = await CompileAsync(folder, [new("test-package", "1.2.0")]);
+        Assert.NotNull(compiled.Release);
+
+        await using var context = database.CreateContext();
+        var release = await context.Releases.Include(r => r.Packages).SingleAsync(r => r.Id == compiled.Release.Id, CancellationToken);
+        switch (attempt)
+        {
+            case "modify pin":
+                context.Entry(release.Packages[0]).Property(p => p.Version).CurrentValue = "1.3.0";
+                break;
+            case "remove pin":
+                context.ReleasePackages.Remove(release.Packages[0]);
+                break;
+            case "add pin":
+                release.Packages.Add(new ReleasePackage { ReleaseId = release.Id, PackageId = "other-package", Version = "1.0.0" });
+                break;
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync(CancellationToken));
+
+        var after = await ReadReleaseAsync(compiled.Release.Id);
+        Assert.Equal([("test-package", "1.2.0")], after.Packages.Select(package => (package.PackageId, package.Version)));
+    }
+
+    private TemporaryFolder PinningFolder() =>
+        new TemporaryFolder()
+            .With("application.json", $$"""
+                { "id": "{{_applicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
+                  "packages": [{ "id": "test-package", "version": "^1.0.0" }] }
+                """)
+            .With("entities/order.json", Order);
+
     private TemporaryFolder SampleFolder(string order = Order) =>
         new TemporaryFolder()
             .With("application.json", $$"""
@@ -230,6 +318,12 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
     {
         await using var context = database.CreateContext();
         return await ReleaseCompiler.CompileAsync(folder.Path, context, CancellationToken);
+    }
+
+    private async Task<ReleaseCompilationResult> CompileAsync(TemporaryFolder folder, IReadOnlyCollection<PackageVersion> installedPackages)
+    {
+        await using var context = database.CreateContext();
+        return await ReleaseCompiler.CompileAsync(folder.Path, context, installedPackages, CancellationToken);
     }
 
     private async Task<int> CountReleasesAsync()
@@ -244,6 +338,7 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
         var release = await context.Releases
             .AsNoTracking()
             .Include(r => r.Resources)
+            .Include(r => r.Packages)
             .SingleAsync(r => r.Id == id, CancellationToken);
         release.Resources.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
         return release;

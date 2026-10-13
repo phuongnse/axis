@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Storage;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -9,24 +10,34 @@ namespace Axis.Configuration.Releases;
 /// <summary>
 /// Compiles an application folder into an immutable release in the tenant database. A folder with
 /// errors produces no release. An unchanged folder returns the release already stored for its
-/// application id and content hash. A stored release can be compiled back into its model.
+/// application id and content hash. The release stores the extension package versions it pins, so
+/// installing a newer version never changes it. A stored release can be compiled back into its model.
 /// </summary>
 public static class ReleaseCompiler
 {
+    /// <summary>Compiles <paramref name="folderPath"/> with no extension package installed; see the overload with installed packages.</summary>
+    public static Task<ReleaseCompilationResult> CompileAsync(
+        string folderPath,
+        ConfigurationDbContext context,
+        CancellationToken cancellationToken = default) =>
+        CompileAsync(folderPath, context, [], cancellationToken);
+
     /// <summary>
-    /// Compiles <paramref name="folderPath"/> and stores the release through
-    /// <paramref name="context"/>, which the caller connects to the tenant database. Call it outside
-    /// an explicit transaction: when a concurrent compile stores the same release first, the
-    /// context's change tracker is cleared and the stored release is returned.
+    /// Compiles <paramref name="folderPath"/> against <paramref name="installedPackages"/> and stores
+    /// the release through <paramref name="context"/>, which the caller connects to the tenant
+    /// database. Call it outside an explicit transaction: when a concurrent compile stores the same
+    /// release first, the context's change tracker is cleared and the stored release is returned.
     /// </summary>
     public static async Task<ReleaseCompilationResult> CompileAsync(
         string folderPath,
         ConfigurationDbContext context,
+        IReadOnlyCollection<PackageVersion> installedPackages,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(installedPackages);
 
-        var compiled = ApplicationCompiler.Compile(folderPath);
+        var compiled = ApplicationCompiler.Compile(folderPath, installedPackages);
         if (compiled.Model is null || compiled.ContentHash is null)
         {
             return new ReleaseCompilationResult(null, null, compiled.Diagnostics);
@@ -49,6 +60,9 @@ public static class ReleaseCompiler
             CreatedAt = DateTimeOffset.UtcNow,
             Resources = compiled.Resources
                 .Select(resource => new ReleaseResource { ReleaseId = releaseId, Path = resource.Path, Content = resource.Content })
+                .ToList(),
+            Packages = compiled.Model.Packages
+                .Select(package => new ReleasePackage { ReleaseId = releaseId, PackageId = package.Id, Version = package.Version })
                 .ToList(),
         };
         context.Releases.Add(release);
@@ -75,8 +89,10 @@ public static class ReleaseCompiler
 
     /// <summary>
     /// Rebuilds the model of <paramref name="release"/> from its stored resources, without the
-    /// folder. A release is stored only when it compiles clean, so any diagnostic, another content
-    /// hash or another application id means the stored rows are wrong.
+    /// folder. Each package range is resolved against the release's own pins only, not against the
+    /// packages installed now, so the release always rebuilds to the same model. A release is stored
+    /// only when it compiles clean, so any diagnostic, another content hash or another application
+    /// id means the stored rows are wrong.
     /// </summary>
     /// <exception cref="InvalidOperationException">The stored release does not compile back into the same application.</exception>
     public static ApplicationModel BuildModel(Release release)
@@ -84,7 +100,8 @@ public static class ReleaseCompiler
         ArgumentNullException.ThrowIfNull(release);
 
         var compiled = ApplicationCompiler.Compile(
-            release.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content)).ToList());
+            release.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content)).ToList(),
+            release.Packages.Select(package => new PackageVersion(package.PackageId, package.Version)).ToList());
         if (compiled.Diagnostics.Count > 0 || compiled.Model is null)
         {
             var code = compiled.Diagnostics.Count > 0 ? compiled.Diagnostics[0].Code : "none";
@@ -115,6 +132,7 @@ public static class ReleaseCompiler
     {
         var release = await context.Releases
             .Include(r => r.Resources)
+            .Include(r => r.Packages)
             .SingleOrDefaultAsync(r => r.ApplicationId == applicationId && r.ContentHash == contentHash, cancellationToken);
 
         // Database collation may not be ordinal, so resources are put in path order here.

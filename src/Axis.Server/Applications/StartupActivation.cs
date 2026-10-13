@@ -1,4 +1,5 @@
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data;
@@ -10,15 +11,17 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Server.Applications;
 
 /// <summary>
-/// Migrates every configured tenant database, then compiles and activates the configured
-/// application folders in it and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
+/// Migrates every configured tenant database, then compiles the configured application folders
+/// against the installed extension packages, activates them in it and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
-/// Restarting with unchanged folders stores no new release and only refreshes the activation time.
+/// Restarting with unchanged folders and installed packages stores no new release and only
+/// refreshes the activation time.
 /// </summary>
 internal sealed partial class StartupActivation(
     StartupActivationOptions options,
     TenantOptions tenants,
+    PackageCatalog packages,
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
     IHostEnvironment environment,
@@ -69,7 +72,7 @@ internal sealed partial class StartupActivation(
         {
             try
             {
-                var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, cancellationToken);
+                var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, cancellationToken);
                 LogDiagnostics(compiled.Diagnostics, folder, tenantId);
                 if (compiled.Release is null || compiled.Model is null)
                 {

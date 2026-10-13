@@ -4,8 +4,9 @@ namespace Axis.Configuration.Storage;
 
 /// <summary>
 /// The configuration module's tables in a tenant database. The caller supplies the connection to
-/// the tenant database. Releases are immutable: saving fails when a stored release or resource is
-/// modified or deleted, or when a resource is added to a release that is not added in the same save.
+/// the tenant database. Releases are immutable: saving fails when a stored release, resource or
+/// package pin is modified or deleted, or when a resource or pin is added to a release that is not
+/// added in the same save.
 /// This guard covers change tracking only; bulk operations and raw SQL bypass it.
 /// </summary>
 public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : DbContext(options)
@@ -32,6 +33,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<Release> Releases => Set<Release>();
 
     public DbSet<ReleaseResource> ReleaseResources => Set<ReleaseResource>();
+
+    public DbSet<ReleasePackage> ReleasePackages => Set<ReleasePackage>();
 
     public DbSet<ActiveReleaseRow> ActiveReleases => Set<ActiveReleaseRow>();
 
@@ -70,6 +73,11 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
                 .HasForeignKey(resource => resource.ReleaseId)
                 .HasConstraintName("fk_release_resources_releases_release_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            release.HasMany(r => r.Packages)
+                .WithOne()
+                .HasForeignKey(package => package.ReleaseId)
+                .HasConstraintName("fk_release_packages_releases_release_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ReleaseResource>(resource =>
@@ -79,6 +87,15 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             resource.Property(r => r.ReleaseId).HasColumnName("release_id");
             resource.Property(r => r.Path).HasColumnName("path");
             resource.Property(r => r.Content).HasColumnName("content").HasColumnType("text");
+        });
+
+        modelBuilder.Entity<ReleasePackage>(package =>
+        {
+            package.ToTable("release_packages");
+            package.HasKey(p => new { p.ReleaseId, p.PackageId }).HasName("pk_release_packages");
+            package.Property(p => p.ReleaseId).HasColumnName("release_id");
+            package.Property(p => p.PackageId).HasColumnName("package_id").HasMaxLength(100);
+            package.Property(p => p.Version).HasColumnName("version").HasMaxLength(50);
         });
 
         modelBuilder.Entity<ActiveReleaseRow>(active =>
@@ -116,7 +133,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     {
         // Entries() detects changes first, so property changes on tracked entities are seen here.
         var entries = ChangeTracker.Entries()
-            .Where(entry => entry.Entity is Release or ReleaseResource)
+            .Where(entry => entry.Entity is Release or ReleaseResource or ReleasePackage)
             .ToList();
         var addedReleaseIds = entries
             .Where(entry => entry is { Entity: Release, State: EntityState.Added })
@@ -135,6 +152,12 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             {
                 throw new InvalidOperationException(
                     $"A stored release is immutable; the resource '{resource.Path}' can only be added together with its release.");
+            }
+
+            if (entry is { Entity: ReleasePackage package, State: EntityState.Added } && !addedReleaseIds.Contains(package.ReleaseId))
+            {
+                throw new InvalidOperationException(
+                    $"A stored release is immutable; the package '{package.PackageId}' can only be added together with its release.");
             }
         }
     }

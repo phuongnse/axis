@@ -3,8 +3,9 @@
 Detailed reference for extension packages: what a package is, its manifest,
 the contracts it builds on, installation, versions and pinning, loading,
 capabilities and what the capability limits do not protect against. The
-manifest, the contracts, installation and loading are built. Versions and
-pinning, capabilities and calls from a process are not built yet. How a process calls a package operation is in
+manifest, the contracts, installation and loading are built. Version ranges
+and pinning in releases are built too. Capabilities and calls from a process
+are not built yet. How a process calls a package operation is in
 [Package operations](processes.md#package-operations), and how an application
 declares its packages is in
 [Extension packages](configuration.md#extension-packages).
@@ -155,24 +156,28 @@ public class RetryableException : Exception { }
 
 ## Versions and pinning
 
-*(planned for M5)*
-
 - **Ranges.** An application's `packages` entry gives a version range, see
   [Extension packages](configuration.md#extension-packages). A range is an
   exact version `1.2.0`, `^1.2.0` for any version of the same major version
   from `1.2.0`, or `~1.2.0` for any version of the same minor version from
-  `1.2.0`.
+  `1.2.0`. Any other form is `AXC0140`.
 - **Pinning.** Compilation picks the highest installed version in each range
-  and pins that exact version in the release. Steps are checked against the
-  pinned version's manifest. A running instance keeps the version its
-  release pins, even after a newer version is installed.
-- **No version in range.** A range that no installed version meets is a
-  diagnostic. Its code comes with the build issue.
-- **Pinned version missing at activation.** Activating a release whose
-  pinned version is not installed fails with a diagnostic.
-- **Pinned version missing on the worker.** A call to a version that the
-  worker does not hold, or cannot load, is a retryable attempt. Nothing ran,
-  as with a missing binding on a connector call.
+  and pins that exact version in the release. The pin is part of the
+  release's content hash. So once a newer version in range is installed,
+  compiling the same folder again gives a new release pinned to it, while the
+  old release keeps its pin. A restart of the server compiles its startup
+  folders again, so it can activate such a new release.
+- **Unknown package.** A package id with no installed version is `AXC0139`.
+- **No version in range.** A range that no installed version meets is
+  `AXC0141`. Its message lists the installed versions.
+- **Steps.** *(planned for M5)* Steps are checked against the pinned
+  version's manifest. A running instance keeps the version its release pins,
+  even after a newer version is installed.
+- **Pinned version missing at activation.** *(planned for M5)* Activating a
+  release whose pinned version is not installed fails with a diagnostic.
+- **Pinned version missing on the worker.** *(planned for M5)* A call to a
+  version that the worker does not hold, or cannot load, is a retryable
+  attempt. Nothing ran, as with a missing binding on a connector call.
 
 ## Loading
 

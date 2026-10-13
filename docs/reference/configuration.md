@@ -432,11 +432,21 @@ flowchart LR
      a newline, encoded as UTF-8. It is written as lowercase hex.
      Formatting-only changes (whitespace, key order, line endings) keep the
      hash; a changed value, or an added, removed or renamed file changes it.
+     After the resources come the pinned
+     [extension packages](#extension-packages), in ordinal order of their id,
+     each contributing `/packages/<id>`, a newline, the pinned version and a
+     newline. A resource path never starts with `/`, so a pin cannot be
+     confused with a file. An application without pins has the hash of its
+     resources alone. So installing a newer version in range gives the same
+     folder a new hash and a new release, and the old release keeps its pin.
    - **Identity.** A release is unique per application `id` and content hash.
      Compiling an unchanged folder returns the stored release instead of
      storing a second one, also when two compiles run at the same time.
    - **Content.** A release stores the canonical content of every resource
-     with its relative path, so it can be read back without the folder.
+     with its relative path, and the exact version of every package it pins,
+     so it can be read back without the folder. Reading it back resolves each
+     range against the release's own pins only, never against the packages
+     installed now.
    - **Errors.** A folder with any error diagnostic produces no release;
      compile returns the diagnostics only.
 5. **Activate.** The current tenant schema is compared with the entity
@@ -656,6 +666,10 @@ sorted by file and then path.
 | `AXC0136` | An extension package operation's `type` is not a class in the package assembly that implements `IOperation`, is not abstract and has a public parameterless constructor. Reported at startup by the host, at `/operations/{i}/type`. |
 | `AXC0137` | An extension package operation name, or a field name in one operation's `input` or `output`, is already used, ignoring letter case. Reported at startup by the host, at the `name` of the later one. |
 | `AXC0138` | An extension package operation's `timeout` is not a positive ISO 8601 duration of at most `PT2M`. Reported at startup by the host, at `/operations/{i}/timeout`. |
+| `AXC0139` | An application's `packages` entry names a package id with no installed version. Reported in `application.json` at `/packages/{i}/id`. |
+| `AXC0140` | An application's `packages` entry has a `version` range that is not an exact version `X.Y.Z`, `^X.Y.Z` or `~X.Y.Z`, with no leading zeros. Reported in `application.json` at `/packages/{i}/version`. |
+| `AXC0141` | No installed version of a package is in its `packages` entry's `version` range. Reported in `application.json` at `/packages/{i}/version`, listing the installed versions. Not checked when the package is unknown or the range is invalid. |
+| `AXC0142` | A package id appears in more than one `packages` entry. Reported in `application.json` at `/packages/{i}/id` of each later entry, which is not checked further. |
 
 ## Startup activation
 
@@ -673,6 +687,11 @@ development or E2E server serves a real application without a separate step.
   to the tenant database, then compiles each listed folder against that database and
   activates the release, in the listed order. The same folders apply to
   every tenant.
+- **Packages.** Each folder compiles against the extension packages
+  installed under `Extensions:Path`, see
+  [Extension packages](#extension-packages). When a newer version in a range
+  was installed since the last start, the folder compiles to a new release
+  pinned to it, and that release is activated.
 - **Before listening.** The step runs before any hosted service starts, so
   the server accepts no request until every tenant is done.
 - **Failures.** Any compile or activation diagnostic, or any error, stops the
@@ -716,7 +735,7 @@ development or E2E server serves a real application without a separate step.
   stops the start like any other diagnostic, and the release stays active.
   The step logs how many seed records it inserted and updated.
 - **Restarts.** Restarting with unchanged folders is safe. An unchanged
-  folder returns its stored release, and activating the active release again
+  folder, with the same package versions installed, returns its stored release, and activating the active release again
   only updates its activation time. After a failure, the next start
   activates again safely because provisioning is additive.
 
@@ -1410,11 +1429,11 @@ The compiler reports these as compile errors, all in one pass. The
 
 ## Extension packages
 
-*(planned for M5)* This section follows
-[D28](../decisions.md#d28-extension-packages--agreed). None of it is built
-yet. An application declares the [extension packages](extension-packages.md)
-it uses in its manifest, `application.json`. Each entry names a package id
-and a version range:
+This section follows
+[D28](../decisions.md#d28-extension-packages--agreed). An application
+declares the [extension packages](extension-packages.md) it uses in its
+manifest, `application.json`. Each entry names a package id and a version
+range:
 
 ```json
 {
@@ -1429,23 +1448,32 @@ and a version range:
 `purchasing-tools` is an illustrative package. The sample files do not change
 until the build issues add packages.
 
-- `packages` is optional. Each package id appears at most once.
+- `packages` is optional. Each entry has an `id`, lower-case letters, digits
+  and `-`, starting with a letter, and a `version`. The schema checks this
+  shape, so breaking it is `AXC0004`. Each package id appears at most once:
+  `AXC0142`.
 - `version` is a version range in one of three forms. Versions are plain
-  `major.minor.patch`, and pre-release versions come later.
+  `major.minor.patch` without leading zeros, and pre-release versions come
+  later. Any other form is `AXC0140`.
   - `1.0.0` is that exact version.
   - `^1.0.0` is any version from `1.0.0` with the same major version, so
-    `1.4.2` but not `2.0.0`.
+    `1.4.2` but not `2.0.0`. `^0.2.0` also means the same major version, so
+    `0.9.0` but not `1.0.0`.
   - `~1.0.0` is any version from `1.0.0` with the same minor version, so
     `1.0.3` but not `1.1.0`.
 - **Pinning.** Compilation picks the highest installed version in each range
-  and pins that exact version in the release. A process step is checked
-  against the pinned version's manifest.
-- **Diagnostics.** A range that no installed version meets is a compile
-  error. Activating a release whose pinned version is not installed fails, as
-  does a package whose manifest does not match its assembly. The codes for
-  ranges and pinning come with the build issue. A manifest that does not
-  match its package is already reported at host startup, as `AXC0132` to
-  `AXC0138`, see [Loading](extension-packages.md#loading).
+  and pins that exact version in the release, as step 4, **Release**, of the
+  pipeline describes. The server compiles against the packages installed
+  under `Extensions:Path`. *(planned for M5)* A process step is
+  checked against the pinned version's manifest.
+- **Diagnostics.** A package id with no installed version is `AXC0139`. A
+  range that no installed version meets is `AXC0141`, and its message lists
+  the installed versions. Both are compile errors in `application.json`.
+  *(planned for M5)* Activating a release whose pinned version is not
+  installed fails, as does a package whose manifest does not match its
+  assembly. A manifest that does not match its package is already reported
+  at host startup, as `AXC0132` to `AXC0138`, see
+  [Loading](extension-packages.md#loading).
 - An application uses only the packages it declares, even though every
   tenant sees the same installed packages. Installation is in
   [Installation](extension-packages.md#installation).

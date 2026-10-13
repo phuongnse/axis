@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 
@@ -11,6 +12,11 @@ public sealed class ReleaseCompilerBuildModelTests
 
     private const string Manifest = """
         { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }
+        """;
+
+    private const string ManifestWithPackages = """
+        { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1,
+          "packages": [{ "id": "test-package", "version": "^1.0.0" }] }
         """;
 
     private const string Order = """
@@ -154,6 +160,50 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_with_pins_compiles_back_against_its_own_pins_only()
+    {
+        var compiled = ApplicationCompiler.Compile(
+            [new ResourceContent("application.json", ManifestWithPackages), new ResourceContent("entities/order.json", Order)],
+            [new PackageVersion("test-package", "1.0.0"), new PackageVersion("test-package", "1.2.0")]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.Equal([("test-package", "1.2.0")], release.Packages.Select(package => (package.PackageId, package.Version)));
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.Equal([new PinnedPackageModel("test-package", "^1.0.0", "1.2.0")], model.Packages);
+    }
+
+    [Fact]
+    public void Stored_release_whose_pin_is_missing_or_out_of_range_throws()
+    {
+        var compiled = ApplicationCompiler.Compile(
+            [new ResourceContent("application.json", ManifestWithPackages), new ResourceContent("entities/order.json", Order)],
+            [new PackageVersion("test-package", "1.2.0")]);
+        var missing = StoredRelease(compiled);
+        missing.Packages.Clear();
+        var outOfRange = StoredRelease(compiled);
+        outOfRange.Packages[0] = new ReleasePackage { ReleaseId = outOfRange.Id, PackageId = "test-package", Version = "2.0.0" };
+
+        Assert.Throws<InvalidOperationException>(() => ReleaseCompiler.BuildModel(missing));
+        Assert.Throws<InvalidOperationException>(() => ReleaseCompiler.BuildModel(outOfRange));
+    }
+
+    [Fact]
+    public void Stored_release_with_another_pin_in_range_throws()
+    {
+        var compiled = ApplicationCompiler.Compile(
+            [new ResourceContent("application.json", ManifestWithPackages), new ResourceContent("entities/order.json", Order)],
+            [new PackageVersion("test-package", "1.2.0")]);
+        var release = StoredRelease(compiled);
+        release.Packages[0] = new ReleasePackage { ReleaseId = release.Id, PackageId = "test-package", Version = "1.3.0" };
+
+        Assert.Throws<InvalidOperationException>(() => ReleaseCompiler.BuildModel(release));
+    }
+
+    [Fact]
     public void Stored_release_with_invalid_content_throws()
     {
         var release = StoredRelease(Compile());
@@ -189,6 +239,7 @@ public sealed class ReleaseCompilerBuildModelTests
             ContentHash = contentHash ?? compiled.ContentHash!,
             CreatedAt = DateTimeOffset.UtcNow,
             Resources = [.. compiled.Resources.Select(resource => new ReleaseResource { ReleaseId = id, Path = resource.Path, Content = resource.Content })],
+            Packages = [.. compiled.Model!.Packages.Select(package => new ReleasePackage { ReleaseId = id, PackageId = package.Id, Version = package.Version })],
         };
     }
 }

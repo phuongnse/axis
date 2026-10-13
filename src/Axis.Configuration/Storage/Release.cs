@@ -18,4 +18,7 @@ public sealed class Release
 
     /// <summary>The canonical content of every resource file of the release.</summary>
     public List<ReleaseResource> Resources { get; init; } = [];
+
+    /// <summary>The extension package versions the release pins.</summary>
+    public List<ReleasePackage> Packages { get; init; } = [];
 }
