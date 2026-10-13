@@ -952,8 +952,9 @@ need a second write that a crash can lose.
 
 ## D28. Extension packages — Agreed
 
-M5 lets a process run custom C# code from an extension package. None of this
-is built yet. See [extension packages](reference/extension-packages.md) for
+M5 lets a process run custom C# code from an extension package. The manifest,
+the contracts, installation and loading are built. The rest is not built yet.
+See [extension packages](reference/extension-packages.md) for
 the manifest, the contracts, installation, loading and capabilities,
 [configuration](reference/configuration.md#extension-packages) for an
 application's `packages`, and

@@ -2,8 +2,9 @@
 
 Detailed reference for extension packages: what a package is, its manifest,
 the contracts it builds on, installation, versions and pinning, loading,
-capabilities and what the capability limits do not protect against. None of
-this is built yet. How a process calls a package operation is in
+capabilities and what the capability limits do not protect against. The
+manifest, the contracts, installation and loading are built. Versions and
+pinning, capabilities and calls from a process are not built yet. How a process calls a package operation is in
 [Package operations](processes.md#package-operations), and how an application
 declares its packages is in
 [Extension packages](configuration.md#extension-packages).
@@ -34,7 +35,7 @@ custom code out of configuration is in
 
 ## Manifest
 
-*(planned for M5)* The manifest, `axis-package.json`, sits at the root of the
+The manifest, `axis-package.json`, sits at the root of the
 package folder. This example uses an illustrative package,
 `purchasing-tools`. It is not the sample package, whose operation is chosen
 in the issue that builds it.
@@ -68,13 +69,16 @@ in the issue that builds it.
 - **`operations`.** The operations the package offers. Each has these:
   - `name` is the operation's name, unique in the package.
   - `type` is the full name of a class in the main assembly that implements
-    `IOperation`.
+    `IOperation`. The class is not abstract and has a public parameterless
+    constructor, because the host creates each instance itself.
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
     whether an unknown outcome is retried, see
     [Call outcomes](processes.md#package-call-outcomes).
   - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
     `PT2M`, as for a [connector](configuration.md#connector-resource).
+    Operation names are unique in the package, and field names are unique in
+    each operation's `input` and in its `output`, all ignoring letter case.
   - `input` and `output` list typed fields. Their types are the
     [rule parameter types](configuration.md#resource-file-shape): `text`,
     `integer`, `decimal`, `boolean`, `date` and `date-time`. A field may be
@@ -85,7 +89,7 @@ in the issue that builds it.
 
 ## Contracts
 
-*(planned for M5)* `Axis.Extensions` is the only assembly a package
+`Axis.Extensions` is the only assembly a package
 references. It holds only these types:
 
 ```csharp
@@ -130,22 +134,24 @@ public class RetryableException : Exception { }
 
 ## Installation
 
-*(planned for M5)*
-
 - **Per installation.** Packages are installed once for the installation,
   not per tenant. Every tenant sees the same installed packages. An
   application uses only the packages it declares.
 - **Where.** The server and the worker both read the setting
   `Extensions:Path`. Each package version is installed in
   `<Path>/<id>/<version>/`, which holds `axis-package.json` and the
-  assemblies.
+  assemblies. A relative path is resolved from the host's content root.
+- **No setting, no packages.** Without `Extensions:Path`, a host has no
+  packages. If the setting names a folder that does not exist, the host does
+  not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
-- **Keep pinned versions.** Keep every version that an active release, or a
-  running instance's release, pins. Removing one makes its calls retry until
-  it is back, see [Versions and pinning](#versions-and-pinning).
+- **Keep pinned versions.** *(planned for M5)* Keep every version that an
+  active release, or a running instance's release, pins. Removing one makes
+  its calls retry until it is back, see
+  [Versions and pinning](#versions-and-pinning).
 
 ## Versions and pinning
 
@@ -170,21 +176,36 @@ public class RetryableException : Exception { }
 
 ## Loading
 
-*(planned for M5)*
-
 - **Own load context.** Each package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
 - **Shared contracts.** The load context shares only `Axis.Extensions` with
   the host. Every other assembly the package needs must ship in its folder.
-- **Manifest check.** A manifest that does not match the package stops
-  activation with a diagnostic. Its code comes with the build issue. A
-  mismatch is any of these:
-  - the folder names differ from `id` or `version`;
-  - the `assembly` file is missing;
-  - the assembly's informational version differs from `version`;
-  - an operation's `type` is missing from the assembly, or does not
-    implement `IOperation`.
+  The .NET framework assemblies come from the host. No other Axis assembly
+  of the host can be loaded into the package's context.
+- **Manifest check.** Each host checks every installed manifest when it
+  starts. The codes are in the diagnostic table of the
+  [configuration pipeline](configuration.md#configuration-pipeline):
+  - `AXC0132`: the manifest is missing, cannot be read, is not valid JSON or
+    does not match its schema;
+  - `AXC0133`: the folder names differ from `id` or `version`;
+  - `AXC0134`: the `assembly` file is missing or cannot be loaded;
+  - `AXC0135`: the assembly's informational version differs from
+    `version`, ignoring build metadata after a `+`;
+  - `AXC0136`: an operation's `type` is missing from the assembly, does not
+    implement `IOperation`, is abstract, or has no public parameterless
+    constructor;
+  - `AXC0137`: an operation name, or a field name in one operation's
+    `input` or `output`, is used twice, ignoring letter case;
+  - `AXC0138`: an operation's `timeout` is not a positive ISO 8601 duration
+    of at most `PT2M`.
+- **A broken package is left out.** The host still starts. It logs each
+  diagnostic as a warning, with its code, file and JSON Pointer, and leaves
+  the package version out. The file is relative to `Extensions:Path`, such
+  as `purchasing-tools/1.0.0/axis-package.json`, and the message names the
+  package id and version.
+- **Activation.** *(planned for M5)* Activating an application that uses a
+  package version that was left out fails with a diagnostic.
 
 ## Capabilities
 
@@ -240,11 +261,11 @@ all of these:
 
 ## Sample and test packages
 
-*(planned for M5)*
-
-- **Sample package.** `samples/packages/` holds one package with a pure
+- **Sample package.** *(planned for M5)* `samples/packages/` holds one package with a pure
   operation and no capabilities. The purchase request sample uses it. Its
   operation is chosen in the issue that builds it.
-- **Test package.** A test-only package under `tests/packages/` covers the
-  capability limits: a declared binding is handed out, and an undeclared one
-  fails the attempt.
+- **Test package.** A test-only package, `test-package`, lives under
+  `tests/packages/`. One source is built as versions 1.0.0 and 2.0.0, and the
+  tests install it to cover installation and loading. *(planned for M5)* It
+  will also cover the capability limits: a declared binding is handed out,
+  and an undeclared one fails the attempt.

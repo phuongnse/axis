@@ -29,8 +29,9 @@ flowchart LR
   *(planned for M5)* It will deliver events to async event triggers, and run
   schedule triggers and their fan-out, see
   [events and triggers](reference/processes.md#events-and-triggers).
-  *(planned for M5)* It will load the installed extension packages and run
-  their operations, see [extension packages](reference/extension-packages.md).
+  It loads the installed extension packages at startup, as the server does.
+  *(planned for M5)* It will run their operations, see
+  [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
 - **Platform database** stores installation-level data: the tenant directory
   and platform settings *(tenant directory planned for M9; tenants come from
@@ -45,20 +46,20 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Core/              shared primitives: ids, results, clock, tenant context
-  Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases
+  Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
   Axis.Processes/         work items, decision, task, operation and end steps, task API; events and triggers (M5)
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
-  Axis.Extensions/        contracts for extension packages: operation interface, operation context (M5)
+  Axis.Extensions/        contracts for extension packages: operation interface, operation context
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
 tests/
   Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
-  packages/               test-only extension package that covers the capability limits (M5)
+  packages/               test-only extension package, built as two versions; capability limits (M5)
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
 samples/
@@ -70,7 +71,8 @@ samples/
 Projects are created when the first issue needs them. The solution holds
 `Axis.Server`, `Axis.Core` (only the tenant context so far),
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
-checker, interpreter and SQL translation), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
+checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
+for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
 `decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
