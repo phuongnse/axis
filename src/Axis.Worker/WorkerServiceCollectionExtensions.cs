@@ -1,3 +1,4 @@
+using Axis.Configuration.Packages;
 using Axis.Processes;
 using Axis.Tenancy;
 
@@ -6,11 +7,13 @@ namespace Axis.Worker;
 public static class WorkerServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the tenancy and processes services and the background service that runs the due
-    /// work items of every configured tenant. Only a worker that runs in Development sends connector
-    /// calls to an <c>http</c> base URL.
+    /// Registers the tenancy and processes services, the installed extension packages and the
+    /// background service that runs the due work items of every configured tenant. Only a worker
+    /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The tenant or worker configuration is invalid.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The tenant or worker configuration is invalid, or <c>Extensions:Path</c> names a folder that does not exist.
+    /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -28,6 +31,7 @@ public static class WorkerServiceCollectionExtensions
         }
 
         services.AddTenancy(configuration, environment);
+        services.AddExtensionPackages(configuration, environment);
         services.AddProcesses(environment.IsDevelopment());
         services.AddSingleton(options);
         services.AddHostedService<WorkerService>();

@@ -29,6 +29,7 @@
   <ItemGroup>
     <Compile Include="..\Axis.Configuration.Tests\ModelAssert.cs" Link="ModelAssert.cs" />
     <Compile Include="..\Axis.Configuration.Tests\TemporaryFolder.cs" Link="TemporaryFolder.cs" />
+    <Compile Include="..\Axis.Configuration.Tests\TestPackages.cs" Link="TestPackages.cs" />
     <Compile Include="..\Axis.Data.Tests\Models.cs" Link="Models.cs" />
     <Compile Include="..\Axis.Server.Tests\TestAuthentication.cs" Link="TestAuthentication.cs" />
     <Compile Include="..\Axis.Server.Tests\TestEndpointCallers.cs" Link="TestEndpointCallers.cs" />
@@ -40,5 +41,7 @@
     <None Include="..\..\samples\apps\purchase-requests\**\*" Link="Samples\purchase-requests\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-realm.json" Link="Keycloak\axis-realm.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Import Project="..\packages\TestPackages.targets" />
 
 </Project>

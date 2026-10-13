@@ -134,4 +134,12 @@ public static class DiagnosticCodes
     public const string UnknownTriggerProcess = "AXC0129";
     public const string UnknownTriggerEvent = "AXC0130";
     public const string TriggerEventOverOtherEntity = "AXC0131";
+
+    public const string PackageManifestInvalid = "AXC0132";
+    public const string PackageFolderMismatch = "AXC0133";
+    public const string PackageAssemblyMissing = "AXC0134";
+    public const string PackageVersionMismatch = "AXC0135";
+    public const string InvalidPackageOperationType = "AXC0136";
+    public const string DuplicatePackageName = "AXC0137";
+    public const string InvalidPackageTimeout = "AXC0138";
 }

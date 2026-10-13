@@ -5,11 +5,13 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <!-- Keeps EF Core at the Design package's version for every project that references this one. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.Expressions\Axis.Expressions.csproj" />
+    <ProjectReference Include="..\Axis.Extensions\Axis.Extensions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +20,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Schemas\*.schema.json" LogicalName="Axis.Configuration.Schemas.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Packages\axis-package.schema.json" LogicalName="Axis.Configuration.Packages.axis-package.schema.json" />
   </ItemGroup>
 
 </Project>

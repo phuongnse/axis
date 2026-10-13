@@ -27,4 +27,6 @@
     <None Include="..\..\docs\**\*.md" Link="Docs\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Import Project="..\packages\TestPackages.targets" />
+
 </Project>

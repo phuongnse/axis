@@ -1,0 +1,23 @@
+<Project>
+
+  <!--
+    Builds both versions of the test-only extension package and copies each build to
+    $(OutDir)TestPackages/v{n}/test-package/{version}/. Tests copy the version folders they need to a
+    temporary folder that acts as Extensions:Path.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)TestPackage.V1\TestPackage.V1.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)TestPackage.V2\TestPackage.V2.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="CopyTestPackages" AfterTargets="Build">
+    <ItemGroup>
+      <TestPackageV1File Include="$(MSBuildThisFileDirectory)TestPackage.V1\bin\$(Configuration)\$(TargetFramework)\**\*" />
+      <TestPackageV2File Include="$(MSBuildThisFileDirectory)TestPackage.V2\bin\$(Configuration)\$(TargetFramework)\**\*" />
+    </ItemGroup>
+    <Error Condition="'@(TestPackageV1File)' == '' Or '@(TestPackageV2File)' == ''" Text="The test package builds were not found under $(MSBuildThisFileDirectory)." />
+    <Copy SourceFiles="@(TestPackageV1File)" DestinationFiles="@(TestPackageV1File->'$(OutDir)TestPackages\v1\test-package\1.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(TestPackageV2File)" DestinationFiles="@(TestPackageV2File->'$(OutDir)TestPackages\v2\test-package\2.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
