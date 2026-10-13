@@ -119,12 +119,78 @@ async function expectStatus(page: Page, id: string, status: string) {
   }).toPass({ timeout: 30_000 })
 }
 
+/** The request's number, read through the record API. */
+async function requestNumber(page: Page, id: string) {
+  const read = await page.request.get(`${recordsPath}/${id}`)
+  expect(read.ok()).toBe(true)
+  const number = ((await read.json()) as { values: { number: string | null } }).values.number
+  expect(number).toBeTruthy()
+  return number!
+}
+
+/**
+ * Opens the request form until it shows a purchase order number, since the worker calls the
+ * purchasing system after approval, and returns it.
+ */
+async function expectPurchaseOrderNumber(page: Page, id: string) {
+  const field = page.getByLabel('Purchase order number', { exact: true })
+  await expect(async () => {
+    await page.goto(`/purchasing/purchaserequestform/${id}`)
+    await expect(field).not.toHaveValue('', { timeout: 1_000 })
+  }).toPass({ timeout: 30_000 })
+  return field.inputValue()
+}
+
+/** The orders that the purchasing system stub holds for the request numbered `number`. */
+async function purchaseOrders(page: Page, number: string) {
+  const response = await page.request.get(`${env('AXIS_E2E_PURCHASING_URL')}/purchase-orders`)
+  expect(response.ok()).toBe(true)
+  const orders = (await response.json()) as { requestNumber: string; orderNumber: string }[]
+  return orders.filter((order) => order.requestNumber === number)
+}
+
+/** Expects the request to show a purchase order number, and the stub to hold exactly that one order for it. */
+async function expectOnePurchaseOrder(page: Page, id: string) {
+  const orderNumber = await expectPurchaseOrderNumber(page, id)
+  const number = await requestNumber(page, id)
+  expect((await purchaseOrders(page, number)).map((order) => order.orderNumber)).toEqual([orderNumber])
+}
+
+/**
+ * Counts the history panel entries that hold every one of `texts`, on all pages of the panel. The
+ * purchase order call adds entries, so an approved request's history can take more than one page.
+ */
+async function countHistory(page: Page, ...texts: string[]) {
+  const history = page.getByTestId('record-history')
+  const entries = history.getByTestId('history-entry')
+  const matching = texts.reduce((locator, text) => locator.filter({ hasText: text }), entries)
+  const next = history.locator('.ant-pagination-next')
+  await expect(entries.first()).toBeVisible()
+  // An earlier count leaves the panel on its last page.
+  const first = history.locator('.ant-pagination-item-1')
+  if ((await first.count()) > 0) {
+    await first.click()
+    await expect(history.locator('.ant-pagination-item-active')).toHaveText('1')
+    await expect(history.locator('.ant-spin-spinning')).toHaveCount(0)
+  }
+  let count = await matching.count()
+  for (let current = 2; (await next.count()) > 0; current++) {
+    if ((await next.getAttribute('class'))?.includes('ant-pagination-disabled')) {
+      break
+    }
+    await next.click()
+    await expect(history.locator('.ant-pagination-item-active')).toHaveText(String(current))
+    await expect(history.locator('.ant-spin-spinning')).toHaveCount(0)
+    count += await matching.count()
+  }
+  return count
+}
+
 /** Expects the history panel to list the submission by anna and a decision by each of `deciders`. */
 async function expectHistory(page: Page, deciders: string[]) {
-  const entries = page.getByTestId('record-history').getByTestId('history-entry')
-  await expect(entries.filter({ hasText: 'Process started' }).filter({ hasText: 'Anna Employee' })).toHaveCount(1)
+  expect(await countHistory(page, 'Process started', 'Anna Employee')).toBe(1)
   for (const name of deciders) {
-    await expect(entries.filter({ hasText: 'Task decided' }).filter({ hasText: name })).toHaveCount(1)
+    expect(await countHistory(page, 'Task decided', name)).toBe(1)
   }
 }
 
@@ -142,6 +208,7 @@ test('a request below the threshold is approved by the department manager from M
   await expectStatus(page, id, 'approved')
   await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
   await expectHistory(page, ['Chau Operations Manager'])
+  await expectOnePurchaseOrder(page, id)
 })
 
 test('a request at the threshold needs the finance reviewer after the manager before it is approved', async ({
@@ -162,6 +229,7 @@ test('a request at the threshold needs the finance reviewer after the manager be
 
   await expectStatus(page, id, 'approved')
   await expectHistory(page, ['Chau Operations Manager', 'Dung Finance Reviewer'])
+  await expectOnePurchaseOrder(page, id)
 })
 
 test('a returned request is edited and submitted again, and the manager then approves it', async ({ page }) => {
@@ -190,8 +258,7 @@ test('a returned request is edited and submitted again, and the manager then app
   expect(read.ok()).toBe(true)
   const record = (await read.json()) as { values: { lineItems: { quantity: number }[] } }
   expect(record.values.lineItems.map((item) => item.quantity)).toEqual([2])
-  const entries = page.getByTestId('record-history').getByTestId('history-entry')
-  await expect(entries.filter({ hasText: 'Process started' }).filter({ hasText: 'Anna Employee' })).toHaveCount(2)
+  expect(await countHistory(page, 'Process started', 'Anna Employee')).toBe(2)
 })
 
 test('a rejected request cannot be submitted again, and the manager gets no new task', async ({ page }) => {
@@ -202,6 +269,9 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   await useSession(page, 'chau')
   await decide(page, title, 'Manager approval', 'Reject')
   await expectStatus(page, id, 'rejected')
+  // The process ends with the rejection, so the purchasing system is never called.
+  await expect(page.getByLabel('Purchase order number', { exact: true })).toHaveValue('')
+  expect(await purchaseOrders(page, await requestNumber(page, id))).toEqual([])
 
   await useSession(page, 'anna')
   await page.goto(`/purchasing/purchaserequestform/${id}`)

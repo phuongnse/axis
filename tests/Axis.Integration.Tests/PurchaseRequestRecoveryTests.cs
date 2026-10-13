@@ -8,8 +8,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A purchase request keeps its place in the approval process when the worker stops: while it
-/// waits for its manager, and when a worker dies in the middle of a step. Each test leaves no due
-/// work item behind, so the next one finds only its own.
+/// waits for its manager, and when a worker dies in the middle of a step. An approved request then
+/// gets its purchase order from the purchasing system stub. Each test leaves no due work item
+/// behind, so the next one finds only its own.
 /// </summary>
 public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
 {
@@ -18,7 +19,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(500, "completed", "markApproved,done", "approved")]
+    [InlineData(500, "completed", "markApproved,createPurchaseOrder,createPurchaseOrder,done", "approved")]
     [InlineData(10000, "waiting", "financeApproval", "submitted")]
     public async Task A_decision_made_while_no_worker_runs_is_taken_up_by_the_next_worker(int unitPrice, string state, string steps, string status)
     {
@@ -64,7 +65,8 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
         }
 
         // The task step writes a row when it opens the task and another when the task is decided.
-        // Every other step ran once, and no revision was written twice.
+        // The connector step writes a row when it stages the call and another when the call
+        // settles. Every other step ran once, and no revision was written twice.
         Assert.Equal($"submit,managerApproval,managerApproval,financeCheck,{steps}", await StepsAsync(instance));
         Assert.Equal(
             0L,
@@ -72,6 +74,20 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
                 "SELECT count(*) - count(DISTINCT revision) FROM axis.process_step_history WHERE process_instance_id = @instance",
                 ("instance", instance)));
         Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+
+        // Only the approved request has a purchase order, and the stub holds exactly one for it.
+        var (number, orderNumber) = await NumbersAsync(anna, subject);
+        var orders = await OrdersAsync(number);
+        if (status == "approved")
+        {
+            Assert.NotNull(orderNumber);
+            Assert.Equal(orderNumber, Assert.Single(orders));
+        }
+        else
+        {
+            Assert.Null(orderNumber);
+            Assert.Empty(orders);
+        }
     }
 
     [Fact]
@@ -173,6 +189,29 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
             ("instance", instance),
             ("action", action ?? ""),
             ("step", step ?? ""));
+
+    /// <summary>The request's number and purchase order number, read through the record API.</summary>
+    private static async Task<(string Number, string? PurchaseOrderNumber)> NumbersAsync(HttpClient client, Guid subject)
+    {
+        using var request = RecordApiFixture.Request(HttpMethod.Get, $"{Records}/{subject:D}", Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var values = body.RootElement.GetProperty("values");
+        return (
+            values.GetProperty("number").GetString()!,
+            values.TryGetProperty("purchaseOrderNumber", out var order) ? order.GetString() : null);
+    }
+
+    /// <summary>The order numbers that the purchasing system stub holds for the request <paramref name="requestNumber"/>.</summary>
+    private async Task<IReadOnlyList<string?>> OrdersAsync(string requestNumber)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(fixture.PurchasingUrl) };
+        using var body = JsonDocument.Parse(await client.GetStringAsync("/purchase-orders", CancellationToken));
+        return [.. body.RootElement.EnumerateArray()
+            .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
+            .Select(order => order.GetProperty("orderNumber").GetString())];
+    }
 
     /// <summary>The request's status and version, read through the record API.</summary>
     private static async Task<(string? Status, long Version)> ReadAsync(HttpClient client, Guid subject)

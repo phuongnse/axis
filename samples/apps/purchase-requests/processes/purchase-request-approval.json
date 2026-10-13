@@ -54,6 +54,16 @@
       "type": "operation",
       "operation": "updateRecord",
       "set": { "status": "'approved'" },
+      "next": "createPurchaseOrder"
+    },
+    {
+      "name": "createPurchaseOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" },
+      "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount" },
+      "output": { "orderNumber": "purchaseOrderNumber" },
+      "retry": { "attempts": 5, "backoff": "PT30S" },
       "next": "done"
     },
     {

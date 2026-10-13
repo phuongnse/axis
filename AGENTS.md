@@ -91,7 +91,7 @@ To run Axis, run `docker compose up --build`. It builds Axis from source and sta
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
 with the purchase request sample at http://localhost:5206, the worker, and the purchasing
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
-the purchasing system that the sample will call. It needs only
+the purchasing system that the sample calls when a request is approved. It needs only
 Docker. `docker compose logs server` shows the activation diagnostics,
 and `docker compose logs worker` shows the worker output. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
@@ -135,7 +135,10 @@ works on a fresh clone:
   5432, 8080, 5207, 5206 and 5173. When `AXIS_POSTGRES_PORT` is set, the script points the server's
   connection strings and the worker's `Tenants__default__ConnectionString` at
   that port. When `AXIS_KEYCLOAK_PORT` is set, it points the server's
-  `Tenants__default__Oidc__Authority` at Keycloak on that port.
+  `Tenants__default__Oidc__Authority` at Keycloak on that port. When
+  `AXIS_PURCHASING_PORT` is set, it points the server's and the worker's
+  `Tenants__default__Bindings__PurchasingSystemUrl__Value` at the purchasing
+  system stub on that port.
 - Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running with
   its data, and Keycloak and the purchasing system stub keep running. Run
   `docker compose down` to stop them.

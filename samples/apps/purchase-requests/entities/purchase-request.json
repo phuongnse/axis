@@ -35,7 +35,8 @@
       "label": { "textKey": "purchaseRequest.status" }
     },
     { "name": "submittedAt", "type": "date-time", "label": { "textKey": "purchaseRequest.submittedAt" } },
-    { "name": "decisionComments", "type": "text", "maxLength": 2000, "label": { "textKey": "purchaseRequest.decisionComments" } }
+    { "name": "decisionComments", "type": "text", "maxLength": 2000, "label": { "textKey": "purchaseRequest.decisionComments" } },
+    { "name": "purchaseOrderNumber", "type": "text", "maxLength": 50, "label": { "textKey": "purchaseRequest.purchaseOrderNumber" } }
   ],
   "validations": [
     {

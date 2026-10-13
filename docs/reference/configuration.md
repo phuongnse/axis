@@ -1006,7 +1006,7 @@ The purchasing system's bindings for tenant `default` look like this:
 
 ### Connector resource
 
-The purchase request sample will hold the purchasing system connector in
+The purchase request sample holds the purchasing system connector in
 `connectors/purchasing-system.json`:
 
 ```json
@@ -1072,10 +1072,12 @@ The purchase request sample will hold the purchasing system connector in
 - The worker never follows a redirect. A `3xx` response fails the call, so
   the secret never goes to another host.
 
-The sample's `PurchaseRequest` entity will gain a `purchaseOrderNumber`
-`text` field, which the call writes. The sample files do not change until
-connector calls are built, because Development, Compose and E2E hold no
-purchasing bindings yet and the sample would no longer activate.
+The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text`
+field, which the call writes. No policy lets a user update it, so the request
+form shows it read-only. The sample activates only for a tenant that holds the
+`PurchasingSystemUrl` and `PurchasingSystemToken` bindings. Development,
+Docker Compose, `scripts/dev.sh` and the E2E run point them at the
+[purchasing system stub](../architecture.md#purchasing-system-stub).
 
 ## Events and triggers
 

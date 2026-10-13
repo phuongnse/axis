@@ -1,0 +1,31 @@
+{
+  "id": "409bc638-0aec-4084-ada2-e3baed50057d",
+  "kind": "connector",
+  "name": "PurchasingSystem",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingSystemUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+  "timeout": "PT30S",
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "createPurchaseOrder",
+      "method": "POST",
+      "path": "/purchase-orders",
+      "input": [
+        { "name": "requestNumber", "type": "text", "required": true },
+        { "name": "supplierCode", "type": "text" },
+        { "name": "amount", "type": "decimal", "required": true }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }],
+      "lookup": "findPurchaseOrder"
+    },
+    {
+      "name": "findPurchaseOrder",
+      "method": "GET",
+      "path": "/purchase-orders/by-key/{idempotencyKey}",
+      "input": [],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }]
+    }
+  ]
+}

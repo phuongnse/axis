@@ -54,6 +54,10 @@ if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
   # The server signs people in at the moved Keycloak.
   export Tenants__default__Oidc__Authority="http://localhost:$AXIS_KEYCLOAK_PORT/realms/axis"
 fi
+if [ -n "${AXIS_PURCHASING_PORT:-}" ]; then
+  # The server checks this binding when it activates the sample, and the worker calls it.
+  export Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$AXIS_PURCHASING_PORT"
+fi
 
 # Job control leaves SIGINT enabled for the background processes. Without it, a
 # non-interactive bash starts them with SIGINT ignored. The jobs are disowned so that bash

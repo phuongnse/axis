@@ -4,9 +4,14 @@ using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Processes.Work;
+using Axis.PurchasingStub;
 using Axis.Server.Tests;
 using Axis.Worker;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +31,11 @@ namespace Axis.Integration.Tests;
 /// Engineering manager, and <c>dung</c> and <c>hoa</c>, two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
 /// started, so a test runs the work items itself. A test can instead start real worker hosts with
 /// <see cref="StartWorkerAsync"/>, and stop them to stand for a worker that is down.
+/// The purchasing system stub runs in process over <c>http</c>. The workers run in Development, the
+/// only environment that lets a connector call an <c>http</c> URL, and their purchasing bindings
+/// point at the stub. The server runs as Testing, so it would not load the development settings,
+/// and its bindings hold an <c>https</c> placeholder: it only checks them when it activates the
+/// sample, and never calls the stub.
 /// </summary>
 public sealed class SampleAppFixture : IAsyncLifetime
 {
@@ -45,7 +55,11 @@ public sealed class SampleAppFixture : IAsyncLifetime
 
     private static readonly TimeSpan _lease = TimeSpan.FromSeconds(30);
 
+    private const string Token = "sample-test-token";
+
     private readonly PostgreSqlFixture _database = new();
+    private WebApplication? _purchasing;
+    private string? _purchasingUrl;
     private string? _connectionString;
     private NpgsqlDataSource? _dataSource;
     private WebApplicationFactory<Program>? _factory;
@@ -55,8 +69,15 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public HttpClient CreateClient() =>
         (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient();
 
+    /// <summary>The address of the purchasing system stub, such as <c>http://127.0.0.1:41234</c>.</summary>
+    public string PurchasingUrl => _purchasingUrl ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     public async ValueTask InitializeAsync()
     {
+        _purchasing = PurchasingStubApp.Create(["--urls", "http://127.0.0.1:0"]);
+        await _purchasing.StartAsync(CancellationToken);
+        _purchasingUrl = _purchasing.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.Single();
+
         await _database.InitializeAsync();
         _connectionString = await _database.CreateDatabaseAsync("sample_a");
         _dataSource = NpgsqlDataSource.Create(_connectionString);
@@ -67,6 +88,10 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{Tenant}:ConnectionString", _connectionString);
             builder.UseTestOidc(Tenant);
+            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
+            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
+            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
+            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", Token);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
             builder.UseTestAuthentication(
                 new TestIdentity("anna", "Anna Employee", "employee"),
@@ -80,14 +105,8 @@ public sealed class SampleAppFixture : IAsyncLifetime
         // Creating a client starts the server, which migrates the database and activates the sample first.
         _factory.CreateClient().Dispose();
 
-        var settings = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"Tenants:{Tenant}:Hosts:0"] = Host,
-                [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
-            })
-            .Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
+        var settings = new ConfigurationBuilder().AddInMemoryCollection(WorkerTenantSettings()).Build();
+        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development" }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()
@@ -108,6 +127,11 @@ public sealed class SampleAppFixture : IAsyncLifetime
         }
 
         await _database.DisposeAsync();
+
+        if (_purchasing is not null)
+        {
+            await _purchasing.DisposeAsync();
+        }
     }
 
     /// <summary>Claims and runs the tenant's due work items until none is left.</summary>
@@ -125,14 +149,15 @@ public sealed class SampleAppFixture : IAsyncLifetime
     /// </summary>
     internal async Task<IHost> StartWorkerAsync(LogCollector logs)
     {
-        var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Worker:PollInterval"] = "00:00:00.05",
-            ["Worker:LeaseDuration"] = "00:00:02",
-            [$"Tenants:{Tenant}:Hosts:0"] = Host,
-            [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
-        });
+        var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Development" });
+
+        // In Development the host would also read appsettings.Development.json and user secrets,
+        // which could add a default tenant this fixture cannot reach.
+        builder.Configuration.Sources.Clear();
+        var settings = WorkerTenantSettings();
+        settings["Worker:PollInterval"] = "00:00:00.05";
+        settings["Worker:LeaseDuration"] = "00:00:02";
+        builder.Configuration.AddInMemoryCollection(settings);
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
@@ -140,6 +165,17 @@ public sealed class SampleAppFixture : IAsyncLifetime
         await host.StartAsync(CancellationToken);
         return host;
     }
+
+    /// <summary>The worker's settings for the tenant, with its purchasing bindings pointing at the stub.</summary>
+    private Dictionary<string, string?> WorkerTenantSettings() => new()
+    {
+        [$"Tenants:{Tenant}:Hosts:0"] = Host,
+        [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
+        [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
+        [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value"] = PurchasingUrl,
+        [$"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind"] = "secret",
+        [$"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value"] = Token,
+    };
 
     /// <summary>Creates a draft Operations request with one line item of <paramref name="unitPrice"/>, and returns its id.</summary>
     public static Task<Guid> CreateRequestAsync(HttpClient client, decimal unitPrice) =>

@@ -679,10 +679,15 @@ The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
 output goes to `artifacts/logs/e2e-purchasing.log`.
 
+The E2E server and worker run in the `Development` environment, because only
+Development lets a connector call an `http` URL. Their `PurchasingSystemUrl`
+and `PurchasingSystemToken` bindings point at the stub, so an approved
+purchase request creates its purchase order there.
+
 ### Purchasing system stub
 
 `tests/Axis.PurchasingStub` stands in for the external purchasing system that
-the purchase request sample's connector will call. It is a test fixture, not
+the purchase request sample's connector calls. It is a test fixture, not
 platform code, and references nothing under `src/`. The E2E run,
 `scripts/dev.sh` and Docker Compose start it. Its orders live in memory only.
 

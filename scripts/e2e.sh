@@ -10,7 +10,9 @@
 # worker exits without a restart request, or never finds the tenant database migrated.
 # The purchasing system stub from tests/Axis.PurchasingStub runs from the build output on
 # $AXIS_E2E_PURCHASING_PORT (default 5281). Specs find it at $AXIS_E2E_PURCHASING_URL. The run
-# fails if it never answers.
+# fails if it never answers. The server and the worker run in Development, because only
+# Development lets a connector call the stub over http. Their purchasing system bindings point at
+# the stub, so an approved purchase request creates its purchase order there.
 # A Compose smoke test then builds the image and runs the stack on free ports. It is skipped
 # when $NEXKIT_BASE_SHA shows that nothing it covers changed.
 set -euo pipefail
@@ -163,11 +165,17 @@ export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 # writes its pid to the pid file for the spec to stop. A worker stopped in the middle of a step
 # keeps its claim until the lease runs out, so the lease is 5 seconds instead of 30, and a restart
 # delays the other specs' work only briefly.
+# The worker runs in Development, as the server does, because only Development lets a connector
+# call the stub over http. It gets the same purchasing system bindings as the server.
 run_worker() {
   local child
   while true; do
-    DOTNET_ENVIRONMENT=Testing Tenants__default__Hosts__0=127.0.0.1 \
+    DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
       Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
+      Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
+      Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
+      Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
+      Tenants__default__Bindings__PurchasingSystemToken__Value=e2e-token \
       dotnet src/Axis.Worker/bin/Release/net10.0/Axis.Worker.dll >>"$AXIS_E2E_WORKER_LOG" 2>&1 &
     child=$!
     echo "$child" >"$AXIS_E2E_WORKER_PID_FILE"

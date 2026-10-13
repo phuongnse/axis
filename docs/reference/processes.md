@@ -75,7 +75,8 @@ threshold is a `rule` with no parameters, so it is configured, not hard-coded:
 
 The process submits the request and records when, asks the department
 manager, asks a finance reviewer at or above the threshold, and ends
-approved, returned or rejected:
+approved, returned or rejected. An approved request then gets its purchase
+order from the purchasing system, see [Connector calls](#connector-calls):
 
 ```json
 {
@@ -134,6 +135,16 @@ approved, returned or rejected:
       "type": "operation",
       "operation": "updateRecord",
       "set": { "status": "'approved'" },
+      "next": "createPurchaseOrder"
+    },
+    {
+      "name": "createPurchaseOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" },
+      "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount" },
+      "output": { "orderNumber": "purchaseOrderNumber" },
+      "retry": { "attempts": 5, "backoff": "PT30S" },
       "next": "done"
     },
     {
@@ -824,7 +835,7 @@ second purchase order.
 ### Step shape
 
 After approval, the purchase request process creates a purchase order.
-`markApproved` names the new step as its `next`:
+`markApproved` names the step as its `next`:
 
 ```json
 {
@@ -845,8 +856,6 @@ After approval, the purchase request process creates a purchase order.
   "next": "done"
 }
 ```
-
-The sample files do not change until the build issues add connectors.
 
 - `connector` names a connector and one of its operations.
 - `input` maps operation inputs to expressions. Each key is an input of the
