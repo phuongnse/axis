@@ -1,0 +1,23 @@
+{
+  "id": "bc241668-fe85-45a4-b7cf-d36da8d56b71",
+  "kind": "endpoint",
+  "name": "SubmitPurchaseRequest",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "process": "PurchaseRequestApproval",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    { "name": "supplier", "type": "reference", "target": "Supplier" },
+    { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"] },
+    { "name": "lineItems", "type": "child-collection", "target": "LineItem" }
+  ],
+  "values": {
+    "title": "title",
+    "department": "department",
+    "supplier": "supplier",
+    "currency": "currency",
+    "lineItems": "lineItems",
+    "status": "'draft'"
+  }
+}

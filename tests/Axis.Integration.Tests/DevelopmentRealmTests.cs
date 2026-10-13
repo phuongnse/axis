@@ -75,13 +75,36 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         var claims = payload.RootElement;
         Assert.Equal("purchasing-system", claims.GetProperty("sub").GetString());
         Assert.Equal("purchasing-system", claims.GetProperty("azp").GetString());
-        var audience = claims.GetProperty("aud");
-        var audiences = audience.ValueKind == JsonValueKind.Array
-            ? audience.EnumerateArray().Select(value => value.GetString()).ToList()
-            : [audience.GetString()];
-        Assert.Contains("axis-endpoints", audiences);
+        Assert.Contains("axis-endpoints", Audiences(claims));
         Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
         Assert.Equal(["purchasing-system"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+    }
+
+    // The E2E journeys use this token to call an endpoint as a realm user without the
+    // purchasing-system role. A token from the sign-in client lacks the endpoint audience.
+    [Fact]
+    public async Task Issues_a_user_a_password_token_for_the_endpoints_through_the_purchasing_system_client()
+    {
+        using var client = new HttpClient();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = KeycloakFixture.PurchasingClientId,
+            ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
+            ["username"] = "anna",
+            ["password"] = KeycloakFixture.Password,
+        });
+        using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
+
+        using var tokens = JsonDocument.Parse(body);
+        using var payload = DecodePayload(tokens.RootElement.GetProperty("access_token").GetString()!);
+        var claims = payload.RootElement;
+        Assert.Equal("anna", claims.GetProperty("sub").GetString());
+        Assert.Contains("axis-endpoints", Audiences(claims));
+        Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
+        Assert.Equal(["employee"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
     }
 
     // The password grant gets a token without a login page.
@@ -98,6 +121,15 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
             ["scope"] = "openid",
         });
         return await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
+    }
+
+    // Keycloak writes a single audience as a string and several as an array.
+    private static List<string?> Audiences(JsonElement claims)
+    {
+        var audience = claims.GetProperty("aud");
+        return audience.ValueKind == JsonValueKind.Array
+            ? audience.EnumerateArray().Select(value => value.GetString()).ToList()
+            : [audience.GetString()];
     }
 
     private static JsonDocument DecodePayload(string token) =>

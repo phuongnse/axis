@@ -439,6 +439,8 @@ systems.
   needs:
   - a confidential client `purchasing-system` with a service account, for
     the client credentials grant;
+  - the password grant on the `purchasing-system` client, so tests can get a
+    realm user's token with the endpoint audience;
   - the `axis` client role `purchasing-system`, held by that service account;
   - a roles mapper on the `purchasing-system` client that writes the `axis`
     client roles to the `roles` claim;
@@ -448,9 +450,9 @@ systems.
     the token's `sub` and so the caller id.
 
   The client secret is `purchasing-system-development-secret`, for
-  development only. Only `appsettings.Development.json` sets
-  `Oidc:EndpointAudience`. The E2E and Compose settings do not, so endpoint
-  calls there are a `401`.
+  development only. `appsettings.Development.json` and the E2E server set
+  `Oidc:EndpointAudience`. The Compose settings do not, so endpoint calls
+  under Compose are a `401`.
 
 ### Authorization
 
