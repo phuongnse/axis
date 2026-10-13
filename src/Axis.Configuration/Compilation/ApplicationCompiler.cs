@@ -20,7 +20,8 @@ namespace Axis.Configuration.Compilation;
 /// their steps call, checks policies, their
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
 /// lookups, checks events, their entities and their payload fields, checks endpoints, their
-/// entities, processes, input fields, mappings, output and wait, and resolves references
+/// entities, processes, input fields, mappings, output and wait, checks triggers, their
+/// processes, events and conditions, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash. Both inputs give the
 /// same result for the same resources.
@@ -208,6 +209,14 @@ public static class ApplicationCompiler
             loaded.UnloadedProcessNames,
             (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, report),
             diagnostics);
+        TriggerChecker.Check(
+            loaded.Triggers,
+            FindEntity,
+            FindProcess,
+            loaded.UnloadedProcessNames,
+            FindEvent,
+            loaded.UnloadedEventNames,
+            diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -232,6 +241,7 @@ public static class ApplicationCompiler
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
             Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
+            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEvent, FindProcess)).ToList(),
         };
         return result with
         {
