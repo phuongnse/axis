@@ -130,14 +130,14 @@ async function requestNumber(page: Page, id: string) {
 
 /**
  * Opens the request form until it shows a purchase order number, since the worker calls the
- * purchasing system after approval, and returns it.
+ * purchasing system after approval, and returns it. It waits up to `timeout` milliseconds.
  */
-async function expectPurchaseOrderNumber(page: Page, id: string) {
+async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_000) {
   const field = page.getByLabel('Purchase order number', { exact: true })
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
     await expect(field).not.toHaveValue('', { timeout: 1_000 })
-  }).toPass({ timeout: 30_000 })
+  }).toPass({ timeout })
   return field.inputValue()
 }
 
@@ -149,9 +149,12 @@ async function purchaseOrders(page: Page, number: string) {
   return orders.filter((order) => order.requestNumber === number)
 }
 
-/** Expects the request to show a purchase order number, and the stub to hold exactly that one order for it. */
-async function expectOnePurchaseOrder(page: Page, id: string) {
-  const orderNumber = await expectPurchaseOrderNumber(page, id)
+/**
+ * Expects the request to show a purchase order number within `timeout` milliseconds, and the stub to
+ * hold exactly that one order for it.
+ */
+async function expectOnePurchaseOrder(page: Page, id: string, timeout = 30_000) {
+  const orderNumber = await expectPurchaseOrderNumber(page, id, timeout)
   const number = await requestNumber(page, id)
   expect((await purchaseOrders(page, number)).map((order) => order.orderNumber)).toEqual([orderNumber])
 }
@@ -209,6 +212,24 @@ test('a request below the threshold is approved by the department manager from M
   await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
   await expectHistory(page, ['Chau Operations Manager'])
   await expectOnePurchaseOrder(page, id)
+})
+
+test('a request whose purchase order response is lost still gets exactly one purchase order', async ({ page }) => {
+  // The worker sends the call again only after the sample's 30 second backoff.
+  test.setTimeout(150_000)
+  await useSession(page, 'anna')
+  const { title, id } = await createRequest(page, 'Lost response', 500)
+  const number = await requestNumber(page, id)
+  // The stub stores the order for this request, then closes the connection without answering.
+  const drop = await page.request.post(`${env('AXIS_E2E_PURCHASING_URL')}/test/drop-request/${number}`)
+  expect(drop.status()).toBe(204)
+  await submit(page, id, title)
+
+  await useSession(page, 'chau')
+  await decide(page, title, 'Manager approval', 'Approve')
+
+  await expectStatus(page, id, 'approved')
+  await expectOnePurchaseOrder(page, id, 90_000)
 })
 
 test('a request at the threshold needs the finance reviewer after the manager before it is approved', async ({

@@ -12,7 +12,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The purchasing system stub over real HTTP: it honours the idempotency key, finds an order by
-/// key, and loses a response on request after it has stored the order.
+/// key, and loses or holds back a response on request after it has stored the order.
 /// </summary>
 public sealed class PurchasingStubTests : IAsyncLifetime
 {
@@ -93,6 +93,55 @@ public sealed class PurchasingStubTests : IAsyncLifetime
         using var retry = await CreateAsync("key-dropped", "PR-2026-00042");
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
         Assert.Equal(["key-other", "key-dropped"], (await ListAsync()).Select(o => o.GetProperty("idempotencyKey").GetString()));
+    }
+
+    [Fact]
+    public async Task Drop_by_request_number_loses_only_the_first_create_for_that_number()
+    {
+        using var drop = await _client.PostAsync("/test/drop-request/PR-2026-00042", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, drop.StatusCode);
+
+        using var other = await CreateAsync("key-other", "PR-2026-00041");
+        Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateAsync("key-dropped", "PR-2026-00042"));
+
+        using var retry = await CreateAsync("key-dropped", "PR-2026-00042");
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        using var another = await CreateAsync("key-another", "PR-2026-00042");
+        Assert.Equal(HttpStatusCode.Created, another.StatusCode);
+        Assert.Equal(["key-other", "key-dropped", "key-another"], (await ListAsync()).Select(o => o.GetProperty("idempotencyKey").GetString()));
+    }
+
+    [Fact]
+    public async Task Held_create_stores_the_order_and_answers_after_the_release()
+    {
+        using var hold = await _client.PostAsync("/test/hold-request/PR-2026-00042", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, hold.StatusCode);
+
+        var create = CreateAsync("key-held", "PR-2026-00042");
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while ((await ListAsync()).Count == 0)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The held create did not store its order within 10 seconds.");
+            await Task.Delay(TimeSpan.FromMilliseconds(20), CancellationToken);
+        }
+
+        var order = Assert.Single(await ListAsync());
+        Assert.Equal("key-held", order.GetProperty("idempotencyKey").GetString());
+        await Task.Delay(TimeSpan.FromMilliseconds(200), CancellationToken);
+        Assert.False(create.IsCompleted);
+
+        using var release = await _client.PostAsync("/test/release-request/PR-2026-00042", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, release.StatusCode);
+
+        using var created = await create;
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(order.GetProperty("orderNumber").GetString(), await OrderNumberAsync(created));
+
+        // The hold happens once, so the next create for the number answers at once.
+        using var repeat = await CreateAsync("key-held", "PR-2026-00042");
+        Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
     }
 
     [Theory]

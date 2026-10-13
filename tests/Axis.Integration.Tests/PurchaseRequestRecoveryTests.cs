@@ -77,7 +77,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
 
         // Only the approved request has a purchase order, and the stub holds exactly one for it.
         var (number, orderNumber) = await NumbersAsync(anna, subject);
-        var orders = await OrdersAsync(number);
+        var orders = await fixture.OrdersAsync(number);
         if (status == "approved")
         {
             Assert.NotNull(orderNumber);
@@ -189,29 +189,6 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
             ("instance", instance),
             ("action", action ?? ""),
             ("step", step ?? ""));
-
-    /// <summary>The request's number and purchase order number, read through the record API.</summary>
-    private static async Task<(string Number, string? PurchaseOrderNumber)> NumbersAsync(HttpClient client, Guid subject)
-    {
-        using var request = RecordApiFixture.Request(HttpMethod.Get, $"{Records}/{subject:D}", Host);
-        using var response = await client.SendAsync(request, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
-        var values = body.RootElement.GetProperty("values");
-        return (
-            values.GetProperty("number").GetString()!,
-            values.TryGetProperty("purchaseOrderNumber", out var order) ? order.GetString() : null);
-    }
-
-    /// <summary>The order numbers that the purchasing system stub holds for the request <paramref name="requestNumber"/>.</summary>
-    private async Task<IReadOnlyList<string?>> OrdersAsync(string requestNumber)
-    {
-        using var client = new HttpClient { BaseAddress = new Uri(fixture.PurchasingUrl) };
-        using var body = JsonDocument.Parse(await client.GetStringAsync("/purchase-orders", CancellationToken));
-        return [.. body.RootElement.EnumerateArray()
-            .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
-            .Select(order => order.GetProperty("orderNumber").GetString())];
-    }
 
     /// <summary>The request's status and version, read through the record API.</summary>
     private static async Task<(string? Status, long Version)> ReadAsync(HttpClient client, Guid subject)
