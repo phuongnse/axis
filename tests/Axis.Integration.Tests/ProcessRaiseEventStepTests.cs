@@ -34,11 +34,27 @@ public sealed class ProcessRaiseEventStepTests(ProcessStepFixture fixture) : ICl
         Assert.Equal(["ratio", "title"], payload.Select(entry => entry.Key).Order(StringComparer.Ordinal));
         Assert.Equal($"Request {subjectId:N}", payload["title"]!.GetValue<string>());
         Assert.Equal(125m, payload["ratio"]!.GetValue<decimal>());
+    }
 
-        // No delivery is queued yet, so the instance's last item is gone with the end step.
+    [Fact]
+    public async Task Raise_event_step_queues_one_delivery_of_its_occurrence_in_its_own_transaction()
+    {
+        var subjectId = await fixture.InsertRequestAsync(500m, 4);
+        var instanceId = await fixture.StartAsync("Announce", subjectId, fixture.FirstReleaseId);
+
+        // Only the raising step runs, so its delivery is still queued.
+        Assert.True(await fixture.RunNextStepAsync(CancellationToken));
+
+        var occurrence = Assert.Single(await EventsAsync(instanceId));
         Assert.Equal(
-            0L,
-            await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE process_instance_id = @id", ("id", instanceId)));
+            1L,
+            await fixture.CountAsync(
+                "SELECT count(*) FROM axis.process_work_items WHERE kind = @kind AND event_id = @id AND process_instance_id IS NULL",
+                ("kind", ProcessStarts.EventDeliverWorkItemKind),
+                ("id", occurrence.Id)));
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE event_id = @id", ("id", occurrence.Id)));
     }
 
     [Fact]

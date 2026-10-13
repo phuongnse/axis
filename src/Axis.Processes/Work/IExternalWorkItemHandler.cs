@@ -4,7 +4,8 @@ namespace Axis.Processes.Work;
 
 /// <summary>
 /// Runs the work items of one kind that call an external system, so no transaction may be open
-/// while they run. The tenant context is the item's tenant while it runs.
+/// while they run, or that commit in several transactions. The tenant context is the item's tenant
+/// while it runs.
 /// </summary>
 public interface IExternalWorkItemHandler
 {

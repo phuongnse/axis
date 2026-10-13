@@ -2,23 +2,28 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Audit;
 using Axis.Data.Records;
-using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Npgsql;
 
-namespace Axis.Server.Processes;
+namespace Axis.Processes.Instances;
 
 /// <summary>
-/// Starts a process instance on a subject record inside the caller's transaction, as both the
-/// process start endpoint and the endpoint call do. It checks the start condition against the
-/// record as stored, inserts the running instance pinned to <c>releaseId</c>, queues its first
-/// work item and appends the audit record <c>process.started</c>. It never commits or rolls back:
-/// the caller does, and rolls back on any result but <see cref="ProcessStartOutcome.Started"/>.
+/// Starts a process instance on a subject record inside the caller's transaction, as the process
+/// start endpoint, the endpoint call and an event trigger's delivery do. It checks the start
+/// condition against the record as stored, inserts the running instance pinned to
+/// <c>releaseId</c>, queues its first work item and appends the audit record
+/// <c>process.started</c>. The instance insert runs in a savepoint, so a start that finds the
+/// process already running leaves the transaction usable. It never commits or rolls back: the
+/// caller does, and decides whether a result other than <see cref="ProcessStartOutcome.Started"/>
+/// rolls back. A result other than <see cref="ProcessStartOutcome.Started"/> wrote nothing.
 /// </summary>
-internal static class ProcessStarter
+public static class ProcessStarter
 {
+    private const string StartSavepoint = "start";
+
     /// <param name="subject">The subject record as read in this transaction, or null to read it here.</param>
+    /// <param name="actorName">The actor's display name, or null for <c>system</c>.</param>
     /// <param name="details">More audit details, such as the endpoint's name, added after <c>processId</c> and <c>releaseId</c>.</param>
     public static async Task<ProcessStartResult> StartAsync(
         NpgsqlConnection connection,
@@ -32,7 +37,7 @@ internal static class ProcessStarter
         Record? subject,
         Guid instanceId,
         string actorId,
-        string actorName,
+        string? actorName,
         JsonObject? details,
         CancellationToken cancellationToken)
     {
@@ -47,7 +52,7 @@ internal static class ProcessStarter
             var result = await RecordExpressions.EvaluateAsync(connection, application, entity, record, condition.Expression, now, cancellationToken);
             if (result.Value is not true)
             {
-                return new ProcessStartResult(ProcessStartOutcome.ConditionFailed, condition.Message.TextKey);
+                return new ProcessStartResult(ProcessStartOutcome.ConditionFailed, condition.Message.TextKey, result.Error?.Message);
             }
         }
 
@@ -63,10 +68,17 @@ internal static class ProcessStarter
             Revision = 1,
             Step = process.Start,
         };
+
+        // A unique violation aborts the transaction, so the insert runs in a savepoint that the
+        // caller's transaction can roll back to.
+        await transaction.SaveAsync(StartSavepoint, cancellationToken);
         if (!await ProcessStarts.TryInsertInstanceAsync(transaction, instance, cancellationToken))
         {
+            await transaction.RollbackAsync(StartSavepoint, cancellationToken);
             return new ProcessStartResult(ProcessStartOutcome.AlreadyRunning);
         }
+
+        await transaction.ReleaseAsync(StartSavepoint, cancellationToken);
 
         await WorkItemQueue.EnqueueAsync(
             connection,
@@ -89,16 +101,10 @@ internal static class ProcessStarter
             cancellationToken);
         return new ProcessStartResult(ProcessStartOutcome.Started);
     }
-
-    /// <summary>The problem of a start that found an instance already running or waiting for the record.</summary>
-    public static IResult AlreadyRunning() =>
-        Results.Problem(
-            statusCode: StatusCodes.Status409Conflict,
-            title: "A running or waiting instance of this process already exists for this record.");
 }
 
 /// <summary>How a start inside the caller's transaction ended.</summary>
-internal enum ProcessStartOutcome
+public enum ProcessStartOutcome
 {
     /// <summary>The instance, its first work item and its audit record are written.</summary>
     Started,
@@ -110,5 +116,8 @@ internal enum ProcessStartOutcome
     AlreadyRunning,
 }
 
-/// <summary>The outcome of a start, with the start condition's message text key when it failed.</summary>
-internal sealed record ProcessStartResult(ProcessStartOutcome Outcome, string? TextKey = null);
+/// <summary>
+/// The outcome of a start, with the start condition's message text key when it failed, and the
+/// run-time error's message when the condition failed with one.
+/// </summary>
+public sealed record ProcessStartResult(ProcessStartOutcome Outcome, string? TextKey = null, string? Error = null);

@@ -11,9 +11,9 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Runs the current step of a process instance on the release the instance is pinned to. The step
 /// commits in the work item's transaction: an operation's record write, a task step's open human
-/// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence,
-/// the new instance state and revision, a step history row, its <c>system</c> audit records and
-/// the next work item. An event occurrence is delivered to no trigger yet. A task step leaves the
+/// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence
+/// and the <c>event.deliver</c> item that delivers it, the new instance state and revision, a step
+/// history row, its <c>system</c> audit records and the next work item. A task step leaves the
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
 /// inside the transaction. A step that finds the instance at another revision than it loaded writes
@@ -289,6 +289,17 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         if (occurrence is not null)
         {
             await ProcessEvents.InsertAsync(context.Transaction, occurrence, cancellationToken);
+
+            // The occurrence is delivered even when no trigger listens now, because the triggers
+            // come from the release that is active at delivery.
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.EventDeliverWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                eventId: occurrence.Id);
         }
 
         await ProcessSteps.InsertHistoryAsync(

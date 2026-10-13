@@ -17,6 +17,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that sends or reconciles one staged connector call.</summary>
     public const string ConnectorCallWorkItemKind = "connector.call";
 
+    /// <summary>The kind of the work item that delivers one event occurrence to the <c>async</c> event triggers of the active release.</summary>
+    public const string EventDeliverWorkItemKind = "event.deliver";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 
@@ -94,7 +97,8 @@ public static class ProcessStarts
     /// <summary>
     /// Inserts <paramref name="instance"/> as <c>running</c> at revision 1. Returns
     /// <see langword="false"/> when the process already has a running or waiting instance for the
-    /// subject record. The failed insert aborts the transaction, so the caller must roll back.
+    /// subject record. The failed insert aborts the transaction, so the caller must roll back,
+    /// either the transaction or to a savepoint taken before the insert.
     /// </summary>
     public static async Task<bool> TryInsertInstanceAsync(
         NpgsqlTransaction transaction,

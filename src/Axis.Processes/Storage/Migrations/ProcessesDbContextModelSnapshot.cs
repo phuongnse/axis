@@ -438,6 +438,41 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("process_tasks", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.TriggerStartRow", b =>
+                {
+                    b.Property<Guid>("TriggerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_id");
+
+                    b.Property<string>("Source")
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
+
+                    b.HasKey("TriggerId", "Source", "SubjectId")
+                        .HasName("pk_trigger_starts");
+
+                    b.ToTable("trigger_starts", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.WorkItemRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -455,6 +490,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<DateTimeOffset>("DueAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -482,6 +521,9 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasIndex("DueAt")
                         .HasDatabaseName("ix_process_work_items_due_at");
+
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_process_work_items_event_id");
 
                     b.HasIndex("ProcessInstanceId")
                         .HasDatabaseName("ix_process_work_items_process_instance_id");
@@ -536,6 +578,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasForeignKey("ConnectorCallId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id");
+
+                    b.HasOne("Axis.Processes.Storage.EventRow", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_process_work_items_events_event_id");
 
                     b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
                         .WithMany()

@@ -35,13 +35,24 @@ internal static class RecordClrValues
     /// </summary>
     public static bool TryFromStored(FieldModel field, JsonNode? node, out object? value)
     {
+        ArgumentNullException.ThrowIfNull(field);
+        return TryFromStored(field.Type, node, out value);
+    }
+
+    /// <summary>
+    /// Converts a stored value of <paramref name="type"/>, such as an event payload value, to the
+    /// CLR type the interpreter reads. Returns false for a decimal that <see cref="decimal"/>
+    /// cannot hold without rounding. A value that does not have the form of its type throws.
+    /// </summary>
+    public static bool TryFromStored(FieldType type, JsonNode? node, out object? value)
+    {
         value = null;
         if (node is null)
         {
             return true;
         }
 
-        switch (field.Type)
+        switch (type)
         {
             case FieldType.Text or FieldType.Enum:
                 value = node.GetValue<string>();
@@ -75,7 +86,7 @@ internal static class RecordClrValues
                 value = Guid.Parse(node.GetValue<string>());
                 return true;
             default:
-                throw new ArgumentOutOfRangeException(nameof(field), field.Type, "A field without a column has no stored value.");
+                throw new ArgumentOutOfRangeException(nameof(type), type, "A field without a column has no stored value.");
         }
     }
 

@@ -4,6 +4,7 @@ namespace Axis.Processes.Work;
 /// <param name="ClaimToken">Identifies this claim. Completing the item checks that it is still current.</param>
 /// <param name="ProcessInstanceId">The process instance the item runs a step of, or <see langword="null"/> for other work.</param>
 /// <param name="ConnectorCallId">The connector call a <c>connector.call</c> item sends, or <see langword="null"/> for other work.</param>
+/// <param name="EventId">The event occurrence an <c>event.deliver</c> item delivers, or <see langword="null"/> for other work.</param>
 /// <param name="Lease">The length the item was claimed for.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
@@ -13,4 +14,5 @@ public sealed record ClaimedWorkItem(
     DateTimeOffset LeaseExpiresAt,
     Guid? ProcessInstanceId,
     Guid? ConnectorCallId,
+    Guid? EventId,
     TimeSpan Lease);
