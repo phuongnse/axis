@@ -7,8 +7,8 @@ namespace Axis.Processes;
 public static class ProcessesServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the work item runner, the handler that runs process steps and the handler that
-    /// sends connector calls. The runner runs the registered <see cref="IWorkItemHandler"/> and
+    /// Registers the work item runner, the handler that runs process steps, the handler that sends
+    /// connector calls and the handler that delivers raised events to their triggers. The runner runs the registered <see cref="IWorkItemHandler"/> and
     /// <see cref="IExternalWorkItemHandler"/> services and needs the tenancy services.
     /// </summary>
     /// <param name="allowHttpConnectorUrls">
@@ -23,6 +23,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton<ConnectorClient>();
         services.AddSingleton<IExternalWorkItemHandler, ConnectorCallHandler>();
+        services.AddSingleton<IExternalWorkItemHandler, EventDeliveryHandler>();
         return services;
     }
 }

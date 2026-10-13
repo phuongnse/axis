@@ -25,10 +25,10 @@ flowchart LR
   endpoints require a session.
 - **Axis.Worker** executes durable work. So far it runs work items, and
   through them the `decision`, `task`, `operation` and `end` steps of process
-  instances. Wait for event, timer and sub-process steps come later.
-  *(planned for M5)* It will deliver events to async event triggers, and run
-  schedule triggers and their fan-out, see
+  instances. Wait for event, timer and sub-process steps come later. It
+  delivers raised events to async event triggers, see
   [events and triggers](reference/processes.md#events-and-triggers).
+  *(planned for M5)* It will run schedule triggers and their fan-out.
   It loads the installed extension packages at startup, as the server does.
   *(planned for M5)* It will run their operations, see
   [extension packages](reference/extension-packages.md).

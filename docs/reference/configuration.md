@@ -1113,9 +1113,10 @@ and its [compile checks](#configuration-pipeline) are built: an event file
 loads, is checked and is part of the release. A
 [raise event step](processes.md#raise-event-step) raises it. The event
 `trigger` resource and its compile checks are built too: an event trigger file
-loads, is checked and is part of the release. *(planned for M5)* Delivering raised events to
-triggers, `sync` mode, data change triggers and schedule triggers are not
-built yet, so a trigger starts nothing. An `event` resource names something that happened to one record. A
+loads, is checked and is part of the release. The worker delivers each raised event to the
+`async` event triggers of the active release, see
+[Event delivery](processes.md#event-delivery). *(planned for M5)* `sync` mode, data change
+triggers and schedule triggers are not built yet. An `event` resource names something that happened to one record. A
 `trigger` resource starts a process for one record when something happens:
 an event is raised, a record is created or updated, or a schedule is due. How
 a trigger starts a process, and when it skips the start, is in

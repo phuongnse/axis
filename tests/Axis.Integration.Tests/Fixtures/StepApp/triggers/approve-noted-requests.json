@@ -1,0 +1,11 @@
+{
+  "id": "f74ff111-86f9-40b9-a507-e4725bc2bac4",
+  "kind": "trigger",
+  "name": "ApproveNotedRequests",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "RequestNoted",
+  "when": "ratio >= 100",
+  "mode": "async",
+  "process": "RoleApprove"
+}

@@ -199,7 +199,7 @@ internal static class InboundEndpoints
             await transaction.RollbackAsync(cancellationToken);
             return started.Outcome == ProcessStartOutcome.ConditionFailed
                 ? Results.ValidationProblem(new Dictionary<string, string[]> { [InputPointer] = [started.TextKey!] })
-                : ProcessStarter.AlreadyRunning();
+                : ProcessStartEndpoints.AlreadyRunning();
         }
 
         await transaction.CommitAsync(cancellationToken);

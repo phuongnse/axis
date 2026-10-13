@@ -1224,9 +1224,9 @@ This section follows
 built. So is the `raiseEvent` step, which stores each occurrence, see
 [Raise event step](#raise-event-step). The event
 [trigger resource](configuration.md#trigger-resource) and its compile checks
-are built too. *(planned for M5)* Delivering an occurrence to triggers is not
-built yet, nor are `sync` mode, data change triggers and schedule triggers.
-Until then, a raised event starts nothing. A `raiseEvent` step raises an
+are built too, and so is the delivery of each occurrence to the `async` event
+triggers, see [Event delivery](#event-delivery). *(planned for M5)* `sync`
+mode, data change triggers and schedule triggers are not built yet. A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a
@@ -1297,9 +1297,8 @@ event's declaration order.
    none, so a step run again after a lost lease stores one occurrence.
 3. *(planned for M5)* It runs the start of each `sync` event trigger for the
    event, see [Starts from triggers](#starts-from-triggers).
-4. *(planned for M5)* It queues one `event.deliver` work item for the
-   occurrence, even when no `async` trigger listens yet. See
-   [Event delivery](#event-delivery).
+4. It queues one `event.deliver` work item for the occurrence, even when no
+   `async` trigger listens yet. See [Event delivery](#event-delivery).
 5. It writes the step's history row, with output `{ "next", "eventId" }`.
 6. It writes `process.stepCompleted`, as other operations do. Raising an
    event writes no audit record of its own.
@@ -1359,20 +1358,31 @@ start would be skipped, because `NoteClose` already runs for the note.
 An `event.deliver` work item delivers one occurrence to the `async` event
 triggers of the active release:
 
-1. The worker reads the triggers for the event's name. With none, the item is
+1. The worker reads the triggers for the event's name, ignoring letter case.
+   With none, or when the application has no active release, the item is
    deleted with no other write.
 2. For each trigger, one transaction does this:
-   1. It inserts a receipt into `axis.trigger_starts`, keyed by the trigger,
-      the event id and the subject record. When that key is taken, the
-      trigger already handled the occurrence and is skipped.
-   2. It evaluates the trigger's `when` on the stored payload, then runs the
-      [start](#starts-from-triggers).
-   3. It records on the receipt whether the start happened or was skipped.
+   1. It checks the item's claim and extends its lease.
+   2. It inserts a receipt into `axis.trigger_starts`, keyed by the trigger,
+      the event id and the subject record, with the outcome `skipped`. When
+      that key is taken, the trigger already handled the occurrence and is
+      skipped.
+   3. It evaluates the trigger's `when` on the stored payload, then runs the
+      [start](#starts-from-triggers). The payload is read with the field types
+      of the event in the active release. A value that no longer fits its
+      type counts as a run-time error.
+   4. It sets the receipt's outcome to `started`, with the instance, when the
+      start happened.
 3. The item is deleted.
 
 A worker that crashes before a commit leaves no receipt for that trigger. The
 next worker claims the item after its lease expires and runs it once. The
-receipts of the triggers that committed make it skip them.
+receipts of the triggers that committed make it skip them, even when the
+instance they started has already ended.
+
+A transaction that fails for another reason leaves the item claimed until its
+lease expires, and the delivery is then tried again. There is no limit on
+these retries yet.
 
 ### Schedules
 
@@ -1474,10 +1484,10 @@ database, with history in `axis.__processes_migrations` (see
   item sends or reconciles one connector call. It has the
   `process_instance_id` of the call's instance and the `connector_call_id` of
   the call. See [Connector calls](#connector-calls). The item's `due_at`
-  gives the backoff.
-  *(planned for M5)* Three more kinds come with [events and triggers](#events-and-triggers):
-  - `event.deliver` delivers one event occurrence to the `async` event
-    triggers. Its item also has the `event_id` of the occurrence.
+  gives the backoff. An `event.deliver` item delivers one event occurrence to
+  the `async` event triggers, see [Event delivery](#event-delivery). It has
+  the `event_id` of the occurrence.
+  *(planned for M5)* Two more kinds come with [events and triggers](#events-and-triggers):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
     also has the `trigger_id`, and its `due_at` is the next occurrence.
   - `trigger.fanOut` starts the process for the records of one occurrence.
@@ -1559,9 +1569,10 @@ database, with history in `axis.__processes_migrations` (see
   | `release_id` | `uuid` | The release that wrote the state |
   | `next_occurrence_at` | `timestamptz` | The next occurrence |
   | `last_occurrence_at` | `timestamptz`, null | The last occurrence that ran. Null before the first |
-- `axis.trigger_starts` *(planned for M5)*: one receipt per trigger, cause and
-  record, see [Starts from triggers](#starts-from-triggers). A unique index on
+- `axis.trigger_starts`: one receipt per trigger, cause and record, see
+  [Starts from triggers](#starts-from-triggers). Its primary key on
   (`trigger_id`, `source`, `subject_id`) makes each start happen at most once.
+  Event delivery writes it. Schedule triggers will write it too.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

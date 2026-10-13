@@ -6,7 +6,7 @@ namespace Axis.Processes.Storage;
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
 /// their steps, their human tasks, their staged connector calls, the events they raised, the receipts of starts and of
-/// endpoint calls that carried an <c>Idempotency-Key</c>, and the work that workers claim and run. The caller supplies the connection to the tenant database.
+/// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
 {
@@ -31,6 +31,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
     public DbSet<EndpointReceiptRow> EndpointReceipts => Set<EndpointReceiptRow>();
+
+    public DbSet<TriggerStartRow> TriggerStarts => Set<TriggerStartRow>();
 
     public DbSet<WorkItemRow> WorkItems => Set<WorkItemRow>();
 
@@ -198,6 +200,20 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             receipt.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         });
 
+        modelBuilder.Entity<TriggerStartRow>(start =>
+        {
+            start.ToTable("trigger_starts");
+
+            // One start per trigger, cause and record.
+            start.HasKey(s => new { s.TriggerId, s.Source, s.SubjectId }).HasName("pk_trigger_starts");
+            start.Property(s => s.TriggerId).HasColumnName("trigger_id");
+            start.Property(s => s.Source).HasColumnName("source");
+            start.Property(s => s.SubjectId).HasColumnName("subject_id");
+            start.Property(s => s.Outcome).HasColumnName("outcome");
+            start.Property(s => s.ProcessInstanceId).HasColumnName("process_instance_id");
+            start.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+        });
+
         modelBuilder.Entity<WorkItemRow>(item =>
         {
             item.ToTable("process_work_items");
@@ -210,9 +226,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ClaimToken).HasColumnName("claim_token");
             item.Property(i => i.ProcessInstanceId).HasColumnName("process_instance_id");
             item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
+            item.Property(i => i.EventId).HasColumnName("event_id");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");
+            item.HasIndex(i => i.EventId).HasDatabaseName("ix_process_work_items_event_id");
             item.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(i => i.ProcessInstanceId)
@@ -222,6 +240,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .WithMany()
                 .HasForeignKey(i => i.ConnectorCallId)
                 .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            item.HasOne<EventRow>()
+                .WithMany()
+                .HasForeignKey(i => i.EventId)
+                .HasConstraintName("fk_process_work_items_events_event_id")
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
