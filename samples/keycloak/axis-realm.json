@@ -71,7 +71,7 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "purchasing-system-development-secret",
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": true,
       "protocolMappers": [

@@ -56,6 +56,7 @@
     "task.reject": "Reject",
     "role.employee": "Employee",
     "role.departmentManager": "Department manager",
-    "role.financeReviewer": "Finance reviewer"
+    "role.financeReviewer": "Finance reviewer",
+    "role.purchasingSystem": "Purchasing system"
   }
 }

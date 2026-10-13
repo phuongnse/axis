@@ -64,6 +64,8 @@ export default defineConfig({
       Tenants__default__Oidc__Authority: `${keycloakUrl}/realms/axis`,
       Tenants__default__Oidc__ClientId: 'axis',
       Tenants__default__Oidc__ClientSecret: 'axis-development-secret',
+      // Endpoint calls need a token for this audience, as in appsettings.Development.json.
+      Tenants__default__Oidc__EndpointAudience: 'axis-endpoints',
       // The purchase request sample activates only with its purchasing system bindings. The stub
       // ignores the token. The worker gets the same bindings from scripts/e2e.sh.
       Tenants__default__Bindings__PurchasingSystemUrl__Kind: 'url',

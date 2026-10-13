@@ -1266,7 +1266,7 @@ signs in is in [Machine callers](../architecture.md#machine-callers).
 ### Endpoint resource
 
 The resource and its compile checks are built. The purchase request sample
-will hold an endpoint that
+holds an endpoint that
 lets the purchasing system submit a purchase request, in
 `endpoints/submit-purchase-request.json`:
 
@@ -1362,8 +1362,8 @@ a note, closes it and returns its status, in
 
 When the worker runs the `close` step within 10 seconds, the call answers
 `201` with `code` and `status`. Otherwise it answers `202` with a status
-location. The sample files, the E2E fixture files and the Keycloak realm do
-not hold these endpoints yet. Later build issues add them.
+location. The purchase request sample holds `SubmitPurchaseRequest`. The E2E
+fixture application does not hold `ImportClosedNote`.
 
 A [data change trigger](#trigger-resource) on `create` of the same entity
 that starts the same process would start it inside the endpoint's record
@@ -1598,7 +1598,7 @@ A policy also grants inbound [endpoints](#endpoint-resource). The target is
 `filter` or `fields`. The grant, its compile checks and its enforcement are
 built. Holding it is enough to call the endpoint: the record create and the
 process start inside the call need no `entity` or `process` grant of the
-caller. The purchase request sample will give the purchasing system this policy, in
+caller. The purchase request sample gives the purchasing system this policy, in
 `policies/purchasing-system-access.json`:
 
 ```json
@@ -1626,8 +1626,7 @@ Its role, in `roles/purchasing-system.json`:
 
 The caller holds the role through the roles claim of its token, as a user
 does. See [Machine callers](../architecture.md#machine-callers). The sample
-gains this policy and role when it gains the `SubmitPurchaseRequest`
-endpoint, in a later build issue.
+holds this policy and role with its `SubmitPurchaseRequest` endpoint.
 
 Compile checks, each a compile error:
 

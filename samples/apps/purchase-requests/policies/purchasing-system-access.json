@@ -1,0 +1,8 @@
+{
+  "id": "1a742db5-543d-4e8d-8c66-61bf42a1b93b",
+  "kind": "policy",
+  "name": "PurchasingSystemAccess",
+  "formatVersion": 1,
+  "roles": ["purchasing-system"],
+  "grants": [{ "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
+}
