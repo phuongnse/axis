@@ -709,7 +709,19 @@ platform code, and references nothing under `src/`. The E2E run,
   without answering. Each drop happens once, so the retry gets the stored order
   back, as in the [lost response](reference/processes.md#lost-response) flow.
   `drop-next` affects the whole stub, so specs that run in parallel should drop
-  by key.
+  by key or by request number.
+- `POST /test/drop-request/{requestNumber}` drops the response of the first
+  create for that `requestNumber`, such as `PR-2026-00042`. A spec knows the
+  request number as soon as it creates the request, but not the idempotency
+  key, which only the worker knows. Specs that run in parallel can use it,
+  since each request has its own number.
+- `POST /test/hold-request/{requestNumber}` holds back the response of the
+  first create for that `requestNumber`. The held create stores its order
+  first, then answers only when
+  `POST /test/release-request/{requestNumber}` is called or the caller hangs
+  up. Tests use it to stop or overtake a worker while its call is still
+  running.
+- Each drop and each hold happens once. The three test endpoints answer `204`.
 - `GET /health` answers `200`.
 
 The stub ignores the `Authorization` header.

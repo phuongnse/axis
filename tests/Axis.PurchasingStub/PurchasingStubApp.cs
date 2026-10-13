@@ -2,8 +2,8 @@ namespace Axis.PurchasingStub;
 
 /// <summary>
 /// A stand-in for the purchasing system that the purchase request sample's connector calls. It
-/// creates purchase orders under an idempotency key, finds them by key, and can lose a response
-/// on purpose after it has stored the order. Orders live in memory only.
+/// creates purchase orders under an idempotency key, finds them by key, and can lose or hold back a
+/// response on purpose after it has stored the order. Orders live in memory only.
 /// </summary>
 public static class PurchasingStubApp
 {
@@ -18,7 +18,7 @@ public static class PurchasingStubApp
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-        app.MapPost("/purchase-orders", (HttpContext context, CreatePurchaseOrder? body, PurchaseOrderStore store) =>
+        app.MapPost("/purchase-orders", async (HttpContext context, CreatePurchaseOrder? body, PurchaseOrderStore store) =>
         {
             var key = context.Request.Headers[IdempotencyHeader].ToString();
             if (string.IsNullOrWhiteSpace(key))
@@ -30,7 +30,20 @@ public static class PurchasingStubApp
                 return Results.Problem("requestNumber and amount are required.", statusCode: StatusCodes.Status400BadRequest);
             }
 
-            var (order, created, drop) = store.Create(key, body.RequestNumber, body.SupplierCode, body.Amount.Value);
+            var (order, created, drop, hold) = store.Create(key, body.RequestNumber, body.SupplierCode, body.Amount.Value);
+            if (hold is not null)
+            {
+                // The order is stored. The caller waits until a test releases the response, or hangs up.
+                try
+                {
+                    await hold.WaitAsync(context.RequestAborted);
+                }
+                catch (OperationCanceledException)
+                {
+                    return Results.Empty;
+                }
+            }
+
             if (drop)
             {
                 // The order is stored. Closing the connection loses the response, as a network
@@ -57,6 +70,24 @@ public static class PurchasingStubApp
         app.MapPost("/test/drop/{idempotencyKey}", (string idempotencyKey, PurchaseOrderStore store) =>
         {
             store.DropKey(idempotencyKey);
+            return Results.NoContent();
+        });
+
+        app.MapPost("/test/drop-request/{requestNumber}", (string requestNumber, PurchaseOrderStore store) =>
+        {
+            store.DropRequest(requestNumber);
+            return Results.NoContent();
+        });
+
+        app.MapPost("/test/hold-request/{requestNumber}", (string requestNumber, PurchaseOrderStore store) =>
+        {
+            store.HoldRequest(requestNumber);
+            return Results.NoContent();
+        });
+
+        app.MapPost("/test/release-request/{requestNumber}", (string requestNumber, PurchaseOrderStore store) =>
+        {
+            store.Release(requestNumber);
             return Results.NoContent();
         });
 

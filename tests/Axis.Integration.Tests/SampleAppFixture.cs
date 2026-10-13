@@ -221,6 +221,29 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public static Task<HttpResponseMessage> CompleteAsync(HttpClient client, Guid taskId, string body) =>
         SendAsync(client, HttpMethod.Post, $"{App}/tasks/{taskId:D}/complete", body);
 
+    /// <summary>The request's number and purchase order number, read through the record API.</summary>
+    public static async Task<(string Number, string? PurchaseOrderNumber)> NumbersAsync(HttpClient client, Guid subject)
+    {
+        using var request = RecordApiFixture.Request(HttpMethod.Get, $"{App}/entities/PurchaseRequest/records/{subject:D}", Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var values = body.RootElement.GetProperty("values");
+        return (
+            values.GetProperty("number").GetString()!,
+            values.TryGetProperty("purchaseOrderNumber", out var order) ? order.GetString() : null);
+    }
+
+    /// <summary>The order numbers that the purchasing system stub holds for the request <paramref name="requestNumber"/>.</summary>
+    public async Task<IReadOnlyList<string?>> OrdersAsync(string requestNumber)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(PurchasingUrl) };
+        using var body = JsonDocument.Parse(await client.GetStringAsync("/purchase-orders", CancellationToken));
+        return [.. body.RootElement.EnumerateArray()
+            .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
+            .Select(order => order.GetProperty("orderNumber").GetString())];
+    }
+
     /// <summary>Runs <paramref name="sql"/> on the tenant database, a <c>SELECT count(*)</c>, with the named parameters.</summary>
     public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters) =>
         (long)(await ScalarAsync(sql, parameters))!;
