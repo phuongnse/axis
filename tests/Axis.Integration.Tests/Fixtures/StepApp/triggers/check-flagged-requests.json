@@ -1,0 +1,10 @@
+{
+  "id": "ddf9a974-b699-4768-b350-25a3214eb4ff",
+  "kind": "trigger",
+  "name": "CheckFlaggedRequests",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "RequestFlagged",
+  "mode": "async",
+  "process": "Review"
+}

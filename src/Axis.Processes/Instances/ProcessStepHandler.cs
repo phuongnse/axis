@@ -11,14 +11,17 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Runs the current step of a process instance on the release the instance is pinned to. The step
 /// commits in the work item's transaction: an operation's record write, a task step's open human
-/// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence
-/// and the <c>event.deliver</c> item that delivers it, the new instance state and revision, a step
+/// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence,
+/// the instances its <c>sync</c> event triggers start and the <c>event.deliver</c> item that
+/// delivers it to its <c>async</c> triggers, the new instance state and revision, a step
 /// history row, its <c>system</c> audit records and the next work item. A task step leaves the
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
-/// inside the transaction. A step that finds the instance at another revision than it loaded writes
-/// nothing. A step that throws is rolled back, and the failure callback then records the error in
-/// the history and marks the instance <c>failed</c>.
+/// inside the transaction. A <c>sync</c> trigger comes from the application's active release, and
+/// its start runs as <c>system</c>, pinned to that release. A skipped <c>sync</c> start is logged
+/// and lets the step commit. A step that finds the instance at another revision than it loaded
+/// writes nothing. A step that throws is rolled back, and the failure callback then records the
+/// error in the history and marks the instance <c>failed</c>.
 /// </summary>
 internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
@@ -289,9 +292,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         if (occurrence is not null)
         {
             await ProcessEvents.InsertAsync(context.Transaction, occurrence, cancellationToken);
+            await StartSyncTriggersAsync(context, occurrence, cancellationToken);
 
-            // The occurrence is delivered even when no trigger listens now, because the triggers
-            // come from the release that is active at delivery.
+            // The occurrence is delivered even when no async trigger listens now, because the
+            // triggers come from the release that is active at delivery.
             await WorkItemQueue.EnqueueAsync(
                 context.Connection,
                 context.Transaction,
@@ -338,6 +342,32 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 cancellationToken,
                 processInstanceId: instance.Id,
                 connectorCallId: call.Id);
+        }
+    }
+
+    /// <summary>
+    /// Starts the process of each <c>sync</c> trigger on the occurrence's event in the active release,
+    /// in model order, in the step's transaction. A skipped start is logged and lets the step commit.
+    /// Any other error throws, so the step rolls back with its event.
+    /// </summary>
+    private async Task StartSyncTriggersAsync(WorkItemContext context, NewEvent occurrence, CancellationToken cancellationToken)
+    {
+        var found = await EventTriggerStarts.FindAsync(
+            context, models, occurrence.ApplicationId, occurrence.Event, TriggerMode.Sync, cancellationToken);
+        if (found is not { Event: { } @event, Triggers: { Count: > 0 } triggers })
+        {
+            return;
+        }
+
+        var stored = new StoredEvent(occurrence.Id, occurrence.ApplicationId, occurrence.Event, occurrence.EntityId, occurrence.SubjectId, occurrence.Payload);
+        foreach (var trigger in triggers)
+        {
+            var (_, skipped) = await EventTriggerStarts.StartAsync(
+                context.Transaction, context.Item.TenantId, found.Model, found.ReleaseId, @event, stored, trigger, cancellationToken);
+            if (skipped is not null)
+            {
+                LogSyncSkipped(trigger.Name, trigger.Process.Name, occurrence.SubjectId, occurrence.Id, skipped);
+            }
         }
     }
 
@@ -549,6 +579,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
 
     private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, Exception? innerException = null) =>
         new(message, instance.Step, instance.Revision, instance.Now, input, innerException);
+
+    [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of event {EventId}: {Reason}.")]
+    private partial void LogSyncSkipped(string trigger, string process, Guid subjectId, Guid eventId, string reason);
 
     [LoggerMessage(LogLevel.Warning, "Step work item {ItemId} names no process instance, so it was discarded.")]
     private partial void LogNoInstance(Guid itemId);

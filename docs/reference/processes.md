@@ -1225,8 +1225,10 @@ built. So is the `raiseEvent` step, which stores each occurrence, see
 [Raise event step](#raise-event-step). The event
 [trigger resource](configuration.md#trigger-resource) and its compile checks
 are built too, and so is the delivery of each occurrence to the `async` event
-triggers, see [Event delivery](#event-delivery). *(planned for M5)* `sync`
-mode, data change triggers and schedule triggers are not built yet. A `raiseEvent` step raises an
+triggers, see [Event delivery](#event-delivery). So is the start of each `sync`
+event trigger in the transaction of the `raiseEvent` step, see
+[Raise event step](#raise-event-step). *(planned for M5)* Data change triggers
+and schedule triggers are not built yet. A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a
@@ -1295,8 +1297,16 @@ event's declaration order.
    even when no trigger listens, so a later wait for event step can match
    early events. A step that finds the instance at another revision stores
    none, so a step run again after a lost lease stores one occurrence.
-3. *(planned for M5)* It runs the start of each `sync` event trigger for the
-   event, see [Starts from triggers](#starts-from-triggers).
+3. It runs the start of each `sync` event trigger for the event, in the
+   order of the release's triggers, see
+   [Starts from triggers](#starts-from-triggers). The triggers come from the
+   application's active release, not from the release the instance is pinned
+   to, and each new instance is pinned to the active release. With no active
+   release, or when it does not declare the event, no `sync` trigger runs. A
+   skipped start lets the step commit. Any other start error fails the step,
+   so the occurrence, the new instances and the step's other writes roll back.
+   A `sync` start writes no receipt to `axis.trigger_starts`, because the
+   step's revision check already raises the event once.
 4. It queues one `event.deliver` work item for the occurrence, even when no
    `async` trigger listens yet. See [Event delivery](#event-delivery).
 5. It writes the step's history row, with output `{ "next", "eventId" }`.
@@ -1328,7 +1338,9 @@ user whose write fired a trigger needs no `start` grant.
 
 A trigger's `when` is evaluated before these steps. A `false`, a `null` or a
 run-time error there skips the start too. A skip never fails the write or
-the step that fired the trigger, which still commits.
+the step that fired the trigger, which still commits. For a `sync` event
+trigger, any other error in the start fails the `raiseEvent` step, which rolls
+back with its event, and the raising instance becomes `failed`.
 
 Every skip is logged at Information level with the trigger, the record and
 the reason. A run-time error is logged with its message. A skip is never
@@ -1341,7 +1353,7 @@ raised.
 | Trigger | Start commits in | Skipped when |
 | --- | --- | --- |
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
-| Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Data change | The write's transaction: a record API create or update, a task form save, an `updateRecord` step, or a connector output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
 | Schedule | The transaction of the fan-out batch that holds the record | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 

@@ -360,7 +360,7 @@ flowchart LR
      [expression diagnostic](expressions.md#diagnostics) code. `when` is not
      checked when the event is unknown. A name whose process or event file was
      not loaded because of its own errors is not reported again. For now a
-     `type` other than `event`, a `mode` other than `async`, and a property
+     `type` other than `event`, a `mode` other than `async` or `sync`, and a property
      that belongs to another trigger type are `AXC0004`.
 
    The model holds the text resources, each entity's display field, each
@@ -1115,7 +1115,9 @@ loads, is checked and is part of the release. A
 `trigger` resource and its compile checks are built too: an event trigger file
 loads, is checked and is part of the release. The worker delivers each raised event to the
 `async` event triggers of the active release, see
-[Event delivery](processes.md#event-delivery). *(planned for M5)* `sync` mode, data change
+[Event delivery](processes.md#event-delivery). A `raiseEvent` step starts the processes of the
+`sync` event triggers in its own transaction, see
+[Raise event step](processes.md#raise-event-step). *(planned for M5)* Data change
 triggers and schedule triggers are not built yet. An `event` resource names something that happened to one record. A
 `trigger` resource starts a process for one record when something happens:
 an event is raised, a record is created or updated, or a schedule is due. How
@@ -1258,10 +1260,10 @@ built, with the codes in the [pipeline](#configuration-pipeline): an unknown
 `process` is `AXC0129`, an unknown `event` is `AXC0130`, an event about
 another entity than the process's subject is `AXC0131`, and a `when` problem
 has its expression code at `/when`. For now the schema accepts only
-`"type": "event"` and `"mode": "async"`, so `dataChange`, `schedule`, `sync`
-and the properties of other types are `AXC0004`. *(planned for M5)* The other
-checks, and their codes, come with the build issues of their trigger types and
-of `sync`.
+`"type": "event"`, with `"mode": "async"` or `"mode": "sync"`, so `dataChange`,
+`schedule`, any other `mode` and the properties of other types are `AXC0004`.
+*(planned for M5)* The other checks, and their codes, come with the build issues
+of their trigger types.
 
 - The `process` exists.
 - The subject entity matches. The event's entity, the `entity`, or the data
