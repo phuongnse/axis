@@ -1,0 +1,13 @@
+{
+  "id": "90fbfeff-ab83-46ef-a891-3bca7cc19156",
+  "kind": "process",
+  "name": "Review",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "startCondition": {
+    "expression": "status is null or status != 'closed'",
+    "message": { "textKey": "ticket.cannotStart" }
+  },
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

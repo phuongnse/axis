@@ -1,0 +1,10 @@
+{
+  "id": "05183073-d0d2-42eb-96ee-395760b998c6",
+  "kind": "trigger",
+  "name": "ReviewNewTickets",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Ticket",
+  "on": ["create"],
+  "process": "Review"
+}

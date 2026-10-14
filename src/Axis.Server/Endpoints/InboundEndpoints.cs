@@ -27,7 +27,8 @@ namespace Axis.Server.Endpoints;
 /// endpoint's input fields (400 keyed <c>/input/…</c>), and <c>Idempotency-Key</c> (400). One
 /// transaction then claims the key's receipt, unique per endpoint and caller, and creates the record
 /// from the mapped values through the record create command, with the caller's id in its creator
-/// fields, and starts the endpoint's process on it as the process start does. A refused value, a
+/// fields, starts the processes of the data change triggers on the entity's create as <c>system</c>,
+/// and starts the endpoint's process on it as the process start does. A refused value, a
 /// failed validation and a missing reference are a 400 keyed <c>/values/…</c>, and a failed start
 /// condition a 400 keyed <c>/input</c>. Both audit records name the caller as the actor and the
 /// endpoint in their details. A call that fails writes nothing. The entity and process grants of
@@ -67,6 +68,7 @@ internal static class InboundEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await FindCallerAsync(request) is not { } caller)
@@ -177,6 +179,19 @@ internal static class InboundEndpoints
                 ProcessInstanceId: null,
                 new JsonObject { ["version"] = record.Version, ["endpoint"] = endpoint.Name },
                 caller.DisplayName),
+            cancellationToken);
+
+        // The data change triggers of the create fire before the endpoint's own start, as system.
+        await DataChangeTriggerStarts.StartAsync(
+            transaction,
+            tenantId,
+            application,
+            active.ReleaseId,
+            entity,
+            DataChangeKinds.Create,
+            record,
+            changedFields: null,
+            loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
 
         var started = await ProcessStarter.StartAsync(
