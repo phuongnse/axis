@@ -21,8 +21,6 @@ custom code out of configuration is in
 
 ## What a package is
 
-*(planned for M5)*
-
 - **Custom C# code.** A package holds logic that does not fit expressions,
   such as file parsing or a complex calculation. It adds typed operations
   that a process step calls.
@@ -32,8 +30,8 @@ custom code out of configuration is in
   assembly described in [Contracts](#contracts).
 - **Build artifact.** Its build gives a folder with the package's assemblies
   and a manifest, `axis-package.json`.
-- **No data access.** A package cannot read or write entities in M5. Data
-  access comes later.
+- **No data access.** A package cannot read or write entities. Data access
+  comes later.
 - **No UI.** React components in packages come later
   ([D8](../decisions.md#d8-custom-ui-widgets-are-packaged-react-components--agreed-deferred)).
 
@@ -181,8 +179,10 @@ public class RetryableException : Exception { }
   release against the manifests of its installed packages, so a release with
   a package operation step cannot be rebuilt on a host that lacks its pinned
   version. The content hash covers the pins and not the manifest contents.
-- **Pinned version missing at activation.** *(planned for M5)* Activating a
-  release whose pinned version is not installed fails with a diagnostic.
+- **Pinned version missing at activation.** Activation compiles the folder
+  against the versions that loaded, so the pin it activates is always
+  installed. *(planned for M6)* Activating a stored release whose pinned
+  version is not installed fails with a diagnostic.
 - **Pinned version missing on the worker.** A call to a version that the
   worker does not hold is a retryable attempt. Nothing ran, as with a missing
   binding on a connector call. The call is retried under the step's retry
@@ -220,8 +220,11 @@ public class RetryableException : Exception { }
   the package version out. The file is relative to `Extensions:Path`, such
   as `purchasing-tools/1.0.0/axis-package.json`, and the message names the
   package id and version.
-- **Activation.** *(planned for M5)* Activating an application that uses a
-  package version that was left out fails with a diagnostic.
+- **Activation.** A version that was left out is not installed as far as
+  compilation is concerned. If it was the only version of a package, or the
+  only one in a range, compilation reports `AXC0139` or `AXC0141`, and the
+  application does not activate. Otherwise compilation pins another installed
+  version in the range.
 
 ## Capabilities
 

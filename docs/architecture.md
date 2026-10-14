@@ -23,15 +23,17 @@ flowchart LR
   It is the BFF: the OIDC client and the cookie session. The record API, the
   data source endpoint, the process start endpoint, the task API and the site
   endpoints require a session.
-- **Axis.Worker** executes durable work. So far it runs work items, and
-  through them the `decision`, `task`, `operation` and `end` steps of process
-  instances. Wait for event, timer and sub-process steps come later. It
+- **Axis.Worker** executes durable work. It runs work items, and through them
+  the `decision`, `task`, `operation` and `end` steps of process instances.
+  Operation steps include `updateRecord`, `callConnector` calls with their
+  retries and reconciliation, and package operations. `raiseEvent` steps raise
+  events. Wait for event, timer and sub-process steps come later. It
   delivers raised events to async event triggers, see
   [events and triggers](reference/processes.md#events-and-triggers).
   It runs the occurrences of schedule triggers and their fan-out over the records
   of the trigger's data source, see [schedules](reference/processes.md#schedules).
   It loads the installed extension packages at startup, as the server does.
-  *(planned for M5)* It will run their operations, see
+  It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
 - **Platform database** stores installation-level data: the tenant directory
@@ -50,7 +52,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items, decision, task, operation and end steps, task API; events and triggers (M5)
+  Axis.Processes/         work items, decision, task, operation and end steps, task API, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
@@ -76,7 +78,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -603,7 +605,6 @@ to the draft. Only another grant can make it readable.
   - the next work item
   - staged connector calls and their work items
   - event occurrences, their delivery work items and sync trigger starts
-    *(planned for M5)*
 
   A revision mismatch aborts the transaction.
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
@@ -623,8 +624,9 @@ to the draft. Only another grant can make it readable.
   for inspection.
 
 The step transactions, the revision check and the history are built for
-`decision`, `task`, `operation` and `end` steps, and for the staging and the
-call of `callConnector` steps, see
+`decision`, `task`, `operation` and `end` steps, for the staging and the call
+of `callConnector` steps, for `raiseEvent` steps with their sync trigger
+starts, and for package operation steps, see
 [Running a step](reference/processes.md#running-a-step).
 The process resource, the start endpoint, the instance and task states, the
 task API, the worker settings and the tables are in

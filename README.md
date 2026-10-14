@@ -12,8 +12,8 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Milestone **M4, Identity and authorization**, is complete. The current milestone is
-**M5, Events, triggers and integration**. The [roadmap](docs/roadmap.md) says what each
+Milestone **M5, Events, triggers and integration**, is complete. The current milestone is
+**M6, Releases and versioning**. The [roadmap](docs/roadmap.md) says what each
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 

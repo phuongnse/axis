@@ -1148,8 +1148,8 @@ The purchase request sample holds the purchasing system connector in
   It is absent when the system does not support one.
 - `operations` lists the named operations.
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
-  - `path` is a path template. `{idempotencyKey}` is the only placeholder in
-    M5. Other placeholders come later.
+  - `path` is a path template. `{idempotencyKey}` is the only placeholder.
+    Other placeholders come later.
   - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
     with `input` fields is a schema error.
   - `output` fields are read from the JSON response.
@@ -1389,7 +1389,7 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 
 ## Inbound endpoints
 
-*(partly built, M5)* This section follows
+This section follows
 [D27](../decisions.md#d27-inbound-endpoints--agreed). The `endpoint` resource,
 its compile checks, the call with its `output` and `wait`, its idempotency, and the
 status location are built. An `endpoint` resource lets another system create
@@ -1579,11 +1579,11 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
 - **Diagnostics.** A package id with no installed version is `AXC0139`. A
   range that no installed version meets is `AXC0141`, and its message lists
   the installed versions. Both are compile errors in `application.json`.
-  *(planned for M5)* Activating a release whose pinned version is not
-  installed fails, as does a package whose manifest does not match its
-  assembly. A manifest that does not match its package is already reported
-  at host startup, as `AXC0132` to `AXC0138`, see
-  [Loading](extension-packages.md#loading).
+  Compilation sees only the versions that loaded at host startup. A manifest
+  that does not match its package is reported at startup, as `AXC0132` to
+  `AXC0138`, see [Loading](extension-packages.md#loading). *(planned for M6)*
+  Activating a stored release whose pinned version is not installed fails
+  with a diagnostic.
 - An application uses only the packages it declares, even though every
   tenant sees the same installed packages. Installation is in
   [Installation](extension-packages.md#installation).
