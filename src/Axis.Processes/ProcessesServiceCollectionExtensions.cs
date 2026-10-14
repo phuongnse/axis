@@ -8,9 +8,11 @@ public static class ProcessesServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the work item runner, the handler that runs process steps, the handler that sends
-    /// connector calls, the handler that runs package operation calls and the handler that delivers
-    /// raised events to their triggers. The runner runs the registered <see cref="IWorkItemHandler"/> and
-    /// <see cref="IExternalWorkItemHandler"/> services and needs the tenancy services.
+    /// connector calls, the handler that runs package operation calls, the handler that delivers
+    /// raised events to their triggers, the handler that runs the occurrences of schedule triggers
+    /// and the handler that starts their processes for the records of their data sources. The runner
+    /// runs the registered <see cref="IWorkItemHandler"/> and <see cref="IExternalWorkItemHandler"/>
+    /// services and needs the tenancy services.
     /// </summary>
     /// <param name="allowHttpConnectorUrls">
     /// Whether a connector call may go to an <c>http</c> base URL. Pass <see langword="true"/> only
@@ -26,6 +28,8 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IExternalWorkItemHandler, ConnectorCallHandler>();
         services.AddSingleton<IExternalWorkItemHandler, PackageCallHandler>();
         services.AddSingleton<IExternalWorkItemHandler, EventDeliveryHandler>();
+        services.AddSingleton<IExternalWorkItemHandler, TriggerScheduleHandler>();
+        services.AddSingleton<IExternalWorkItemHandler, TriggerFanOutHandler>();
         return services;
     }
 }

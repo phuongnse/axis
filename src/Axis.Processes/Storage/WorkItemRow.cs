@@ -34,4 +34,13 @@ public sealed class WorkItemRow
 
     /// <summary>The event occurrence an <c>event.deliver</c> item delivers, or <see langword="null"/> for other work.</summary>
     public Guid? EventId { get; init; }
+
+    /// <summary>The schedule trigger a <c>trigger.schedule</c> or <c>trigger.fanOut</c> item runs, or <see langword="null"/> for other work.</summary>
+    public Guid? TriggerId { get; init; }
+
+    /// <summary>The release whose trigger a <c>trigger.fanOut</c> item runs, or <see langword="null"/> for other work.</summary>
+    public Guid? ReleaseId { get; init; }
+
+    /// <summary>The occurrence a <c>trigger.fanOut</c> item runs, or <see langword="null"/> for other work.</summary>
+    public DateTimeOffset? OccurrenceAt { get; init; }
 }

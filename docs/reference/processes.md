@@ -1270,8 +1270,9 @@ event trigger in the transaction of the `raiseEvent` step, see
 [Raise event step](#raise-event-step). Data change triggers fire on record API
 creates and updates, on an inbound endpoint's record create, on task form
 saves, on `updateRecord` steps, on connector outputs and on package operation
-outputs, see [Starts from triggers](#starts-from-triggers). Schedule triggers
-compile and are part of the release, but the worker does not run them yet.
+outputs, see [Starts from triggers](#starts-from-triggers). The worker runs
+schedule triggers too, once for each occurrence and for each record of the
+trigger's data source, see [Schedules](#schedules).
 *(planned for M5)* A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
@@ -1378,7 +1379,9 @@ user whose write fired a trigger needs no `start` grant.
 5. It inserts the instance's first work item.
 6. It writes the audit record `process.started`, with the actor `system`. Its
    details are `{ "processId", "releaseId", "trigger" }`, where `trigger` is
-   the trigger's name. A start from an event adds `"eventId"`.
+   the trigger's name. A start from an event adds `"eventId"`. A start from a
+   schedule adds `"occurrenceAt"`, the occurrence time in UTC, such as
+   `"2026-01-01T05:00:00Z"`.
 
 A trigger's `when` is evaluated before these steps. A `false`, a `null` or a
 run-time error there skips the start too. A skip never fails the write or
@@ -1412,7 +1415,7 @@ compiled against.
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
-| Schedule | The transaction of the fan-out batch that holds the record | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
+| Schedule | The `trigger.fanOut` transaction of the occurrence, which holds every record's start. Batches of 100 are *(planned for M5)* | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
 or hits a run-time error.
@@ -1469,18 +1472,23 @@ these retries yet.
 ### Schedules
 
 **Schedule state.** Activating a release writes the schedule state of each
-schedule trigger for the tenant, in `axis.trigger_schedules`. The next
-occurrence is computed from the activation time. Triggers that the release
-removes lose their state and their work item.
+schedule trigger for the tenant, in `axis.trigger_schedules`, and its
+`trigger.schedule` work item. The next occurrence is computed from the
+activation time, even for a trigger that did not change, so a server restart
+computes it again. Triggers that the release removes lose their state and
+their work item. The server's startup activation writes this state right after
+the release is active.
 
 **Occurrences.** Each schedule trigger has one `trigger.schedule` work item,
 due at its next occurrence. Workers claim it with `FOR UPDATE SKIP LOCKED`,
 so only one worker runs each occurrence per tenant. The claim's transaction
 does this:
 
-1. It records the occurrence as the trigger's last occurrence. When several
-   occurrences were missed, for example while no worker ran, only the latest
-   one runs.
+1. It records the occurrence as the trigger's last occurrence. It changes the
+   state only while the stored next occurrence is still the one this item
+   ran. When several occurrences were missed, for example while no worker ran,
+   only the latest one runs *(planned for M5)*. Today the stored occurrence
+   runs late.
 2. It queues a `trigger.fanOut` work item for the occurrence.
 3. It computes the next occurrence after now, and sets the item's `due_at` to
    it.
@@ -1496,19 +1504,30 @@ the data source:
 
 1. It reads the trigger and its data source from the release that was active
    at the occurrence.
-2. It runs the data source as `system`, with the trigger's fixed parameters.
-   It reads 100 records at a time, ordered by record id, after the stored
-   cursor. The data source's `pageSize` and `sort` do not apply.
+2. It runs the data source as `system`, with the trigger's fixed parameters,
+   ordered by record id. The data source's `pageSize` and `sort` do not apply.
+   It reads 100 records at a time, after the stored cursor *(planned for
+   M5)*. Today one transaction reads and starts every record of the
+   occurrence.
 3. For each record, it inserts a receipt into `axis.trigger_starts`, keyed by
-   the trigger, the occurrence time and the record. When that key is taken,
-   the record is skipped. Otherwise it runs the
-   [start](#starts-from-triggers).
-4. The batch's transaction stores the new cursor and the item for the next
-   batch with the starts. When the data source has no more records, the item is deleted.
+   the trigger, the occurrence time and the record. The time is in UTC, such
+   as `2026-01-01T05:00:00Z`. When that key is taken, the record is skipped.
+   Otherwise it runs the [start](#starts-from-triggers). The process, the
+   record and the release the instance is pinned to come from the release that
+   is active when the fan-out runs. When the application has no active release,
+   or the active release has no such process, the occurrence starts nothing
+   and the reason is logged.
+4. The transaction deletes the item with the starts.
 
-A worker that crashes in the middle of a batch commits none of it. The next
-worker runs the batch again from the stored cursor. The receipts make each
-record start at most once per occurrence.
+**Failures.** A fan-out transaction that fails leaves the item claimed. It
+runs again after the lease expires, as event delivery does, and the receipts
+make each record start at most once per occurrence. A data error in the data
+source's filter, an SQLSTATE of class 22, is different. It is logged as a
+warning and the item is deleted, because trying again would fail the same way.
+
+A worker that crashes in the middle of the occurrence commits none of it. The
+next worker runs it again. Batches with a stored cursor, so that a run resumes
+where it stopped, are *(planned for M5)*.
 
 ## Worker settings
 
@@ -1571,13 +1590,14 @@ database, with history in `axis.__processes_migrations` (see
   the call. See [Package operations](#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](#event-delivery). It has
   the `event_id` of the occurrence.
-  *(planned for M5)* Two more kinds come with [events and triggers](#events-and-triggers):
+  Two more kinds come with [schedules](#schedules):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
-    also has the `trigger_id`, and its `due_at` is the next occurrence.
+    also has the `trigger_id`, and its `due_at` is the next occurrence. A
+    partial unique index allows one such item for each trigger.
   - `trigger.fanOut` starts the process for the records of one occurrence.
     Its item also has the `trigger_id`, the `release_id` that was active at
-    the occurrence, the `occurrence_at` time and the `cursor`, the last record
-    id it handled.
+    the occurrence and the `occurrence_at` time. The `cursor`, the last record
+    id it handled, is *(planned for M5)*.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's
@@ -1663,20 +1683,21 @@ database, with history in `axis.__processes_migrations` (see
   | `payload` | `jsonb` | The evaluated payload fields |
   | `process_instance_id` | `uuid` | The instance that raised the event |
   | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
-- `axis.trigger_schedules` *(planned for M5)*: the schedule state, one row per
+- `axis.trigger_schedules`: the schedule state, one row per
   schedule trigger of the tenant, see [Schedules](#schedules). Activation
   writes it.
 
   | Column | Type | Meaning |
   | --- | --- | --- |
   | `trigger_id` | `uuid` | The trigger |
+  | `application_id` | `uuid` | The application. Activation uses it to find the triggers a new release removed |
   | `release_id` | `uuid` | The release that wrote the state |
   | `next_occurrence_at` | `timestamptz` | The next occurrence |
   | `last_occurrence_at` | `timestamptz`, null | The last occurrence that ran. Null before the first |
 - `axis.trigger_starts`: one receipt per trigger, cause and record, see
   [Starts from triggers](#starts-from-triggers). Its primary key on
   (`trigger_id`, `source`, `subject_id`) makes each start happen at most once.
-  Event delivery writes it. Schedule triggers will write it too.
+  Event delivery and schedule fan-out write it.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

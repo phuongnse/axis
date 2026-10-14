@@ -509,6 +509,37 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("process_tasks", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.TriggerScheduleRow", b =>
+                {
+                    b.Property<Guid>("TriggerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset?>("LastOccurrenceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_occurrence_at");
+
+                    b.Property<DateTimeOffset>("NextOccurrenceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_occurrence_at");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.HasKey("TriggerId")
+                        .HasName("pk_trigger_schedules");
+
+                    b.HasIndex("ApplicationId")
+                        .HasDatabaseName("ix_trigger_schedules_application_id");
+
+                    b.ToTable("trigger_schedules", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.TriggerStartRow", b =>
                 {
                     b.Property<Guid>("TriggerId")
@@ -575,6 +606,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_expires_at");
 
+                    b.Property<DateTimeOffset?>("OccurrenceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurrence_at");
+
                     b.Property<Guid?>("PackageCallId")
                         .HasColumnType("uuid")
                         .HasColumnName("package_call_id");
@@ -583,10 +618,18 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("process_instance_id");
 
+                    b.Property<Guid?>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
                     b.Property<string>("TenantId")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TriggerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_id");
 
                     b.HasKey("Id")
                         .HasName("pk_process_work_items");
@@ -605,6 +648,11 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasIndex("ProcessInstanceId")
                         .HasDatabaseName("ix_process_work_items_process_instance_id");
+
+                    b.HasIndex("TriggerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_process_work_items_schedule_trigger_id")
+                        .HasFilter("kind = 'trigger.schedule'");
 
                     b.ToTable("process_work_items", "axis");
                 });
