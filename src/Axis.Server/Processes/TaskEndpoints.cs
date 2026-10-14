@@ -23,7 +23,8 @@ namespace Axis.Server.Processes;
 /// A completion then locks the task and checks that it is open (409), then the content type (415),
 /// the body (400) and the record write of its values (400, 409). One transaction writes the values,
 /// closes the task, resumes the instance on the outcome's next step and appends the audit record
-/// <c>task.completed</c>. A completion that fails writes nothing. A task shows its process, step,
+/// <c>task.completed</c>. A completion with values then starts the data change triggers of the
+/// update, from the active release, in the same transaction. A completion that fails writes nothing. A task shows its process, step,
 /// outcomes and form as the release its instance is pinned to declares them, and a completion
 /// uses that release too. Its subject label is the record's display field in the active release.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
@@ -145,6 +146,7 @@ internal static class TaskEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
@@ -169,7 +171,7 @@ internal static class TaskEndpoints
             // The lock makes a concurrent completion of the task wait until this one commits or
             // rolls back, and then find the task as it was left.
             var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
-            var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active.Model, task, user, tenantId, cancellationToken);
+            var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, tenantId, loggerFactory, cancellationToken);
             if (failure is not null)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -193,12 +195,14 @@ internal static class TaskEndpoints
         ActiveApplicationResolver resolver,
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
-        ApplicationModel active,
+        ActiveApplication current,
         ProcessTaskRow? task,
         CurrentUserResponse user,
         string tenantId,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var active = current.Model;
         if (task is null || task.ApplicationId != active.Manifest.Id)
         {
             return TaskNotFound();
@@ -233,6 +237,8 @@ internal static class TaskEndpoints
         long? readVersion = null;
         long? writtenVersion = null;
         IReadOnlyList<string> fields = [];
+        Record? previous = null;
+        Record? updated = null;
         if (body.Input is { } input)
         {
             // The values are written as a record update on the task's release. The lock makes the
@@ -262,6 +268,8 @@ internal static class TaskEndpoints
                 return result.Outcome == RecordWriteOutcome.StaleVersion ? StaleVersion() : RecordEndpoints.WriteFailure(result);
             }
 
+            previous = stored;
+            updated = written;
             readVersion = stored.Version;
             writtenVersion = written.Version;
             fields = [.. RecordEndpoints.SetFields(entity, input)];
@@ -279,6 +287,25 @@ internal static class TaskEndpoints
             new TaskCompletion(outcome.Name, outcome.Next, user.Id, user.DisplayName, readVersion, writtenVersion, fields),
             tenantId,
             cancellationToken);
+
+        // The triggers run once the task is closed and its instance resumes, so a trigger on the
+        // task's own process finds the instance running and is skipped.
+        if (previous is not null && updated is not null && body.Input is { } saved)
+        {
+            await DataChangeTriggerStarts.StartAfterUpdateAsync(
+                transaction,
+                tenantId,
+                active,
+                current.ReleaseId,
+                task.ReleaseId,
+                entity,
+                previous,
+                updated,
+                saved.Rows.Select(rows => rows.Collection.Name),
+                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                cancellationToken);
+        }
+
         return null;
     }
 

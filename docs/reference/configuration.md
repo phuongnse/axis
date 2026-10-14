@@ -380,8 +380,8 @@ flowchart LR
      boolean over the watched record, with the scope of a process condition:
      its fields, rules, reference paths and aggregates. Its first problem is
      reported at `/when`. `fields` and `when` are not checked when the entity
-     is unknown. Data change triggers fire on record API creates and updates
-     and on an inbound endpoint's create, and do not fire yet on other writes.
+     is unknown. Data change triggers fire on every committed write through the
+     record command, see [Starts from triggers](processes.md#starts-from-triggers).
 
      A schedule trigger's `schedule` must be a valid 5-field cron, otherwise
      it is `AXC0160` at `/schedule`. Its `timeZone` must be an IANA id,
@@ -1176,9 +1176,9 @@ loads, is checked and is part of the release. The worker delivers each raised ev
 [Event delivery](processes.md#event-delivery). A `raiseEvent` step starts the processes of the
 `sync` event triggers in its own transaction, see
 [Raise event step](processes.md#raise-event-step). Data change triggers start their
-processes in the transaction of a record API create or update and of an inbound endpoint's
-create, see [Starts from triggers](processes.md#starts-from-triggers). *(planned for M5)* Task
-form saves, `updateRecord` steps and connector outputs do not fire them yet. The schedule
+processes in the transaction of a record API create or update, of an inbound endpoint's
+create, of a task form save, of an `updateRecord` step, of a connector output and of a package
+operation output, see [Starts from triggers](processes.md#starts-from-triggers). The schedule
 `trigger` resource and its compile checks are built: a schedule trigger file loads, is checked
 and is part of the release. *(planned for M5)* The worker does not run schedule triggers yet.
 An `event` resource names something that happened to one record. A
@@ -1286,9 +1286,8 @@ when its `amount` changes, and the amount is 1000 or more, in
 - `when` is optional. It is a boolean expression over the new record, with
   the same scope as a process's `when`.
 - It fires on every committed write through the record command: the record
-  API, an inbound endpoint's create, a task form save, an `updateRecord` step
-  and a connector output. *(planned for M5)* Only the record API and the
-  inbound endpoint's create fire it so far.
+  API, an inbound endpoint's create, a task form save, an `updateRecord` step,
+  a connector output and a package operation output.
 
 **Schedule trigger.** It starts `NoteClose` every night at 02:00 in Ho Chi
 Minh City, for each note the `NoteRows` data source returns, in
@@ -1344,9 +1343,8 @@ has its expression code at `/when`. The data change trigger checks are built
 too: an unknown `entity` is `AXC0143`, an `entity` that is not the process's
 subject is `AXC0144`, an unknown or computed name in `fields` is `AXC0145`,
 and a `when` problem has its expression code at `/when`. Data change
-triggers compile and are part of the release. They fire on record API
-creates and updates and on an inbound endpoint's create, and not yet on other
-writes. The schedule trigger checks are built too: an invalid `schedule` is
+triggers compile and are part of the release. They fire on every
+committed write through the record command. The schedule trigger checks are built too: an invalid `schedule` is
 `AXC0160`, an unknown `timeZone` is `AXC0161`, an unknown `dataSource` is
 `AXC0162`, a grouped one is `AXC0163`, one over another entity is `AXC0164`,
 an unknown or repeated `parameters` key is `AXC0165`, a wrongly typed value

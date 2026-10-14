@@ -1,0 +1,9 @@
+{
+  "id": "0b1e6f33-53ab-4155-8d74-3d7a3b2b6441",
+  "kind": "process",
+  "name": "Notify",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

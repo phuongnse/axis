@@ -9,8 +9,11 @@ using static Axis.Integration.Tests.RecordApiFixture;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Data change triggers fire for the writes that commit: a record API create and update, and an
-/// inbound endpoint's create. <c>ReviewNewTickets</c> starts <c>Review</c> on every create.
+/// Data change triggers fire for the writes that commit: a record API create and update, an
+/// inbound endpoint's create, an <c>updateRecord</c> step and a task form save.
+/// <c>EscalateOnStage</c> starts <c>Escalate</c> on an update that changes <c>stage</c>, and
+/// <c>NotifyEscalated</c> starts <c>Notify</c> when the new stage is <c>escalated</c>.
+/// <c>ReviewNewTickets</c> starts <c>Review</c> on every create.
 /// <c>RecheckAmounts</c> starts <c>Recheck</c> on an update that changes <c>amount</c>, when the new
 /// amount is at least 100. The signed-in clerk holds no process grant, so each start shows that the
 /// trigger runs as <c>system</c>.
@@ -164,7 +167,82 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
         Assert.Equal(2L, await fixture.CountAsync("SELECT count(*) FROM axis.process_instances WHERE subject_id = @record", ("record", recordId)));
     }
 
+    [Fact]
+    public async Task A_step_that_changes_a_field_its_own_trigger_watches_does_not_start_its_process_again_and_the_skip_is_logged()
+    {
+        var id = await CreateAsync("""{ "title": "Router" }""");
+        await UpdateAsync(id, """{ "version": 1, "values": { "stage": "open" } }""");
+        Assert.Equal(1L, await CountInstancesAsync(id, "Escalate"));
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(1L, await CountInstancesAsync(id, "Escalate"));
+        var skipped = Assert.Single(fixture.Logs.Entries, entry =>
+            entry.Contains(id.ToString("D"), StringComparison.Ordinal) && entry.Contains("EscalateOnStage", StringComparison.Ordinal));
+        Assert.StartsWith("Information: ", skipped, StringComparison.Ordinal);
+        Assert.Contains("the process already runs for the record", skipped, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_step_that_changes_a_field_another_trigger_watches_starts_that_process_in_the_steps_transaction()
+    {
+        var id = await CreateAsync("""{ "title": "Switch" }""");
+        await UpdateAsync(id, """{ "version": 1, "values": { "stage": "open" } }""");
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(1L, await CountInstancesAsync(id, "Notify"));
+        var started = (string)(await fixture.ScalarAsync(
+            """
+            SELECT a.xmin::text FROM axis.audit_records a
+            JOIN axis.process_instances i ON i.id = a.process_instance_id
+            WHERE a.action = 'process.started' AND a.record_id = @record AND i.process_id = @process
+            """,
+            ("record", id), ("process", fixture.ProcessId("Notify"))))!;
+        var updated = (string)(await fixture.ScalarAsync(
+            """
+            SELECT a.xmin::text FROM axis.audit_records a
+            JOIN axis.process_instances i ON i.id = a.process_instance_id
+            WHERE a.action = 'record.updated' AND a.actor = 'system' AND a.record_id = @record AND i.process_id = @process
+            """,
+            ("record", id), ("process", fixture.ProcessId("Escalate"))))!;
+        Assert.Equal(updated, started);
+    }
+
+    [Fact]
+    public async Task A_task_form_save_that_changes_a_watched_field_starts_the_triggered_process_as_system()
+    {
+        var id = await CreateAsync("""{ "title": "Dock" }""");
+        var instance = await fixture.StartAsync("Triage", id);
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        var task = await fixture.TaskIdAsync(instance);
+
+        using var client = fixture.CreateClient().SignedInAs("cara");
+        using var request = Request(
+            HttpMethod.Post,
+            $"/api/apps/TriggerApp/tasks/{task:D}/complete",
+            TriggerApiFixture.Host,
+            """{ "outcome": "done", "version": 1, "values": { "stage": "escalated" } }""");
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(1L, await CountInstancesAsync(id, "Notify"));
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.audit_records a
+            JOIN axis.process_instances i ON i.id = a.process_instance_id
+            WHERE a.action = 'process.started' AND a.actor = 'system' AND a.record_id = @record
+              AND i.process_id = @process AND a.details ->> 'trigger' = 'NotifyEscalated'
+            """,
+            ("record", id), ("process", fixture.ProcessId("Notify"))));
+    }
+
     private static string Column(string field) => EntityNaming.Quote(field == "id" ? EntityNaming.IdColumn : EntityNaming.Column(field));
+
+    private Task<long> CountInstancesAsync(Guid recordId, string process) =>
+        fixture.CountAsync(
+            "SELECT count(*) FROM axis.process_instances WHERE subject_id = @record AND process_id = @process",
+            ("record", recordId), ("process", fixture.ProcessId(process)));
 
     private Task<long> RecheckCountAsync(Guid recordId) =>
         fixture.CountAsync(

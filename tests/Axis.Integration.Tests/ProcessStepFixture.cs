@@ -304,6 +304,24 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return releaseId;
     }
 
+    /// <summary>
+    /// Compiles and activates a copy of StepApp with one more file, <paramref name="relativePath"/>
+    /// holding <paramref name="content"/>. Returns the new release's id.
+    /// </summary>
+    public async Task<Guid> ActivateCopyWithAsync(string relativePath, string content)
+    {
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
+        {
+            folder.With(Path.GetRelativePath(_appFolder, file), await File.ReadAllTextAsync(file));
+        }
+
+        folder.With(relativePath, content);
+        var (releaseId, _) = await ActivateAsync(folder.Path);
+        Assert.NotEqual(FirstReleaseId, releaseId);
+        return releaseId;
+    }
+
     /// <summary>Waits until one session of the tenant database waits on a lock, and fails when <paramref name="run"/> ends first.</summary>
     public async Task WaitUntilBlockedOnLockAsync(Task run, CancellationToken cancellationToken)
     {

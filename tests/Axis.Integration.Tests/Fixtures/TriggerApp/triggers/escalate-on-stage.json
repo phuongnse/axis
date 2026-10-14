@@ -1,0 +1,11 @@
+{
+  "id": "039932c7-398e-405d-8189-55784e4a354d",
+  "kind": "trigger",
+  "name": "EscalateOnStage",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Ticket",
+  "on": ["update"],
+  "fields": ["stage"],
+  "process": "Escalate"
+}

@@ -19,7 +19,8 @@ namespace Axis.Processes.Instances;
 /// extends the item's lease by the connector's timeout. The request then carries the stored input,
 /// the auth from the tenant's secret binding and the operation identity as its idempotency key. An
 /// outcome transaction records the result. A <c>2xx</c> whose body fits the output writes the
-/// output fields, settles the call <c>succeeded</c> and resumes the instance on <c>next</c>. A
+/// output fields, starts the data change triggers of the update from the active release, settles
+/// the call <c>succeeded</c> and resumes the instance on <c>next</c>. A
 /// retryable error, and an unknown outcome on a connector that declares <c>idempotency</c>, set the
 /// call back to <c>pending</c> and keep the item, due again after the step's backoff, while attempts
 /// are left. Any other unknown outcome leaves the call <c>unknown</c> and the instance waiting. When
@@ -545,7 +546,7 @@ internal sealed partial class ConnectorCallHandler(
     }
 
     /// <summary>Writes the success in the transaction. Returns the error when the record write is refused, or <see langword="null"/>.</summary>
-    private static async Task<string?> WriteSuccessAsync(
+    private async Task<string?> WriteSuccessAsync(
         ClaimedWorkItem item,
         NpgsqlTransaction transaction,
         LoadedInstance instance,
@@ -579,6 +580,7 @@ internal sealed partial class ConnectorCallHandler(
         var input = new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = record?.Version };
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
+        Record? updated = null;
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
@@ -588,6 +590,7 @@ internal sealed partial class ConnectorCallHandler(
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
             }
 
+            updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -611,6 +614,23 @@ internal sealed partial class ConnectorCallHandler(
         if (recordAudit is not null)
         {
             await AuditRecords.AppendAsync(transaction, recordAudit, cancellationToken);
+        }
+
+        if (updated is not null
+            && await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken) is { } active)
+        {
+            await DataChangeTriggerStarts.StartAfterUpdateAsync(
+                transaction,
+                item.TenantId,
+                active.Model,
+                active.ReleaseId,
+                call.ReleaseId,
+                entity,
+                record!,
+                updated,
+                [],
+                logger,
+                cancellationToken);
         }
 
         await AuditRecords.AppendAsync(transaction, Called(instance, attempt, ConnectorCalls.Succeeded, status), cancellationToken);

@@ -1,12 +1,9 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
-using Axis.Configuration.Releases;
-using Axis.Configuration.Storage;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Expressions.Evaluation;
 using Axis.Processes.Work;
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Axis.Processes.Instances;
@@ -32,21 +29,12 @@ internal static class EventTriggerStarts
         TriggerMode mode,
         CancellationToken cancellationToken)
     {
-        ActiveRelease? active;
-        await using (var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>()
-            .UseNpgsql(context.Connection)
-            .Options))
-        {
-            await configuration.Database.UseTransactionAsync(context.Transaction, cancellationToken);
-            active = await new ActiveReleaseStore(configuration).FindByApplicationIdAsync(applicationId, cancellationToken);
-        }
-
-        if (active is null)
+        if (await models.FindActiveAsync(context, applicationId, cancellationToken) is not { } active)
         {
             return null;
         }
 
-        var model = await models.GetAsync(context, active.ReleaseId, cancellationToken);
+        var (releaseId, model) = active;
         var declared = model.Events.FirstOrDefault(candidate => string.Equals(candidate.Name, eventName, StringComparison.OrdinalIgnoreCase));
         List<TriggerModel> triggers = declared is null
             ? []
@@ -58,7 +46,7 @@ internal static class EventTriggerStarts
                     && trigger.Event is { } @event
                     && string.Equals(@event.Name, eventName, StringComparison.OrdinalIgnoreCase)),
             ];
-        return new EventTriggers(active.ReleaseId, model, declared, triggers);
+        return new EventTriggers(releaseId, model, declared, triggers);
     }
 
     /// <summary>

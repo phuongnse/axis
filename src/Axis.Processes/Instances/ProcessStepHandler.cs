@@ -19,7 +19,9 @@ namespace Axis.Processes.Instances;
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
 /// inside the transaction. A package operation step does the same with a <c>package.call</c> item,
-/// so no operation runs inside the transaction. A <c>sync</c> trigger comes from the application's active release, and
+/// so no operation runs inside the transaction. An <c>updateRecord</c> step starts the data change
+/// triggers of the update after its <c>record.updated</c> audit. A <c>sync</c> trigger and a data
+/// change trigger come from the application's active release, and
 /// its start runs as <c>system</c>, pinned to that release. A skipped <c>sync</c> start is logged
 /// and lets the step commit. A step that finds the instance at another revision than it loaded
 /// writes nothing. A step that throws is rolled back, and the failure callback then records the
@@ -315,6 +317,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         // The record is written only once the instance is known to be current, so a stale step
         // writes nothing. A rejected write throws, which rolls back the instance's move too.
         AuditEntry? recordAudit = null;
+        Record? updated = null;
         if (assignments is not null)
         {
             var result = await RecordCommands.SetAsync(context.Connection, model, entity, record, assignments, instance.Now, cancellationToken);
@@ -323,6 +326,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
             }
 
+            updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -377,6 +381,23 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (recordAudit is not null)
         {
             await AuditRecords.AppendAsync(context.Transaction, recordAudit, cancellationToken);
+        }
+
+        if (updated is not null
+            && await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken) is { } active)
+        {
+            await DataChangeTriggerStarts.StartAfterUpdateAsync(
+                context.Transaction,
+                context.Item.TenantId,
+                active.Model,
+                active.ReleaseId,
+                instance.ReleaseId,
+                entity,
+                record,
+                updated,
+                [],
+                logger,
+                cancellationToken);
         }
 
         await AuditRecords.AppendAsync(

@@ -1268,9 +1268,9 @@ are built too, and so is the delivery of each occurrence to the `async` event
 triggers, see [Event delivery](#event-delivery). So is the start of each `sync`
 event trigger in the transaction of the `raiseEvent` step, see
 [Raise event step](#raise-event-step). Data change triggers fire on record API
-creates and updates and on an inbound endpoint's record create, see
-[Starts from triggers](#starts-from-triggers). They do not fire yet on task
-form saves, `updateRecord` steps or connector outputs. Schedule triggers
+creates and updates, on an inbound endpoint's record create, on task form
+saves, on `updateRecord` steps, on connector outputs and on package operation
+outputs, see [Starts from triggers](#starts-from-triggers). Schedule triggers
 compile and are part of the release, but the worker does not run them yet.
 *(planned for M5)* A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
@@ -1396,15 +1396,22 @@ its cause.
 
 Triggers come from the release that is active when the trigger fires. For an
 `async` event trigger, that is when the event is delivered, not when it was
-raised. For a data change trigger, it is the release the write's request
-resolved when it began. The write and its triggers then use the same model,
-even when a release activates while the request runs.
+raised. For a data change trigger on a record API or inbound endpoint write,
+it is the release the write's request resolved when it began. The write and
+its triggers then use the same model, even when a release activates while the
+request runs. A system-side write, which is a task form save, an
+`updateRecord` step, a connector output or a package operation output, takes
+its triggers from the active release at the time of the write, while the write
+itself uses the release the task or instance is pinned to. When the two
+differ, the record is read again with the active release's model before the
+triggers run, so a `when` and a start condition see the field types they were
+compiled against.
 
 | Trigger | Start commits in | Skipped when |
 | --- | --- | --- |
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
-| Data change | The write's transaction: a record API create or update, or an inbound endpoint's create. *(planned for M5)* A task form save, an `updateRecord` step and a connector output do not fire yet | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
 | Schedule | The transaction of the fan-out batch that holds the record | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
@@ -1417,7 +1424,11 @@ A child collection in `fields` counts as changed whenever the update body
 sets it, because an update replaces all its rows. The triggers run in the
 order of the release, after the record and its `record.created` or
 `record.updated` audit record are written and before the commit. For an
-inbound endpoint call, they run before the endpoint's own start. A start that
+inbound endpoint call, they run before the endpoint's own start. For an
+`updateRecord` step, a connector output or a package operation output, they run
+after its `record.updated` audit record. For a task form save, they run after
+the `task.completed` audit record, once the task is closed and its instance
+resumes, so the instance of the task's own process is already running. A start that
 fails for any reason but a skip, such as a database error, fails the write,
 which rolls back with everything the triggers started. The record is locked
 by the write, so a data change start does not lock it again. Suppose `NoteClose` had a data

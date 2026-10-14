@@ -1,0 +1,8 @@
+{
+  "id": "541df874-62eb-4b00-a929-9aca6bb74ea2",
+  "kind": "form",
+  "name": "TicketTriage",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [{ "title": { "textKey": "ticketTriage.main" }, "fields": [{ "field": "stage" }] }]
+}

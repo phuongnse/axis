@@ -74,6 +74,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
     private readonly ProcessStepFixture _tenant = new();
     private readonly TemporaryFolder _packages = new TemporaryFolder().Install(1);
     private readonly TemporaryFolder _application = new();
+    private PackageCatalog? _catalog;
     private ServiceProvider? _worker;
     private ApplicationModel? _model;
 
@@ -98,7 +99,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         Edit("entities/request.json", request => request["fields"]!.AsArray().Add(new JsonObject { ["name"] = "total", ["type"] = "integer" }));
         _application.With("processes/package-sum.json", SumProcess).With("processes/package-fail.json", FailProcess);
 
-        var catalog = PackageCatalog.Load(_packages.Path);
+        var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);
         (ReleaseId, _model) = await _tenant.ActivateAsync(_application.Path, catalog.Versions);
 
@@ -147,6 +148,26 @@ public sealed class PackageCallFixture : IAsyncLifetime
         Assert.Equal(WorkItemOutcome.Completed, await RunStepAsync(cancellationToken));
         Assert.Equal(ProcessStarts.Waiting, (await _tenant.InstanceAsync(instanceId)).State);
         return (subjectId, instanceId);
+    }
+
+    /// <summary>
+    /// Compiles and activates a copy of the StepApp copy with one more file, <paramref name="relativePath"/>
+    /// holding <paramref name="content"/>, against the installed package. The new release becomes the
+    /// active one. Returns its id.
+    /// </summary>
+    public async Task<Guid> ActivateCopyWithAsync(string relativePath, string content)
+    {
+        var catalog = _catalog ?? throw new InvalidOperationException("The fixture is not initialized.");
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_application.Path, "*", SearchOption.AllDirectories))
+        {
+            folder.With(Path.GetRelativePath(_application.Path, file), await File.ReadAllTextAsync(file));
+        }
+
+        folder.With(relativePath, content);
+        var (releaseId, _) = await _tenant.ActivateAsync(folder.Path, catalog.Versions);
+        Assert.NotEqual(ReleaseId, releaseId);
+        return releaseId;
     }
 
     /// <summary>Reads the request <paramref name="id"/> with its <c>total</c> field.</summary>
