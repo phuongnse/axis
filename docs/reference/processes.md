@@ -220,8 +220,9 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   computed fields are recomputed and validations run, in the step's
   transaction. A validation failure fails the step. An `operation` of the
   form `<package>/<operation>` names an operation from an extension package.
-  It is checked and compiled, and *(planned for M5)* it runs outside the
-  step's transaction, see [Package operations](#package-operations). A second built-in operation, `callConnector`, calls an
+  It is checked and compiled, and it runs outside the step's transaction,
+  see [Package operations](#package-operations). Its retries and capability
+  limits are *(planned for M5)*. A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked, compiled, staged
   and sent, its call is retried, and an unknown outcome is reconciled. A third
