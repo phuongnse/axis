@@ -3,18 +3,47 @@
   "title": "Axis trigger",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "kind", "name", "formatVersion", "type", "event", "process"],
+  "required": ["id", "kind", "name", "formatVersion", "type", "process"],
   "properties": {
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "trigger" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "type": { "const": "event" },
+    "type": { "enum": ["event", "dataChange"] },
     "event": { "$ref": "#/$defs/name" },
+    "entity": { "$ref": "#/$defs/name" },
+    "on": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["create", "update"] }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/name" }
+    },
     "when": { "type": "string", "minLength": 1 },
     "mode": { "enum": ["async", "sync"] },
     "process": { "$ref": "#/$defs/name" }
   },
+  "allOf": [
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "event" } } },
+      "then": {
+        "required": ["event"],
+        "properties": { "entity": false, "on": false, "fields": false }
+      }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "dataChange" } } },
+      "then": {
+        "required": ["entity", "on"],
+        "properties": { "event": false, "mode": false }
+      }
+    }
+  ],
   "$defs": {
     "id": {
       "type": "string",

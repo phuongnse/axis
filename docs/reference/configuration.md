@@ -359,9 +359,23 @@ flowchart LR
      first problem is reported at `/when` with its
      [expression diagnostic](expressions.md#diagnostics) code. `when` is not
      checked when the event is unknown. A name whose process or event file was
-     not loaded because of its own errors is not reported again. For now a
-     `type` other than `event`, a `mode` other than `async` or `sync`, and a property
-     that belongs to another trigger type are `AXC0004`.
+     not loaded because of its own errors is not reported again.
+
+     A data change trigger's `entity` must name a loaded entity, ignoring
+     letter case, otherwise it is `AXC0143` at `/entity`. An entity that is not
+     the process's subject entity is `AXC0144` at `/entity`, naming both
+     entities. It is not checked when the process is unknown. A name in
+     `fields` that names no field of the entity, or names a computed field,
+     is `AXC0145` at `/fields/{i}`. `when` is parsed and type-checked as a
+     boolean over the watched record, with the scope of a process condition:
+     its fields, rules, reference paths and aggregates. Its first problem is
+     reported at `/when`. `fields` and `when` are not checked when the entity
+     is unknown. Data change triggers compile but do not fire yet.
+
+     A `type` other than `event` or `dataChange`, a `mode` other than
+     `async` or `sync`, a property that belongs to another trigger type, an
+     empty or repeated `on`, and an empty or repeated `fields` are
+     `AXC0004`.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -670,6 +684,9 @@ sorted by file and then path.
 | `AXC0140` | An application's `packages` entry has a `version` range that is not an exact version `X.Y.Z`, `^X.Y.Z` or `~X.Y.Z`, with no leading zeros. Reported in `application.json` at `/packages/{i}/version`. |
 | `AXC0141` | No installed version of a package is in its `packages` entry's `version` range. Reported in `application.json` at `/packages/{i}/version`, listing the installed versions. Not checked when the package is unknown or the range is invalid. |
 | `AXC0142` | A package id appears in more than one `packages` entry. Reported in `application.json` at `/packages/{i}/id` of each later entry, which is not checked further. |
+| `AXC0143` | A data change trigger's `entity` names no loaded entity. Reported in the trigger at `/entity`. |
+| `AXC0144` | A data change trigger's `entity` is not the process's subject entity. Reported in the trigger at `/entity`. |
+| `AXC0145` | A name in a data change trigger's `fields` names no field of the entity, or names a computed field. Reported in the trigger at `/fields/{i}`. |
 
 ## Startup activation
 
@@ -1215,10 +1232,11 @@ when its `amount` changes, and the amount is 1000 or more, in
 
 - `entity` names the entity whose records are watched. It is the process's
   subject entity.
-- `on` is a non-empty list of `create` and `update`. `delete` comes later,
+- `on` is a non-empty, unique list of `create` and `update`. `delete` comes later,
   because a deleted record cannot be a subject.
-- `fields` is optional. On an update, the trigger fires only when one of the
-  named fields changed. A create always passes it.
+- `fields` is optional. If present, it is a non-empty, unique list. On an
+  update, the trigger fires only when one of the named fields changed. A
+  create always passes it.
 - `when` is optional. It is a boolean expression over the new record, with
   the same scope as a process's `when`.
 - It fires on every committed write through the record command: the record
@@ -1259,11 +1277,15 @@ The compiler reports these as compile errors. The event trigger checks are
 built, with the codes in the [pipeline](#configuration-pipeline): an unknown
 `process` is `AXC0129`, an unknown `event` is `AXC0130`, an event about
 another entity than the process's subject is `AXC0131`, and a `when` problem
-has its expression code at `/when`. For now the schema accepts only
-`"type": "event"`, with `"mode": "async"` or `"mode": "sync"`, so `dataChange`,
+has its expression code at `/when`. The data change trigger checks are built
+too: an unknown `entity` is `AXC0143`, an `entity` that is not the process's
+subject is `AXC0144`, an unknown or computed name in `fields` is `AXC0145`,
+and a `when` problem has its expression code at `/when`. Data change
+triggers compile and are part of the release, but they do not fire yet. For
+now the schema accepts only `"type": "event"` and `"type": "dataChange"`, so
 `schedule`, any other `mode` and the properties of other types are `AXC0004`.
-*(planned for M5)* The other checks, and their codes, come with the build issues
-of their trigger types.
+*(planned for M5)* The schedule checks, and their codes, come with the build
+issue of that trigger type.
 
 - The `process` exists.
 - The subject entity matches. The event's entity, the `entity`, or the data

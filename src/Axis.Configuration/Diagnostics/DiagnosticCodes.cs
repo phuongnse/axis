@@ -147,4 +147,7 @@ public static class DiagnosticCodes
     public const string InvalidPackageRange = "AXC0140";
     public const string NoPackageVersionInRange = "AXC0141";
     public const string DuplicateApplicationPackage = "AXC0142";
+    public const string UnknownTriggerEntity = "AXC0143";
+    public const string TriggerEntityNotProcessSubject = "AXC0144";
+    public const string InvalidTriggerField = "AXC0145";
 }

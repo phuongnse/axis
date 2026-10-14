@@ -17,7 +17,8 @@ namespace Axis.Configuration.Compilation;
 /// trigger's <c>when</c> scope holds only the event's scalar payload fields. A
 /// data source scope adds the data source's parameters after the fields, has the named
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
-/// process scope resolves paths the same way. No other scope resolves paths.
+/// process scope resolves paths the same way, and a data change trigger's <c>when</c> uses the process
+/// scope. No other scope resolves paths.
 /// </summary>
 public static class ExpressionScopes
 {

@@ -21,7 +21,8 @@ public sealed class TriggerCompilerTests
         { "id": "{{NoteId}}", "kind": "entity", "name": "Note", "formatVersion": 1,
           "fields": [
             { "name": "title", "type": "text" },
-            { "name": "priority", "type": "integer" }
+            { "name": "priority", "type": "integer" },
+            { "name": "summary", "type": "text", "expression": "title" }
           ] }
         """;
 
@@ -133,10 +134,7 @@ public sealed class TriggerCompilerTests
     public void A_condition_that_is_not_a_boolean_over_the_payload_is_a_diagnostic_at_when(string when, string code)
     {
         using var folder = Folder()
-            .With("rules/is-urgent.json", """
-                { "id": "66666666-6666-4666-8666-666666666602", "kind": "rule", "name": "IsUrgent", "formatVersion": 1,
-                  "parameters": [{ "name": "value", "type": "integer" }], "resultType": "boolean", "expression": "value >= 3" }
-                """)
+            .With("rules/is-urgent.json", IsUrgentRule)
             .With("triggers/review.json", Trigger("ReviewClosedNotes", "NoteClosed", "NoteReview", $$""", "when": "{{when}}" """));
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -146,7 +144,134 @@ public sealed class TriggerCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void A_data_change_trigger_compiles_into_the_model_with_its_entity_on_flags_and_fields()
+    {
+        using var folder = Folder().With("triggers/review.json", DataChangeTrigger("note", "NOTEREVIEW", """, "on": ["update"], "fields": ["PRIORITY"] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var trigger = Assert.Single(result.Model.Triggers);
+        Assert.Equal(
+            (Guid.Parse(TriggerId), "ReviewNotes", "triggers/review.json", TriggerType.DataChange, DataChangeKinds.Update),
+            (trigger.Id, trigger.Name, trigger.File, trigger.Type, trigger.On));
+        Assert.Equal(new EntityReference(Guid.Parse(NoteId), "Note"), trigger.Entity);
+        Assert.Equal(new ProcessReference(Guid.Parse(NoteReviewId), "NoteReview"), trigger.Process);
+        Assert.Equal(["priority"], trigger.Fields);
+        Assert.Equal((TriggerMode.Async, null, null), (trigger.Mode, trigger.Event, trigger.When));
+    }
+
+    [Fact]
+    public void A_data_change_trigger_without_fields_has_null_fields_and_both_flags()
+    {
+        using var folder = Folder().With("triggers/review.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["create", "update"] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var trigger = Assert.Single(result.Model!.Triggers);
+        Assert.Equal((DataChangeKinds.Create | DataChangeKinds.Update, null), (trigger.On, trigger.Fields));
+    }
+
+    [Fact]
+    public void A_data_change_condition_sees_the_record_and_can_call_a_rule()
+    {
+        using var folder = Folder()
+            .With("rules/is-urgent.json", IsUrgentRule)
+            .With("triggers/review.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["create"], "when": "IsUrgent(priority) and title == 'x'" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var when = Assert.Single(result.Model!.Triggers).When;
+        Assert.NotNull(when);
+        Assert.Equal(ExpressionType.Boolean, when.Check.Type);
+    }
+
+    [Fact]
+    public void A_data_change_condition_that_is_not_a_boolean_is_a_diagnostic_at_when()
+    {
+        using var folder = Folder().With("triggers/review.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["create"], "when": "priority" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.ResultTypeMismatch, "triggers/review.json", "/when"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_data_change_trigger_over_an_unknown_entity_or_another_entity_is_a_diagnostic_at_entity()
+    {
+        using var folder = Folder()
+            .With("triggers/a.json", DataChangeTrigger("Nothing", "NoteReview", """, "on": ["create"] """))
+            .With("triggers/b.json", DataChangeTrigger("Person", "NoteReview", """, "on": ["create"] """, id: OtherTriggerId));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownTriggerEntity, "triggers/a.json", "/entity"),
+                (DiagnosticCodes.TriggerEntityNotProcessSubject, "triggers/b.json", "/entity"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)));
+        Assert.Equal(
+            [
+                "The entity 'Nothing' was not found. No loaded entity has that name.",
+                "The trigger watches the entity 'Person', but the process 'NoteReview' is over 'Note'. A trigger starts the process for the record that changed.",
+            ],
+            result.Diagnostics.Select(diagnostic => diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_data_change_field_that_is_unknown_or_computed_is_a_diagnostic_at_its_index()
+    {
+        using var folder = Folder().With("triggers/review.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["update"], "fields": ["title", "nothing", "Summary"] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.InvalidTriggerField, "/fields/1"),
+                (DiagnosticCodes.InvalidTriggerField, "/fields/2"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("names no field", result.Diagnostics[0].Message);
+        Assert.Contains("computed field", result.Diagnostics[1].Message);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_data_change_trigger_over_an_entity_that_did_not_load_is_not_reported_again()
+    {
+        using var folder = Folder()
+            .With("entities/broken.json", """
+                { "id": "11111111-1111-4111-8111-111111111119", "kind": "entity", "name": "Broken", "formatVersion": 1 }
+                """)
+            .With("triggers/review.json", DataChangeTrigger("Broken", "NoteReview", """, "on": ["create"], "fields": ["x"], "when": "nothing" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.File.StartsWith("triggers/", StringComparison.Ordinal));
+    }
+
     [Theory]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create"], "event": "NoteClosed" """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create"], "mode": "async" """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": [] """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create", "create"] """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["delete"] """)]
+    [InlineData(""" "type": "dataChange", "on": ["create"] """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note" """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["update"], "fields": [] """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["update"], "fields": ["title", "title"] """)]
+    [InlineData(""" "type": "event", "event": "NoteClosed", "on": ["create"] """)]
+    [InlineData(""" "type": "event", "event": "NoteClosed", "fields": ["title"] """)]
+    [InlineData(""" "type": "schedule", "event": "NoteClosed" """)]
     [InlineData(""" "type": "dataChange", "event": "NoteClosed" """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "Sync" """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "later" """)]
@@ -165,6 +290,16 @@ public sealed class TriggerCompilerTests
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.SchemaViolation, "triggers/review.json"), (diagnostic.Code, diagnostic.File)));
         Assert.Null(result.Model);
     }
+
+    private const string IsUrgentRule = """
+        { "id": "66666666-6666-4666-8666-666666666602", "kind": "rule", "name": "IsUrgent", "formatVersion": 1,
+          "parameters": [{ "name": "value", "type": "integer" }], "resultType": "boolean", "expression": "value >= 3" }
+        """;
+
+    private static string DataChangeTrigger(string entity, string process, string rest = "", string id = TriggerId) => $$"""
+        { "id": "{{id}}", "kind": "trigger", "name": "{{(id == TriggerId ? "ReviewNotes" : "ReviewOthers")}}", "formatVersion": 1, "type": "dataChange",
+          "entity": "{{entity}}", "process": "{{process}}" {{rest}} }
+        """;
 
     private static string Trigger(string name, string @event, string process, string rest = "", string id = TriggerId) => $$"""
         { "id": "{{id}}", "kind": "trigger", "name": "{{name}}", "formatVersion": 1, "type": "event",
