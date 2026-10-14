@@ -15,8 +15,8 @@ public static class ProcessesServiceCollectionExtensions
     /// services and needs the tenancy services.
     /// </summary>
     /// <param name="allowHttpConnectorUrls">
-    /// Whether a connector call may go to an <c>http</c> base URL. Pass <see langword="true"/> only
-    /// in Development.
+    /// Whether a connector call, or a package operation through a <c>url</c> binding, may go to an
+    /// <c>http</c> URL. Pass <see langword="true"/> only in Development.
     /// </param>
     public static IServiceCollection AddProcesses(this IServiceCollection services, bool allowHttpConnectorUrls)
     {
@@ -25,6 +25,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton<ConnectorClient>();
+        services.AddSingleton<PackageHttpTransport>();
         services.AddSingleton<IExternalWorkItemHandler, ConnectorCallHandler>();
         services.AddSingleton<IExternalWorkItemHandler, PackageCallHandler>();
         services.AddSingleton<IExternalWorkItemHandler, EventDeliveryHandler>();

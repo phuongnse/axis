@@ -516,10 +516,11 @@ flowchart LR
      active under the manifest name; if one is, it returns `AXC0020` and
      changes nothing. It then checks each site path; it returns one `AXC0031`
      for every site whose path another application holds, and changes
-     nothing. It then checks the deployment bindings of every connector
-     against the tenant's. It returns one `AXC0100` for every binding the
-     tenant lacks or holds with another kind, and outside Development one
-     `AXC0101` for every base URL binding that is not `https`, and changes
+     nothing. It then checks the deployment bindings of every connector, and
+     of every package operation that a process step uses, against the tenant's.
+     It returns one `AXC0100` for every binding the tenant lacks or holds with
+     another kind, and outside Development one `AXC0101` for every base URL
+     binding or package `url` binding that is not `https`, and changes
      nothing. It then provisions the entity tables (see
      [Storage](storage.md#storage)); when provisioning returns diagnostics, they are
      returned and the active release is untouched. Only then is the release
@@ -672,8 +673,8 @@ sorted by file and then path.
 | `AXC0097` | A connector operation's `path` has an unbalanced `{` or `}`, or a placeholder other than `{idempotencyKey}`, such as `{orderId}`. Reported at `/operations/{i}/path`. |
 | `AXC0098` | A connector operation's `lookup` names no operation of the connector, ignoring letter case, or names its own operation. Or the operation it names is not a `GET`, has no `{idempotencyKey}` in its `path`, or has other outputs than the operation it serves. The message says which. Reported at `/operations/{i}/lookup`. |
 | `AXC0099` | A connector's `timeout` is not a positive ISO 8601 duration of at most `PT2M`, in the form a task's `dueIn` takes, such as `PT30S`. Reported at `/timeout`. |
-| `AXC0100` | The tenant a release is activated for lacks a binding a connector names, or holds it with another kind. `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding. Reported by activation at `/baseUrl/binding`, `/auth/token/binding` or `/auth/value/binding` of the connector file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
-| `AXC0101` | Outside Development, a connector's `baseUrl` binding is not an `https` URL. Reported by activation at `/baseUrl/binding` of the connector file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
+| `AXC0100` | The tenant a release is activated for lacks a binding a connector names, or holds it with another kind. `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding. Reported by activation at `/baseUrl/binding`, `/auth/token/binding` or `/auth/value/binding` of the connector file. The same applies to the `capabilities` of a package operation that a process step uses: `urls` need `url` bindings and `secrets` need `secret` bindings, reported at `/steps/{i}/operation` of the process file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
+| `AXC0101` | Outside Development, a connector's `baseUrl` binding is not an `https` URL. Reported by activation at `/baseUrl/binding` of the connector file. The same applies to a `url` binding in the `capabilities` of a package operation that a process step uses, reported at `/steps/{i}/operation` of the process file. The message names the tenant and the binding, never its value. Nothing is provisioned or activated. |
 | `AXC0102` | A process `callConnector` step's `connector` `name` names no loaded connector, ignoring letter case. Reported at `/steps/{i}/connector/name`. Not reported when the name is a connector file that was not loaded because of its own errors. Its `input` and `output` are then not checked. |
 | `AXC0103` | A process `callConnector` step's `connector` `operation` names no operation of its connector, ignoring letter case. Reported at `/steps/{i}/connector/operation`. Its `input` and `output` are then not checked. |
 | `AXC0104` | A key of a `callConnector` step's `input` names no input of the operation, or an input an earlier key of the step already names, ignoring letter case. Reported at `/steps/{i}/input/{key}`. |
@@ -1019,7 +1020,9 @@ This section follows
 The `Bindings` block, its startup checks, resolving a binding at run time,
 the secret value that hides itself from text, JSON and logs, the `connector`
 resource with its [compile checks](#configuration-pipeline) and the activation
-check are built. Calling a connector and using secrets in its calls are built
+check are built. So are the bindings that a package operation declares, which
+activation checks and the operation context hands out, see
+[Capabilities](extension-packages.md#capabilities). Calling a connector and using secrets in its calls are built
 too, and so are retries and reconciliation. A `connector` resource
 describes an external system that a process can call. Its URL and its secret
 are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
@@ -1032,6 +1035,8 @@ reconciles is in [Connector calls](processes.md#connector-calls).
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
+  A package operation names them in the `capabilities` of its manifest:
+  `urls` need `url` bindings and `secrets` need `secret` bindings.
 - **Where values live.** Each tenant holds its values in
   `Tenants:{id}:Bindings:{name}` of the host configuration, until the tenant
   directory in M9. Each binding has a `Kind`, `url` or `secret`, and a
@@ -1056,7 +1061,9 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   binding.
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
-  kind (`AXC0100`). The binding diagnostic names the tenant and the binding.
+  kind (`AXC0100`). The release uses the bindings of its connectors, and the
+  `capabilities` of each package operation that a process step uses. The
+  binding diagnostic names the tenant and the binding.
   Activation checks bindings before it provisions anything, and reports every
   bad binding at once. Startup activation passes in each tenant's bindings,
   so a bad binding stops the start. A tenant is checked only when a release
@@ -1069,9 +1076,11 @@ reconciles is in [Connector calls](processes.md#connector-calls).
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
-  must be `https`. Activation checks each connector's base URL binding
-  (`AXC0101`). The call checks it again: a worker outside Development never
-  sends a call to an `http` URL, and fails the call instead.
+  must be `https`. Activation checks each connector's base URL binding and
+  each `url` binding that a package operation step declares (`AXC0101`). The
+  call checks it again: a worker outside Development never sends a call to an
+  `http` URL, and fails the call instead. A package call is retried instead,
+  and the operation does not run.
 
 The purchasing system's bindings for tenant `default` look like this:
 

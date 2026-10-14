@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
+using Axis.Data;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -149,6 +150,9 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private static readonly ActivationBindings _bindings =
+        ProcessStepFixture.PackageBindings(ProcessStepFixture.TenantId, new Uri("https://test.example.test"), allowHttp: false);
+
     private readonly ProcessStepFixture _tenant = new();
     private readonly TemporaryFolder _packages = new TemporaryFolder().Install("1.0.0", "1.1.0");
     private readonly TemporaryFolder _application = new();
@@ -195,7 +199,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);
-        (ReleaseId, _model) = await _tenant.ActivateAsync(_application.Path, catalog.Versions);
+        (ReleaseId, _model) = await _tenant.ActivateAsync(_application.Path, catalog.Versions, _bindings);
 
         _worker = BuildWorker(_packages.Path);
         _workerWithoutPackages = BuildWorker(_noPackages.Path);
@@ -271,7 +275,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
 
         folder.With(relativePath, content);
-        var (releaseId, _) = await _tenant.ActivateAsync(folder.Path, catalog.Versions);
+        var (releaseId, _) = await _tenant.ActivateAsync(folder.Path, catalog.Versions, _bindings);
         Assert.NotEqual(ReleaseId, releaseId);
         return releaseId;
     }
@@ -295,7 +299,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         application["packages"]!.AsArray()[0]!["version"] = version;
         await File.WriteAllTextAsync(path, application.ToJsonString());
 
-        var activated = await _tenant.ActivateAsync(folder.Path, catalog.Versions);
+        var activated = await _tenant.ActivateAsync(folder.Path, catalog.Versions, _bindings);
         Assert.NotEqual(ReleaseId, activated.ReleaseId);
         return activated;
     }
@@ -351,6 +355,10 @@ public sealed class PackageCallFixture : IAsyncLifetime
             {
                 [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
                 [$"Tenants:{_tenant.Tenant}:ConnectionString"] = _tenant.ConnectionString,
+                [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Kind"] = "url",
+                [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Value"] = "https://test.example.test",
+                [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Kind"] = "secret",
+                [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Value"] = "test-token",
                 [PackageCatalog.PathSetting] = packagesPath,
             })
             .Build();

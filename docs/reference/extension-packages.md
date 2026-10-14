@@ -6,8 +6,8 @@ capabilities and what the capability limits do not protect against. The
 manifest, the contracts, installation and loading are built. Version ranges
 and pinning in releases are built too, and so is checking a process step
 against the pinned manifest. Running a package operation from a process is
-built too, and so are its retries under the step's retry policy. Capabilities
-are not. How a process calls a package
+built too, and so are its retries under the step's retry policy. So are the
+capability limits of the operation context. How a process calls a package
 operation is in
 [Package operations](processes.md#package-operations), and how an application
 declares its packages is in
@@ -225,21 +225,40 @@ public class RetryableException : Exception { }
 
 ## Capabilities
 
-*(planned for M5)* An operation gets resources only through its context, and
-the context hands out only what the operation's manifest declares.
+An operation gets resources only through its context, and
+the context hands out only what the operation's manifest declares, for the
+tenant of the call.
 
+- **Resolved before the run.** The worker resolves every declared binding for
+  the current tenant before it runs the operation. A declared binding that the
+  tenant lacks, or holds with the wrong kind, makes the attempt retryable and
+  the operation does not run, as for a connector call.
 - **HTTP.** `GetHttpClient(name)` returns a client whose base address is the
-  value of the declared `url` binding `name`. The client refuses a request to
-  any other host, and follows no redirects, as a connector call does
+  value of the declared `url` binding `name`, with a trailing `/` added when
+  it has none, so a relative path extends the base path. The client follows no
+  redirects, as a connector call does
   ([D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed)).
+  It refuses a request whose scheme, host and port are not those of a `url`
+  binding the operation declares. The path on a declared host is not limited.
+  The clients share one connection pool for all tenants, which keeps no cookies.
+- **HTTPS.** The value of a `url` binding must be `https`. `http` is allowed
+  only in Development, as for connector base URLs. A worker outside
+  Development treats an `http` value as a retryable error and runs nothing.
 - **Secrets.** `GetSecret(name)` returns the value of the declared `secret`
   binding `name`.
 - **Anything else throws.** Asking for a binding the operation did not
-  declare throws. The attempt then fails, even if the operation catches the
-  exception and goes on.
+  declare, or sending a request to a host no declared `url` binding names,
+  throws. The attempt then fails at once, even if the operation catches the
+  exception and goes on, because a retry cannot fix a package that asks for
+  more than it declares.
+- **The error names the binding.** The error in the step history and on the call
+  names the operation, the package and the binding the operation asked for, or
+  the client it sent through. It holds no secret value and no URL, because a
+  host the package builds can carry input data.
 - **Activation check.** The binding check at activation also covers the
   bindings that package operations declare. A binding that is missing for the
-  tenant, or of the wrong kind, fails activation, see
+  tenant, or of the wrong kind, fails activation with `AXC0100`, and an `http`
+  `url` binding outside Development fails it with `AXC0101`, see
   [Deployment bindings](configuration.md#deployment-bindings).
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
@@ -248,7 +267,7 @@ the context hands out only what the operation's manifest declares.
 
 ## Not a sandbox
 
-*(planned for M5)* A package loads in the host's process, so loading it is not
+A package loads in the host's process, so loading it is not
 isolation. The capability limits stop mistakes. They do not stop a package
 that sets out to get around them. Packages are trusted code that the operator
 installs and reviews. Out-of-process isolation comes with multi-tenant
@@ -288,6 +307,7 @@ all of these:
   `/extensions`. In every run mode `Extensions:Path` names that folder.
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
-  tests install it to cover installation and loading. *(planned for M5)* It
-  will also cover the capability limits: a declared binding is handed out,
-  and an undeclared one fails the attempt.
+  tests install it to cover installation and loading. Its `probe` operation
+  in version 1.0.0 covers the capability limits: it uses its declared `url`
+  and `secret` bindings, and in the other modes it asks for a host or a secret
+  it does not declare.

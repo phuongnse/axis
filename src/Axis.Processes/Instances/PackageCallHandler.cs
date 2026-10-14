@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
@@ -6,6 +7,7 @@ using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Extensions;
 using Axis.Processes.Work;
+using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -27,13 +29,25 @@ namespace Axis.Processes.Instances;
 /// the operation may have acted, so it is retried only when it is <c>idempotent</c> and attempts are
 /// left. Otherwise the call is left <c>unknown</c> and the instance stays waiting. An output that does
 /// not fit, any other exception, a release or manifest that does not match, and a retryable error
-/// when no attempts are left settle the call <c>failed</c> and fail the instance. The retry policy and
-/// the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
+/// when no attempts are left settle the call <c>failed</c> and fail the instance.
+/// Before the operation runs, the worker resolves the <c>url</c> and <c>secret</c> bindings its
+/// manifest declares for the tenant. A binding the tenant lacks, or an <c>http</c> URL outside
+/// Development, is a retryable error and the operation does not run. The context gives the
+/// operation only those bindings. An operation that asks for another binding, or sends a request
+/// to a host no declared <c>url</c> binding names, fails the call at once, even if it catches the
+/// exception. The error names the operation, the package and the binding, never a value.
+/// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
 /// instance still waiting on the step at the revision the attempt saw. No input value and no
 /// exception message is stored or logged.
 /// </summary>
-internal sealed partial class PackageCallHandler(ReleaseModelCache models, PackageCatalog packages, ILogger<PackageCallHandler> logger) : IExternalWorkItemHandler
+internal sealed partial class PackageCallHandler(
+    ReleaseModelCache models,
+    PackageCatalog packages,
+    IDeploymentBindings bindings,
+    ConnectorCallSettings settings,
+    PackageHttpTransport transport,
+    ILogger<PackageCallHandler> logger) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
     internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
@@ -140,7 +154,20 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
             return await FailAsync(item, connection, attempt, $"The stored input of the call did not fit the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}'.", cancellationToken);
         }
 
-        var run = await RunAsync(target, attempt.Call, input, cancellationToken);
+        // The bindings are resolved before the operation runs, so a missing one leaves nothing run.
+        if (!TryCreateContext(item, target, attempt.Call, out var context, out var bindingError))
+        {
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, cancellationToken);
+        }
+
+        var run = await RunAsync(target, attempt.Call, input, context, cancellationToken);
+        if (context.Violation is { } violation)
+        {
+            // The operation asked for more than it declares. A retry cannot fix that, and the
+            // operation may have swallowed the exception, so this holds whatever it returned.
+            return await FailAsync(item, connection, attempt, violation, cancellationToken);
+        }
+
         if (run.Timeout)
         {
             // The operation may have acted.
@@ -221,11 +248,63 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
     }
 
     /// <summary>
+    /// Resolves the <c>url</c> and <c>secret</c> bindings the operation declares for the current
+    /// tenant into its context. Returns <see langword="false"/> with the error when a binding is
+    /// missing or of the wrong kind, or when a URL is not <c>https</c> and the host does not allow
+    /// <c>http</c>. The error never holds a binding's value.
+    /// </summary>
+    private bool TryCreateContext(
+        ClaimedWorkItem item,
+        Target target,
+        LoadedPackageCall call,
+        [NotNullWhen(true)] out PackageOperationContext? context,
+        [NotNullWhen(false)] out string? error)
+    {
+        var capabilities = target.Operation.Capabilities;
+        var urls = new Dictionary<string, Uri>(StringComparer.OrdinalIgnoreCase);
+        var secrets = new Dictionary<string, SecretValue>(StringComparer.OrdinalIgnoreCase);
+        context = null;
+        try
+        {
+            foreach (var name in capabilities.Urls)
+            {
+                var value = bindings.Resolve(name).Value;
+                if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !settings.AllowHttp))
+                {
+                    error = $"Tenant '{item.TenantId}' binding '{name}' is not an https URL. Only Development allows http.";
+                    return false;
+                }
+
+                urls[name] = uri;
+            }
+
+            foreach (var name in capabilities.Secrets)
+            {
+                secrets[name] = bindings.ResolveSecret(name);
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            error = exception.Message;
+            return false;
+        }
+
+        error = null;
+        context = new PackageOperationContext(call.Id, target.Package.Manifest.Id, target.Operation.Name, urls, secrets, transport.Handler);
+        return true;
+    }
+
+    /// <summary>
     /// Creates the operation and runs it, with no transaction open, under a token that is cancelled
     /// at the step's timeout. The result holds the output, or the error of an exception as its type
     /// name and whether it is retryable, or says that the run timed out. Worker shutdown is not caught.
     /// </summary>
-    private static async Task<Run> RunAsync(Target target, LoadedPackageCall call, Dictionary<string, object?> input, CancellationToken cancellationToken)
+    private static async Task<Run> RunAsync(
+        Target target,
+        LoadedPackageCall call,
+        Dictionary<string, object?> input,
+        PackageOperationContext context,
+        CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(target.Step.Timeout);
@@ -234,7 +313,7 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
             var operation = target.Package.CreateOperation(call.Operation);
 
             // An operation that ignores its token keeps running, but the worker stops waiting for it.
-            var output = await operation.RunAsync(input, new PackageOperationContext(call.Id), timeout.Token).WaitAsync(timeout.Token);
+            var output = await operation.RunAsync(input, context, timeout.Token).WaitAsync(timeout.Token);
             return new Run(output, null, false, false);
         }
         catch (Exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)

@@ -59,6 +59,8 @@ public sealed class PackageStepCompilerTests
         Assert.Equal(new RetryPolicyModel(10, TimeSpan.FromMinutes(1)), step.Retry);
         Assert.True(step.Idempotent);
         Assert.Equal(TimeSpan.FromSeconds(30), step.Timeout);
+        Assert.Equal(["TestUrl"], step.Capabilities.Urls);
+        Assert.Equal(["TestToken"], step.Capabilities.Secrets);
     }
 
     [Fact]

@@ -60,7 +60,7 @@ tests/
   Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
-  packages/               test-only extension package, built as three versions; capability limits (M5)
+  packages/               test-only extension package, built as three versions; covers the capability limits
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
 samples/
