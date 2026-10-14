@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Processes.Work;
@@ -10,9 +11,9 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// The compiled models of the releases instances are pinned to, per tenant and release id. Releases
 /// are immutable, so an entry never goes stale. There is no eviction: the cache grows by one model
-/// per release a step runs on.
+/// per release a step runs on. A model is rebuilt against the packages installed on this host.
 /// </summary>
-internal sealed class ReleaseModelCache
+internal sealed class ReleaseModelCache(PackageCatalog packages)
 {
     private readonly ConcurrentDictionary<(string TenantId, Guid ReleaseId), ApplicationModel> _models = new();
 
@@ -36,6 +37,6 @@ internal sealed class ReleaseModelCache
         await configuration.Database.UseTransactionAsync(context.Transaction, cancellationToken);
         var release = await new ActiveReleaseStore(configuration).GetReleaseAsync(releaseId, cancellationToken)
             ?? throw new InvalidOperationException($"The release '{releaseId}' could not be found.");
-        return _models.GetOrAdd(key, ReleaseCompiler.BuildModel(release));
+        return _models.GetOrAdd(key, ReleaseCompiler.BuildModel(release, packages.Versions));
     }
 }

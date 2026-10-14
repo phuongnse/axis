@@ -18,7 +18,7 @@ namespace Axis.Configuration.Compilation;
 /// the field type rules and type-checks its computed fields and validations, checks forms, sites,
 /// pages and seeds, checks data sources and their filters, checks role labels, checks processes,
 /// their step graphs, their conditions, the roles their tasks name and the connector operations
-/// their steps call, checks policies, their
+/// their steps call and the pinned package operations they run, checks policies, their
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
 /// lookups, checks events, their entities and their payload fields, checks endpoints, their
 /// entities, processes, input fields, mappings, output and wait, checks triggers, their
@@ -144,11 +144,24 @@ public static class ApplicationCompiler
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         IReadOnlyList<PinnedPackageModel> packages = [];
+        IReadOnlySet<string>? declaredPackageIds = null;
         if (loaded.Application is { } application)
         {
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
             packages = PackageChecker.Check(application, installedPackages, diagnostics);
+            declaredPackageIds = new HashSet<string>(application.Packages.Select(package => package.Id), StringComparer.Ordinal);
         }
+
+        // Package ids are matched exactly. Each pin is an installed version, so it has its manifest's operations.
+        var pinnedPackages = packages.ToDictionary(
+            pin => pin.Id,
+            pin => new PinnedOperations(
+                pin.Id,
+                pin.Version,
+                installedPackages.First(candidate => candidate.Id == pin.Id && candidate.Version == pin.Version).Operations),
+            StringComparer.Ordinal);
+
+        PinnedOperations? FindPackage(string id) => pinnedPackages.GetValueOrDefault(id);
 
         foreach (var role in loaded.Roles)
         {
@@ -188,6 +201,8 @@ public static class ApplicationCompiler
             loaded.UnloadedConnectorNames,
             FindEvent,
             loaded.UnloadedEventNames,
+            FindPackage,
+            declaredPackageIds,
             textKeys,
             rules,
             diagnostics);
@@ -249,7 +264,7 @@ public static class ApplicationCompiler
             Texts = loaded.Texts,
             Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, rules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules)).ToList(),

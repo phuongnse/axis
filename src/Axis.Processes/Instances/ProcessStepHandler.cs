@@ -242,6 +242,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 details = new JsonObject { ["step"] = step.Name, ["next"] = following.Name };
                 action = AuditActions.ProcessStepCompleted;
                 break;
+            case PackageOperationStepModel packageStep:
+                throw Failure(
+                    $"The step '{step.Name}' runs the package operation '{packageStep.Package}/{packageStep.Operation}'. Package operation steps are not supported yet.",
+                    instance,
+                    input);
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }

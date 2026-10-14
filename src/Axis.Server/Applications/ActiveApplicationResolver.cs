@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Core.Tenancy;
@@ -11,7 +12,7 @@ namespace Axis.Server.Applications;
 /// The active release is read on every call, so a new activation is served by the next call. The
 /// model is rebuilt from the release's stored resources once per tenant and release, then cached.
 /// </summary>
-internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenantContextAccessor tenants, ActiveModelCache cache)
+internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenantContextAccessor tenants, ActiveModelCache cache, PackageCatalog packages)
 {
     /// <summary>
     /// Returns the model of the release active under <paramref name="appName"/>, ignoring letter
@@ -118,6 +119,6 @@ internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenant
 
         var release = await store.GetReleaseAsync(releaseId, cancellationToken)
             ?? throw new InvalidOperationException($"The release '{releaseId}' could not be found.");
-        return cache.GetOrAdd(tenantId, releaseId, ReleaseCompiler.BuildModel(release));
+        return cache.GetOrAdd(tenantId, releaseId, ReleaseCompiler.BuildModel(release, packages.Versions));
     }
 }

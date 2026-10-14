@@ -29,6 +29,10 @@
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
     },
+    "stepOperation": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$"
+    },
     "textReference": {
       "type": "object",
       "additionalProperties": false,
@@ -59,7 +63,7 @@
           "items": { "$ref": "#/$defs/branch" }
         },
         "otherwise": { "$ref": "#/$defs/name" },
-        "operation": { "$ref": "#/$defs/name" },
+        "operation": { "$ref": "#/$defs/stepOperation" },
         "set": {
           "type": "object",
           "minProperties": 1,
@@ -218,6 +222,16 @@
           "then": {
             "required": ["event", "fields"],
             "properties": { "set": false, "connector": false, "input": false, "output": false, "retry": false }
+          }
+        },
+        {
+          "if": {
+            "required": ["type", "operation"],
+            "properties": { "type": { "const": "operation" }, "operation": { "type": "string", "pattern": "/" } }
+          },
+          "then": {
+            "required": ["input"],
+            "properties": { "set": false, "connector": false, "event": false, "fields": false }
           }
         }
       ]

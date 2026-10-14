@@ -200,9 +200,10 @@ flowchart LR
      `/steps/{i}/branches/{j}/when` with its
      [expression diagnostic](expressions.md#diagnostics) code. The
      `startCondition` message joins the `AXC0028` check. An operation step
-     whose `operation` is not `updateRecord`, `callConnector` or
-     `raiseEvent`, matched exactly, is `AXC0078` at `/steps/{i}/operation`,
-     and its other properties are not checked. Each key of an
+     whose `operation` is not `updateRecord`, `callConnector`,
+     `raiseEvent` or a package operation written `<package>/<operation>`,
+     matched exactly, is `AXC0078` at `/steps/{i}/operation`, and its other
+     properties are not checked. Each key of an
      `updateRecord` `set` must name a field of the entity, ignoring letter
      case, that no earlier key of the step names, otherwise it is `AXC0079`.
      A computed field, a sequence field or a child collection is `AXC0080`.
@@ -229,7 +230,15 @@ flowchart LR
      a field of the same type, and an `integer` output also fits a `decimal`
      field. Each of these is reported at `/steps/{i}/output/{key}`. A retry
      `backoff` that is not a positive whole-number duration is `AXC0109` at
-     `/steps/{i}/retry/backoff`. A `raiseEvent` step's `event` that names no
+     `/steps/{i}/retry/backoff`. A package operation step
+     whose package the application does not list in `packages` is `AXC0150`
+     at `/steps/{i}/operation`, unless it was listed and failed pinning
+     (`AXC0139` to `AXC0142`) or `application.json` was not loaded. An
+     operation the pinned version's manifest does not offer, ignoring letter
+     case, is `AXC0151` at the same path. With either, the step's `input` and
+     `output` are not checked. Otherwise they and the `retry` are checked as
+     for a `callConnector` step (`AXC0104` to `AXC0109`), against the
+     manifest's fields. A `raiseEvent` step's `event` that names no
      loaded [event](#event-resource), ignoring letter case, is `AXC0125` at
      `/steps/{i}/event`. A name whose event file was not loaded because of
      its own errors is not reported again. An event about another entity
@@ -262,8 +271,9 @@ flowchart LR
      `set` or with `connector`, `input`, `output` or `retry`, a
      `callConnector` step without `connector` or `input` or with `set`, a
      `raiseEvent` step without `event` or `fields` or with `set`,
-     `connector`, `input`, `output` or `retry`, an `event` or `fields` on
-     any other step, a retry `attempts` outside 1 to 10, a task without
+     `connector`, `input`, `output` or `retry`, a package operation step
+     without `input` or with `set`, `connector`, `event` or `fields`, an
+     `event` or `fields` on any other step, a retry `attempts` outside 1 to 10, a task without
      `label`, `assignee`, `form` or an outcome, and an `end` step with
      `branches`, `otherwise` or any other property, are `AXC0004`. See
      [processes](processes.md#compile-checks).
@@ -619,7 +629,7 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector` or `raiseEvent`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
 | `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
@@ -687,6 +697,8 @@ sorted by file and then path.
 | `AXC0143` | A data change trigger's `entity` names no loaded entity. Reported in the trigger at `/entity`. |
 | `AXC0144` | A data change trigger's `entity` is not the process's subject entity. Reported in the trigger at `/entity`. |
 | `AXC0145` | A name in a data change trigger's `fields` names no field of the entity, or names a computed field. Reported in the trigger at `/fields/{i}`. |
+| `AXC0150` | A process package operation step's `operation` names a package that the application does not list in `packages`, matched exactly. Not reported for a listed package that failed pinning (`AXC0139` to `AXC0142`), or when `application.json` was not loaded. Reported at `/steps/{i}/operation`. |
+| `AXC0151` | A process package operation step's `operation` names no operation in the manifest of the pinned version, matched ignoring letter case. Reported at `/steps/{i}/operation`. Its `input` and `output` are then not checked. |
 
 ## Startup activation
 

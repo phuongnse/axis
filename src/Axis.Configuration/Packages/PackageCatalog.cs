@@ -32,7 +32,7 @@ public sealed class PackageCatalog
     {
         Packages = packages;
         Diagnostics = diagnostics;
-        Versions = [.. packages.Select(package => new PackageVersion(package.Manifest.Id, package.Manifest.Version))];
+        Versions = [.. packages.Select(package => new PackageVersion(package.Manifest.Id, package.Manifest.Version) { Operations = package.Manifest.Operations })];
     }
 
     public static PackageCatalog Empty { get; } = new([], []);
@@ -40,7 +40,7 @@ public sealed class PackageCatalog
     /// <summary>The loaded packages, by id and then by version.</summary>
     public IReadOnlyList<InstalledPackage> Packages { get; }
 
-    /// <summary>The id and version of each loaded package, in the order of <see cref="Packages"/>.</summary>
+    /// <summary>The id, version and operations of each loaded package, in the order of <see cref="Packages"/>.</summary>
     public IReadOnlyList<PackageVersion> Versions { get; }
 
     /// <summary>The problems of the packages that were left out.</summary>

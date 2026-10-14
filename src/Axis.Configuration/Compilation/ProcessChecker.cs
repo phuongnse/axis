@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
@@ -14,15 +15,17 @@ namespace Axis.Configuration.Compilation;
 /// <c>end</c> step and is in no cycle. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
-/// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c> or
-/// <c>raiseEvent</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
+/// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c>,
+/// <c>raiseEvent</c> or a package operation, named <c>&lt;package&gt;/&lt;operation&gt;</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
 /// entity, named once, that is not computed, numbered by a sequence or a child collection. Each
 /// <c>set</c> expression type-checks against its field's type over the same scope as a condition.
 /// A <c>callConnector</c> step names a loaded connector and one of its operations. Its inputs are inputs of the operation,
 /// named once, that cover every required input, and each input expression type-checks against the
 /// input's type over the same scope. Its outputs are outputs of the operation, named once, each
 /// written to its own subject field that an <c>updateRecord</c> could set and whose type fits the
-/// output's. Its retry <c>backoff</c> is a positive fixed duration. A <c>raiseEvent</c> step names
+/// output's. Its retry <c>backoff</c> is a positive fixed duration. A package operation step names
+/// a package the application lists and an operation of the version it pins, and its inputs,
+/// outputs and retry are checked the same way against the manifest's fields. A <c>raiseEvent</c> step names
 /// a loaded event about the subject entity. Each of its <c>fields</c> keys names a payload field of
 /// the event, named once, every payload field has a key, and each expression type-checks against
 /// the payload field's type over the same scope. A task step's assignee is exactly one of a <c>user</c>, a
@@ -33,7 +36,8 @@ namespace Axis.Configuration.Compilation;
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
 /// unknown step is not also reported as having no path to an end, and a form, entity, role,
-/// connector or event file that was not loaded because of its own errors is not reported again.
+/// connector or event file that was not loaded because of its own errors, or a package that failed
+/// pinning, is not reported again.
 /// </summary>
 internal static class ProcessChecker
 {
@@ -46,7 +50,10 @@ internal static class ProcessChecker
     /// names the owner of a child entity, or gives null for a root entity.
     /// <paramref name="roleNames"/> holds the declared role names, compared exactly.
     /// <paramref name="findConnector"/> finds a loaded connector by name, ignoring letter case, and
-    /// <paramref name="findEvent"/> a loaded event.
+    /// <paramref name="findEvent"/> a loaded event. <paramref name="findPackage"/> finds the pinned
+    /// package version by id, compared exactly. <paramref name="declaredPackageIds"/> holds the ids
+    /// the application lists in <c>packages</c>, or is null when <c>application.json</c> was not
+    /// loaded.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -61,6 +68,8 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, EventResource?> findEvent,
         IReadOnlySet<string> unloadedEventNames,
+        Func<string, PinnedOperations?> findPackage,
+        IReadOnlySet<string>? declaredPackageIds,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -102,7 +111,8 @@ internal static class ProcessChecker
                 CheckConditions(process, scope, Report);
             }
 
-            CheckOperations(process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, Report);
+            CheckOperations(
+                process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, Report);
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, roleNames, unloadedRoleNames, Report);
 
@@ -134,7 +144,9 @@ internal static class ProcessChecker
     /// declared names of its connector, its operation, its inputs and outputs and their fields. Its
     /// inputs and outputs are in the operation's declaration order, and its retry policy has the
     /// defaults filled in. A raised event holds the event's declared name, and its payload is in the
-    /// event's declaration order.
+    /// event's declaration order. A package operation holds the package id, the pinned version, the
+    /// manifest's declared operation name, inputs and outputs in the manifest's order, the retry
+    /// policy with the defaults filled in, and the manifest's <c>idempotent</c> and <c>timeout</c>.
     /// </summary>
     public static ProcessModel Build(
         ProcessResource process,
@@ -142,6 +154,7 @@ internal static class ProcessChecker
         Func<string, FormResource?> findForm,
         Func<string, ConnectorResource?> findConnector,
         Func<string, EventResource?> findEvent,
+        Func<string, PinnedOperations?> findPackage,
         IEnumerable<ExpressionRule> rules)
     {
         var entity = findEntity(process.Entity)!;
@@ -211,6 +224,38 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
+        // A checked call names a pinned package and one of its operations, and each input and output once.
+        PackageOperationStepModel BuildPackageCall(ProcessStepDefinition step)
+        {
+            var separator = step.Operation!.IndexOf('/', StringComparison.Ordinal);
+            var package = findPackage(step.Operation[..separator])!;
+            var operation = FindPackageOperation(package, step.Operation[(separator + 1)..])!;
+            var inputs = new Dictionary<string, string>(step.Input!, StringComparer.OrdinalIgnoreCase);
+            var outputs = new Dictionary<string, string>(step.Output ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+            TimeSpan? backoff = step.Retry?.Backoff is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
+            return new PackageOperationStepModel(
+                step.Name,
+                package.Id,
+                package.Version,
+                operation.Name,
+                [
+                    .. operation.Input
+                        .Where(input => inputs.ContainsKey(input.Name))
+                        .Select(input => new ConnectorInputModel(
+                            input.Name,
+                            ExpressionModel.Compile(inputs[input.Name], scope, ExpressionScopes.TypeOf(input.Type)))),
+                ],
+                [
+                    .. operation.Output
+                        .Where(output => outputs.ContainsKey(output.Name))
+                        .Select(output => new ConnectorOutputModel(output.Name, FindField(entity, outputs[output.Name])!.Name)),
+                ],
+                new RetryPolicyModel(step.Retry?.Attempts ?? DefaultRetryAttempts, backoff ?? _defaultRetryBackoff),
+                operation.Idempotent,
+                operation.Timeout,
+                Resolve(step.Next!));
+        }
+
         // A checked raise names a loaded event and gives each of its payload fields once.
         RaiseEventStepModel BuildRaiseEvent(ProcessStepDefinition step)
         {
@@ -247,6 +292,7 @@ internal static class ProcessChecker
                     ProcessStepDefinition.TaskStep => BuildTask(step),
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.RaiseEvent => BuildRaiseEvent(step),
+                    ProcessStepDefinition.OperationStep when step.Operation!.Contains('/', StringComparison.Ordinal) => BuildPackageCall(step),
                     ProcessStepDefinition.OperationStep => new OperationStepModel(
                         step.Name,
                         step.Operation!,
@@ -489,9 +535,10 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks each operation step: its operation is <c>updateRecord</c>, <c>callConnector</c> or
-    /// <c>raiseEvent</c>, matched exactly as a step <c>type</c> is. A connector call is checked by
-    /// <see cref="CheckConnectorCall"/>, and a raised event by <see cref="CheckRaiseEvent"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
+    /// Checks each operation step: its operation is <c>updateRecord</c>, <c>callConnector</c>,
+    /// <c>raiseEvent</c> or a package operation, which contains a <c>/</c>, matched exactly as a step
+    /// <c>type</c> is. A connector call is checked by <see cref="CheckConnectorCall"/>, a package
+    /// operation by <see cref="CheckPackageCall"/> and a raised event by <see cref="CheckRaiseEvent"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
     /// of <paramref name="entity"/>, ignoring letter case, that no earlier key of the step names and
     /// that can be set. Its expression then fits the field's type over <paramref name="scope"/>. The
     /// <c>set</c> is not checked when the subject entity is unknown. The other properties of an
@@ -506,6 +553,8 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, EventResource?> findEvent,
         IReadOnlySet<string> unloadedEventNames,
+        Func<string, PinnedOperations?> findPackage,
+        IReadOnlySet<string>? declaredPackageIds,
         Action<string, string, string> report)
     {
         for (var index = 0; index < process.Steps.Count; index++)
@@ -513,6 +562,12 @@ internal static class ProcessChecker
             var step = process.Steps[index];
             if (step.Type != ProcessStepDefinition.OperationStep)
             {
+                continue;
+            }
+
+            if (step.Operation!.Contains('/', StringComparison.Ordinal))
+            {
+                CheckPackageCall(step, index, entity, scope, findPackage, declaredPackageIds, report);
                 continue;
             }
 
@@ -532,7 +587,7 @@ internal static class ProcessChecker
             {
                 report(
                     DiagnosticCodes.UnknownOperation,
-                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}' and '{ProcessStepDefinition.RaiseEvent}'.",
+                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}' and '{ProcessStepDefinition.RaiseEvent}'. A package operation is written '<package>/<operation>'.",
                     $"/steps/{index}/operation");
                 continue;
             }
@@ -628,10 +683,62 @@ internal static class ProcessChecker
         }
         else
         {
-            CheckConnectorInputs(step, path, operation, scope, report);
-            CheckConnectorOutputs(step, path, operation, entity, report);
+            CheckInputs(step, path, operation.Name, ToFields(operation.Input), scope, report);
+            CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
         }
 
+        CheckRetry(step, path, report);
+    }
+
+    /// <summary>
+    /// Checks a package operation step: its package is pinned, and its operation is an operation of
+    /// the manifest of the pinned version, ignoring letter case. A package that is not pinned is
+    /// reported only when the application does not list it: a listed package that failed pinning is
+    /// already reported, and so is an <c>application.json</c> that was not loaded. Only then are its
+    /// inputs and outputs checked like those of a connector call, against the manifest's fields. The
+    /// retry <c>backoff</c>, when set, is a positive fixed duration.
+    /// </summary>
+    private static void CheckPackageCall(
+        ProcessStepDefinition step,
+        int index,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, PinnedOperations?> findPackage,
+        IReadOnlySet<string>? declaredPackageIds,
+        Action<string, string, string> report)
+    {
+        var path = $"/steps/{index}";
+        var separator = step.Operation!.IndexOf('/', StringComparison.Ordinal);
+        var packageId = step.Operation[..separator];
+        var operationName = step.Operation[(separator + 1)..];
+        if (findPackage(packageId) is not { } package)
+        {
+            if (declaredPackageIds is not null && !declaredPackageIds.Contains(packageId))
+            {
+                report(
+                    DiagnosticCodes.UnknownStepPackage,
+                    $"The package '{packageId}' is not one of the application's packages. Add it to 'packages' in application.json.",
+                    $"{path}/operation");
+            }
+        }
+        else if (FindPackageOperation(package, operationName) is not { } operation)
+        {
+            report(
+                DiagnosticCodes.UnknownPackageOperation,
+                $"The operation '{operationName}' was not found. Package '{package.Id}' {package.Version} has no operation with that name.",
+                $"{path}/operation");
+        }
+        else
+        {
+            CheckInputs(step, path, operation.Name, ToFields(operation.Input), scope, report);
+            CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+        }
+
+        CheckRetry(step, path, report);
+    }
+
+    private static void CheckRetry(ProcessStepDefinition step, string path, Action<string, string, string> report)
+    {
         if (step.Retry?.Backoff is { } backoff && !IsoDuration.TryParse(backoff, out _))
         {
             report(
@@ -641,20 +748,31 @@ internal static class ProcessChecker
         }
     }
 
-    private static void CheckConnectorInputs(
-        ProcessStepDefinition step, string path, ConnectorOperationDefinition operation, ExpressionScope? scope, Action<string, string, string> report)
+    private static IReadOnlyList<OperationField> ToFields(IReadOnlyList<ConnectorFieldDefinition> fields) =>
+        [.. fields.Select(field => new OperationField(field.Name, FieldTypes.Parse(field.Type), field.Required))];
+
+    private static IReadOnlyList<OperationField> ToFields(IReadOnlyList<PackageField> fields) =>
+        [.. fields.Select(field => new OperationField(field.Name, field.Type, field.Required))];
+
+    private static void CheckInputs(
+        ProcessStepDefinition step,
+        string path,
+        string operationName,
+        IReadOnlyList<OperationField> fields,
+        ExpressionScope? scope,
+        Action<string, string, string> report)
     {
         // The key that first named each input, by the input's declared name.
         var namedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, expression) in step.Input!)
         {
             var keyPath = $"{path}/input/{key}";
-            var input = operation.Input.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            var input = fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
             if (input is null)
             {
                 report(
                     DiagnosticCodes.UnknownConnectorInput,
-                    $"The input '{key}' was not found. The operation '{operation.Name}' has no input with that name.",
+                    $"The input '{key}' was not found. The operation '{operationName}' has no input with that name.",
                     keyPath);
                 continue;
             }
@@ -684,20 +802,25 @@ internal static class ProcessChecker
             }
         }
 
-        foreach (var input in operation.Input)
+        foreach (var input in fields)
         {
             if (input.Required && !namedBy.ContainsKey(input.Name))
             {
                 report(
                     DiagnosticCodes.MissingConnectorInput,
-                    $"The input '{input.Name}' is required by the operation '{operation.Name}', but the step does not give it.",
+                    $"The input '{input.Name}' is required by the operation '{operationName}', but the step does not give it.",
                     $"{path}/input");
             }
         }
     }
 
-    private static void CheckConnectorOutputs(
-        ProcessStepDefinition step, string path, ConnectorOperationDefinition operation, EntityResource? entity, Action<string, string, string> report)
+    private static void CheckOutputs(
+        ProcessStepDefinition step,
+        string path,
+        string operationName,
+        IReadOnlyList<OperationField> fields,
+        EntityResource? entity,
+        Action<string, string, string> report)
     {
         // The key that first named each output, by the output's declared name, and the key that
         // first wrote each field, by the field's declared name.
@@ -706,12 +829,12 @@ internal static class ProcessChecker
         foreach (var (key, fieldName) in step.Output ?? new Dictionary<string, string>())
         {
             var keyPath = $"{path}/output/{key}";
-            var output = operation.Output.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            var output = fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
             if (output is null)
             {
                 report(
                     DiagnosticCodes.UnknownConnectorOutput,
-                    $"The output '{key}' was not found. The operation '{operation.Name}' has no output with that name.",
+                    $"The output '{key}' was not found. The operation '{operationName}' has no output with that name.",
                     keyPath);
                 continue;
             }
@@ -756,13 +879,13 @@ internal static class ProcessChecker
                 continue;
             }
 
-            var outputType = FieldTypes.Parse(output.Type);
+            var outputType = output.Type;
             var fieldType = FieldTypes.Parse(field.Type);
             if (outputType != fieldType && !(outputType == FieldType.Integer && fieldType == FieldType.Decimal))
             {
                 report(
                     DiagnosticCodes.InvalidOutputField,
-                    $"The output '{output.Name}' is {output.Type}, so it cannot be written to the field '{field.Name}', which is {field.Type}.",
+                    $"The output '{output.Name}' is {FieldTypes.Name(outputType)}, so it cannot be written to the field '{field.Name}', which is {field.Type}.",
                     keyPath);
             }
         }
@@ -872,6 +995,10 @@ internal static class ProcessChecker
     private static ConnectorOperationDefinition? FindOperation(ConnectorResource connector, string name) =>
         connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Finds the first operation of <paramref name="package"/> with <paramref name="name"/>, ignoring letter case.</summary>
+    private static PackageOperation? FindPackageOperation(PinnedOperations package, string name) =>
+        package.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Why a process cannot write <paramref name="field"/>, or null when it can.</summary>
     private static string? ReadOnlyReason(FieldDefinition field) =>
         field.Expression is not null ? "is computed"
@@ -973,6 +1100,12 @@ internal static class ProcessChecker
         }
     }
 
+    /// <summary>An input or output field of a connector or package operation, with its type as a field type.</summary>
+    private sealed record OperationField(string Name, FieldType Type, bool Required);
+
     /// <summary>A transition and its path in the process file. <see cref="Target"/> is the index of the step it names, or null when it names none.</summary>
     private readonly record struct Transition(int? Target, string Path);
 }
+
+/// <summary>The pinned version of an extension package: its id, its <c>major.minor.patch</c> version and the operations its manifest offers.</summary>
+internal sealed record PinnedOperations(string Id, string Version, IReadOnlyList<PackageOperation> Operations);
