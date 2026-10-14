@@ -34,8 +34,8 @@
 | **M2** | Data and rules | Done | Expression language, named rules, validation and computed fields, data sources (filters, sorting, paging, relations, aggregates), seed data beyond insert-once, such as updating seeded records, and line items on the purchase request form. |
 | **M3** | Processes and tasks | Done | Worker host. Purchase request submit → manager task → finance task above the threshold → approved, returned or rejected. Survives worker restart. One decision per task, one start per submission. Audit trail and sequence numbers. |
 | **M4** | Identity and authorization | Done | OIDC login through the BFF (Keycloak in tests), roles, default-deny policies at resource, record, field and action level. Denied-access E2E for the purchase request scenarios. |
-| **M5** | Events, triggers and integration | Next | Events, data change triggers, schedules, inbound endpoints, connectors with idempotency and reconciliation, deployment bindings and secrets, extension packages. The approved request creates exactly one purchase order, even when a response is lost. |
-| **M6** | Releases and versioning | Planned | Immutable releases with full pinning, waiting instances finishing on their old release, schema evolution with migrations, separate database roles for runtime access and schema changes, text resource lifecycle, configuration test scenarios in CI. |
+| **M5** | Events, triggers and integration | Done | Events, data change triggers, schedules, inbound endpoints, connectors with idempotency and reconciliation, deployment bindings and secrets, extension packages. The approved request creates exactly one purchase order, even when a response is lost. |
+| **M6** | Releases and versioning | Next | Immutable releases with full pinning, waiting instances finishing on their old release, schema evolution with migrations, separate database roles for runtime access and schema changes, text resource lifecycle, configuration test scenarios in CI. |
 | **M7** | Inspection and operations | Planned | Process inspector (graph, path, attempts, input and output, failures), correlated logs, metrics and traces, health checks, operator retry, cancel and resolve. |
 | **M8** | Studio and modules | Planned | Visual authoring that uses the same resource contracts, a dependency graph and a "where is this used" view, reusable modules, and a second sample application. |
 | **M9** | Tenancy and deployment | Planned | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. |
@@ -49,7 +49,11 @@ M4 is complete. See the closed
 [M4 milestone](https://github.com/phuongnse/axis/milestone/4?closed=1) on
 GitHub.
 
-M5 is next. See the
+M5 is complete. See the closed
+[M5 milestone](https://github.com/phuongnse/axis/milestone/5?closed=1) on
+GitHub.
+
+M6 is next. See the
 [milestones](https://github.com/phuongnse/axis/milestones) on GitHub.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4

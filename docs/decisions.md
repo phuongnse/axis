@@ -301,8 +301,9 @@ Processes and the worker host arrive in M3. See
   configured, not hard-coded.
 - **Operation:** M3 has one built-in operation, `updateRecord`. It sets fields
   of the subject record from expressions, through the record update command,
-  inside the step's transaction. Operations from extension packages and
-  external calls come in M5.
+  inside the step's transaction. M5 adds `raiseEvent`, `callConnector` and
+  package operations, see [D25](#d25-connectors-deployment-bindings-and-secrets--agreed),
+  [D26](#d26-events-and-triggers--agreed) and [D28](#d28-extension-packages--agreed).
 - **Start:** a process can declare a `startCondition`, an expression with a
   message text key. A start that fails it is a `400`. The start pins the
   instance to the active release.
@@ -318,8 +319,8 @@ Processes and the worker host arrive in M3. See
   claim token. The commit checks the token. When a lease expires, another
   worker can claim the item.
 - **Failure:** a failing step rolls back. A following transaction records the
-  error in the history and marks the instance `failed`. Retry policies come in
-  M5, and operator retry in M7.
+  error in the history and marks the instance `failed`. Connector and package
+  operation steps have retry policies (D25, D28). Operator retry comes in M7.
 - **History:** every step occurrence records its input, output, decision and
   error.
 
@@ -742,7 +743,9 @@ environment.
 
 ## D26. Events and triggers — Agreed
 
-M5 lets things that happen start processes. None of this is built yet. See
+M5 lets things that happen start processes. The event and trigger resources,
+the raise event step, sync and async event triggers, data change triggers and
+schedule triggers are built. See
 [configuration](reference/configuration.md#events-and-triggers) for the
 `event` and `trigger` resources, and
 [processes](reference/processes.md#events-and-triggers) for the raise event
@@ -862,7 +865,7 @@ responses and its errors. The owner confirmed these points on issue #312 on
   the `process` it starts on that record.
   - It is its own resource kind, not a `trigger`, because it has an input
     schema, an authorization grant and a response.
-  - In M5 an endpoint always creates its subject record. Acting on an
+  - An endpoint always creates its subject record. Acting on an
     existing record comes later.
 - **Address:** it answers `POST /api/apps/{app}/endpoints/{name}`.
 - **Input types:** input fields use the entity field types, including
@@ -953,7 +956,10 @@ need a second write that a crash can lose.
 ## D28. Extension packages — Agreed
 
 M5 lets a process run custom C# code from an extension package. The manifest,
-the contracts, installation and loading are built. The rest is not built yet.
+the contracts, installation and loading are built. Version pinning, the
+package operation step, its retries and the capability limits are built too.
+The activation check for a missing pinned version is not built *(planned for
+M6)*.
 See [extension packages](reference/extension-packages.md) for
 the manifest, the contracts, installation, loading and capabilities,
 [configuration](reference/configuration.md#extension-packages) for an

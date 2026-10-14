@@ -82,7 +82,7 @@ Later constraints:
 | **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. In M3 a process names one entity, its subject, and runs for one record of it. | M3 |
 | **Process instance** | One run of a process. It is pinned to its release and records every step occurrence with its input, output, decision and error. | M3 |
 | **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. In M3 the assignee is a user or a role, and the due date is only shown. Queues and escalation come later. See [processes](../reference/processes.md#task-api). | M3 |
-| **Retry policy** | In M5, a `callConnector` step and a package operation step declare their attempts and their backoff. The platform fixes which errors are retried, and the instance fails when attempts run out. Operator retry comes in M7, and alerts and compensation later. See [call outcomes](../reference/processes.md#call-outcomes) and [package call outcomes](../reference/processes.md#package-call-outcomes). | M5 |
+| **Retry policy** | A `callConnector` step and a package operation step declare their attempts and their backoff. The platform fixes which errors are retried, and the instance fails when attempts run out. Operator retry comes in M7, and alerts and compensation later. See [call outcomes](../reference/processes.md#call-outcomes) and [package call outcomes](../reference/processes.md#package-call-outcomes). | M5 |
 
 **Step kinds:**
 

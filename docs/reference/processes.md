@@ -1300,7 +1300,7 @@ saves, on `updateRecord` steps, on connector outputs and on package operation
 outputs, see [Starts from triggers](#starts-from-triggers). The worker runs
 schedule triggers too, once for each occurrence and for each record of the
 trigger's data source, see [Schedules](#schedules).
-*(planned for M5)* A `raiseEvent` step raises an
+A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a
