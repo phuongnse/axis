@@ -27,8 +27,8 @@ public sealed class TriggerCompilerTests
         """;
 
     private const string Person = $$"""
-        { "id": "{{PersonId}}", "kind": "entity", "name": "Person", "formatVersion": 1,
-          "fields": [ { "name": "name", "type": "text" } ] }
+        { "id": "{{PersonId}}", "kind": "entity", "name": "Person", "formatVersion": 1, "displayField": "name",
+          "fields": [ { "name": "name", "type": "text", "required": true } ] }
         """;
 
     [Fact]
@@ -272,6 +272,13 @@ public sealed class TriggerCompilerTests
     [InlineData(""" "type": "event", "event": "NoteClosed", "on": ["create"] """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "fields": ["title"] """)]
     [InlineData(""" "type": "schedule", "event": "NoteClosed" """)]
+    [InlineData(""" "type": "schedule", "schedule": "0 6 * * *", "timeZone": "Europe/Berlin", "dataSource": "NoteRows", "when": "priority >= 3" """)]
+    [InlineData(""" "type": "schedule", "schedule": "0 6 * * *", "timeZone": "Europe/Berlin", "dataSource": "NoteRows", "mode": "async" """)]
+    [InlineData(""" "type": "schedule", "schedule": "0 6 * * *", "dataSource": "NoteRows" """)]
+    [InlineData(""" "type": "schedule", "schedule": "0 6 * * *", "timeZone": "Europe/Berlin", "dataSource": "NoteRows", "entity": "Note" """)]
+    [InlineData(""" "type": "event", "event": "NoteClosed", "schedule": "0 6 * * *" """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create"], "timeZone": "Europe/Berlin" """)]
+    [InlineData(""" "type": "schedule", "schedule": "0 6 * * *", "timeZone": "Europe/Berlin", "dataSource": "NoteRows", "parameters": { "bad key": 1 } """)]
     [InlineData(""" "type": "dataChange", "event": "NoteClosed" """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "Sync" """)]
     [InlineData(""" "type": "event", "event": "NoteClosed", "mode": "later" """)]
@@ -290,6 +297,292 @@ public sealed class TriggerCompilerTests
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.SchemaViolation, "triggers/review.json"), (diagnostic.Code, diagnostic.File)));
         Assert.Null(result.Model);
     }
+
+    [Fact]
+    public void A_schedule_trigger_compiles_into_the_model_with_its_schedule_time_zone_data_source_and_parameters()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(rest: """, "parameters": { "MINPRIORITY": 3, "Status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var trigger = Assert.Single(result.Model.Triggers);
+        Assert.Equal(
+            (Guid.Parse(TriggerId), "Nightly", "triggers/nightly.json", TriggerType.Schedule, TriggerMode.Async),
+            (trigger.Id, trigger.Name, trigger.File, trigger.Type, trigger.Mode));
+        Assert.Equal("0 6 * * 1-5", trigger.Schedule!.Expression);
+        Assert.Equal("Europe/Berlin", trigger.TimeZone!.Id);
+        Assert.Equal(new DataSourceReference(Guid.Parse(NoteRowsId), "NoteRows"), trigger.DataSource);
+        Assert.Equal(new ProcessReference(Guid.Parse(NoteReviewId), "NoteReview"), trigger.Process);
+
+        // The values are keyed by the declared names, in the data source's order.
+        Assert.Equal(
+            [new KeyValuePair<string, object?>("minPriority", 3L), new KeyValuePair<string, object?>("status", null)],
+            trigger.Parameters!.ToList());
+        Assert.Null(trigger.Event);
+        Assert.Null(trigger.Entity);
+        Assert.Null(trigger.When);
+    }
+
+    [Fact]
+    public void A_schedule_trigger_reads_every_parameter_type_as_its_clr_type()
+    {
+        using var folder = ScheduleFolder()
+            .With("data-sources/typed.json", $$"""
+                { "id": "{{TypedRowsId}}", "kind": "dataSource", "name": "TypedRows", "formatVersion": 1, "entity": "Note",
+                  "fields": [{ "name": "title", "path": "title" }],
+                  "parameters": [
+                    { "name": "t", "type": "text" },
+                    { "name": "i", "type": "integer" },
+                    { "name": "d", "type": "decimal" },
+                    { "name": "b", "type": "boolean" },
+                    { "name": "day", "type": "date" },
+                    { "name": "at", "type": "date-time" },
+                    { "name": "e", "type": "enum", "values": ["open", "closed"] },
+                    { "name": "r", "type": "reference", "target": "Person" }
+                  ] }
+                """)
+            .With("triggers/nightly.json", ScheduleTrigger(
+                dataSource: "TypedRows",
+                rest: $$""", "parameters": { "t": "x", "i": -4, "d": 1.5, "b": true, "day": "2026-03-29", "at": "2026-03-29T03:00:00+02:00", "e": "closed", "r": "{{PersonId}}" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(
+            ["x", -4L, 1.5m, true, new DateOnly(2026, 3, 29), new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero), "closed", Guid.Parse(PersonId)],
+            Assert.Single(result.Model!.Triggers).Parameters!.Values.ToArray());
+    }
+
+    [Fact]
+    public void A_bad_schedule_is_reported_in_one_pass_at_each_path()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(
+            schedule: "* * * *", timeZone: "Mars/Olympus", dataSource: "PersonRows", process: "NoteReview"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.TriggerDataSourceOverOtherEntity, "/dataSource"),
+                (DiagnosticCodes.MissingTriggerParameter, "/parameters"),
+                (DiagnosticCodes.InvalidTriggerSchedule, "/schedule"),
+                (DiagnosticCodes.UnknownTriggerTimeZone, "/timeZone"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("NoteReview", result.Diagnostics.Single(diagnostic => diagnostic.Code == DiagnosticCodes.TriggerDataSourceOverOtherEntity).Message);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Every_parameter_the_trigger_does_not_give_is_reported_once_at_parameters()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger());
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [(DiagnosticCodes.MissingTriggerParameter, "/parameters"), (DiagnosticCodes.MissingTriggerParameter, "/parameters")],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("minPriority", result.Diagnostics[0].Message);
+        Assert.Contains("status", result.Diagnostics[1].Message);
+    }
+
+    [Fact]
+    public void A_schedule_trigger_over_an_unknown_data_source_is_a_diagnostic_at_data_source()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(dataSource: "Missing"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownTriggerDataSource, "/dataSource"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_schedule_trigger_over_a_data_source_that_did_not_load_is_not_reported_again()
+    {
+        using var folder = ScheduleFolder()
+            .With("data-sources/broken.json", """
+                { "id": "99999999-9999-4999-8999-999999999909", "kind": "dataSource", "name": "Broken", "formatVersion": 1 }
+                """)
+            .With("triggers/nightly.json", ScheduleTrigger(dataSource: "Broken"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.File.StartsWith("triggers/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_schedule_trigger_over_a_grouped_data_source_is_a_diagnostic_at_data_source()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(dataSource: "NotesByTitle"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.GroupedTriggerDataSource, "/dataSource"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_schedule_trigger_with_an_unknown_or_repeated_parameter_key_is_a_diagnostic_at_the_key()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(
+            rest: """, "parameters": { "minPriority": 3, "nothing": 1, "MINPRIORITY": 4, "status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownTriggerParameter, "/parameters/MINPRIORITY"),
+                (DiagnosticCodes.UnknownTriggerParameter, "/parameters/nothing"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("already given by 'minPriority'", result.Diagnostics[0].Message);
+    }
+
+    [Theory]
+    [InlineData(""" "minPriority": "3", "status": null """)]
+    [InlineData(""" "minPriority": 3.5, "status": null """)]
+    [InlineData(""" "minPriority": 99999999999999999999, "status": null """)]
+    [InlineData(""" "minPriority": null, "status": null """)]
+    [InlineData(""" "minPriority": true, "status": null """)]
+    public void A_wrongly_typed_value_is_a_diagnostic_at_the_key(string parameters)
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(rest: $$""", "parameters": { {{parameters}} } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidTriggerParameterValue, "/parameters/minPriority"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_enum_value_that_is_not_in_the_values_is_a_diagnostic_at_the_key()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(rest: """, "parameters": { "minPriority": 3, "status": "later" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidTriggerParameterValue, "/parameters/status"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("* * * *")]
+    [InlineData("60 * * * *")]
+    [InlineData("* 24 * * *")]
+    [InlineData("* * 0 * *")]
+    [InlineData("* * * 13 *")]
+    [InlineData("* * * * 8")]
+    [InlineData("5-3 * * * *")]
+    [InlineData("*/0 * * * *")]
+    [InlineData("5/10 * * * *")]
+    [InlineData("0 0 * JAN *")]
+    [InlineData("0 0 * * MON")]
+    [InlineData("0 0 30 2 *")]
+    [InlineData("0 0 31 4,6,9,11 *")]
+    [InlineData("1,,2 * * * *")]
+    [InlineData("-1 * * * *")]
+    [InlineData("1- * * * *")]
+    [InlineData("1-2-3 * * * *")]
+    [InlineData("*/-1 * * * *")]
+    [InlineData("١ * * * *")]
+    public void An_invalid_cron_is_a_diagnostic_at_schedule(string schedule)
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(
+            schedule: schedule, rest: """, "parameters": { "minPriority": 3, "status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidTriggerSchedule, "/schedule"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("0 0 29 2 *")]
+    [InlineData("0 0 31 * *")]
+    [InlineData("0 0 30 2 1")]
+    [InlineData("*/15 9-17 * * 1-5")]
+    [InlineData("0 0 * * 7")]
+    [InlineData("0,30 */6 1,15 1-6/2 0")]
+    public void A_valid_cron_compiles(string schedule)
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(
+            schedule: schedule, rest: """, "parameters": { "minPriority": 3, "status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("Europe/berlin")]
+    [InlineData("W. Europe Standard Time")]
+    [InlineData("Berlin")]
+    public void A_time_zone_that_is_not_an_exact_iana_id_is_a_diagnostic_at_time_zone(string timeZone)
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(
+            timeZone: timeZone, rest: """, "parameters": { "minPriority": 3, "status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownTriggerTimeZone, "/timeZone"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_schedule_trigger_with_an_unknown_process_is_axc0129()
+    {
+        using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(
+            process: "Nothing", rest: """, "parameters": { "minPriority": 3, "status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownTriggerProcess, "/process"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    private const string NoteRowsId = "99999999-9999-4999-8999-999999999901";
+    private const string TypedRowsId = "99999999-9999-4999-8999-999999999904";
+
+    private static string ScheduleTrigger(
+        string schedule = "0 6 * * 1-5",
+        string timeZone = "Europe/Berlin",
+        string dataSource = "NoteRows",
+        string process = "NoteReview",
+        string rest = "") => $$"""
+        { "id": "{{TriggerId}}", "kind": "trigger", "name": "Nightly", "formatVersion": 1, "type": "schedule",
+          "schedule": "{{schedule}}", "timeZone": "{{timeZone}}", "dataSource": "{{dataSource}}", "process": "{{process}}" {{rest}} }
+        """;
+
+    /// <summary>
+    /// <see cref="Folder"/> with the data source <c>NoteRows</c> over <c>Note</c> with the required integer
+    /// <c>minPriority</c> and the optional enum <c>status</c>, the grouped data source <c>NotesByTitle</c>
+    /// and the data source <c>PersonRows</c> over <c>Person</c>.
+    /// </summary>
+    private static TemporaryFolder ScheduleFolder() =>
+        Folder()
+            .With("data-sources/note-rows.json", $$"""
+                { "id": "{{NoteRowsId}}", "kind": "dataSource", "name": "NoteRows", "formatVersion": 1, "entity": "Note",
+                  "fields": [{ "name": "title", "path": "title" }],
+                  "parameters": [
+                    { "name": "minPriority", "type": "integer", "required": true },
+                    { "name": "status", "type": "enum", "values": ["open", "closed"] }
+                  ] }
+                """)
+            .With("data-sources/notes-by-title.json", """
+                { "id": "99999999-9999-4999-8999-999999999902", "kind": "dataSource", "name": "NotesByTitle", "formatVersion": 1, "entity": "Note",
+                  "fields": [{ "name": "title", "path": "title" }],
+                  "aggregate": { "groupBy": ["title"], "measures": [{ "name": "n", "function": "count" }] } }
+                """)
+            .With("data-sources/person-rows.json", """
+                { "id": "99999999-9999-4999-8999-999999999903", "kind": "dataSource", "name": "PersonRows", "formatVersion": 1, "entity": "Person",
+                  "fields": [{ "name": "name", "path": "name" }],
+                  "parameters": [{ "name": "limit", "type": "integer" }] }
+                """);
 
     private const string IsUrgentRule = """
         { "id": "66666666-6666-4666-8666-666666666602", "kind": "rule", "name": "IsUrgent", "formatVersion": 1,

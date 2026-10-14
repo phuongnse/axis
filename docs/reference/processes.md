@@ -1248,8 +1248,9 @@ event trigger in the transaction of the `raiseEvent` step, see
 [Raise event step](#raise-event-step). Data change triggers fire on record API
 creates and updates and on an inbound endpoint's record create, see
 [Starts from triggers](#starts-from-triggers). They do not fire yet on task
-form saves, `updateRecord` steps or connector outputs. *(planned for M5)*
-Schedule triggers are not built yet. A `raiseEvent` step raises an
+form saves, `updateRecord` steps or connector outputs. Schedule triggers
+compile and are part of the release, but the worker does not run them yet.
+*(planned for M5)* A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a

@@ -8,6 +8,9 @@ public enum TriggerType
 
     /// <summary>A record of the process's subject entity that was created or updated.</summary>
     DataChange,
+
+    /// <summary>A cron schedule, for each row of a data source.</summary>
+    Schedule,
 }
 
 /// <summary>The kinds of write that start a data change trigger.</summary>
@@ -38,7 +41,8 @@ public enum TriggerMode
 /// process for the record a raised event names, either later in async mode or in the raising
 /// step's transaction in sync mode. A data change trigger starts it for a record that was created
 /// or updated. Data change triggers fire on record API creates and updates and on an inbound
-/// endpoint's create.
+/// endpoint's create. A schedule trigger starts it on a cron schedule in its own time zone, for each
+/// row of a data source with fixed parameter values. The worker does not run schedule triggers yet.
 /// </summary>
 public sealed record TriggerModel
 {
@@ -71,4 +75,21 @@ public sealed record TriggerModel
 
     /// <summary>The boolean condition over the event's payload fields or over the watched record, or null when every occurrence starts the process.</summary>
     public ExpressionModel? When { get; init; }
+
+    /// <summary>The cron of a schedule trigger. It is set for a schedule trigger only.</summary>
+    public CronSchedule? Schedule { get; init; }
+
+    /// <summary>The time zone in which <see cref="Schedule"/> is read. It is set for a schedule trigger only.</summary>
+    public TimeZoneInfo? TimeZone { get; init; }
+
+    /// <summary>The data source whose rows a schedule trigger starts the process for. It is set for a schedule trigger only.</summary>
+    public DataSourceReference? DataSource { get; init; }
+
+    /// <summary>
+    /// The values of the data source's parameters, by declared name, in the data source's declaration order. A
+    /// value is a <see cref="string"/> for text and enum, <see cref="long"/>, <see cref="decimal"/>,
+    /// <see cref="bool"/>, <see cref="DateOnly"/>, a <see cref="DateTimeOffset"/> in UTC or a <see cref="Guid"/> for
+    /// reference, or null when an optional parameter is not given. It is set for a schedule trigger only.
+    /// </summary>
+    public IReadOnlyDictionary<string, object?>? Parameters { get; init; }
 }

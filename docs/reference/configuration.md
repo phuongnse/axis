@@ -383,10 +383,28 @@ flowchart LR
      is unknown. Data change triggers fire on record API creates and updates
      and on an inbound endpoint's create, and do not fire yet on other writes.
 
-     A `type` other than `event` or `dataChange`, a `mode` other than
-     `async` or `sync`, a property that belongs to another trigger type, an
-     empty or repeated `on`, and an empty or repeated `fields` are
-     `AXC0004`.
+     A schedule trigger's `schedule` must be a valid 5-field cron, otherwise
+     it is `AXC0160` at `/schedule`. Its `timeZone` must be an IANA id,
+     written with its exact letter case, otherwise it is `AXC0161` at
+     `/timeZone`. Its `dataSource` must name a loaded data source, ignoring
+     letter case, otherwise it is `AXC0162` at `/dataSource`. A grouped data
+     source is `AXC0163` and a data source over another entity than the
+     process's subject entity is `AXC0164`, both at `/dataSource`. The
+     second is not checked when either entity is unknown. Each `parameters`
+     key must name a parameter of the data source, ignoring letter case, and
+     no parameter may be named twice, otherwise the key is `AXC0165` at
+     `/parameters/{key}`. A value that is not a literal of the parameter's
+     type is `AXC0166` at `/parameters/{key}`. Each parameter that no key
+     gives is `AXC0167` at `/parameters`, once for each parameter, even when
+     `parameters` is left out. The parameters are not checked when the data
+     source is unknown. A name whose data source file was not loaded because
+     of its own errors is not reported again. The
+     [schedule trigger](#events-and-triggers) section lists the rules.
+
+     A `type` other than `event`, `dataChange` or `schedule`, a `mode` other
+     than `async` or `sync`, a `when` or `mode` on a schedule trigger, a
+     property that belongs to another trigger type, an empty or repeated
+     `on`, and an empty or repeated `fields` are `AXC0004`.
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
@@ -406,7 +424,9 @@ flowchart LR
    typed input fields, their mapped fields in the entity's order with each
    expression checked, and their output and wait. It also holds the triggers
    in path order, with their event and process resolved and their `when`
-   checked. No model is produced while any error remains.
+   checked. A schedule trigger holds its parsed cron, its time zone, its
+   data source reference and its parameter values, typed and keyed by the
+   declared parameter names. No model is produced while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -700,6 +720,14 @@ sorted by file and then path.
 | `AXC0145` | A name in a data change trigger's `fields` names no field of the entity, or names a computed field. Reported in the trigger at `/fields/{i}`. |
 | `AXC0150` | A process package operation step's `operation` names a package that the application does not list in `packages`, matched exactly. Not reported for a listed package that failed pinning (`AXC0139` to `AXC0142`), or when `application.json` was not loaded. Reported at `/steps/{i}/operation`. |
 | `AXC0151` | A process package operation step's `operation` names no operation in the manifest of the pinned version, matched ignoring letter case. Reported at `/steps/{i}/operation`. Its `input` and `output` are then not checked. |
+| `AXC0160` | A schedule trigger's `schedule` is not a valid 5-field cron. Reported at `/schedule`. |
+| `AXC0161` | A schedule trigger's `timeZone` is not an IANA time zone id known to the machine, or is written in another letter case. Reported at `/timeZone`. |
+| `AXC0162` | A schedule trigger's `dataSource` names no loaded data source, matched ignoring letter case. Reported at `/dataSource`. |
+| `AXC0163` | A schedule trigger's `dataSource` names a grouped data source. Reported at `/dataSource`. |
+| `AXC0164` | A schedule trigger's `dataSource` is over another entity than the process's subject entity. Reported at `/dataSource`. |
+| `AXC0165` | A key in a schedule trigger's `parameters` names no parameter of the data source, or repeats a parameter that an earlier key gives, ignoring letter case. Reported at `/parameters/{key}`. |
+| `AXC0166` | A value in a schedule trigger's `parameters` is not a literal of its parameter's type, or is `null` for a required parameter. Reported at `/parameters/{key}`. |
+| `AXC0167` | A schedule trigger does not give a parameter of its data source. Reported at `/parameters`, once for each missing parameter. |
 
 ## Startup activation
 
@@ -1150,8 +1178,10 @@ loads, is checked and is part of the release. The worker delivers each raised ev
 [Raise event step](processes.md#raise-event-step). Data change triggers start their
 processes in the transaction of a record API create or update and of an inbound endpoint's
 create, see [Starts from triggers](processes.md#starts-from-triggers). *(planned for M5)* Task
-form saves, `updateRecord` steps and connector outputs do not fire them yet, and schedule
-triggers are not built yet. An `event` resource names something that happened to one record. A
+form saves, `updateRecord` steps and connector outputs do not fire them yet. The schedule
+`trigger` resource and its compile checks are built: a schedule trigger file loads, is checked
+and is part of the release. *(planned for M5)* The worker does not run schedule triggers yet.
+An `event` resource names something that happened to one record. A
 `trigger` resource starts a process for one record when something happens:
 an event is raised, a record is created or updated, or a schedule is due. How
 a trigger starts a process, and when it skips the start, is in
@@ -1280,7 +1310,16 @@ Minh City, for each note the `NoteRows` data source returns, in
 ```
 
 - `schedule` is a standard 5-field cron expression: minute, hour, day of the
-  month, month and day of the week.
+  month, month and day of the week. Each field is a comma list of `*`,
+  numbers, ranges such as `1-5` and steps such as `*/15` or `10-30/5`. A step
+  follows `*` or a range, not a single number. The ranges are 0–59, 0–23,
+  1–31, 1–12 and 0–7. Day of week 0 and 7 are both Sunday. Month and day names
+  such as `JAN` or `MON` are not accepted. When both the day of month and the
+  day of week are restricted, a day matches if either one matches, as in
+  crontab. A field that starts with `*` counts as unrestricted. A cron that
+  never matches a date is invalid: that is the case only when no allowed
+  month has an allowed day of month. February counts as 29 days, so
+  `0 0 29 2 *` is valid and runs in leap years.
 - `timeZone` is required. It is an IANA time zone id, such as
   `Asia/Ho_Chi_Minh`. It does not settle the application time zone rule of
   [D22](../decisions.md#d22-current-time-and-time-zones--agreed).
@@ -1289,7 +1328,13 @@ Minh City, for each note the `NoteRows` data source returns, in
   process for every row it returns, in record id order. The data source's
   `pageSize` and `sort` do not apply.
 - `parameters` maps the data source's declared parameters to literal values.
-  It may be left out when there are none.
+  It may be left out when there are none. A value uses the record API's JSON
+  forms: a number for `integer` and `decimal`, `true` or `false` for
+  `boolean`, and a string for the other types, which follow the
+  [data source parameter](data-sources.md) forms. `null` means the parameter
+  is not given, and is allowed for an optional parameter only. Every declared
+  parameter needs a key. Keys match the declared names ignoring letter case,
+  and the release holds the declared names.
 
 The compiler reports these as compile errors. The event trigger checks are
 built, with the codes in the [pipeline](#configuration-pipeline): an unknown
@@ -1301,10 +1346,18 @@ subject is `AXC0144`, an unknown or computed name in `fields` is `AXC0145`,
 and a `when` problem has its expression code at `/when`. Data change
 triggers compile and are part of the release. They fire on record API
 creates and updates and on an inbound endpoint's create, and not yet on other
-writes. For now the schema accepts only `"type": "event"` and `"type": "dataChange"`, so
-`schedule`, any other `mode` and the properties of other types are `AXC0004`.
-*(planned for M5)* The schedule checks, and their codes, come with the build
-issue of that trigger type.
+writes. The schedule trigger checks are built too: an invalid `schedule` is
+`AXC0160`, an unknown `timeZone` is `AXC0161`, an unknown `dataSource` is
+`AXC0162`, a grouped one is `AXC0163`, one over another entity is `AXC0164`,
+an unknown or repeated `parameters` key is `AXC0165`, a wrongly typed value
+is `AXC0166` and a missing parameter is `AXC0167`. Schedule triggers compile
+and are part of the release, and the platform computes the next occurrence of
+a schedule in its time zone. On a daylight saving change a local time that
+does not exist runs at the next valid time, and a repeated local time runs
+once, at the first. *(planned for M5)* The worker does not run schedule
+triggers yet. The schema accepts only `"type": "event"`, `"type": "dataChange"`
+and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
+`mode` on a schedule trigger and the properties of other types are `AXC0004`.
 
 - The `process` exists.
 - The subject entity matches. The event's entity, the `entity`, or the data
