@@ -1560,7 +1560,7 @@ until the build issues add packages.
 - **Pinning.** Compilation picks the highest installed version in each range
   and pins that exact version in the release, as step 4, **Release**, of the
   pipeline describes. The server compiles against the packages installed
-  under `Extensions:Path`. *(planned for M5)* A process step is
+  under `Extensions:Path`. A process step is
   checked against the pinned version's manifest.
 - **Diagnostics.** A package id with no installed version is `AXC0139`. A
   range that no installed version meets is `AXC0141`, and its message lists

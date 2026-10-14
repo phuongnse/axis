@@ -179,7 +179,7 @@ public sealed class ReleaseCompilerBuildModelTests
     [Fact]
     public void Stored_release_with_a_package_step_compiles_back_against_the_installed_package()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         var installed = PackageCatalog.Load(packages.Path).Versions;
         var compiled = ApplicationCompiler.Compile(
             [

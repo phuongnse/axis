@@ -10,12 +10,12 @@ internal static class TestPackages
 {
     public const string Id = "test-package";
 
-    /// <summary>Copies the given versions, 1 for <c>1.0.0</c> and 2 for <c>2.0.0</c>, to <paramref name="root"/>.</summary>
-    public static TemporaryFolder Install(this TemporaryFolder root, params int[] majorVersions)
+    /// <summary>Copies the given versions, such as <c>1.0.0</c>, <c>1.1.0</c> and <c>2.0.0</c>, to <paramref name="root"/>.</summary>
+    public static TemporaryFolder Install(this TemporaryFolder root, params string[] versions)
     {
-        foreach (var major in majorVersions)
+        foreach (var version in versions)
         {
-            var source = Path.Combine(AppContext.BaseDirectory, "TestPackages", $"v{major}");
+            var source = Path.Combine(AppContext.BaseDirectory, "TestPackages", version);
             foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
             {
                 var target = Path.Combine(root.Path, Path.GetRelativePath(source, file));

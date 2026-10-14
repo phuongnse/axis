@@ -23,7 +23,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
     [Fact]
     public async Task Server_and_worker_list_the_installed_package_with_its_typed_operations()
     {
-        using var root = new TemporaryFolder().Install(1);
+        using var root = new TemporaryFolder().Install("1.0.0");
         var connectionString = await database.CreateDatabaseAsync("packages", CancellationToken);
 
         await using var server = CreateServer(connectionString, root.Path, new LogCollector());
@@ -60,7 +60,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
     [Fact]
     public async Task Two_versions_of_a_package_load_side_by_side_and_each_runs_its_own_code()
     {
-        using var root = new TemporaryFolder().Install(1, 2);
+        using var root = new TemporaryFolder().Install("1.0.0", "2.0.0");
         using var worker = BuildWorker(await database.CreateDatabaseAsync("packages", CancellationToken), root.Path);
         var catalog = worker.Services.GetRequiredService<PackageCatalog>();
 
@@ -82,7 +82,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
     [Fact]
     public async Task Server_starts_without_a_broken_package_and_logs_its_diagnostic_as_a_warning()
     {
-        using var root = new TemporaryFolder().Install(1, 2)
+        using var root = new TemporaryFolder().Install("1.0.0", "2.0.0")
             .EditManifest("2.0.0", manifest => manifest["operations"]![0]!["type"] = "TestPackage.Missing");
         var logs = new LogCollector();
 

@@ -13,7 +13,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void An_installed_package_loads_with_its_manifest()
     {
-        using var root = new TemporaryFolder().Install(1);
+        using var root = new TemporaryFolder().Install("1.0.0");
 
         var catalog = PackageCatalog.Load(root.Path);
 
@@ -29,7 +29,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void A_manifest_that_fails_its_schema_is_a_diagnostic_and_the_package_is_not_listed()
     {
-        using var root = new TemporaryFolder().Install(1)
+        using var root = new TemporaryFolder().Install("1.0.0")
             .EditManifest("1.0.0", manifest => manifest["operations"]![0]!.AsObject().Remove("idempotent"));
 
         var catalog = PackageCatalog.Load(root.Path);
@@ -44,7 +44,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void A_manifest_that_is_not_valid_JSON_or_is_missing_is_a_diagnostic()
     {
-        using var root = new TemporaryFolder().Install(1, 2)
+        using var root = new TemporaryFolder().Install("1.0.0", "2.0.0")
             .With("test-package/1.0.0/axis-package.json", "{")
             .With("other-package/1.0.0/readme.txt", "");
 
@@ -62,7 +62,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void An_operation_type_the_assembly_lacks_is_a_diagnostic_naming_the_package()
     {
-        using var root = new TemporaryFolder().Install(1)
+        using var root = new TemporaryFolder().Install("1.0.0")
             .EditManifest("1.0.0", manifest => manifest["operations"]![0]!["type"] = "TestPackage.Missing");
 
         var catalog = PackageCatalog.Load(root.Path);
@@ -77,7 +77,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void Folder_names_that_differ_from_the_manifest_are_a_diagnostic()
     {
-        using var root = new TemporaryFolder().Install(1);
+        using var root = new TemporaryFolder().Install("1.0.0");
         Directory.Move(Path.Combine(root.Path, "test-package", "1.0.0"), Path.Combine(root.Path, "test-package", "1.0.1"));
         Directory.Move(Path.Combine(root.Path, "test-package"), Path.Combine(root.Path, "other-package"));
 
@@ -95,7 +95,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void A_missing_assembly_is_a_diagnostic()
     {
-        using var root = new TemporaryFolder().Install(1)
+        using var root = new TemporaryFolder().Install("1.0.0")
             .EditManifest("1.0.0", manifest => manifest["assembly"] = "Missing.dll");
 
         var catalog = PackageCatalog.Load(root.Path);
@@ -109,7 +109,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void An_assembly_version_that_differs_from_the_manifest_is_a_diagnostic()
     {
-        using var root = new TemporaryFolder().Install(1)
+        using var root = new TemporaryFolder().Install("1.0.0")
             .EditManifest("1.0.0", manifest => manifest["version"] = "1.0.1");
         Directory.Move(Path.Combine(root.Path, "test-package", "1.0.0"), Path.Combine(root.Path, "test-package", "1.0.1"));
 
@@ -126,7 +126,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void Duplicate_names_and_a_timeout_above_two_minutes_are_diagnostics()
     {
-        using var root = new TemporaryFolder().Install(1).EditManifest("1.0.0", manifest =>
+        using var root = new TemporaryFolder().Install("1.0.0").EditManifest("1.0.0", manifest =>
         {
             var sum = manifest["operations"]![1]!;
             sum["name"] = "DESCRIBE";
@@ -149,7 +149,7 @@ public sealed class PackageCatalogTests
     [Fact]
     public void A_package_sees_the_hosts_contracts_and_no_other_Axis_assembly()
     {
-        using var root = new TemporaryFolder().Install(1);
+        using var root = new TemporaryFolder().Install("1.0.0");
 
         var package = Assert.Single(PackageCatalog.Load(root.Path).Packages);
         var operation = package.CreateOperation("describe");
