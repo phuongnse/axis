@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The sample extension package payment-references 1.0.0, which the purchase request sample calls. -->
+  <PropertyGroup>
+    <AssemblyName>PaymentReferences</AssemblyName>
+    <RootNamespace>PaymentReferences</RootNamespace>
+    <Version>1.0.0</Version>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Not copied: the host shares its own Axis.Extensions with every package. -->
+    <ProjectReference Include="..\..\..\src\Axis.Extensions\Axis.Extensions.csproj" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="axis-package.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    Installs every build in artifacts/extensions/payment-references/1.0.0/, the folder that Extensions:Path
+    names in Development, under scripts/dev.sh and in the E2E run. Debug and Release write the same version.
+  -->
+  <Target Name="InstallSamplePackage" AfterTargets="Build">
+    <ItemGroup>
+      <SamplePackageFile Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SamplePackageFile)" DestinationFiles="@(SamplePackageFile->'$(MSBuildThisFileDirectory)..\..\..\artifacts\extensions\payment-references\1.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

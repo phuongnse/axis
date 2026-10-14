@@ -44,7 +44,8 @@ Vietnamese.
   Testcontainers for storage and engine behaviour. Use Playwright for UI
   journeys. Test denied access as well as allowed access.
 - No application-specific code in the platform. Purchase requests and other
-  sample applications live as configuration under `samples/`.
+  sample applications live as configuration under `samples/`. Sample extension
+  packages, which hold custom C# code, live under `samples/packages/`.
 - Never commit secrets, tokens, local logs or machine snapshots.
 
 ## Working through NexKit
@@ -70,7 +71,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | Script | What it does | Needs |
 | --- | --- | --- |
 | `scripts/setup.sh` | Restores .NET packages, installs npm packages and the Playwright browser | Network |
-| `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution | |
+| `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution, which installs the sample extension package in `artifacts/extensions` | |
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
@@ -117,6 +118,11 @@ works on a fresh clone:
 - It starts PostgreSQL, Keycloak and the purchasing system stub with Docker
   Compose. It waits until PostgreSQL accepts connections, Keycloak's `axis`
   realm answers and the stub answers. The first run builds the stub's image.
+- It builds the sample extension package, `samples/packages/PaymentReferences`, into
+  `artifacts/extensions`, where the Development settings of the server and the worker
+  point `Extensions:Path`. The purchase request sample declares the package, so it
+  does not activate without it. A change to the package's C# code needs a restart of
+  the script.
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
@@ -150,6 +156,10 @@ works on a fresh clone:
   database, so either can start first. If you moved PostgreSQL with
   `AXIS_POSTGRES_PORT`, override `Tenants__default__ConnectionString` for the
   worker.
+- `dotnet run` of the server or the worker needs the sample extension package built
+  first, with `scripts/build.sh` or
+  `dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj`.
+  Until then `Extensions:Path` names a folder that does not exist, and they stop.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request
   sample, `../../samples/apps/purchase-requests`, in `ActivateOnStartup`. So
   `scripts/dev.sh` migrates every tenant database, then compiles and activates the

@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Builds the sample extension package payment-references 1.0.0 and copies the build to
+    $(OutDir)SamplePackages/payment-references/1.0.0/. SamplePackages.Path is then the Extensions:Path
+    folder that a test passes to the server, the worker or PackageCatalog.Load.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)PaymentReferences\PaymentReferences.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="CopySamplePackages" AfterTargets="Build">
+    <ItemGroup>
+      <SamplePackageFile Include="$(MSBuildThisFileDirectory)PaymentReferences\bin\$(Configuration)\$(TargetFramework)\**\*" />
+    </ItemGroup>
+    <Error Condition="'@(SamplePackageFile)' == ''" Text="The sample package build was not found under $(MSBuildThisFileDirectory)." />
+    <Copy SourceFiles="@(SamplePackageFile)" DestinationFiles="@(SamplePackageFile->'$(OutDir)SamplePackages\payment-references\1.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

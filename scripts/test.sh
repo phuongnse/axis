@@ -8,6 +8,8 @@ for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.E
   run_suite "$project" "tests/$project" dotnet test --project "tests/$project" -c Release \
     --report-xunit-junit --report-xunit-junit-filename "$project.xml" --results-directory "$results_dir"
 done
+run_suite PaymentReferences.Tests samples/packages/PaymentReferences.Tests dotnet test --project samples/packages/PaymentReferences.Tests -c Release \
+  --report-xunit-junit --report-xunit-junit-filename PaymentReferences.Tests.xml --results-directory "$results_dir"
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 

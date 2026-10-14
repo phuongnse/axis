@@ -12,6 +12,10 @@
     <Project Path="src/Axis.Tenancy/Axis.Tenancy.csproj" />
     <Project Path="src/Axis.Worker/Axis.Worker.csproj" />
   </Folder>
+  <Folder Name="/samples/packages/">
+    <Project Path="samples/packages/PaymentReferences/PaymentReferences.csproj" />
+    <Project Path="samples/packages/PaymentReferences.Tests/PaymentReferences.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Axis.Configuration.Tests/Axis.Configuration.Tests.csproj" />
     <Project Path="tests/Axis.Data.Tests/Axis.Data.Tests.csproj" />

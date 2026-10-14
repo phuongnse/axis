@@ -25,6 +25,7 @@ const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
 // application and the purchase request sample.
 const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 const purchaseRequests = path.resolve(import.meta.dirname, '..', '..', 'samples', 'apps', 'purchase-requests')
+const extensionsPath = path.resolve(import.meta.dirname, '..', '..', 'artifacts', 'extensions')
 
 export default defineConfig({
   testDir: './specs',
@@ -72,6 +73,9 @@ export default defineConfig({
       Tenants__default__Bindings__PurchasingSystemUrl__Value: purchasingUrl,
       Tenants__default__Bindings__PurchasingSystemToken__Kind: 'secret',
       Tenants__default__Bindings__PurchasingSystemToken__Value: 'e2e-token',
+      // The sample extension package payment-references, which scripts/build.sh installs. The worker gets
+      // the same folder from scripts/e2e.sh.
+      Extensions__Path: extensionsPath,
       ActivateOnStartup__0: e2eApp,
       ActivateOnStartup__1: purchaseRequests,
     },

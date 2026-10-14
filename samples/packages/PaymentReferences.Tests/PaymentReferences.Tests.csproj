@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaymentReferences\PaymentReferences.csproj" />
+    <!-- The package project does not copy Axis.Extensions, so the tests reference it too. -->
+    <ProjectReference Include="..\..\..\src\Axis.Extensions\Axis.Extensions.csproj" />
+  </ItemGroup>
+
+</Project>

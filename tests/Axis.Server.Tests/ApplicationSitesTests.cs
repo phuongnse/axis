@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Tests;
 using Axis.Presentation.Sites;
 
 namespace Axis.Server.Tests;
@@ -8,7 +9,7 @@ public sealed class ApplicationSitesTests
     [Fact]
     public void Table_over_a_grouped_data_source_lists_the_group_fields_then_the_measures()
     {
-        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
 
@@ -27,7 +28,7 @@ public sealed class ApplicationSitesTests
     [Fact]
     public void Form_marks_only_the_purchase_request_number_as_a_sequence_field()
     {
-        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
 
@@ -45,7 +46,7 @@ public sealed class ApplicationSitesTests
     [Fact]
     public void Unshaped_access_lists_every_entity_action_and_field_and_a_task_inbox_has_none()
     {
-        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
 

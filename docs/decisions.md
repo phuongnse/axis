@@ -1033,7 +1033,8 @@ operation step. The owner confirmed these points on issue #313 on
     ([D7](#d7-custom-code-lives-in-extension-packages--agreed)).
 - **Sample package:** `samples/packages/` holds one package with a pure
   operation and no capabilities. The purchase request sample uses it. The
-  sample operation is chosen in the issue that builds it. A test-only package
+  sample package is `payment-references`, whose operation computes an ISO 11649
+  creditor reference. A test-only package
   under `tests/` covers the capability limits.
 
 *Why:* see [knowledge](domain/knowledge.md#logic-in-configuration) and
