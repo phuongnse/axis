@@ -1,0 +1,15 @@
+{
+  "id": "payment-references",
+  "version": "1.0.0",
+  "assembly": "PaymentReferences.dll",
+  "operations": [
+    {
+      "name": "creditorReference",
+      "type": "PaymentReferences.CreditorReferenceOperation",
+      "idempotent": true,
+      "timeout": "PT10S",
+      "input": [{ "name": "reference", "type": "text", "required": true }],
+      "output": [{ "name": "creditorReference", "type": "text", "required": true }]
+    }
+  ]
+}

@@ -37,6 +37,7 @@
     "purchaseRequest.submittedAt": "Gửi lúc",
     "purchaseRequest.decisionComments": "Ý kiến phê duyệt",
     "purchaseRequest.purchaseOrderNumber": "Số đơn đặt hàng",
+    "purchaseRequest.paymentReference": "Mã tham chiếu thanh toán",
     "purchaseRequest.totalAmountPositive": "Tổng tiền phải lớn hơn không.",
     "purchaseRequest.submit": "Gửi duyệt",
     "purchaseRequest.cannotSubmit": "Chỉ có thể gửi yêu cầu nháp hoặc bị trả lại có tổng tiền.",

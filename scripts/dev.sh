@@ -8,6 +8,8 @@
 # activates the edited configuration. The worker and the SPA keep running. Ctrl+C stops the
 # server, the worker and the SPA. PostgreSQL, Keycloak and the purchasing system stub keep
 # running.
+# The sample extension package payment-references is built first, into artifacts/extensions,
+# which the server and the worker read through Extensions:Path.
 # AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_SERVER_PORT and
 # AXIS_WEB_PORT move the ports (5432, 8080, 5207, 5206, 5173).
 # Works with the bash 3.2 that ships with macOS.
@@ -167,6 +169,12 @@ cleanup() {
   rm -rf "$state"
 }
 trap cleanup EXIT
+# The purchase request sample declares this package, so the server cannot activate it without the
+# build in artifacts/extensions. A fresh clone has none. A change to the package's C# code needs a
+# restart of this script.
+log "Building the sample extension package"
+dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj --nologo -v quiet
+
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.
 interrupted=0

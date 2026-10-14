@@ -41,8 +41,8 @@ custom code out of configuration is in
 
 The manifest, `axis-package.json`, sits at the root of the
 package folder. This example uses an illustrative package,
-`purchasing-tools`. It is not the sample package, whose operation is chosen
-in the issue that builds it.
+`purchasing-tools`. The [sample package](#sample-and-test-packages),
+`payment-references`, has a manifest of the same shape.
 
 ```json
 {
@@ -277,9 +277,15 @@ all of these:
 
 ## Sample and test packages
 
-- **Sample package.** *(planned for M5)* `samples/packages/` holds one package with a pure
-  operation and no capabilities. The purchase request sample uses it. Its
-  operation is chosen in the issue that builds it.
+- **Sample package.** `samples/packages/` holds one package, `payment-references`
+  1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
+  has no capabilities. It turns a request number into an ISO 11649 creditor reference:
+  `RF`, two mod-97 check digits, then the number without separators. The purchase
+  request sample declares the package and calls the operation in its approval process,
+  in the `assignPaymentReference` step after the purchase order is created. The package
+  project copies each build to `artifacts/extensions/payment-references/1.0.0/`.
+  `scripts/build.sh` and `scripts/dev.sh` install it there, and the Compose image holds it in
+  `/extensions`. In every run mode `Extensions:Path` names that folder.
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. *(planned for M5)* It

@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
+using Axis.Configuration.Tests;
 using Axis.Data;
 
 namespace Axis.Integration.Tests;
@@ -21,7 +22,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         ReleaseCompilationResult compiled;
         await using (var context = database.CreateConfigurationContext())
         {
-            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, CancellationToken);
+            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, SamplePackages.Versions, CancellationToken);
         }
 
         Assert.Empty(compiled.Diagnostics);
@@ -48,6 +49,26 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         var active = await FindActiveAsync();
         Assert.NotNull(active);
         Assert.Equal(compiled.Release!.Id, active.ReleaseId);
+    }
+
+    [Fact]
+    public async Task The_sample_does_not_compile_without_its_package()
+    {
+        // The tests of this class share one database, so the sample may already be active.
+        var activeBefore = await FindActiveAsync();
+        ReleaseCompilationResult compiled;
+        await using (var context = database.CreateConfigurationContext())
+        {
+            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, [], CancellationToken);
+        }
+
+        Assert.Null(compiled.Release);
+        Assert.Null(compiled.Model);
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownPackage);
+        Assert.Equal("application.json", diagnostic.File);
+        Assert.Equal("/packages/0/id", diagnostic.Path);
+        Assert.Contains("payment-references", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(activeBefore, await FindActiveAsync());
     }
 
     private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled, ActivationBindings bindings)

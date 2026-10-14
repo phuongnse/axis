@@ -141,6 +141,18 @@ async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_00
   return field.inputValue()
 }
 
+/**
+ * Waits up to `timeout` milliseconds for the form of the request `id` to show a Payment reference that
+ * matches `pattern`. The sample's extension package writes it after the purchase order is created.
+ */
+async function expectPaymentReference(page: Page, id: string, pattern: RegExp, timeout = 30_000) {
+  const field = page.getByLabel('Payment reference', { exact: true })
+  await expect(async () => {
+    await page.goto(`/purchasing/purchaserequestform/${id}`)
+    await expect(field).toHaveValue(pattern, { timeout: 1_000 })
+  }).toPass({ timeout })
+}
+
 /** The orders that the purchasing system stub holds for the request numbered `number`. */
 async function purchaseOrders(page: Page, number: string) {
   const response = await page.request.get(`${env('AXIS_E2E_PURCHASING_URL')}/purchase-orders`)
@@ -212,6 +224,9 @@ test('a request below the threshold is approved by the department manager from M
   await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
   await expectHistory(page, ['Chau Operations Manager'])
   await expectOnePurchaseOrder(page, id)
+  // ISO 11649: RF, two check digits, then the request number without its hyphens.
+  const number = await requestNumber(page, id)
+  await expectPaymentReference(page, id, new RegExp(`^RF\\d{2}${number.replaceAll('-', '')}$`))
 })
 
 test('a request whose purchase order response is lost still gets exactly one purchase order', async ({ page }) => {
