@@ -28,7 +28,8 @@ flowchart LR
   instances. Wait for event, timer and sub-process steps come later. It
   delivers raised events to async event triggers, see
   [events and triggers](reference/processes.md#events-and-triggers).
-  *(planned for M5)* It will run schedule triggers and their fan-out.
+  It runs the occurrences of schedule triggers and their fan-out over the records
+  of the trigger's data source, see [schedules](reference/processes.md#schedules).
   It loads the installed extension packages at startup, as the server does.
   *(planned for M5)* It will run their operations, see
   [extension packages](reference/extension-packages.md).

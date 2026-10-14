@@ -34,14 +34,13 @@ public sealed class ProcessStepFixture : IAsyncLifetime
 {
     public const string TenantId = "a";
 
-    private static readonly string _appFolder = Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp");
-
     private static readonly TimeSpan _lease = TimeSpan.FromSeconds(30);
 
     private static readonly TimeSpan _lockWaitTimeout = TimeSpan.FromSeconds(30);
 
     private readonly PostgreSqlFixture _database = new();
     private readonly string _tenantId;
+    private readonly string _appFolder;
     private string? _connectionString;
     private NpgsqlDataSource? _dataSource;
     private ServiceProvider? _services;
@@ -53,9 +52,19 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     }
 
     internal ProcessStepFixture(string tenantId)
+        : this(tenantId, StepAppFolder)
+    {
+    }
+
+    /// <summary>A fixture that activates the application in <paramref name="appFolder"/> first, in place of StepApp.</summary>
+    internal ProcessStepFixture(string tenantId, string appFolder)
     {
         _tenantId = tenantId;
+        _appFolder = appFolder;
     }
+
+    /// <summary>The folder of the StepApp fixture application.</summary>
+    internal static string StepAppFolder { get; } = Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp");
 
     /// <summary>The tenant whose database the fixture holds.</summary>
     public string Tenant => _tenantId;
@@ -285,9 +294,9 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public async Task<Guid> ActivateRenamedReleaseAsync()
     {
         using var folder = new TemporaryFolder();
-        foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(StepAppFolder, "*", SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(_appFolder, file);
+            var relative = Path.GetRelativePath(StepAppFolder, file);
             var content = await File.ReadAllTextAsync(file);
             if (string.Equals(Path.GetFileName(file), "review.json", StringComparison.Ordinal))
             {
@@ -311,9 +320,9 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public async Task<Guid> ActivateCopyWithAsync(string relativePath, string content)
     {
         using var folder = new TemporaryFolder();
-        foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(StepAppFolder, "*", SearchOption.AllDirectories))
         {
-            folder.With(Path.GetRelativePath(_appFolder, file), await File.ReadAllTextAsync(file));
+            folder.With(Path.GetRelativePath(StepAppFolder, file), await File.ReadAllTextAsync(file));
         }
 
         folder.With(relativePath, content);
@@ -433,6 +442,58 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return actions;
     }
 
+    /// <summary>The state rows of the schedule triggers, by trigger id.</summary>
+    internal async Task<IReadOnlyList<TriggerScheduleState>> TriggerSchedulesAsync()
+    {
+        await using var command = DataSource.CreateCommand(
+            "SELECT trigger_id, application_id, release_id, next_occurrence_at, last_occurrence_at FROM axis.trigger_schedules ORDER BY trigger_id");
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<TriggerScheduleState>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new TriggerScheduleState(
+                reader.GetGuid(0),
+                reader.GetGuid(1),
+                reader.GetGuid(2),
+                reader.GetFieldValue<DateTimeOffset>(3),
+                reader.IsDBNull(4) ? null : reader.GetFieldValue<DateTimeOffset>(4)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>The <c>trigger.schedule</c> work items: the trigger each waits for and when it is due.</summary>
+    internal async Task<IReadOnlyList<(Guid TriggerId, DateTimeOffset DueAt)>> ScheduleItemsAsync()
+    {
+        await using var command = DataSource.CreateCommand(
+            "SELECT trigger_id, due_at FROM axis.process_work_items WHERE kind = @kind ORDER BY trigger_id");
+        command.Parameters.AddWithValue("kind", ProcessStarts.TriggerScheduleWorkItemKind);
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<(Guid, DateTimeOffset)>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetGuid(0), reader.GetFieldValue<DateTimeOffset>(1)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>Queues a <c>trigger.fanOut</c> item for the trigger's occurrence, due a minute ago.</summary>
+    internal async Task EnqueueFanOutAsync(Guid triggerId, Guid releaseId, DateTimeOffset occurrenceAt)
+    {
+        await using var connection = await DataSource.OpenConnectionAsync();
+        await WorkItemQueue.EnqueueAsync(
+            connection,
+            transaction: null,
+            _tenantId,
+            ProcessStarts.TriggerFanOutWorkItemKind,
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            CancellationToken.None,
+            triggerId: triggerId,
+            releaseId: releaseId,
+            occurrenceAt: occurrenceAt);
+    }
+
     private Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder) => ActivateAsync(folder, []);
 
     /// <summary>Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it. Returns the release's id and model.</summary>
@@ -444,6 +505,11 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, StepAppBindings(_tenantId));
         Assert.Empty(activated.Diagnostics);
+        await using (var connection = await DataSource.OpenConnectionAsync())
+        {
+            await TriggerSchedules.ActivateAsync(connection, _tenantId, compiled.Model!, compiled.Release!.Id, CancellationToken.None);
+        }
+
         return (compiled.Release!.Id, compiled.Model!);
     }
 
@@ -467,6 +533,14 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     private DataDbContext CreateDataContext() =>
         new(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(_connectionString).Options);
 }
+
+/// <summary>A row of <c>axis.trigger_schedules</c>.</summary>
+internal sealed record TriggerScheduleState(
+    Guid TriggerId,
+    Guid ApplicationId,
+    Guid ReleaseId,
+    DateTimeOffset NextOccurrenceAt,
+    DateTimeOffset? LastOccurrenceAt);
 
 /// <summary>A row of a process instance's step history. <see cref="Next"/> is the output's <c>next</c>.</summary>
 public sealed record HistoryRow(

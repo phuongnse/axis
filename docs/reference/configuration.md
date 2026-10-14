@@ -1180,7 +1180,8 @@ processes in the transaction of a record API create or update, of an inbound end
 create, of a task form save, of an `updateRecord` step, of a connector output and of a package
 operation output, see [Starts from triggers](processes.md#starts-from-triggers). The schedule
 `trigger` resource and its compile checks are built: a schedule trigger file loads, is checked
-and is part of the release. *(planned for M5)* The worker does not run schedule triggers yet.
+and is part of the release. The worker runs schedule triggers, see
+[Schedules](processes.md#schedules).
 An `event` resource names something that happened to one record. A
 `trigger` resource starts a process for one record when something happens:
 an event is raised, a record is created or updated, or a schedule is due. How
@@ -1352,8 +1353,8 @@ is `AXC0166` and a missing parameter is `AXC0167`. Schedule triggers compile
 and are part of the release, and the platform computes the next occurrence of
 a schedule in its time zone. On a daylight saving change a local time that
 does not exist runs at the next valid time, and a repeated local time runs
-once, at the first. *(planned for M5)* The worker does not run schedule
-triggers yet. The schema accepts only `"type": "event"`, `"type": "dataChange"`
+once, at the first. The worker runs schedule triggers, see
+[Schedules](processes.md#schedules). The schema accepts only `"type": "event"`, `"type": "dataChange"`
 and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 `mode` on a schedule trigger and the properties of other types are `AXC0004`.
 

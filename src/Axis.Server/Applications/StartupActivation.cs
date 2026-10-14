@@ -4,6 +4,7 @@ using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data;
 using Axis.Data.Seeding;
+using Axis.Processes.Instances;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,7 @@ namespace Axis.Server.Applications;
 
 /// <summary>
 /// Migrates every configured tenant database, then compiles the configured application folders
-/// against the installed extension packages, activates them in it and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
+/// against the installed extension packages, activates them in it, writes the state of their schedule triggers and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
 /// Restarting with unchanged folders and installed packages stores no new release and only
@@ -86,6 +87,8 @@ internal sealed partial class StartupActivation(
                     throw Failure("could not be activated", activated.Diagnostics, folder, tenantId);
                 }
 
+                await TriggerSchedules.ActivateAsync(
+                    await database.GetConnectionAsync(cancellationToken), tenantId, compiled.Model, compiled.Release.Id, cancellationToken);
                 LogActivated(compiled.Model.Manifest.Name, compiled.Release.Id, folder, tenantId);
                 if (compiled.Model.Seeds.Count > 0)
                 {

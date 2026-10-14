@@ -23,6 +23,12 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that delivers one event occurrence to the <c>async</c> event triggers of the active release.</summary>
     public const string EventDeliverWorkItemKind = "event.deliver";
 
+    /// <summary>The kind of the work item that waits for the next occurrence of one schedule trigger.</summary>
+    public const string TriggerScheduleWorkItemKind = "trigger.schedule";
+
+    /// <summary>The kind of the work item that starts the process of a schedule trigger for each record of its data source, for one occurrence.</summary>
+    public const string TriggerFanOutWorkItemKind = "trigger.fanOut";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 

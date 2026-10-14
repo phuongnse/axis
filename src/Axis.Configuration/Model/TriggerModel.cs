@@ -42,7 +42,7 @@ public enum TriggerMode
 /// step's transaction in sync mode. A data change trigger starts it for a record that was created
 /// or updated. Data change triggers fire on record API creates and updates and on an inbound
 /// endpoint's create. A schedule trigger starts it on a cron schedule in its own time zone, for each
-/// row of a data source with fixed parameter values. The worker does not run schedule triggers yet.
+/// row of a data source with fixed parameter values. The worker runs the occurrences.
 /// </summary>
 public sealed record TriggerModel
 {

@@ -19,14 +19,16 @@ public static class WorkItemQueue
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id
+        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at
         """;
 
     /// <summary>
     /// Adds a ready work item and returns its id. <paramref name="processInstanceId"/> names the
     /// process instance the item runs a step or a connector call of, when it does,
     /// <paramref name="connectorCallId"/> the connector call it sends, <paramref name="eventId"/>
-    /// the event occurrence it delivers, and <paramref name="packageCallId"/> the package call it runs.
+    /// the event occurrence it delivers, <paramref name="packageCallId"/> the package call it runs,
+    /// <paramref name="triggerId"/> the schedule trigger it runs, <paramref name="releaseId"/> the
+    /// release whose trigger a fan-out runs, and <paramref name="occurrenceAt"/> its occurrence.
     /// </summary>
     public static async Task<Guid> EnqueueAsync(
         NpgsqlConnection connection,
@@ -38,14 +40,17 @@ public static class WorkItemQueue
         Guid? processInstanceId = null,
         Guid? connectorCallId = null,
         Guid? eventId = null,
-        Guid? packageCallId = null)
+        Guid? packageCallId = null,
+        Guid? triggerId = null,
+        Guid? releaseId = null,
+        DateTimeOffset? occurrenceAt = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id, event_id, package_call_id)
-            VALUES (@id, @tenant, @kind, @due, @instance, @call, @event, @packageCall)
+            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id, event_id, package_call_id, trigger_id, release_id, occurrence_at)
+            VALUES (@id, @tenant, @kind, @due, @instance, @call, @event, @packageCall, @trigger, @release, @occurrence)
             """,
             connection,
             transaction);
@@ -57,6 +62,9 @@ public static class WorkItemQueue
         command.Parameters.Add(new NpgsqlParameter("call", NpgsqlDbType.Uuid) { Value = (object?)connectorCallId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("event", NpgsqlDbType.Uuid) { Value = (object?)eventId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("packageCall", NpgsqlDbType.Uuid) { Value = (object?)packageCallId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("trigger", NpgsqlDbType.Uuid) { Value = (object?)triggerId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = (object?)releaseId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("occurrence", NpgsqlDbType.TimestampTz) { Value = occurrenceAt is { } occurrence ? occurrence.ToUniversalTime() : DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return id;
     }
@@ -95,6 +103,9 @@ public static class WorkItemQueue
             await reader.IsDBNullAsync(6, cancellationToken) ? null : reader.GetGuid(6),
             await reader.IsDBNullAsync(7, cancellationToken) ? null : reader.GetGuid(7),
             await reader.IsDBNullAsync(8, cancellationToken) ? null : reader.GetGuid(8),
+            await reader.IsDBNullAsync(9, cancellationToken) ? null : reader.GetGuid(9),
+            await reader.IsDBNullAsync(10, cancellationToken) ? null : reader.GetGuid(10),
+            await reader.IsDBNullAsync(11, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(11),
             lease);
     }
 
@@ -146,6 +157,35 @@ public static class WorkItemQueue
             connection,
             transaction);
         command.Parameters.AddWithValue("delay", NpgsqlDbType.Interval, delay);
+        command.Parameters.AddWithValue("id", item.Id);
+        command.Parameters.AddWithValue("token", item.ClaimToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Keeps the item and makes it due at <paramref name="dueAt"/>, in the transaction, if the claim
+    /// is still current. The claim and its lease are released, so any worker can claim the item once
+    /// it is due. Returns <see langword="false"/> when another worker has claimed it since, so the
+    /// caller must roll back.
+    /// </summary>
+    public static async Task<bool> RescheduleAtAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ClaimedWorkItem item,
+        DateTimeOffset dueAt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(item);
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_work_items
+            SET due_at = @due, claim_token = NULL, lease_expires_at = NULL
+            WHERE id = @id AND claim_token = @token
+            """,
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("due", dueAt.ToUniversalTime());
         command.Parameters.AddWithValue("id", item.Id);
         command.Parameters.AddWithValue("token", item.ClaimToken);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;

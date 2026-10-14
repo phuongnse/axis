@@ -6,7 +6,7 @@ namespace Axis.Processes.Storage;
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
 /// their steps, their human tasks, their staged connector calls, the events they raised, the receipts of starts and of
-/// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, and the work that workers claim and run. The caller supplies the connection to the tenant database.
+/// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, the state of schedule triggers, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
 {
@@ -35,6 +35,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<EndpointReceiptRow> EndpointReceipts => Set<EndpointReceiptRow>();
 
     public DbSet<TriggerStartRow> TriggerStarts => Set<TriggerStartRow>();
+
+    public DbSet<TriggerScheduleRow> TriggerSchedules => Set<TriggerScheduleRow>();
 
     public DbSet<WorkItemRow> WorkItems => Set<WorkItemRow>();
 
@@ -245,6 +247,18 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             start.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         });
 
+        modelBuilder.Entity<TriggerScheduleRow>(schedule =>
+        {
+            schedule.ToTable("trigger_schedules");
+            schedule.HasKey(s => s.TriggerId).HasName("pk_trigger_schedules");
+            schedule.Property(s => s.TriggerId).HasColumnName("trigger_id").ValueGeneratedNever();
+            schedule.Property(s => s.ApplicationId).HasColumnName("application_id");
+            schedule.Property(s => s.ReleaseId).HasColumnName("release_id");
+            schedule.Property(s => s.NextOccurrenceAt).HasColumnName("next_occurrence_at");
+            schedule.Property(s => s.LastOccurrenceAt).HasColumnName("last_occurrence_at");
+            schedule.HasIndex(s => s.ApplicationId).HasDatabaseName("ix_trigger_schedules_application_id");
+        });
+
         modelBuilder.Entity<WorkItemRow>(item =>
         {
             item.ToTable("process_work_items");
@@ -259,11 +273,20 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
             item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
+            item.Property(i => i.TriggerId).HasColumnName("trigger_id");
+            item.Property(i => i.ReleaseId).HasColumnName("release_id");
+            item.Property(i => i.OccurrenceAt).HasColumnName("occurrence_at");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");
             item.HasIndex(i => i.PackageCallId).HasDatabaseName("ix_process_work_items_package_call_id");
             item.HasIndex(i => i.EventId).HasDatabaseName("ix_process_work_items_event_id");
+
+            // A schedule trigger has at most one item that waits for its next occurrence.
+            item.HasIndex(i => i.TriggerId)
+                .IsUnique()
+                .HasFilter("kind = 'trigger.schedule'")
+                .HasDatabaseName("ux_process_work_items_schedule_trigger_id");
             item.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(i => i.ProcessInstanceId)
