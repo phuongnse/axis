@@ -141,14 +141,10 @@ returns 404, upgrade `gh` and try again.
 - The text names the concepts the issue touches, in the terms of
   [concepts.md](../../../docs/domain/concepts.md), even when it links to the
   docs. Triage reads only the issue and its discussion, not the links.
-- The issue gets one or more of GitHub's labels `bug`, `enhancement` and
-  `documentation`. Add every label that fits:
-  - `bug`: behaviour that a doc, a test or a check already promises does not
-    hold, such as a failing or flaky check on `main`, or a leak of server
-    internals.
-  - `enhancement`: new or extended behaviour, including tests, checks and
-    developer tooling.
-  - `documentation`: docs, or the delivery workflow, are the main change.
+- The issue gets at least one label. It gets every repository label that
+  fits its content. Read the current labels with `gh label list`, and choose
+  by each label's description on GitHub. There is no fixed list. For example,
+  an issue about an accessibility barrier gets `accessibility`.
 
   The creator, the owner or the local agent, sets the labels in
   `gh issue create --label`. Each part of a split gets its own labels by the

@@ -125,14 +125,12 @@ them.
    implements and is in the current milestone. Its text names the concepts it
    touches, so triage can choose the [profile](#profiles).
 
-   It gets one or more of GitHub's labels `bug`, `enhancement` and
-   `documentation`. Add every label that fits:
-   - `bug`: behaviour that a doc, a test or a check already promises does not
-     hold. Examples are a failing or flaky check on `main`, or a leak of server
-     internals. A bug issue opened for a CI failure on `main` gets `bug`.
-   - `enhancement`: new or extended behaviour, including tests, checks and
-     developer tooling.
-   - `documentation`: docs, or the delivery workflow, are the main change.
+   It gets every repository label that fits its content, and at least one.
+   Read the current labels with `gh label list`, and choose by each label's
+   description on GitHub. This doc keeps no fixed list of labels, because the
+   owner adds and removes them. For example, a bug issue opened for a CI
+   failure on `main` gets `bug`, and an issue about an accessibility barrier
+   gets `accessibility`.
 
    The creator, the owner or the local agent, sets the labels in
    `gh issue create --label`. Each part of a split gets its own labels by the
