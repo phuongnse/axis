@@ -28,8 +28,8 @@ record, is checked, compiled and run. Its step stores the event in
 steps are checked and compiled against the manifest of the pinned package
 version. Their step stages the call and leaves the instance `waiting`, and the
 worker runs the operation and records its result, see
-[Package operations](#package-operations). Retries of package calls, and
-capability limits, are planned for M5. So are
+[Package operations](#package-operations). Retries of package calls under the
+step's retry policy are built too. Capability limits are planned for M5. So are
 triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers).
@@ -221,8 +221,8 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   transaction. A validation failure fails the step. An `operation` of the
   form `<package>/<operation>` names an operation from an extension package.
   It is checked and compiled, and it runs outside the step's transaction,
-  see [Package operations](#package-operations). Its retries and capability
-  limits are *(planned for M5)*. A second built-in operation, `callConnector`, calls an
+  see [Package operations](#package-operations). Its calls are retried under the
+  step's retry policy, and its capability limits are *(planned for M5)*. A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked, compiled, staged
   and sent, its call is retried, and an unknown outcome is reconciled. A third
@@ -712,9 +712,8 @@ the next step as usual.
 - **Failure.** A failing step rolls back. A following transaction records the
   error in the history and sets the instance to `failed`. No step is retried.
   A `callConnector` step retries its call under its retry policy, see
-  [Connector calls](#connector-calls). *(planned for M5)* So does a package
-  operation step, see [Package operations](#package-operations). Operator
-  retry comes in M7.
+  [Connector calls](#connector-calls). So does a package operation step, see
+  [Package operations](#package-operations). Operator retry comes in M7.
 - **Revision.** An instance's revision is a counter that starts at 1 and goes
   up each time the instance changes. A step changes the instance only at the
   revision it loaded.
@@ -1125,8 +1124,8 @@ The purchasing system holds one order, and the request records its number.
 
 This section follows
 [D28](../decisions.md#d28-extension-packages--agreed). The step shape, its
-compile checks and running the step are built. Retries and capability limits
-are *(planned for M5)*. A package
+compile checks, running the step and retries under the step's retry policy are
+built. Capability limits are *(planned for M5)*. A package
 operation step runs one operation of an
 [extension package](extension-packages.md), custom C# code that the operator
 installs. The step runs like a [connector call](#connector-calls): it stages
@@ -1199,7 +1198,9 @@ the operation in place of the HTTP request:
   `axis.package_calls` and the work item kind is `package.call`. The step
   writes the history row `{ "state": "waiting", "operationId" }` and the audit
   record `operation.staged`. A required input that gives `null` fails the
-  step.
+  step. The call also stores the step's retry policy and the operation's
+  `idempotent` flag, because a worker that lacks the pinned version cannot
+  read them from the release.
 - **Mark.** Before each attempt, a short transaction marks the call
   `sending`, counts the attempt and extends the item's lease past the
   operation's `timeout`.
@@ -1227,16 +1228,24 @@ again with the stored input under the same operation identity.
 | --- | --- | --- | --- |
 | The output fits the manifest | Succeeded | Not needed | Not needed |
 | The output does not fit the manifest | Failed | No | The instance becomes `failed` at once |
-| A `RetryableException` | Retryable | Yes *(planned for M5)*. For now, no | The instance becomes `failed` at once |
+| A `RetryableException` | Retryable | Yes, while attempts are left | The instance becomes `failed` |
 | Any other exception, or a request to the context for an undeclared capability | Failed | No | The instance becomes `failed` at once |
-| The pinned version is missing on the worker, or fails to load | Retryable | Yes *(planned for M5)*. For now, no | The instance becomes `failed` at once |
-| A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true` *(planned for M5)*. For now, no | The call stays `unknown` |
+| The pinned version is missing on the worker | Retryable | Yes, while attempts are left | The instance becomes `failed` |
+| The release lacks the step, or the installed manifest lacks the operation | Failed | No | The instance becomes `failed` at once |
+| A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true` and attempts are left | The call stays `unknown` |
 
 - **Fits.** An output fits when it has a value of the right
   [.NET type](extension-packages.md#contracts) for each output, and a value
   for each required output.
 - **Undeclared capability.** The attempt fails even if the operation catches
   the exception that the context throws.
+- **A retry.** It sets the call back to `pending` and keeps the item. The item
+  is due after the step's backoff doubled for each attempt made, so after
+  `backoff`·2^(n−1) for attempt n, and at most an hour. A retry writes no
+  history row and no audit record. A call with a missing version counts the
+  attempt without marking the call `sending`, because the operation never ran.
+  A release without the step, or an installed manifest without the operation,
+  is not retried, since a retry cannot fix it.
 - **Left unknown.** A call whose operation is not `idempotent`, or whose
   attempts ran out after an unknown outcome, stays `unknown`. The instance
   stays `waiting`. The operation may have acted, so the platform neither
@@ -1663,6 +1672,9 @@ database, with history in `axis.__processes_migrations` (see
   | `operation` | `text` | The operation's name |
   | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed` |
   | `attempts` | `integer` | The attempts made so far, the first one included |
+  | `retry_attempts` | `integer` | The attempts the step's retry policy allows, stored when the call is staged |
+  | `retry_backoff` | `interval` | The step's backoff, stored when the call is staged |
+  | `idempotent` | `boolean` | Whether the operation is `idempotent`, stored when the call is staged |
   | `input` | `jsonb`, null | The evaluated input. Kept while the call is `unknown`, and cleared when it settles. Never copied to history, audit records or logs |
   | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |

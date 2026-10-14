@@ -168,6 +168,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Operation).HasColumnName("operation");
             call.Property(c => c.State).HasColumnName("state");
             call.Property(c => c.Attempts).HasColumnName("attempts");
+
+            // The defaults are the retry policy and flag of a call staged before they were stored.
+            call.Property(c => c.RetryAttempts).HasColumnName("retry_attempts").HasDefaultValue(3);
+            call.Property(c => c.RetryBackoff).HasColumnName("retry_backoff").HasColumnType("interval").HasDefaultValueSql("'30 seconds'::interval");
+            call.Property(c => c.Idempotent).HasColumnName("idempotent").HasDefaultValue(false);
             call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
             call.Property(c => c.LastError).HasColumnName("last_error");
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");

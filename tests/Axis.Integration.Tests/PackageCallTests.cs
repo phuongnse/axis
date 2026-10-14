@@ -181,6 +181,160 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Null(await fixture.RunCallAsync(CancellationToken));
     }
 
+    [Fact]
+    public async Task A_flaky_call_that_throws_twice_settles_succeeded_after_three_attempts_and_moves_on_to_next()
+    {
+        var tenant = fixture.Tenant;
+        var (subjectId, instanceId) = await fixture.StageAsync("PackageFlaky", CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(10));
+        await fixture.MakeDueAsync(callId);
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(20));
+        await fixture.MakeDueAsync(callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+
+        Assert.Equal((PackageCalls.Succeeded, 3, (string?)null, (string?)null), await CallAsync(callId));
+        Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
+        Assert.Equal(3L, (await fixture.RequestAsync(subjectId)).Values["total"]!.GetValue<long>());
+        Assert.Equal(2, (await tenant.HistoryAsync(instanceId)).Count);
+        Assert.Equal(
+            new[] { AuditActions.OperationStaged, AuditActions.RecordUpdated, AuditActions.OperationCalled }.Order(StringComparer.Ordinal),
+            (await tenant.SystemAuditActionsAsync(instanceId)).Order(StringComparer.Ordinal));
+        var called = JsonNode.Parse(await AuditDetailsAsync(instanceId, AuditActions.OperationCalled))!;
+        Assert.Equal((3, "succeeded"), (called["attempts"]!.GetValue<int>(), called["outcome"]!.GetValue<string>()));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_retry_sets_the_call_pending_and_writes_no_history_row_and_no_audit_record()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageFlaky", CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(10));
+        var call = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Pending, 1, (string?)"Axis.Extensions.RetryableException"), (call.State, call.Attempts, call.LastError));
+        Assert.NotNull(call.Input);
+
+        await fixture.MakeDueAsync(callId);
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(20));
+        call = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Pending, 2), (call.State, call.Attempts));
+        Assert.NotNull(call.Input);
+
+        Assert.Equal((ProcessStarts.Waiting, 2L, "flaky", false), await tenant.InstanceAsync(instanceId));
+        Assert.Single(await tenant.HistoryAsync(instanceId));
+        Assert.Equal(AuditActions.OperationStaged, Assert.Single(await tenant.SystemAuditActionsAsync(instanceId)));
+    }
+
+    [Fact]
+    public async Task A_flaky_call_that_throws_more_often_than_its_attempts_allow_fails_the_instance()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageFlakyShort", CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync(CancellationToken));
+        await fixture.MakeDueAsync(callId);
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync(CancellationToken));
+
+        Assert.Equal((PackageCalls.Failed, 2, (string?)"Axis.Extensions.RetryableException", (string?)null), await CallAsync(callId));
+        Assert.Equal((ProcessStarts.Failed, 3L, "flaky", true), await tenant.InstanceAsync(instanceId));
+        var row = (await tenant.HistoryAsync(instanceId))[1];
+        Assert.Equal(("flaky", 2L, "Axis.Extensions.RetryableException"), (row.Step, row.Revision, row.Error));
+        Assert.Equal(
+            new[] { AuditActions.OperationStaged, AuditActions.OperationCalled, AuditActions.ProcessFailed }.Order(StringComparer.Ordinal),
+            (await tenant.SystemAuditActionsAsync(instanceId)).Order(StringComparer.Ordinal));
+        var called = JsonNode.Parse(await AuditDetailsAsync(instanceId, AuditActions.OperationCalled))!;
+        Assert.Equal((2, "failed"), (called["attempts"]!.GetValue<int>(), called["outcome"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task A_worker_that_does_not_hold_the_pinned_version_counts_an_attempt_and_reschedules_the_call()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageSum", CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        var before = await fixture.DatabaseNowAsync();
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallWithoutPackagesAsync(CancellationToken));
+        var after = await fixture.DatabaseNowAsync();
+
+        // The step's backoff is the default PT30S.
+        var dueAt = await fixture.DueAtAsync(callId);
+        Assert.NotNull(dueAt);
+        Assert.InRange(dueAt.Value, before + TimeSpan.FromSeconds(30), after + TimeSpan.FromSeconds(30));
+        var call = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Pending, 1), (call.State, call.Attempts));
+        Assert.Equal("The package 'test-package' 1.0.0 is not installed on this worker.", call.LastError);
+        Assert.Equal("{\"a\": 2, \"b\": 3}", call.Input);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "sum", false), await tenant.InstanceAsync(instanceId));
+        Assert.Single(await tenant.HistoryAsync(instanceId));
+
+        // A worker that holds the version runs the retry.
+        await fixture.MakeDueAsync(callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+        var settled = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Succeeded, 2), (settled.State, settled.Attempts));
+    }
+
+    [Fact]
+    public async Task A_slow_call_that_is_not_idempotent_times_out_and_is_left_unknown_with_the_instance_waiting()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageSlow", CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+
+        Assert.Equal((ProcessStarts.Waiting, 2L, "slow", false), await tenant.InstanceAsync(instanceId));
+        var call = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Unknown, 1, (string?)PackageCallHandler.TimedOut), (call.State, call.Attempts, call.LastError));
+        Assert.NotNull(call.Input);
+        var row = (await tenant.HistoryAsync(instanceId))[1];
+        Assert.Equal(("slow", 2L, (string?)PackageCallHandler.TimedOut), (row.Step, row.Revision, row.Error));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
+            JsonNode.Parse(row.Output!)));
+        Assert.Equal(AuditActions.OperationStaged, Assert.Single(await tenant.SystemAuditActionsAsync(instanceId)));
+        Assert.Null(await fixture.RunCallAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task An_idempotent_call_found_sending_goes_back_to_pending_and_is_rescheduled()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageFlaky", CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        // A worker marked the call and crashed before it recorded a result.
+        await tenant.ScalarAsync("UPDATE axis.package_calls SET state = 'sending', attempts = 1 WHERE id = @id", ("id", callId));
+
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(10));
+
+        var call = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Pending, 1, (string?)PackageCallHandler.UnknownOutcome), (call.State, call.Attempts, call.LastError));
+        Assert.NotNull(call.Input);
+        Assert.Equal((ProcessStarts.Waiting, 2L, "flaky", false), await tenant.InstanceAsync(instanceId));
+        Assert.Single(await tenant.HistoryAsync(instanceId));
+    }
+
+    /// <summary>
+    /// Runs the call's item and checks it is rescheduled to <paramref name="delay"/> after the
+    /// database time of the run, read before and after it.
+    /// </summary>
+    private async Task RunAndAssertRescheduledAsync(Guid callId, TimeSpan delay)
+    {
+        var before = await fixture.DatabaseNowAsync();
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync(CancellationToken));
+        var after = await fixture.DatabaseNowAsync();
+        var dueAt = await fixture.DueAtAsync(callId);
+        Assert.NotNull(dueAt);
+        Assert.InRange(dueAt.Value, before + delay, after + delay);
+    }
+
     private async Task<Guid> CallIdAsync(Guid instanceId) =>
         (Guid)(await fixture.Tenant.ScalarAsync("SELECT id FROM axis.package_calls WHERE process_instance_id = @id", ("id", instanceId)))!;
 

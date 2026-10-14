@@ -16,11 +16,13 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// One tenant database with a copy of the StepApp fixture that pins <c>test-package</c> 1.0.0. The
-/// copy adds a <c>total</c> field to <c>Request</c> and two processes: <c>PackageSum</c>, which runs
+/// copy adds a <c>total</c> field to <c>Request</c> and these processes: <c>PackageSum</c>, which runs
 /// <c>test-package/sum</c> on the divisor and the divisor plus one and writes the result to
-/// <c>total</c>, and <c>PackageFail</c>, which runs <c>test-package/fail</c>. The worker has the
-/// package installed, its log entries go to <see cref="Logs"/>, and its host is never started, so a
-/// test runs the work items itself.
+/// <c>total</c>, <c>PackageFail</c>, which runs <c>test-package/fail</c>, <c>PackageFlaky</c> and
+/// <c>PackageFlakyShort</c>, which run <c>test-package/flaky</c> with the divisor as the number of
+/// failures and 3 or 2 attempts, and <c>PackageSlow</c>, which runs <c>test-package/slow</c>. The worker
+/// has the package installed, its log entries go to <see cref="Logs"/>, and its host is never started,
+/// so a test runs the work items itself. A second worker has no package installed.
 /// </summary>
 public sealed class PackageCallFixture : IAsyncLifetime
 {
@@ -71,11 +73,57 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private const string FlakyProcessTemplate = """
+        {
+          "id": "{id}",
+          "kind": "process",
+          "name": "{name}",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "flaky",
+          "steps": [
+            {
+              "name": "flaky",
+              "type": "operation",
+              "operation": "test-package/flaky",
+              "input": { "failures": "divisor" },
+              "output": { "attempts": "total" },
+              "retry": { "attempts": {attempts}, "backoff": "PT10S" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
+    private const string SlowProcess = """
+        {
+          "id": "e4a7d1b9-6c25-4f83-b0d6-2a9c5e8f7143",
+          "kind": "process",
+          "name": "PackageSlow",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "slow",
+          "steps": [
+            {
+              "name": "slow",
+              "type": "operation",
+              "operation": "test-package/slow",
+              "input": { "a": "divisor" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     private readonly ProcessStepFixture _tenant = new();
     private readonly TemporaryFolder _packages = new TemporaryFolder().Install(1);
     private readonly TemporaryFolder _application = new();
+    private readonly TemporaryFolder _noPackages = new();
     private PackageCatalog? _catalog;
     private ServiceProvider? _worker;
+    private ServiceProvider? _workerWithoutPackages;
     private ApplicationModel? _model;
 
     /// <summary>Every log entry of the worker.</summary>
@@ -97,24 +145,19 @@ public sealed class PackageCallFixture : IAsyncLifetime
 
         Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "^1.0.0" }));
         Edit("entities/request.json", request => request["fields"]!.AsArray().Add(new JsonObject { ["name"] = "total", ["type"] = "integer" }));
-        _application.With("processes/package-sum.json", SumProcess).With("processes/package-fail.json", FailProcess);
+        _application
+            .With("processes/package-sum.json", SumProcess)
+            .With("processes/package-fail.json", FailProcess)
+            .With("processes/package-flaky.json", Flaky("PackageFlaky", "b3f8a2c1-7d46-4e09-8a15-6c0d9e2f4b78", 3))
+            .With("processes/package-flaky-short.json", Flaky("PackageFlakyShort", "a91c4e7d-2b58-4f36-9d80-5e3a7b1c6f24", 2))
+            .With("processes/package-slow.json", SlowProcess);
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);
         (ReleaseId, _model) = await _tenant.ActivateAsync(_application.Path, catalog.Versions);
 
-        var settings = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
-                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = _tenant.ConnectionString,
-                [PackageCatalog.PathSetting] = _packages.Path,
-            })
-            .Build();
-        _worker = new ServiceCollection()
-            .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
-            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing", ContentRootPath = AppContext.BaseDirectory })
-            .BuildServiceProvider();
+        _worker = BuildWorker(_packages.Path);
+        _workerWithoutPackages = BuildWorker(_noPackages.Path);
     }
 
     public async ValueTask DisposeAsync()
@@ -124,8 +167,14 @@ public sealed class PackageCallFixture : IAsyncLifetime
             await _worker.DisposeAsync();
         }
 
+        if (_workerWithoutPackages is not null)
+        {
+            await _workerWithoutPackages.DisposeAsync();
+        }
+
         await _tenant.DisposeAsync();
         _application.Dispose();
+        _noPackages.Dispose();
         _packages.Dispose();
     }
 
@@ -134,6 +183,22 @@ public sealed class PackageCallFixture : IAsyncLifetime
 
     /// <summary>Runs the next due package call item.</summary>
     public Task<WorkItemOutcome?> RunCallAsync(CancellationToken cancellationToken) => RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken);
+
+    /// <summary>Runs the next due package call item on a worker that holds no package version.</summary>
+    public Task<WorkItemOutcome?> RunCallWithoutPackagesAsync(CancellationToken cancellationToken) =>
+        RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken, _workerWithoutPackages);
+
+    /// <summary>Makes the work item of the call <paramref name="callId"/> due now.</summary>
+    public Task MakeDueAsync(Guid callId) =>
+        _tenant.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE package_call_id = @id", ("id", callId));
+
+    /// <summary>The due time of the work item of the call <paramref name="callId"/>, or <see langword="null"/> when it has none.</summary>
+    public async Task<DateTime?> DueAtAsync(Guid callId) =>
+        (DateTime?)await _tenant.ScalarAsync("SELECT due_at FROM axis.process_work_items WHERE package_call_id = @id", ("id", callId));
+
+    /// <summary>The current time by the clock of the tenant database.</summary>
+    public async Task<DateTime> DatabaseNowAsync() =>
+        (DateTime)(await _tenant.ScalarAsync("SELECT now()"))!;
 
     /// <summary>
     /// Starts <paramref name="process"/> for a new request with the divisor 2 and runs its step,
@@ -187,9 +252,31 @@ public sealed class PackageCallFixture : IAsyncLifetime
         File.WriteAllText(path, json.ToJsonString());
     }
 
-    private async Task<WorkItemOutcome?> RunAsync(string kind, CancellationToken cancellationToken)
+    private static string Flaky(string name, string id, int attempts) =>
+        FlakyProcessTemplate
+            .Replace("{id}", id, StringComparison.Ordinal)
+            .Replace("{name}", name, StringComparison.Ordinal)
+            .Replace("{attempts}", attempts.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+
+    private ServiceProvider BuildWorker(string packagesPath)
     {
-        var runner = (_worker ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        var settings = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
+                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = _tenant.ConnectionString,
+                [PackageCatalog.PathSetting] = packagesPath,
+            })
+            .Build();
+        return new ServiceCollection()
+            .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
+            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing", ContentRootPath = AppContext.BaseDirectory })
+            .BuildServiceProvider();
+    }
+
+    private async Task<WorkItemOutcome?> RunAsync(string kind, CancellationToken cancellationToken, ServiceProvider? worker = null)
+    {
+        var runner = (worker ?? _worker ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
         var item = await _tenant.ClaimAsync(kind, _lease, cancellationToken);
         return item is null ? null : await runner.ExecuteAsync(item, cancellationToken);
     }

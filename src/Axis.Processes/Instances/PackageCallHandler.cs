@@ -19,13 +19,19 @@ namespace Axis.Processes.Instances;
 /// a token that is cancelled at the timeout. An outcome transaction records the result. An output
 /// that fits the manifest writes the output fields, starts the data change triggers of the update
 /// from the active release, settles the call <c>succeeded</c> and resumes
-/// the instance on <c>next</c>. An output that does not fit, an exception, and a pinned version
-/// that is missing or fails to load settle the call <c>failed</c> and fail the instance, for now,
-/// since retries are not built. A timeout leaves the call <c>unknown</c>, and so does a call found
-/// already <c>sending</c>: the operation may have acted, so it is never run again, and the instance
-/// stays waiting. Each transaction checks the claim token, and the outcome needs the instance still
-/// waiting on the step at the revision the attempt saw. No input value and no exception message is
-/// stored or logged.
+/// the instance on <c>next</c>. A <see cref="RetryableException"/>, and a pinned version that the
+/// worker does not hold, set the call back to <c>pending</c> while the step's retry policy has
+/// attempts left. The item is then due again after the backoff, doubled for each attempt and at most
+/// an hour, and the next attempt runs under the same operation identity. A retry writes no history row
+/// and no audit record. A timeout, and a call found already <c>sending</c>, have an unknown outcome:
+/// the operation may have acted, so it is retried only when it is <c>idempotent</c> and attempts are
+/// left. Otherwise the call is left <c>unknown</c> and the instance stays waiting. An output that does
+/// not fit, any other exception, a release or manifest that does not match, and a retryable error
+/// when no attempts are left settle the call <c>failed</c> and fail the instance. The retry policy and
+/// the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
+/// version can still decide. Each transaction checks the claim token, and the outcome needs the
+/// instance still waiting on the step at the revision the attempt saw. No input value and no
+/// exception message is stored or logged.
 /// </summary>
 internal sealed partial class PackageCallHandler(ReleaseModelCache models, PackageCatalog packages, ILogger<PackageCallHandler> logger) : IExternalWorkItemHandler
 {
@@ -45,7 +51,7 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
         Attempt attempt;
         Target? target = null;
         string? error = null;
-        var sending = false;
+        var errorClass = ErrorClass.Failed;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             var call = item.PackageCallId is { } callId ? await PackageCalls.LoadAsync(transaction, callId, cancellationToken) : null;
@@ -68,53 +74,65 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
             }
 
             attempt = new Attempt(call, instance.Revision, call.Attempts, instance.Now);
-
-            // A worker crashed after it marked the call, so the operation may have acted.
-            sending = call.State == PackageCalls.Sending;
-            if (!sending)
+            var package = call.State == PackageCalls.Sending ? null : packages.Find(call.Package, call.Version);
+            if (call.State == PackageCalls.Sending)
+            {
+                // A worker crashed after it marked the call, so the operation may have acted. The
+                // attempt the crashed worker made is already counted.
+                errorClass = ErrorClass.Unknown;
+                error = UnknownOutcome;
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            else if (package is null)
+            {
+                // The release cannot be rebuilt without the version, and the operation never ran, so
+                // the attempt is counted without marking the call.
+                var attempts = await PackageCalls.CountAttemptAsync(transaction, call.Id, cancellationToken)
+                    ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
+                attempt = attempt with { Attempts = attempts };
+                errorClass = ErrorClass.Retryable;
+                error = $"The package '{call.Package}' {call.Version} is not installed on this worker.";
+                await transaction.CommitAsync(cancellationToken);
+            }
+            else
             {
                 try
                 {
-                    target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, cancellationToken);
+                    target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, package, cancellationToken);
                 }
                 catch (InvalidOperationException exception)
                 {
                     error = exception.Message;
                 }
-            }
 
-            if (target is not null)
-            {
-                var attempts = await PackageCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
-                    ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
-                attempt = attempt with { Attempts = attempts };
+                if (target is not null)
+                {
+                    var attempts = await PackageCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
+                        ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
+                    attempt = attempt with { Attempts = attempts };
 
-                // No other worker claims the item while the operation runs.
-                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, target.Step.Timeout + item.Lease, cancellationToken))
+                    // No other worker claims the item while the operation runs.
+                    if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, target.Step.Timeout + item.Lease, cancellationToken))
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        LogLostClaim(item.Id, item.PackageCallId);
+                        return WorkItemOutcome.LostClaim;
+                    }
+
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                else
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    LogLostClaim(item.Id, item.PackageCallId);
-                    return WorkItemOutcome.LostClaim;
                 }
-
-                await transaction.CommitAsync(cancellationToken);
             }
-            else
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-        }
-
-        if (sending)
-        {
-            // The attempt the crashed worker made is already counted.
-            return await LeaveUnknownAsync(item, connection, attempt, UnknownOutcome, cancellationToken);
         }
 
         if (target is null)
         {
-            // Retrying is not built yet, and it cannot add what the release or the host lacks.
-            return await FailAsync(item, connection, attempt, error!, cancellationToken);
+            // A release or a manifest that does not match cannot be fixed by a retry. A call that is
+            // found sending or lacks its version is settled by the retry policy.
+            return await SettleAttemptAsync(item, connection, attempt, errorClass, error!, cancellationToken);
         }
 
         if (ReadInput(attempt.Call.Input, target.Operation) is not { } input)
@@ -125,13 +143,13 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
         var run = await RunAsync(target, attempt.Call, input, cancellationToken);
         if (run.Timeout)
         {
-            // The operation may have acted. It is never run again.
-            return await LeaveUnknownAsync(item, connection, attempt, TimedOut, cancellationToken);
+            // The operation may have acted.
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, TimedOut, cancellationToken);
         }
 
         if (run.Error is { } runError)
         {
-            return await FailAsync(item, connection, attempt, runError, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, run.Retryable ? ErrorClass.Retryable : ErrorClass.Failed, runError, cancellationToken);
         }
 
         if (Fit(run.Output, target) is not { } values)
@@ -147,9 +165,14 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
         return await SucceedAsync(item, connection, attempt, target, values, cancellationToken);
     }
 
-    /// <summary>Finds the step, the subject entity, the installed package and the operation of the call.</summary>
-    /// <exception cref="InvalidOperationException">The release or the host lacks one of them.</exception>
-    private async Task<Target> FindTargetAsync(WorkItemContext context, LoadedPackageCall call, LoadedInstance instance, CancellationToken cancellationToken)
+    /// <summary>Finds the step, the subject entity and the operation of the call in the release and the installed <paramref name="package"/>.</summary>
+    /// <exception cref="InvalidOperationException">The release or the package lacks one of them.</exception>
+    private async Task<Target> FindTargetAsync(
+        WorkItemContext context,
+        LoadedPackageCall call,
+        LoadedInstance instance,
+        InstalledPackage package,
+        CancellationToken cancellationToken)
     {
         var model = await models.GetAsync(context, call.ReleaseId, cancellationToken);
         var process = model.Processes.FirstOrDefault(candidate => candidate.Id == instance.ProcessId)
@@ -161,8 +184,6 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
             throw new InvalidOperationException($"The process '{process.Name}' has no package operation step '{call.Step}'.");
         }
 
-        var package = packages.Find(call.Package, call.Version)
-            ?? throw new InvalidOperationException($"The package '{call.Package}' {call.Version} is not installed on this worker.");
         var operation = package.Manifest.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"The package '{call.Package}' {call.Version} has no operation '{call.Operation}'.");
         return new Target(model, entity, packageStep, package, operation);
@@ -202,7 +223,7 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
     /// <summary>
     /// Creates the operation and runs it, with no transaction open, under a token that is cancelled
     /// at the step's timeout. The result holds the output, or the error of an exception as its type
-    /// name, or says that the run timed out. Worker shutdown is not caught.
+    /// name and whether it is retryable, or says that the run timed out. Worker shutdown is not caught.
     /// </summary>
     private static async Task<Run> RunAsync(Target target, LoadedPackageCall call, Dictionary<string, object?> input, CancellationToken cancellationToken)
     {
@@ -214,16 +235,16 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
 
             // An operation that ignores its token keeps running, but the worker stops waiting for it.
             var output = await operation.RunAsync(input, new PackageOperationContext(call.Id), timeout.Token).WaitAsync(timeout.Token);
-            return new Run(output, null, false);
+            return new Run(output, null, false, false);
         }
         catch (Exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            return new Run(null, null, true);
+            return new Run(null, null, false, true);
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             // The message can hold input values or secrets, so only the type is kept.
-            return new Run(null, ErrorOf(exception), false);
+            return new Run(null, ErrorOf(exception), exception is RetryableException, false);
         }
     }
 
@@ -443,6 +464,76 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
     }
 
     /// <summary>
+    /// Records an attempt that ended with <paramref name="error"/> of <paramref name="errorClass"/>.
+    /// A retryable error is retried while attempts are left, and an unknown outcome only when the
+    /// operation is also <c>idempotent</c>. An unknown outcome that is not retried leaves the call
+    /// <c>unknown</c>. Anything else fails the call.
+    /// </summary>
+    private Task<WorkItemOutcome> SettleAttemptAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        ErrorClass errorClass,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        var attemptsLeft = attempt.Attempts < call.Retry.Attempts;
+        return errorClass switch
+        {
+            ErrorClass.Retryable when attemptsLeft =>
+                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), cancellationToken),
+            ErrorClass.Unknown when attemptsLeft && call.Idempotent =>
+                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), cancellationToken),
+            ErrorClass.Unknown => LeaveUnknownAsync(item, connection, attempt, error, cancellationToken),
+            _ => FailAsync(item, connection, attempt, error, cancellationToken),
+        };
+    }
+
+    /// <summary>
+    /// Sets the call back to <c>pending</c> with the attempt's error, and keeps the item, due again
+    /// after <paramref name="delay"/>. The next attempt runs the stored input under the same
+    /// operation identity. It writes no history row and no audit record.
+    /// </summary>
+    private async Task<WorkItemOutcome> RetryAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        string error,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        var call = attempt.Call;
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
+        if (!IsWaitingAt(instance, call, attempt))
+        {
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, call.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
+        }
+
+        await PackageCalls.RetryAsync(transaction, call.Id, error, cancellationToken);
+        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, call.Id);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        LogRetrying(call.Id, call.ProcessInstanceId, attempt.Attempts, error, delay);
+        return WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>
     /// Leaves the call <c>unknown</c> with the attempt's error, and keeps its stored input. The
     /// item is deleted and the instance stays waiting. A history row with the outcome
     /// <c>unknown</c> makes the call visible. It writes no audit record, because the call has not
@@ -586,6 +677,9 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
     [LoggerMessage(LogLevel.Warning, "Package call {CallId} of process instance {InstanceId} failed: {Error}")]
     private partial void LogFailed(Guid callId, Guid instanceId, string error);
 
+    [LoggerMessage(LogLevel.Warning, "Package call {CallId} of process instance {InstanceId} will be retried after attempt {Attempts} in {Delay}: {Error}")]
+    private partial void LogRetrying(Guid callId, Guid instanceId, int attempts, string error, TimeSpan delay);
+
     [LoggerMessage(LogLevel.Warning, "Package call {CallId} of process instance {InstanceId} has an unknown outcome after {Attempts} attempts and is not run again: {Error}")]
     private partial void LogUnknown(Guid callId, Guid instanceId, int attempts, string error);
 
@@ -603,6 +697,19 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
         InstalledPackage Package,
         PackageOperation Operation);
 
-    /// <summary>The result of a run: the output, the error of an exception, or that it timed out.</summary>
-    private sealed record Run(IReadOnlyDictionary<string, object?>? Output, string? Error, bool Timeout);
+    /// <summary>The result of a run: the output, the error of an exception and whether it is retryable, or that it timed out.</summary>
+    private sealed record Run(IReadOnlyDictionary<string, object?>? Output, string? Error, bool Retryable, bool Timeout);
+
+    /// <summary>How an attempt that did not succeed is handled.</summary>
+    private enum ErrorClass
+    {
+        /// <summary>The call fails at once.</summary>
+        Failed,
+
+        /// <summary>The operation did not act, so the call is retried while attempts are left.</summary>
+        Retryable,
+
+        /// <summary>The operation may have acted. The call is retried only when it is <c>idempotent</c>.</summary>
+        Unknown,
+    }
 }

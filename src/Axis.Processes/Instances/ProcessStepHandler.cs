@@ -278,6 +278,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     packageStep.Package,
                     packageStep.Version,
                     packageOperation.Name,
+                    packageStep.Retry,
+                    packageStep.Idempotent,
                     await StageAsync(
                         context,
                         model,

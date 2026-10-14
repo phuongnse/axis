@@ -33,6 +33,21 @@ public sealed class PackageCallRow
     public required int Attempts { get; init; }
 
     /// <summary>
+    /// The attempts the step's retry policy allows, copied when the call is staged. A worker that
+    /// lacks the pinned package version cannot read the policy from the release, so the call keeps it.
+    /// </summary>
+    public required int RetryAttempts { get; init; }
+
+    /// <summary>The wait before the second attempt, from the step's retry policy.</summary>
+    public required TimeSpan RetryBackoff { get; init; }
+
+    /// <summary>
+    /// Whether the operation is <c>idempotent</c>, copied when the call is staged. An unknown
+    /// outcome is retried only then.
+    /// </summary>
+    public required bool Idempotent { get; init; }
+
+    /// <summary>
     /// The evaluated input as JSON text, or <see langword="null"/> once the call settled. It is
     /// never copied to history, audit records or logs.
     /// </summary>

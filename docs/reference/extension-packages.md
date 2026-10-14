@@ -6,7 +6,8 @@ capabilities and what the capability limits do not protect against. The
 manifest, the contracts, installation and loading are built. Version ranges
 and pinning in releases are built too, and so is checking a process step
 against the pinned manifest. Running a package operation from a process is
-built too, but capabilities and retries are not. How a process calls a package
+built too, and so are its retries under the step's retry policy. Capabilities
+are not. How a process calls a package
 operation is in
 [Package operations](processes.md#package-operations), and how an application
 declares its packages is in
@@ -151,9 +152,9 @@ public class RetryableException : Exception { }
   server compiles and activates against them, and the worker runs them.
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
-- **Keep pinned versions.** *(planned for M5)* Keep every version that an
-  active release, or a running instance's release, pins. Removing one makes
-  its calls retry until it is back, see
+- **Keep pinned versions.** Keep every version that an active release, or a
+  running instance's release, pins. Removing one makes its calls retry under
+  the step's retry policy, and fail when attempts run out, see
   [Versions and pinning](#versions-and-pinning).
 
 ## Versions and pinning
@@ -183,9 +184,11 @@ public class RetryableException : Exception { }
 - **Pinned version missing at activation.** *(planned for M5)* Activating a
   release whose pinned version is not installed fails with a diagnostic.
 - **Pinned version missing on the worker.** A call to a version that the
-  worker does not hold, or cannot load, is a retryable attempt. Nothing ran,
-  as with a missing binding on a connector call. *(planned for M5)* Retrying
-  it is not built, and for now the call and the instance fail at once.
+  worker does not hold is a retryable attempt. Nothing ran, as with a missing
+  binding on a connector call. The call is retried under the step's retry
+  policy, and the instance fails when attempts run out. The call stores the
+  policy when it is staged, because the worker cannot rebuild the release
+  without the version.
 
 ## Loading
 

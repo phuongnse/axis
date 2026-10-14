@@ -30,6 +30,20 @@
       "type": "TestPackage.FailOperation",
       "idempotent": false,
       "input": [{ "name": "a", "type": "integer", "required": true }]
+    },
+    {
+      "name": "flaky",
+      "type": "TestPackage.FlakyOperation",
+      "idempotent": true,
+      "input": [{ "name": "failures", "type": "integer", "required": true }],
+      "output": [{ "name": "attempts", "type": "integer", "required": true }]
+    },
+    {
+      "name": "slow",
+      "type": "TestPackage.SlowOperation",
+      "idempotent": false,
+      "timeout": "PT1S",
+      "input": [{ "name": "a", "type": "integer", "required": true }]
     }
   ]
 }

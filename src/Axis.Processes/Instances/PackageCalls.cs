@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Axis.Configuration.Model;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -29,16 +30,18 @@ internal static class PackageCalls
     public const string Failed = "failed";
 
     /// <summary>
-    /// Inserts <paramref name="call"/> as <c>pending</c> with no attempts. It is created at the
-    /// transaction's time. A second call for the same instance and step violates the unique index.
+    /// Inserts <paramref name="call"/> as <c>pending</c> with no attempts, and with the retry policy
+    /// and the <c>idempotent</c> flag it carries. It is created at the transaction's time. A second call for the same instance and step violates the unique index.
     /// </summary>
     public static async Task InsertAsync(NpgsqlTransaction transaction, NewPackageCall call, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.package_calls
-                (id, process_instance_id, step, release_id, package, version, operation, state, attempts, input, created_at)
-            VALUES (@id, @instance, @step, @release, @package, @version, @operation, @state, 0, @input, now())
+                (id, process_instance_id, step, release_id, package, version, operation, state, attempts,
+                 retry_attempts, retry_backoff, idempotent, input, created_at)
+            VALUES (@id, @instance, @step, @release, @package, @version, @operation, @state, 0,
+                 @retryAttempts, @retryBackoff, @idempotent, @input, now())
             """,
             Connection(transaction),
             transaction);
@@ -50,6 +53,9 @@ internal static class PackageCalls
         command.Parameters.AddWithValue("version", call.Version);
         command.Parameters.AddWithValue("operation", call.Operation);
         command.Parameters.AddWithValue("state", Pending);
+        command.Parameters.AddWithValue("retryAttempts", call.Retry.Attempts);
+        command.Parameters.Add(new NpgsqlParameter("retryBackoff", NpgsqlDbType.Interval) { Value = call.Retry.Backoff });
+        command.Parameters.AddWithValue("idempotent", call.Idempotent);
         command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = call.Input.ToJsonString() });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -62,7 +68,8 @@ internal static class PackageCalls
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT process_instance_id, step, release_id, package, version, operation, state, attempts, input::text
+            SELECT process_instance_id, step, release_id, package, version, operation, state, attempts,
+                   retry_attempts, retry_backoff, idempotent, input::text
             FROM axis.package_calls WHERE id = @id FOR UPDATE
             """,
             Connection(transaction),
@@ -84,7 +91,9 @@ internal static class PackageCalls
             reader.GetString(5),
             reader.GetString(6),
             reader.GetInt32(7),
-            await reader.IsDBNullAsync(8, cancellationToken) ? null : reader.GetString(8));
+            new RetryPolicyModel(reader.GetInt32(8), reader.GetFieldValue<TimeSpan>(9)),
+            reader.GetBoolean(10),
+            await reader.IsDBNullAsync(11, cancellationToken) ? null : reader.GetString(11));
     }
 
     /// <summary>
@@ -105,6 +114,42 @@ internal static class PackageCalls
         command.Parameters.AddWithValue("sending", Sending);
         command.Parameters.AddWithValue("pending", Pending);
         return await command.ExecuteScalarAsync(cancellationToken) is int attempts ? attempts : null;
+    }
+
+    /// <summary>
+    /// Counts an attempt that did not mark the call <c>sending</c>, because the operation never ran.
+    /// The call stays <c>pending</c>. Returns the attempts made, this one included, or
+    /// <see langword="null"/> when the call is not pending.
+    /// </summary>
+    public static async Task<int?> CountAttemptAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.package_calls SET attempts = attempts + 1
+            WHERE id = @id AND state = @pending
+            RETURNING attempts
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("pending", Pending);
+        return await command.ExecuteScalarAsync(cancellationToken) is int attempts ? attempts : null;
+    }
+
+    /// <summary>
+    /// Sets the call <paramref name="id"/> back to <c>pending</c> with the last attempt's error. Its
+    /// stored input is kept, so the next attempt runs under the same operation identity.
+    /// </summary>
+    public static async Task RetryAsync(NpgsqlTransaction transaction, Guid id, string lastError, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.package_calls SET state = @state, last_error = @error WHERE id = @id",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", Pending);
+        command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = lastError });
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -158,6 +203,8 @@ internal static class PackageCalls
 /// <param name="Package">The package id.</param>
 /// <param name="Version">The pinned package version.</param>
 /// <param name="Operation">The operation's declared name.</param>
+/// <param name="Retry">The step's retry policy.</param>
+/// <param name="Idempotent">Whether the operation is idempotent, so an unknown outcome may be retried.</param>
 /// <param name="Input">The evaluated input, keyed by the inputs' declared names.</param>
 internal sealed record NewPackageCall(
     Guid Id,
@@ -167,6 +214,8 @@ internal sealed record NewPackageCall(
     string Package,
     string Version,
     string Operation,
+    RetryPolicyModel Retry,
+    bool Idempotent,
     JsonObject Input);
 
 /// <summary>A package call as the worker that runs it loads it.</summary>
@@ -175,6 +224,8 @@ internal sealed record NewPackageCall(
 /// <param name="Version">The pinned package version.</param>
 /// <param name="Operation">The operation's declared name.</param>
 /// <param name="Attempts">The attempts made so far.</param>
+/// <param name="Retry">The retry policy stored when the call was staged.</param>
+/// <param name="Idempotent">Whether the operation is idempotent, stored when the call was staged.</param>
 /// <param name="Input">The stored input as JSON text, or <see langword="null"/> once the call settled.</param>
 internal sealed record LoadedPackageCall(
     Guid Id,
@@ -186,4 +237,6 @@ internal sealed record LoadedPackageCall(
     string Operation,
     string State,
     int Attempts,
+    RetryPolicyModel Retry,
+    bool Idempotent,
     string? Input);

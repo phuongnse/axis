@@ -209,6 +209,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<bool>("Idempotent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("idempotent");
+
                     b.Property<string>("Input")
                         .HasColumnType("jsonb")
                         .HasColumnName("input");
@@ -234,6 +240,18 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<Guid>("ReleaseId")
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
+
+                    b.Property<int>("RetryAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("retry_attempts");
+
+                    b.Property<TimeSpan>("RetryBackoff")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("interval")
+                        .HasColumnName("retry_backoff")
+                        .HasDefaultValueSql("'30 seconds'::interval");
 
                     b.Property<DateTimeOffset?>("SettledAt")
                         .HasColumnType("timestamp with time zone")
