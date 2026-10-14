@@ -14,8 +14,7 @@ namespace Axis.Configuration.Compilation;
 /// and its <c>when</c> is a boolean over the watched record with the scope of a process condition.
 /// Every problem of a trigger is reported in one pass. A process, event or entity whose file did
 /// not load is not reported again, the entity match is not checked when either entity is unknown,
-/// and <c>when</c> is not checked without the event or the entity. Data change triggers compile but
-/// do not fire yet.
+/// and <c>when</c> is not checked without the event or the entity.
 /// </summary>
 internal static class TriggerChecker
 {

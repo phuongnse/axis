@@ -1,0 +1,13 @@
+{
+  "id": "4ef63353-26b4-4be0-be7e-ae439b3c7cf4",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.clerk": "Clerk",
+    "role.importer": "Importer",
+    "ticket.amountNotNegative": "The amount must not be negative.",
+    "ticket.cannotStart": "A closed ticket cannot be reviewed."
+  }
+}

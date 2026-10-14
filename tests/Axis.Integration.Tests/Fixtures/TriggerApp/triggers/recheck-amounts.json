@@ -1,0 +1,12 @@
+{
+  "id": "96601b74-bc71-456d-b244-de4d542ca5a3",
+  "kind": "trigger",
+  "name": "RecheckAmounts",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Ticket",
+  "on": ["update"],
+  "fields": ["amount"],
+  "when": "amount >= 100",
+  "process": "Recheck"
+}

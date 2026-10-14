@@ -1,0 +1,16 @@
+{
+  "id": "748d4bfd-e94e-4579-8f54-5f2dc471f1dd",
+  "kind": "endpoint",
+  "name": "ImportTicket",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "process": "Intake",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "amount", "type": "decimal" }
+  ],
+  "values": {
+    "title": "title",
+    "amount": "amount"
+  }
+}

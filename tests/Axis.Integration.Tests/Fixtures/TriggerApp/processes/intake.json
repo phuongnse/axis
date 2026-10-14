@@ -1,0 +1,9 @@
+{
+  "id": "a54620b1-9bff-477c-a325-b811adce86a6",
+  "kind": "process",
+  "name": "Intake",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

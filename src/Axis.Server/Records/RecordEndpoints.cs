@@ -1,8 +1,10 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
+using Axis.Processes.Instances;
 using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
@@ -36,6 +38,8 @@ namespace Axis.Server.Records;
 /// entity's creator fields to the session user's id. Every create, update and delete that
 /// succeeds appends one audit record in its transaction. Its actor is the session user, with their
 /// display name. A write that fails leaves none.
+/// A create or update also starts the processes of the data change triggers that match it, in the
+/// same transaction, as <c>system</c>. A write that fails starts none.
 /// A body is checked in order: content type (415), then body (400), then a field that no grant for
 /// the action covers (403, at the path of each such field), then the computed fields of
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
@@ -81,7 +85,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -164,7 +168,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -214,7 +218,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -269,6 +273,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -277,7 +282,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -336,6 +341,17 @@ internal static class RecordEndpoints
                 written is not null && !outside
                     ? RecordAudit(user, AuditActions.RecordCreated, application!, model, written.Id, written.Version)
                     : null,
+                () => DataChangeTriggerStarts.StartAsync(
+                    transaction,
+                    TenantId(tenants),
+                    application!,
+                    releaseId,
+                    model,
+                    DataChangeKinds.Create,
+                    written!,
+                    changedFields: null,
+                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                    cancellationToken),
                 cancellationToken);
             if (outside)
             {
@@ -358,6 +374,7 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -366,7 +383,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -473,6 +490,16 @@ internal static class RecordEndpoints
                 return Results.ValidationProblem(failures);
             }
 
+
+            // A trigger with fields compares the record before and after the write. The row lock
+            // makes this read the version the update replaces.
+            Record? before = null;
+            if (DataChangeTriggerStarts.NeedsPreviousRecord(application!, model)
+                && await RecordCommands.LockAsync(connection, model, recordId, cancellationToken))
+            {
+                before = await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken);
+            }
+
             result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
@@ -482,6 +509,19 @@ internal static class RecordEndpoints
                 written is not null && !outside
                     ? RecordAudit(user, AuditActions.RecordUpdated, application!, model, written.Id, written.Version, SetFields(model, input))
                     : null,
+                () => DataChangeTriggerStarts.StartAsync(
+                    transaction,
+                    TenantId(tenants),
+                    application!,
+                    releaseId,
+                    model,
+                    DataChangeKinds.Update,
+                    written!,
+                    before is null
+                        ? null
+                        : DataChangeTriggerStarts.ChangedFields(model, before, written!, input.Rows.Select(rows => rows.Collection.Name)),
+                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                    cancellationToken),
                 cancellationToken);
             if (outside)
             {
@@ -509,7 +549,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -561,6 +601,7 @@ internal static class RecordEndpoints
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
                     ? RecordAudit(user, AuditActions.RecordDeleted, application!, model, recordId, version)
                     : null,
+                beforeCommit: null,
                 cancellationToken);
         }
 
@@ -630,32 +671,43 @@ internal static class RecordEndpoints
     /// Finds the application and the entity in its active release, or the 404 that says which is
     /// missing. A child entity has no record routes: its rows are served through the owner record.
     /// </summary>
-    private static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound)> ResolveEntityAsync(
+    private static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound, Guid ReleaseId)> ResolveEntityAsync(
         string app,
         string entity,
         ActiveApplicationResolver resolver,
         CancellationToken cancellationToken)
     {
-        if (await resolver.ResolveAsync(app, cancellationToken) is not { } application)
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
         {
-            return (null, null, NotFound("No application is active under this name."));
+            return (null, null, NotFound("No application is active under this name."), Guid.Empty);
         }
 
+        var application = active.Model;
         return application.TryGetEntity(entity, out var model) && !application.IsChildEntity(model)
-            ? (application, model, null)
-            : (null, null, NotFound("The application has no entity with this name."));
+            ? (application, model, null, active.ReleaseId)
+            : (null, null, NotFound("The application has no entity with this name."), Guid.Empty);
     }
 
     /// <summary>
-    /// Appends <paramref name="audit"/> and commits the write when it succeeded, which is when
-    /// there is an audit record, and rolls back every write otherwise. Disposing the transaction
-    /// rolls back on an exception, so a write whose audit record fails is not committed.
+    /// Appends <paramref name="audit"/>, runs <paramref name="beforeCommit"/> and commits the write
+    /// when it succeeded, which is when there is an audit record, and rolls back every write
+    /// otherwise. Disposing the transaction rolls back on an exception, so a write whose audit
+    /// record or trigger start fails is not committed.
     /// </summary>
-    private static async Task CompleteAsync(NpgsqlTransaction transaction, AuditEntry? audit, CancellationToken cancellationToken)
+    private static async Task CompleteAsync(
+        NpgsqlTransaction transaction,
+        AuditEntry? audit,
+        Func<Task>? beforeCommit,
+        CancellationToken cancellationToken)
     {
         if (audit is not null)
         {
             await AuditRecords.AppendAsync(transaction, audit, cancellationToken);
+            if (beforeCommit is not null)
+            {
+                await beforeCommit();
+            }
+
             await transaction.CommitAsync(cancellationToken);
         }
         else
@@ -663,6 +715,9 @@ internal static class RecordEndpoints
             await transaction.RollbackAsync(cancellationToken);
         }
     }
+
+    private static string TenantId(ITenantContextAccessor tenants) =>
+        (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
 
     /// <summary>
     /// The audit record of a record write. Its details hold the record's version, and on update

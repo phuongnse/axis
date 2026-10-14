@@ -1,0 +1,9 @@
+{
+  "id": "3958099d-f0ea-4585-8318-7d452ba084d5",
+  "kind": "process",
+  "name": "Recheck",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

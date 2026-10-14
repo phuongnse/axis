@@ -37,7 +37,8 @@ public enum TriggerMode
 /// A compiled trigger: it starts a process when something happens. An event trigger starts the
 /// process for the record a raised event names, either later in async mode or in the raising
 /// step's transaction in sync mode. A data change trigger starts it for a record that was created
-/// or updated. Data change triggers compile but do not fire yet.
+/// or updated. Data change triggers fire on record API creates and updates and on an inbound
+/// endpoint's create.
 /// </summary>
 public sealed record TriggerModel
 {

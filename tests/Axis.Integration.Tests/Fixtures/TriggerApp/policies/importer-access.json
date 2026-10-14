@@ -1,0 +1,8 @@
+{
+  "id": "906e16ca-9c68-44ad-82d8-44ef6acc325a",
+  "kind": "policy",
+  "name": "ImporterAccess",
+  "formatVersion": 1,
+  "roles": ["importer"],
+  "grants": [{ "endpoint": "ImportTicket", "actions": ["invoke"] }]
+}

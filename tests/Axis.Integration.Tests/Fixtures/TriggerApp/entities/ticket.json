@@ -1,0 +1,15 @@
+{
+  "id": "d5c18bb2-7df3-4fb7-a251-21270b7d98c0",
+  "kind": "entity",
+  "name": "Ticket",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "amount", "type": "decimal" },
+    { "name": "status", "type": "text" }
+  ],
+  "validations": [
+    { "expression": "amount is null or amount >= 0", "message": { "textKey": "ticket.amountNotNegative" }, "field": "amount" }
+  ]
+}

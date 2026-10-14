@@ -1245,8 +1245,11 @@ built. So is the `raiseEvent` step, which stores each occurrence, see
 are built too, and so is the delivery of each occurrence to the `async` event
 triggers, see [Event delivery](#event-delivery). So is the start of each `sync`
 event trigger in the transaction of the `raiseEvent` step, see
-[Raise event step](#raise-event-step). Data change triggers compile but do not
-fire yet. *(planned for M5)* Schedule triggers are not built yet. A `raiseEvent` step raises an
+[Raise event step](#raise-event-step). Data change triggers fire on record API
+creates and updates and on an inbound endpoint's record create, see
+[Starts from triggers](#starts-from-triggers). They do not fire yet on task
+form saves, `updateRecord` steps or connector outputs. *(planned for M5)*
+Schedule triggers are not built yet. A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a
@@ -1360,26 +1363,41 @@ the step that fired the trigger, which still commits. For a `sync` event
 trigger, any other error in the start fails the `raiseEvent` step, which rolls
 back with its event, and the raising instance becomes `failed`.
 
-Every skip is logged at Information level with the trigger, the record and
-the reason. A run-time error is logged with its message. A skip is never
-tried again, so a process never starts long after its cause.
+Every skip for a `when`, a `startCondition`, a receipt or a process that
+already runs is logged at Information level with the trigger, the record and
+the reason. A run-time error is logged with its message. A data change
+trigger that does not list the write in `on`, or whose `fields` an update did
+not change, is passed over without a log line, because it was never a
+candidate. A skip is never tried again, so a process never starts long after
+its cause.
 
 Triggers come from the release that is active when the trigger fires. For an
 `async` event trigger, that is when the event is delivered, not when it was
-raised.
+raised. For a data change trigger, it is the release the write's request
+resolved when it began. The write and its triggers then use the same model,
+even when a release activates while the request runs.
 
 | Trigger | Start commits in | Skipped when |
 | --- | --- | --- |
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
-| Data change | The write's transaction: a record API create or update, a task form save, an `updateRecord` step, or a connector output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Data change | The write's transaction: a record API create or update, or an inbound endpoint's create. *(planned for M5)* A task form save, an `updateRecord` step and a connector output do not fire yet | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
 | Schedule | The transaction of the fan-out batch that holds the record | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
 or hits a run-time error.
 
 A data change trigger sees the record as the write left it. A create always
-passes `fields`, because every field is new. Suppose `NoteClose` had a data
+passes `fields`, because every field is new. An update passes `fields` when
+the stored value of a listed field differs from the value before the update.
+A child collection in `fields` counts as changed whenever the update body
+sets it, because an update replaces all its rows. The triggers run in the
+order of the release, after the record and its `record.created` or
+`record.updated` audit record are written and before the commit. For an
+inbound endpoint call, they run before the endpoint's own start. A start that
+fails for any reason but a skip, such as a database error, fails the write,
+which rolls back with everything the triggers started. The record is locked
+by the write, so a data change start does not lock it again. Suppose `NoteClose` had a data
 change trigger on `Note` updates. Its own `close` step would fire it, and the
 start would be skipped, because `NoteClose` already runs for the note.
 

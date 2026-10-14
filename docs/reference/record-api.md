@@ -160,6 +160,11 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
   fields in `values` change, and fields left out keep their value. `null`
   clears a field that is not required. An empty `values` only increments
   `version`. The response is `200` with the record and its new version.
+- **Data change triggers.** A create or update that commits also starts the
+  processes of the matching [data change triggers](processes.md#starts-from-triggers)
+  in the same transaction, as `system`. The user needs no `start` grant. A
+  write that fails starts none, and a start that is skipped never fails the
+  write.
 - **Delete.** `DELETE` removes the record by id only. It needs no body and no
   version. The response is `204` with no body. A record that another record
   references through a `reference` field is kept, and the response is `409`.
@@ -595,12 +600,15 @@ One transaction then does the rest:
    apply, as in a [record API create](#create-update-and-delete). The
    creator field gets the caller's id. Errors are a `400` keyed
    `/values/<field>`, and a unique-value conflict is a `409`.
-3. It evaluates the process's `startCondition` on the new record. A failure
+3. It starts the processes of the [data change triggers](processes.md#starts-from-triggers)
+   on `create` for the entity, as `system`, in the order of the release. A
+   skipped trigger start does not fail the call.
+4. It evaluates the process's `startCondition` on the new record. A failure
    is a `400` keyed `/input`, with the condition's message text key.
-4. It inserts the instance, pinned to the active release, with its first
+5. It inserts the instance, pinned to the active release, with its first
    work item, as the [process start](processes.md#start-endpoint) does. An
    instance already running for the record is a `409`.
-5. It writes the audit records `record.created` and `process.started`.
+6. It writes the audit records `record.created` and `process.started`.
 
 When any part fails, nothing is written. After the commit, an endpoint with
 `wait` checks the instance's state until it completes or `wait` runs out.

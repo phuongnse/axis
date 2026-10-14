@@ -1,0 +1,8 @@
+{
+  "id": "e595a539-2a0c-4bad-b17a-a71c1b6787b2",
+  "kind": "policy",
+  "name": "ClerkAccess",
+  "formatVersion": 1,
+  "roles": ["clerk"],
+  "grants": [{ "entity": "Ticket", "actions": ["read", "create", "update"] }]
+}
