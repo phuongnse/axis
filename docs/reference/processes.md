@@ -1227,8 +1227,8 @@ built. So is the `raiseEvent` step, which stores each occurrence, see
 are built too, and so is the delivery of each occurrence to the `async` event
 triggers, see [Event delivery](#event-delivery). So is the start of each `sync`
 event trigger in the transaction of the `raiseEvent` step, see
-[Raise event step](#raise-event-step). *(planned for M5)* Data change triggers
-and schedule triggers are not built yet. A `raiseEvent` step raises an
+[Raise event step](#raise-event-step). Data change triggers compile but do not
+fire yet. *(planned for M5)* Schedule triggers are not built yet. A `raiseEvent` step raises an
 [event](configuration.md#event-resource) for its subject record. A
 [trigger](configuration.md#trigger-resource) starts a process for one record
 when an event is raised, when a record is created or updated, or when a
