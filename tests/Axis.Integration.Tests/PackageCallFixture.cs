@@ -20,8 +20,10 @@ namespace Axis.Integration.Tests;
 /// <c>test-package/sum</c> on the divisor and the divisor plus one and writes the result to
 /// <c>total</c>, <c>PackageFail</c>, which runs <c>test-package/fail</c>, <c>PackageFlaky</c> and
 /// <c>PackageFlakyShort</c>, which run <c>test-package/flaky</c> with the divisor as the number of
-/// failures and 3 or 2 attempts, and <c>PackageSlow</c>, which runs <c>test-package/slow</c>. The worker
-/// has the package installed, its log entries go to <see cref="Logs"/>, and its host is never started,
+/// failures and 3 or 2 attempts, <c>PackageSlow</c>, which runs <c>test-package/slow</c>, and
+/// <c>PackageDescribe</c>, which waits on a task, then runs <c>test-package/describe</c> and writes its
+/// <c>version</c> to <c>packageVersion</c>. Versions 1.0.0 and 1.1.0 of the package are installed. The
+/// worker has them installed, its log entries go to <see cref="Logs"/>, and its host is never started,
 /// so a test runs the work items itself. A second worker has no package installed.
 /// </summary>
 public sealed class PackageCallFixture : IAsyncLifetime
@@ -117,8 +119,38 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private const string DescribeProcess = """
+        {
+          "id": "7e3a9c14-5b02-4d68-8f71-0a6d2c9e4b35",
+          "kind": "process",
+          "name": "PackageDescribe",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "review",
+          "steps": [
+            {
+              "name": "review",
+              "type": "task",
+              "label": { "textKey": "request.approve" },
+              "assignee": { "role": "finance" },
+              "form": "RequestReview",
+              "outcomes": [{ "name": "approve", "label": { "textKey": "task.approve" }, "next": "describe" }]
+            },
+            {
+              "name": "describe",
+              "type": "operation",
+              "operation": "test-package/describe",
+              "input": { "name": "title" },
+              "output": { "version": "packageVersion" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     private readonly ProcessStepFixture _tenant = new();
-    private readonly TemporaryFolder _packages = new TemporaryFolder().Install(1);
+    private readonly TemporaryFolder _packages = new TemporaryFolder().Install("1.0.0", "1.1.0");
     private readonly TemporaryFolder _application = new();
     private readonly TemporaryFolder _noPackages = new();
     private PackageCatalog? _catalog;
@@ -135,6 +167,9 @@ public sealed class PackageCallFixture : IAsyncLifetime
     /// <summary>The release of the StepApp copy that pins the package.</summary>
     public Guid ReleaseId { get; private set; }
 
+    /// <summary>The model of the release <see cref="ReleaseId"/>.</summary>
+    public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     public async ValueTask InitializeAsync()
     {
         await _tenant.InitializeAsync();
@@ -143,14 +178,20 @@ public sealed class PackageCallFixture : IAsyncLifetime
             _application.With(Path.GetRelativePath(_appFolder, file), await File.ReadAllTextAsync(file));
         }
 
-        Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "^1.0.0" }));
-        Edit("entities/request.json", request => request["fields"]!.AsArray().Add(new JsonObject { ["name"] = "total", ["type"] = "integer" }));
+        Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" }));
+        Edit("entities/request.json", request =>
+        {
+            var fields = request["fields"]!.AsArray();
+            fields.Add(new JsonObject { ["name"] = "total", ["type"] = "integer" });
+            fields.Add(new JsonObject { ["name"] = "packageVersion", ["type"] = "text" });
+        });
         _application
             .With("processes/package-sum.json", SumProcess)
             .With("processes/package-fail.json", FailProcess)
             .With("processes/package-flaky.json", Flaky("PackageFlaky", "b3f8a2c1-7d46-4e09-8a15-6c0d9e2f4b78", 3))
             .With("processes/package-flaky-short.json", Flaky("PackageFlakyShort", "a91c4e7d-2b58-4f36-9d80-5e3a7b1c6f24", 2))
-            .With("processes/package-slow.json", SlowProcess);
+            .With("processes/package-slow.json", SlowProcess)
+            .With("processes/package-describe.json", DescribeProcess);
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);
@@ -235,7 +276,52 @@ public sealed class PackageCallFixture : IAsyncLifetime
         return releaseId;
     }
 
-    /// <summary>Reads the request <paramref name="id"/> with its <c>total</c> field.</summary>
+    /// <summary>
+    /// Compiles and activates a copy of the StepApp copy that pins <c>test-package</c> exactly at
+    /// <paramref name="version"/>, against the installed packages. The new release becomes the active one.
+    /// Returns its id and model.
+    /// </summary>
+    public async Task<(Guid ReleaseId, ApplicationModel Model)> ActivatePinnedAsync(string version)
+    {
+        var catalog = _catalog ?? throw new InvalidOperationException("The fixture is not initialized.");
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_application.Path, "*", SearchOption.AllDirectories))
+        {
+            folder.With(Path.GetRelativePath(_application.Path, file), await File.ReadAllTextAsync(file));
+        }
+
+        var path = Path.Combine(folder.Path, "application.json");
+        var application = JsonNode.Parse(await File.ReadAllTextAsync(path))!.AsObject();
+        application["packages"]!.AsArray()[0]!["version"] = version;
+        await File.WriteAllTextAsync(path, application.ToJsonString());
+
+        var activated = await _tenant.ActivateAsync(folder.Path, catalog.Versions);
+        Assert.NotEqual(ReleaseId, activated.ReleaseId);
+        return activated;
+    }
+
+    /// <summary>
+    /// Completes the open task of <paramref name="instanceId"/> with the outcome <c>approve</c> as the
+    /// task endpoint does, which resumes the instance on the step <c>describe</c>.
+    /// </summary>
+    public async Task CompleteTaskAsync(Guid instanceId, CancellationToken cancellationToken)
+    {
+        var taskId = Assert.Single(await _tenant.TasksAsync(instanceId)).Id;
+        await using var connection = await _tenant.DataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
+        Assert.NotNull(task);
+        Assert.True(await ProcessTasks.TryCompleteAsync(transaction, taskId, "approve", "maria", cancellationToken));
+        await ProcessTasks.ResumeAsync(
+            transaction,
+            task,
+            new TaskCompletion("approve", "describe", "maria", "Maria", null, null, []),
+            _tenant.Tenant,
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>Reads the request <paramref name="id"/> with its <c>total</c> and <c>packageVersion</c> fields.</summary>
     public async Task<Record> RequestAsync(Guid id)
     {
         Assert.True((_model ?? throw new InvalidOperationException("The fixture is not initialized.")).TryGetEntity("Request", out var request));

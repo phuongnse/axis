@@ -1,0 +1,49 @@
+{
+  "id": "test-package",
+  "version": "1.1.0",
+  "assembly": "Axis.TestPackage.dll",
+  "operations": [
+    {
+      "name": "describe",
+      "type": "TestPackage.DescribeOperation",
+      "idempotent": true,
+      "input": [{ "name": "name", "type": "text", "required": true }],
+      "output": [
+        { "name": "greeting", "type": "text", "required": true },
+        { "name": "version", "type": "text", "required": true }
+      ],
+      "capabilities": { "urls": ["TestUrl"], "secrets": ["TestToken"] }
+    },
+    {
+      "name": "sum",
+      "type": "TestPackage.SumOperation",
+      "idempotent": false,
+      "timeout": "PT5S",
+      "input": [
+        { "name": "a", "type": "integer", "required": true },
+        { "name": "b", "type": "integer", "required": true }
+      ],
+      "output": [{ "name": "total", "type": "integer", "required": true }]
+    },
+    {
+      "name": "fail",
+      "type": "TestPackage.FailOperation",
+      "idempotent": false,
+      "input": [{ "name": "a", "type": "integer", "required": true }]
+    },
+    {
+      "name": "flaky",
+      "type": "TestPackage.FlakyOperation",
+      "idempotent": true,
+      "input": [{ "name": "failures", "type": "integer", "required": true }],
+      "output": [{ "name": "attempts", "type": "integer", "required": true }]
+    },
+    {
+      "name": "slow",
+      "type": "TestPackage.SlowOperation",
+      "idempotent": false,
+      "timeout": "PT1S",
+      "input": [{ "name": "a", "type": "integer", "required": true }]
+    }
+  ]
+}

@@ -281,7 +281,7 @@ all of these:
   operation and no capabilities. The purchase request sample uses it. Its
   operation is chosen in the issue that builds it.
 - **Test package.** A test-only package, `test-package`, lives under
-  `tests/packages/`. One source is built as versions 1.0.0 and 2.0.0, and the
+  `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. *(planned for M5)* It
   will also cover the capability limits: a declared binding is handed out,
   and an undeclared one fails the attempt.

@@ -23,6 +23,7 @@
   </Folder>
   <Folder Name="/tests/packages/">
     <Project Path="tests/packages/TestPackage.V1/TestPackage.V1.csproj" />
+    <Project Path="tests/packages/TestPackage.V1_1/TestPackage.V1_1.csproj" />
     <Project Path="tests/packages/TestPackage.V2/TestPackage.V2.csproj" />
   </Folder>
 </Solution>

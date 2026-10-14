@@ -18,7 +18,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void A_valid_package_step_compiles_to_a_step_model_that_holds_the_pinned_version()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """
@@ -43,7 +43,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void A_package_step_keeps_its_retry_policy_and_the_manifest_idempotency()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """
@@ -64,7 +64,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_operation_of_a_package_the_application_does_not_list_is_reported_at_the_operation()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """
@@ -87,7 +87,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_operation_of_a_package_when_the_application_lists_none_is_reported()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(Process(
             """
             { "name": "add", "type": "operation", "operation": "test-package/sum", "input": {}, "next": "done" }
@@ -102,7 +102,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_operation_of_a_listed_package_that_failed_pinning_is_not_reported_again()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 $$"""
@@ -119,7 +119,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_unknown_operation_of_a_pinned_package_is_reported_at_the_operation()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """
@@ -142,7 +142,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_input_expression_of_the_wrong_type_is_reported_at_its_key()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """
@@ -163,7 +163,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void A_missing_required_input_is_reported_at_the_input()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """
@@ -182,7 +182,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_output_that_does_not_fit_its_subject_field_is_reported_at_its_key()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 $$"""
@@ -202,7 +202,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void An_invalid_retry_backoff_is_reported_for_a_package_step()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 $$"""
@@ -224,7 +224,7 @@ public sealed class PackageStepCompilerTests
     [InlineData(""" "fields": { "status": "'x'" }, """)]
     public void A_package_step_with_a_property_of_another_operation_is_a_schema_error(string property)
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 $$"""
@@ -241,7 +241,7 @@ public sealed class PackageStepCompilerTests
     [Fact]
     public void A_package_step_without_input_is_a_schema_error()
     {
-        using var packages = new TemporaryFolder().Install(1);
+        using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = Folder(
             Process(
                 """

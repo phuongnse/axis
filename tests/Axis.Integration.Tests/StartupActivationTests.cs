@@ -379,7 +379,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     public async Task Start_compiles_against_the_installed_packages_and_pins_the_highest_version_in_range()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
-        using var packages = new TemporaryFolder().Install(1, 2);
+        using var packages = new TemporaryFolder().Install("1.0.0", "2.0.0");
         using var folder = ApplicationFolder(TitleField)
             .With("application.json", $$"""
                 { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
