@@ -1,0 +1,18 @@
+{
+  "id": "662c5ed5-064d-4353-a56d-e4121a9d734c",
+  "kind": "process",
+  "name": "Escalate",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "start": "escalate",
+  "steps": [
+    {
+      "name": "escalate",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "stage": "'escalated'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

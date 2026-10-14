@@ -1,0 +1,12 @@
+{
+  "id": "73e186d1-d994-419d-89ec-cce83bef3237",
+  "kind": "trigger",
+  "name": "NotifyEscalated",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Ticket",
+  "on": ["update"],
+  "fields": ["stage"],
+  "when": "stage == 'escalated'",
+  "process": "Notify"
+}

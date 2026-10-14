@@ -1,0 +1,19 @@
+{
+  "id": "a53294bf-8e01-49a5-8628-e15db77a4a43",
+  "kind": "process",
+  "name": "Triage",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "start": "triage",
+  "steps": [
+    {
+      "name": "triage",
+      "type": "task",
+      "label": { "textKey": "ticket.triage" },
+      "assignee": { "role": "clerk" },
+      "form": "TicketTriage",
+      "outcomes": [{ "name": "done", "label": { "textKey": "task.done" }, "next": "finished" }]
+    },
+    { "name": "finished", "type": "end" }
+  ]
+}

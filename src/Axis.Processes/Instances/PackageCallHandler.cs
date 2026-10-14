@@ -17,7 +17,8 @@ namespace Axis.Processes.Instances;
 /// extends the item's lease by the operation's timeout. The operation then runs from the package
 /// version the release pins, with the stored input and the operation identity in its context, under
 /// a token that is cancelled at the timeout. An outcome transaction records the result. An output
-/// that fits the manifest writes the output fields, settles the call <c>succeeded</c> and resumes
+/// that fits the manifest writes the output fields, starts the data change triggers of the update
+/// from the active release, settles the call <c>succeeded</c> and resumes
 /// the instance on <c>next</c>. An output that does not fit, an exception, and a pinned version
 /// that is missing or fails to load settle the call <c>failed</c> and fail the instance, for now,
 /// since retries are not built. A timeout leaves the call <c>unknown</c>, and so does a call found
@@ -343,7 +344,7 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
     }
 
     /// <summary>Writes the success in the transaction. Returns the error when the record write is refused, or <see langword="null"/>.</summary>
-    private static async Task<string?> WriteSuccessAsync(
+    private async Task<string?> WriteSuccessAsync(
         ClaimedWorkItem item,
         NpgsqlTransaction transaction,
         LoadedInstance instance,
@@ -376,6 +377,7 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
         var input = new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = record?.Version };
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
+        Record? updated = null;
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
@@ -385,6 +387,7 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
             }
 
+            updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -408,6 +411,23 @@ internal sealed partial class PackageCallHandler(ReleaseModelCache models, Packa
         if (recordAudit is not null)
         {
             await AuditRecords.AppendAsync(transaction, recordAudit, cancellationToken);
+        }
+
+        if (updated is not null
+            && await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken) is { } active)
+        {
+            await DataChangeTriggerStarts.StartAfterUpdateAsync(
+                transaction,
+                item.TenantId,
+                active.Model,
+                active.ReleaseId,
+                call.ReleaseId,
+                entity,
+                record!,
+                updated,
+                [],
+                logger,
+                cancellationToken);
         }
 
         await AuditRecords.AppendAsync(transaction, Called(instance, attempt, PackageCalls.Succeeded), cancellationToken);

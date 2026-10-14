@@ -8,6 +8,9 @@
     "role.clerk": "Clerk",
     "role.importer": "Importer",
     "ticket.amountNotNegative": "The amount must not be negative.",
-    "ticket.cannotStart": "A closed ticket cannot be reviewed."
+    "ticket.cannotStart": "A closed ticket cannot be reviewed.",
+    "ticket.triage": "Triage the ticket",
+    "ticketTriage.main": "Ticket",
+    "task.done": "Done"
   }
 }

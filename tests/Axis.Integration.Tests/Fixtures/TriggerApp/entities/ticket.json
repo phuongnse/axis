@@ -7,7 +7,8 @@
   "fields": [
     { "name": "title", "type": "text", "required": true, "maxLength": 50 },
     { "name": "amount", "type": "decimal" },
-    { "name": "status", "type": "text" }
+    { "name": "status", "type": "text" },
+    { "name": "stage", "type": "text" }
   ],
   "validations": [
     { "expression": "amount is null or amount >= 0", "message": { "textKey": "ticket.amountNotNegative" }, "field": "amount" }

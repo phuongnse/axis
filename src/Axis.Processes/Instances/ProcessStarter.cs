@@ -74,7 +74,10 @@ public static class ProcessStarter
         await transaction.SaveAsync(StartSavepoint, cancellationToken);
         if (!await ProcessStarts.TryInsertInstanceAsync(transaction, instance, cancellationToken))
         {
+            // The rollback keeps the savepoint open, so it is released too. Otherwise the caller's
+            // later writes would run in a subtransaction, with an xid of their own.
             await transaction.RollbackAsync(StartSavepoint, cancellationToken);
+            await transaction.ReleaseAsync(StartSavepoint, cancellationToken);
             return new ProcessStartResult(ProcessStartOutcome.AlreadyRunning);
         }
 
