@@ -9,15 +9,18 @@ using NpgsqlTypes;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The task list, a record's history and the work claim stay fast at a realistic size: the reads
-/// answer within the time limit, and the plan of each query uses its index.
+/// The task list, a record's history, the work claim, the event lookup and the endpoint receipt
+/// lookup stay fast at a realistic size: the reads answer within the time limit where a limit is set,
+/// and the plan of each query uses its index.
 /// </summary>
 public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : IClassFixture<ProcessStepFixture>
 {
     private const int OpenTasks = 10_000;
     private const int AuditRecordCount = 100_000;
     private const int AuditedRecords = 1_000;
-    private const int FutureWorkItems = 10_000;
+    private const int FutureWorkItems = 100_000;
+    private const int EventCount = 100_000;
+    private const int ReceiptCount = 100_000;
     private const int DueWorkItems = 100;
     private const int PageSize = 50;
 
@@ -131,7 +134,7 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
     }
 
     [Fact]
-    public async Task The_work_claim_over_ten_thousand_queued_items_uses_the_due_index()
+    public async Task The_work_claim_over_a_hundred_thousand_queued_items_uses_the_due_index()
     {
         // A healthy queue is mostly future work, such as deadlines, with a little work due now. On a
         // tiny or fully due queue a full table read is the right plan, so the check would prove nothing.
@@ -168,6 +171,75 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
             await using var delete = fixture.DataSource.CreateCommand("DELETE FROM axis.process_work_items WHERE process_instance_id IS NULL");
             await delete.ExecuteNonQueryAsync(CancellationToken);
         }
+    }
+
+    [Fact]
+    public async Task The_event_lookup_over_a_hundred_thousand_events_uses_the_event_key()
+    {
+        // The events reference one instance, as the foreign key demands. The lookup reads one by its id.
+        var instance = Guid.NewGuid();
+        var firstEvent = Guid.NewGuid();
+        await using (var insert = fixture.DataSource.CreateCommand(
+            $"""
+            WITH instance AS (
+                INSERT INTO axis.process_instances
+                    (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step)
+                VALUES (@instance, @application, @process, @entity, gen_random_uuid(), @release, '{ProcessStarts.Waiting}', 2, 'approve'))
+            INSERT INTO axis.events
+                (id, application_id, event, release_id, entity_id, subject_id, payload, process_instance_id, raised_at)
+            SELECT CASE WHEN n = 1 THEN @first ELSE gen_random_uuid() END, @application, 'RequestNoted', @release, @entity,
+                   gen_random_uuid(), jsonb_build_object(), @instance, now()
+            FROM generate_series(1, {EventCount}) AS n
+            """))
+        {
+            insert.Parameters.AddWithValue("instance", instance);
+            insert.Parameters.AddWithValue("first", firstEvent);
+            insert.Parameters.AddWithValue("application", Guid.NewGuid());
+            insert.Parameters.AddWithValue("process", Guid.NewGuid());
+            insert.Parameters.AddWithValue("entity", Guid.NewGuid());
+            insert.Parameters.AddWithValue("release", Guid.NewGuid());
+            await insert.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        await AnalyzeAsync("axis.events");
+
+        var plan = await ExplainAsync(ProcessEvents.LoadSql, command => command.Parameters.AddWithValue("id", firstEvent));
+
+        AssertUsesIndex(plan, "pk_events");
+    }
+
+    [Fact]
+    public async Task The_endpoint_receipt_lookup_over_a_hundred_thousand_receipts_uses_the_receipt_key()
+    {
+        // The receipts spread over 10 endpoints and 20 callers, each with its own keys.
+        var application = Guid.NewGuid();
+        var endpoints = Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray();
+        await using (var insert = fixture.DataSource.CreateCommand(
+            $"""
+            INSERT INTO axis.endpoint_receipts (application_id, endpoint_id, caller, key, record_id, instance_id, input_hash)
+            SELECT @application, (@endpoints::uuid[])[n % 10 + 1], 'caller-' || n % 20, 'key-' || n,
+                   gen_random_uuid(), gen_random_uuid(), sha256('x')
+            FROM generate_series(1, {ReceiptCount}) AS n
+            """))
+        {
+            insert.Parameters.AddWithValue("application", application);
+            insert.Parameters.AddWithValue("endpoints", endpoints);
+            await insert.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        await AnalyzeAsync("axis.endpoint_receipts");
+
+        // Row 7 has endpoint 8 of 10 and caller 7 of 20.
+        var plan = await ExplainAsync(EndpointReceipts.FindSql, command =>
+        {
+            command.Parameters.AddWithValue("application", application);
+            command.Parameters.AddWithValue("endpoint", endpoints[7]);
+            command.Parameters.AddWithValue("caller", "caller-7");
+            command.Parameters.AddWithValue("key", "key-7");
+            command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = "{}" });
+        });
+
+        AssertUsesIndex(plan, "pk_endpoint_receipts");
     }
 
     /// <summary>Adds the parameters of the first page to a page query.</summary>
