@@ -1424,7 +1424,7 @@ compiled against.
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
-| Schedule | The `trigger.fanOut` transaction of the occurrence, which holds every record's start. Batches of 100 are *(planned for M5)* | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
+| Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
 or hits a run-time error.
@@ -1482,10 +1482,16 @@ these retries yet.
 
 **Schedule state.** Activating a release writes the schedule state of each
 schedule trigger for the tenant, in `axis.trigger_schedules`, and its
-`trigger.schedule` work item. The next occurrence is computed from the
-activation time, even for a trigger that did not change, so a server restart
-computes it again. Triggers that the release removes lose their state and
-their work item. The server's startup activation writes this state right after
+`trigger.schedule` work item. The state keeps the `schedule` and `timeZone`
+the next occurrence was computed from. Activation computes the next occurrence
+from the activation time only for a new trigger, or one whose `schedule` or
+`timeZone` changed. A trigger with the same id, `schedule` and `timeZone` keeps
+its stored next occurrence, even a past one, and its work item is due then. So
+after a server restart the worker catches up, as the occurrence steps below
+describe. A trigger's data source, parameters and
+process are read when the occurrence runs, so a change only to them keeps the
+next occurrence. Triggers that the release removes lose their state and their
+work item. The server's startup activation writes this state right after
 the release is active.
 
 **Occurrences.** Each schedule trigger has one `trigger.schedule` work item,
@@ -1496,8 +1502,8 @@ does this:
 1. It records the occurrence as the trigger's last occurrence. It changes the
    state only while the stored next occurrence is still the one this item
    ran. When several occurrences were missed, for example while no worker ran,
-   only the latest one runs *(planned for M5)*. Today the stored occurrence
-   runs late.
+   only the latest one at or before now runs, once. The worker logs how many
+   it skipped.
 2. It queues a `trigger.fanOut` work item for the occurrence.
 3. It computes the next occurrence after now, and sets the item's `due_at` to
    it.
@@ -1515,9 +1521,9 @@ the data source:
    at the occurrence.
 2. It runs the data source as `system`, with the trigger's fixed parameters,
    ordered by record id. The data source's `pageSize` and `sort` do not apply.
-   It reads 100 records at a time, after the stored cursor *(planned for
-   M5)*. Today one transaction reads and starts every record of the
-   occurrence.
+   Each claim reads one batch of 100 records, by record id after the item's
+   stored cursor. A record created while the fan-out runs is included only if
+   its id sorts after the cursor.
 3. For each record, it inserts a receipt into `axis.trigger_starts`, keyed by
    the trigger, the occurrence time and the record. The time is in UTC, such
    as `2026-01-01T05:00:00Z`. When that key is taken, the record is skipped.
@@ -1526,7 +1532,9 @@ the data source:
    is active when the fan-out runs. When the application has no active release,
    or the active release has no such process, the occurrence starts nothing
    and the reason is logged.
-4. The transaction deletes the item with the starts.
+4. The transaction commits the batch's starts and receipts together with the
+   item. A full batch of 100 stores the last record id as the item's `cursor`
+   and makes the item due again at once. A shorter batch deletes the item.
 
 **Failures.** A fan-out transaction that fails leaves the item claimed. It
 runs again after the lease expires, as event delivery does, and the receipts
@@ -1534,9 +1542,15 @@ make each record start at most once per occurrence. A data error in the data
 source's filter, an SQLSTATE of class 22, is different. It is logged as a
 warning and the item is deleted, because trying again would fail the same way.
 
-A worker that crashes in the middle of the occurrence commits none of it. The
-next worker runs it again. Batches with a stored cursor, so that a run resumes
-where it stopped, are *(planned for M5)*.
+A worker that stops in the middle of the occurrence loses only its open batch.
+The next worker claims the item and continues after the stored cursor. Each
+record still starts at most once per occurrence.
+
+A fan-out that began before a new release was activated finishes with the
+trigger and data source of the release it started under, and starts the
+process in the release that is active when each batch runs. A release that
+removes the trigger deletes its state and its `trigger.schedule` item, so no
+further occurrence runs, but a running fan-out finishes.
 
 ## Worker settings
 
@@ -1605,8 +1619,8 @@ database, with history in `axis.__processes_migrations` (see
     partial unique index allows one such item for each trigger.
   - `trigger.fanOut` starts the process for the records of one occurrence.
     Its item also has the `trigger_id`, the `release_id` that was active at
-    the occurrence and the `occurrence_at` time. The `cursor`, the last record
-    id it handled, is *(planned for M5)*.
+    the occurrence and the `occurrence_at` time. Its `cursor` is the last
+    record id it handled, and is null before its first batch.
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's
@@ -1704,6 +1718,8 @@ database, with history in `axis.__processes_migrations` (see
   | `trigger_id` | `uuid` | The trigger |
   | `application_id` | `uuid` | The application. Activation uses it to find the triggers a new release removed |
   | `release_id` | `uuid` | The release that wrote the state |
+  | `schedule` | `text`, null | The cron text the next occurrence was computed from. Null for a row written before it was stored |
+  | `time_zone` | `text`, null | The time zone id the next occurrence was computed in. Null for a row written before it was stored |
   | `next_occurrence_at` | `timestamptz` | The next occurrence |
   | `last_occurrence_at` | `timestamptz`, null | The last occurrence that ran. Null before the first |
 - `axis.trigger_starts`: one receipt per trigger, cause and record, see

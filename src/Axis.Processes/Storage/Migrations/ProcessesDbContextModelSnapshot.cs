@@ -549,6 +549,14 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("Schedule")
+                        .HasColumnType("text")
+                        .HasColumnName("schedule");
+
+                    b.Property<string>("TimeZone")
+                        .HasColumnType("text")
+                        .HasColumnName("time_zone");
+
                     b.HasKey("TriggerId")
                         .HasName("pk_trigger_schedules");
 
@@ -606,6 +614,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<Guid?>("ConnectorCallId")
                         .HasColumnType("uuid")
                         .HasColumnName("connector_call_id");
+
+                    b.Property<Guid?>("Cursor")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cursor");
 
                     b.Property<DateTimeOffset>("DueAt")
                         .HasColumnType("timestamp with time zone")

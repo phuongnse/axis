@@ -11,10 +11,13 @@ using Npgsql;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// Runs a <c>trigger.fanOut</c> work item: one occurrence of a schedule trigger. In one transaction
-/// it extends the lease, reads the ids of the records the trigger's data source returns as
-/// <c>system</c>, with the trigger's fixed parameters and in record id order, and starts the
-/// trigger's process for each. The trigger and the data source come from the release the item
+/// Runs a <c>trigger.fanOut</c> work item: one occurrence of a schedule trigger. Each claim runs one
+/// batch of up to 100 records in one transaction. It extends the lease, reads the ids of the
+/// records the trigger's data source returns as <c>system</c>, with the trigger's fixed parameters,
+/// in record id order and after the item's cursor, and starts the trigger's process for each. A full
+/// batch stores the last id as the cursor and makes the item due at once, in the same transaction, so
+/// a worker that stops loses at most its open batch and any worker continues after the cursor. A short
+/// batch deletes the item. The trigger and the data source come from the release the item
 /// names, which was active at the occurrence. The process, the records and the pin come from the
 /// release that is active now. With no active release, or one without the process, the occurrence
 /// starts nothing. Each record gets a receipt in <c>axis.trigger_starts</c> keyed by the trigger,
@@ -41,6 +44,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
         var occurrence = occurrenceAt.UtcDateTime.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'", CultureInfo.InvariantCulture);
 
         var skips = new List<(Guid SubjectId, string Reason)>();
+        var outcome = WorkItemOutcome.Completed;
         TriggerModel trigger;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -66,7 +70,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
                 var parameters = dataSource.Parameters
                     .Select(parameter => new DataSourceParameterValue(parameter, trigger.Parameters!.GetValueOrDefault(parameter.Name)))
                     .ToList();
-                var ids = await ListIdsAsync(connection, transaction, stored, dataSource, parameters, cancellationToken);
+                var ids = await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, cancellationToken);
                 if (ids is null)
                 {
                     LogDataError(trigger.Name, occurrence);
@@ -82,10 +86,22 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
                             skips.Add((id, skipped));
                         }
                     }
+
+                    if (ids.Count == PageSize)
+                    {
+                        if (!await WorkItemQueue.AdvanceCursorAsync(connection, transaction, item, ids[^1], cancellationToken))
+                        {
+                            await transaction.RollbackAsync(cancellationToken);
+                            LogLostClaim(item.Id, triggerId, occurrence);
+                            return WorkItemOutcome.LostClaim;
+                        }
+
+                        outcome = WorkItemOutcome.Rescheduled;
+                    }
                 }
             }
 
-            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            if (outcome == WorkItemOutcome.Completed && !await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
             {
                 await transaction.RollbackAsync(cancellationToken);
                 LogLostClaim(item.Id, triggerId, occurrence);
@@ -100,41 +116,33 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
             LogSkipped(trigger.Name, trigger.Process.Name, subjectId, occurrence, reason);
         }
 
-        return WorkItemOutcome.Completed;
+        return outcome;
     }
 
     /// <summary>
-    /// Reads the root record ids of the data source, page by page. Returns <see langword="null"/>
-    /// when the database rejects the filter with a data exception. That aborts the statement, so
-    /// the read runs in a savepoint that is rolled back, which keeps the transaction usable.
+    /// Reads one batch of root record ids of the data source, after <paramref name="after"/>.
+    /// Returns <see langword="null"/> when the database rejects the filter with a data exception.
+    /// That aborts the statement, so the read runs in a savepoint that is rolled back, which keeps
+    /// the transaction usable.
     /// </summary>
-    private static async Task<List<Guid>?> ListIdsAsync(
+    private static async Task<IReadOnlyList<Guid>?> ListIdsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         ApplicationModel model,
         DataSourceModel dataSource,
         IReadOnlyList<DataSourceParameterValue> parameters,
+        Guid? after,
         CancellationToken cancellationToken)
     {
-        var ids = new List<Guid>();
         await transaction.SaveAsync(Savepoint, cancellationToken);
-        for (var page = 1; ; page++)
+        var ids = await DataSourceQueries.ListIdsAfterAsync(connection, model, dataSource, parameters, after, PageSize, cancellationToken);
+        if (ids is null)
         {
-            var rows = await DataSourceQueries.ListAsync(connection, model, dataSource, page, PageSize, sort: null, parameters, cancellationToken: cancellationToken);
-            if (rows is null)
-            {
-                await transaction.RollbackAsync(Savepoint, cancellationToken);
-                await transaction.ReleaseAsync(Savepoint, cancellationToken);
-                return null;
-            }
-
-            ids.AddRange(rows.Items.Select(row => row.Id!.Value));
-            if (rows.Items.Count < PageSize)
-            {
-                await transaction.ReleaseAsync(Savepoint, cancellationToken);
-                return ids;
-            }
+            await transaction.RollbackAsync(Savepoint, cancellationToken);
         }
+
+        await transaction.ReleaseAsync(Savepoint, cancellationToken);
+        return ids;
     }
 
     /// <summary>

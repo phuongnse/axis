@@ -43,4 +43,7 @@ public sealed class WorkItemRow
 
     /// <summary>The occurrence a <c>trigger.fanOut</c> item runs, or <see langword="null"/> for other work.</summary>
     public DateTimeOffset? OccurrenceAt { get; init; }
+
+    /// <summary>The last record id a <c>trigger.fanOut</c> item handled, or <see langword="null"/> before its first batch.</summary>
+    public Guid? Cursor { get; init; }
 }

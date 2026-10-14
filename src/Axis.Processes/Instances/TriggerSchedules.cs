@@ -14,8 +14,10 @@ public static class TriggerSchedules
 {
     /// <summary>
     /// In one transaction, stores for each schedule trigger of <paramref name="model"/> its state
-    /// row and its <c>trigger.schedule</c> work item, both at the trigger's next occurrence after
-    /// the transaction's time, and releases a claim on the item. A trigger the application had
+    /// row and its <c>trigger.schedule</c> work item, both at the trigger's next occurrence, and
+    /// releases a claim on the item. A new or changed trigger gets its next occurrence after the
+    /// transaction's time, and a trigger with the same <c>schedule</c> and <c>timeZone</c> keeps its
+    /// stored one, even a past one, so the worker catches up after downtime. A trigger the application had
     /// before and <paramref name="model"/> no longer has loses its row and its item. The row keeps
     /// the trigger's latest run occurrence. Triggers of other applications are untouched.
     /// </summary>
@@ -37,12 +39,19 @@ public static class TriggerSchedules
         {
             var next = trigger.Schedule!.NextAfter(now, trigger.TimeZone!);
             kept.Add(trigger.Id);
+            DateTimeOffset due;
             await using (var state = new NpgsqlCommand(
                 """
-                INSERT INTO axis.trigger_schedules (trigger_id, application_id, release_id, next_occurrence_at)
-                VALUES (@trigger, @application, @release, @next)
+                INSERT INTO axis.trigger_schedules (trigger_id, application_id, release_id, schedule, time_zone, next_occurrence_at)
+                VALUES (@trigger, @application, @release, @schedule, @timeZone, @next)
                 ON CONFLICT (trigger_id) DO UPDATE
-                SET application_id = EXCLUDED.application_id, release_id = EXCLUDED.release_id, next_occurrence_at = EXCLUDED.next_occurrence_at
+                SET application_id = EXCLUDED.application_id, release_id = EXCLUDED.release_id,
+                    schedule = EXCLUDED.schedule, time_zone = EXCLUDED.time_zone,
+                    next_occurrence_at = CASE
+                        WHEN axis.trigger_schedules.schedule = EXCLUDED.schedule AND axis.trigger_schedules.time_zone = EXCLUDED.time_zone
+                        THEN axis.trigger_schedules.next_occurrence_at
+                        ELSE EXCLUDED.next_occurrence_at END
+                RETURNING next_occurrence_at
                 """,
                 connection,
                 transaction))
@@ -50,8 +59,10 @@ public static class TriggerSchedules
                 state.Parameters.AddWithValue("trigger", trigger.Id);
                 state.Parameters.AddWithValue("application", applicationId);
                 state.Parameters.AddWithValue("release", releaseId);
+                state.Parameters.AddWithValue("schedule", trigger.Schedule!.Expression);
+                state.Parameters.AddWithValue("timeZone", trigger.TimeZone!.Id);
                 state.Parameters.AddWithValue("next", next.ToUniversalTime());
-                await state.ExecuteNonQueryAsync(cancellationToken);
+                due = new DateTimeOffset((DateTime)(await state.ExecuteScalarAsync(cancellationToken))!);
             }
 
             await using var item = new NpgsqlCommand(
@@ -66,7 +77,7 @@ public static class TriggerSchedules
             item.Parameters.AddWithValue("id", Guid.CreateVersion7());
             item.Parameters.AddWithValue("tenant", tenantId);
             item.Parameters.AddWithValue("kind", ProcessStarts.TriggerScheduleWorkItemKind);
-            item.Parameters.AddWithValue("next", next.ToUniversalTime());
+            item.Parameters.AddWithValue("next", due.ToUniversalTime());
             item.Parameters.AddWithValue("trigger", trigger.Id);
             await item.ExecuteNonQueryAsync(cancellationToken);
         }

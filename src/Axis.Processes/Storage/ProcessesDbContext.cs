@@ -259,6 +259,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             schedule.Property(s => s.TriggerId).HasColumnName("trigger_id").ValueGeneratedNever();
             schedule.Property(s => s.ApplicationId).HasColumnName("application_id");
             schedule.Property(s => s.ReleaseId).HasColumnName("release_id");
+            schedule.Property(s => s.Schedule).HasColumnName("schedule");
+            schedule.Property(s => s.TimeZone).HasColumnName("time_zone");
             schedule.Property(s => s.NextOccurrenceAt).HasColumnName("next_occurrence_at");
             schedule.Property(s => s.LastOccurrenceAt).HasColumnName("last_occurrence_at");
             schedule.HasIndex(s => s.ApplicationId).HasDatabaseName("ix_trigger_schedules_application_id");
@@ -281,6 +283,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.TriggerId).HasColumnName("trigger_id");
             item.Property(i => i.ReleaseId).HasColumnName("release_id");
             item.Property(i => i.OccurrenceAt).HasColumnName("occurrence_at");
+            item.Property(i => i.Cursor).HasColumnName("cursor");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");

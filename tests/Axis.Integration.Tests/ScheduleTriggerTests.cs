@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
+using Axis.Processes.Work;
 
 namespace Axis.Integration.Tests;
 
@@ -46,11 +48,17 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
 
         await ScheduleTriggerFixture.RunUntilIdleAsync("a", fixture.NewWorker(), CancellationToken);
 
+        // The stored occurrence is months old, so the worker ran only the latest daily one.
+        var state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        var occurrence = state.LastOccurrenceAt ?? throw new InvalidOperationException("No occurrence ran.");
+        Assert.True(occurrence > _occurrence && occurrence <= DateTimeOffset.UtcNow);
+        AssertBerlinSixOClock(occurrence);
+
         foreach (var id in large)
         {
             var instance = Assert.Single(await InstancesAsync(tenant, id));
             Assert.Equal((ProcessStarts.Waiting, tenant.FirstReleaseId), (instance.State, instance.ReleaseId));
-            Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id));
+            Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id, occurrence));
         }
 
         Assert.Empty(await InstancesAsync(tenant, small));
@@ -58,9 +66,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)));
 
         // The item and the state wait for the next 06:00 in Berlin.
-        var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var item = Assert.Single(await tenant.ScheduleItemsAsync());
-        Assert.Equal(_occurrence, state.LastOccurrenceAt);
         Assert.Equal(state.NextOccurrenceAt, item.DueAt);
         AssertNextBerlinSixOClock(state.NextOccurrenceAt);
 
@@ -75,7 +81,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
                 ["processId"] = process.Id,
                 ["releaseId"] = tenant.FirstReleaseId,
                 ["trigger"] = Trigger,
-                ["occurrenceAt"] = "2026-01-01T05:00:00Z",
+                ["occurrenceAt"] = Source(occurrence),
             },
             JsonNode.Parse(details!)));
     }
@@ -97,8 +103,9 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         // Two more fan-outs of the occurrence stand for deliveries that a crashed worker ran. Both
         // workers run them at once and may try to start the same records.
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
-        await tenant.EnqueueFanOutAsync(state.TriggerId, state.ReleaseId, _occurrence);
-        await tenant.EnqueueFanOutAsync(state.TriggerId, state.ReleaseId, _occurrence);
+        var occurrence = state.LastOccurrenceAt ?? throw new InvalidOperationException("No occurrence ran.");
+        await tenant.EnqueueFanOutAsync(state.TriggerId, state.ReleaseId, occurrence);
+        await tenant.EnqueueFanOutAsync(state.TriggerId, state.ReleaseId, occurrence);
         await Task.WhenAll(
             ScheduleTriggerFixture.RunUntilIdleAsync("c", first, CancellationToken),
             ScheduleTriggerFixture.RunUntilIdleAsync("c", second, CancellationToken));
@@ -106,7 +113,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         foreach (var id in large)
         {
             var instance = Assert.Single(await InstancesAsync(tenant, id));
-            Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id));
+            Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id, occurrence));
             Assert.Equal(
                 1L,
                 await tenant.CountAsync(
@@ -119,10 +126,177 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)));
     }
 
+    [Fact]
+    public async Task Worker_stopped_in_the_middle_of_a_fan_out_leaves_each_record_started_once_and_a_new_worker_completes_it()
+    {
+        var tenant = fixture.Tenant("d");
+        for (var index = 0; index < 1000; index++)
+        {
+            await tenant.InsertRequestAsync(2000m, 1);
+        }
+
+        await DueAtAsync(tenant, _occurrence);
+
+        // The schedule item, then three batches of 100 records.
+        await fixture.RunAsync("d", fixture.NewWorker(), 4, CancellationToken);
+
+        // A worker claims the next batch and stops before it commits anything.
+        await using (var connection = await tenant.DataSource.OpenConnectionAsync(CancellationToken))
+        {
+            Assert.NotNull(await WorkItemQueue.ClaimAsync(connection, "d", [ProcessStarts.TriggerFanOutWorkItemKind], TimeSpan.Zero, CancellationToken));
+        }
+
+        Assert.Equal(300L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts WHERE outcome = 'started'"));
+        Assert.Equal(
+            0L,
+            await tenant.CountAsync(
+                "SELECT count(*) FROM (SELECT subject_id FROM axis.process_instances GROUP BY subject_id HAVING count(*) > 1) d"));
+        Assert.Equal(300L, await tenant.CountAsync("SELECT count(*) FROM axis.process_instances"));
+        Assert.Equal(1L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = @kind AND cursor IS NOT NULL", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)));
+
+        await ScheduleTriggerFixture.RunUntilIdleAsync("d", fixture.NewWorker(), CancellationToken);
+
+        Assert.Equal(1000L, await tenant.CountAsync("SELECT count(*) FROM axis.process_instances"));
+        Assert.Equal(1000L, await tenant.CountAsync("SELECT count(DISTINCT subject_id) FROM axis.process_instances"));
+        Assert.Equal(1000L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts WHERE outcome = 'started'"));
+        Assert.Equal(1000L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts"));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)));
+    }
+
+    [Fact]
+    public async Task Missed_hourly_occurrences_run_only_the_latest_once_and_the_next_is_due_an_hour_later()
+    {
+        var tenant = fixture.Tenant("e");
+        var record = await tenant.InsertRequestAsync(2000m, 1);
+        var stored = await MoveBackThreeHoursAsync(tenant);
+
+        await ScheduleTriggerFixture.RunUntilIdleAsync("e", fixture.NewWorker(), CancellationToken);
+
+        await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored);
+    }
+
+    [Fact]
+    public async Task A_release_that_removes_the_trigger_lets_the_running_fan_out_finish_and_runs_no_further_occurrence()
+    {
+        var tenant = fixture.Tenant("f");
+        for (var index = 0; index < 250; index++)
+        {
+            await tenant.InsertRequestAsync(2000m, 1);
+        }
+
+        await DueAtAsync(tenant, _occurrence);
+        var worker = fixture.NewWorker();
+
+        // The schedule item, then the first batch of 100 records.
+        await fixture.RunAsync("f", worker, 2, CancellationToken);
+        Assert.Equal(100L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts"));
+
+        await tenant.ActivateAsync(ProcessStepFixture.StepAppFolder, []);
+
+        Assert.Empty(await tenant.TriggerSchedulesAsync());
+        Assert.Empty(await tenant.ScheduleItemsAsync());
+
+        await ScheduleTriggerFixture.RunUntilIdleAsync("f", worker, CancellationToken);
+
+        Assert.Equal(250L, await tenant.CountAsync("SELECT count(*) FROM axis.process_instances"));
+        Assert.Equal(250L, await tenant.CountAsync("SELECT count(DISTINCT subject_id) FROM axis.process_instances"));
+        Assert.Equal(250L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts WHERE outcome = 'started'"));
+        Assert.Equal(1L, await tenant.CountAsync("SELECT count(DISTINCT source) FROM axis.trigger_starts"));
+
+        // No later occurrence runs.
+        await ScheduleTriggerFixture.RunUntilIdleAsync("f", worker, CancellationToken);
+
+        Assert.Equal(250L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts"));
+        Assert.Equal(
+            0L,
+            await tenant.CountAsync(
+                "SELECT count(*) FROM axis.process_work_items WHERE kind = ANY(@kinds)",
+                ("kinds", new[] { ProcessStarts.TriggerScheduleWorkItemKind, ProcessStarts.TriggerFanOutWorkItemKind })));
+    }
+
+    [Fact]
+    public async Task Activating_the_same_release_again_keeps_a_missed_next_occurrence_and_the_worker_runs_only_the_latest()
+    {
+        var tenant = fixture.Tenant("g");
+        var record = await tenant.InsertRequestAsync(2000m, 1);
+        var stored = await MoveBackThreeHoursAsync(tenant);
+
+        await tenant.ActivateAsync(fixture.HourlyFolder, []);
+
+        var state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        var item = Assert.Single(await tenant.ScheduleItemsAsync());
+        Assert.Equal(stored, state.NextOccurrenceAt);
+        Assert.Equal(stored, item.DueAt);
+        Assert.Null(state.LastOccurrenceAt);
+
+        await ScheduleTriggerFixture.RunUntilIdleAsync("g", fixture.NewWorker(), CancellationToken);
+
+        await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored);
+    }
+
+    [Fact]
+    public async Task Activating_a_release_with_a_changed_schedule_computes_the_next_occurrence_from_the_activation_time()
+    {
+        var tenant = fixture.Tenant("h");
+        await DueAtAsync(tenant, _occurrence);
+
+        var (releaseId, _) = await tenant.ActivateAsync(fixture.HourlyFolder, []);
+
+        var state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        var item = Assert.Single(await tenant.ScheduleItemsAsync());
+        Assert.Equal(releaseId, state.ReleaseId);
+        Assert.Equal(state.NextOccurrenceAt, item.DueAt);
+        Assert.Equal(
+            (true, true, true),
+            (
+                (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at > now() FROM axis.trigger_schedules"))!,
+                (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at <= now() + interval '1 hour' FROM axis.trigger_schedules"))!,
+                (bool)(await tenant.ScalarAsync("SELECT date_trunc('hour', next_occurrence_at) = next_occurrence_at FROM axis.trigger_schedules"))!));
+    }
+
+    /// <summary>
+    /// Moves the stored next occurrence and the schedule item three hours back, to the start of the
+    /// hour, so that three hourly occurrences are missed. Returns the stored time.
+    /// </summary>
+    private static async Task<DateTimeOffset> MoveBackThreeHoursAsync(ProcessStepFixture tenant)
+    {
+        await tenant.ScalarAsync("UPDATE axis.trigger_schedules SET next_occurrence_at = date_trunc('hour', now()) - interval '2 hours'");
+        await tenant.ScalarAsync(
+            "UPDATE axis.process_work_items SET due_at = date_trunc('hour', now()) - interval '2 hours' WHERE kind = @kind",
+            ("kind", ProcessStarts.TriggerScheduleWorkItemKind));
+        return Assert.Single(await tenant.TriggerSchedulesAsync()).NextOccurrenceAt;
+    }
+
+    /// <summary>
+    /// Checks that the worker skipped the occurrences missed since <paramref name="stored"/> and ran
+    /// the latest one once for <paramref name="record"/>, and that the next occurrence is an hour later.
+    /// The checks hold even if the hour rolls over while the test runs.
+    /// </summary>
+    private static async Task AssertOnlyTheLatestHourlyOccurrenceRanAsync(ProcessStepFixture tenant, Guid record, DateTimeOffset stored)
+    {
+        var state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        var item = Assert.Single(await tenant.ScheduleItemsAsync());
+        var latest = state.LastOccurrenceAt ?? throw new InvalidOperationException("No occurrence ran.");
+        Assert.True(latest >= stored.AddHours(2));
+        Assert.True((bool)(await tenant.ScalarAsync("SELECT @latest <= now() AND now() - @latest < interval '1 hour'", ("latest", latest)))!);
+        Assert.Equal(latest.AddHours(1), state.NextOccurrenceAt);
+        Assert.Equal(state.NextOccurrenceAt, item.DueAt);
+
+        Assert.Equal(1L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts"));
+        var instance = Assert.Single(await InstancesAsync(tenant, record));
+        Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, record, latest));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)));
+    }
+
+    private static void AssertBerlinSixOClock(DateTimeOffset instant)
+    {
+        var berlin = TimeZoneInfo.ConvertTime(instant, TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin"));
+        Assert.Equal((6, 0, 0), (berlin.Hour, berlin.Minute, berlin.Second));
+    }
+
     private static void AssertNextBerlinSixOClock(DateTimeOffset next)
     {
-        var berlin = TimeZoneInfo.ConvertTime(next, TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin"));
-        Assert.Equal((6, 0, 0), (berlin.Hour, berlin.Minute, berlin.Second));
+        AssertBerlinSixOClock(next);
         Assert.True(next > DateTimeOffset.UtcNow);
 
         // The next 06:00 is a day away at most, or 25 hours on the day the clocks go back.
@@ -156,13 +330,17 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         return rows;
     }
 
-    private static async Task<(string Outcome, Guid? InstanceId)> ReceiptAsync(ProcessStepFixture tenant, Guid subjectId)
+    private static string Source(DateTimeOffset occurrence) =>
+        occurrence.UtcDateTime.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'", CultureInfo.InvariantCulture);
+
+    private static async Task<(string Outcome, Guid? InstanceId)> ReceiptAsync(ProcessStepFixture tenant, Guid subjectId, DateTimeOffset occurrence)
     {
         await using var command = tenant.DataSource.CreateCommand(
             """
             SELECT outcome, process_instance_id FROM axis.trigger_starts
-            WHERE trigger_id = (SELECT trigger_id FROM axis.trigger_schedules) AND source = '2026-01-01T05:00:00Z' AND subject_id = @subject
+            WHERE trigger_id = (SELECT trigger_id FROM axis.trigger_schedules) AND source = @source AND subject_id = @subject
             """);
+        command.Parameters.AddWithValue("source", Source(occurrence));
         command.Parameters.AddWithValue("subject", subjectId);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
