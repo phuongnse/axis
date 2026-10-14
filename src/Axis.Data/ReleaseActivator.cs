@@ -8,7 +8,8 @@ namespace Axis.Data;
 /// <summary>
 /// Makes a compiled release the active release of its application: it checks that no other
 /// application is active under the manifest name or holds one of its site paths, checks that the
-/// tenant has every deployment binding its connectors name with the right kind, provisions the
+/// tenant has every deployment binding its connectors and the package operations its processes use
+/// name with the right kind, provisions the
 /// entity tables and then sets the active release with its site paths.
 /// <para>
 /// Provisioning runs in its own transaction, and the active release and its site paths are written
@@ -96,9 +97,10 @@ public static class ReleaseActivator
     }
 
     /// <summary>
-    /// Reports every connector binding the tenant lacks or holds with another kind, and every base
-    /// URL that is not <c>https</c> when <c>http</c> is not allowed. A message names the tenant
-    /// and the binding, never its value.
+    /// Reports every binding the tenant lacks or holds with another kind: those of the connectors,
+    /// and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
+    /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A message
+    /// names the tenant and the binding, never its value.
     /// </summary>
     private static List<Diagnostic> CheckBindings(ApplicationModel model, ActivationBindings bindings)
     {
@@ -120,6 +122,38 @@ public static class ReleaseActivator
             if (connector.Auth is { } auth)
             {
                 CheckBinding(auth.Binding, ActivationBinding.SecretKind, auth.BindingPath, bindings, Report);
+            }
+        }
+
+        foreach (var process in model.Processes)
+        {
+            for (var index = 0; index < process.Steps.Count; index++)
+            {
+                if (process.Steps[index] is not PackageOperationStepModel step)
+                {
+                    continue;
+                }
+
+                var path = $"/steps/{index}/operation";
+                void Report(string code, string message, string path) =>
+                    diagnostics.Add(new Diagnostic(code, message, process.File, path, process.Id));
+
+                foreach (var name in step.Capabilities.Urls)
+                {
+                    var url = CheckBinding(name, ActivationBinding.UrlKind, path, bindings, Report);
+                    if (url is not null && !bindings.AllowHttp && url.Url?.Scheme != Uri.UriSchemeHttps)
+                    {
+                        Report(
+                            DiagnosticCodes.InsecureBaseUrl,
+                            $"Tenant '{bindings.TenantId}' binding '{name}' is not an https URL. Only Development allows http.",
+                            path);
+                    }
+                }
+
+                foreach (var name in step.Capabilities.Secrets)
+                {
+                    CheckBinding(name, ActivationBinding.SecretKind, path, bindings, Report);
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Model;
@@ -133,7 +134,9 @@ public sealed record RetryPolicyModel(int Attempts, TimeSpan Backoff);
 /// subject record, and moves to <see cref="Next"/> when the run succeeds. <see cref="Package"/>
 /// is the package id as the application lists it and <see cref="Operation"/> is the manifest's
 /// declared name. <see cref="Retry"/> says how often and how soon a failed attempt is tried again.
-/// <see cref="Idempotent"/> and <see cref="Timeout"/> come from the manifest of that version.
+/// <see cref="Idempotent"/>, <see cref="Timeout"/> and <see cref="Capabilities"/> come from the
+/// manifest of that version. <see cref="Capabilities"/> names the <c>url</c> and <c>secret</c>
+/// deployment bindings the operation declares.
 /// </summary>
 public sealed record PackageOperationStepModel(
     string Name,
@@ -145,7 +148,8 @@ public sealed record PackageOperationStepModel(
     RetryPolicyModel Retry,
     bool Idempotent,
     TimeSpan Timeout,
-    string Next) : ProcessStepModel(Name);
+    string Next,
+    PackageCapabilities Capabilities) : ProcessStepModel(Name);
 
 /// <summary>
 /// A <c>raiseEvent</c> operation step: it raises <see cref="Event"/>, by its declared name, about

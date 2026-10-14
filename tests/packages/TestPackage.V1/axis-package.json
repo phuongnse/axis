@@ -44,6 +44,14 @@
       "idempotent": false,
       "timeout": "PT1S",
       "input": [{ "name": "a", "type": "integer", "required": true }]
+    },
+    {
+      "name": "probe",
+      "type": "TestPackage.ProbeOperation",
+      "idempotent": false,
+      "input": [{ "name": "mode", "type": "text", "required": true }],
+      "output": [{ "name": "status", "type": "integer", "required": true }],
+      "capabilities": { "urls": ["TestUrl"], "secrets": ["TestToken"] }
     }
   ]
 }

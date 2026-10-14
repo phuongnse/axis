@@ -142,6 +142,21 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             AllowHttp: false);
 
     /// <summary>
+    /// <see cref="StepAppBindings"/> and the bindings the <c>describe</c> and <c>probe</c> operations of
+    /// <c>test-package</c> declare: <c>TestUrl</c>, a url binding holding <paramref name="testUrl"/>, and
+    /// the secret <c>TestToken</c>.
+    /// </summary>
+    public static ActivationBindings PackageBindings(string tenantId, Uri testUrl, bool allowHttp)
+    {
+        var bindings = new Dictionary<string, ActivationBinding>(StepAppBindings(tenantId).Bindings, StringComparer.OrdinalIgnoreCase)
+        {
+            ["TestUrl"] = new(ActivationBinding.UrlKind, testUrl),
+            ["TestToken"] = new(ActivationBinding.SecretKind, null),
+        };
+        return new ActivationBindings(tenantId, bindings, allowHttp);
+    }
+
+    /// <summary>
     /// Inserts a request with a new title, <paramref name="amount"/>, <paramref name="divisor"/> and
     /// an optional <paramref name="department"/>, and returns its id.
     /// </summary>
@@ -497,13 +512,10 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     private Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder) => ActivateAsync(folder, []);
 
     /// <summary>Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it. Returns the release's id and model.</summary>
-    internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder, IReadOnlyCollection<PackageVersion> packages)
+    internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(
+        string folder, IReadOnlyCollection<PackageVersion> packages, ActivationBindings? bindings = null)
     {
-        await using var configuration = CreateConfigurationContext();
-        await using var data = CreateDataContext();
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
-        Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, StepAppBindings(_tenantId));
+        var (compiled, activated) = await TryActivateAsync(folder, packages, bindings ?? StepAppBindings(_tenantId));
         Assert.Empty(activated.Diagnostics);
         await using (var connection = await DataSource.OpenConnectionAsync())
         {
@@ -511,6 +523,22 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         }
 
         return (compiled.Release!.Id, compiled.Model!);
+    }
+
+    /// <summary>
+    /// Compiles the application in <paramref name="folder"/> against <paramref name="packages"/>, which must
+    /// give no diagnostic, and tries to activate it with <paramref name="bindings"/>. Returns the compilation
+    /// and the activation result, which may hold diagnostics. It writes no schedules.
+    /// </summary>
+    internal async Task<(ReleaseCompilationResult Compiled, ActivationResult Activated)> TryActivateAsync(
+        string folder, IReadOnlyCollection<PackageVersion> packages, ActivationBindings bindings)
+    {
+        await using var configuration = CreateConfigurationContext();
+        await using var data = CreateDataContext();
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
+        Assert.Empty(compiled.Diagnostics);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings);
+        return (compiled, activated);
     }
 
     private EntityModel RequestEntity

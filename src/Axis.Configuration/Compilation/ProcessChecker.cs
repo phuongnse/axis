@@ -253,7 +253,8 @@ internal static class ProcessChecker
                 new RetryPolicyModel(step.Retry?.Attempts ?? DefaultRetryAttempts, backoff ?? _defaultRetryBackoff),
                 operation.Idempotent,
                 operation.Timeout,
-                Resolve(step.Next!));
+                Resolve(step.Next!),
+                operation.Capabilities);
         }
 
         // A checked raise names a loaded event and gives each of its payload fields once.

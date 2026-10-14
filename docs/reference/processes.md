@@ -29,7 +29,7 @@ steps are checked and compiled against the manifest of the pinned package
 version. Their step stages the call and leaves the instance `waiting`, and the
 worker runs the operation and records its result, see
 [Package operations](#package-operations). Retries of package calls under the
-step's retry policy are built too. Capability limits are planned for M5. So are
+step's retry policy are built too. The capability limits of package operations are built too. So are
 triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers).
@@ -222,7 +222,7 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   form `<package>/<operation>` names an operation from an extension package.
   It is checked and compiled, and it runs outside the step's transaction,
   see [Package operations](#package-operations). Its calls are retried under the
-  step's retry policy, and its capability limits are *(planned for M5)*. A second built-in operation, `callConnector`, calls an
+  step's retry policy, and its context hands it only the capabilities it declares. A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked, compiled, staged
   and sent, its call is retried, and an unknown outcome is reconciled. A third
@@ -1125,7 +1125,7 @@ The purchasing system holds one order, and the request records its number.
 This section follows
 [D28](../decisions.md#d28-extension-packages--agreed). The step shape, its
 compile checks, running the step and retries under the step's retry policy are
-built. Capability limits are *(planned for M5)*. A package
+built, and so are the capability limits of the operation context. A package
 operation step runs one operation of an
 [extension package](extension-packages.md), custom C# code that the operator
 installs. The step runs like a [connector call](#connector-calls): it stages
@@ -1204,9 +1204,12 @@ the operation in place of the HTTP request:
 - **Mark.** Before each attempt, a short transaction marks the call
   `sending`, counts the attempt and extends the item's lease past the
   operation's `timeout`.
-- **Run.** The worker loads the pinned package version and runs the
-  operation with the stored input, outside any transaction. The context's
+- **Run.** The worker loads the pinned package version, resolves the
+  `url` and `secret` bindings the operation declares for the tenant, and runs
+  the operation with the stored input, outside any transaction. The context's
   `OperationId` is the operation identity, the same on every attempt. The
+  context hands out only the declared bindings, see
+  [Capabilities](extension-packages.md#capabilities). The
   worker passes a cancellation token that is cancelled at the `timeout`.
 - **Record.** An outcome transaction records the result, as for a connector
   call. On success it writes the output fields with the record update rules,
@@ -1231,6 +1234,7 @@ again with the stored input under the same operation identity.
 | A `RetryableException` | Retryable | Yes, while attempts are left | The instance becomes `failed` |
 | Any other exception, or a request to the context for an undeclared capability | Failed | No | The instance becomes `failed` at once |
 | The pinned version is missing on the worker | Retryable | Yes, while attempts are left | The instance becomes `failed` |
+| A declared binding the tenant lacks, or an `http` url outside Development | Retryable | Yes, while attempts are left | The instance becomes `failed` |
 | The release lacks the step, or the installed manifest lacks the operation | Failed | No | The instance becomes `failed` at once |
 | A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true` and attempts are left | The call stays `unknown` |
 
@@ -1238,7 +1242,8 @@ again with the stored input under the same operation identity.
   [.NET type](extension-packages.md#contracts) for each output, and a value
   for each required output.
 - **Undeclared capability.** The attempt fails even if the operation catches
-  the exception that the context throws.
+  the exception that the context throws. The error names the operation, the
+  package and the binding, and holds no value.
 - **A retry.** It sets the call back to `pending` and keeps the item. The item
   is due after the step's backoff doubled for each attempt made, so after
   `backoff`·2^(n−1) for attempt n, and at most an hour. A retry writes no
