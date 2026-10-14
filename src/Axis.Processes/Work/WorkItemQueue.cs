@@ -19,7 +19,7 @@ public static class WorkItemQueue
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at
+        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor
         """;
 
     /// <summary>
@@ -106,6 +106,7 @@ public static class WorkItemQueue
             await reader.IsDBNullAsync(9, cancellationToken) ? null : reader.GetGuid(9),
             await reader.IsDBNullAsync(10, cancellationToken) ? null : reader.GetGuid(10),
             await reader.IsDBNullAsync(11, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(11),
+            await reader.IsDBNullAsync(12, cancellationToken) ? null : reader.GetGuid(12),
             lease);
     }
 
@@ -186,6 +187,35 @@ public static class WorkItemQueue
             connection,
             transaction);
         command.Parameters.AddWithValue("due", dueAt.ToUniversalTime());
+        command.Parameters.AddWithValue("id", item.Id);
+        command.Parameters.AddWithValue("token", item.ClaimToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Stores <paramref name="cursor"/> as the last record the item handled and makes the item due
+    /// at once, in the transaction, if the claim is still current. The claim and its lease are
+    /// released, so any worker can claim the item. Returns <see langword="false"/> when another
+    /// worker has claimed it since, so the caller must roll back.
+    /// </summary>
+    public static async Task<bool> AdvanceCursorAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ClaimedWorkItem item,
+        Guid cursor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(item);
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_work_items
+            SET cursor = @cursor, due_at = now(), claim_token = NULL, lease_expires_at = NULL
+            WHERE id = @id AND claim_token = @token
+            """,
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("cursor", cursor);
         command.Parameters.AddWithValue("id", item.Id);
         command.Parameters.AddWithValue("token", item.ClaimToken);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;

@@ -1,4 +1,5 @@
 using Axis.Configuration.Tests;
+using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
@@ -9,8 +10,9 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Three tenants, <c>a</c>, <c>b</c> and <c>c</c>, each with its own database holding StepApp plus a
-/// schedule trigger. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
+/// Eight tenants, <c>a</c> to <c>h</c>, each with its own database holding StepApp plus a
+/// schedule trigger. Tenants <c>e</c> and <c>g</c> start with <see cref="HourlyFolder"/>, a copy of
+/// the application whose trigger runs every hour, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
 /// <c>RoleApprove</c> for each request of the data source <c>LargeRequests</c>, those with an
 /// amount of at least the fixed <c>minAmount</c> of 1000. Each test uses its own tenant, so record
 /// sets do not mix. Workers are built from the worker's own registration and never started, so a
@@ -24,10 +26,14 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
     private readonly Dictionary<string, ProcessStepFixture> _tenants = new(StringComparer.Ordinal);
     private readonly List<ServiceProvider> _workers = [];
     private TemporaryFolder? _folder;
+    private TemporaryFolder? _hourlyFolder;
     private IConfiguration? _settings;
 
     /// <summary>Every log entry of the workers.</summary>
     internal LogCollector Logs { get; } = new();
+
+    /// <summary>A copy of the application whose trigger runs at the start of every hour, with the same ids.</summary>
+    internal string HourlyFolder => (_hourlyFolder ?? throw new InvalidOperationException("The fixture is not initialized.")).Path;
 
     public async ValueTask InitializeAsync()
     {
@@ -65,9 +71,17 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
                 }
                 """);
 
-        foreach (var id in new[] { "a", "b", "c" })
+        _hourlyFolder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_folder.Path, "*", SearchOption.AllDirectories))
         {
-            var tenant = new ProcessStepFixture(id, _folder.Path);
+            var relativePath = Path.GetRelativePath(_folder.Path, file);
+            var content = await File.ReadAllTextAsync(file);
+            _hourlyFolder.With(relativePath, relativePath == "triggers/review-large-requests.json" ? content.Replace("\"0 6 * * *\"", "\"0 * * * *\"", StringComparison.Ordinal) : content);
+        }
+
+        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h" })
+        {
+            var tenant = new ProcessStepFixture(id, id is "e" or "g" ? _hourlyFolder.Path : _folder.Path);
             _tenantList.Add(tenant);
             _tenants[id] = tenant;
             await tenant.InitializeAsync();
@@ -96,12 +110,13 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
         }
 
         _folder?.Dispose();
+        _hourlyFolder?.Dispose();
     }
 
     /// <summary>The database of <paramref name="tenantId"/>.</summary>
     public ProcessStepFixture Tenant(string tenantId) => _tenants[tenantId];
 
-    /// <summary>Builds a worker for the three tenants. The fixture disposes it.</summary>
+    /// <summary>Builds a worker for the eight tenants. The fixture disposes it.</summary>
     public WorkItemRunner NewWorker()
     {
         var worker = new ServiceCollection()
@@ -117,6 +132,27 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
     {
         while (await worker.RunNextAsync(tenantId, _lease, cancellationToken))
         {
+        }
+    }
+
+    /// <summary>
+    /// Claims and runs the tenant's next due <c>trigger.schedule</c> or <c>trigger.fanOut</c> item on
+    /// <paramref name="worker"/>, <paramref name="count"/> times. Each run must find an item. The
+    /// steps of the instances that a fan-out starts are left, so each run is one occurrence or one batch.
+    /// </summary>
+    public async Task RunAsync(string tenantId, WorkItemRunner worker, int count, CancellationToken cancellationToken)
+    {
+        for (var run = 0; run < count; run++)
+        {
+            await using var connection = await _tenants[tenantId].DataSource.OpenConnectionAsync(cancellationToken);
+            var item = await WorkItemQueue.ClaimAsync(
+                connection,
+                tenantId,
+                [ProcessStarts.TriggerScheduleWorkItemKind, ProcessStarts.TriggerFanOutWorkItemKind],
+                _lease,
+                cancellationToken);
+            Assert.True(item is not null, $"Run {run + 1} of {count} found no due trigger work item.");
+            await worker.ExecuteAsync(item, cancellationToken);
         }
     }
 }

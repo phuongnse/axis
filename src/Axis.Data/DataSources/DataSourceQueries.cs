@@ -93,6 +93,59 @@ public static class DataSourceQueries
     }
 
     /// <summary>
+    /// Reads up to <paramref name="limit"/> root ids of the rows that pass the filter, in id order,
+    /// starting after <paramref name="after"/> when it is given. Unlike <see cref="ListAsync"/> it
+    /// reads by id and not by page, so rows added or removed between two calls never shift it, and
+    /// it does not count. <paramref name="parameters"/> holds one value per declared parameter, in
+    /// declaration order. Returns <see langword="null"/> when the database rejects the filter with
+    /// a data exception (SQLSTATE class 22). Any other database error is thrown.
+    /// </summary>
+    public static async Task<IReadOnlyList<Guid>?> ListIdsAfterAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        DataSourceModel dataSource,
+        IReadOnlyList<DataSourceParameterValue> parameters,
+        Guid? after,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        var id = $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
+        var cursor = after is null ? null : new RecordCondition($"({id} > @after)", [], "");
+        var statement = Statement(application, dataSource, sort: null, cursor);
+        try
+        {
+            await using var command = new NpgsqlCommand($"SELECT {id} FROM {statement.From} ORDER BY {id} ASC LIMIT @limit", connection);
+            AddValues(command, statement.Values);
+            AddParameters(command, parameters);
+            if (after is { } last)
+            {
+                command.Parameters.Add(new NpgsqlParameter("after", NpgsqlDbType.Uuid) { Value = last });
+            }
+
+            command.Parameters.AddWithValue("limit", limit);
+            var ids = new List<Guid>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                ids.Add(reader.GetGuid(0));
+            }
+
+            return ids;
+        }
+        catch (PostgresException exception) when (exception.SqlState.StartsWith("22", StringComparison.Ordinal))
+        {
+            // Class 22 is a data exception: the filter could not be evaluated for some row.
+            return null;
+        }
+    }
+
+    /// <summary>
     /// The count and the page statement of <paramref name="dataSource"/>, and the values of its
     /// filter. The page statement ends with <c>LIMIT @limit OFFSET @offset</c>. Both put the
     /// filter and <paramref name="condition"/>, joined with <c>AND</c>, in one <c>WHERE</c> clause
@@ -136,7 +189,7 @@ public static class DataSourceQueries
             ? $"SELECT count(*) FROM {from}"
             : $"SELECT count(*) FROM (SELECT count(*) FROM {from}{groupBy}) AS g";
         var pageSql = $"SELECT {select} FROM {from}{groupBy}{orderBy} LIMIT @limit OFFSET @offset";
-        return new DataSourceStatement(countSql, pageSql, values);
+        return new DataSourceStatement(countSql, pageSql, values, from);
     }
 
     /// <summary>
@@ -424,7 +477,8 @@ public static class DataSourceQueries
 }
 
 /// <summary>
-/// The SQL of a data source read: the count statement, the page statement and the values of the
-/// data source filter that both name.
+/// The SQL of a data source read: the count statement, the page statement, the values of the
+/// data source filter that both name, and the <c>FROM</c> clause with its joins and <c>WHERE</c>
+/// that both share, without the keyword.
 /// </summary>
-internal sealed record DataSourceStatement(string CountSql, string PageSql, IReadOnlyList<SqlValue> Values);
+internal sealed record DataSourceStatement(string CountSql, string PageSql, IReadOnlyList<SqlValue> Values, string From);
