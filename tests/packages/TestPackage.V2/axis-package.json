@@ -24,6 +24,12 @@
         { "name": "b", "type": "integer", "required": true }
       ],
       "output": [{ "name": "total", "type": "integer", "required": true }]
+    },
+    {
+      "name": "fail",
+      "type": "TestPackage.FailOperation",
+      "idempotent": false,
+      "input": [{ "name": "a", "type": "integer", "required": true }]
     }
   ]
 }

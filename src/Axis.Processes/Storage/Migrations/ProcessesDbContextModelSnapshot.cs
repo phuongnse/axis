@@ -193,6 +193,77 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("events", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.PackageCallRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Input")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("input");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("Package")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("package");
+
+                    b.Property<Guid>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Step")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("step");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_package_calls");
+
+                    b.HasIndex("ProcessInstanceId", "Step")
+                        .IsUnique()
+                        .HasDatabaseName("ux_package_calls_process_instance_id_step");
+
+                    b.ToTable("package_calls", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.ProcessInstanceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -504,6 +575,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_expires_at");
 
+                    b.Property<Guid?>("PackageCallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("package_call_id");
+
                     b.Property<Guid?>("ProcessInstanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_instance_id");
@@ -524,6 +599,9 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasIndex("EventId")
                         .HasDatabaseName("ix_process_work_items_event_id");
+
+                    b.HasIndex("PackageCallId")
+                        .HasDatabaseName("ix_process_work_items_package_call_id");
 
                     b.HasIndex("ProcessInstanceId")
                         .HasDatabaseName("ix_process_work_items_process_instance_id");
@@ -549,6 +627,16 @@ namespace Axis.Processes.Storage.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_events_process_instances_process_instance_id");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.PackageCallRow", b =>
+                {
+                    b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_package_calls_process_instances_process_instance_id");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.ProcessStepHistoryRow", b =>
@@ -584,6 +672,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_process_work_items_events_event_id");
+
+                    b.HasOne("Axis.Processes.Storage.PackageCallRow", null)
+                        .WithMany()
+                        .HasForeignKey("PackageCallId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_process_work_items_package_calls_package_call_id");
 
                     b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
                         .WithMany()
