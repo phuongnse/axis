@@ -32,11 +32,14 @@ internal static class ProcessEvents
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    /// <summary>The read of one occurrence by its id, with its parameter <c>@id</c>.</summary>
+    internal const string LoadSql = "SELECT application_id, event, entity_id, subject_id, payload::text FROM axis.events WHERE id = @id";
+
     /// <summary>Returns the occurrence <paramref name="id"/>, or <see langword="null"/> when there is none.</summary>
     internal static async Task<StoredEvent?> LoadAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            "SELECT application_id, event, entity_id, subject_id, payload::text FROM axis.events WHERE id = @id",
+            LoadSql,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
         command.Parameters.AddWithValue("id", id);
