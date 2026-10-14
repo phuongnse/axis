@@ -46,6 +46,14 @@ public static class EndpointReceipts
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
+    /// <summary>The read of one receipt by its key, with the parameters <c>@application</c>, <c>@endpoint</c>, <c>@caller</c>, <c>@key</c> and <c>@input</c>.</summary>
+    internal const string FindSql =
+        """
+        SELECT record_id, instance_id, input_hash = sha256(convert_to(@input::text, 'UTF8'))
+        FROM axis.endpoint_receipts
+        WHERE application_id = @application AND endpoint_id = @endpoint AND caller = @caller AND key = @key
+        """;
+
     /// <summary>
     /// Returns the stored receipt of <paramref name="key"/>, and whether <paramref name="inputJson"/>
     /// is the input it was claimed with, or <see langword="null"/> when there is none.
@@ -60,13 +68,7 @@ public static class EndpointReceipts
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        await using var command = new NpgsqlCommand(
-            """
-            SELECT record_id, instance_id, input_hash = sha256(convert_to(@input::text, 'UTF8'))
-            FROM axis.endpoint_receipts
-            WHERE application_id = @application AND endpoint_id = @endpoint AND caller = @caller AND key = @key
-            """,
-            connection);
+        await using var command = new NpgsqlCommand(FindSql, connection);
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.AddWithValue("endpoint", endpointId);
         command.Parameters.AddWithValue("caller", caller);

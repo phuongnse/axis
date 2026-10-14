@@ -36,7 +36,8 @@
     },
     { "name": "submittedAt", "type": "date-time", "label": { "textKey": "purchaseRequest.submittedAt" } },
     { "name": "decisionComments", "type": "text", "maxLength": 2000, "label": { "textKey": "purchaseRequest.decisionComments" } },
-    { "name": "purchaseOrderNumber", "type": "text", "maxLength": 50, "label": { "textKey": "purchaseRequest.purchaseOrderNumber" } }
+    { "name": "purchaseOrderNumber", "type": "text", "maxLength": 50, "label": { "textKey": "purchaseRequest.purchaseOrderNumber" } },
+    { "name": "paymentReference", "type": "text", "maxLength": 25, "label": { "textKey": "purchaseRequest.paymentReference" } }
   ],
   "validations": [
     {

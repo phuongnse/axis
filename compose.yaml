@@ -55,6 +55,8 @@ services:
       ConnectionStrings__Platform: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
+      # The sample extension package payment-references, which the image holds, that the sample declares.
+      Extensions__Path: /extensions
       # The purchasing system stub on the Compose network. The token is in appsettings.Development.json.
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
     ports:
@@ -69,7 +71,8 @@ services:
       start_interval: 2s
 
   # Waits until the server has migrated the tenant database, then runs its due work items. It
-  # calls the purchasing system stub when a purchase request is approved.
+  # calls the purchasing system stub when a purchase request is approved, and runs the sample
+# extension package that assigns the payment reference.
   worker:
     build:
       context: .
@@ -81,6 +84,8 @@ services:
         condition: service_healthy
     environment:
       DOTNET_ENVIRONMENT: Development
+      # The sample extension package payment-references, which the image holds.
+      Extensions__Path: /extensions
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
 

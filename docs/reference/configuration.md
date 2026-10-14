@@ -1168,7 +1168,10 @@ The purchase request sample holds the purchasing system connector in
 The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text`
 field, which the call writes. No policy lets a user update it, so the request
 form shows it read-only. The sample activates only for a tenant that holds the
-`PurchasingSystemUrl` and `PurchasingSystemToken` bindings. Development,
+`PurchasingSystemUrl` and `PurchasingSystemToken` bindings. The entity also
+has a `paymentReference` `text` field, which the sample extension package
+writes after the purchase order is created, so the form shows it read-only too.
+Development,
 Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 [purchasing system stub](../architecture.md#purchasing-system-stub).
 
@@ -1550,8 +1553,10 @@ range:
 }
 ```
 
-`purchasing-tools` is an illustrative package. The sample files do not change
-until the build issues add packages.
+`purchasing-tools` is an illustrative package. The purchase request sample
+declares the real sample package the same way, with
+`{ "id": "payment-references", "version": "^1.0.0" }`. Without that package
+installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
 
 - `packages` is optional. Each entry has an `id`, lower-case letters, digits
   and `-`, starting with a letter, and a `version`. The schema checks this

@@ -80,7 +80,9 @@ threshold is a `rule` with no parameters, so it is configured, not hard-coded:
 The process submits the request and records when, asks the department
 manager, asks a finance reviewer at or above the threshold, and ends
 approved, returned or rejected. An approved request then gets its purchase
-order from the purchasing system, see [Connector calls](#connector-calls):
+order from the purchasing system, see [Connector calls](#connector-calls), and
+a payment reference from the sample extension package, see
+[Package steps](#package-step-shape):
 
 ```json
 {
@@ -149,6 +151,15 @@ order from the purchasing system, see [Connector calls](#connector-calls):
       "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount" },
       "output": { "orderNumber": "purchaseOrderNumber" },
       "retry": { "attempts": 5, "backoff": "PT30S" },
+      "next": "assignPaymentReference"
+    },
+    {
+      "name": "assignPaymentReference",
+      "type": "operation",
+      "operation": "payment-references/creditorReference",
+      "input": { "reference": "number" },
+      "output": { "creditorReference": "paymentReference" },
+      "retry": { "attempts": 3, "backoff": "PT10S" },
       "next": "done"
     },
     {
@@ -1103,7 +1114,8 @@ request still ends with exactly one purchase order.
    `PO-2026-0001` and creates no new order.
 9. The outcome transaction settles C as succeeded. It writes
    `purchaseOrderNumber = PO-2026-0001`, `record.updated`, and one
-   `connector.called` with `attempts` 2. The instance moves on to `done`.
+   `connector.called` with `attempts` 2. The instance moves on to
+   `assignPaymentReference`, which runs the sample package and then moves on to `done`.
 10. `done` completes the instance.
 
 The purchasing system holds one order, and the request records its number.
@@ -1138,8 +1150,9 @@ operation, even a pure one, so there is one rule for all of them.
 The examples use an illustrative package, `purchasing-tools`, with the
 operation `normalizeSupplierCode` from the
 [manifest example](extension-packages.md#manifest), and an illustrative
-`supplierCode` text field on the subject. They are not the sample package,
-whose operation is chosen in the issue that builds it.
+`supplierCode` text field on the subject. The sample package,
+`payment-references`, is used the same way by the `assignPaymentReference` step
+of the [purchase request sample](#resource-shape).
 
 ```json
 {

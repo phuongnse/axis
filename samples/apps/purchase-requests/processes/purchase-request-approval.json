@@ -64,6 +64,15 @@
       "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount" },
       "output": { "orderNumber": "purchaseOrderNumber" },
       "retry": { "attempts": 5, "backoff": "PT30S" },
+      "next": "assignPaymentReference"
+    },
+    {
+      "name": "assignPaymentReference",
+      "type": "operation",
+      "operation": "payment-references/creditorReference",
+      "input": { "reference": "number" },
+      "output": { "creditorReference": "paymentReference" },
+      "retry": { "attempts": 3, "backoff": "PT10S" },
       "next": "done"
     },
     {

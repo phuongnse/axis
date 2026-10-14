@@ -13,19 +13,24 @@ COPY web/ ./
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
 RUN npm run build
 
-# The server, published with the SPA in its web root, and the worker.
+# The server, published with the SPA in its web root, the worker and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/ src/
+COPY samples/packages/ samples/packages/
 COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -o /app \
     && test -f /app/wwwroot/index.html
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -o /worker
+# The sample extension package, installed in /src/artifacts/extensions/payment-references/1.0.0.
+RUN dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj -c Release \
+    && test -f /src/artifacts/extensions/payment-references/1.0.0/axis-package.json
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS worker
 WORKDIR /app
 COPY --from=build /worker .
+COPY --from=build /src/artifacts/extensions /extensions
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
 
@@ -50,6 +55,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app .
+COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/ /samples/
 USER $APP_UID
 EXPOSE 8080

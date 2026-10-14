@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
+using Axis.Configuration.Tests;
 using Axis.Processes.Work;
 using Axis.PurchasingStub;
 using Axis.Server.Tests;
@@ -92,6 +93,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", Token);
+            builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
             builder.UseTestAuthentication(
                 new TestIdentity("anna", "Anna Employee", "employee"),
@@ -106,7 +108,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
         _factory.CreateClient().Dispose();
 
         var settings = new ConfigurationBuilder().AddInMemoryCollection(WorkerTenantSettings()).Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development" }).BuildServiceProvider();
+        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()
@@ -169,6 +171,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
     /// <summary>The worker's settings for the tenant, with its purchasing bindings pointing at the stub.</summary>
     private Dictionary<string, string?> WorkerTenantSettings() => new()
     {
+        ["Extensions:Path"] = SamplePackages.Path,
         [$"Tenants:{Tenant}:Hosts:0"] = Host,
         [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
         [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",

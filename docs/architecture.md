@@ -66,7 +66,7 @@ tests/
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
-  packages/               one sample extension package (M5)
+  packages/               the sample extension package payment-references and its unit tests
 ```
 
 Projects are created when the first issue needs them. The solution holds
@@ -76,7 +76,8 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects and `web/`.
+`decision`, `task`, `operation` and `end` steps and the task API), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
 

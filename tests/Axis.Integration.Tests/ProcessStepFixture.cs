@@ -177,6 +177,23 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>
+    /// Inserts <paramref name="count"/> requests with new titles, <paramref name="amount"/> and
+    /// <paramref name="divisor"/> and no department, in one statement.
+    /// </summary>
+    public async Task InsertRequestsAsync(int count, decimal amount, long divisor)
+    {
+        await using var command = DataSource.CreateCommand(
+            $"""
+            INSERT INTO {RequestTable} ({Column("id")}, {Column("title")}, {Column("amount")}, {Column("divisor")}, {Column("department")})
+            SELECT gen_random_uuid(), 'Request ' || n, @amount, @divisor, NULL FROM generate_series(1, @count) AS n
+            """);
+        command.Parameters.AddWithValue("count", count);
+        command.Parameters.Add(new NpgsqlParameter("amount", NpgsqlDbType.Numeric) { Value = amount });
+        command.Parameters.AddWithValue("divisor", divisor);
+        await command.ExecuteNonQueryAsync();
+    }
+
     /// <summary>Inserts a department with a new name and <paramref name="manager"/>, and returns its id.</summary>
     public async Task<Guid> InsertDepartmentAsync(string? manager)
     {
