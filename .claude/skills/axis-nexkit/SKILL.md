@@ -115,8 +115,10 @@ python3 "$KIT/bin/nexkit" status
 ```
 
 Split an issue that reports `too_large`. Create each part with
-`gh issue create --title "<part's behaviour>" --milestone "<parent's milestone>"`,
-then add the parts to the parent in order. Title each part by the behaviour it
+`gh issue create --title "<part's behaviour>" --milestone "<parent's milestone>" --label "<part's labels>"`,
+then add the parts to the parent in order. `--label` takes a comma-separated
+list, for example `--label bug,documentation`. Each part gets its own labels by
+the rule in the writing checklist. It does not copy the parent's labels. Title each part by the behaviour it
 delivers, as for any issue. Never reuse the parent's title, whole or as a
 prefix: write `Connector call steps pass compile checks`, not
 `Call connector step: compile checks and model`. The sub-issue link already
@@ -139,6 +141,20 @@ returns 404, upgrade `gh` and try again.
 - The text names the concepts the issue touches, in the terms of
   [concepts.md](../../../docs/domain/concepts.md), even when it links to the
   docs. Triage reads only the issue and its discussion, not the links.
+- The issue gets one or more of GitHub's labels `bug`, `enhancement` and
+  `documentation`. Add every label that fits:
+  - `bug`: behaviour that a doc, a test or a check already promises does not
+    hold, such as a failing or flaky check on `main`, or a leak of server
+    internals.
+  - `enhancement`: new or extended behaviour, including tests, checks and
+    developer tooling.
+  - `documentation`: docs, or the delivery workflow, are the main change.
+
+  The creator, the owner or the local agent, sets the labels in
+  `gh issue create --label`. Each part of a split gets its own labels by the
+  same rule, not the parent's. A bug issue opened for a CI failure on `main`
+  gets `bug`. See
+  [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
 
 ## Checklist: reviewing a plan
 
@@ -213,7 +229,7 @@ returns 404, upgrade `gh` and try again.
 | The review job errored | Comment `/nexkit review` to retry. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
 | NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
-| CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the failure and the run link, in the current milestone, and plan it before other issues. |
+| CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the `bug` label, the failure and the run link, in the current milestone, and plan it before other issues. |
 
 For the mechanics behind each failure, read NexKit's troubleshooting doc at the
 pinned ref, found as described under "Where the values live".

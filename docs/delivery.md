@@ -124,6 +124,19 @@ them.
    revised only to cut the number of criteria. It links to the doc sections it
    implements and is in the current milestone. Its text names the concepts it
    touches, so triage can choose the [profile](#profiles).
+
+   It gets one or more of GitHub's labels `bug`, `enhancement` and
+   `documentation`. Add every label that fits:
+   - `bug`: behaviour that a doc, a test or a check already promises does not
+     hold. Examples are a failing or flaky check on `main`, or a leak of server
+     internals. A bug issue opened for a CI failure on `main` gets `bug`.
+   - `enhancement`: new or extended behaviour, including tests, checks and
+     developer tooling.
+   - `documentation`: docs, or the delivery workflow, are the main change.
+
+   The creator, the owner or the local agent, sets the labels in
+   `gh issue create --label`. Each part of a split gets its own labels by the
+   same rule. It does not copy the parent's labels.
 2. **Plan.** Comment `/nexkit plan` on the issue. NexKit's plan agent posts a
    plan as a comment.
 3. **Review the plan.** Check it against [decisions.md](decisions.md), and
