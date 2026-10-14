@@ -177,6 +177,40 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_with_a_package_step_compiles_back_against_the_installed_package()
+    {
+        using var packages = new TemporaryFolder().Install(1);
+        var installed = PackageCatalog.Load(packages.Path).Versions;
+        var compiled = ApplicationCompiler.Compile(
+            [
+                new ResourceContent("application.json", ManifestWithPackages),
+                new ResourceContent("entities/order.json", """
+                    { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
+                      "fields": [ { "name": "total", "type": "integer" } ] }
+                    """),
+                new ResourceContent("processes/add.json", """
+                    { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Add", "formatVersion": 1,
+                      "entity": "Order", "start": "add",
+                      "steps": [
+                        { "name": "add", "type": "operation", "operation": "test-package/sum",
+                          "input": { "a": "1", "b": "total" }, "output": { "total": "total" }, "next": "done" },
+                        { "name": "done", "type": "end" } ] }
+                    """),
+            ],
+            installed);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release, installed);
+
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(model.Processes).Steps[0]);
+        Assert.Equal(("test-package", "1.0.0", "sum", TimeSpan.FromSeconds(5)), (step.Package, step.Version, step.Operation, step.Timeout));
+        Assert.Throws<InvalidOperationException>(() => ReleaseCompiler.BuildModel(release));
+    }
+
+    [Fact]
     public void Stored_release_whose_pin_is_missing_or_out_of_range_throws()
     {
         var compiled = ApplicationCompiler.Compile(

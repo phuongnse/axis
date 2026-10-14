@@ -4,8 +4,9 @@ Detailed reference for extension packages: what a package is, its manifest,
 the contracts it builds on, installation, versions and pinning, loading,
 capabilities and what the capability limits do not protect against. The
 manifest, the contracts, installation and loading are built. Version ranges
-and pinning in releases are built too. Capabilities and calls from a process
-are not built yet. How a process calls a package operation is in
+and pinning in releases are built too, and so is checking a process step
+against the pinned manifest. Capabilities and running a package operation
+from a process are not built yet. How a process calls a package operation is in
 [Package operations](processes.md#package-operations), and how an application
 declares its packages is in
 [Extension packages](configuration.md#extension-packages).
@@ -170,9 +171,14 @@ public class RetryableException : Exception { }
 - **Unknown package.** A package id with no installed version is `AXC0139`.
 - **No version in range.** A range that no installed version meets is
   `AXC0141`. Its message lists the installed versions.
-- **Steps.** *(planned for M5)* Steps are checked against the pinned
-  version's manifest. A running instance keeps the version its release pins,
-  even after a newer version is installed.
+- **Steps.** A package operation step is checked against the pinned
+  version's manifest, see
+  [Package step shape](processes.md#package-step-shape), and the compiled
+  step holds that version. A running instance keeps the version its release
+  pins, even after a newer version is installed. A host rebuilds a stored
+  release against the manifests of its installed packages, so a release with
+  a package operation step cannot be rebuilt on a host that lacks its pinned
+  version. The content hash covers the pins and not the manifest contents.
 - **Pinned version missing at activation.** *(planned for M5)* Activating a
   release whose pinned version is not installed fails with a diagnostic.
 - **Pinned version missing on the worker.** *(planned for M5)* A call to a

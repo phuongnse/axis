@@ -90,18 +90,24 @@ public static class ReleaseCompiler
     /// <summary>
     /// Rebuilds the model of <paramref name="release"/> from its stored resources, without the
     /// folder. Each package range is resolved against the release's own pins only, not against the
-    /// packages installed now, so the release always rebuilds to the same model. A release is stored
+    /// packages installed now, so the release always rebuilds to the same model. The operations of
+    /// each pin come from the same version in <paramref name="installedPackages"/>, and a pin that
+    /// is not installed has none, so a release with a package operation step cannot be rebuilt
+    /// without it. Null means no package is installed. A release is stored
     /// only when it compiles clean, so any diagnostic, another content hash or another application
     /// id means the stored rows are wrong.
     /// </summary>
     /// <exception cref="InvalidOperationException">The stored release does not compile back into the same application.</exception>
-    public static ApplicationModel BuildModel(Release release)
+    public static ApplicationModel BuildModel(Release release, IReadOnlyCollection<PackageVersion>? installedPackages = null)
     {
         ArgumentNullException.ThrowIfNull(release);
 
         var compiled = ApplicationCompiler.Compile(
             release.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content)).ToList(),
-            release.Packages.Select(package => new PackageVersion(package.PackageId, package.Version)).ToList());
+            release.Packages
+                .Select(package => installedPackages?.FirstOrDefault(installed => installed.Id == package.PackageId && installed.Version == package.Version)
+                    ?? new PackageVersion(package.PackageId, package.Version))
+                .ToList());
         if (compiled.Diagnostics.Count > 0 || compiled.Model is null)
         {
             var code = compiled.Diagnostics.Count > 0 ? compiled.Diagnostics[0].Code : "none";

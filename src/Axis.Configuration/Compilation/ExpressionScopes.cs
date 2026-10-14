@@ -171,7 +171,10 @@ public static class ExpressionScopes
         TypeOf(field.Name, FieldTypes.Parse(field.Type), field.Values, field.Target);
 
     /// <summary>The expression type of a scalar type name other than <c>enum</c>, as a rule parameter or result declares it.</summary>
-    internal static ExpressionType TypeOf(string scalarType) => TypeOf("", FieldTypes.Parse(scalarType), null, null)!;
+    internal static ExpressionType TypeOf(string scalarType) => TypeOf(FieldTypes.Parse(scalarType));
+
+    /// <summary>The expression type of a scalar field type other than <c>enum</c>, as a package operation field declares it.</summary>
+    internal static ExpressionType TypeOf(FieldType scalarType) => TypeOf("", scalarType, null, null)!;
 
     /// <summary>Each child collection whose child entity is found, with the child's fields, computed ones included, as its item scope.</summary>
     private static List<ExpressionCollection> CollectionsOf(

@@ -25,8 +25,10 @@ retry policy are built too, and so is reconciliation of a call whose outcome
 is unknown. A `raiseEvent` step, which raises an event about the subject
 record, is checked, compiled and run. Its step stores the event in
 `axis.events`, see [Raise event step](#raise-event-step). Package operation
-steps are planned for M5. They run an operation from an extension package,
-see [Package operations](#package-operations). So are triggers, which start
+steps are checked and compiled against the manifest of the pinned package
+version. Running them is planned for M5, and an instance that reaches one
+fails for now, see [Package operations](#package-operations). So are
+triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers).
 
@@ -214,10 +216,10 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   maps fields of the subject record to expressions, and `next` names the step
   that follows. The step writes the values with the record update rules, so
   computed fields are recomputed and validations run, in the step's
-  transaction. A validation failure fails the step. *(planned for M5)* An
-  `operation` of the form `<package>/<operation>` runs an operation from an
-  extension package outside the step's transaction, see
-  [Package operations](#package-operations). A second built-in operation, `callConnector`, calls an
+  transaction. A validation failure fails the step. An `operation` of the
+  form `<package>/<operation>` names an operation from an extension package.
+  It is checked and compiled, and *(planned for M5)* it runs outside the
+  step's transaction, see [Package operations](#package-operations). A second built-in operation, `callConnector`, calls an
   external system outside the step's transaction, see
   [Connector calls](#connector-calls). Its step is checked, compiled, staged
   and sent, its call is retried, and an unknown outcome is reconciled. A third
@@ -249,8 +251,9 @@ reported in one pass. See
   such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord`, `callConnector` or `raiseEvent`,
-  matched exactly as a step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord`, `callConnector`, `raiseEvent` or a
+  package operation written `<package>/<operation>`, matched exactly as a
+  step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
   The field is not computed, not numbered by a sequence and not a child
@@ -259,7 +262,9 @@ reported in one pass. See
   `when`. A problem is reported at `/steps/{i}/set/{field}` with its
   expression code, such as `AXC0048` for a value of the wrong type.
 - A `callConnector` step's checks are listed under
-  [Connector calls](#connector-calls) (`AXC0102` to `AXC0109`).
+  [Connector calls](#connector-calls) (`AXC0102` to `AXC0109`). A package
+  operation step's checks are listed under
+  [Package step shape](#package-step-shape) (`AXC0150` and `AXC0151`).
 - A `raiseEvent` step's checks are listed under
   [Raise event step](#raise-event-step) (`AXC0125` to `AXC0128`).
 - An operation has `operation` and `next`, and no `branches` or `otherwise`.
@@ -1102,9 +1107,12 @@ The purchasing system holds one order, and the request records its number.
 
 ## Package operations
 
-*(planned for M5)* This section follows
-[D28](../decisions.md#d28-extension-packages--agreed). None of it is built
-yet. A package operation step runs one operation of an
+This section follows
+[D28](../decisions.md#d28-extension-packages--agreed). The step shape and its
+compile checks are built. Running the step is *(planned for M5)*, and an
+instance that reaches a package operation step fails for now. Its history
+error says that package operation steps are not supported yet. A package
+operation step runs one operation of an
 [extension package](extension-packages.md), custom C# code that the operator
 installs. The step runs like a [connector call](#connector-calls): it stages
 the call, the worker runs the operation outside any database transaction, and
@@ -1142,17 +1150,27 @@ whose operation is chosen in the issue that builds it.
   `callConnector`.
 - `next` names the step taken when the call succeeds.
 
-The compiler reports these as compile errors. Their codes come with the build
-issue.
+The compiler reports these as compile errors.
 
 - The package is one of the application's
-  [`packages`](configuration.md#extension-packages).
-- The operation is in the manifest of the version the release pins.
-- `input`, `output` and `retry` are checked as for a `callConnector` step,
-  see [Step shape](#step-shape), against the operation's fields in the
-  manifest.
-- A package operation step has `input` and `next`, and no `set` or
-  `connector`.
+  [`packages`](configuration.md#extension-packages). The package id is
+  matched exactly. Otherwise it is `AXC0150` at `/steps/{i}/operation`. A
+  listed package that failed pinning (`AXC0139` to `AXC0142`) is not
+  reported again, and neither is any package when `application.json` was not
+  loaded.
+- The operation is in the manifest of the version the release pins,
+  matched ignoring letter case. Otherwise it is `AXC0151` at
+  `/steps/{i}/operation`. The compiled step holds the manifest's declared
+  name.
+- `input`, `output` and `retry` are checked as for a `callConnector` step
+  (`AXC0104` to `AXC0109`), see [Step shape](#step-shape), against the
+  operation's fields in the manifest.
+- A package operation step has `input` and `next`, and no `set`, `connector`,
+  `event` or `fields` (`AXC0004`).
+
+The compiled step holds the package id, the pinned version, the operation,
+the inputs and outputs in manifest order, the retry policy with the defaults
+filled in, `next`, and the manifest's `idempotent` and `timeout`.
 
 ### Staging a package call
 

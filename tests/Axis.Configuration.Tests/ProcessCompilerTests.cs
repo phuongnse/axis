@@ -354,8 +354,8 @@ public sealed class ProcessCompilerTests
     }
 
     [Theory]
-    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord', 'callConnector' and 'raiseEvent'.")]
-    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord', 'callConnector' and 'raiseEvent'.")]
+    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord', 'callConnector' and 'raiseEvent'. A package operation is written '<package>/<operation>'.")]
+    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord', 'callConnector' and 'raiseEvent'. A package operation is written '<package>/<operation>'.")]
     [InlineData("updateRecord", """{ "nope": "'x'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/nope", "The field 'nope' was not found. The entity 'Order' has no field with that name.")]
     [InlineData("updateRecord", """{ "status": "'x'", "STATUS": "'y'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/STATUS", "The field 'status' is already set by 'status' in this step.")]
     [InlineData("updateRecord", """{ "large": "true" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/large", "The field 'large' is computed, so an operation cannot set it.")]

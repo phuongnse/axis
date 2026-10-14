@@ -9,8 +9,8 @@ namespace Axis.Configuration.Model;
 /// is a boolean expression checked over the subject entity's fields and the named rules, every
 /// value an operation sets is checked against its field's type over the same scope, and a task's
 /// <c>user</c> assignee is a <c>text</c> expression over that scope too. Every input a connector
-/// call sends is checked against the input's type over that scope, and every output it writes
-/// names a field that fits the output's type. Every payload field a raised event carries is checked
+/// or package operation call sends is checked against the input's type over that scope, and every
+/// output it writes names a field that fits the output's type. Every payload field a raised event carries is checked
 /// against the field's type over that scope.
 /// </summary>
 public sealed record ProcessModel
@@ -108,23 +108,44 @@ public sealed record CallConnectorStepModel(
     string Next) : ProcessStepModel(Name);
 
 /// <summary>
-/// An input a <c>callConnector</c> step sends: the input's declared name, and the expression over
-/// the subject record that gives its value, checked against the input's type. The inputs of a step
-/// are in the operation's declaration order.
+/// An input a <c>callConnector</c> or package operation step sends: the input's declared name, and
+/// the expression over the subject record that gives its value, checked against the input's type.
+/// The inputs of a step are in the operation's declaration order.
 /// </summary>
 public sealed record ConnectorInputModel(string Input, ExpressionModel Value);
 
 /// <summary>
-/// An output a <c>callConnector</c> step writes: the output's declared name and the declared name
-/// of the subject field it is written to. The outputs of a step are in the operation's declaration order.
+/// An output a <c>callConnector</c> or package operation step writes: the output's declared name
+/// and the declared name of the subject field it is written to. The outputs of a step are in the
+/// operation's declaration order.
 /// </summary>
 public sealed record ConnectorOutputModel(string Output, string Field);
 
 /// <summary>
-/// The retry policy of a <c>callConnector</c> step: <see cref="Attempts"/> counts the first
-/// attempt, and <see cref="Backoff"/> is the delay before the second one.
+/// The retry policy of a <c>callConnector</c> or package operation step: <see cref="Attempts"/>
+/// counts the first attempt, and <see cref="Backoff"/> is the delay before the second one.
 /// </summary>
 public sealed record RetryPolicyModel(int Attempts, TimeSpan Backoff);
+
+/// <summary>
+/// A package operation step: it runs <see cref="Operation"/> of <see cref="Package"/> at the
+/// pinned <see cref="Version"/>, with <see cref="Input"/>, writes <see cref="Output"/> to the
+/// subject record, and moves to <see cref="Next"/> when the run succeeds. <see cref="Package"/>
+/// is the package id as the application lists it and <see cref="Operation"/> is the manifest's
+/// declared name. <see cref="Retry"/> says how often and how soon a failed attempt is tried again.
+/// <see cref="Idempotent"/> and <see cref="Timeout"/> come from the manifest of that version.
+/// </summary>
+public sealed record PackageOperationStepModel(
+    string Name,
+    string Package,
+    string Version,
+    string Operation,
+    IReadOnlyList<ConnectorInputModel> Input,
+    IReadOnlyList<ConnectorOutputModel> Output,
+    RetryPolicyModel Retry,
+    bool Idempotent,
+    TimeSpan Timeout,
+    string Next) : ProcessStepModel(Name);
 
 /// <summary>
 /// A <c>raiseEvent</c> operation step: it raises <see cref="Event"/>, by its declared name, about
