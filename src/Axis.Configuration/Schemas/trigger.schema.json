@@ -9,7 +9,7 @@
     "kind": { "const": "trigger" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "type": { "enum": ["event", "dataChange"] },
+    "type": { "enum": ["event", "dataChange", "schedule"] },
     "event": { "$ref": "#/$defs/name" },
     "entity": { "$ref": "#/$defs/name" },
     "on": {
@@ -26,6 +26,10 @@
     },
     "when": { "type": "string", "minLength": 1 },
     "mode": { "enum": ["async", "sync"] },
+    "schedule": { "type": "string", "minLength": 1 },
+    "timeZone": { "type": "string", "minLength": 1 },
+    "dataSource": { "$ref": "#/$defs/name" },
+    "parameters": { "type": "object", "propertyNames": { "$ref": "#/$defs/name" } },
     "process": { "$ref": "#/$defs/name" }
   },
   "allOf": [
@@ -33,14 +37,21 @@
       "if": { "required": ["type"], "properties": { "type": { "const": "event" } } },
       "then": {
         "required": ["event"],
-        "properties": { "entity": false, "on": false, "fields": false }
+        "properties": { "entity": false, "on": false, "fields": false, "schedule": false, "timeZone": false, "dataSource": false, "parameters": false }
       }
     },
     {
       "if": { "required": ["type"], "properties": { "type": { "const": "dataChange" } } },
       "then": {
         "required": ["entity", "on"],
-        "properties": { "event": false, "mode": false }
+        "properties": { "event": false, "mode": false, "schedule": false, "timeZone": false, "dataSource": false, "parameters": false }
+      }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "schedule" } } },
+      "then": {
+        "required": ["schedule", "timeZone", "dataSource"],
+        "properties": { "event": false, "entity": false, "on": false, "fields": false, "when": false, "mode": false }
       }
     }
   ],

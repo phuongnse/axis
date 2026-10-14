@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
+using Axis.Expressions.Evaluation;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Typing;
 
@@ -14,7 +16,10 @@ namespace Axis.Configuration.Compilation;
 /// and its <c>when</c> is a boolean over the watched record with the scope of a process condition.
 /// Every problem of a trigger is reported in one pass. A process, event or entity whose file did
 /// not load is not reported again, the entity match is not checked when either entity is unknown,
-/// and <c>when</c> is not checked without the event or the entity.
+/// and <c>when</c> is not checked without the event or the entity. A schedule trigger has a valid cron
+/// and a known IANA time zone, and names a loaded data source that is not grouped and is over the
+/// process's subject entity. Its parameters give a literal value of its type to every parameter of the
+/// data source and name no other.
 /// </summary>
 internal static class TriggerChecker
 {
@@ -27,6 +32,8 @@ internal static class TriggerChecker
         Func<string, EventResource?> findEvent,
         IReadOnlySet<string> unloadedEventNames,
         IReadOnlySet<string> unloadedEntityNames,
+        Func<string, DataSourceResource?> findDataSource,
+        IReadOnlySet<string> unloadedDataSourceNames,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
@@ -48,6 +55,12 @@ internal static class TriggerChecker
             if (trigger.Type == "dataChange")
             {
                 CheckDataChange(trigger, process, findEntity, unloadedEntityNames, rules, Report);
+                continue;
+            }
+
+            if (trigger.Type == "schedule")
+            {
+                CheckSchedule(trigger, process, findEntity, findDataSource, unloadedDataSourceNames, Report);
                 continue;
             }
 
@@ -166,6 +179,187 @@ internal static class TriggerChecker
         }
     }
 
+    /// <summary>
+    /// Checks a schedule trigger in one pass. The schema requires its cron, time zone and data
+    /// source. An unknown data source stops the check of its parameters.
+    /// </summary>
+    private static void CheckSchedule(
+        TriggerResource trigger,
+        ProcessResource? process,
+        Func<string, EntityResource?> findEntity,
+        Func<string, DataSourceResource?> findDataSource,
+        IReadOnlySet<string> unloadedDataSourceNames,
+        Action<string, string, string> report)
+    {
+        if (!CronSchedule.TryParse(trigger.Schedule!, out _, out var cronError))
+        {
+            report(DiagnosticCodes.InvalidTriggerSchedule, $"The schedule '{trigger.Schedule}' is not valid. {cronError}", "/schedule");
+        }
+
+        var timeZoneId = trigger.TimeZone!;
+        if (!TryFindTimeZone(timeZoneId, out _))
+        {
+            report(
+                DiagnosticCodes.UnknownTriggerTimeZone,
+                $"The time zone '{timeZoneId}' is not known. Use an IANA id such as 'Europe/Berlin', written with its exact letter case.",
+                "/timeZone");
+        }
+
+        var dataSource = findDataSource(trigger.DataSource!);
+        if (dataSource is null)
+        {
+            if (!unloadedDataSourceNames.Contains(trigger.DataSource!))
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerDataSource,
+                    $"The data source '{trigger.DataSource}' was not found. No loaded data source has that name.",
+                    "/dataSource");
+            }
+
+            return;
+        }
+
+        if (dataSource.Aggregate is not null)
+        {
+            report(
+                DiagnosticCodes.GroupedTriggerDataSource,
+                $"The data source '{dataSource.Name}' is grouped. A schedule starts the process for each root record, so its data source has one row for each record.",
+                "/dataSource");
+        }
+
+        // An unknown entity has a diagnostic of its own on the data source or the process.
+        if (process is not null
+            && findEntity(dataSource.Entity) is { } rowEntity
+            && findEntity(process.Entity) is { } subject
+            && !ReferenceEquals(rowEntity, subject))
+        {
+            report(
+                DiagnosticCodes.TriggerDataSourceOverOtherEntity,
+                $"The data source '{dataSource.Name}' is over the entity '{rowEntity.Name}', but the process '{process.Name}' is over '{subject.Name}'. A schedule starts the process for each row of the data source.",
+                "/dataSource");
+        }
+
+        var given = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in trigger.Parameters ?? new Dictionary<string, JsonElement>())
+        {
+            var path = $"/parameters/{key}";
+            var parameter = FindParameter(dataSource, key);
+            if (parameter is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerParameter,
+                    $"The parameter '{key}' was not found. The data source '{dataSource.Name}' has no parameter with that name.",
+                    path);
+                continue;
+            }
+
+            if (!given.TryAdd(parameter.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerParameter,
+                    $"The parameter '{parameter.Name}' is already given by '{given[parameter.Name]}'.",
+                    path);
+                continue;
+            }
+
+            if (!TryReadParameterValue(parameter, value, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTriggerParameterValue,
+                    value.ValueKind == JsonValueKind.Null
+                        ? $"The parameter '{parameter.Name}' is required, so its value cannot be null."
+                        : $"The value is not a valid {parameter.Type} for the parameter '{parameter.Name}'.",
+                    path);
+            }
+        }
+
+        foreach (var parameter in dataSource.Parameters)
+        {
+            if (!given.ContainsKey(parameter.Name))
+            {
+                report(
+                    DiagnosticCodes.MissingTriggerParameter,
+                    $"The parameter '{parameter.Name}' is a parameter of the data source '{dataSource.Name}', but the trigger does not give it. Give a value, or null for an optional parameter.",
+                    "/parameters");
+            }
+        }
+    }
+
+    private static DataSourceParameterDefinition? FindParameter(DataSourceResource dataSource, string name) =>
+        dataSource.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Finds an IANA time zone by its exact id. A Windows id, or an id in another letter case, is not found.</summary>
+    private static bool TryFindTimeZone(string id, out TimeZoneInfo timeZone)
+    {
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
+            && found.HasIanaId
+            && string.Equals(found.Id, id, StringComparison.Ordinal))
+        {
+            timeZone = found;
+            return true;
+        }
+
+        timeZone = TimeZoneInfo.Utc;
+        return false;
+    }
+
+    /// <summary>
+    /// Reads the JSON <paramref name="element"/> as a value of <paramref name="parameter"/>'s type, in the
+    /// record API's JSON forms: a number for integer and decimal, true or false for boolean and a string for
+    /// the other types. The CLR value is the one the data source request gives. Null is allowed only for an
+    /// optional parameter.
+    /// </summary>
+    private static bool TryReadParameterValue(DataSourceParameterDefinition parameter, JsonElement element, out object? value)
+    {
+        value = null;
+        if (element.ValueKind == JsonValueKind.Null)
+        {
+            return parameter.Required != true;
+        }
+
+        if (!FieldTypes.TryParse(parameter.Type, out var type))
+        {
+            return false;
+        }
+
+        switch (type)
+        {
+            case FieldType.Text when element.ValueKind == JsonValueKind.String && element.GetString() is { } text && !text.Contains('\0', StringComparison.Ordinal):
+                value = text;
+                return true;
+            case FieldType.Integer when element.ValueKind == JsonValueKind.Number
+                && element.TryGetDecimal(out var whole)
+                && decimal.Truncate(whole) == whole
+                && whole >= long.MinValue
+                && whole <= long.MaxValue:
+                value = (long)whole;
+                return true;
+            case FieldType.Decimal when element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var number):
+                value = number;
+                return true;
+            case FieldType.Boolean when element.ValueKind is JsonValueKind.True or JsonValueKind.False:
+                value = element.GetBoolean();
+                return true;
+            case FieldType.Date when element.ValueKind == JsonValueKind.String && DateLiterals.TryParseDate(element.GetString()!, out var date):
+                value = date;
+                return true;
+            case FieldType.DateTime when element.ValueKind == JsonValueKind.String && DateLiterals.TryParseDateTime(element.GetString()!, out var dateTime):
+                value = dateTime.ToUniversalTime();
+                return true;
+            case FieldType.Enum when element.ValueKind == JsonValueKind.String
+                && parameter.Values?.Contains(element.GetString()!, StringComparer.Ordinal) == true:
+                value = element.GetString();
+                return true;
+            case FieldType.Reference when element.ValueKind == JsonValueKind.String
+                && element.GetString() is { Length: 36 } id
+                && Guid.TryParseExact(id, "D", out var guid):
+                value = guid;
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static FieldDefinition? FindField(EntityResource entity, string name) =>
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
 
@@ -179,11 +373,17 @@ internal static class TriggerChecker
         Func<string, EntityResource?> findEntity,
         Func<string, EventResource?> findEvent,
         Func<string, ProcessResource?> findProcess,
+        Func<string, DataSourceResource?> findDataSource,
         IEnumerable<ExpressionRule> rules)
     {
         if (trigger.Type == "dataChange")
         {
             return BuildDataChange(trigger, findEntity, findProcess, rules);
+        }
+
+        if (trigger.Type == "schedule")
+        {
+            return BuildSchedule(trigger, findProcess, findDataSource);
         }
 
         var @event = findEvent(trigger.Event!)
@@ -204,6 +404,50 @@ internal static class TriggerChecker
             When = trigger.When is { } when
                 ? ExpressionModel.Compile(when, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean)
                 : null,
+        };
+    }
+
+    private static TriggerModel BuildSchedule(
+        TriggerResource trigger,
+        Func<string, ProcessResource?> findProcess,
+        Func<string, DataSourceResource?> findDataSource)
+    {
+        var process = findProcess(trigger.Process)
+            ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+        var dataSource = findDataSource(trigger.DataSource!)
+            ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+        if (!CronSchedule.TryParse(trigger.Schedule!, out var schedule, out _) || !TryFindTimeZone(trigger.TimeZone!, out var timeZone))
+        {
+            throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+        }
+
+        var given = trigger.Parameters ?? new Dictionary<string, JsonElement>();
+        var parameters = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var parameter in dataSource.Parameters)
+        {
+            var element = given.First(pair => string.Equals(pair.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
+            if (!TryReadParameterValue(parameter, element, out var value))
+            {
+                throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+            }
+
+            parameters.Add(parameter.Name, value);
+        }
+
+        return new TriggerModel
+        {
+            Id = trigger.Id,
+            Name = trigger.Name,
+            File = trigger.File,
+            Type = TriggerType.Schedule,
+
+            // The mode applies to event triggers only. A schedule trigger is async.
+            Mode = TriggerMode.Async,
+            Process = new ProcessReference(process.Id, process.Name),
+            Schedule = schedule,
+            TimeZone = timeZone,
+            DataSource = new DataSourceReference(dataSource.Id, dataSource.Name),
+            Parameters = parameters,
         };
     }
 

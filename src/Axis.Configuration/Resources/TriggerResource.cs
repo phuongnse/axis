@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Axis.Configuration.Resources;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace Axis.Configuration.Resources;
 /// </summary>
 public sealed record TriggerResource : Resource
 {
-    /// <summary>What starts the trigger: <c>event</c> or <c>dataChange</c>.</summary>
+    /// <summary>What starts the trigger: <c>event</c>, <c>dataChange</c> or <c>schedule</c>.</summary>
     public required string Type { get; init; }
 
     /// <summary>The name of the event that starts the trigger. The schema requires it for an <c>event</c> trigger.</summary>
@@ -32,6 +34,18 @@ public sealed record TriggerResource : Resource
 
     /// <summary>How the process is started. The schema accepts <c>async</c> or <c>sync</c> for an event trigger only, and null means <c>async</c>.</summary>
     public string? Mode { get; init; }
+
+    /// <summary>The 5-field cron text of a <c>schedule</c> trigger. The schema requires it there.</summary>
+    public string? Schedule { get; init; }
+
+    /// <summary>The IANA time zone id in which a <c>schedule</c> trigger's cron is read. The schema requires it there.</summary>
+    public string? TimeZone { get; init; }
+
+    /// <summary>The name of the data source whose rows a <c>schedule</c> trigger starts the process for. The schema requires it there.</summary>
+    public string? DataSource { get; init; }
+
+    /// <summary>The literal values of the data source's parameters for a <c>schedule</c> trigger, by parameter name. A value's type is checked by the compiler.</summary>
+    public IReadOnlyDictionary<string, JsonElement>? Parameters { get; init; }
 
     /// <summary>The name of the process the trigger starts.</summary>
     public required string Process { get; init; }

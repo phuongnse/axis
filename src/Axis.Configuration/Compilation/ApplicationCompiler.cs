@@ -245,6 +245,8 @@ public static class ApplicationCompiler
             FindEvent,
             loaded.UnloadedEventNames,
             loaded.UnloadedEntityNames,
+            FindDataSource,
+            loaded.UnloadedDataSourceNames,
             rules,
             diagnostics);
 
@@ -271,7 +273,7 @@ public static class ApplicationCompiler
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
             Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
-            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, rules)).ToList(),
+            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules)).ToList(),
             Packages = packages,
         };
         return result with

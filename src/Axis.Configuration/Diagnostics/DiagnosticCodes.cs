@@ -152,4 +152,13 @@ public static class DiagnosticCodes
     public const string InvalidTriggerField = "AXC0145";
     public const string UnknownStepPackage = "AXC0150";
     public const string UnknownPackageOperation = "AXC0151";
+
+    public const string InvalidTriggerSchedule = "AXC0160";
+    public const string UnknownTriggerTimeZone = "AXC0161";
+    public const string UnknownTriggerDataSource = "AXC0162";
+    public const string GroupedTriggerDataSource = "AXC0163";
+    public const string TriggerDataSourceOverOtherEntity = "AXC0164";
+    public const string UnknownTriggerParameter = "AXC0165";
+    public const string InvalidTriggerParameterValue = "AXC0166";
+    public const string MissingTriggerParameter = "AXC0167";
 }
