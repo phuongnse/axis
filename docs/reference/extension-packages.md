@@ -5,8 +5,9 @@ the contracts it builds on, installation, versions and pinning, loading,
 capabilities and what the capability limits do not protect against. The
 manifest, the contracts, installation and loading are built. Version ranges
 and pinning in releases are built too, and so is checking a process step
-against the pinned manifest. Capabilities and running a package operation
-from a process are not built yet. How a process calls a package operation is in
+against the pinned manifest. Running a package operation from a process is
+built too, but capabilities and retries are not. How a process calls a package
+operation is in
 [Package operations](processes.md#package-operations), and how an application
 declares its packages is in
 [Extension packages](configuration.md#extension-packages).
@@ -181,9 +182,10 @@ public class RetryableException : Exception { }
   version. The content hash covers the pins and not the manifest contents.
 - **Pinned version missing at activation.** *(planned for M5)* Activating a
   release whose pinned version is not installed fails with a diagnostic.
-- **Pinned version missing on the worker.** *(planned for M5)* A call to a
-  version that the worker does not hold, or cannot load, is a retryable
-  attempt. Nothing ran, as with a missing binding on a connector call.
+- **Pinned version missing on the worker.** A call to a version that the
+  worker does not hold, or cannot load, is a retryable attempt. Nothing ran,
+  as with a missing binding on a connector call. *(planned for M5)* Retrying
+  it is not built, and for now the call and the instance fail at once.
 
 ## Loading
 

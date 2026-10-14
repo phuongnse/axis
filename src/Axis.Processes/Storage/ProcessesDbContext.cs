@@ -26,6 +26,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
 
     public DbSet<ConnectorCallRow> ConnectorCalls => Set<ConnectorCallRow>();
 
+    public DbSet<PackageCallRow> PackageCalls => Set<PackageCallRow>();
+
     public DbSet<EventRow> Events => Set<EventRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
@@ -151,6 +153,35 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<PackageCallRow>(call =>
+        {
+            call.ToTable("package_calls");
+            call.HasKey(c => c.Id).HasName("pk_package_calls");
+            call.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
+            call.Property(c => c.ProcessInstanceId).HasColumnName("process_instance_id");
+            call.Property(c => c.Step).HasColumnName("step");
+            call.Property(c => c.ReleaseId).HasColumnName("release_id");
+            call.Property(c => c.Package).HasColumnName("package");
+            call.Property(c => c.Version).HasColumnName("version");
+            call.Property(c => c.Operation).HasColumnName("operation");
+            call.Property(c => c.State).HasColumnName("state");
+            call.Property(c => c.Attempts).HasColumnName("attempts");
+            call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
+            call.Property(c => c.LastError).HasColumnName("last_error");
+            call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            call.Property(c => c.SettledAt).HasColumnName("settled_at");
+
+            // A step stages at most one call.
+            call.HasIndex(c => new { c.ProcessInstanceId, c.Step })
+                .IsUnique()
+                .HasDatabaseName("ux_package_calls_process_instance_id_step");
+            call.HasOne<ProcessInstanceRow>()
+                .WithMany()
+                .HasForeignKey(c => c.ProcessInstanceId)
+                .HasConstraintName("fk_package_calls_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<EventRow>(@event =>
         {
             @event.ToTable("events");
@@ -226,10 +257,12 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ClaimToken).HasColumnName("claim_token");
             item.Property(i => i.ProcessInstanceId).HasColumnName("process_instance_id");
             item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
+            item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");
+            item.HasIndex(i => i.PackageCallId).HasDatabaseName("ix_process_work_items_package_call_id");
             item.HasIndex(i => i.EventId).HasDatabaseName("ix_process_work_items_event_id");
             item.HasOne<ProcessInstanceRow>()
                 .WithMany()
@@ -240,6 +273,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .WithMany()
                 .HasForeignKey(i => i.ConnectorCallId)
                 .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            item.HasOne<PackageCallRow>()
+                .WithMany()
+                .HasForeignKey(i => i.PackageCallId)
+                .HasConstraintName("fk_process_work_items_package_calls_package_call_id")
                 .OnDelete(DeleteBehavior.Restrict);
             item.HasOne<EventRow>()
                 .WithMany()

@@ -34,7 +34,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
             Assert.Empty(catalog.Diagnostics);
             var package = Assert.Single(catalog.Packages);
             Assert.Equal(("test-package", "1.0.0"), (package.Manifest.Id, package.Manifest.Version));
-            Assert.Equal(2, package.Manifest.Operations.Count);
+            Assert.Equal(3, package.Manifest.Operations.Count);
 
             var describe = package.Manifest.Operations[0];
             Assert.Equal(("describe", "TestPackage.DescribeOperation", true, TimeSpan.FromSeconds(30)), (describe.Name, describe.Type, describe.Idempotent, describe.Timeout));
@@ -49,6 +49,11 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
             Assert.Equal([new PackageField("total", FieldType.Integer, true)], sum.Output);
             Assert.Empty(sum.Capabilities.Urls);
             Assert.Empty(sum.Capabilities.Secrets);
+
+            var fail = package.Manifest.Operations[2];
+            Assert.Equal(("fail", "TestPackage.FailOperation", false, TimeSpan.FromSeconds(30)), (fail.Name, fail.Type, fail.Idempotent, fail.Timeout));
+            Assert.Equal([new PackageField("a", FieldType.Integer, true)], fail.Input);
+            Assert.Empty(fail.Output);
         }
     }
 

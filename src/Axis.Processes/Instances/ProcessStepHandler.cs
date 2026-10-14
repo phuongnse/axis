@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Work;
@@ -17,13 +18,14 @@ namespace Axis.Processes.Instances;
 /// history row, its <c>system</c> audit records and the next work item. A task step leaves the
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
-/// inside the transaction. A <c>sync</c> trigger comes from the application's active release, and
+/// inside the transaction. A package operation step does the same with a <c>package.call</c> item,
+/// so no operation runs inside the transaction. A <c>sync</c> trigger comes from the application's active release, and
 /// its start runs as <c>system</c>, pinned to that release. A skipped <c>sync</c> start is logged
 /// and lets the step commit. A step that finds the instance at another revision than it loaded
 /// writes nothing. A step that throws is rolled back, and the failure callback then records the
 /// error in the history and marks the instance <c>failed</c>.
 /// </summary>
-internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
+internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
     /// <summary>The decision recorded when no branch was true.</summary>
     internal const string Otherwise = "otherwise";
@@ -130,6 +132,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
         NewConnectorCall? call = null;
+        NewPackageCall? packageCall = null;
         NewEvent? occurrence = null;
         switch (step)
         {
@@ -204,7 +207,17 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                     instance.ReleaseId,
                     connector.Name,
                     operation.Name,
-                    await StageAsync(context, model, entity, record, callStep, operation, instance, input, cancellationToken));
+                    await StageAsync(
+                        context,
+                        model,
+                        entity,
+                        record,
+                        callStep,
+                        callStep.Input,
+                        name => operation.Input.Any(field => field.Required && string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)),
+                        instance,
+                        input,
+                        cancellationToken));
                 state = ProcessStarts.Waiting;
                 nextStep = step.Name;
                 decision = null;
@@ -243,10 +256,51 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 action = AuditActions.ProcessStepCompleted;
                 break;
             case PackageOperationStepModel packageStep:
-                throw Failure(
-                    $"The step '{step.Name}' runs the package operation '{packageStep.Package}/{packageStep.Operation}'. Package operation steps are not supported yet.",
-                    instance,
-                    input);
+                if (!process.TryGetStep(packageStep.Next, out _))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{packageStep.Next}'.", instance, input);
+                }
+
+                // The compiled step does not say which inputs are required, so the manifest does.
+                var packageOperation = packages.Find(packageStep.Package, packageStep.Version)?.Manifest.Operations
+                    .FirstOrDefault(candidate => string.Equals(candidate.Name, packageStep.Operation, StringComparison.OrdinalIgnoreCase))
+                    ?? throw Failure(
+                        $"The package '{packageStep.Package}' {packageStep.Version} has no operation '{packageStep.Operation}' installed.",
+                        instance,
+                        input);
+                packageCall = new NewPackageCall(
+                    Guid.CreateVersion7(),
+                    instance.Id,
+                    step.Name,
+                    instance.ReleaseId,
+                    packageStep.Package,
+                    packageStep.Version,
+                    packageOperation.Name,
+                    await StageAsync(
+                        context,
+                        model,
+                        entity,
+                        record,
+                        packageStep,
+                        packageStep.Input,
+                        name => packageOperation.Input.Any(field => field.Required && string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)),
+                        instance,
+                        input,
+                        cancellationToken));
+                state = ProcessStarts.Waiting;
+                nextStep = step.Name;
+                decision = null;
+                output = new JsonObject { ["state"] = ProcessStarts.Waiting, ["operationId"] = packageCall.Id };
+                details = new JsonObject
+                {
+                    ["step"] = step.Name,
+                    ["package"] = packageStep.Package,
+                    ["version"] = packageStep.Version,
+                    ["operation"] = packageOperation.Name,
+                    ["operationId"] = packageCall.Id,
+                };
+                action = AuditActions.OperationStaged;
+                break;
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
@@ -292,6 +346,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         if (call is not null)
         {
             await ConnectorCalls.InsertAsync(context.Transaction, call, cancellationToken);
+        }
+
+        if (packageCall is not null)
+        {
+            await PackageCalls.InsertAsync(context.Transaction, packageCall, cancellationToken);
         }
 
         if (occurrence is not null)
@@ -347,6 +406,19 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 cancellationToken,
                 processInstanceId: instance.Id,
                 connectorCallId: call.Id);
+        }
+
+        if (packageCall is not null)
+        {
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.PackageCallWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                processInstanceId: instance.Id,
+                packageCallId: packageCall.Id);
         }
     }
 
@@ -490,8 +562,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
     }
 
     /// <summary>
-    /// Evaluates each input of a <c>callConnector</c> step, in the step's order, into the body the
-    /// call stores. Dates and date-times take the record API's text forms, and an optional input
+    /// Evaluates each input of a <c>callConnector</c> or package operation step, in the step's
+    /// order, into the body the call stores. <paramref name="isRequired"/> says whether an input of
+    /// the operation is required. Dates and date-times take the record API's text forms, and an optional input
     /// that gives null is stored as null. An input that fails at run time, or a required input that
     /// gives null, fails the step.
     /// </summary>
@@ -500,14 +573,15 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
         ApplicationModel model,
         EntityModel entity,
         Record record,
-        CallConnectorStepModel step,
-        ConnectorOperationModel operation,
+        ProcessStepModel step,
+        IReadOnlyList<ConnectorInputModel> inputs,
+        Func<string, bool> isRequired,
         LoadedInstance instance,
         JsonObject input,
         CancellationToken cancellationToken)
     {
         var body = new JsonObject();
-        foreach (var mapping in step.Input)
+        foreach (var mapping in inputs)
         {
             var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, mapping.Value, instance.Now, cancellationToken);
             if (result.Error is { } error)
@@ -515,8 +589,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ILogg
                 throw Failure(error.Message, instance, input);
             }
 
-            var required = operation.Input.Any(field => field.Required && string.Equals(field.Name, mapping.Input, StringComparison.OrdinalIgnoreCase));
-            if (result.Value is null && required)
+            if (result.Value is null && isRequired(mapping.Input))
             {
                 throw Failure($"The required input '{mapping.Input}' of the step '{step.Name}' gave no value.", instance, input);
             }

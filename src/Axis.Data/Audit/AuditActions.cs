@@ -24,4 +24,8 @@ public static class AuditActions
     public const string ConnectorCallStaged = "connector.callStaged";
 
     public const string ConnectorCalled = "connector.called";
+
+    public const string OperationStaged = "operation.staged";
+
+    public const string OperationCalled = "operation.called";
 }

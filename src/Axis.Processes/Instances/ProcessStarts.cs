@@ -17,6 +17,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that sends or reconciles one staged connector call.</summary>
     public const string ConnectorCallWorkItemKind = "connector.call";
 
+    /// <summary>The kind of the work item that runs one staged package operation call.</summary>
+    public const string PackageCallWorkItemKind = "package.call";
+
     /// <summary>The kind of the work item that delivers one event occurrence to the <c>async</c> event triggers of the active release.</summary>
     public const string EventDeliverWorkItemKind = "event.deliver";
 

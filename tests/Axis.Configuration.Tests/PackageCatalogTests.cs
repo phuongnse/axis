@@ -22,7 +22,7 @@ public sealed class PackageCatalogTests
         Assert.Same(package, catalog.Find(TestPackages.Id, "1.0.0"));
         Assert.Null(catalog.Find(TestPackages.Id, "2.0.0"));
         Assert.Equal(("test-package", "1.0.0", "Axis.TestPackage.dll"), (package.Manifest.Id, package.Manifest.Version, package.Manifest.Assembly));
-        Assert.Equal(["describe", "sum"], package.Manifest.Operations.Select(operation => operation.Name));
+        Assert.Equal(["describe", "sum", "fail"], package.Manifest.Operations.Select(operation => operation.Name));
         Assert.Equal("test-package/1.0.0", package.LoadContext.Name);
     }
 

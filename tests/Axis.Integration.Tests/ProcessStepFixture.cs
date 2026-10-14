@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
@@ -205,12 +206,14 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// Starts <paramref name="process"/> for the request <paramref name="subjectId"/>, pinned to
     /// <paramref name="releaseId"/>, as the start endpoint does: the instance is <c>running</c> at
     /// revision 1 on the process's start step, with its first work item due a minute ago. Returns
-    /// the instance id.
+    /// the instance id. The process comes from <paramref name="applicationModel"/>, or from StepApp
+    /// when none is given.
     /// </summary>
-    public async Task<Guid> StartAsync(string process, Guid subjectId, Guid releaseId)
+    public async Task<Guid> StartAsync(string process, Guid subjectId, Guid releaseId, ApplicationModel? applicationModel = null)
     {
-        Assert.True(Model.TryGetProcess(process, out var model));
-        Assert.True(Model.TryGetEntity("Request", out var request));
+        applicationModel ??= Model;
+        Assert.True(applicationModel.TryGetProcess(process, out var model));
+        Assert.True(applicationModel.TryGetEntity("Request", out var request));
         var instanceId = Guid.CreateVersion7();
         await using var connection = await DataSource.OpenConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -412,11 +415,14 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return actions;
     }
 
-    private async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder)
+    private Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder) => ActivateAsync(folder, []);
+
+    /// <summary>Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it. Returns the release's id and model.</summary>
+    internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder, IReadOnlyCollection<PackageVersion> packages)
     {
         await using var configuration = CreateConfigurationContext();
         await using var data = CreateDataContext();
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration);
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, StepAppBindings(_tenantId));
         Assert.Empty(activated.Diagnostics);

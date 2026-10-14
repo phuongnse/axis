@@ -29,6 +29,9 @@ public sealed class WorkItemRow
     /// <summary>The connector call a <c>connector.call</c> item sends, or <see langword="null"/> for other work.</summary>
     public Guid? ConnectorCallId { get; init; }
 
+    /// <summary>The package call a <c>package.call</c> item runs, or <see langword="null"/> for other work.</summary>
+    public Guid? PackageCallId { get; init; }
+
     /// <summary>The event occurrence an <c>event.deliver</c> item delivers, or <see langword="null"/> for other work.</summary>
     public Guid? EventId { get; init; }
 }

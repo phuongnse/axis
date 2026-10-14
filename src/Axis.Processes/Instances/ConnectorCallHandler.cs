@@ -458,7 +458,7 @@ internal sealed partial class ConnectorCallHandler(
     /// staged input is written: text as a string, an integer as a long, a decimal as a decimal, a
     /// boolean as a bool, a date as a <see cref="DateOnly"/> and a date-time as a <see cref="DateTimeOffset"/>.
     /// </summary>
-    private static bool TryRead(JsonElement element, FieldType type, out object? value)
+    internal static bool TryRead(JsonElement element, FieldType type, out object? value)
     {
         value = null;
         switch (type)

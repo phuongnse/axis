@@ -9,8 +9,8 @@ model. The worker host, its claims (see [Execution](#execution)), the
 [worker settings](#worker-settings), the [start endpoint](#start-endpoint) and
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
-`axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`
-and `axis.events` tables are built too. So is the engine that runs
+`axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`,
+`axis.package_calls` and `axis.events` tables are built too. So is the engine that runs
 `decision`, `task`, `operation` and `end` steps, see
 [Running a step](#running-a-step). The [task API](#task-api) routes that
 list the user's tasks, read one task and complete one are built. Completing
@@ -26,8 +26,10 @@ is unknown. A `raiseEvent` step, which raises an event about the subject
 record, is checked, compiled and run. Its step stores the event in
 `axis.events`, see [Raise event step](#raise-event-step). Package operation
 steps are checked and compiled against the manifest of the pinned package
-version. Running them is planned for M5, and an instance that reaches one
-fails for now, see [Package operations](#package-operations). So are
+version. Their step stages the call and leaves the instance `waiting`, and the
+worker runs the operation and records its result, see
+[Package operations](#package-operations). Retries of package calls, and
+capability limits, are planned for M5. So are
 triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers).
@@ -411,7 +413,7 @@ caller, and its details add the endpoint's name.
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](#connector-calls). *(planned for M5)* It also waits for a package operation call, see [Package operations](#package-operations). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](#connector-calls). It also waits for a package operation call, see [Package operations](#package-operations). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 
@@ -722,12 +724,14 @@ the next step as usual.
   calls no failure callback. Its item is claimed again after the lease
   expires.
 - **Calls outside a transaction.** A `connector.call` item runs with no
-  transaction open while its request is in flight. It opens its own short
+  transaction open while its request is in flight. A `package.call` item runs
+  with none open while its operation runs. It opens its own short
   transactions, before and after the request, and each checks the claim
   token. See [Staging and the call](#staging-and-the-call).
 - **Restarts.** An instance that waits on a task has no work item, so it
   needs no running worker. One that waits on a connector call has the call's
-  `connector.call` item. A task decision is accepted while no worker runs: it
+  `connector.call` item, and one that waits on a package call has its
+  `package.call` item. A task decision is accepted while no worker runs: it
   queues the next step's work item. The next worker to start runs that step. A step that
   a worker never committed leaves no trace, and the worker that claims it after
   the lease runs it once.
@@ -738,7 +742,9 @@ the next step as usual.
 
 The worker runs the `decision`, `task`, `operation` and `end` steps. A
 `callConnector` operation step stages its call, and a `connector.call` item
-sends it, see [Staging and the call](#staging-and-the-call). A `raiseEvent`
+sends it, see [Staging and the call](#staging-and-the-call). A package
+operation step stages its call, and a `package.call` item runs it, see
+[Staging a package call](#staging-a-package-call). A `raiseEvent`
 operation step stores its event, see [Raise event step](#raise-event-step).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
@@ -759,6 +765,9 @@ one transaction:
    - An **`updateRecord`** operation evaluates each `set` expression on the
      record. The instance stays `running` on its `next` step.
    - A **`callConnector`** operation evaluates each `input` expression on the
+     record. A required input that gives `null` fails the step. The instance
+     becomes `waiting` on the step.
+   - A **package operation** step evaluates each `input` expression on the
      record. A required input that gives `null` fails the step. The instance
      becomes `waiting` on the step.
    - A **`raiseEvent`** operation evaluates each `fields` expression on the
@@ -786,6 +795,9 @@ one transaction:
    A `callConnector` step then inserts its call into `axis.connector_calls`
    as `pending`, see [Staging and the call](#staging-and-the-call).
 
+   A package operation step then inserts its call into `axis.package_calls`
+   as `pending`, see [Staging a package call](#staging-a-package-call).
+
    A `raiseEvent` step then inserts its occurrence into `axis.events`, see
    [Raise event step](#raise-event-step).
 
@@ -805,16 +817,19 @@ one transaction:
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
    - A `callConnector` step writes `connector.callStaged` with details
      `{ "step", "connector", "operation", "operationId" }`.
+   - A package operation step writes `operation.staged` with details
+     `{ "step", "package", "version", "operation", "operationId" }`.
    - An end step writes `process.completed` with details `{ "step" }`.
 7. A decision, an `updateRecord` operation and a `raiseEvent` operation
    insert the work item of the next step. A task step inserts none, because
    the instance waits for the task. A `callConnector` step inserts a
-   `connector.call` item for its call instead.
+   `connector.call` item for its call instead, and a package operation step
+   inserts a `package.call` item.
 
 Any exception in the step, such as a `when` that divides by zero, a missing
 subject record, a record write that a validation refuses or a task assignee
 that gives no user, rolls all of it back. So the record keeps its values and
-version, and no task, connector call or event occurrence is stored. The
+version, and no task, connector call, package call or event occurrence is stored. The
 error of a refused write names each field pointer and message, such as
 `The record update was rejected: /values/amount: request.amountNegative`. A
 following transaction then sets the instance to `failed` with its `ended_at`
@@ -1108,10 +1123,9 @@ The purchasing system holds one order, and the request records its number.
 ## Package operations
 
 This section follows
-[D28](../decisions.md#d28-extension-packages--agreed). The step shape and its
-compile checks are built. Running the step is *(planned for M5)*, and an
-instance that reaches a package operation step fails for now. Its history
-error says that package operation steps are not supported yet. A package
+[D28](../decisions.md#d28-extension-packages--agreed). The step shape, its
+compile checks and running the step are built. Retries and capability limits
+are *(planned for M5)*. A package
 operation step runs one operation of an
 [extension package](extension-packages.md), custom C# code that the operator
 installs. The step runs like a [connector call](#connector-calls): it stages
@@ -1180,8 +1194,11 @@ the operation in place of the HTTP request:
 - **Staging.** The step's transaction evaluates the input, stores the call
   as `pending` with a stable operation identity and the evaluated input, sets
   the instance to `waiting` on the step, and queues a work item. A unique
-  index on instance and step lets a step stage only one call. The table and
-  the work item kind come with the build issue.
+  index on instance and step lets a step stage only one call. The table is
+  `axis.package_calls` and the work item kind is `package.call`. The step
+  writes the history row `{ "state": "waiting", "operationId" }` and the audit
+  record `operation.staged`. A required input that gives `null` fails the
+  step.
 - **Mark.** Before each attempt, a short transaction marks the call
   `sending`, counts the attempt and extends the item's lease past the
   operation's `timeout`.
@@ -1209,10 +1226,10 @@ again with the stored input under the same operation identity.
 | --- | --- | --- | --- |
 | The output fits the manifest | Succeeded | Not needed | Not needed |
 | The output does not fit the manifest | Failed | No | The instance becomes `failed` at once |
-| A `RetryableException` | Retryable | Yes | The instance becomes `failed` |
+| A `RetryableException` | Retryable | Yes *(planned for M5)*. For now, no | The instance becomes `failed` at once |
 | Any other exception, or a request to the context for an undeclared capability | Failed | No | The instance becomes `failed` at once |
-| The pinned version is missing on the worker, or fails to load | Retryable | Yes | The instance becomes `failed` |
-| A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true`. Otherwise the call stays `unknown` | The call stays `unknown` |
+| The pinned version is missing on the worker, or fails to load | Retryable | Yes *(planned for M5)*. For now, no | The instance becomes `failed` at once |
+| A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true` *(planned for M5)*. For now, no | The call stays `unknown` |
 
 - **Fits.** An output fits when it has a value of the right
   [.NET type](extension-packages.md#contracts) for each output, and a value
@@ -1223,7 +1240,10 @@ again with the stored input under the same operation identity.
   attempts ran out after an unknown outcome, stays `unknown`. The instance
   stays `waiting`. The operation may have acted, so the platform neither
   runs it again nor fails the instance. A history row with output
-  `{ "operationId", "outcome": "unknown" }` makes it visible. Packages have no
+  `{ "operationId", "outcome": "unknown" }` makes it visible. Its error is a
+  fixed sentence, one for a timeout and one for a call found `sending`. The
+  call keeps its stored input, and it writes no `operation.called` audit record
+  and no `process.failed`, because it has not settled. Packages have no
   lookup, so an operator resolves it in M7.
 - **Audit.** Each settled call writes one audit record `operation.called`,
   with actor `system` and details
@@ -1232,7 +1252,8 @@ again with the stored input under the same operation identity.
   `updateRecord` does. A failed call also writes `process.failed`.
 - **Exceptions.** History holds the exception type of a failed attempt, such
   as `System.FormatException`, never its message. A message can hold input
-  values or secrets.
+  values or secrets. An output that does not fit gets a fixed sentence that
+  names the package and the operation, and holds no value.
 
 ## Events and triggers
 
@@ -1518,7 +1539,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a call left unknown with no lookup. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1532,7 +1553,9 @@ database, with history in `axis.__processes_migrations` (see
   item sends or reconciles one connector call. It has the
   `process_instance_id` of the call's instance and the `connector_call_id` of
   the call. See [Connector calls](#connector-calls). The item's `due_at`
-  gives the backoff. An `event.deliver` item delivers one event occurrence to
+  gives the backoff. A `package.call` item runs one package call. It has the
+  `process_instance_id` of the call's instance and the `package_call_id` of
+  the call. See [Package operations](#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](#event-delivery). It has
   the `event_id` of the occurrence.
   *(planned for M5)* Two more kinds come with [events and triggers](#events-and-triggers):
@@ -1589,6 +1612,26 @@ database, with history in `axis.__processes_migrations` (see
   | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles. Never copied to history, audit records or logs |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
+  | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
+  | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
+- `axis.package_calls`: one row per staged package call, see
+  [Package operations](#package-operations). A unique index on
+  (`process_instance_id`, `step`) lets a step stage only one call. Times use
+  the database clock. There is no column for an output.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID, the call's operation identity. It is the `OperationId` of the operation's context |
+  | `process_instance_id` | `uuid` | The instance |
+  | `step` | `text` | The declared name of the package operation step |
+  | `release_id` | `uuid` | The release the instance is pinned to |
+  | `package` | `text` | The package id |
+  | `version` | `text` | The package version the release pins |
+  | `operation` | `text` | The operation's name |
+  | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed` |
+  | `attempts` | `integer` | The attempts made so far, the first one included |
+  | `input` | `jsonb`, null | The evaluated input. Kept while the call is `unknown`, and cleared when it settles. Never copied to history, audit records or logs |
+  | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
 - `axis.events`: one row per event occurrence, see
