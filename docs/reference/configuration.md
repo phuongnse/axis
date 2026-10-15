@@ -497,9 +497,10 @@ flowchart LR
    - **Errors.** A folder with any error diagnostic produces no release;
      compile returns the diagnostics only.
 5. **Activate.** The current tenant schema is compared with the entity
-   definitions of the release. Additive changes are planned and applied;
-   incompatible changes are rejected with a diagnostic until migrations exist
-   (M6). See [Schema planning](storage.md#schema-planning). The release becomes active
+   definitions of the release. Pending [migrations](storage.md#migrations)
+   run first *(planned for M6)*, then additive changes are planned and applied.
+   Other incompatible changes stay rejected with a diagnostic. See
+   [Schema planning](storage.md#schema-planning). The release becomes active
    for new work only after that has completed successfully.
    - **Active release.** Each application `id` has at most one active
      release, stored with the manifest `name` as written. The name is unique
@@ -531,7 +532,9 @@ flowchart LR
      application took the name after the check, the upsert is refused and
      activation returns the same `AXC0020`. When another application took a
      site path after the check, the unique index refuses it and activation
-     returns one `AXC0031` for that path.
+     returns one `AXC0031` for that path. With a pending migration, a refused
+     name or site path at the upsert rolls back the migrations and provisioning
+     too *(planned for M6)*.
    - **Transactions.** Provisioning runs in its own transaction (DDL,
      provisioning records and the schema lock). The active release and its
      `axis.active_sites` rows are written afterwards, after provisioning
@@ -539,8 +542,11 @@ flowchart LR
      leaves neither written. No other configuration statement runs while the
      provisioning transaction is open, so the caller may use one tenant
      connection for both or two connections. Activation must run outside an
-     explicit transaction.
-   - **Failure after provisioning.** When writing the active release fails
+     explicit transaction. With a pending migration, the migrations,
+     provisioning, the active release and its `axis.active_sites` rows are
+     written in one transaction instead *(planned for M6)*.
+   - **Failure after provisioning.** This applies to activations without a
+     pending migration. When writing the active release fails
      after provisioning committed, the error propagates. The new tables and
      columns stay, recorded for the application, and the previous release
      stays active and keeps serving: it reads and writes only its own
@@ -549,7 +555,8 @@ flowchart LR
      additive. An activation that loses the name or a site path to a
      concurrent one also
      leaves its provisioned tables in place, recorded for its application
-     `id` and not active.
+     `id` and not active. With a pending migration, nothing stays applied
+     after a failed activation *(planned for M6)*.
    - **Re-activation.** Activating the active release again provisions
      nothing, keeps its site paths and changes only its activation time. A
      release that renames a site path frees the old path for another
@@ -798,7 +805,9 @@ development or E2E server serves a real application without a separate step.
 - **Restarts.** Restarting with unchanged folders is safe. An unchanged
   folder, with the same package versions installed, returns its stored release, and activating the active release again
   only updates its activation time. After a failure, the next start
-  activates again safely because provisioning is additive.
+  activates again safely because provisioning is additive. A failed activation
+  with a pending migration leaves nothing applied, so the next start runs the
+  migrations again *(planned for M6)*.
 
 ## Resource file shape
 
@@ -960,6 +969,52 @@ computed fields come later:
 - A data source filter's SQL inlines the rule's expression in place of the
   call, instead of running it. The expression must then be in the
   [SQL subset](expressions.md#sql-subset).
+
+A `migration` resource changes one entity's storage before additive provisioning
+*(planned for M6)*. See [D30](../decisions.md#d30-schema-migrations--agreed)
+and [migrations](storage.md#migrations) for activation and old-release work.
+
+```json
+{
+  "id": "7b3096e8-c14a-48f2-9a56-30bbd774e102",
+  "kind": "migration",
+  "name": "RenameDecisionComments",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "changes": [
+    { "type": "renameField", "from": "decisionComments", "to": "reviewComments" },
+    { "type": "fill", "field": "priority", "value": "'normal'" }
+  ]
+}
+```
+
+The entity file in the same release renames `decisionComments` to
+`reviewComments` and adds this required field:
+
+```json
+{ "name": "priority", "type": "enum", "values": ["low", "normal", "high"], "required": true }
+```
+
+- `id` is permanent. `kind` is `migration`, `name` names the migration and
+  `formatVersion` is `1`. `entity` names the entity it changes.
+- `changes` is ordered. Each change has a `type` and the properties below.
+
+  | Type | Properties | Effect |
+  | --- | --- | --- |
+  | `renameField` | `from`, `to` | Rename the column, keeping its values. |
+  | `dropField` | `field` | Drop the column and its values. |
+  | `dropEntity` | None | Drop the entity table, its child tables and provisioning records. |
+  | `fill` | `field`, `value` | Fill every null with an expression over the record. |
+  | `convert` | `field`, `value` | Convert stored values to the field's new type, or map removed enum values to kept ones. |
+
+- Each migration has its own file. Files run in ordinal order of their
+  relative path, such as `migrations/0001-rename-decision-comments.json`.
+  Changes within a file run in list order.
+- Migration files are part of the release and its content hash. Applied
+  files must stay unchanged in later releases. Migrations run forward only.
+- A `fill` or `convert` value must translate to the
+  [SQL subset](expressions.md#sql-subset). An expression outside that subset
+  is a compile diagnostic. The value is an expression, never raw SQL.
 
 ## Sequences
 
