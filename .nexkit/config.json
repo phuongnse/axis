@@ -1,5 +1,12 @@
 {
   "version": 1,
+  "agents": {
+    "claude": {
+      "runtime": "claude-code",
+      "provider": "anthropic",
+      "oauth_token_secret": "CLAUDE_CODE_OAUTH_TOKEN"
+    }
+  },
   "model": "claude-opus-5-5",
   "effort": "high",
   "setup": [
