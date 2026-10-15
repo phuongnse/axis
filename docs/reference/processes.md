@@ -470,9 +470,10 @@ the moment of action. Policies add to this check and never replace it.
   does not make editable, with "Cannot be set.".
 - Field write grants do not apply to the values of a task completion. The
   form decides which fields are editable.
-- `subject.label` follows the record API's
-  [label rule](record-api.md#record-shape): it shows when the user may read
-  the subject entity's display field, and is `null` otherwise.
+- `subject.label` uses the subject entity's display field from the task's
+  release *(planned for M6)*. Readability still comes from the active
+  release's policies. The label is `null` when the user may not read that
+  field, as in the record API's [label rule](record-api.md#record-shape).
 
 **List my tasks.** `GET /api/apps/{app}/tasks?page=&pageSize=` lists the
 `open` tasks the user may act on, whatever release their instance is pinned
@@ -486,6 +487,7 @@ by `createdAt`, then by `id`.
   "items": [
     {
       "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01",
+      "releaseId": "0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01",
       "process": "PurchaseRequestApproval",
       "step": "managerApproval",
       "labelKey": "purchaseRequest.managerApproval",
@@ -504,9 +506,12 @@ by `createdAt`, then by `id`.
 }
 ```
 
-- `subject.label` is the value of the subject entity's display field, as the
-  record API's `labels` give it. It is `null` when the user may not read the
-  display field.
+- `releaseId` names the task's release *(planned for M6)*. The inbox loads
+  the texts of each release its rows name, so each step label uses its own
+  release's texts.
+- `subject.label` is the value of the display field from the task's release
+  *(planned for M6)*. It is `null` when the active release's policies do not
+  let the user read that field.
 - `dueAt` is `null` when the step has no `dueIn`.
 
 **Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
@@ -515,6 +520,7 @@ state:
 ```json
 {
   "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01",
+  "releaseId": "0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01",
   "process": "PurchaseRequestApproval",
   "instanceId": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
   "step": "managerApproval",
@@ -549,6 +555,11 @@ state:
 }
 ```
 
+- `releaseId` names the task's release *(planned for M6)*. The task page
+  loads its texts with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`.
+- `subject.label` uses the display field from the task's release
+  *(planned for M6)*. The active release's policies decide whether the user
+  may read it. Otherwise the label is `null`.
 - `assignee` has the user id or the role name, and the other is `null`.
 - `form` is the step's form in the task's release, so a task pinned to an
   earlier release keeps its own layout. It has the shape of a form widget's
@@ -708,6 +719,79 @@ One transaction records the decision:
 The form, the outcomes and the record write all use the release the instance
 is pinned to. When any part fails, nothing is written. The worker then runs
 the next step as usual.
+
+## Releases and running work
+
+New work starts on the active release. Running work stays on its pinned
+release until it ends, including its tasks, forms, texts and package versions
+*(planned for M6)*. Roles and policies come from the active release. This
+section records [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
+
+The table includes the rules already built. Notes mark the M6 additions.
+**Pinned** means the instance's or task's release, or the release id requested
+for texts. **Both** means different parts use different releases.
+
+| Endpoint or command | Release | Notes |
+| --- | --- | --- |
+| Record API | Active | Reads and writes use the release resolved when the request begins. |
+| Data source endpoint | Active | The query and its policies come from the active release. |
+| Process start endpoint | Active | The new instance is pinned to the active release at its start. |
+| Inbound endpoint | Active | Creates the record and starts its instance on the active release. |
+| Site, site list and page endpoints | Active | Describe sites and pages of active applications. |
+| Texts endpoint without `release` | Active | Serves the active release's texts. |
+| Texts endpoint with `release` | Pinned | Serves any stored release of the site's application *(planned for M6)*. An unknown id, a non-UUID or another application's release answers `404`. |
+| Task list | Both | Step and subject labels use the task's release. The subject's display field and loading that release's texts are *(planned for M6)*. Policies come from the active release. |
+| Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too *(planned for M6)*. Policies come from the active release. |
+| Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
+| Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
+| `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
+| `raiseEvent` | Both | The occurrence holds the pinned release. Its `sync` triggers come from the active release. |
+| `event.deliver` | Active | Reads `async` event triggers from the release active at delivery. |
+| Data change triggers | Active | Fire from the active release, even when old-release work writes the record. |
+| Schedule fan-out | Active | Uses the release active when the fan-out runs, and pins each new instance to it. |
+| Server and worker start check | Both | Rebuilds every active release and every release with a running or waiting instance *(planned for M6)*. A missing pinned package version stops the start. |
+
+- **Starts from old work.** A data change or event trigger set off by
+  old-release work starts a new instance on the active release. For writes,
+  the record is read again with the active model before its triggers run.
+  See [Starts from triggers](#starts-from-triggers).
+- **Authorization.** Roles and policies always come from the active release,
+  including for older tasks. The assignee check stays unchanged. The
+  subject's display field comes from the task's release *(planned for M6)*,
+  but the active policies decide whether it is readable. Removing or renaming
+  a policy can deny access to an old task's subject record or fields.
+- **Pinned texts** *(planned for M6)*. Each release carries its own texts.
+  The inbox and task page load them using the task's `releaseId`. Old texts
+  stay readable by id for as long as the release is stored, even after its
+  instances end. A newer release may remove a key its labels no longer use.
+  Every key used by a label must still exist in every locale of that release,
+  as `AXC0027` and `AXC0028` already check.
+
+### Walkthrough: a waiting purchase request
+
+This walkthrough shows full release pinning *(planned for M6)* in the
+[purchase request sample](../../samples/apps/purchase-requests/sites/purchasing.json).
+R1 and R2 stand for stored release UUIDs of the same application.
+
+Release R1 has `FinanceThreshold()` = 10000, and the text key
+`purchaseRequest.sections.decision` reads "Decision" in English.
+PR-2026-00042 has a total of 12000 and waits on `managerApproval` in R1.
+Release R2 then becomes active. It replaces that text key with a new key in
+its form and texts, and raises `FinanceThreshold()` to 15000.
+
+1. The manager's inbox row shows R1's step label, loaded from R1's texts.
+   Its subject label uses R1's display field, if R2's policies allow it.
+2. The task read returns `releaseId` R1 and R1's form. Its fields are
+   filtered by R2's policies, so a tightened field grant applies at once.
+3. The task page loads `GET /api/sites/purchasing/texts/en?release=<R1>`.
+   The section title still reads "Decision", even though R2 removed its key.
+4. When the manager approves, `financeCheck` runs on R1. The waiting
+   request's finance check uses R1's threshold: 12000 >= 10000. It goes to
+   `financeApproval`, which is also on R1.
+5. A new request for 12000 submitted after R2 becomes active starts on R2.
+   After manager approval, 12000 < 15000 sends it to `markApproved`.
+6. After the R1 instance ends, `?release=<R1>` still answers with R1's
+   texts, because R1 is still a stored release of the site's application.
 
 ## Execution
 

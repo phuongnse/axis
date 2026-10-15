@@ -958,8 +958,9 @@ need a second write that a crash can lose.
 M5 lets a process run custom C# code from an extension package. The manifest,
 the contracts, installation and loading are built. Version pinning, the
 package operation step, its retries and the capability limits are built too.
-The activation check for a missing pinned version is not built *(planned for
-M6)*.
+The planned activation check for a missing pinned version is replaced by
+[D29](#d29-release-pinning-and-text-resources--agreed)'s start check
+*(planned for M6)*.
 See [extension packages](reference/extension-packages.md) for
 the manifest, the contracts, installation, loading and capabilities,
 [configuration](reference/configuration.md#extension-packages) for an
@@ -1052,3 +1053,57 @@ compiled against. Staging every call like a connector call in
 code out of database transactions, and gives retries and unknown outcomes one
 rule. The capability limits stop mistakes, not hostile code, so the docs say
 plainly that a package is trusted code.
+
+## D29. Release pinning and text resources — Agreed
+
+M6 keeps running work on its release, including its tasks, forms, texts and
+package versions *(planned for M6)*. Roles and policies still come from the
+active release. See [releases and running work](reference/processes.md#releases-and-running-work)
+for the endpoint and command rules and a purchase request walkthrough.
+The owner confirmed these points on issue #412 on 2026-10-15.
+
+- **New work and pinned work:**
+  - New work starts on the active release. The record API, data sources,
+    process starts, inbound endpoints, triggers, sites and pages use it.
+  - Running work stays on its release until it ends. Its steps, connector
+    and package calls, tasks, forms and texts all use that release.
+  - A data change or event trigger set off by old-release work starts new
+    work on the active release.
+- **Tasks:**
+  - Each task list item and task read returns `releaseId`. The inbox loads
+    the texts of each release its rows name. The task page loads the texts
+    of the task's release.
+  - Step labels, forms, outcomes and field definitions come from the task's
+    release. The subject label uses that release's display field.
+  - Roles and policies always come from the active release. They decide
+    which fields the user may read, including the subject's display field.
+    The assignee check stays as it is.
+  - A tightened policy applies at once. Removing or renaming a policy can
+    lock a user out of an old-release task's fields.
+- **Text resources:**
+  - Each release carries its own texts. Removing a key in a newer release
+    does not change a task still running on an older release.
+  - Without `release`, `GET /api/sites/{path}/texts/{locale}` uses the active
+    release. With `?release={releaseId}`, it answers for any stored release
+    of the site's application. An unknown id, a non-UUID or another
+    application's release answers `404`.
+  - A key used by a label must exist in every locale of that release, as
+    `AXC0027` and `AXC0028` already check. A newer release can remove a key
+    its own labels no longer use.
+  - Old texts stay readable by release id for as long as the release is
+    stored, even after its instances end.
+- **Missing pinned package version:**
+  - At the start of the server and the worker, every active release and
+    every release with a running or waiting instance is rebuilt.
+  - A pinned package version that is not installed stops the start with a
+    diagnostic naming the tenant, application, release and package version.
+  - This start check replaces D28's planned activation check. Its
+    diagnostic code is added only when the check is built.
+
+*Why:* [D11](#d11-durable-process-engine--agreed) and
+[execution](domain/knowledge.md#execution) keep running work on the version
+it started with. Pinning texts keeps removed keys readable on old tasks.
+[D24](#d24-roles-and-policies--agreed) keeps authorization current, so an old
+task cannot preserve a loosened policy. Checking pinned package versions at
+start extends [D28](#d28-extension-packages--agreed): a host cannot rebuild
+work without the code its release pins.

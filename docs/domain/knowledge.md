@@ -111,8 +111,10 @@ The result is:
 **Axis rules:**
 
 - **Release pinning.** An instance is pinned to its release, including
-  process, operation, form and text versions. A new release affects only new
-  starts.
+  process, operation, form and text versions. New starts use the active
+  release. Roles and policies use the active release even for older work,
+  so a tightened policy applies at once. Full pinning is *(planned for M6)*,
+  see [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
 - **One transaction per step.** Business writes, process progress, the
   idempotency receipt, audit records and the next work items commit together
   in one PostgreSQL transaction.
