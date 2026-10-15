@@ -4,7 +4,15 @@
     "claude": {
       "runtime": "claude-code",
       "provider": "anthropic",
-      "oauth_token_secret": "CLAUDE_CODE_OAUTH_TOKEN"
+      "oauth_token_secret": "CLAUDE_CODE_OAUTH_TOKEN",
+      "fallback": [
+        "claude-fallback"
+      ]
+    },
+    "claude-fallback": {
+      "runtime": "claude-code",
+      "provider": "anthropic",
+      "oauth_token_secret": "CLAUDE_FALLBACK_OAUTH_TOKEN"
     },
     "astra": {
       "runtime": "codex",

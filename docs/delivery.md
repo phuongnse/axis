@@ -42,7 +42,9 @@ models, are not copied here. Look them up where they live.
   `conflicts.auto_resolve` on, each time `main` moves NexKit starts a fix round
   for every open NexKit pull request that now conflicts with it. A conflict
   that needs a choice ends the round as `blocked`, with a question.
-- **NexKit pauses at the Claude usage limit and resumes after it resets.** The
+- **NexKit pauses at the Claude usage limit and resumes after it resets.** A
+  Claude stage first moves to the second Claude subscription. NexKit pauses
+  only when both are at their limit. The
   run's comment shows the reset time. No person repeats the command. A stage
   that runs on an OpenAI model on Azure does not pause: a rate or quota error
   ends the run as an error, and the local agent repeats the command.
