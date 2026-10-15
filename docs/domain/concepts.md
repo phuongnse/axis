@@ -13,7 +13,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Application** | A deployable business application. It is a folder of resources with a manifest, and owns a set of sites. | M1 |
 | **Resource** | One typed configuration item with a stable `id`, a `kind`, a `name`, a format version and typed references to other resources. | M1 |
 | **Module** | A reusable bundle of resources and extension operations, such as notifications, document generation or audit export. Applications declare the modules they depend on, with version ranges. | M8 |
-| **Release** | The immutable compiled form of an application at one point in time. It pins every resource version it uses. New work starts on the active release; running work stays on its own. | M1 (basic), M6 (full) |
+| **Release** | The immutable compiled form of an application at one point in time. It pins every resource version it uses. New work starts on the active release. Running work, with its tasks, forms, texts and package versions, stays on its release until it ends, while roles and policies come from the active release *(planned for M6)*. | M1 (basic), M6 (full) |
 | **Diagnostic** | A validation or compile error or warning. It points at the resource, field and path that caused it. | M1 |
 
 ## Data
@@ -126,7 +126,7 @@ Inbound endpoints are their own resource, not a trigger kind. See
 | **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. M1 has a basic form over all of an entity's fields. M3 builds the `form` resource: sections of fields, any of them read-only, used by both pages and tasks. Wizard steps, conditional states, validation as the user types and file upload come later. See [frontend](../reference/frontend.md). | M1 (basic), M3 (form resource), later |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M1 only has the table's `formPage` link. M3 builds the `startProcess` action on a form widget and the outcomes of a task. Run operation comes later, and navigate actions are still **Proposed** in [D15](../decisions.md#d15-presentation-model--agreed). | M3 |
 | **Theme** | Design tokens for light and dark mode, shared by every site. M1 has the shared tokens. A site will be able to adjust tokens later, but never add per-page styling. | M1 (shared tokens), later (site adjustments) |
-| **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Releases pin text versions, and a key that is still in use cannot be deleted. | M1 (basic), M6 (full) |
+| **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Each release carries its own texts, so removing a key in a newer release does not affect work still running on an older one *(planned for M6)*. | M1 (basic), M6 (full) |
 
 ## Security and operations
 

@@ -42,6 +42,8 @@ flowchart LR
      `/texts` of the file that lacks it, once per key, naming the first
      locale in path order that has it. A file already reported as a duplicate
      locale is left out of this check. Keys are compared ordinally.
+     Each release carries its own texts, so a newer release can remove a key
+     that older running work still shows *(planned for M6)*.
    - **Labels.** The text key of the application label, an entity label or a
      field label must be in some locale, otherwise it is `AXC0028` at that
      label's `/textKey`. This applies also when the application has no text
@@ -1581,9 +1583,13 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
   the installed versions. Both are compile errors in `application.json`.
   Compilation sees only the versions that loaded at host startup. A manifest
   that does not match its package is reported at startup, as `AXC0132` to
-  `AXC0138`, see [Loading](extension-packages.md#loading). *(planned for M6)*
-  Activating a stored release whose pinned version is not installed fails
-  with a diagnostic.
+  `AXC0138`, see [Loading](extension-packages.md#loading).
+  At the start of the server and the worker, every active release and every
+  release with a running or waiting instance is rebuilt *(planned for M6)*.
+  A pinned version that is not installed stops the start with a diagnostic
+  naming the tenant, application, release and package version. See
+  [Versions and pinning](extension-packages.md#versions-and-pinning) and
+  [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
 - An application uses only the packages it declares, even though every
   tenant sees the same installed packages. Installation is in
   [Installation](extension-packages.md#installation).

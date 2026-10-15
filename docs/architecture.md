@@ -594,6 +594,11 @@ to the draft. Only another grant can make it readable.
 
 ## Process engine (D11)
 
+- **Release pinning** *(planned for M6)*. New work starts on the active
+  release, and running work keeps its steps, tasks, forms, texts and package
+  versions until it ends. Roles and policies use the active release, see
+  [releases and running work](reference/processes.md#releases-and-running-work)
+  and [D29](decisions.md#d29-release-pinning-and-text-resources--agreed).
 - **State.** Instances and step occurrences are rows in the tenant database.
   There is no in-memory state that matters after a crash.
 - **Step transactions.** A step transition loads the instance at its current

@@ -179,10 +179,13 @@ public class RetryableException : Exception { }
   release against the manifests of its installed packages, so a release with
   a package operation step cannot be rebuilt on a host that lacks its pinned
   version. The content hash covers the pins and not the manifest contents.
-- **Pinned version missing at activation.** Activation compiles the folder
+- **Pinned version missing at start.** Activation compiles the folder
   against the versions that loaded, so the pin it activates is always
-  installed. *(planned for M6)* Activating a stored release whose pinned
-  version is not installed fails with a diagnostic.
+  installed. At the start of the server and the worker, every active release
+  and every release with a running or waiting instance is rebuilt
+  *(planned for M6)*. A pinned version that is not installed stops the start
+  with a diagnostic naming the tenant, application, release and package
+  version. See [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
 - **Pinned version missing on the worker.** A call to a version that the
   worker does not hold is a retryable attempt. Nothing ran, as with a missing
   binding on a connector call. The call is retried under the step's retry
