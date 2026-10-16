@@ -231,8 +231,9 @@ child tables are in [Schema planning](#schema-planning).
 
 ## Migrations
 
-Application schema migrations are not built yet *(planned for M6)*. This
-section records [D30](../decisions.md#d30-schema-migrations--agreed).
+The migration resource and its compile checks are built. Applying
+migrations at activation is *(planned for M6)*. This section records
+[D30](../decisions.md#d30-schema-migrations--agreed).
 A [migration resource](configuration.md#resource-file-shape) changes one
 entity's storage and runs once per tenant, before additive provisioning.
 Migrations run forward only. The following rules, table and example are

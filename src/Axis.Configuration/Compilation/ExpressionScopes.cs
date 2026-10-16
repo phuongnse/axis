@@ -14,7 +14,7 @@ namespace Axis.Configuration.Compilation;
 /// are given, which for now is the top level of a validation, a data source filter, a process
 /// condition and a policy filter. A policy filter uses a data source scope with no parameters. An
 /// endpoint's mapping scope holds only the endpoint's input fields, typed as parameters. An event
-/// trigger's <c>when</c> scope holds only the event's scalar payload fields. A
+/// trigger's <c>when</c> scope holds only the event's scalar payload fields. A migration value's scope holds only the record's own fields. A
 /// data source scope adds the data source's parameters after the fields, has the named
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
 /// process scope resolves paths the same way, and a data change trigger's <c>when</c> uses the process
@@ -155,6 +155,18 @@ public static class ExpressionScopes
             fields
                 .Where(field => EventChecker.IsScalar(FieldTypes.Parse(field.Type)))
                 .Select(field => (field.Name, (ExpressionType?)TypeOf(field.Type))),
+            rules: null,
+            collections: null,
+            referenceFields: null);
+
+    /// <summary>
+    /// The scope of a migration's <c>fill</c> or <c>convert</c> value: the record's own fields, as
+    /// the entity had them before the change. The scope has no rules, no collections and resolves no
+    /// paths. A child collection is not a field here.
+    /// </summary>
+    internal static ExpressionScope ForMigration(IEnumerable<(string Name, FieldDefinition Field)> fields) =>
+        Build(
+            fields.Select(pair => (pair.Name, TypeOf(pair.Field))),
             rules: null,
             collections: null,
             referenceFields: null);

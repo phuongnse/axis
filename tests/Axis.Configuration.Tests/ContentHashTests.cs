@@ -149,6 +149,24 @@ public sealed class ContentHashTests
     }
 
     [Fact]
+    public void Added_migration_file_changes_the_hash()
+    {
+        using var original = SampleFolder();
+        using var added = SampleFolder().With("migrations/0001-fill-number.json", Migration("'n/a'"));
+
+        AssertDifferentHashes(original, added);
+    }
+
+    [Fact]
+    public void Changed_value_in_a_migration_file_changes_the_hash()
+    {
+        using var original = SampleFolder().With("migrations/0001-fill-number.json", Migration("'n/a'"));
+        using var changed = SampleFolder().With("migrations/0001-fill-number.json", Migration("'none'"));
+
+        AssertDifferentHashes(original, changed);
+    }
+
+    [Fact]
     public void Removed_file_changes_the_hash()
     {
         using var original = SampleFolder();
@@ -182,6 +200,11 @@ public sealed class ContentHashTests
         Assert.Null(result.ContentHash);
         Assert.Empty(result.Resources);
     }
+
+    private static string Migration(string value) => $$"""
+        { "id": "44444444-4444-4444-8444-444444444444", "kind": "migration", "name": "FillNumber", "formatVersion": 1, "entity": "Order",
+          "changes": [ { "type": "fill", "field": "number", "value": "{{value}}" } ] }
+        """;
 
     private static TemporaryFolder SampleFolder(string order = Order) =>
         new TemporaryFolder()

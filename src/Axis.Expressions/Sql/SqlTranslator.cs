@@ -30,7 +30,10 @@ public static class SqlTranslator
 
     /// <summary>
     /// Translates <paramref name="expression"/>, which must have passed
-    /// <see cref="ExpressionTypeChecker"/>. <paramref name="column"/> maps a field path to the SQL
+    /// <see cref="ExpressionTypeChecker"/>. Without a <paramref name="check"/> the expression need
+    /// only parse: a call with the wrong number of arguments is reported as
+    /// <see cref="ExpressionDiagnosticCodes.WrongArgumentCount"/>, and no rule call is translated.
+    /// <paramref name="column"/> maps a field path to the SQL
     /// text of its column. The path is the names as written, so a bare name is a one-item list and
     /// <c>department.name</c> is <c>["department", "name"]</c>. <paramref name="check"/> is the type
     /// checker's result, which says the rule each rule call resolved to. Without it no rule call is
@@ -176,6 +179,15 @@ public static class SqlTranslator
             }
 
             var name = signature.Name;
+            var count = call.Arguments.Count;
+            if (count < signature.MinArguments || count > signature.MaxArguments)
+            {
+                // A checked expression never gets here. An expression translated without a check can.
+                var needs = signature.MaxArguments == int.MaxValue ? $"at least {signature.MinArguments}" : $"{signature.MinArguments}";
+                var noun = signature.MinArguments == 1 ? "argument" : "arguments";
+                throw Fail($"Function '{name}' needs {needs} {noun}, found {count}", call.Offset, code: ExpressionDiagnosticCodes.WrongArgumentCount);
+            }
+
             if (signature.IsAggregate)
             {
                 // A collection has no column, so no aggregate is in the subset.
@@ -292,11 +304,11 @@ public static class SqlTranslator
     /// The problem <paramref name="reason"/> at <paramref name="offset"/>. A <paramref name="hint"/>
     /// follows the position, as in the parser's messages.
     /// </summary>
-    private static TranslationFailure Fail(string reason, int offset, string? hint = null) =>
+    private static TranslationFailure Fail(string reason, int offset, string? hint = null, string code = ExpressionDiagnosticCodes.OutsideSqlSubset) =>
         new(
             reason,
             new ExpressionDiagnostic(
-                ExpressionDiagnosticCodes.OutsideSqlSubset,
+                code,
                 $"{reason} at character {offset + 1}.{(hint is null ? "" : $" {hint}.")}",
                 offset));
 

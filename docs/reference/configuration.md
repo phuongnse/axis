@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint` or `trigger`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint`, `trigger` or `migration`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -408,6 +408,14 @@ flowchart LR
      property that belongs to another trigger type, an empty or repeated
      `on`, and an empty or repeated `fields` are `AXC0004`.
 
+   - **Migrations.** A [migration](#resource-file-shape)'s `entity` must name a
+     loaded entity, otherwise it is `AXC0170` at `/entity`. Its changes are
+     checked against the entity with the undo-and-replay rules in
+     [the migration section](#resource-file-shape): `AXC0171` to `AXC0173`,
+     and each `fill` and `convert` value at `/changes/{i}/value`. A
+     `renameField` without `to`, or a change with a property that belongs to
+     another change type, is `AXC0004`.
+
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
    sites and pages with their entity, data source and page references
@@ -428,7 +436,10 @@ flowchart LR
    in path order, with their event and process resolved and their `when`
    checked. A schedule trigger holds its parsed cron, its time zone, its
    data source reference and its parameter values, typed and keyed by the
-   declared parameter names. No model is produced while any error remains.
+   declared parameter names. It also holds the migrations in ordinal order of
+   their file path, each with its entity name as written and its changes in
+   file order. A change's `value` stays expression text. No model is produced
+   while any error remains.
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -633,9 +644,9 @@ sorted by file and then path.
 | `AXC0048` | An expression's type does not fit the type its use needs, such as an integer where a validation needs a boolean. Reported at the JSON Pointer of the expression string. The message names both types. |
 | `AXC0049` | A text literal compared with an enum is not one of the field's `values`. Reported at the JSON Pointer of the expression string, with the character position of the literal in the message. |
 | `AXC0050` | An expression calls a function or rule that does not exist, such as `foo(1)`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. |
-| `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)`, `sum(lineItems)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. |
+| `AXC0051` | An expression calls a function or rule with the wrong number of arguments, such as `round(1.5)`, `sum(lineItems)` or `IsPositive()`. Reported at the JSON Pointer of the expression string, with the character position of the call in the message. The message names the expected count. The SQL check of a migration value that is not type-checked reports it too, such as `abs()`. |
 | `AXC0052` | A validation's `field` names no field of the entity. Reported at `/validations/{i}/field`. |
-| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)`, an aggregate such as `count(lines)`, or a call to a rule whose expression uses `lower`. So does a filter whose rule calls inline to more than 2,000 syntax nodes. Reported at `/filter`, with the character position of the operator or the call in the message. A message about a rule call names the rule the filter calls. See [SQL subset](expressions.md#sql-subset). |
+| `AXC0053` | A data source filter uses something outside the SQL subset, such as `/`, `lower(name)`, an aggregate such as `count(lines)`, or a call to a rule whose expression uses `lower`. So does a filter whose rule calls inline to more than 2,000 syntax nodes. Reported at `/filter`, with the character position of the operator or the call in the message. A message about a rule call names the rule the filter calls. A migration's `fill` or `convert` value uses something outside the SQL subset in the same way, such as `upper(title)`, and is reported at `/changes/{i}/value`. See [SQL subset](expressions.md#sql-subset). |
 | `AXC0054` | A data source parameter's `name` is also a field of the data source's entity, is `page`, `pageSize` or `sort`, or is already used by an earlier parameter of the same data source, all ignoring letter case. Reported at `/parameters/{i}/name`. |
 | `AXC0055` | Rules call each other in a cycle, such as A → B → A. Reported once per cycle, at `/expression` of the rule where the cycle starts in path order. The message names every rule in the cycle. |
 | `AXC0056` | An earlier parameter of the same rule already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter. |
@@ -739,6 +750,10 @@ sorted by file and then path.
 | `AXC0165` | A key in a schedule trigger's `parameters` names no parameter of the data source, or repeats a parameter that an earlier key gives, ignoring letter case. Reported at `/parameters/{key}`. |
 | `AXC0166` | A value in a schedule trigger's `parameters` is not a literal of its parameter's type, or is `null` for a required parameter. Reported at `/parameters/{key}`. |
 | `AXC0167` | A schedule trigger does not give a parameter of its data source. Reported at `/parameters`, once for each missing parameter. |
+| `AXC0170` | A migration's `entity` names no loaded entity, matched ignoring letter case. Not reported when the entity's file failed to load, or when a migration of that entity name holds `dropEntity`. Reported at `/entity`. |
+| `AXC0171` | A `renameField`'s `from`, or a `dropField`'s or `convert`'s `field`, names no field of the entity as it is at that change. Reported at `/changes/{i}/from` or `/changes/{i}/field`. |
+| `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
+| `AXC0173` | A `fill`'s or `convert`'s `field` is not a field of the entity in the release. A child-collection field does not count. Reported at `/changes/{i}/field`. |
 
 ## Startup activation
 
@@ -971,9 +986,11 @@ computed fields come later:
   call, instead of running it. The expression must then be in the
   [SQL subset](expressions.md#sql-subset).
 
-A `migration` resource changes one entity's storage before additive provisioning
-*(planned for M6)*. See [D30](../decisions.md#d30-schema-migrations--agreed)
-and [migrations](storage.md#migrations) for activation and old-release work.
+A `migration` resource changes one entity's storage before additive provisioning.
+The resource and its compile checks are built. Applying migrations at
+activation is *(planned for M6)*. See
+[D30](../decisions.md#d30-schema-migrations--agreed) and
+[migrations](storage.md#migrations) for activation and old-release work.
 
 ```json
 {
@@ -1016,6 +1033,30 @@ The entity file in the same release renames `decisionComments` to
 - A `fill` or `convert` value must translate to the
   [SQL subset](expressions.md#sql-subset). An expression outside that subset
   is a compile diagnostic. The value is an expression, never raw SQL.
+- A release holds only the entity as it is after its migrations. The compiler
+  undoes the changes of all migrations of one entity, last change first, to
+  rebuild the entity as it was before them. It then replays them forward in
+  path order, so what an earlier migration leaves behind is what a later one
+  starts from. A `from` or `field` that the entity lacks at that point is
+  `AXC0171`, and a `to` that is already a field is `AXC0172`. A `fill` or
+  `convert` `field` that the entity lacks in the release is `AXC0173`. A child
+  collection is not a field for these checks. A migration of an entity that
+  no loaded entity names is `AXC0170`, unless a migration of that name drops
+  the entity. Changes after a `dropEntity` are not checked against fields.
+  These checks only find contradictions inside the release. A name that never
+  existed in the stored table is found when migrations are applied.
+- A `fill` or `convert` value sees the record's own fields only. It cannot
+  call rules, follow reference paths or use aggregates. `now()` is allowed and
+  `currentUser()` is not.
+- A value is type-checked against its field's type, and the problem is
+  reported at `/changes/{i}/value` with its usual code, such as `AXC0048`. It
+  is not type-checked when the type at that point is unknown: a later change
+  drops or converts the field, the value comes after a `dropEntity`, or a
+  `convert` reads its own field. The stored type is known only when the
+  migration is applied. Every value is still parsed and checked against the
+  SQL subset, so `upper(title)` is `AXC0053` in a `fill` and in a `convert`.
+  A value that is not type-checked can name an unknown field or call
+  `currentUser()` without a compile diagnostic.
 
 ## Sequences
 
