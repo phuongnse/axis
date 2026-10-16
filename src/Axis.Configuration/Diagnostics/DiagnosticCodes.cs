@@ -171,4 +171,17 @@ public static class DiagnosticCodes
     public const string MigrationChangeNotApplied = "AXC0175";
     public const string FillLeftNulls = "AXC0176";
     public const string ConvertFailed = "AXC0177";
+
+    public const string UnknownScenarioRole = "AXC0180";
+    public const string UnknownScenarioUser = "AXC0181";
+    public const string UnknownScenarioEntity = "AXC0182";
+    public const string UnknownScenarioField = "AXC0183";
+    public const string UnknownScenarioProcess = "AXC0184";
+    public const string UnknownScenarioStep = "AXC0185";
+    public const string UnknownScenarioOutcome = "AXC0186";
+    public const string UnsavedScenarioRecord = "AXC0187";
+    public const string DuplicateScenarioRecord = "AXC0188";
+    public const string InvalidScenarioValue = "AXC0189";
+    public const string UnknownStubOperation = "AXC0190";
+    public const string UnknownStubOutput = "AXC0191";
 }

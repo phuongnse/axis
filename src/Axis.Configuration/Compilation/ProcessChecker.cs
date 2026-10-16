@@ -993,11 +993,11 @@ internal static class ProcessChecker
         entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Finds the first operation of <paramref name="connector"/> with <paramref name="name"/>, ignoring letter case.</summary>
-    private static ConnectorOperationDefinition? FindOperation(ConnectorResource connector, string name) =>
+    internal static ConnectorOperationDefinition? FindOperation(ConnectorResource connector, string name) =>
         connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Finds the first operation of <paramref name="package"/> with <paramref name="name"/>, ignoring letter case.</summary>
-    private static PackageOperation? FindPackageOperation(PinnedOperations package, string name) =>
+    internal static PackageOperation? FindPackageOperation(PinnedOperations package, string name) =>
         package.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Why a process cannot write <paramref name="field"/>, or null when it can.</summary>

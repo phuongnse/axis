@@ -111,6 +111,7 @@ public static class ApplicationLoader
         var endpoints = new List<EndpointResource>();
         var triggers = new List<TriggerResource>();
         var migrations = new List<MigrationResource>();
+        var scenarios = new List<ScenarioResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -216,7 +217,12 @@ public static class ApplicationLoader
             {
                 // Sources come in path order, so the contents do too. A file that fails
                 // validation is already an error, so it never becomes part of a release.
-                resources.Add(new ResourceContent(file, JsonCanonicalizer.Canonicalize(root)));
+                // Scenarios compile with the application but stay out of the release and its content hash (D32).
+                if (kind != ResourceKinds.Scenario)
+                {
+                    resources.Add(new ResourceContent(file, JsonCanonicalizer.Canonicalize(root)));
+                }
+
                 switch (kind)
                 {
                     case ResourceKinds.Application when file == ManifestFileName:
@@ -273,6 +279,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Migration:
                         migrations.Add(root.Deserialize<MigrationResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Scenario:
+                        scenarios.Add(root.Deserialize<ScenarioResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -311,6 +320,7 @@ public static class ApplicationLoader
             UnloadedEndpointNames = unloadedEndpointNames,
             Triggers = triggers,
             Migrations = migrations,
+            Scenarios = scenarios,
         };
     }
 
@@ -474,7 +484,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}' or '{ResourceKinds.Trigger}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}', '{ResourceKinds.Scenario}' or '{ResourceKinds.Trigger}'.",
                 file,
                 "/kind",
                 resourceId));

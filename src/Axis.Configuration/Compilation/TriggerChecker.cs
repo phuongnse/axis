@@ -2,7 +2,6 @@ using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
-using Axis.Expressions.Evaluation;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Typing;
 
@@ -317,47 +316,7 @@ internal static class TriggerChecker
             return parameter.Required != true;
         }
 
-        if (!FieldTypes.TryParse(parameter.Type, out var type))
-        {
-            return false;
-        }
-
-        switch (type)
-        {
-            case FieldType.Text when element.ValueKind == JsonValueKind.String && element.GetString() is { } text && !text.Contains('\0', StringComparison.Ordinal):
-                value = text;
-                return true;
-            case FieldType.Integer when element.ValueKind == JsonValueKind.Number
-                && element.TryGetDecimal(out var whole)
-                && decimal.Truncate(whole) == whole
-                && whole >= long.MinValue
-                && whole <= long.MaxValue:
-                value = (long)whole;
-                return true;
-            case FieldType.Decimal when element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var number):
-                value = number;
-                return true;
-            case FieldType.Boolean when element.ValueKind is JsonValueKind.True or JsonValueKind.False:
-                value = element.GetBoolean();
-                return true;
-            case FieldType.Date when element.ValueKind == JsonValueKind.String && DateLiterals.TryParseDate(element.GetString()!, out var date):
-                value = date;
-                return true;
-            case FieldType.DateTime when element.ValueKind == JsonValueKind.String && DateLiterals.TryParseDateTime(element.GetString()!, out var dateTime):
-                value = dateTime.ToUniversalTime();
-                return true;
-            case FieldType.Enum when element.ValueKind == JsonValueKind.String
-                && parameter.Values?.Contains(element.GetString()!, StringComparer.Ordinal) == true:
-                value = element.GetString();
-                return true;
-            case FieldType.Reference when element.ValueKind == JsonValueKind.String
-                && element.GetString() is { Length: 36 } id
-                && Guid.TryParseExact(id, "D", out var guid):
-                value = guid;
-                return true;
-            default:
-                return false;
-        }
+        return FieldTypes.TryParse(parameter.Type, out var type) && FieldValues.TryRead(type, parameter.Values, element, out value);
     }
 
     private static FieldDefinition? FindField(EntityResource entity, string name) =>
