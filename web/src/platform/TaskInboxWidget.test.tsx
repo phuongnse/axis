@@ -6,6 +6,7 @@ import { assignLocation } from './navigation'
 import type { WidgetMetadata } from './site'
 import { TaskInboxWidget } from './TaskInboxWidget'
 import { TextProvider } from './TextProvider'
+import type { TextCatalog } from './texts'
 
 vi.mock('./navigation')
 
@@ -24,6 +25,7 @@ const inboxWidget: WidgetMetadata = {
 
 const reviewId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 const approveId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
+const releaseId = '0192f4a0-1b2c-7d3e-8f40-5b6c7d8e9f02'
 const dueAt = '2026-10-13T09:30:00.123456Z'
 
 // In the task API's order: the earliest due date first, and no due date last.
@@ -31,6 +33,7 @@ const taskPage = JSON.stringify({
   items: [
     {
       id: reviewId,
+      releaseId,
       process: 'NoteReview',
       step: 'review',
       labelKey: 'noteReview.task',
@@ -40,6 +43,7 @@ const taskPage = JSON.stringify({
     },
     {
       id: approveId,
+      releaseId,
       process: 'NoteApproval',
       step: 'approve',
       labelKey: 'noteApproval.task',
@@ -64,9 +68,20 @@ const texts = {
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
-/** Stubs `fetch` with the task API and returns the requested URLs. */
-function stubTasks(body = taskPage, status = 200) {
-  const fetchMock = vi.fn(async (_input: string) => new Response(body, { status }))
+/**
+ * Stubs `fetch` with the task API and the texts of the tasks' release, and returns the requested
+ * URLs. The release texts answer `releaseTexts` with `releaseStatus`.
+ */
+function stubTasks(
+  body = taskPage,
+  status = 200,
+  { releaseTexts = {}, releaseStatus = 200 }: { releaseTexts?: Record<string, string>; releaseStatus?: number } = {},
+) {
+  const fetchMock = vi.fn(async (input: string) =>
+    input.includes('/texts/')
+      ? new Response(JSON.stringify({ locale: 'en', texts: releaseTexts }), { status: releaseStatus })
+      : new Response(body, { status }),
+  )
   vi.stubGlobal('fetch', fetchMock)
   return () => fetchMock.mock.calls.map(([url]) => url)
 }
@@ -75,11 +90,11 @@ function CurrentSearch() {
   return <output data-testid="search">{useLocation().search}</output>
 }
 
-function renderWidget(search = '') {
+function renderWidget(search = '', outerCatalogs: TextCatalog[] = catalogs) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/tasks${search}`]}>
-      <TextProvider catalogs={catalogs} development={false}>
-        <TaskInboxWidget sitePath="e2e" pageName="Tasks" widget={inboxWidget} locale="en" />
+      <TextProvider catalogs={outerCatalogs} development={false}>
+        <TaskInboxWidget sitePath="e2e" pageName="Tasks" widget={inboxWidget} locale="en" fallbackLocale="en" />
       </TextProvider>
       <CurrentSearch />
     </MemoryRouter>,
@@ -112,6 +127,32 @@ describe('TaskInboxWidget', () => {
     expect(within(approve).getByText('Order chairs')).toBeInTheDocument()
     // No due date is an empty cell.
     expect(within(approve).getAllByRole('cell')[2]).toHaveTextContent(/^$/)
+  })
+
+  it("renders a step label from the texts of the task's release when the site texts lack the key", async () => {
+    const requests = stubTasks(taskPage, 200, { releaseTexts: { 'noteReview.task': 'Check the note' } })
+    const { 'noteReview.task': _removed, ...siteTexts } = texts
+
+    renderWidget('', [{ texts: siteTexts, fallbackTexts: siteTexts }])
+
+    expect(await screen.findByRole('link', { name: 'Check the note' })).toHaveAttribute(
+      'href',
+      `/e2e/tasks/${reviewId}`,
+    )
+    // Both tasks are on one release, so its texts are fetched once.
+    expect(requests().filter((url) => url.includes('/texts/'))).toEqual([
+      `/api/sites/e2e/texts/en?release=${releaseId}`,
+    ])
+  })
+
+  it("shows the load error when the texts of the tasks' releases fail to load", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubTasks(taskPage, 200, { releaseStatus: 500 })
+
+    renderWidget()
+
+    expect(await screen.findByTestId('tasks-error')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('starts sign-in with the current path and query string when nobody is signed in', async () => {
@@ -156,6 +197,6 @@ describe('TaskInboxWidget', () => {
 
     await screen.findByRole('row', { name: /Review the note/ })
     await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''))
-    expect(requests()).toEqual([tasksPath])
+    expect(requests().filter((url) => url.startsWith(tasksPath))).toEqual([tasksPath])
   })
 })

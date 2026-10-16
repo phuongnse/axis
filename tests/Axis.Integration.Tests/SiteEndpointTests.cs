@@ -212,6 +212,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     [InlineData("/api/sites")]
     [InlineData("/api/sites/records")]
     [InlineData("/api/sites/records/texts/en")]
+    [InlineData("/api/sites/records/texts/en?release=6f1c2a40-7a3b-4c52-9d0e-1b2c3d4e5f60")]
     [InlineData("/api/sites/records/pages/items")]
     [InlineData("/api/sites/unknown")]
     [InlineData("/api/sites/unknown/texts/en")]

@@ -55,7 +55,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | --- | --- |
   | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles" } ] }`, every site of every active application, in path order |
   | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey" } ] }` |
-  | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application *(planned for M6)*. An unknown id, a non-UUID or another application's release answers `404`. |
+  | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |
 
   A page response looks like this:
@@ -160,8 +160,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - The texts endpoint serves any locale the site's application has texts
     for. Without `release`, it uses the active release. Optional
     `?release={releaseId}` serves the texts of any stored release of the
-    site's application *(planned for M6)*. An unknown id, a non-UUID or
-    another application's release answers `404`.
+    site's application. An unknown id, a non-UUID or another application's
+    release answers `404`.
   - The page endpoint serves any page of the site's application, not only
     pages in the site's navigation, because form pages opened from a table
     are not in navigation.
@@ -652,8 +652,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     subject's label and the due date, formatted as a `date-time` cell. An
     empty subject label or due date is an empty cell.
     The inbox loads the texts of each release its rows name through
-    `releaseId` *(planned for M6)*. Tasks from several releases each show
-    their own release's labels.
+    `releaseId`, once per release. Tasks from several releases each show
+    their own release's labels. The table stays loading until those texts
+    have arrived, and a failed load shows the inbox's load error.
   - **Paging.** `page` and `pageSize` live in the URL, as for a table. There
     is no sort.
   - **Links.** Each row opens the task page at
@@ -665,8 +666,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Task page**. The address `/{site}/{inboxpage}/{taskId}`
   shows one task, under the page of its task inbox.
   - It loads the texts of the task's `releaseId` with
-    `GET /api/sites/{path}/texts/{locale}?release={releaseId}`
-    *(planned for M6)*. The step, form and outcome labels use those texts.
+    `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, for the
+    current and the fallback locale. The step, form and outcome labels use
+    those texts first, then the site texts and the platform texts. If they
+    fail to load, the page shows its load error.
   - It shows the step's label, the subject's label, the due date and the
     form's sections over the subject record. The layout and the field types
     come from the task read's `form`, and the values from the subject

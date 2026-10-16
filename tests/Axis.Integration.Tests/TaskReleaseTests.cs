@@ -7,7 +7,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A task pinned to release A, read after a release B is activated. The label comes from A's
-/// display field, the readable fields and the role assignee check follow B.
+/// display field and the texts served by its release id, the readable fields and the role assignee
+/// check follow B.
 /// </summary>
 public sealed class TaskReleaseTests(TaskApiFixture fixture) : IClassFixture<TaskApiFixture>
 {
@@ -43,6 +44,54 @@ public sealed class TaskReleaseTests(TaskApiFixture fixture) : IClassFixture<Tas
 
         using var read = await GetJsonAsync(maria, $"{Tasks}/{task:D}", TenantB);
         Assert.Equal(RequestTitle(subject), read.RootElement.GetProperty("subject").GetProperty("label").GetString());
+    }
+
+    [Fact]
+    public async Task A_task_started_on_release_A_returns_release_A_after_release_B_is_activated()
+    {
+        var (task, _, _) = await CreateTaskAsync("Approve");
+        await ActivateRewordedAsync();
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var read = await GetJsonAsync(maria, $"{Tasks}/{task:D}");
+        Assert.Equal(fixture.ReleaseId(TenantA), read.RootElement.GetProperty("releaseId").GetGuid());
+
+        using var list = await GetJsonAsync(maria, AllTasks);
+        var item = list.RootElement.GetProperty("items").EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == task);
+        Assert.Equal(fixture.ReleaseId(TenantA), item.GetProperty("releaseId").GetGuid());
+    }
+
+    [Fact]
+    public async Task The_texts_of_release_A_are_served_by_its_id_while_release_B_is_active()
+    {
+        await ActivateRewordedAsync();
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var old = await GetJsonAsync(maria, $"/api/sites/steps/texts/en?release={fixture.ReleaseId(TenantA):D}");
+        Assert.Equal("Approve the request", old.RootElement.GetProperty("texts").GetProperty("request.approve").GetString());
+
+        using var active = await GetJsonAsync(maria, "/api/sites/steps/texts/en");
+        Assert.Equal("Approve this request", active.RootElement.GetProperty("texts").GetProperty("request.approve").GetString());
+    }
+
+    [Theory]
+    [InlineData("other")]
+    [InlineData("unknown")]
+    [InlineData("not-a-uuid")]
+    public async Task The_texts_of_a_release_that_is_not_one_of_the_applications_are_a_404(string kind)
+    {
+        var release = kind switch
+        {
+            "other" => (await fixture.CompileFixtureAsync(TenantA, "SecondApp")).ToString("D"),
+            "unknown" => Guid.NewGuid().ToString("D"),
+            _ => kind,
+        };
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var response = await SendAsync(maria, $"/api/sites/steps/texts/en?release={release}");
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
+        Assert.Equal("No release of the site's application exists with this id.", problem.RootElement.GetProperty("title").GetString());
     }
 
     [Fact]
@@ -115,6 +164,13 @@ public sealed class TaskReleaseTests(TaskApiFixture fixture) : IClassFixture<Tas
         using var completed = await CompleteAsync(maria, userTask, """{ "outcome": "approve" }""");
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
     }
+
+    // Release B rewords the Approve step's label, so the texts of A and B differ.
+    private Task<Guid> ActivateRewordedAsync() =>
+        fixture.ActivateEditedAsync(TenantA, (path, content) =>
+            path == Path.Combine("texts", "en.json")
+                ? content.Replace("Approve the request", "Approve this request", StringComparison.Ordinal)
+                : content);
 
     /// <summary>
     /// Creates a request in a department managed by <c>maria</c>, starts <paramref name="process"/>

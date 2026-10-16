@@ -1,5 +1,5 @@
-import { useCallback, type ReactNode } from 'react'
-import { resolveText, TextContext, type TextCatalog } from './texts'
+import { useCallback, useMemo, type ReactNode } from 'react'
+import { resolveText, TextCatalogsContext, TextContext, type TextCatalog } from './texts'
 
 interface TextProviderProps {
   /** The catalogs a key resolves through, in order: the site texts, then the platform texts. */
@@ -11,5 +11,10 @@ interface TextProviderProps {
 
 export function TextProvider({ catalogs, development, children }: TextProviderProps) {
   const text = useCallback((key: string) => resolveText(key, catalogs, development), [catalogs, development])
-  return <TextContext.Provider value={text}>{children}</TextContext.Provider>
+  const value = useMemo(() => ({ catalogs, development }), [catalogs, development])
+  return (
+    <TextCatalogsContext.Provider value={value}>
+      <TextContext.Provider value={text}>{children}</TextContext.Provider>
+    </TextCatalogsContext.Provider>
+  )
 }

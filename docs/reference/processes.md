@@ -508,7 +508,7 @@ by `createdAt`, then by `id`.
 }
 ```
 
-- `releaseId` names the task's release *(planned for M6)*. The inbox loads
+- `releaseId` names the task's release. The inbox loads
   the texts of each release its rows name, so each step label uses its own
   release's texts.
 - `subject.label` is the value of the display field from the task's release.
@@ -557,7 +557,7 @@ state:
 }
 ```
 
-- `releaseId` names the task's release *(planned for M6)*. The task page
+- `releaseId` names the task's release. The task page
   loads its texts with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`.
 - `subject.label` uses the display field from the task's release. The active
   release's policies decide whether the user
@@ -741,9 +741,9 @@ for texts. **Both** means different parts use different releases.
 | Inbound endpoint | Active | Creates the record and starts its instance on the active release. |
 | Site, site list and page endpoints | Active | Describe sites and pages of active applications. |
 | Texts endpoint without `release` | Active | Serves the active release's texts. |
-| Texts endpoint with `release` | Pinned | Serves any stored release of the site's application *(planned for M6)*. An unknown id, a non-UUID or another application's release answers `404`. |
-| Task list | Both | Step and subject labels use the task's release. Loading that release's texts is *(planned for M6)*. Policies and roles come from the active release. |
-| Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too *(planned for M6)*. Policies come from the active release. |
+| Texts endpoint with `release` | Pinned | Serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
+| Task list | Both | Step and subject labels use the task's release. Their texts load from it too. Policies and roles come from the active release. |
+| Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
@@ -770,7 +770,7 @@ for texts. **Both** means different parts use different releases.
   subject's display field comes from the task's release, but the active
   policies decide whether it is readable. Removing or renaming a policy can
   deny access to an old task's subject record or fields.
-- **Pinned texts** *(planned for M6)*. Each release carries its own texts.
+- **Pinned texts.** Each release carries its own texts.
   The inbox and task page load them using the task's `releaseId`. Old texts
   stay readable by id for as long as the release is stored, even after its
   instances end. A newer release may remove a key its labels no longer use.

@@ -43,7 +43,7 @@ flowchart LR
      locale in path order that has it. A file already reported as a duplicate
      locale is left out of this check. Keys are compared ordinally.
      Each release carries its own texts, so a newer release can remove a key
-     that older running work still shows *(planned for M6)*.
+     that older running work still shows.
    - **Labels.** The text key of the application label, an entity label or a
      field label must be in some locale, otherwise it is `AXC0028` at that
      label's `/textKey`. This applies also when the application has no text

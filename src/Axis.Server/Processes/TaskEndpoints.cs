@@ -96,6 +96,7 @@ internal static class TaskEndpoints
 
             items.Add(new TaskListItem(
                 task.Id,
+                task.ReleaseId,
                 process.Name,
                 step.Name,
                 step.Label.TextKey,
@@ -350,6 +351,7 @@ internal static class TaskEndpoints
 
         return new TaskResponse(
             task.Id,
+            task.ReleaseId,
             process.Name,
             task.ProcessInstanceId,
             step.Name,
@@ -470,9 +472,10 @@ internal static class TaskEndpoints
 /// <summary>One page of the open tasks the user may act on, and the number of them on every page.</summary>
 internal sealed record TaskListResponse(IReadOnlyList<TaskListItem> Items, int Page, int PageSize, long TotalCount);
 
-/// <summary>An open task as a task list shows it. <see cref="DueAt"/> is null when the step has no <c>dueIn</c>.</summary>
+/// <summary>An open task as a task list shows it, with the release it started on. <see cref="DueAt"/> is null when the step has no <c>dueIn</c>.</summary>
 internal sealed record TaskListItem(
     Guid Id,
+    Guid ReleaseId,
     string Process,
     string Step,
     string LabelKey,
@@ -495,6 +498,7 @@ internal sealed record TaskOutcome(string Name, string LabelKey);
 /// <summary>One task in any state, as a task read returns it.</summary>
 internal sealed record TaskResponse(
     Guid Id,
+    Guid ReleaseId,
     string Process,
     Guid InstanceId,
     string Step,

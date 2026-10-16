@@ -10,7 +10,9 @@ namespace Axis.Server.Presentation;
 /// their pages to the SPA. A site is found by its path. The endpoints need a session: without one
 /// they answer 401 before any 404, so a signed-out caller cannot learn which sites or pages exist.
 /// A site's navigation leaves out the pages the user cannot read, such a page answers 403, and page
-/// metadata lists only the fields, actions and access the user's grants allow.
+/// metadata lists only the fields, actions and access the user's grants allow. The texts endpoint
+/// answers the texts of the active release, or of any stored release of the site's application when
+/// it is given a <c>release</c> id, so a task page can show the texts of the release it started on.
 /// </summary>
 internal static class SiteEndpoints
 {
@@ -55,7 +57,7 @@ internal static class SiteEndpoints
             return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))] });
         });
 
-        sites.MapGet("/{path}/texts/{locale}", async (HttpContext context, string path, string locale, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
+        sites.MapGet("/{path}/texts/{locale}", async (HttpContext context, string path, string locale, string? release, ActiveApplicationResolver resolver, CancellationToken cancellationToken) =>
         {
             if (await CurrentUsers.FindAsync(context) is null)
             {
@@ -67,7 +69,20 @@ internal static class SiteEndpoints
                 return SiteNotFound();
             }
 
-            return ApplicationSites.FindTexts(active.Application, locale) is { } texts
+            var model = active.Application;
+            if (release is not null)
+            {
+                // Only the hyphenated form names a release; any other text is no release.
+                if (!Guid.TryParseExact(release, "D", out var releaseId) || release.Length != 36
+                    || await resolver.FindReleaseModelAsync(model.Manifest.Id, releaseId, cancellationToken) is not { } found)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No release of the site's application exists with this id.");
+                }
+
+                model = found;
+            }
+
+            return ApplicationSites.FindTexts(model, locale) is { } texts
                 ? Results.Ok(texts)
                 : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No text resources exist for this locale.");
         });

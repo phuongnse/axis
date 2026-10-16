@@ -49,6 +49,12 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// <summary>The compiled model of the StepApp fixture.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
 
+    /// <summary>
+    /// The release the StepApp fixture was first activated as on <paramref name="tenant"/>, which
+    /// <see cref="StartAsync"/> pins every instance to.
+    /// </summary>
+    public Guid ReleaseId(string tenant) => _tenants[tenant].ReleaseId;
+
     /// <summary>The host of <paramref name="tenant"/>.</summary>
     public static string Host(string tenant) => $"{tenant}.example.test";
 
@@ -363,6 +369,18 @@ public sealed class TaskApiFixture : IAsyncLifetime
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"));
         Assert.Empty(activated.Diagnostics);
+        return compiled.Release!.Id;
+    }
+
+    /// <summary>
+    /// Compiles the fixture folder <paramref name="fixture"/>, such as <c>SecondApp</c>, on
+    /// <paramref name="tenant"/> without activating it. Returns the id of the stored release.
+    /// </summary>
+    public async Task<Guid> CompileFixtureAsync(string tenant, string fixture)
+    {
+        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(_tenants[tenant].ConnectionString).Options);
+        var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", fixture), configuration);
+        Assert.Empty(compiled.Diagnostics);
         return compiled.Release!.Id;
     }
 

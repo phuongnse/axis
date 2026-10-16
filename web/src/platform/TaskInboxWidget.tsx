@@ -5,7 +5,8 @@ import { formatValue } from './formatValue'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
-import { useText } from './texts'
+import { resolveText, useText, useTextCatalogs } from './texts'
+import { useReleaseTexts } from './useReleaseTexts'
 
 interface TaskInboxWidgetProps {
   sitePath: string
@@ -14,6 +15,8 @@ interface TaskInboxWidgetProps {
   widget: WidgetMetadata
   /** The UI locale, for formatting the due date. */
   locale: string
+  /** The site's fallback locale, for the texts of the tasks' releases. */
+  fallbackLocale: string
 }
 
 /** The outcome of the last finished request. */
@@ -33,9 +36,14 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * first, with no due date last. Each row links to the task's address under the inbox page. Paging
  * lives in the URL as the task API's `page` and `pageSize`, as on a table. With nobody signed in, the
  * task API's 401 starts sign-in.
+ *
+ * A row's label comes from the texts of the release its task started on, then the site texts and
+ * the platform texts. The table stays loading until the texts of every release on the page have
+ * loaded. If they fail to load, the inbox shows its load error.
  */
-export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInboxWidgetProps) {
+export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLocale }: TaskInboxWidgetProps) {
   const t = useText()
+  const { catalogs, development } = useTextCatalogs()
   const [searchParams, setSearchParams] = useSearchParams()
   // The server sets the path on every task inbox.
   const tasksPath = widget.tasksPath!
@@ -48,6 +56,11 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
   const totalCount = loading ? undefined : state.page?.totalCount
+  const items = state.page?.items
+  const releaseIds = useMemo(() => items?.map((task) => task.releaseId) ?? [], [items])
+  const releaseTexts = useReleaseTexts(sitePath, releaseIds, locale, fallbackLocale)
+  const releaseCatalogs = releaseTexts.catalogs
+  const textsLoading = releaseIds.some((id) => !releaseCatalogs.has(id))
 
   // An invalid, repeated or out-of-order parameter is rewritten without a history entry.
   useEffect(() => {
@@ -89,7 +102,13 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
       {
         key: 'task',
         title: t('shell.tasks.task'),
-        render: (_value: unknown, task: TaskListItem) => <Link to={`${taskPath}/${task.id}`}>{t(task.labelKey)}</Link>,
+        render: (_value: unknown, task: TaskListItem) => {
+          const releaseCatalog = releaseCatalogs.get(task.releaseId)
+          const label = releaseCatalog
+            ? resolveText(task.labelKey, [releaseCatalog, ...catalogs], development)
+            : t(task.labelKey)
+          return <Link to={`${taskPath}/${task.id}`}>{label}</Link>
+        },
       },
       {
         key: 'subject',
@@ -102,7 +121,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
         render: (_value: unknown, task: TaskListItem) => formatValue(dueAtField, task.dueAt, {}, { locale, text: t }),
       },
     ],
-    [locale, t, taskPath],
+    [locale, t, taskPath, releaseCatalogs, catalogs, development],
   )
 
   // A new page size starts again at page 1. Paging adds history entries.
@@ -112,7 +131,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
     setSearchParams(writeTableQuery(searchParams, { page, pageSize, sort: null }))
   }
 
-  if (failed) {
+  if (failed || releaseTexts.failed) {
     return <Alert data-testid="tasks-error" type="error" message={t('shell.tasks.loadFailed')} />
   }
   return (
@@ -120,7 +139,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale }: TaskInbo
       rowKey="id"
       columns={columns}
       dataSource={state.page?.items}
-      loading={loading}
+      loading={loading || textsLoading}
       locale={{ emptyText: t('shell.tasks.empty') }}
       pagination={{
         current: query.page,
