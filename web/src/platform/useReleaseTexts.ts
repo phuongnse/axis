@@ -21,8 +21,14 @@ export function useReleaseTexts(
   const ids = [...new Set(releaseIds)].sort().join(',')
   const request = requestKey(sitePath, ids, locale, fallbackLocale)
   const [catalogs, setCatalogs] = useState(noCatalogs)
-  // The request that failed, so the next request starts without the failure.
+  // The request that failed.
   const [failedRequest, setFailedRequest] = useState<string>()
+  // A request that starts again, such as after a switch of locale and back, starts without the failure.
+  const [seenRequest, setSeenRequest] = useState(request)
+  if (seenRequest !== request) {
+    setSeenRequest(request)
+    setFailedRequest(undefined)
+  }
 
   useEffect(() => {
     if (ids === '') {
