@@ -4,5 +4,5 @@
   "name": "NoteAccess",
   "formatVersion": 1,
   "roles": ["clerk"],
-  "grants": [{ "entity": "Note", "actions": ["read", "create", "update"] }]
+  "grants": [{ "entity": "Note", "actions": ["read", "create", "update", "delete"] }]
 }

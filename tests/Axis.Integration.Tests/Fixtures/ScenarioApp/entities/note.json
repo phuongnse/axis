@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "fields": [
     { "name": "title", "type": "text", "required": true },
+    { "name": "code", "type": "text", "maxLength": 20, "unique": true },
     { "name": "quantity", "type": "integer" },
     { "name": "dueAt", "type": "date-time" },
     { "name": "lines", "type": "child-collection", "target": "NoteLine" }
