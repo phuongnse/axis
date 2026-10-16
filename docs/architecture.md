@@ -136,6 +136,16 @@ The `Tenants` section of the server configuration is keyed by tenant id:
 
 Environment variables override it in the usual form, such as
 `Tenants__default__ConnectionString` or `Tenants__default__Hosts__0`.
+
+*(planned for M6)* Each tenant also gets `SchemaConnectionString`, or
+`Tenants__default__SchemaConnectionString` as an environment variable.
+`ConnectionString` is then for the runtime database role, and
+`SchemaConnectionString` is for the schema database role. The server reads
+both. The worker reads only `ConnectionString`. This is a breaking setting
+change: every installation must add the setting and a second database role,
+and there is no fallback to one connection string. See
+[database roles](reference/storage.md#database-roles) and
+[D31](decisions.md#d31-separate-database-roles--agreed).
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
 database. The `Platform` connection string is separate and still serves the
@@ -149,6 +159,12 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - a tenant has no hosts, or a host entry that is blank or only whitespace;
 - a tenant has no connection string, or one that is only whitespace;
 - the same host is listed under two tenants, compared ignoring letter case;
+- *(planned for M6)* in the server, a tenant has no `SchemaConnectionString`,
+  or one that is only whitespace, or both connection strings name the same
+  user;
+- *(planned for M6)* in the server and the worker, the runtime database role
+  is a superuser, owns the `axis` or `entities` schema, or may create objects
+  in either;
 - a binding has a missing `Kind` or one other than `url` or `secret`, a blank
   `Value`, or is a `url` binding whose value is not an absolute `http` or
   `https` URL. The message names the tenant and the binding, never the value;

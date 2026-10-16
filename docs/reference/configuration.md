@@ -817,6 +817,10 @@ development or E2E server serves a real application without a separate step.
   reported as `AXC0033`, and the transaction is rolled back. Any `AXC0033`
   stops the start like any other diagnostic, and the release stays active.
   The step logs how many seed records it inserted and updated.
+- **Database roles** *(planned for M6)*. Migrations, compiling, storing and
+  activating use `SchemaConnectionString`. Schedule trigger state and seeding
+  use `ConnectionString`. See
+  [database roles](storage.md#database-roles) for the table of steps.
 - **Restarts.** Restarting with unchanged folders is safe. An unchanged
   folder, with the same package versions installed, returns its stored release, and activating the active release again
   only updates its activation time. After a failure, the next start
