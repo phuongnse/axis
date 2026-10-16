@@ -56,6 +56,9 @@ if (startupFolders.Length > 0)
     builder.Services.AddHostedService<StartupActivation>();
 }
 
+// Registered after StartupActivation, so a release activated at this start is the one checked.
+builder.Services.AddHostedService<StartupReleaseCheck>();
+
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();

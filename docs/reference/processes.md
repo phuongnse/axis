@@ -751,7 +751,7 @@ for texts. **Both** means different parts use different releases.
 | `event.deliver` | Active | Reads `async` event triggers from the release active at delivery. |
 | Data change triggers | Active | Fire from the active release, even when old-release work writes the record. |
 | Schedule fan-out | Active | Uses the release active when the fan-out runs, and pins each new instance to it. |
-| Server and worker start check | Both | Rebuilds every active release and every release with a running or waiting instance *(planned for M6)*. A missing pinned package version stops the start. |
+| Server and worker start check | Both | Rebuilds every active release and every release with a running or waiting instance. A missing pinned package version is `AXC0146` and stops the start. |
 
 - **Starts from old work.** A data change or event trigger set off by
   old-release work starts a new instance on the active release. For writes,
