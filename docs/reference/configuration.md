@@ -2177,8 +2177,9 @@ A `scenario` resource is a configuration-level test. See
 `scenarios/`, one file per scenario. They compile with the application but stay
 out of the release and its content hash. A file is a scenario because its `kind`
 is `scenario`, wherever it is in the folder. The resource kind and its compile
-checks exist. The runner runs record actions and `expectRecord` steps. The
-other steps and the use of `stubs` and `now` are *(planned for M6)*.
+checks exist. The runner runs record actions, with or without `expect`, and
+`expectRecord` steps. The other steps and the use of `stubs` and `now` are
+*(planned for M6)*.
 
 This scenario submits a purchase request above the finance threshold. The
 manager is denied the finance decision. Both tasks are completed and the
@@ -2275,12 +2276,14 @@ Every step has a `type`. These are the step kinds:
   They go through the record command, as the record API does.
 - Only actions may declare `expect`. With no `expect`, an action must succeed.
   An unmet expectation fails the scenario:
-  - `"denied"` means 403.
-  - `"notFound"` means 404, for example a record outside every read filter.
-  - `"conflict"` means 409, for a unique value, a referenced record or a task
-    that is already completed.
-  - `{ "invalid": "lineItems/0/quantity" }` means a validation problem at that
-    path under `/values/`.
+  - `"denied"` means 403. A grant, a field grant or a record filter refused
+    the action.
+  - `"notFound"` means 404. The record is outside every read filter, or it does
+    not exist, for example after a `deleteRecord` step.
+  - `"conflict"` means 409, for a unique value, a referenced record, a stale
+    version or a task that is already completed.
+  - `{ "invalid": "lineItems/0/quantity" }` means a 400 validation problem with
+    an error at that path under `/values/`. Other errors may come with it.
 - A step that has `expect` may not use `save`, because a failed action creates
   no record.
 - The runner supplies the record's current `version` on updates and task
@@ -2310,16 +2313,21 @@ package or binds a connector cannot run yet. A user's display name is their id.
 
 What runs now:
 
-- `createRecord`, `updateRecord` and `deleteRecord` without `expect`. Any outcome
-  other than success fails the scenario and names the outcome, such as `Denied`.
+- `createRecord`, `updateRecord` and `deleteRecord`, with or without `expect`.
+  With no `expect`, any outcome other than success fails the scenario. With
+  `expect`, any other outcome fails it. The failure names the expectation and the
+  actual outcome as the record command reports it, followed by any field errors,
+  for example `Step 2 (createRecord): expected denied but the outcome was Written`
+  or `Step 1 (createRecord): expected invalid at '/values/quantity' but the outcome
+  was Invalid: /values/title Required.`. A taken unique value is reported as
+  `Conflict (UniqueValue)`.
 - `expectRecord`. Numbers compare by value, so 5000 equals 5000.00. Date-times
   compare as instants. A child collection must have as many rows as expected, and
   each expected row is compared on the fields it names.
 
-*(planned for M6)*: `startProcess`, `completeTask`, `expectInstance`, `expectTask`
-and any action with `expect`. A scenario that uses a step type that does not run
-yet fails with `step type '<type>' is not supported yet`. An action with `expect`
-fails with `expect is not supported yet`.
+*(planned for M6)*: `startProcess`, `completeTask`, `expectInstance` and
+`expectTask`. A scenario that uses a step type that does not run yet fails with
+`step type '<type>' is not supported yet`.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

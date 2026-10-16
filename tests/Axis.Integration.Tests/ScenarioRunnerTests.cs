@@ -10,6 +10,7 @@ namespace Axis.Integration.Tests;
 public sealed class ScenarioRunnerTests
 {
     private const string Clerk = """{ "anna": ["clerk"] }""";
+    private const string Reader = """{ "rita": ["reader"] }""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -111,15 +112,90 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
-    public async Task A_step_kind_that_is_not_supported_yet_fails_the_scenario()
+    public async Task A_create_by_a_user_without_a_create_grant_passes_with_expect_denied()
     {
-        using var folder = Application(Scenario("Unsupported", Clerk, """
+        using var folder = Application(Scenario("DeniedExpected", Reader, """
+            { "type": "createRecord", "entity": "Note", "as": "rita", "values": { "title": "Desk" }, "expect": "denied" }
+            """));
+
+        var result = await RunAsync(folder, "DeniedExpected");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_create_without_a_required_field_passes_with_expect_invalid_at_that_path_and_fails_at_another()
+    {
+        using var folder = Application(
+            Scenario("RightPath", Clerk, """
+                { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "quantity": 1 }, "expect": { "invalid": "title" } }
+                """),
+            Scenario("WrongPath", Clerk, """
+                { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "quantity": 1 }, "expect": { "invalid": "quantity" } }
+                """));
+
+        var right = await RunAsync(folder, "RightPath");
+        var wrong = await RunAsync(folder, "WrongPath");
+
+        Assert.True(right.Passed, right.Failure);
+        Assert.False(wrong.Passed);
+        Assert.Contains("Step 1 (createRecord)", wrong.Failure);
+        Assert.Contains("Invalid", wrong.Failure);
+        Assert.Contains("/values/title", wrong.Failure);
+    }
+
+    [Fact]
+    public async Task A_second_create_with_the_same_unique_value_passes_with_expect_conflict()
+    {
+        using var folder = Application(Scenario("Conflict", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk", "code": "A-1" } },
+            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Chair", "code": "A-1" }, "expect": "conflict" }
+            """));
+
+        var result = await RunAsync(folder, "Conflict");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task An_update_and_a_delete_of_a_deleted_record_pass_with_expect_not_found()
+    {
+        using var folder = Application(Scenario("Gone", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk" } },
+            { "type": "deleteRecord", "record": "note", "as": "anna" },
+            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Chair" }, "expect": "notFound" },
+            { "type": "deleteRecord", "record": "note", "as": "anna", "expect": "notFound" }
+            """));
+
+        var result = await RunAsync(folder, "Gone");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task An_update_of_a_deleted_record_without_expect_fails_with_the_not_found_outcome()
+    {
+        using var folder = Application(Scenario("GoneUnexpected", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk" } },
+            { "type": "deleteRecord", "record": "note", "as": "anna" },
+            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Chair" } }
+            """));
+
+        var result = await RunAsync(folder, "GoneUnexpected");
+
+        Assert.Equal("Step 3 (updateRecord): expected success but the outcome was NotFound", result.Failure);
+    }
+
+    [Fact]
+    public async Task A_create_that_succeeds_despite_expect_denied_fails_with_the_expectation_and_the_outcome()
+    {
+        using var folder = Application(Scenario("Unexpected", Clerk, """
             { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk" }, "expect": "denied" }
             """));
 
-        var result = await RunAsync(folder, "Unsupported");
+        var result = await RunAsync(folder, "Unexpected");
 
-        Assert.Equal("Step 1 (createRecord): expect is not supported yet", result.Failure);
+        Assert.Equal("Step 1 (createRecord): expected denied but the outcome was Written", result.Failure);
     }
 
     [Fact]

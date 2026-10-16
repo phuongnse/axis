@@ -44,12 +44,11 @@ internal sealed class ScenarioSteps(
 
     private async Task CreateAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
-        RejectExpect(step);
         var entity = Entity(step.Entity);
         var body = Body(version: null, step.Values);
         var result = await RecordCommand.CreateAsync(
             connection, ScenarioRunner.TenantId, model, releaseId, entity, Actor(step), _ => Task.FromResult<byte[]?>(body), loggerFactory, cancellationToken);
-        RequireOutcome(result, RecordCommandOutcome.Written);
+        Check(step, result, RecordCommandOutcome.Written);
         if (step.Save is { } alias)
         {
             _saved[alias] = (entity, result.Record!.Id);
@@ -58,22 +57,21 @@ internal sealed class ScenarioSteps(
 
     private async Task UpdateAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
-        RejectExpect(step);
         var (entity, id) = Saved(step.Record);
-        var stored = await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken)
-            ?? throw new StepFailedException($"record '{step.Record}' no longer exists");
-        var body = Body(stored.Version, step.Values);
+        var stored = await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken);
+
+        // A record that no longer exists still goes to the record command, which answers NotFound.
+        var body = Body(stored?.Version ?? 1, step.Values);
         var result = await RecordCommand.UpdateAsync(
             connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), _ => Task.FromResult<byte[]?>(body), loggerFactory, cancellationToken);
-        RequireOutcome(result, RecordCommandOutcome.Written);
+        Check(step, result, RecordCommandOutcome.Written);
     }
 
     private async Task DeleteAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
-        RejectExpect(step);
         var (entity, id) = Saved(step.Record);
         var result = await RecordCommand.DeleteAsync(connection, model, entity, id, Actor(step), loggerFactory, cancellationToken);
-        RequireOutcome(result, RecordCommandOutcome.Deleted);
+        Check(step, result, RecordCommandOutcome.Deleted);
     }
 
     private async Task ExpectRecordAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
@@ -87,28 +85,55 @@ internal sealed class ScenarioSteps(
         }
     }
 
-    private static void RejectExpect(ScenarioStepDefinition step)
+    private static void Check(ScenarioStepDefinition step, RecordCommandResult result, RecordCommandOutcome success)
     {
-        if (step.Expect is not null)
+        if (step.Expect is not { } expect)
         {
-            throw new StepFailedException("expect is not supported yet");
-        }
-    }
+            if (result.Outcome != success)
+            {
+                throw new StepFailedException($"expected success but the outcome was {Actual(result)}");
+            }
 
-    private static void RequireOutcome(RecordCommandResult result, RecordCommandOutcome expected)
-    {
-        if (result.Outcome == expected)
-        {
             return;
         }
 
-        var message = $"expected success but the outcome was {result.Outcome}";
-        if (result.Errors is { Count: > 0 } errors)
+        if (!Meets(expect, result))
         {
-            message += ": " + string.Join("; ", errors.Select(error => $"{error.Key} {string.Join(", ", error.Value)}"));
+            throw new StepFailedException($"expected {Describe(expect)} but the outcome was {Actual(result)}");
+        }
+    }
+
+    private static bool Meets(JsonElement expect, RecordCommandResult result) =>
+        expect.ValueKind == JsonValueKind.String
+            ? expect.GetString() switch
+            {
+                "denied" => result.Outcome is RecordCommandOutcome.Denied or RecordCommandOutcome.OutsideFilters or RecordCommandOutcome.UnwritableFields,
+                "notFound" => result.Outcome == RecordCommandOutcome.NotFound,
+                "conflict" => result.Outcome is RecordCommandOutcome.Conflict or RecordCommandOutcome.StaleVersion,
+                _ => false,
+            }
+            : result.Outcome == RecordCommandOutcome.Invalid
+                && result.Errors?.ContainsKey("/values/" + expect.GetProperty("invalid").GetString()) == true;
+
+    private static string Describe(JsonElement expect) =>
+        expect.ValueKind == JsonValueKind.String
+            ? expect.GetString()!
+            : $"invalid at '/values/{expect.GetProperty("invalid").GetString()}'";
+
+    private static string Actual(RecordCommandResult result)
+    {
+        var actual = result.Outcome.ToString();
+        if (result.Conflict is { } conflict)
+        {
+            actual += $" ({conflict})";
         }
 
-        throw new StepFailedException(message);
+        if (result.Errors is { Count: > 0 } errors)
+        {
+            actual += ": " + string.Join("; ", errors.Select(error => $"{error.Key} {string.Join(", ", error.Value)}"));
+        }
+
+        return actual;
     }
 
     private EntityModel Entity(string? name) =>
