@@ -1,0 +1,10 @@
+{
+  "id": "25e6defe-b2df-4846-a313-66d670685d40",
+  "kind": "site",
+  "name": "ReleaseSite",
+  "formatVersion": 1,
+  "path": "release-app",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [{ "page": "Tasks", "label": { "textKey": "nav.tasks" } }]
+}

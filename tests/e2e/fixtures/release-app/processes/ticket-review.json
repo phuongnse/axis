@@ -1,0 +1,23 @@
+{
+  "id": "fa4cf777-90a0-49c4-89b3-24bdfb58724e",
+  "kind": "process",
+  "name": "TicketReview",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "ticketReview.task" },
+      "assignee": { "user": "'binh'" },
+      "form": "TicketReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "ticketReview.approve" }, "next": "end" },
+        { "name": "reject", "label": { "textKey": "ticketReview.reject" }, "next": "end" }
+      ]
+    },
+    { "name": "end", "type": "end" }
+  ]
+}

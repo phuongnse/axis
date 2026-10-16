@@ -1,0 +1,20 @@
+{
+  "id": "1853a802-98e7-4251-9673-d06208f7b54e",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Release app",
+    "nav.tasks": "Tasks",
+    "pages.tasks.title": "My tasks",
+    "ticket.label": "Ticket",
+    "ticket.topic": "Topic",
+    "ticketReview.task": "Review the ticket",
+    "ticketReview.main": "Ticket",
+    "ticketReview.approve": "Approve",
+    "ticketReview.reject": "Reject",
+    "role.employee": "Employee",
+    "role.departmentManager": "Department manager"
+  }
+}

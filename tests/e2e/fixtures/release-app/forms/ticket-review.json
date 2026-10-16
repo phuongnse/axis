@@ -1,0 +1,13 @@
+{
+  "id": "21fccbbf-6a9d-40bc-b04b-cf31313c6d37",
+  "kind": "form",
+  "name": "TicketReview",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [
+    {
+      "title": { "textKey": "ticketReview.main" },
+      "fields": [{ "field": "topic", "readOnly": true }]
+    }
+  ]
+}
