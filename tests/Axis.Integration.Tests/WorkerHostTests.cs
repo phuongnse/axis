@@ -235,6 +235,10 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
 
         await MigrateAsync(tenantA);
+
+        // Between the last migration and the grant step the worker may see its tables as read-only and log a
+        // failed poll. It polls again, so only errors after the grant step count.
+        var loggedAfterGrants = logs.Entries.Count;
         var item = await EnqueueAsync(tenantA, "a", RecordKind);
         await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1);
         await host.StopAsync(CancellationToken);
@@ -242,7 +246,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         Assert.Equal([new Run(item, "a", "worker")], await RunsAsync(tenantA));
         Assert.Single(logs.Entries, entry => entry == "Information: Waiting for the database of tenant a to be migrated.");
         Assert.Contains("Information: Tenant a is ready for work.", logs.Entries);
-        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries.Skip(loggedAfterGrants), entry => entry.StartsWith("Error", StringComparison.Ordinal));
     }
 
     private static IHost BuildHost(string worker, LogCollector logs, params (string TenantId, string ConnectionString)[] tenants) =>
@@ -301,10 +305,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             await MigrateAsync(connectionString);
         }
 
-        // The test tables are in the public schema, so they do not count as migrations.
+        // The test tables are in the public schema, so they do not count as migrations. The runtime role needs
+        // its own grant on them.
         await using (var dataSource = NpgsqlDataSource.Create(connectionString))
         await using (var command = dataSource.CreateCommand(
-            "CREATE TABLE test_runs (item_id uuid, tenant_id text, worker text); CREATE TABLE test_failures (item_id uuid, message text)"))
+            "CREATE TABLE test_runs (item_id uuid, tenant_id text, worker text); CREATE TABLE test_failures (item_id uuid, message text); "
+            + $"GRANT SELECT, INSERT, UPDATE, DELETE ON test_runs, test_failures TO {PostgreSqlServer.RuntimeRole}"))
         {
             await command.ExecuteNonQueryAsync(CancellationToken);
         }
@@ -316,6 +322,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     {
         await using var context = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options);
         await context.Database.MigrateAsync(CancellationToken);
+        await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString, CancellationToken);
     }
 
     private static async Task<Guid> EnqueueAsync(string connectionString, string tenantId, string kind, DateTimeOffset? dueAt = null)

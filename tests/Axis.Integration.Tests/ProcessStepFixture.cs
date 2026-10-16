@@ -96,6 +96,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
             await processes.Database.MigrateAsync();
+            await PostgreSqlServer.GrantRuntimeRoleAsync(_connectionString);
         }
 
         var (releaseId, model) = await ActivateAsync(_appFolder);

@@ -53,9 +53,10 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     a release and its resources are only inserted together. Saving fails when
     a stored release or resource is modified or deleted, or when a resource is
     added to a stored release. Bulk operations (`ExecuteUpdate`,
-    `ExecuteDelete`) and raw SQL bypass this guard. A database trigger that
-    refuses `UPDATE`, `DELETE` and `TRUNCATE` on the release tables is
-    planned, see [Database roles](#database-roles) *(planned for M6)*.
+    `ExecuteDelete`) and raw SQL bypass this guard, so a database trigger backs
+    it: it refuses `UPDATE`, `DELETE` and `TRUNCATE` on the release tables with
+    SQLSTATE `23001`. The guard still fails first, before any SQL runs. See
+    [Database roles](#database-roles).
 - **Entity tables.** These are generated per entity in the tenant database and
   live in the `entities` schema, separate from the `axis` system tables.
   `Axis.Data` plans them (see [Schema planning](#schema-planning)) and
@@ -117,13 +118,14 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
 ## Database roles
 
 See [D31](../decisions.md#d31-separate-database-roles--agreed). The two
-settings and the connection each step uses are built. The integration tests
-create the two database roles, `axis_schema` and `axis_runtime`, own each test
-database with `axis_schema`, run the server and worker as `axis_runtime`, and
-run activation as `axis_schema`. Docker Compose, `scripts/dev.sh` and
-`scripts/e2e.sh` do the same: `samples/postgres/init-roles.sql` creates the
-roles. *(planned for M6)* The grants that limit the runtime role, the release
-trigger and the start checks are still to come.
+settings, the connection each step uses, the grants that limit the runtime
+role and the release trigger are built. The integration tests create the two
+database roles, `axis_schema` and `axis_runtime`, own each test database with
+`axis_schema`, run the server and worker as `axis_runtime`, and run activation
+as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
+same: `samples/postgres/init-roles.sql` creates the roles and grants them
+nothing. *(planned for M6)* The start checks for a superuser, a schema owner or
+a role that may create objects are still to come.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
   and `entities` schemas. The runtime database role reads and writes data, and
@@ -148,22 +150,33 @@ What each database role may do:
 
 - **Default privileges.** The schema database role sets default privileges. A
   new table in `entities` gives the runtime database role `SELECT`, `INSERT`,
-  `UPDATE` and `DELETE`. A new table in `axis` gives it `SELECT` only.
-- **Explicit grants.** A migration that adds an `axis` table that runtime
-  writes grants those rights on it explicitly. A new system table is read-only
-  until someone decides otherwise.
+  `UPDATE` and `DELETE`. A new table in `axis` gives it `SELECT` only. The
+  grant step also clears the database-wide default privileges that older
+  setups set, because a per-schema default cannot narrow them.
+- **Explicit grants.** The grant step holds the list of `axis` tables that
+  runtime writes. It grants row access on those and revokes `INSERT`, `UPDATE`,
+  `DELETE` and `TRUNCATE` on every other `axis` table, so a database with
+  older, wider grants is repaired. A new system table is read-only until
+  someone adds it to the list.
 - **Role name.** The runtime database role is the user of `ConnectionString`.
-  The schema database role grants its rights in a migration, or in a grant step
-  that runs with the migrations, because the name comes from configuration.
+  The name comes from configuration, so a migration cannot hold it. A grant
+  step runs over the schema connection at every server start, both before and
+  after the EF Core migrations. The first run sets the default privileges for
+  the tables the migrations create. The second run grants the tables that now
+  exist. The step refuses a runtime database role that is the schema database
+  role.
 - **Release trigger.** A trigger refuses every `UPDATE`, `DELETE` and
-  `TRUNCATE` on the three release tables, for every database role. It replaces
-  the change-tracking guard described above for `Axis.Configuration`. A stored release can no longer be deleted at all.
-  Cleaning up old releases needs a later decision. A superuser can still
-  disable the trigger. It guards against mistakes by Axis, not against a
-  database administrator.
+  `TRUNCATE` on the three release tables, for every database role, with
+  SQLSTATE `23001`. An `Axis.Configuration` migration creates it. It backs the
+  change-tracking guard described above, which stays and fails first. A stored
+  release can no longer be deleted at all.
+  Cleaning up old releases needs a later decision. A superuser or the table
+  owner can still disable the trigger. It guards against mistakes by Axis, not
+  against a database administrator.
 - **Start checks.** A missing or blank setting stops the start, naming the
-  tenant and the setting. The server does this today. *(planned for M6)* So do
-  two settings that name the same user, and a
+  tenant and the setting. The server does this today. So does a
+  `ConnectionString` that names no user, and two settings that name the same
+  user. *(planned for M6)* So does a
   runtime database role that is a superuser, owns the `axis` or `entities`
   schema, or may create objects in either. The server runs all of these
   checks. The worker validates `ConnectionString` and the runtime database
@@ -178,6 +191,7 @@ Which connection string each step uses. The server does this today:
 | EF Core migrations of configuration, data and processes | `SchemaConnectionString` |
 | Compiling a folder and storing its release | `SchemaConnectionString` |
 | Activation: migrations, provisioning, active release, site paths | `SchemaConnectionString` |
+| Grants for the runtime database role, before and after the migrations | `SchemaConnectionString` |
 | Schedule trigger state | `ConnectionString` |
 | Seed records | `ConnectionString` |
 | Start release check (`AXC0146`) and the runtime database role check, in the server and the worker | `ConnectionString` |

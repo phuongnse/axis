@@ -4,6 +4,7 @@ using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data;
 using Axis.Data.Seeding;
+using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
@@ -13,11 +14,13 @@ using Npgsql;
 namespace Axis.Server.Applications;
 
 /// <summary>
-/// Migrates every configured tenant database, then compiles the configured application folders
+/// Migrates every configured tenant database and grants its runtime database role its rights (before
+/// and after the migrations), then compiles the configured application folders
 /// against the installed extension packages, activates them in it, writes the state of their schedule triggers and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. The migrations, release storage, entity
 /// provisioning and the active release use a connection from the tenant's
-/// <c>SchemaConnectionString</c>, which closes when the tenant is done. The schedule trigger state
+/// <c>SchemaConnectionString</c>, which closes when the tenant is done. The runtime database role is the
+/// user of the tenant's <c>ConnectionString</c>. The schedule trigger state
 /// and the seed records use the tenant's <c>ConnectionString</c>. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
 /// Restarting with unchanged folders and installed packages stores no new release and only
@@ -71,9 +74,22 @@ internal sealed partial class StartupActivation(
         var configuration = await schema.GetConfigurationAsync(cancellationToken);
         var data = await schema.GetDataAsync(cancellationToken);
         var processes = await schema.GetProcessesAsync(cancellationToken);
+        var runtimeRole = new NpgsqlConnectionStringBuilder(tenants.Tenants[tenantId].ConnectionString!).Username;
+        if (string.IsNullOrWhiteSpace(runtimeRole))
+        {
+            throw new InvalidOperationException(
+                $"The ConnectionString of tenant '{tenantId}' names no user, so the runtime database role is unknown.");
+        }
+
+        var schemaConnection = await schema.GetConnectionAsync(cancellationToken);
+
+        // Before the migrations, so the default privileges apply to the tables they create. After them, so
+        // the tables that exist get their grants, and a database with older, wider grants is repaired.
+        await GrantRuntimeRoleAsync(schemaConnection, runtimeRole, tenantId, cancellationToken);
         await configuration.Database.MigrateAsync(cancellationToken);
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
+        await GrantRuntimeRoleAsync(schemaConnection, runtimeRole, tenantId, cancellationToken);
         var bindings = Bindings(tenantId);
 
         foreach (var folder in options.Folders)
@@ -114,6 +130,20 @@ internal sealed partial class StartupActivation(
                 LogFailed(exception, folder, tenantId);
                 throw;
             }
+        }
+    }
+
+    private static async Task GrantRuntimeRoleAsync(
+        NpgsqlConnection schemaConnection, string runtimeRole, string tenantId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RuntimeRoleGrants.ApplyAsync(schemaConnection, runtimeRole, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new InvalidOperationException(
+                $"Tenant '{tenantId}': {exception.Message} Its ConnectionString and SchemaConnectionString must name different users.", exception);
         }
     }
 

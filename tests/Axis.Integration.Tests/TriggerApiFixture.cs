@@ -70,6 +70,7 @@ public sealed class TriggerApiFixture : IAsyncLifetime
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
             await processes.Database.MigrateAsync();
+            await PostgreSqlServer.GrantRuntimeRoleAsync(_connectionString);
         }
 
         await using (var connection = new NpgsqlConnection(_connectionString))

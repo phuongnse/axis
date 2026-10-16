@@ -453,6 +453,129 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         Assert.True((long)(await ScalarAsync(a, "SELECT count(*) FROM pg_tables WHERE schemaname = 'entities'"))! > 0);
     }
 
+    [Fact]
+    public async Task Runtime_role_cannot_create_alter_or_drop_in_the_axis_or_entities_schema()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        await StartAsync(a, b, folder);
+        var note = EntityNaming.QualifiedTable(EntityNaming.Table(_noteId));
+
+        foreach (var sql in new[]
+        {
+            "CREATE TABLE axis.denied (id uuid)",
+            "CREATE TABLE entities.denied (id uuid)",
+            $"ALTER TABLE {note} ADD COLUMN denied text",
+            "ALTER TABLE axis.audit_records ADD COLUMN denied text",
+            $"DROP TABLE {note}",
+            "DROP TABLE axis.audit_records",
+        })
+        {
+            await AssertSqlStateAsync(PostgreSqlServer.RuntimeConnectionString(a), sql, PostgresErrorCodes.InsufficientPrivilege);
+        }
+    }
+
+    [Fact]
+    public async Task Runtime_role_reads_and_writes_the_table_of_an_entity_that_a_later_start_created()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        await StartAsync(a, b, folder);
+
+        var ticketId = Guid.NewGuid();
+        folder.With("entities/ticket.json", $$"""{ "id": "{{ticketId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1, "fields": [{{TitleField}}] }""");
+        await StartAsync(a, b, folder);
+
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(ticketId));
+        var runtime = PostgreSqlServer.RuntimeConnectionString(a);
+        var id = Guid.NewGuid();
+        await ScalarAsync(runtime, $"INSERT INTO {table} (id, f_title) VALUES ('{id}', 'first')");
+        Assert.Equal(1L, await ScalarAsync(runtime, $"SELECT count(*) FROM {table}"));
+        await ScalarAsync(runtime, $"UPDATE {table} SET f_title = 'second' WHERE id = '{id}'");
+        Assert.Equal("second", await ScalarAsync(runtime, $"SELECT f_title FROM {table} WHERE id = '{id}'"));
+        await ScalarAsync(runtime, $"DELETE FROM {table} WHERE id = '{id}'");
+        Assert.Equal(0L, await ScalarAsync(runtime, $"SELECT count(*) FROM {table}"));
+    }
+
+    [Fact]
+    public async Task Nobody_can_update_delete_or_truncate_a_stored_release_and_the_runtime_role_cannot_insert_one()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        var active = await StartAsync(a, b, folder);
+
+        // A release without packages leaves release_packages empty, and a row trigger needs a row to fire on.
+        await ScalarAsync(a, $"INSERT INTO axis.release_packages (release_id, package_id, version) VALUES ('{active[0]}', 'Example', '1.0.0')");
+        var runtime = PostgreSqlServer.RuntimeConnectionString(a);
+
+        foreach (var table in new[] { "releases", "release_resources", "release_packages" })
+        {
+            var column = table == "releases" ? "id" : "release_id";
+            foreach (var sql in new[] { $"UPDATE axis.{table} SET {column} = {column}", $"DELETE FROM axis.{table}" })
+            {
+                await AssertSqlStateAsync(runtime, sql, PostgresErrorCodes.InsufficientPrivilege);
+                await AssertSqlStateAsync(a, sql, PostgresErrorCodes.RestrictViolation);
+            }
+
+            await AssertSqlStateAsync(a, $"TRUNCATE axis.{table} CASCADE", PostgresErrorCodes.RestrictViolation);
+            await AssertSqlStateAsync(runtime, $"INSERT INTO axis.{table} DEFAULT VALUES", PostgresErrorCodes.InsufficientPrivilege);
+        }
+    }
+
+    [Fact]
+    public async Task Runtime_role_cannot_write_the_tables_that_activation_writes()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        await StartAsync(a, b, folder);
+        var runtime = PostgreSqlServer.RuntimeConnectionString(a);
+
+        foreach (var (table, column) in new[] { ("active_releases", "application_id"), ("provisioned_entities", "entity_id") })
+        {
+            Assert.True((long)(await ScalarAsync(runtime, $"SELECT count(*) FROM axis.{table}"))! > 0);
+            foreach (var sql in new[] { $"INSERT INTO axis.{table} DEFAULT VALUES", $"UPDATE axis.{table} SET {column} = {column}", $"DELETE FROM axis.{table}" })
+            {
+                await AssertSqlStateAsync(runtime, sql, PostgresErrorCodes.InsufficientPrivilege);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Start_repairs_a_database_with_wider_grants_than_the_runtime_role_may_have()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        await StartAsync(a, b, folder);
+        await ScalarAsync(a, $"GRANT ALL ON axis.active_releases TO {PostgreSqlServer.RuntimeRole}");
+        await ScalarAsync(a, $"ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO {PostgreSqlServer.RuntimeRole}");
+
+        await StartAsync(a, b, folder);
+
+        await AssertSqlStateAsync(PostgreSqlServer.RuntimeConnectionString(a), "DELETE FROM axis.active_releases", PostgresErrorCodes.InsufficientPrivilege);
+        Assert.Equal(0L, await ScalarAsync(a, "SELECT count(*) FROM pg_default_acl WHERE defaclnamespace = 0"));
+    }
+
+    [Fact]
+    public async Task Start_refuses_a_runtime_role_that_is_the_schema_role_and_names_the_tenant()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(
+            a, b, folder.Path, logs, new Dictionary<string, string> { ["Tenants:a:ConnectionString"] = a });
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("tenant 'a'", exception.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0L, await ScalarAsync(a, "SELECT count(*) FROM pg_tables WHERE schemaname = 'axis'"));
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(
         string a,
         string b,
@@ -533,6 +656,13 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await using var command = dataSource.CreateCommand(sql);
         return await command.ExecuteScalarAsync(CancellationToken);
+    }
+
+    /// <summary>Runs <paramref name="sql"/> and checks that PostgreSQL refuses it with <paramref name="sqlState"/>.</summary>
+    private static async Task AssertSqlStateAsync(string connectionString, string sql, string sqlState)
+    {
+        var exception = await Assert.ThrowsAsync<PostgresException>(() => ScalarAsync(connectionString, sql));
+        Assert.True(exception.SqlState == sqlState, $"{sql} gave {exception.SqlState}, expected {sqlState}: {exception.Message}");
     }
 
     private Task<string> CreateDatabaseAsync() => database.CreateDatabaseAsync("startup", CancellationToken);
