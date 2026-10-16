@@ -48,6 +48,7 @@ flowchart LR
 src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
+  Axis.Scenarios/         console host that runs an application's test scenarios (planned for M6)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -652,9 +653,14 @@ Moved to [reference/frontend.md](reference/frontend.md).
 | Integration | xUnit + Testcontainers PostgreSQL and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm |
 | Frontend unit | Vitest + Testing Library | Shared components and metadata rendering |
 | End to end | Playwright | Real server + real database + SPA, user journeys and denied access |
+| Scenario | Axis.Scenarios + Testcontainers PostgreSQL | Configuration-level tests of each sample application *(planned for M6)* |
 
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
+
+`scripts/integration.sh` will run the scenarios of every application under
+`samples/apps/` against its Testcontainers PostgreSQL *(planned for M6)*. See
+[test scenarios](reference/configuration.md#test-scenarios).
 
 The integration tests share one Keycloak container with the development realm
 per run. It starts the first time a test needs it, so a run with no such test
