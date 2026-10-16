@@ -111,8 +111,8 @@
           "model": "claude-haiku-5-5"
         },
         "review": {
-          "agent": "astra",
-          "model": "gpt-6-astra"
+          "agent": "claude",
+          "model": "claude-opus-5-5"
         }
       }
     },
@@ -127,8 +127,8 @@
           "timeout_minutes": 60
         },
         "review": {
-          "agent": "astra",
-          "model": "gpt-6-astra"
+          "agent": "claude",
+          "model": "claude-opus-5-5"
         }
       }
     }
