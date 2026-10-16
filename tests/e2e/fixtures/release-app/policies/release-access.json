@@ -1,0 +1,11 @@
+{
+  "id": "3d04ec5f-a60e-4d1d-ab89-30561b67d1a3",
+  "kind": "policy",
+  "name": "ReleaseAccess",
+  "formatVersion": 1,
+  "roles": ["employee", "department-manager"],
+  "grants": [
+    { "entity": "Ticket", "actions": ["read", "create", "update"] },
+    { "process": "TicketReview", "actions": ["start"] }
+  ]
+}

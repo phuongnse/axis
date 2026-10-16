@@ -65,6 +65,7 @@ tests/
   packages/               test-only extension package, built as three versions; covers the capability limits
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
+    fixtures/release-app/ application a spec activates during the run, to test releases
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
@@ -683,6 +684,15 @@ real metadata and records:
   platform journeys;
 - the purchase request sample in `samples/apps/purchase-requests`, for the
   purchase request skeleton journeys.
+
+A spec can also activate another folder during the run, to test releases. The
+helper `tests/e2e/activate.ts` starts the built server once more on a spare
+port, with the same settings as the E2E server and that folder in
+`ActivateOnStartup`. It waits until `/health/ready` answers, then stops that
+server. The E2E server reads the active release on each request, so it serves
+the new release at once. The helper throws an error with the server output when
+the folder does not activate. Only the spec that needs it uses
+`tests/e2e/fixtures/release-app`, so the other specs see no change.
 
 The E2E run also starts the worker against the same database, with a 5 second
 lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart

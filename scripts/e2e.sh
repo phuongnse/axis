@@ -5,6 +5,10 @@
 # /api/auth/sign-in. The SPA does not offer it yet.
 # The server starts with two applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
+# A spec can activate another folder during the run: tests/e2e/activate.ts starts the built server
+# once more on a spare port with that folder in ActivateOnStartup, waits until it is ready and
+# stops it. The main server then serves the new release. tests/e2e/fixtures/release-app is
+# activated that way.
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
 # can restart it: it writes the restart file, then stops the worker process. The run fails if the
 # worker exits without a restart request, or never finds the tenant database migrated.

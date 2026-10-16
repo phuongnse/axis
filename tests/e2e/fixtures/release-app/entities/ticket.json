@@ -1,0 +1,11 @@
+{
+  "id": "33137855-41a7-41e1-bc9e-53efe6b57ab0",
+  "kind": "entity",
+  "name": "Ticket",
+  "formatVersion": 1,
+  "label": { "textKey": "ticket.label" },
+  "displayField": "topic",
+  "fields": [
+    { "name": "topic", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "ticket.topic" } }
+  ]
+}
