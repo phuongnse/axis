@@ -2188,7 +2188,7 @@ and `expectTask` steps. It sets `now`. It answers connector and package calls
 from `stubs`.
 
 This scenario submits a purchase request above the finance threshold. The
-manager is denied the finance decision. Both tasks are completed and the
+manager approves it, the finance reviewer takes the finance decision and the
 request ends `approved`:
 
 ```json
@@ -2232,13 +2232,13 @@ request ends `approved`:
     { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
     { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
     {
-      "type": "completeTask",
+      "type": "expectInstance",
+      "process": "PurchaseRequestApproval",
       "record": "request",
-      "step": "financeApproval",
-      "outcome": "approve",
-      "as": "binh",
-      "expect": "denied"
+      "state": "waiting",
+      "step": "financeApproval"
     },
+    { "type": "expectTask", "record": "request", "step": "financeApproval", "assignee": { "role": "finance-reviewer" } },
     { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "lan" },
     {
       "type": "expectInstance",
@@ -2331,7 +2331,7 @@ To run the scenarios of an application folder, see
 [D32](../decisions.md#d32-test-scenarios--agreed):
 
 ```sh
-dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string> [--results <folder>]
+dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string> [--extensions <folder>] [--results <folder>]
 ```
 
 The runner runs the scenarios one at a time. Each gets a new
@@ -2339,8 +2339,14 @@ The runner runs the scenarios one at a time. Each gets a new
 whether it passed or failed. The `--server` login must be allowed to create
 databases. A scenario runs as the tenant `scenario`, with no deployment
 real bindings. The runner API reads the manifests of the extension packages it is
-given and runs none of their code. The command loads no packages yet, so it cannot
-compile an application that declares a package. A user's display name is their id.
+given and runs none of their code. `--extensions` names the folder of installed
+packages, which plays the role of `Extensions:Path`. The command compiles the
+application against them. It prints the problems it finds with a package and carries
+on. Without the option no package is installed, so an application that declares a
+package does not compile. A user's display name is their id.
+
+`scripts/integration.sh` runs the scenarios of every application under
+`samples/apps/` from the integration tests, on their Testcontainers PostgreSQL.
 
 What runs now:
 

@@ -1,0 +1,45 @@
+{
+  "id": "bd059896-4e74-43d6-bd45-f6e8abd08d41",
+  "kind": "scenario",
+  "name": "ReturnedRequestGoesBackToRequester",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["employee"],
+    "binh": ["department-manager"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "PurchaseRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "title": "Chairs",
+        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
+        "currency": "USD",
+        "status": "draft",
+        "lineItems": [{ "description": "Chair", "quantity": 2, "unitPrice": 1500 }]
+      }
+    },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "return", "as": "binh" },
+    { "type": "expectRecord", "record": "request", "values": { "status": "returned" } },
+    {
+      "type": "expectInstance",
+      "process": "PurchaseRequestApproval",
+      "record": "request",
+      "state": "completed"
+    },
+    { "type": "updateRecord", "record": "request", "as": "anna", "values": { "title": "Better chairs" } },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    {
+      "type": "expectTask",
+      "record": "request",
+      "step": "managerApproval",
+      "state": "open"
+    },
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } }
+  ]
+}

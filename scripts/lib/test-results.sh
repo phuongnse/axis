@@ -20,6 +20,14 @@ run_suite() {
   "$@" || status=1
 }
 
+# expect_suite NAME CWD
+# Registers a suite whose results another suite writes to $results_dir/NAME.xml. Call it
+# before that suite runs, so a results file left by an earlier run is removed first.
+expect_suite() {
+  rm -f "$results_dir/$1.xml"
+  suites+=("$1:$2")
+}
+
 # run_suite_if_affected NAME CWD COMMAND...
 # Like run_suite, but skips the suite when scripts/lib/affected.mjs shows that no path it
 # covers changed since $NEXKIT_BASE_SHA. Any other outcome runs it.
