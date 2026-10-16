@@ -151,9 +151,8 @@ public class RetryableException : Exception { }
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
 - **Keep pinned versions.** Keep every version that an active release, or a
-  running instance's release, pins. Removing one makes its calls retry under
-  the step's retry policy, and fail when attempts run out, see
-  [Versions and pinning](#versions-and-pinning).
+  release with a running or waiting instance, pins. Removing one stops the
+  start of both hosts, see [Versions and pinning](#versions-and-pinning).
 
 ## Versions and pinning
 
@@ -182,10 +181,14 @@ public class RetryableException : Exception { }
 - **Pinned version missing at start.** Activation compiles the folder
   against the versions that loaded, so the pin it activates is always
   installed. At the start of the server and the worker, every active release
-  and every release with a running or waiting instance is rebuilt
-  *(planned for M6)*. A pinned version that is not installed stops the start
-  with a diagnostic naming the tenant, application, release and package
-  version. See [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
+  and every release with a running or waiting instance is rebuilt. A pinned
+  version that is not installed is `AXC0146` and stops the start with a
+  diagnostic naming the tenant, application, release and package version. The
+  worker process then exits with a non-zero code. An older release with no
+  running or waiting instance is not checked. The worker checks a tenant once
+  its database is migrated, and the server skips a tenant database that is not
+  migrated or cannot be reached. See
+  [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
 - **Pinned version missing on the worker.** A call to a version that the
   worker does not hold is a retryable attempt. Nothing ran, as with a missing
   binding on a connector call. The call is retried under the step's retry

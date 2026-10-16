@@ -728,6 +728,7 @@ sorted by file and then path.
 | `AXC0143` | A data change trigger's `entity` names no loaded entity. Reported in the trigger at `/entity`. |
 | `AXC0144` | A data change trigger's `entity` is not the process's subject entity. Reported in the trigger at `/entity`. |
 | `AXC0145` | A name in a data change trigger's `fields` names no field of the entity, or names a computed field. Reported in the trigger at `/fields/{i}`. |
+| `AXC0146` | A release that is active, or has a running or waiting process instance, pins an extension package version that is not installed. Reported at the start of the server and the worker, in that release's stored `application.json` at `/packages/{i}/version`. It names the tenant, application, release, package id and version, and stops the start. |
 | `AXC0150` | A process package operation step's `operation` names a package that the application does not list in `packages`, matched exactly. Not reported for a listed package that failed pinning (`AXC0139` to `AXC0142`), or when `application.json` was not loaded. Reported at `/steps/{i}/operation`. |
 | `AXC0151` | A process package operation step's `operation` names no operation in the manifest of the pinned version, matched ignoring letter case. Reported at `/steps/{i}/operation`. Its `input` and `output` are then not checked. |
 | `AXC0160` | A schedule trigger's `schedule` is not a valid 5-field cron. Reported at `/schedule`. |
@@ -1640,9 +1641,9 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
   that does not match its package is reported at startup, as `AXC0132` to
   `AXC0138`, see [Loading](extension-packages.md#loading).
   At the start of the server and the worker, every active release and every
-  release with a running or waiting instance is rebuilt *(planned for M6)*.
-  A pinned version that is not installed stops the start with a diagnostic
-  naming the tenant, application, release and package version. See
+  release with a running or waiting instance is rebuilt. A pinned version
+  that is not installed is `AXC0146` and stops the start. The diagnostic names
+  the tenant, application, release and package version. See
   [Versions and pinning](extension-packages.md#versions-and-pinning) and
   [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
 - An application uses only the packages it declares, even though every

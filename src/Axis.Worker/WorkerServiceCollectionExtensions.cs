@@ -34,6 +34,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddExtensionPackages(configuration, environment);
         services.AddProcesses(environment.IsDevelopment());
         services.AddSingleton(options);
+        services.AddSingleton<StartupCheckState>();
         services.AddHostedService<WorkerService>();
         return services;
     }

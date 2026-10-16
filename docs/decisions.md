@@ -959,8 +959,7 @@ M5 lets a process run custom C# code from an extension package. The manifest,
 the contracts, installation and loading are built. Version pinning, the
 package operation step, its retries and the capability limits are built too.
 The planned activation check for a missing pinned version is replaced by
-[D29](#d29-release-pinning-and-text-resources--agreed)'s start check
-*(planned for M6)*.
+[D29](#d29-release-pinning-and-text-resources--agreed)'s start check.
 See [extension packages](reference/extension-packages.md) for
 the manifest, the contracts, installation, loading and capabilities,
 [configuration](reference/configuration.md#extension-packages) for an
@@ -1098,7 +1097,7 @@ The owner confirmed these points on issue #412 on 2026-10-15.
   - A pinned package version that is not installed stops the start with a
     diagnostic naming the tenant, application, release and package version.
   - This start check replaces D28's planned activation check. Its
-    diagnostic code is added only when the check is built.
+    diagnostic code is `AXC0146`.
 
 *Why:* [D11](#d11-durable-process-engine--agreed) and
 [execution](domain/knowledge.md#execution) keep running work on the version
