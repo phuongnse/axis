@@ -27,6 +27,7 @@ internal static class ResourceSchemas
         [ResourceKinds.Endpoint] = Load("endpoint.schema.json"),
         [ResourceKinds.Trigger] = Load("trigger.schema.json"),
         [ResourceKinds.Migration] = Load("migration.schema.json"),
+        [ResourceKinds.Scenario] = Load("scenario.schema.json"),
     };
 
     public static bool TryGet(string kind, out JsonSchema schema) =>

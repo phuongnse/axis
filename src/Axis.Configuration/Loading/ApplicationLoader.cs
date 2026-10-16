@@ -111,6 +111,7 @@ public static class ApplicationLoader
         var endpoints = new List<EndpointResource>();
         var triggers = new List<TriggerResource>();
         var migrations = new List<MigrationResource>();
+        var scenarios = new List<ScenarioResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -216,7 +217,12 @@ public static class ApplicationLoader
             {
                 // Sources come in path order, so the contents do too. A file that fails
                 // validation is already an error, so it never becomes part of a release.
-                resources.Add(new ResourceContent(file, JsonCanonicalizer.Canonicalize(root)));
+                // Scenarios compile with the application but stay out of the release and its content hash (D32).
+                if (kind != ResourceKinds.Scenario)
+                {
+                    resources.Add(new ResourceContent(file, JsonCanonicalizer.Canonicalize(root)));
+                }
+
                 switch (kind)
                 {
                     case ResourceKinds.Application when file == ManifestFileName:
@@ -273,6 +279,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Migration:
                         migrations.Add(root.Deserialize<MigrationResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Scenario:
+                        scenarios.Add(root.Deserialize<ScenarioResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -311,6 +320,7 @@ public static class ApplicationLoader
             UnloadedEndpointNames = unloadedEndpointNames,
             Triggers = triggers,
             Migrations = migrations,
+            Scenarios = scenarios,
         };
     }
 
@@ -474,7 +484,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}' or '{ResourceKinds.Trigger}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}', '{ResourceKinds.Scenario}' or '{ResourceKinds.Trigger}'.",
                 file,
                 "/kind",
                 resourceId));
@@ -503,7 +513,30 @@ public static class ApplicationLoader
     private static bool Validate(string file, JsonElement root, string kind, Guid? resourceId, List<Diagnostic> diagnostics)
     {
         ResourceSchemas.TryGet(kind, out var schema);
-        return SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, file, resourceId, diagnostics);
+        var valid = SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, file, resourceId, diagnostics);
+        return valid && (kind != ResourceKinds.Scenario || CheckScenarioNow(file, root, resourceId, diagnostics));
+    }
+
+    /// <summary>
+    /// Checks that the <c>now</c> of a scenario is a real moment. The schema pattern limits each part's
+    /// range, and this rejects a date the calendar does not have, such as 30 February.
+    /// </summary>
+    private static bool CheckScenarioNow(string file, JsonElement root, Guid? resourceId, List<Diagnostic> diagnostics)
+    {
+        if (root.TryGetProperty("now", out var now)
+            && now.GetString() is { } text
+            && !DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.SchemaViolation,
+                $"The value '{text}' is not a real date and time. Use an RFC 3339 timestamp such as 2026-03-01T09:00:00Z.",
+                file,
+                "/now",
+                resourceId));
+            return false;
+        }
+
+        return true;
     }
 
     private static void CheckDuplicates(

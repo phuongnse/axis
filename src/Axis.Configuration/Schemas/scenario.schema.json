@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "users", "steps"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "scenario" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "now": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+    },
+    "users": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": { "$ref": "#/$defs/roleName" }
+      }
+    },
+    "stubs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stub" }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "roleName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 60
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stub": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output"],
+      "properties": {
+        "connector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "operation"],
+          "properties": {
+            "name": { "$ref": "#/$defs/name" },
+            "operation": { "$ref": "#/$defs/name" }
+          }
+        },
+        "operation": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*$"
+        },
+        "output": { "type": "object" }
+      },
+      "oneOf": [{ "required": ["connector"] }, { "required": ["operation"] }]
+    },
+    "assignee": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": { "$ref": "#/$defs/reference" },
+        "role": { "$ref": "#/$defs/roleName" }
+      },
+      "oneOf": [{ "required": ["user"] }, { "required": ["role"] }]
+    },
+    "expect": {
+      "oneOf": [
+        { "enum": ["denied", "notFound", "conflict"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["invalid"],
+          "properties": { "invalid": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": [
+            "createRecord",
+            "updateRecord",
+            "deleteRecord",
+            "startProcess",
+            "completeTask",
+            "expectRecord",
+            "expectInstance",
+            "expectTask"
+          ]
+        },
+        "entity": { "$ref": "#/$defs/name" },
+        "record": { "$ref": "#/$defs/reference" },
+        "save": { "$ref": "#/$defs/reference" },
+        "as": { "$ref": "#/$defs/reference" },
+        "process": { "$ref": "#/$defs/name" },
+        "step": { "$ref": "#/$defs/name" },
+        "outcome": { "$ref": "#/$defs/name" },
+        "state": { "enum": ["running", "waiting", "completed", "failed", "open"] },
+        "assignee": { "$ref": "#/$defs/assignee" },
+        "values": { "type": "object" },
+        "expect": { "$ref": "#/$defs/expect" }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "createRecord" } } },
+          "then": {
+            "required": ["entity", "values", "as"],
+            "properties": { "record": false, "process": false, "step": false, "outcome": false, "state": false, "assignee": false },
+            "not": { "required": ["save", "expect"] }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "updateRecord" } } },
+          "then": {
+            "required": ["record", "values", "as"],
+            "properties": { "entity": false, "save": false, "process": false, "step": false, "outcome": false, "state": false, "assignee": false }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "deleteRecord" } } },
+          "then": {
+            "required": ["record", "as"],
+            "properties": { "entity": false, "save": false, "values": false, "process": false, "step": false, "outcome": false, "state": false, "assignee": false }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "startProcess" } } },
+          "then": {
+            "required": ["process", "record", "as"],
+            "properties": { "entity": false, "save": false, "values": false, "step": false, "outcome": false, "state": false, "assignee": false }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "completeTask" } } },
+          "then": {
+            "required": ["record", "step", "outcome", "as"],
+            "properties": { "entity": false, "save": false, "process": false, "state": false, "assignee": false }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "expectRecord" } } },
+          "then": {
+            "required": ["record", "values"],
+            "properties": {
+              "entity": false,
+              "save": false,
+              "as": false,
+              "process": false,
+              "step": false,
+              "outcome": false,
+              "state": false,
+              "assignee": false,
+              "expect": false
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "expectInstance" } } },
+          "then": {
+            "required": ["process", "record", "state"],
+            "properties": {
+              "entity": false,
+              "save": false,
+              "values": false,
+              "as": false,
+              "outcome": false,
+              "assignee": false,
+              "expect": false,
+              "state": { "enum": ["running", "waiting", "completed", "failed"] }
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "expectTask" } } },
+          "then": {
+            "required": ["record", "step"],
+            "properties": {
+              "entity": false,
+              "save": false,
+              "values": false,
+              "as": false,
+              "process": false,
+              "outcome": false,
+              "expect": false,
+              "state": { "enum": ["open", "completed"] }
+            },
+            "oneOf": [{ "required": ["assignee"] }, { "required": ["state"] }]
+          }
+        }
+      ]
+    }
+  }
+}

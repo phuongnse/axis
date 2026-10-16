@@ -18,7 +18,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint`, `trigger` or `migration`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint`, `trigger`, `migration` or `scenario`). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as
@@ -416,6 +416,54 @@ flowchart LR
      `renameField` without `to`, or a change with a property that belongs to
      another change type, is `AXC0004`.
 
+   - **Scenarios.** A [scenario](#test-scenarios) is checked against the
+     application, and every problem is reported in one pass. A name whose file
+     was not loaded because of its own errors is not reported again. Entities,
+     fields, processes, steps, outcomes, connectors and operations are matched
+     ignoring letter case. Roles, user ids and record aliases are matched
+     exactly.
+     - A role in `users`, or an `assignee.role`, that names no declared role is
+       `AXC0180` at `/users/{user}/{j}` or `/steps/{i}/assignee/role`. An `as`
+       or an `assignee.user` that names no user of the scenario is `AXC0181` at
+       `/steps/{i}/as` or `/steps/{i}/assignee/user`.
+     - A `createRecord` `entity` that names no loaded entity, or names a child
+       entity, is `AXC0182` at `/steps/{i}/entity`.
+     - A key in `values` that names no field of the record's entity is
+       `AXC0183` at `/steps/{i}/values/{key}`. The path continues into a child
+       collection as `{key}/{n}/{key}`. A value that does not fit its field's
+       type is `AXC0189` at the same path. A reference must be a UUID and an
+       enum value must be one of the field's values. A child collection must be
+       an array of objects. `null` fits every type, and computed and read-only
+       fields are not refused, because a scenario may test that the record API
+       refuses a value.
+     - A `process` of `startProcess` or `expectInstance` that names no loaded
+       process, or a process over another entity than the record's, is
+       `AXC0184` at `/steps/{i}/process`. A `step` of `expectInstance` that
+       names no step of that process is `AXC0185` at `/steps/{i}/step`.
+     - A `step` of `completeTask` or `expectTask` must name a `task` step of a
+       process over the record's entity, otherwise it is `AXC0185` at
+       `/steps/{i}/step`. An `outcome` of `completeTask` must be an outcome of
+       such a task step, otherwise it is `AXC0186` at `/steps/{i}/outcome`.
+     - A `record` that no earlier step saved is `AXC0187` at
+       `/steps/{i}/record`. A `save` that an earlier step already used is
+       `AXC0188` at `/steps/{i}/save`. A step with an unknown alias or entity
+       is not checked further.
+     - A connector stub that names no loaded connector is `AXC0190` at
+       `/stubs/{i}/connector/name`, and one that names an operation the
+       connector lacks is `AXC0190` at `/stubs/{i}/connector/operation`. A
+       package stub whose package is not one of the application's packages, or
+       whose operation is not in the pinned manifest, is `AXC0190` at
+       `/stubs/{i}/operation`. A package that is listed but could not be pinned
+       is not reported again. An `output` key that names no output field of the
+       operation is `AXC0191` at `/stubs/{i}/output/{key}`. The types of the
+       output values are not checked.
+     - A malformed file, such as an unknown step `type`, a missing or forbidden
+       step property, `save` together with `expect`, `expect` on an
+       expectation step, or a `now` that is not a real date and time, such as
+       `2026-02-30T09:00:00Z`, is `AXC0004`.
+     - A scenario error is an error like any other, so a folder with one does
+       not compile or activate.
+
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the
    sites and pages with their entity, data source and page references
@@ -498,7 +546,8 @@ flowchart LR
      resources alone. So installing a newer version in range gives the same
      folder a new hash and a new release, and the old release keeps its pin.
      [Scenario](#test-scenarios) files under `scenarios/` are left out of the
-     release and its content hash *(planned for M6)*.
+     release and its content hash. So adding or editing a scenario keeps the
+     hash and the release.
    - **Identity.** A release is unique per application `id` and content hash.
      Compiling an unchanged folder returns the stored release instead of
      storing a second one, also when two compiles run at the same time.
@@ -753,6 +802,18 @@ sorted by file and then path.
 | `AXC0175` | A pending migration holds a `fill` or `convert` on a child entity, or a `fill` or `convert` of a field that a computed field reads, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until activation can recompute computed fields. |
 | `AXC0176` | A pending `fill` leaves a `null` in some row, because its value is `null` for that row. Reported at `/changes/{i}/value` of the migration file, with the number of rows in the message. Nothing is applied. |
 | `AXC0177` | A pending `convert` fails for a stored row, such as text that does not parse as the new type, a value that is too long, a required field left empty or a duplicate in a unique field. Also reported when an enum `convert` leaves a value that the field does not list. Reported at `/changes/{i}/value` of the migration file, with a fixed message and, for a database error, its PostgreSQL error code. Nothing is applied. |
+| `AXC0180` | A role in a scenario's `users`, or an `assignee.role` of an `expectTask` step, names no declared role. Roles are matched exactly. Not reported when the role's file failed to load. Reported at `/users/{user}/{j}` or `/steps/{i}/assignee/role`. |
+| `AXC0181` | A step's `as`, or an `assignee.user` of an `expectTask` step, names no user of the scenario. Reported at `/steps/{i}/as` or `/steps/{i}/assignee/user`. |
+| `AXC0182` | A `createRecord` step's `entity` names no loaded entity, or names a child entity. Not reported when the entity's file failed to load. Reported at `/steps/{i}/entity`. |
+| `AXC0183` | A key in a step's `values`, or in an item of a child collection, names no field of the entity. Reported at `/steps/{i}/values/{key}`. |
+| `AXC0184` | A `startProcess` or `expectInstance` step's `process` names no loaded process, or a process over another entity than the record's. Not reported when the process's file failed to load. Reported at `/steps/{i}/process`. |
+| `AXC0185` | An `expectInstance` step's `step` names no step of its process, or a `completeTask` or `expectTask` step's `step` names no task step of a process over the record's entity. Reported at `/steps/{i}/step`. |
+| `AXC0186` | A `completeTask` step's `outcome` names no outcome of the task step. Reported at `/steps/{i}/outcome`. |
+| `AXC0187` | A step's `record` is not saved by an earlier step. Reported at `/steps/{i}/record`. |
+| `AXC0188` | A `createRecord` step's `save` is already used by an earlier step. Reported at `/steps/{i}/save`. |
+| `AXC0189` | A value in a step's `values` does not fit its field's type: not a valid text, number, boolean, date, reference or listed enum value, or a child collection that is not an array of objects. Reported at `/steps/{i}/values/{key}`. |
+| `AXC0190` | A stub names no loaded connector, no operation of the connector, no package of the application, or no operation of the pinned package. Reported at `/stubs/{i}/connector/name`, `/stubs/{i}/connector/operation` or `/stubs/{i}/operation`. |
+| `AXC0191` | A key in a stub's `output` names no output field of the operation. Reported at `/stubs/{i}/output/{key}`. |
 
 ## Startup activation
 
@@ -2111,10 +2172,12 @@ below. Both examples below compile, given that rule.
 
 ## Test scenarios
 
-A `scenario` resource is a configuration-level test *(planned for M6)*. See
+A `scenario` resource is a configuration-level test. See
 [D32](../decisions.md#d32-test-scenarios--agreed). Scenario files live under
 `scenarios/`, one file per scenario. They compile with the application but stay
-out of the release and its content hash.
+out of the release and its content hash. A file is a scenario because its `kind`
+is `scenario`, wherever it is in the folder. The resource kind and its compile
+checks exist. Running scenarios is still *(planned for M6)*.
 
 This scenario submits a purchase request above the finance threshold. The
 manager is denied the finance decision. Both tasks are completed and the
@@ -2227,7 +2290,8 @@ Every step has a `type`. These are the step kinds:
   and task states in [processes](processes.md#instance-states) and
   [task states](processes.md#task-states).
 - Every reference to an entity, field, process, step, outcome, role, user or
-  alias is checked at compile. The diagnostic codes come with the build.
+  alias is checked at compile. See the **Scenarios** bullet of the
+  [Resolve step](#configuration-pipeline) for the checks and their codes.
 
 To run the scenarios of an application folder, see
 [D32](../decisions.md#d32-test-scenarios--agreed):

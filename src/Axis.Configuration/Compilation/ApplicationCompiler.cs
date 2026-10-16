@@ -23,6 +23,7 @@ namespace Axis.Configuration.Compilation;
 /// lookups, checks events, their entities and their payload fields, checks endpoints, their
 /// entities, processes, input fields, mappings, output and wait, checks triggers, their
 /// processes, events and conditions, checks migrations, their entities, fields and values, checks
+/// scenarios, their users, steps, values and stubs, checks
 /// the extension packages of the manifest and pins each to the highest installed version in its
 /// range, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
@@ -251,6 +252,20 @@ public static class ApplicationCompiler
             rules,
             diagnostics);
         MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, diagnostics);
+        ScenarioChecker.Check(
+            loaded.Scenarios,
+            roleNames,
+            loaded.UnloadedRoleNames,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            loaded.Processes,
+            loaded.UnloadedProcessNames,
+            FindConnector,
+            loaded.UnloadedConnectorNames,
+            FindPackage,
+            declaredPackageIds,
+            diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
