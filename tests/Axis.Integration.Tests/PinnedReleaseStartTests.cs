@@ -115,6 +115,33 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         using var newer = new TemporaryFolder().Install("1.1.0");
         using var folder = ApplicationFolder("1.0.0");
         var (connectionString, _) = await ActivateFirstReleaseAsync(folder, both.Path);
+
+        var (exitCode, text) = await RunWorkerAsync(connectionString, newer.Path, stopWhenStarted: false);
+
+        Assert.True(exitCode == 1, $"Exit code {exitCode}. Output:{Environment.NewLine}{text}");
+        Assert.True(text.Contains(DiagnosticCodes.PinnedPackageVersionMissing, StringComparison.Ordinal), text);
+    }
+
+    [Fact]
+    public async Task Worker_process_exits_with_code_zero_after_a_normal_shutdown_when_every_pinned_version_is_installed()
+    {
+        using var both = new TemporaryFolder().Install("1.0.0", "1.1.0");
+        using var folder = ApplicationFolder("1.0.0");
+        var (connectionString, _) = await ActivateFirstReleaseAsync(folder, both.Path);
+
+        var (exitCode, text) = await RunWorkerAsync(connectionString, both.Path, stopWhenStarted: true);
+
+        Assert.True(exitCode == 0, $"Exit code {exitCode}. Output:{Environment.NewLine}{text}");
+        Assert.DoesNotContain(DiagnosticCodes.PinnedPackageVersionMissing, text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Runs the built worker as its own process. With <paramref name="stopWhenStarted"/> it sends
+    /// SIGTERM once the host reports it started, for a normal shutdown. Otherwise it waits for the
+    /// worker to exit on its own.
+    /// </summary>
+    private static async Task<(int ExitCode, string Output)> RunWorkerAsync(string connectionString, string packages, bool stopWhenStarted)
+    {
         var directory = WorkerDirectory();
         using var process = new Process
         {
@@ -130,7 +157,7 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
             ["DOTNET_ENVIRONMENT"] = "Testing",
             ["Tenants__a__Hosts__0"] = TenantHost,
             ["Tenants__a__ConnectionString"] = connectionString,
-            ["Extensions__Path"] = newer.Path,
+            ["Extensions__Path"] = packages,
             ["Worker__PollInterval"] = "00:00:00.05",
         })
         {
@@ -138,8 +165,22 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         }
 
         var output = new System.Text.StringBuilder();
-        process.OutputDataReceived += (_, e) => { lock (output) { output.AppendLine(e.Data); } };
-        process.ErrorDataReceived += (_, e) => { lock (output) { output.AppendLine(e.Data); } };
+        var started = new TaskCompletionSource();
+        void Receive(string? line)
+        {
+            lock (output)
+            {
+                output.AppendLine(line);
+            }
+
+            if (line is not null && line.Contains("Application started", StringComparison.Ordinal))
+            {
+                started.TrySetResult();
+            }
+        }
+
+        process.OutputDataReceived += (_, e) => Receive(e.Data);
+        process.ErrorDataReceived += (_, e) => Receive(e.Data);
         Assert.True(process.Start());
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
@@ -147,23 +188,34 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            if (stopWhenStarted)
+            {
+                await started.Task.WaitAsync(timeout.Token);
+                // Give the start check time to run before the shutdown.
+                await Task.Delay(TimeSpan.FromSeconds(2), timeout.Token);
+                using var signal = Process.Start("kill", $"-TERM {process.Id}")!;
+                await signal.WaitForExitAsync(timeout.Token);
+            }
+
             await process.WaitForExitAsync(timeout.Token);
         }
         catch (OperationCanceledException) when (!CancellationToken.IsCancellationRequested)
         {
             process.Kill(entireProcessTree: true);
-            Assert.Fail($"The worker did not exit within 60 seconds. Output:{Environment.NewLine}{output}");
+            string partial;
+            lock (output)
+            {
+                partial = output.ToString();
+            }
+
+            Assert.Fail($"The worker did not finish within 60 seconds. Output:{Environment.NewLine}{partial}");
         }
 
         process.WaitForExit();
-        string text;
         lock (output)
         {
-            text = output.ToString();
+            return (process.ExitCode, output.ToString());
         }
-
-        Assert.NotEqual(0, process.ExitCode);
-        Assert.True(text.Contains(DiagnosticCodes.PinnedPackageVersionMissing, StringComparison.Ordinal), text);
     }
 
     /// <summary>
