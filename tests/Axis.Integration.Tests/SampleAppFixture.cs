@@ -85,9 +85,9 @@ public sealed class SampleAppFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", _connectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(_connectionString));
             builder.UseSetting($"Tenants:{Tenant}:Hosts:0", Host);
-            builder.UseSetting($"Tenants:{Tenant}:ConnectionString", _connectionString);
+            builder.UseSetting($"Tenants:{Tenant}:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_connectionString));
             builder.UseSetting($"Tenants:{Tenant}:SchemaConnectionString", _connectionString);
             builder.UseTestOidc(Tenant);
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
@@ -137,13 +137,17 @@ public sealed class SampleAppFixture : IAsyncLifetime
         }
     }
 
-    /// <summary>Claims and runs the tenant's due work items until none is left.</summary>
-    public async Task RunUntilIdleAsync(CancellationToken cancellationToken)
+    /// <summary>Claims and runs the tenant's due work items until none is left, and returns how many it ran.</summary>
+    public async Task<int> RunUntilIdleAsync(CancellationToken cancellationToken)
     {
         var runner = (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        var ran = 0;
         while (await runner.RunNextAsync(Tenant, _lease, cancellationToken))
         {
+            ran++;
         }
+
+        return ran;
     }
 
     /// <summary>
@@ -174,7 +178,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
     {
         ["Extensions:Path"] = SamplePackages.Path,
         [$"Tenants:{Tenant}:Hosts:0"] = Host,
-        [$"Tenants:{Tenant}:ConnectionString"] = _connectionString,
+        [$"Tenants:{Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(ConnectionString),
         [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
         [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value"] = PurchasingUrl,
         [$"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind"] = "secret",
@@ -247,6 +251,16 @@ public sealed class SampleAppFixture : IAsyncLifetime
             .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
             .Select(order => order.GetProperty("orderNumber").GetString())];
     }
+
+    /// <summary>The connection string of the tenant database's owner, <see cref="PostgreSqlServer.SchemaRole"/>.</summary>
+    public string ConnectionString => _connectionString ?? throw new InvalidOperationException("The fixture is not initialized.");
+
+    /// <summary>
+    /// Runs <paramref name="sql"/> on the tenant database, a <c>SELECT count(*)</c>, as the PostgreSQL superuser,
+    /// which is the only role that sees or ends the sessions of other roles.
+    /// </summary>
+    public async Task<long> AdminCountAsync(string sql) =>
+        (long)(await PostgreSqlServer.AdminScalarAsync(ConnectionString, sql, CancellationToken))!;
 
     /// <summary>Runs <paramref name="sql"/> on the tenant database, a <c>SELECT count(*)</c>, with the named parameters.</summary>
     public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters) =>

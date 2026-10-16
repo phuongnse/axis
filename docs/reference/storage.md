@@ -110,16 +110,22 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   matched against the model's declared names and never used as an identifier.
 - **Database credentials.** Each tenant has two connection strings.
   `SchemaConnectionString` serves startup activation only, and
-  `ConnectionString` serves everything else. *(planned for M6)* Runtime access
-  and schema changes will use different database roles. Until then, both
-  settings name the same database user. See [Database roles](#database-roles).
+  `ConnectionString` serves everything else. The integration tests already run
+  the server and worker as one database role and activation as another.
+  *(planned for M6)* Everywhere else, runtime access and schema changes will use
+  different database roles. Until then, both settings name the same database
+  user. See [Database roles](#database-roles).
 
 ## Database roles
 
 See [D31](../decisions.md#d31-separate-database-roles--agreed). The two
-settings and the connection each step uses are built. *(planned for M6)* The
-two database roles themselves, the grants and the start checks are still to
-come. Today both settings name the same database user, which does everything.
+settings and the connection each step uses are built. The integration tests
+create the two database roles, `axis_schema` and `axis_runtime`, own each test
+database with `axis_schema`, run the server and worker as `axis_runtime`, and
+run activation as `axis_schema`. *(planned for M6)* The grants that limit the
+runtime role, the release trigger and the start checks are still to come, and so
+are the roles in Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh`. There,
+both settings name the same database user, which does everything.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
   and `entities` schemas. The runtime database role reads and writes data, and

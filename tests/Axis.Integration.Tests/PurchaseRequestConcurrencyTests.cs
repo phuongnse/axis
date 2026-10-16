@@ -113,7 +113,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
         }
 
         var start = PostStartAsync(anna, subject);
-        await WaitUntilAsync(async () => start.IsCompleted || await fixture.CountAsync(
+        await WaitUntilAsync(async () => start.IsCompleted || await fixture.AdminCountAsync(
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1);
         await transaction.CommitAsync(CancellationToken);
 

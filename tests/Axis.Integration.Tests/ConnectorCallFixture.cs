@@ -51,7 +51,7 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
         {
             _tokens[tenantId] = $"token-{tenantId}-{Guid.NewGuid():N}";
             values[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
-            values[$"Tenants:{tenantId}:ConnectionString"] = tenant.ConnectionString;
+            values[$"Tenants:{tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenant.ConnectionString);
             values[$"Tenants:{tenantId}:Bindings:PurchasingUrl:Kind"] = "url";
             values[$"Tenants:{tenantId}:Bindings:PurchasingUrl:Value"] = $"{_stub.BaseUrl}/tenant-{tenantId}";
             values[$"Tenants:{tenantId}:Bindings:PurchasingToken:Kind"] = "secret";

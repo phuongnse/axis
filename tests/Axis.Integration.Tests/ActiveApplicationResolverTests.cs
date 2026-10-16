@@ -103,12 +103,12 @@ public sealed class ActiveApplicationResolverTests(DataDatabaseFixture database)
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", connectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:Hosts:0", "a.example.test");
-            builder.UseSetting("Tenants:a:ConnectionString", connectionString);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);
             builder.UseSetting("Tenants:b:Hosts:0", "b.example.test");
-            builder.UseSetting("Tenants:b:ConnectionString", connectionString);
+            builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:b:SchemaConnectionString", connectionString);
             builder.UseTestOidc("a", "b");
         });

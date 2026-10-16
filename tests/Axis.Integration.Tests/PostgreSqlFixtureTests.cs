@@ -24,6 +24,23 @@ public sealed class PostgreSqlFixtureTests
     }
 
     [Fact]
+    public async Task Database_is_owned_by_the_schema_role_and_the_runtime_role_cannot_create_tables()
+    {
+        await using var database = new PostgreSqlFixture();
+        await database.InitializeAsync();
+
+        Assert.Equal(
+            PostgreSqlServer.SchemaRole,
+            await ScalarAsync(database.ConnectionString, "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()"));
+        Assert.Equal(PostgreSqlServer.SchemaRole, await ScalarAsync(database.ConnectionString, "SELECT current_user"));
+
+        var runtime = PostgreSqlServer.RuntimeConnectionString(database.ConnectionString);
+        Assert.Equal(PostgreSqlServer.RuntimeRole, await ScalarAsync(runtime, "SELECT current_user"));
+        var exception = await Assert.ThrowsAsync<PostgresException>(() => ScalarAsync(runtime, "CREATE TABLE t (id int)"));
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, exception.SqlState);
+    }
+
+    [Fact]
     public async Task Shared_server_allows_enough_connections_for_parallel_classes()
     {
         await using var database = new PostgreSqlFixture();

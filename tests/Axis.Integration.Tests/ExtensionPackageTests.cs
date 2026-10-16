@@ -115,9 +115,9 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", connectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:Hosts:0", TenantHost);
-            builder.UseSetting("Tenants:a:ConnectionString", connectionString);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);
             builder.UseSetting(PackageCatalog.PathSetting, packagePath);
             builder.UseTestOidc("a");
@@ -130,7 +130,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenants:a:Hosts:0"] = TenantHost,
-            ["Tenants:a:ConnectionString"] = connectionString,
+            ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
             [PackageCatalog.PathSetting] = packagePath,
         });
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);

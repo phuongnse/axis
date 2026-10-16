@@ -438,23 +438,18 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
-    public async Task Startup_activation_with_a_separate_schema_role_leaves_it_owning_every_axis_and_entities_table()
+    public async Task Startup_activation_leaves_the_schema_role_owning_every_axis_and_entities_table()
     {
         var a = await CreateDatabaseAsync();
         var b = await CreateDatabaseAsync();
-        var role = $"schema_{Guid.NewGuid():N}";
-        await ScalarAsync(a, $"CREATE ROLE \"{role}\" LOGIN PASSWORD 'axis'");
-        await ScalarAsync(a, $"GRANT CREATE ON DATABASE \"{new NpgsqlConnectionStringBuilder(a).Database}\" TO \"{role}\"");
-        var schemaA = new NpgsqlConnectionStringBuilder(a) { Username = role, Password = "axis" }.ConnectionString;
         using var folder = ApplicationFolder(TitleField);
 
-        // The runtime connection stays the superuser until the runtime role exists.
-        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), schemaA: schemaA))
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector()))
         {
             factory.CreateClient().Dispose();
         }
 
-        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM pg_tables WHERE schemaname IN ('axis', 'entities') AND tableowner <> '{role}'"));
+        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM pg_tables WHERE schemaname IN ('axis', 'entities') AND tableowner <> '{PostgreSqlServer.SchemaRole}'"));
         Assert.True((long)(await ScalarAsync(a, "SELECT count(*) FROM pg_tables WHERE schemaname = 'entities'"))! > 0);
     }
 
@@ -463,19 +458,17 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         string b,
         string? folder,
         LogCollector logs,
-        IReadOnlyDictionary<string, string>? settings = null,
-        string? schemaA = null,
-        string? schemaB = null) =>
+        IReadOnlyDictionary<string, string>? settings = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", a);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(a));
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
-            builder.UseSetting("Tenants:a:ConnectionString", a);
-            builder.UseSetting("Tenants:a:SchemaConnectionString", schemaA ?? a);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(a));
+            builder.UseSetting("Tenants:a:SchemaConnectionString", a);
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
-            builder.UseSetting("Tenants:b:ConnectionString", b);
-            builder.UseSetting("Tenants:b:SchemaConnectionString", schemaB ?? b);
+            builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(b));
+            builder.UseSetting("Tenants:b:SchemaConnectionString", b);
             builder.UseTestOidc("a", "b");
             builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
             if (folder is not null)

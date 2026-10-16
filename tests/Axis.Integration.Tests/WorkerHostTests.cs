@@ -259,7 +259,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         foreach (var (tenantId, connectionString) in tenants)
         {
             settings[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
-            settings[$"Tenants:{tenantId}:ConnectionString"] = connectionString;
+            settings[$"Tenants:{tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString);
         }
 
         builder.Configuration.AddInMemoryCollection(settings);
@@ -288,7 +288,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     private static Connections CreateConnections(string connectionString)
     {
         var options = new TenantOptions();
-        options.Tenants["a"] = new TenantSettings { ConnectionString = connectionString };
+        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) };
         var accessor = new TenantContextAccessor();
         return new Connections(new TenantConnectionFactory(options, accessor), accessor);
     }

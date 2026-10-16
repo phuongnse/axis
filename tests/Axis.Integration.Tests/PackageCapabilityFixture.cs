@@ -109,7 +109,7 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
                 catalog.Versions,
                 ProcessStepFixture.PackageBindings(tenantId, new Uri(testUrl), allowHttp: true));
             values[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
-            values[$"Tenants:{tenantId}:ConnectionString"] = tenant.ConnectionString;
+            values[$"Tenants:{tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenant.ConnectionString);
             values[$"Tenants:{tenantId}:Bindings:TestUrl:Kind"] = "url";
             values[$"Tenants:{tenantId}:Bindings:TestUrl:Value"] = testUrl;
             values[$"Tenants:{tenantId}:Bindings:TestToken:Kind"] = "secret";
