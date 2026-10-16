@@ -22,8 +22,9 @@ namespace Axis.Configuration.Compilation;
 /// roles, their grants and their filters, checks connectors, their timeouts, operations, paths and
 /// lookups, checks events, their entities and their payload fields, checks endpoints, their
 /// entities, processes, input fields, mappings, output and wait, checks triggers, their
-/// processes, events and conditions, checks the extension packages of the manifest and pins each
-/// to the highest installed version in its range, and resolves references
+/// processes, events and conditions, checks migrations, their entities, fields and values, checks
+/// the extension packages of the manifest and pins each to the highest installed version in its
+/// range, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins.
 /// Both inputs give the same result for the same resources and installed packages.
@@ -249,6 +250,7 @@ public static class ApplicationCompiler
             loaded.UnloadedDataSourceNames,
             rules,
             diagnostics);
+        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
         if (result.HasErrors || loaded.Application is null)
@@ -274,6 +276,7 @@ public static class ApplicationCompiler
             Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules)).ToList(),
+            Migrations = loaded.Migrations.Select(MigrationChecker.Build).ToList(),
             Packages = packages,
         };
         return result with

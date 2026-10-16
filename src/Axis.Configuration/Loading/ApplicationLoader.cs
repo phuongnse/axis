@@ -110,6 +110,7 @@ public static class ApplicationLoader
         var events = new List<EventResource>();
         var endpoints = new List<EndpointResource>();
         var triggers = new List<TriggerResource>();
+        var migrations = new List<MigrationResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -269,6 +270,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Trigger:
                         triggers.Add(root.Deserialize<TriggerResource>(_serializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Migration:
+                        migrations.Add(root.Deserialize<MigrationResource>(_serializerOptions)! with { File = file });
+                        break;
                 }
             }
         }
@@ -306,6 +310,7 @@ public static class ApplicationLoader
             Endpoints = endpoints,
             UnloadedEndpointNames = unloadedEndpointNames,
             Triggers = triggers,
+            Migrations = migrations,
         };
     }
 
@@ -469,7 +474,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}' or '{ResourceKinds.Trigger}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}' or '{ResourceKinds.Trigger}'.",
                 file,
                 "/kind",
                 resourceId));

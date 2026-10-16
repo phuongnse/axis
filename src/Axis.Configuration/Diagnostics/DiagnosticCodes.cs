@@ -162,4 +162,9 @@ public static class DiagnosticCodes
     public const string UnknownTriggerParameter = "AXC0165";
     public const string InvalidTriggerParameterValue = "AXC0166";
     public const string MissingTriggerParameter = "AXC0167";
+
+    public const string UnknownMigrationEntity = "AXC0170";
+    public const string UnknownMigrationField = "AXC0171";
+    public const string MigrationFieldAlreadyExists = "AXC0172";
+    public const string MigrationFieldNotInEntity = "AXC0173";
 }

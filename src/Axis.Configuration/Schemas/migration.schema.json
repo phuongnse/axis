@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis migration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "entity", "changes"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "migration" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "entity": { "$ref": "#/$defs/name" },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/change" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["renameField", "dropField", "dropEntity", "fill", "convert"] },
+        "from": { "$ref": "#/$defs/name" },
+        "to": { "$ref": "#/$defs/name" },
+        "field": { "$ref": "#/$defs/name" },
+        "value": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "renameField" } } },
+          "then": { "required": ["from", "to"], "properties": { "field": false, "value": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "dropField" } } },
+          "then": { "required": ["field"], "properties": { "from": false, "to": false, "value": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "dropEntity" } } },
+          "then": { "properties": { "from": false, "to": false, "field": false, "value": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "enum": ["fill", "convert"] } } },
+          "then": { "required": ["field", "value"], "properties": { "from": false, "to": false } }
+        }
+      ]
+    }
+  }
+}

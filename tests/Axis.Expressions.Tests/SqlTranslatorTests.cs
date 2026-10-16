@@ -254,6 +254,20 @@ public sealed class SqlTranslatorTests
         Assert.StartsWith("Function 'IsBig' is not translated to SQL", result.Diagnostic.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("abs()", "Function 'abs' needs 1 argument, found 0 at character 1.")]
+    [InlineData("round(1)", "Function 'round' needs 2 arguments, found 1 at character 1.")]
+    public void Wrong_argument_count_without_a_check_result_is_reported_as_one(string expression, string message)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((ExpressionDiagnosticCodes.WrongArgumentCount, 0, message), (result.Diagnostic.Code, result.Diagnostic.Offset, result.Diagnostic.Message));
+    }
+
     [Fact]
     public void Rule_chain_past_the_inlined_node_cap_is_outside_the_subset_before_rendering()
     {

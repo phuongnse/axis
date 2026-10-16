@@ -598,7 +598,9 @@ Rules:
 
 Entity validations, computed fields, rules, data source filters,
 [process](processes.md#resource-shape) conditions and
-[policy](configuration.md#roles-and-policies) filters are written this way.
+[policy](configuration.md#roles-and-policies) filters, and the `fill` and
+`convert` values of [migrations](configuration.md#resource-file-shape), are
+written this way.
 
 An expression is one JSON string:
 
@@ -674,7 +676,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   [SQL subset](#sql-subset), at the operator, call or path step. This
   includes `/`, `lower`, `upper`, `trim`, every aggregate, a call to a rule
   whose body is outside the subset, and a filter whose rule calls inline to
-  more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks.
+  more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks. A migration's `fill` or `convert` value is checked against the subset at `/changes/{i}/value`, even when its type check waits for activation. See [migrations](configuration.md#resource-file-shape).
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
   the limit.
 - **`AXC0086`.** A computed field calls `now()`, including inside an
