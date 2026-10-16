@@ -7,8 +7,9 @@
 # tests/e2e/fixtures/e2e-app and the purchase request sample in samples/apps/purchase-requests.
 # A spec can activate another folder during the run: tests/e2e/activate.ts starts the built server
 # once more on a spare port with that folder in ActivateOnStartup, waits until it is ready and
-# stops it. The main server then serves the new release. tests/e2e/fixtures/release-app is
-# activated that way.
+# stops it. The main server then serves the new release. The release-pinning spec activates
+# tests/e2e/fixtures/release-app that way. The purchase request release spec activates a changed copy
+# of the purchase request sample, and activates the committed sample again when it ends.
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
 # can restart it: it writes the restart file, then stops the worker process. The run fails if the
 # worker exits without a restart request, or never finds the tenant database migrated.
