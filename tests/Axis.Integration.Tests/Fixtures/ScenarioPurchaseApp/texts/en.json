@@ -1,0 +1,28 @@
+{
+  "id": "7b8efc8b-f34b-449b-b9d6-db29b4e5c958",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "purchaseRequest.label": "Purchase request",
+    "purchaseRequest.number": "Number",
+    "purchaseRequest.title": "Title",
+    "purchaseRequest.requester": "Requester",
+    "purchaseRequest.manager": "Manager",
+    "purchaseRequest.amount": "Amount",
+    "purchaseRequest.status": "Status",
+    "purchaseRequest.submittedAt": "Submitted at",
+    "purchaseRequest.decisionComments": "Decision comments",
+    "purchaseRequest.managerApproval": "Manager approval",
+    "purchaseRequest.financeApproval": "Finance approval",
+    "purchaseRequest.sections.request": "Request",
+    "purchaseRequest.sections.decision": "Decision",
+    "task.approve": "Approve",
+    "task.return": "Return",
+    "task.reject": "Reject",
+    "role.employee": "Employee",
+    "role.departmentManager": "Department manager",
+    "role.financeReviewer": "Finance reviewer"
+  }
+}

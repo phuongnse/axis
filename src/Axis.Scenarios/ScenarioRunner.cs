@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
@@ -20,24 +21,33 @@ namespace Axis.Scenarios;
 /// given the compiled and activated application and its seed data, and dropped when the scenario
 /// ends, whether it passed or failed. The scenario runs as the tenant <see cref="TenantId"/> with
 /// no deployment bindings and no extension packages. Each step runs as its user, with the roles the
-/// scenario gives that user. The first failing step ends the scenario.
+/// scenario gives that user. The first failing step ends the scenario. After each action the runner
+/// runs the due process steps in-process, so the process reaches its next wait. The scenario's
+/// <c>now</c> reaches every connection as the PostgreSQL setting <c>axis.now</c>, which the
+/// transaction time and the SQL of <c>now()</c> read. Times that PostgreSQL writes itself, such as
+/// <c>created_at</c>, keep the real clock.
 /// </summary>
 public static class ScenarioRunner
 {
     /// <summary>The tenant id every scenario runs under.</summary>
     public const string TenantId = "scenario";
 
+    /// <summary>The most process step work items that may run after one action.</summary>
+    public const int WorkItemLimit = 1000;
+
     /// <summary>
     /// Runs <paramref name="scenario"/> of the application in <paramref name="folder"/> on the
     /// server of <paramref name="serverConnectionString"/>, whose login may create databases.
     /// A cancelled run still drops the database, then throws <see cref="OperationCanceledException"/>.
+    /// An action that makes more than <paramref name="workItemLimit"/> work items run fails the scenario.
     /// </summary>
     public static async Task<ScenarioResult> RunAsync(
         string folder,
         ScenarioResource scenario,
         string serverConnectionString,
         ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int workItemLimit = WorkItemLimit)
     {
         var stopwatch = Stopwatch.StartNew();
         var database = $"axis_scenario_{Guid.NewGuid():N}";
@@ -57,8 +67,16 @@ public static class ScenarioRunner
         try
         {
             // The connection does not pool, so no idle session keeps the database from being dropped.
-            var connectionString = new NpgsqlConnectionStringBuilder(serverConnectionString) { Database = database, Pooling = false }.ConnectionString;
-            failure = await RunInDatabaseAsync(folder, scenario, connectionString, loggerFactory, cancellationToken);
+            var builder = new NpgsqlConnectionStringBuilder(serverConnectionString) { Database = database, Pooling = false };
+            if (scenario.Now is { } now)
+            {
+                // The setting reaches every connection of the scenario, including the work item runner's.
+                var time = DateTimeOffset.Parse(now, CultureInfo.InvariantCulture).ToUniversalTime();
+                var option = "-c axis.now=" + time.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
+                builder.Options = string.IsNullOrEmpty(builder.Options) ? option : builder.Options + " " + option;
+            }
+
+            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, loggerFactory, workItemLimit, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -93,6 +111,7 @@ public static class ScenarioRunner
         ScenarioResource scenario,
         string connectionString,
         ILoggerFactory loggerFactory,
+        int workItemLimit,
         CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);
@@ -128,12 +147,17 @@ public static class ScenarioRunner
         }
 
         var steps = new ScenarioSteps(connection, model, compiled.Release.Id, scenario, loggerFactory);
+        var work = new ScenarioWork(connectionString, loggerFactory, workItemLimit);
         for (var index = 0; index < scenario.Steps.Count; index++)
         {
             var step = scenario.Steps[index];
             try
             {
                 await steps.RunAsync(step, cancellationToken);
+                if (IsAction(step))
+                {
+                    await work.RunDueAsync(cancellationToken);
+                }
             }
             catch (StepFailedException exception)
             {
@@ -143,6 +167,13 @@ public static class ScenarioRunner
 
         return null;
     }
+
+    private static bool IsAction(ScenarioStepDefinition step) =>
+        step.Type is ScenarioStepDefinition.CreateRecord
+            or ScenarioStepDefinition.UpdateRecord
+            or ScenarioStepDefinition.DeleteRecord
+            or ScenarioStepDefinition.StartProcess
+            or ScenarioStepDefinition.CompleteTask;
 
     private static string Setup(string reason, IReadOnlyList<Diagnostic> diagnostics)
     {

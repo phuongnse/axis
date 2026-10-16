@@ -1,0 +1,17 @@
+{
+  "id": "e3ad6f3e-f938-458b-9147-8a83f82f6d96",
+  "kind": "policy",
+  "name": "DepartmentManagerAccess",
+  "formatVersion": 1,
+  "roles": [
+    "department-manager"
+  ],
+  "grants": [
+    {
+      "entity": "PurchaseRequest",
+      "actions": [
+        "read"
+      ]
+    }
+  ]
+}

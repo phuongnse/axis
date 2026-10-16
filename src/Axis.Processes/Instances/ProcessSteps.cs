@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Axis.Expressions.Sql;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -18,8 +19,8 @@ internal static class ProcessSteps
     public static async Task<LoadedInstance?> LoadAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            """
-            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, now()
+            $"""
+            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, {SqlTranslator.NowSql}
             FROM axis.process_instances WHERE id = @id
             """,
             Connection(transaction),

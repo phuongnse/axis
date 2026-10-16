@@ -1142,7 +1142,8 @@ record create fills a field that names a sequence with the next number.
 }
 ```
 
-- **Tokens.** `{yyyy}` is the four-digit UTC year. The local year waits for
+- **Tokens.** `{yyyy}` is the four-digit UTC year of the create's transaction
+  time. The local year waits for
   the [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed). `{n}` is the number, and
   `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
   Every other character is literal.
@@ -2181,9 +2182,9 @@ A `scenario` resource is a configuration-level test. See
 `scenarios/`, one file per scenario. They compile with the application but stay
 out of the release and its content hash. A file is a scenario because its `kind`
 is `scenario`, wherever it is in the folder. The resource kind and its compile
-checks exist. The runner runs record actions, with or without `expect`, and
-`expectRecord` steps. The other steps and the use of `stubs` and `now` are
-*(planned for M6)*.
+checks exist. The runner runs record actions, process starts and task
+completions, with or without `expect`, and the `expectRecord`, `expectInstance`
+and `expectTask` steps. It sets `now`. The use of `stubs` is *(planned for M6)*.
 
 This scenario submits a purchase request above the finance threshold. The
 manager is denied the finance decision. Both tasks are completed and the
@@ -2256,9 +2257,9 @@ request ends `approved`:
 - `users` maps a user id to its role names. Each role must be a declared
   [`role`](#roles-and-policies). No identity provider takes part. The runner
   gives each step the user's id and roles, as a session would.
-- `now` is a date-time with an offset. It fixes the time that expressions and
-  task due dates read, for the whole scenario. Timestamps that PostgreSQL
-  writes, such as `created_at`, keep the real clock.
+- `now` is a date-time with an offset. It fixes the time that expressions,
+  filters, sequence numbers and task due dates read, for the whole scenario.
+  Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.
 - `stubs` hold one output per connector operation or package operation. A stub
   has the same shape as the process step that calls it. A call without a stub
   fails the scenario.
@@ -2276,18 +2277,25 @@ Every step has a `type`. These are the step kinds:
 | `expectInstance` | `process`, `record`, `state`, optional `step` | Asserts the state of the process instance on the record, and the step it waits at. |
 | `expectTask` | `record`, `step`, `assignee` or `state` | Asserts who the task is assigned to, or its state. |
 
-- `createRecord`, `updateRecord` and `deleteRecord` are the record actions.
-  They go through the record command, as the record API does.
+- `createRecord`, `updateRecord`, `deleteRecord`, `startProcess` and
+  `completeTask` are the actions. The record actions go through the record
+  command, as the record API does. `startProcess` and `completeTask` apply the
+  checks of the process start and task endpoints without the HTTP layer.
 - Only actions may declare `expect`. With no `expect`, an action must succeed.
   An unmet expectation fails the scenario:
   - `"denied"` means 403. A grant, a field grant or a record filter refused
-    the action.
+    the action. For `startProcess` it is a missing start grant. For
+    `completeTask` it is a user who is not the task's assignee.
   - `"notFound"` means 404. The record is outside every read filter, or it does
-    not exist, for example after a `deleteRecord` step.
+    not exist, for example after a `deleteRecord` step. For `completeTask` it is
+    also a step with no task yet.
   - `"conflict"` means 409, for a unique value, a referenced record, a stale
-    version or a task that is already completed.
+    version, a process that is already running for the record or a task that is
+    already completed.
   - `{ "invalid": "lineItems/0/quantity" }` means a 400 validation problem with
-    an error at that path under `/values/`. Other errors may come with it.
+    an error at that path under `/values/`. Other errors may come with it. For
+    `completeTask`, a value for a field the task form does not make editable is
+    such an error, for example `{ "invalid": "amount" }`.
 - A step that has `expect` may not use `save`, because a failed action creates
   no record.
 - The runner supplies the record's current `version` on updates and task
@@ -2329,9 +2337,35 @@ What runs now:
   compare as instants. A child collection must have as many rows as expected, and
   each expected row is compared on the fields it names.
 
-*(planned for M6)*: `startProcess`, `completeTask`, `expectInstance` and
-`expectTask`. A scenario that uses a step type that does not run yet fails with
-`step type '<type>' is not supported yet`.
+- `startProcess` and `completeTask`, with or without `expect`. They apply the
+  same checks as the API: the start grant, the read access to the record, the
+  start condition and a running instance for `startProcess`, and the assignee,
+  the task state and the task form for `completeTask`. `completeTask` writes its
+  `values` under the task form rules, as the task API does. Only an editable
+  field the user may read can be set. The values are written as a record update,
+  then the data change triggers start. A start whose condition is not true fails
+  the scenario with `ConditionFailed`, and no `expect` matches it.
+- `expectInstance` and `expectTask`. They read the newest instance or task of
+  the record. A failure names both values, for example
+  `Step 4 (expectTask): task 'managerApproval' expected assignee user 'binh' but was user 'dung'`
+  or `instance of process 'PurchaseRequestApproval' expected state completed but
+  was waiting at step 'managerApproval'`. `step` on `expectInstance` is compared
+  ignoring letter case.
+- **Process steps.** After each action, the runner runs the `process.step` work
+  items of the scenario's tenant in-process, until none is due. So the process
+  reaches its next wait: an open task, or its end. If one action makes more than
+  1,000 items run, the scenario fails at that step.
+- **The current time.** With `now` set, the runner gives every connection of the
+  scenario the PostgreSQL setting `axis.now`. The transaction time reads it
+  instead of PostgreSQL `now()`. So `now()` in expressions, in policy and data
+  source filters, task due dates, step history times and the year of a sequence
+  number all use it. Timestamps that PostgreSQL writes itself, such as
+  `created_at`, keep the real clock.
+
+*(planned for M6)*: stubs, connector and package calls, event deliveries and
+schedule triggers. Only the `process.step` items run, so event deliveries and
+schedule triggers stay queued and do not fail the scenario. An application with a
+connector or a package cannot run in a scenario yet.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

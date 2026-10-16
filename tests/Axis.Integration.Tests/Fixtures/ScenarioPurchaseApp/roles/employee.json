@@ -1,0 +1,9 @@
+{
+  "id": "cb4938b2-a4db-48cd-80ac-2e1aa723499a",
+  "kind": "role",
+  "name": "employee",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.employee"
+  }
+}

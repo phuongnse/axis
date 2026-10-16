@@ -1,0 +1,17 @@
+{
+  "id": "19db80f0-2aaf-4ac4-bef8-762e13f0803e",
+  "kind": "policy",
+  "name": "FinanceReviewerAccess",
+  "formatVersion": 1,
+  "roles": [
+    "finance-reviewer"
+  ],
+  "grants": [
+    {
+      "entity": "PurchaseRequest",
+      "actions": [
+        "read"
+      ]
+    }
+  ]
+}

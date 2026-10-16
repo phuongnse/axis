@@ -29,6 +29,12 @@ public static class SqlTranslator
     public const string CurrentUserParameter = "currentUser";
 
     /// <summary>
+    /// The SQL that <c>now()</c> becomes: the PostgreSQL session setting <c>axis.now</c> when it is
+    /// set, and the transaction start time otherwise. Only a test scenario sets it, to fix the time.
+    /// </summary>
+    public const string NowSql = "coalesce(nullif(current_setting('axis.now', true), '')::timestamptz, now())";
+
+    /// <summary>
     /// Translates <paramref name="expression"/>, which must have passed
     /// <see cref="ExpressionTypeChecker"/>. Without a <paramref name="check"/> the expression need
     /// only parse: a call with the wrong number of arguments is reported as
@@ -220,7 +226,7 @@ public static class SqlTranslator
                 "year" or "month" or "day" => $"((extract({name} from {arguments[0]}))::bigint)",
                 "addDays" => $"({arguments[0]} + ({arguments[1]})::int)",
                 "daysBetween" => $"({arguments[1]} - {arguments[0]})",
-                "now" => "now()",
+                "now" => NowSql,
                 "currentUser" => "@" + CurrentUserParameter,
                 _ => throw NotTranslated(name, call.Offset),
             };

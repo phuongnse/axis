@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
+using Axis.Expressions.Sql;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -127,13 +128,14 @@ public static class RecordQueries
     /// <summary>
     /// Reads the start time of the current transaction, which is what <c>now()</c> gives in an
     /// expression. Call it inside the caller's transaction, so it is that transaction's time.
+    /// A test scenario fixes it with the session setting <c>axis.now</c>, which wins when it is set.
     /// </summary>
     public static async Task<DateTimeOffset> TransactionTimeAsync(
         NpgsqlConnection connection, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
-        await using var command = new NpgsqlCommand("SELECT now()", connection);
+        await using var command = new NpgsqlCommand($"SELECT {SqlTranslator.NowSql}", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
         return reader.GetFieldValue<DateTimeOffset>(0);
