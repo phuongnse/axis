@@ -279,6 +279,43 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
     }
 
+    [Fact]
+    public async Task A_waiting_drop_entity_finds_the_entity_under_the_name_a_release_committed_while_it_waited()
+    {
+        using var folder = Application()
+            .With("entities/order.json", Order(NumberField))
+            .With("entities/customer.json", Customer());
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        Assert.Equal(1, await CountProvisionedEntitiesAsync(_customerId));
+
+        // The second release renames the entity Customer to Client. The third drops it by its new name.
+        folder.With("entities/customer.json", EntityFile("Client", _customerId, """{ "name": "name", "type": "text" }"""));
+        var second = await CompileAsync(folder);
+        folder
+            .Without("entities/customer.json")
+            .With("migrations/0001-drop-client.json", Migration(_migrationId, "Client", """[{ "type": "dropEntity" }]"""));
+        var third = await CompileAsync(folder);
+
+        // The second release stops at the active release write and still holds the schema lock.
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var renaming = ActivateAsync(second, store => new PausingStore(store, reached, release));
+        await reached.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
+
+        // The third release waits for the lock. It must read the stored entity ids after the wait, or it
+        // looks for Client in the first release, finds nothing, skips the table and gives AXC0017.
+        var dropping = ActivateAsync(third);
+        await WaitUntilAsync(async () => dropping.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0);
+        release.SetResult();
+
+        Assert.Empty((await renaming).Diagnostics);
+        Assert.Empty((await dropping).Diagnostics);
+        Assert.Empty(await ReadTablesAsync(_customerId));
+        Assert.Equal(0, await CountProvisionedEntitiesAsync(_customerId));
+        Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+        Assert.Equal(third.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
     // R1 has a note field and R2 renames it to remark, so one migration is applied.
     private async Task<TemporaryFolder> AppliedRenameAsync()
     {

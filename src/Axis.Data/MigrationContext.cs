@@ -10,9 +10,11 @@ namespace Axis.Data;
 /// keeps another activation from committing a migration between the history check and the write.
 /// </summary>
 /// <param name="ReleaseId">The release being activated, recorded as the one that applied the migrations.</param>
-/// <param name="StoredEntityIds">
-/// The entity ids by name, ignoring letter case, as the application's active release has them. They name the
-/// tables that hold the data now, including those of an entity the new release no longer has.
+/// <param name="ReadStoredEntityIdsAsync">
+/// Reads the entity ids by name, ignoring letter case, as the application's active release has them. They name
+/// the tables that hold the data now, including those of an entity the new release no longer has. Provisioning
+/// calls it only when a migration is pending, and only after it took the schema lock, so it never sees a release
+/// that another activation replaces while this one waits for the lock.
 /// </param>
 /// <param name="SetActiveReleaseAsync">
 /// Writes the active release and its site paths in the given provisioning transaction, and gives the
@@ -21,12 +23,12 @@ namespace Axis.Data;
 /// </param>
 public sealed record MigrationContext(
     Guid ReleaseId,
-    IReadOnlyDictionary<string, Guid> StoredEntityIds,
+    Func<CancellationToken, Task<IReadOnlyDictionary<string, Guid>>> ReadStoredEntityIdsAsync,
     Func<DbTransaction, CancellationToken, Task<IReadOnlyList<Diagnostic>>>? SetActiveReleaseAsync)
 {
     /// <summary>No release, no stored entities and no active release write.</summary>
     public static MigrationContext None { get; } = new(
         Guid.Empty,
-        new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase),
+        _ => Task.FromResult<IReadOnlyDictionary<string, Guid>>(new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase)),
         null);
 }

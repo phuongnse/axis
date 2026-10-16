@@ -82,9 +82,7 @@ public static class ReleaseActivator
         var sitePaths = model.Sites.Select(site => site.Path).ToList();
         var migrations = new MigrationContext(
             release.Id,
-            model.Migrations.Count > 0
-                ? await ReadStoredEntityIdsAsync(store, manifest.Id, cancellationToken)
-                : MigrationContext.None.StoredEntityIds,
+            token => ReadStoredEntityIdsAsync(store, manifest.Id, token),
             async (transaction, token) => ToDiagnostics(
                 model,
                 await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)));
@@ -93,7 +91,7 @@ public static class ReleaseActivator
     }
 
     // The entity ids of the application's active release by entity name: the tables that hold its data now.
-    private static async Task<Dictionary<string, Guid>> ReadStoredEntityIdsAsync(IActiveReleaseStore store, Guid applicationId, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyDictionary<string, Guid>> ReadStoredEntityIdsAsync(IActiveReleaseStore store, Guid applicationId, CancellationToken cancellationToken)
     {
         var ids = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         if (await store.FindByApplicationIdAsync(applicationId, cancellationToken) is not { } active

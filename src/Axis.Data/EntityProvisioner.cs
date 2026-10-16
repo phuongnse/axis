@@ -94,7 +94,11 @@ public static class EntityProvisioner
 
             var catalog = await CatalogReader.ReadAsync(connection, npgsqlTransaction, cancellationToken);
             var records = await ReadRecordsAsync(model, context, cancellationToken);
-            var plan = SchemaPlanner.Plan(model, catalog, records, history.Pending, migrations.StoredEntityIds);
+            // Read under the lock: an activation that held it before us may have renamed or dropped entities.
+            var storedEntityIds = history.Pending.Count > 0
+                ? await migrations.ReadStoredEntityIdsAsync(cancellationToken)
+                : new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+            var plan = SchemaPlanner.Plan(model, catalog, records, history.Pending, storedEntityIds);
             if (plan.Diagnostics.Count > 0)
             {
                 await transaction.RollbackAsync(cancellationToken);
