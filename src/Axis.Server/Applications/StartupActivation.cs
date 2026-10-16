@@ -8,13 +8,17 @@ using Axis.Processes.Instances;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Axis.Server.Applications;
 
 /// <summary>
 /// Migrates every configured tenant database, then compiles the configured application folders
 /// against the installed extension packages, activates them in it, writes the state of their schedule triggers and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
-/// service starts, so the server is not listening yet. Any diagnostic or error stops the start:
+/// service starts, so the server is not listening yet. The migrations, release storage, entity
+/// provisioning and the active release use a connection from the tenant's
+/// <c>SchemaConnectionString</c>, which closes when the tenant is done. The schedule trigger state
+/// and the seed records use the tenant's <c>ConnectionString</c>. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
 /// Restarting with unchanged folders and installed packages stores no new release and only
 /// refreshes the activation time.
@@ -22,6 +26,7 @@ namespace Axis.Server.Applications;
 internal sealed partial class StartupActivation(
     StartupActivationOptions options,
     TenantOptions tenants,
+    TenantSchemaConnections schemaConnections,
     PackageCatalog packages,
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
@@ -59,11 +64,13 @@ internal sealed partial class StartupActivation(
 
     private async Task ActivateTenantAsync(string tenantId, CancellationToken cancellationToken)
     {
+        await using var schemaSource = NpgsqlDataSource.Create(schemaConnections.For(tenantId));
+        await using var schema = new TenantDatabase(new DataSourceConnections(schemaSource));
         await using var scope = scopes.CreateAsyncScope();
-        var database = scope.ServiceProvider.GetRequiredService<TenantDatabase>();
-        var configuration = await database.GetConfigurationAsync(cancellationToken);
-        var data = await database.GetDataAsync(cancellationToken);
-        var processes = await database.GetProcessesAsync(cancellationToken);
+        var runtime = scope.ServiceProvider.GetRequiredService<TenantDatabase>();
+        var configuration = await schema.GetConfigurationAsync(cancellationToken);
+        var data = await schema.GetDataAsync(cancellationToken);
+        var processes = await schema.GetProcessesAsync(cancellationToken);
         await configuration.Database.MigrateAsync(cancellationToken);
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
@@ -88,11 +95,11 @@ internal sealed partial class StartupActivation(
                 }
 
                 await TriggerSchedules.ActivateAsync(
-                    await database.GetConnectionAsync(cancellationToken), tenantId, compiled.Model, compiled.Release.Id, cancellationToken);
+                    await runtime.GetConnectionAsync(cancellationToken), tenantId, compiled.Model, compiled.Release.Id, cancellationToken);
                 LogActivated(compiled.Model.Manifest.Name, compiled.Release.Id, folder, tenantId);
                 if (compiled.Model.Seeds.Count > 0)
                 {
-                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, await database.GetConnectionAsync(cancellationToken), cancellationToken);
+                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, await runtime.GetConnectionAsync(cancellationToken), cancellationToken);
                     if (seeded.Diagnostics.Count > 0)
                     {
                         LogDiagnostics(seeded.Diagnostics, folder, tenantId);
@@ -126,6 +133,13 @@ internal sealed partial class StartupActivation(
         }
 
         return new ActivationBindings(tenantId, bindings, AllowHttp: environment.IsDevelopment());
+    }
+
+    /// <summary>Opens connections from one data source, whatever the current tenant is.</summary>
+    private sealed class DataSourceConnections(NpgsqlDataSource source) : ITenantConnectionFactory
+    {
+        public ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default) =>
+            source.OpenConnectionAsync(cancellationToken);
     }
 
     private void LogDiagnostics(IReadOnlyList<Diagnostic> diagnostics, string folder, string tenantId)

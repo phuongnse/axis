@@ -173,6 +173,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
     {
         builder.UseSetting($"Tenants:{tenant}:Hosts:0", host);
         builder.UseSetting($"Tenants:{tenant}:ConnectionString", UnreachableDatabase);
+        builder.UseSetting($"Tenants:{tenant}:SchemaConnectionString", UnreachableDatabase);
         builder.UseSetting($"Tenants:{tenant}:Oidc:Authority", authority);
         builder.UseSetting($"Tenants:{tenant}:Oidc:ClientId", KeycloakFixture.ClientId);
         builder.UseSetting($"Tenants:{tenant}:Oidc:ClientSecret", KeycloakFixture.ClientSecret);

@@ -151,8 +151,10 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifeti
             builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
             builder.UseSetting("Tenants:a:Hosts:0", "localhost");
             builder.UseSetting("Tenants:a:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:b:SchemaConnectionString", UnreachableDatabase);
             UseKeycloak(builder, "a", authority);
             UseKeycloak(builder, "b", authority);
         });

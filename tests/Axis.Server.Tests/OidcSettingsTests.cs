@@ -49,8 +49,10 @@ public sealed class OidcSettingsTests
             .. _completeOidc,
             "Tenants:b:Hosts:0=b.example.test",
             $"Tenants:b:ConnectionString={UnreachableDatabase}",
+            $"Tenants:b:SchemaConnectionString={UnreachableDatabase}",
             "Tenants:c:Hosts:0=c.example.test",
             $"Tenants:c:ConnectionString={UnreachableDatabase}",
+            $"Tenants:c:SchemaConnectionString={UnreachableDatabase}",
             "Tenants:c:Oidc:ClientId=axis",
         ]);
 
@@ -84,6 +86,7 @@ public sealed class OidcSettingsTests
             builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             foreach (var setting in settings)
             {
                 var separator = setting.IndexOf('=', StringComparison.Ordinal);

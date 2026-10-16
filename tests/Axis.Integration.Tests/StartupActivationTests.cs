@@ -437,16 +437,45 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(DBNull.Value, await ScalarAsync(b, "SELECT to_regclass('axis.releases')::text"));
     }
 
+    [Fact]
+    public async Task Startup_activation_with_a_separate_schema_role_leaves_it_owning_every_axis_and_entities_table()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        var role = $"schema_{Guid.NewGuid():N}";
+        await ScalarAsync(a, $"CREATE ROLE \"{role}\" LOGIN PASSWORD 'axis'");
+        await ScalarAsync(a, $"GRANT CREATE ON DATABASE \"{new NpgsqlConnectionStringBuilder(a).Database}\" TO \"{role}\"");
+        var schemaA = new NpgsqlConnectionStringBuilder(a) { Username = role, Password = "axis" }.ConnectionString;
+        using var folder = ApplicationFolder(TitleField);
+
+        // The runtime connection stays the superuser until the runtime role exists.
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), schemaA: schemaA))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM pg_tables WHERE schemaname IN ('axis', 'entities') AND tableowner <> '{role}'"));
+        Assert.True((long)(await ScalarAsync(a, "SELECT count(*) FROM pg_tables WHERE schemaname = 'entities'"))! > 0);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(
-        string a, string b, string? folder, LogCollector logs, IReadOnlyDictionary<string, string>? settings = null) =>
+        string a,
+        string b,
+        string? folder,
+        LogCollector logs,
+        IReadOnlyDictionary<string, string>? settings = null,
+        string? schemaA = null,
+        string? schemaB = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Platform", a);
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", a);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", schemaA ?? a);
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", b);
+            builder.UseSetting("Tenants:b:SchemaConnectionString", schemaB ?? b);
             builder.UseTestOidc("a", "b");
             builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
             if (folder is not null)

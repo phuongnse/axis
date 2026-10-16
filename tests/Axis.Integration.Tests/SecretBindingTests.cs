@@ -57,6 +57,23 @@ public sealed class SecretBindingTests
     }
 
     [Fact]
+    public void A_worker_whose_tenants_have_only_a_connection_string_starts()
+    {
+        // The worker reads no SchemaConnectionString. Only the server does.
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+        using var host = builder.Build();
+
+        Assert.NotNull(host.Services.GetRequiredService<IDeploymentBindings>());
+    }
+
+    [Fact]
     public void In_development_a_secret_set_in_a_json_file_starts_the_worker()
     {
         using var folder = new TemporaryFolder().With("appsettings.json", SettingsFile(Value));

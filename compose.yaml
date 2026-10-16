@@ -54,6 +54,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Platform: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
+      # Only the server reads this setting. Startup activation uses it.
+      Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
       # The sample extension package payment-references, which the image holds, that the sample declares.
       Extensions__Path: /extensions

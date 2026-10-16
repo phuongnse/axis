@@ -26,6 +26,7 @@ public sealed class TenantLogScopeTests
         {
             ["Tenants:tenant-a:Hosts:0"] = "a.example.test",
             ["Tenants:tenant-a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+            ["Tenants:tenant-a:SchemaConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
         });
         builder.Logging.ClearProviders().AddProvider(logs);
         builder.Services.AddTenancy(builder.Configuration, builder.Environment);
