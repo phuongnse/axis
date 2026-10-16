@@ -4,7 +4,7 @@ using System.Text.Unicode;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 
-namespace Axis.Server.Processes;
+namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Reads the body of a task completion: <c>outcome</c>, one of the step's outcomes ignoring letter
@@ -40,7 +40,7 @@ internal static class TaskCompletionBody
     /// <paramref name="release"/>. <paramref name="readable"/> holds the names of the fields the
     /// user may read, or is null for every field.
     /// </summary>
-    public static TaskCompletionResult Read(
+    public static TaskCompletionBodyResult Read(
         byte[] utf8Body,
         TaskStepModel step,
         FormModel form,
@@ -158,7 +158,7 @@ internal static class TaskCompletionBody
                 }
             }
 
-            return errors.Count > 0 ? new TaskCompletionResult(null, null, errors) : new TaskCompletionResult(outcome, input, null);
+            return errors.Count > 0 ? new TaskCompletionBodyResult(null, null, errors) : new TaskCompletionBodyResult(outcome, input, null);
         }
     }
 
@@ -211,7 +211,7 @@ internal static class TaskCompletionBody
     private static string Pointer(string parent, string name) =>
         $"{parent}/{name.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal)}";
 
-    private static TaskCompletionResult Malformed() =>
+    private static TaskCompletionBodyResult Malformed() =>
         new(null, null, new SortedDictionary<string, string[]>(StringComparer.Ordinal) { [""] = [MalformedBody] });
 }
 
@@ -219,7 +219,7 @@ internal static class TaskCompletionBody
 /// A read completion body: the outcome and the values to write, or the errors, never both.
 /// <see cref="Input"/> is null when the body writes no value.
 /// </summary>
-internal sealed record TaskCompletionResult(
+internal sealed record TaskCompletionBodyResult(
     TaskOutcomeModel? Outcome,
     RecordInput? Input,
     SortedDictionary<string, string[]>? Errors);

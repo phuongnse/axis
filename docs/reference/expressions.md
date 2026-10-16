@@ -367,7 +367,9 @@ interpreter and the SQL translation agree on it:
   is the same instant as the step history's `started_at`.
 - **Start condition.** The start transaction.
 - **Validation.** The transaction that writes the record.
-- **Data source filter.** The query, as PostgreSQL `now()`.
+- **Data source filter.** The query, as PostgreSQL `now()`. A test scenario
+  that sets `now` gives the PostgreSQL setting `axis.now`, which the filter
+  reads first.
 - **Rule.** The transaction of whatever calls it.
 
 A computed field's value is stored and would go stale, so `now()` in a
@@ -544,7 +546,8 @@ These translate to SQL:
 - `year`, `month` and `day`, through `extract`, cast to `bigint`;
 - `addDays`, as `date + integer`;
 - `daysBetween`, as `b - a`;
-- `now()`, as PostgreSQL `now()`, the start time of the query's transaction;
+- `now()`, as the scenario's `axis.now` setting when it is set, and PostgreSQL
+  `now()` otherwise, the start time of the query's transaction;
 - `currentUser()`, as the named parameter `@currentUser`, which the caller
   binds as `text`;
 - rule calls, inlined when the rule body is in the subset. Each argument is

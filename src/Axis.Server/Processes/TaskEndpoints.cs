@@ -25,13 +25,13 @@ namespace Axis.Server.Processes;
 /// A completion takes the application's start lock shared first. When the active release is no
 /// longer the one resolved, it runs again from resolution on the new release, and answers 503
 /// after three attempts.
-/// A completion then locks the task and checks that it is open (409), then the content type (415),
-/// the body (400) and the record write of its values (400, 409). One transaction writes the values,
-/// closes the task, resumes the instance on the outcome's next step and appends the audit record
-/// <c>task.completed</c>. A completion with values then starts the data change triggers of the
-/// update, from the active release, in the same transaction. A completion that fails writes nothing. A task shows its process, step,
-/// outcomes and form as the release its instance is pinned to declares them, and a completion
-/// uses that release too. Its subject label is the record's display field in the task's release.
+/// A completion then locks the task and runs <see cref="TaskCompletionCommand"/>, which checks that
+/// it is open (409), then the content type (415), the body (400) and the record write of its
+/// values (400, 409). One transaction writes the values, closes the task, resumes the instance
+/// on the outcome's next step and appends the audit record <c>task.completed</c>. A completion
+/// that fails writes nothing. A task shows its process, step, outcomes and form as the release
+/// its instance is pinned to declares them, and a completion uses that release too. Its subject
+/// label is the record's display field in the task's release.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
 /// A role assignee counts only when the active release declares the role, so a user whose role the
 /// active release drops can no longer list, read or complete the task.
@@ -95,7 +95,7 @@ internal static class TaskEndpoints
         {
             if (!readable.TryGetValue(task.SubjectEntityId, out var fields))
             {
-                fields = Readable(active.Model, roles, task.SubjectEntityId);
+                fields = TaskCompletionCommand.Readable(active.Model, roles, task.SubjectEntityId);
                 readable[task.SubjectEntityId] = fields;
             }
 
@@ -218,8 +218,9 @@ internal static class TaskEndpoints
     }
 
     /// <summary>
-    /// Completes the locked <paramref name="task"/> in <paramref name="transaction"/>, or returns
-    /// the failure, after which the caller rolls every write back.
+    /// Completes the locked <paramref name="task"/> in <paramref name="transaction"/> with
+    /// <see cref="TaskCompletionCommand"/>, or returns the failure, after which the caller rolls
+    /// every write back.
     /// </summary>
     private static async Task<IResult?> CompleteLockedAsync(
         HttpRequest request,
@@ -234,111 +235,29 @@ internal static class TaskEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        var active = current.Model;
-        if (task is null || task.ApplicationId != active.Manifest.Id)
-        {
-            return TaskNotFound();
-        }
-
-        if (!TaskQueries.MayAct(task, user.Id, roles))
-        {
-            return AssignedToSomeoneElse();
-        }
-
-        if (task.State != ProcessTasks.Open)
-        {
-            return AlreadyCompleted();
-        }
-
-        if (!JsonRequest.IsJson(request))
-        {
-            return JsonRequest.UnsupportedMediaType();
-        }
-
-        var (release, _, step) = await TaskStepAsync(resolver, task, cancellationToken);
-        var form = FormOf(release, task, step);
-        var entity = release.FindEntity(task.SubjectEntityId)
-            ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
-        var readable = Readable(active, roles, task.SubjectEntityId);
-        var body = TaskCompletionBody.Read(await RecordEndpoints.ReadBodyAsync(request, cancellationToken), step, form, entity, release, readable);
-        if (body.Errors is { } errors)
-        {
-            return Results.ValidationProblem(errors);
-        }
-
-        long? readVersion = null;
-        long? writtenVersion = null;
-        IReadOnlyList<string> fields = [];
-        Record? previous = null;
-        Record? updated = null;
-        if (body.Input is { } input)
-        {
-            // The values are written as a record update on the task's release. The lock makes the
-            // read below see the latest version, which the computed fields and validations use.
-            await RecordCommands.LockAsync(connection, entity, task.SubjectId, cancellationToken);
-            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cancellationToken) is not { } stored)
-            {
-                return RecordEndpoints.WriteFailure(new RecordWriteResult(RecordWriteOutcome.NotFound));
-            }
-
-            var computed = RecordComputer.ComputeUpdate(release, entity, stored, input.Values, input.Rows);
-            if (computed.Errors is { } computeErrors)
-            {
-                return Results.ValidationProblem(computeErrors);
-            }
-
-            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now) is { } failures)
-            {
-                return Results.ValidationProblem(failures);
-            }
-
-            var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
-            if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
-            {
-                return result.Outcome == RecordWriteOutcome.StaleVersion ? StaleVersion() : RecordEndpoints.WriteFailure(result);
-            }
-
-            previous = stored;
-            updated = written;
-            readVersion = stored.Version;
-            writtenVersion = written.Version;
-            fields = [.. RecordCommand.SetFields(entity, input)];
-        }
-
-        var outcome = body.Outcome!;
-        if (!await ProcessTasks.TryCompleteAsync(transaction, task.Id, outcome.Name, user.Id, cancellationToken))
-        {
-            return AlreadyCompleted();
-        }
-
-        await ProcessTasks.ResumeAsync(
+        var result = await TaskCompletionCommand.CompleteLockedAsync(
+            connection,
             transaction,
-            task,
-            new TaskCompletion(outcome.Name, outcome.Next, user.Id, user.DisplayName, readVersion, writtenVersion, fields),
             tenantId,
+            current.Model,
+            current.ReleaseId,
+            task,
+            new RecordActor(user.Id, user.DisplayName, roles),
+            (completing, ct) => resolver.GetReleaseModelAsync(completing.ReleaseId, ct),
+            async ct => JsonRequest.IsJson(request) ? await RecordEndpoints.ReadBodyAsync(request, ct) : null,
+            loggerFactory,
             cancellationToken);
-
-        // The triggers run once the task is closed and its instance resumes, so a trigger on the
-        // task's own process finds the instance running and is skipped.
-        if (previous is not null && updated is not null && body.Input is { } saved)
+        return result.Outcome switch
         {
-            await DataChangeTriggerStarts.StartAfterUpdateAsync(
-                transaction,
-                tenantId,
-                active,
-                current.ReleaseId,
-                task.ReleaseId,
-                entity,
-                previous,
-                updated,
-                saved.Rows.Select(rows => rows.Collection.Name),
-                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                cancellationToken);
-        }
-
-        return null;
+            TaskCompletionOutcome.Completed => null,
+            TaskCompletionOutcome.NotFound => TaskNotFound(),
+            TaskCompletionOutcome.Denied => AssignedToSomeoneElse(),
+            TaskCompletionOutcome.AlreadyCompleted => AlreadyCompleted(),
+            TaskCompletionOutcome.UnsupportedContent => JsonRequest.UnsupportedMediaType(),
+            TaskCompletionOutcome.Invalid => Results.ValidationProblem(result.Errors!),
+            TaskCompletionOutcome.StaleVersion => StaleVersion(),
+            _ => RecordEndpoints.WriteFailure(result.Write!),
+        };
     }
 
     /// <summary>
@@ -355,10 +274,10 @@ internal static class TaskEndpoints
     {
         var (release, process, step) = await TaskStepAsync(resolver, task, cancellationToken);
         var labels = await ReadLabelsAsync(connection, [(task, release)], cancellationToken);
-        var formModel = FormOf(release, task, step);
+        var formModel = TaskCompletionCommand.FormOf(release, task, step);
         var form = ApplicationSites.DescribeForm(release, formModel.Name);
         var entity = ApplicationSites.DescribeEntity(release, formModel.Entity.Name);
-        var readable = Readable(active, roles, task.SubjectEntityId);
+        var readable = TaskCompletionCommand.Readable(active, roles, task.SubjectEntityId);
         var sections = form.Sections;
         if (readable is not null)
         {
@@ -389,22 +308,13 @@ internal static class TaskEndpoints
             task.Outcome);
     }
 
-    private static FormModel FormOf(ApplicationModel release, ProcessTaskRow task, TaskStepModel step) =>
-        release.TryGetForm(step.Form.Name, out var form)
-            ? form
-            : throw new InvalidOperationException($"The form of task '{task.Id}' is not in its release.");
-
     /// <summary>The model of the task's release, with the task's process and step as that release declares them.</summary>
     private static async Task<(ApplicationModel Release, ProcessModel Process, TaskStepModel Step)> TaskStepAsync(
         ActiveApplicationResolver resolver, ProcessTaskRow task, CancellationToken cancellationToken)
     {
-        // The worker created the task from this release, so its process and task step are in it.
         var release = await resolver.GetReleaseModelAsync(task.ReleaseId, cancellationToken);
-        var process = release.Processes.FirstOrDefault(candidate => candidate.Id == task.ProcessId)
-            ?? throw new InvalidOperationException($"The process of task '{task.Id}' is not in its release.");
-        return process.TryGetStep(task.Step, out var found) && found is TaskStepModel step
-            ? (release, process, step)
-            : throw new InvalidOperationException($"The task step of task '{task.Id}' is not in its release.");
+        var (process, step) = TaskCompletionCommand.StepOf(release, task);
+        return (release, process, step);
     }
 
     /// <summary>
@@ -451,16 +361,6 @@ internal static class TaskEndpoints
         var labelled = entity.DisplayField is { } displayField && (readable is null || readable.Contains(displayField));
         return new TaskSubject(entity.Name, task.SubjectId, labelled ? labels.GetValueOrDefault((task.ReleaseId, task.SubjectId)) : null);
     }
-
-    /// <summary>
-    /// The declared names of the fields of the subject entity that <paramref name="roles"/> may
-    /// read in the <paramref name="active"/> release, or null for every field. A user with no
-    /// <c>read</c> grant on it, or a subject entity no longer in the release, reads no field.
-    /// </summary>
-    private static IReadOnlySet<string>? Readable(ApplicationModel active, IEnumerable<string> roles, Guid subjectEntityId) =>
-        active.FindEntity(subjectEntityId) is { } entity
-            ? PolicyEvaluator.Fields(active, roles, entity, PolicyAction.Read)
-            : new HashSet<string>(StringComparer.Ordinal);
 
     private static IResult SignInRequired() =>
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to work on tasks.");

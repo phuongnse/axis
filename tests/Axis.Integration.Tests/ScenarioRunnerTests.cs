@@ -274,11 +274,166 @@ public sealed class ScenarioRunnerTests
         Assert.Contains("Usage:", output.ToString());
     }
 
-    private static async Task<ScenarioResult> RunAsync(TemporaryFolder folder, string name)
+    private const string Purchasing = """
+        { "anna": ["employee"], "binh": ["department-manager"], "dung": ["department-manager"], "chau": ["finance-reviewer"] }
+        """;
+
+    private const string CreateRequest = """
+        { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "Chairs", "manager": "binh", "amount": 5000 } },
+        """;
+
+    private const string StartApproval = """
+        { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+        """;
+
+    [Fact]
+    public async Task A_request_below_the_threshold_is_approved_when_the_manager_completes_the_task()
+    {
+        using var folder = PurchaseApplication(Scenario("BelowThreshold", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "managerApproval" },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "open" },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "approved" } }
+            """));
+
+        var result = await RunAsync(folder, "BelowThreshold");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_request_at_the_threshold_waits_for_the_finance_reviewer_after_the_manager()
+    {
+        using var folder = PurchaseApplication(Scenario("AtThreshold", Purchasing, """
+            { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "Servers", "manager": "binh", "amount": 10000 } },
+            """ + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" },
+            { "type": "expectTask", "record": "request", "step": "financeApproval", "assignee": { "role": "finance-reviewer" } },
+            { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "reject", "as": "chau" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "rejected" } }
+            """));
+
+        var result = await RunAsync(folder, "AtThreshold");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_start_without_a_grant_a_completion_by_a_non_assignee_and_a_second_start_are_refused_as_expected()
+    {
+        using var folder = PurchaseApplication(Scenario("Refused", Purchasing, CreateRequest + """
+            { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "chau", "expect": "denied" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "notFound" },
+            """ + StartApproval + """
+            { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna", "expect": "conflict" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "dung", "expect": "denied" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "conflict" }
+            """));
+
+        var result = await RunAsync(folder, "Refused");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_completion_by_a_non_assignee_without_an_expectation_fails_with_the_denied_outcome()
+    {
+        using var folder = PurchaseApplication(Scenario("NotTheAssignee", Purchasing, CreateRequest + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "dung" }
+            """));
+
+        var result = await RunAsync(folder, "NotTheAssignee");
+
+        Assert.False(result.Passed);
+        Assert.StartsWith("Step 3 (completeTask): ", result.Failure);
+        Assert.Contains("Denied", result.Failure);
+    }
+
+    [Fact]
+    public async Task A_completion_writes_the_values_the_form_makes_editable_and_refuses_a_read_only_field()
+    {
+        using var written = PurchaseApplication(Scenario("EditableValue", Purchasing, CreateRequest + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "values": { "decisionComments": "ok" } },
+            { "type": "expectRecord", "record": "request", "values": { "decisionComments": "ok", "status": "approved" } }
+            """));
+        using var refused = PurchaseApplication(Scenario("ReadOnlyValue", Purchasing, CreateRequest + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "values": { "amount": 5 }, "expect": { "invalid": "amount" } },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "open" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "values": { "amount": 5 } }
+            """));
+
+        var passed = await RunAsync(written, "EditableValue");
+        var failed = await RunAsync(refused, "ReadOnlyValue");
+
+        Assert.True(passed.Passed, passed.Failure);
+        Assert.False(failed.Passed);
+        Assert.StartsWith("Step 5 (completeTask): ", failed.Failure);
+        Assert.Contains("/values/amount", failed.Failure);
+    }
+
+    [Fact]
+    public async Task A_failed_task_or_instance_expectation_names_the_step_and_both_values()
+    {
+        using var task = PurchaseApplication(Scenario("WrongAssignee", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "dung" } }
+            """));
+        using var instance = PurchaseApplication(Scenario("WrongState", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" }
+            """));
+        using var noTask = PurchaseApplication(Scenario("NoTaskYet", Purchasing, CreateRequest + """
+            { "type": "expectTask", "record": "request", "step": "financeApproval", "state": "open" }
+            """));
+
+        var wrongAssignee = await RunAsync(task, "WrongAssignee");
+        var wrongState = await RunAsync(instance, "WrongState");
+        var missing = await RunAsync(noTask, "NoTaskYet");
+
+        Assert.Equal(
+            "Step 3 (expectTask): task 'managerApproval' expected assignee user 'dung' but was user 'binh'", wrongAssignee.Failure);
+        Assert.StartsWith("Step 3 (expectInstance): ", wrongState.Failure);
+        Assert.Contains("expected state completed but was waiting", wrongState.Failure);
+        Assert.Contains("managerApproval", wrongState.Failure);
+        Assert.Equal("Step 2 (expectTask): no task of step 'financeApproval' exists for record 'request'", missing.Failure);
+    }
+
+    [Fact]
+    public async Task The_scenario_time_decides_the_sequence_year_and_the_value_now_gives()
+    {
+        using var folder = PurchaseApplication(Scenario("FixedTime", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectRecord", "record": "request", "values": { "number": "PR-2031-00001", "status": "submitted", "submittedAt": "2031-03-01T09:00:00Z" } }
+            """, now: "2031-03-01T10:00:00+01:00"));
+
+        var result = await RunAsync(folder, "FixedTime");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task An_action_that_runs_more_work_items_than_the_limit_fails_at_that_step()
+    {
+        using var folder = PurchaseApplication(Scenario("TooManySteps", Purchasing, CreateRequest + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" }
+            """));
+
+        var result = await RunAsync(folder, "TooManySteps", workItemLimit: 2);
+
+        Assert.False(result.Passed);
+        Assert.StartsWith("Step 3 (completeTask): ", result.Failure);
+        Assert.Contains("more than 2 work items", result.Failure);
+    }
+
+    private static async Task<ScenarioResult> RunAsync(TemporaryFolder folder, string name, int workItemLimit = ScenarioRunner.WorkItemLimit)
     {
         var scenario = Axis.Configuration.Loading.ApplicationLoader.Load(folder.Path).Scenarios.Single(candidate => candidate.Name == name);
         return await ScenarioRunner.RunAsync(
-            folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), NullLoggerFactory.Instance, CancellationToken);
+            folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), NullLoggerFactory.Instance, CancellationToken, workItemLimit);
     }
 
     private static async Task<bool> DatabaseExistsAsync(string name)
@@ -291,10 +446,18 @@ public sealed class ScenarioRunnerTests
     }
 
     /// <summary>A copy of the ScenarioApp fixture with the given scenario files added under <c>scenarios/</c>.</summary>
-    private static TemporaryFolder Application(params (string Name, string Json)[] scenarios)
+    private static TemporaryFolder Application(params (string Name, string Json)[] scenarios) =>
+        Application("ScenarioApp", scenarios);
+
+    private static TemporaryFolder Application((string Name, string Json) scenario) => Application([scenario]);
+
+    /// <summary>A copy of the ScenarioPurchaseApp fixture, a purchase request with an approval process, with the scenario added.</summary>
+    private static TemporaryFolder PurchaseApplication((string Name, string Json) scenario) => Application("ScenarioPurchaseApp", [scenario]);
+
+    private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios)
     {
         var folder = new TemporaryFolder();
-        var source = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ScenarioApp");
+        var source = Path.Combine(AppContext.BaseDirectory, "Fixtures", fixture);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(source, file);
@@ -309,14 +472,13 @@ public sealed class ScenarioRunnerTests
         return folder;
     }
 
-    private static TemporaryFolder Application((string Name, string Json) scenario) => Application([scenario]);
-
-    private static (string Name, string Json) Scenario(string name, string users, string steps) => (name, $$"""
+    private static (string Name, string Json) Scenario(string name, string users, string steps, string? now = null) => (name, $$"""
         {
           "id": "{{Guid.NewGuid()}}",
           "kind": "scenario",
           "name": "{{name}}",
           "formatVersion": 1,
+          {{(now is null ? "" : $"\"now\": \"{now}\",")}}
           "users": {{users}},
           "steps": [{{steps}}]
         }

@@ -1,0 +1,34 @@
+{
+  "id": "c5d97ad4-70c1-48f4-b0b1-f7a4ceeb81b1",
+  "kind": "form",
+  "name": "PurchaseRequestReview",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "sections": [
+    {
+      "title": {
+        "textKey": "purchaseRequest.sections.request"
+      },
+      "fields": [
+        {
+          "field": "title",
+          "readOnly": true
+        },
+        {
+          "field": "amount",
+          "readOnly": true
+        }
+      ]
+    },
+    {
+      "title": {
+        "textKey": "purchaseRequest.sections.decision"
+      },
+      "fields": [
+        {
+          "field": "decisionComments"
+        }
+      ]
+    }
+  ]
+}

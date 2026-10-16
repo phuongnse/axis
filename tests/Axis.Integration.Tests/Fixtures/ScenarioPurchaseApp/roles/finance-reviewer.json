@@ -1,0 +1,9 @@
+{
+  "id": "30156033-e12e-4996-8128-688ace639665",
+  "kind": "role",
+  "name": "finance-reviewer",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.financeReviewer"
+  }
+}

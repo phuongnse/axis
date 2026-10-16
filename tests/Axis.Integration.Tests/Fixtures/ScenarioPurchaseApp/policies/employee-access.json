@@ -1,0 +1,25 @@
+{
+  "id": "6d6dfe37-d306-4bc7-af2b-7c851907d972",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": [
+    "employee"
+  ],
+  "grants": [
+    {
+      "entity": "PurchaseRequest",
+      "actions": [
+        "read",
+        "create",
+        "update"
+      ]
+    },
+    {
+      "process": "PurchaseRequestApproval",
+      "actions": [
+        "start"
+      ]
+    }
+  ]
+}
