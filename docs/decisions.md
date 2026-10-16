@@ -1109,9 +1109,11 @@ work without the code its release pins.
 
 ## D30. Schema migrations — Agreed
 
-Activation applies the `renameField`, `dropField` and `dropEntity` migrations
-once per tenant. The start lock, the old-release work check, `fill`, `convert`
-and the recompute of computed fields are not built yet *(planned for M6)*. Migrations
+Activation applies the `renameField`, `dropField`, `dropEntity` and `fill`
+migrations once per tenant. The start lock, the old-release work check, `convert`
+and the recompute of computed fields are not built yet *(planned for M6)*. Until
+the recompute is built, a `fill` on a child entity and a `fill` of a field that
+a computed field reads are refused. Migrations
 change entity storage in ways that are not additive, before provisioning.
 See [configuration](reference/configuration.md#resource-file-shape) for the
 resource shape and [storage](reference/storage.md#migrations) for planning,
