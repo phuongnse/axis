@@ -6,6 +6,7 @@ using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Seeding;
 using Axis.Data.Storage;
+using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Storage;
 using Microsoft.EntityFrameworkCore;
@@ -110,7 +111,7 @@ public static class ScenarioRunner
         }
 
         var bindings = new ActivationBindings(TenantId, new Dictionary<string, ActivationBinding>(), AllowHttp: false);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, cancellationToken);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, cancellationToken);
         if (activated.Diagnostics.Count > 0)
         {
             return Setup("could not be activated", activated.Diagnostics);

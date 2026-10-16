@@ -87,7 +87,7 @@ internal sealed partial class StartupActivation(
                     throw Failure("does not compile", compiled.Diagnostics, folder, tenantId);
                 }
 
-                var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, cancellationToken);
+                var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, cancellationToken);
                 if (activated.Diagnostics.Count > 0)
                 {
                     LogDiagnostics(activated.Diagnostics, folder, tenantId);

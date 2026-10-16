@@ -5,6 +5,7 @@ using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Data.Schema;
+using Axis.Processes.Instances;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -654,6 +655,103 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
     }
 
+    [Fact]
+    public async Task A_pending_drop_field_is_refused_while_a_waiting_instance_is_pinned_to_a_release_that_has_the_field_and_applies_once_it_ends()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        var instance = await InsertInstanceAsync(first.Release!.Id, ProcessStarts.Waiting);
+        folder
+            .With("entities/order.json", Order(NumberField))
+            .With("migrations/0001-drop-note.json", Migration(_migrationId, "Order", """[{ "type": "dropField", "field": "note" }]"""));
+        var second = await CompileAsync(folder);
+        var before = await ReadStateAsync(_orderId);
+
+        var refused = await ActivateAsync(second);
+
+        var diagnostic = Assert.Single(refused.Diagnostics);
+        Assert.Equal(DiagnosticCodes.OldReleaseWorkOpen, diagnostic.Code);
+        Assert.Equal(_migrationId, diagnostic.ResourceId);
+        Assert.Equal("migrations/0001-drop-note.json", diagnostic.File);
+        Assert.Contains($"'{first.Release.Id}'", diagnostic.Message);
+        Assert.Contains(" 1 running or waiting ", diagnostic.Message);
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Equal(first.Release.Id, await ReadActiveReleaseIdAsync());
+
+        await SetInstanceStateAsync(instance, ProcessStarts.Completed);
+        var applied = await ActivateAsync(second);
+
+        Assert.Empty(applied.Diagnostics);
+        Assert.Equal(["id", "version", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+        Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_pending_rename_of_a_field_the_release_of_a_waiting_instance_does_not_have_is_applied_at_once()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertInstanceAsync(first.Release!.Id, ProcessStarts.Waiting);
+        folder.With("entities/order.json", Order(NumberField, NoteField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        folder
+            .With("entities/order.json", Order(NumberField, RemarkField))
+            .With("migrations/0001-rename-note.json", RenameMigration(_migrationId, "note", "remark"));
+        var third = await CompileAsync(folder);
+
+        var result = await ActivateAsync(third);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(third.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_pending_fill_is_applied_while_an_instance_pinned_to_an_older_release_waits()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertOrderAsync("PO-1", null);
+        await InsertInstanceAsync(first.Release!.Id, ProcessStarts.Waiting);
+        folder
+            .With("entities/order.json", Order(NumberField, RequiredNoteField))
+            .With("migrations/0001-fill-note.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "note", "value": "'n/a'" }]"""));
+        var second = await CompileAsync(folder);
+
+        var result = await ActivateAsync(second);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(["PO-1: n/a"], await ReadOrderNotesAsync());
+        Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_pending_type_convert_is_refused_while_a_waiting_instance_is_pinned_to_a_release_that_has_the_field()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, TextQuantityField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_quantity", "7"));
+        await InsertInstanceAsync(first.Release!.Id, ProcessStarts.Waiting);
+        folder
+            .With("entities/order.json", Order(NumberField, IntegerQuantityField))
+            .With("migrations/0001-convert-quantity.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "quantity", "value": "quantity" }]"""));
+        var before = await ReadStateAsync(_orderId);
+
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.OldReleaseWorkOpen, diagnostic.Code);
+        Assert.Equal(_migrationId, diagnostic.ResourceId);
+        Assert.Equal("text", Assert.Single(Assert.Single(await ReadTablesAsync(_orderId)).Columns, column => column.Name == "f_quantity").Type);
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Equal(first.Release.Id, await ReadActiveReleaseIdAsync());
+    }
+
     // A connection with an open transaction that holds the application's start lock shared.
     private async Task<OpenStart> OpenStartAsync()
     {
@@ -760,7 +858,38 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
         IActiveReleaseStore store = new ActiveReleaseStore(configuration);
-        return await ReleaseActivator.ActivateAsync(compiled, wrap?.Invoke(store) ?? store, data, ActivationBindings.None("default"), CancellationToken);
+        return await ReleaseActivator.ActivateAsync(compiled, wrap?.Invoke(store) ?? store, data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
+    }
+
+    // An instance of the order process, pinned to the release, in the given state.
+    private async Task<Guid> InsertInstanceAsync(Guid releaseId, string state)
+    {
+        var id = Guid.NewGuid();
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand(
+            """
+            INSERT INTO axis.process_instances
+                (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step)
+            VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, 'approve')
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", _applicationId);
+        command.Parameters.AddWithValue("process", Guid.NewGuid());
+        command.Parameters.AddWithValue("entity", _orderId);
+        command.Parameters.AddWithValue("subject", Guid.NewGuid());
+        command.Parameters.AddWithValue("release", releaseId);
+        command.Parameters.AddWithValue("state", state);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+        return id;
+    }
+
+    private async Task SetInstanceStateAsync(Guid id, string state)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("UPDATE axis.process_instances SET state = @state WHERE id = @id");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
     private async Task<Guid> InsertOrderAsync(string number, string? note)

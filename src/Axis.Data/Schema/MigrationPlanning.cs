@@ -59,6 +59,8 @@ internal sealed class MigrationPlanning
 
     public List<MigrationRecordChange> RecordChanges { get; } = [];
 
+    public List<DestructiveChange> DestructiveChanges { get; } = [];
+
     public CatalogSnapshot Catalog => new(_tables);
 
     public ProvisioningRecords Records => new(_entities, _enumValues);
@@ -81,13 +83,13 @@ internal sealed class MigrationPlanning
         switch (change.Type)
         {
             case MigrationChangeType.RenameField:
-                Rename(tableIndex, id, change);
+                Rename(migration, tableIndex, id, change);
                 break;
             case MigrationChangeType.DropField:
-                Drop(tableIndex, id, change);
+                Drop(migration, tableIndex, id, change);
                 break;
             case MigrationChangeType.DropEntity:
-                DropEntity(id, table);
+                DropEntity(migration, id, table);
                 break;
             case MigrationChangeType.Fill:
                 Fill(migration, index, tableIndex, id, change);
@@ -325,6 +327,7 @@ internal sealed class MigrationPlanning
                 && string.Equals(value.FieldName, change.Field, StringComparison.OrdinalIgnoreCase)
                 && removed.Contains(value.Value, StringComparer.Ordinal));
             RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.Convert, entityId, change.Field, null) { Values = removed });
+            DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.Field));
             return;
         }
 
@@ -345,6 +348,7 @@ internal sealed class MigrationPlanning
         {
             Columns = [.. table.Columns.Select(candidate => candidate == existing ? existing with { Type = expected } : candidate)],
         };
+        DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.Field));
     }
 
     // The release names the field by its last name, so a rename after the fill gives the names to look for.
@@ -387,7 +391,7 @@ internal sealed class MigrationPlanning
         _ => false,
     };
 
-    private void Rename(int tableIndex, Guid entityId, MigrationChangeModel change)
+    private void Rename(MigrationModel migration, int tableIndex, Guid entityId, MigrationChangeModel change)
     {
         var table = _tables[tableIndex];
         var from = EntityNaming.Column(change.From!);
@@ -424,9 +428,10 @@ internal sealed class MigrationPlanning
         }
 
         RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.RenameField, entityId, change.From, change.To));
+        DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.From));
     }
 
-    private void Drop(int tableIndex, Guid entityId, MigrationChangeModel change)
+    private void Drop(MigrationModel migration, int tableIndex, Guid entityId, MigrationChangeModel change)
     {
         var table = _tables[tableIndex];
         var name = EntityNaming.Column(change.Field!);
@@ -440,9 +445,10 @@ internal sealed class MigrationPlanning
         _tables[tableIndex] = table with { Columns = [.. table.Columns.Where(candidate => candidate.Name != name)] };
         _enumValues.RemoveAll(recorded => recorded.EntityId == entityId && string.Equals(recorded.FieldName, change.Field, StringComparison.OrdinalIgnoreCase));
         RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.DropField, entityId, change.Field, null));
+        DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.Field));
     }
 
-    private void DropEntity(Guid entityId, string table)
+    private void DropEntity(MigrationModel migration, Guid entityId, string table)
     {
         // Child tables come before the table they reference, deepest first. Never CASCADE.
         var dropped = new List<string>();
@@ -467,6 +473,7 @@ internal sealed class MigrationPlanning
                 _entities.RemoveAll(entity => entity.EntityId == id);
                 _enumValues.RemoveAll(value => value.EntityId == id);
                 RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.DropEntity, id, null, null));
+                DestructiveChanges.Add(new DestructiveChange(migration, id, null));
             }
         }
     }

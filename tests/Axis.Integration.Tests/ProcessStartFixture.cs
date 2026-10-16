@@ -5,6 +5,7 @@ using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -207,7 +208,7 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration);
         Assert.Empty(compiled.Diagnostics);
         IActiveReleaseStore store = new ActiveReleaseStore(configuration);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, wrap?.Invoke(store) ?? store, data, ActivationBindings.None("a"));
+        var activated = await ReleaseActivator.ActivateAsync(compiled, wrap?.Invoke(store) ?? store, data, ActivationBindings.None("a"), OpenInstanceCounter.Instance);
         Assert.Empty(activated.Diagnostics);
         return (compiled.Release!.Id, compiled.Model!);
     }

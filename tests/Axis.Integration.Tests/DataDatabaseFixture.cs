@@ -1,11 +1,12 @@
 using Axis.Configuration.Storage;
 using Axis.Data.Storage;
+using Axis.Processes.Storage;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
 
-/// <summary>A real PostgreSQL database with the configuration and data modules' migrations applied.</summary>
+/// <summary>A real PostgreSQL database with the configuration, data and processes modules' migrations applied.</summary>
 public sealed class DataDatabaseFixture : IAsyncLifetime
 {
     private readonly PostgreSqlFixture _database = new();
@@ -44,6 +45,11 @@ public sealed class DataDatabaseFixture : IAsyncLifetime
 
         await using var data = CreateContext();
         await data.Database.MigrateAsync();
+
+        await using var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>()
+            .UseNpgsql(ConnectionString)
+            .Options);
+        await processes.Database.MigrateAsync();
     }
 
     public async ValueTask DisposeAsync() => await _database.DisposeAsync();

@@ -335,9 +335,9 @@ child tables are in [Schema planning](#schema-planning).
 
 The migration resource, its compile checks and the once-per-tenant apply of
 `renameField`, `dropField`, `dropEntity`, `fill` and `convert` at activation are
-built, and so is the start lock. The old-release work check and the recompute
-of computed fields are *(planned for M6)*, and so are the rules, table rows
-and example below that use them. Until the recompute is built, a `fill` or
+built, and so are the start lock and the old-release work check. The recompute
+of computed fields is *(planned for M6)*, and so are the rules, table rows
+and example steps below that use it. Until the recompute is built, a `fill` or
 `convert` on a child entity and a `fill` or `convert` of a field that a computed
 field reads are `AXC0175`. This section records
 [D30](../decisions.md#d30-schema-migrations--agreed).
@@ -358,7 +358,9 @@ Migrations run forward only.
      The schema lock already keeps those rows from changing in between.
   3. Check changed history. Any diagnostic stops the activation. *(Built.)*
   4. Count old-release work for the destructive changes below. Any such
-     work stops the activation with a diagnostic. *(Planned for M6.)*
+     work stops the activation with `AXC0178`. *(Built.)* The count runs
+     after planning and before the first statement, and only when the plan
+     holds a destructive change that plans a statement.
   5. Run pending migrations in ordinal path order, and changes in file order.
      *(Built for `renameField`, `dropField`, `dropEntity`, `fill` and `convert`.
      A `fill` runs one `UPDATE` that counts the rows it left `null`. Any such row
@@ -387,15 +389,22 @@ Migrations run forward only.
   that lacks an applied migration file is refused, so an older release
   without that file cannot be activated again. The way back is a new
   release with a new forward migration.
-- **Old-release work** *(planned for M6)*. After taking both locks, count `running` and
+- **Old-release work** *(built)*. After taking both locks, count `running` and
   `waiting` process instances pinned to a release other than the one being
-  activated whose model has the column the change affects. This applies to
-  `renameField` (its `from` column), `dropField`, `dropEntity` (its tables'
-  columns) and `convert`. For each such release, a new diagnostic names the
-  migration, the release and the count of open instances. Activation then
-  changes nothing. A `fill` or an additive change never waits for old-release
-  work.
-- **Start lock** *(built; the count it protects is planned for M6)*. Every
+  activated whose stored model has the column the change affects. This applies to
+  `renameField` (its `from` column), `dropField`, `dropEntity` (the dropped
+  entity and the child entities dropped with it) and `convert`. A release
+  has the column when its stored entity has the same entity id and a field of
+  that name, ignoring letter case. For each such release and migration,
+  `AXC0178` names the migration, the release and the count of open instances.
+  It is reported at the migration file with an empty path, and the migration
+  `id` is its `resourceId`. Activation then changes nothing. A release whose
+  stored content cannot be found counts as using every column. A `fill`, an
+  additive change and a change that plans no statement never wait for
+  old-release work. Instances of the release being activated and of other
+  applications do not count. Once the old instances end, activating the same
+  release again applies the migration.
+- **Start lock** *(built)*. Every
   transaction that reads the active release and inserts a process instance
   takes `pg_advisory_xact_lock_shared` keyed on the application `id`, before
   it reads the active release. The key is a `bigint`: the XOR of the two
@@ -437,11 +446,11 @@ Migrations run forward only.
 
 | Change | SQL | Waits for old-release work |
 | --- | --- | --- |
-| `renameField` | `ALTER TABLE ... RENAME COLUMN`, plus `RENAME CONSTRAINT` for its `uq_` and `fk_` names, which hash the column name | Yes *(planned for M6)* |
-| `dropField` | `ALTER TABLE ... DROP COLUMN`, without `CASCADE` | Yes *(planned for M6)* |
-| `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes *(planned for M6)* |
+| `renameField` | `ALTER TABLE ... RENAME COLUMN`, plus `RENAME CONSTRAINT` for its `uq_` and `fk_` names, which hash the column name | Yes |
+| `dropField` | `ALTER TABLE ... DROP COLUMN`, without `CASCADE` | Yes |
+| `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes |
 | `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` *(built, except for a child entity and a field a computed field reads)* | No |
-| `convert` | For a type change, `ADD COLUMN axis_convert`, `UPDATE ... SET axis_convert = (<value>)::<type>`, `ALTER COLUMN ... TYPE ... USING axis_convert`, then `DROP COLUMN axis_convert`. For removed enum values, `UPDATE ... SET f = <value> WHERE f IN (<removed>)` *(built, except for a child entity and a field a computed field reads)* | Yes *(planned for M6)* |
+| `convert` | For a type change, `ADD COLUMN axis_convert`, `UPDATE ... SET axis_convert = (<value>)::<type>`, `ALTER COLUMN ... TYPE ... USING axis_convert`, then `DROP COLUMN axis_convert`. For removed enum values, `UPDATE ... SET f = <value> WHERE f IN (<removed>)` *(built, except for a child entity and a field a computed field reads)* | Yes |
 | Additive changes | As in [Schema planning](#schema-planning) today | No |
 
 A `fill` on a missing column adds it as nullable before the `UPDATE`.
@@ -494,7 +503,8 @@ records a migration only when activation commits. The table has an index on
 ### Example: renaming a field while a task waits
 
 This example uses the purchase request migration in
-[configuration](configuration.md#resource-file-shape) *(planned for M6)*.
+[configuration](configuration.md#resource-file-shape). Its recompute of
+computed fields is *(planned for M6)*.
 R1 and R2 stand for stored release UUIDs of the same application.
 
 1. R1 is active. An employee submits a purchase request. Its process
@@ -502,13 +512,13 @@ R1 and R2 stand for stored release UUIDs of the same application.
 2. R2 adds `RenameDecisionComments`. Its entity file renames
    `decisionComments` to `reviewComments` and adds the required `priority`.
    The migration renames the column and fills `priority` with `'normal'`.
-3. Activating R2 is refused with a new diagnostic naming migration
+3. Activating R2 is refused with `AXC0178`, naming migration
    `RenameDecisionComments`, release R1 and 1 open instance. R1 stays active.
    No schema, stored value or migration record changes.
 4. The manager approves. The instance runs to `completed`.
 5. Once no `running` or `waiting` instance is pinned to R1, activating R2
    applies the rename and fill, provisions the required constraint,
-   recomputes affected computed fields and switches the active release and
+   recomputes affected computed fields *(planned for M6)* and switches the active release and
    site paths in one transaction.
 
 New submissions while R1 is active also count. On a busy application, the
@@ -518,10 +528,8 @@ in an earlier release never waits for old-release work.
 
 ### Limits
 
-These limits apply to migrations. Those about `fill`, `convert` and
-old-release work are *(planned for M6)*. Until the old-release check is
-built, a running or waiting process instance of an older release can fail at
-its next step after a rename or a drop.
+These limits apply to migrations. Those about the recompute of computed
+fields by a `fill` or `convert` are *(planned for M6)*.
 
 - A large `fill` or `convert` holds the schema lock and its row locks until
   commit. There are no batched backfills.

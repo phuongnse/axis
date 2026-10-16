@@ -20,6 +20,10 @@ public sealed class SchemaPlannerTests
     private static readonly Guid _supplierId = Guid.Parse("33333333-3333-4333-8333-333333333333");
     private static readonly Guid _lineId = Guid.Parse("44444444-4444-4444-8444-444444444444");
 
+    // The entity and field of each destructive change, in order.
+    private static List<(Guid EntityId, string? Field)> DestructiveTargets(SchemaPlan plan) =>
+        [.. plan.DestructiveChanges.Select(change => (change.EntityId, change.Field))];
+
     [Fact]
     public void Empty_catalog_creates_every_table_before_any_foreign_key_and_records_entities_and_enum_values()
     {
@@ -532,6 +536,7 @@ public sealed class SchemaPlannerTests
                 new MigrationRecordChange(MigrationChangeType.RenameField, _orderId, "status", "state"),
             ],
             plan.RecordChanges);
+        Assert.Equal([(_orderId, "code"), (_orderId, "customer"), (_orderId, "status")], DestructiveTargets(plan));
         Assert.Empty(plan.NewEnumValues);
     }
 
@@ -560,6 +565,7 @@ public sealed class SchemaPlannerTests
                 new MigrationRecordChange(MigrationChangeType.DropField, _orderId, "status", null),
             ],
             plan.RecordChanges);
+        Assert.Equal([(_orderId, "note"), (_orderId, "status")], DestructiveTargets(plan));
     }
 
     [Fact]
@@ -578,6 +584,7 @@ public sealed class SchemaPlannerTests
                 new MigrationRecordChange(MigrationChangeType.DropEntity, _orderId, null, null),
             ],
             plan.RecordChanges);
+        Assert.Equal([(_lineId, null), (_orderId, null)], DestructiveTargets(plan));
     }
 
     [Fact]
@@ -597,6 +604,7 @@ public sealed class SchemaPlannerTests
         Assert.Equal((DiagnosticCodes.RemovedField, "entities/order.json"), (diagnostic.Code, diagnostic.File));
         AssertNothingPlanned(plan);
         Assert.Empty(plan.RecordChanges);
+        Assert.Empty(plan.DestructiveChanges);
     }
 
     [Fact]
@@ -612,6 +620,7 @@ public sealed class SchemaPlannerTests
 
         Assert.Empty(plan.Diagnostics);
         Assert.Empty(plan.RecordChanges);
+        Assert.Empty(plan.DestructiveChanges);
         Assert.Equal(model.Entities.Count, plan.Statements.Count(statement => statement.StartsWith("CREATE TABLE", StringComparison.Ordinal)));
         Assert.DoesNotContain(plan.Statements, statement => statement.Contains("RENAME", StringComparison.Ordinal) || statement.StartsWith("DROP", StringComparison.Ordinal));
     }
@@ -636,6 +645,7 @@ public sealed class SchemaPlannerTests
             ],
             plan.Statements);
         Assert.All(plan.Commands, command => Assert.Equal(new ConvertTarget(migration.Id, "migrations/0001-order.json", 0, "note", false), command.Convert));
+        Assert.Equal([(_orderId, "note")], DestructiveTargets(plan));
     }
 
     [Fact]
@@ -749,6 +759,7 @@ public sealed class SchemaPlannerTests
         var fill = plan.Commands[0];
         Assert.Equal([new SqlValue("f0", ExpressionTypeKind.Integer, 0L)], fill.Parameters);
         Assert.Equal(new FillTarget(migration.Id, "migrations/0001-order.json", 0, "amount"), fill.Fill);
+        Assert.Empty(plan.DestructiveChanges);
         Assert.Null(plan.Commands[1].Fill);
     }
 

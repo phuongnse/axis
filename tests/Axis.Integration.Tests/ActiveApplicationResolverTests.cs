@@ -3,6 +3,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
 using Axis.Core.Tenancy;
 using Axis.Data;
+using Axis.Processes.Instances;
 using Axis.Server.Applications;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -166,6 +167,6 @@ public sealed class ActiveApplicationResolverTests(DataDatabaseFixture database)
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken);
+        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
     }
 }

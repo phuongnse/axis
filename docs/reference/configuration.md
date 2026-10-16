@@ -562,6 +562,9 @@ flowchart LR
    definitions of the release. Pending [migrations](storage.md#migrations)
    run first: a `renameField`, `dropField`, `dropEntity`, `fill` or `convert` is
    applied once per tenant. A `convert` that fails for a stored row is `AXC0177`.
+   A `renameField`, `dropField`, `dropEntity` or `convert` is refused with `AXC0178`
+   while a running or waiting process instance is pinned to another release that
+   uses the changed column.
    A `fill` makes a field that was `null` in some rows
    `NOT NULL` when the release requires it. Then additive changes are planned and applied.
    Other incompatible changes stay rejected with a diagnostic. See
@@ -802,6 +805,7 @@ sorted by file and then path.
 | `AXC0175` | A pending migration holds a `fill` or `convert` on a child entity, or a `fill` or `convert` of a field that a computed field reads, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until activation can recompute computed fields. |
 | `AXC0176` | A pending `fill` leaves a `null` in some row, because its value is `null` for that row. Reported at `/changes/{i}/value` of the migration file, with the number of rows in the message. Nothing is applied. |
 | `AXC0177` | A pending `convert` fails for a stored row, such as text that does not parse as the new type, a value that is too long, a required field left empty or a duplicate in a unique field. Also reported when an enum `convert` leaves a value that the field does not list. Reported at `/changes/{i}/value` of the migration file, with a fixed message and, for a database error, its PostgreSQL error code. Nothing is applied. |
+| `AXC0178` | A pending `renameField`, `dropField`, `dropEntity` or `convert` changes a column that another release of the application uses, and `running` or `waiting` process instances are pinned to that release. One per migration and release, with the release id and the number of open instances in the message. Reported at the migration file with an empty path and the migration `id` as `resourceId`. Nothing is applied. Activate the release again once those instances end. |
 | `AXC0180` | A role in a scenario's `users`, or an `assignee.role` of an `expectTask` step, names no declared role. Roles are matched exactly. Not reported when the role's file failed to load. Reported at `/users/{user}/{j}` or `/steps/{i}/assignee/role`. |
 | `AXC0181` | A step's `as`, or an `assignee.user` of an `expectTask` step, names no user of the scenario. Reported at `/steps/{i}/as` or `/steps/{i}/assignee/user`. |
 | `AXC0182` | A `createRecord` step's `entity` names no loaded entity, or names a child entity. Not reported when the entity's file failed to load. Reported at `/steps/{i}/entity`. |

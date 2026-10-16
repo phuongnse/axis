@@ -563,7 +563,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance);
         return (compiled, activated);
     }
 

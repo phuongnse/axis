@@ -371,7 +371,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"));
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"), OpenInstanceCounter.Instance);
         Assert.Empty(activated.Diagnostics);
         return compiled.Release!.Id;
     }
@@ -406,7 +406,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
         var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"));
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"), OpenInstanceCounter.Instance);
         Assert.Empty(activated.Diagnostics);
         _model ??= compiled.Model;
         return new Tenant(connectionString, NpgsqlDataSource.Create(connectionString), compiled.Release!.Id);

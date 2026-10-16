@@ -8,6 +8,7 @@ using Axis.Data.DataSources;
 using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Policy;
+using Axis.Processes.Instances;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -146,7 +147,7 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
             var compiled = await ReleaseCompiler.CompileAsync(
                 Path.Combine(AppContext.BaseDirectory, "Fixtures", "PolicyPerformanceApp"), configuration, CancellationToken);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken);
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
             Assert.Empty(activated.Diagnostics);
             var model = compiled.Model!;
             Assert.True(model.TryGetEntity("Department", out var department));

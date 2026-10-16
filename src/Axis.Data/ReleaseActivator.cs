@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
@@ -23,6 +24,8 @@ namespace Axis.Data;
 /// <para>
 /// When a migration is pending, the same transaction holds the application's <see cref="StartLock"/>
 /// exclusively until it commits, so a process start either commits first or waits and pins the new release.
+/// Under both locks, a destructive migration is refused with <see cref="DiagnosticCodes.OldReleaseWorkOpen"/>
+/// while running or waiting process instances are pinned to another release that uses the column it changes.
 /// </para>
 /// </summary>
 public static class ReleaseActivator
@@ -30,19 +33,22 @@ public static class ReleaseActivator
     /// <summary>
     /// Activates the release in <paramref name="compiled"/>, which must have a release and a model
     /// with the same application id, for the tenant whose deployment bindings are
-    /// <paramref name="bindings"/>. Call it outside an explicit transaction.
+    /// <paramref name="bindings"/>. <paramref name="openInstances"/> counts the process instances that are
+    /// still open on the other releases of the application. Call it outside an explicit transaction.
     /// </summary>
     public static async Task<ActivationResult> ActivateAsync(
         ReleaseCompilationResult compiled,
         IActiveReleaseStore store,
         DataDbContext data,
         ActivationBindings bindings,
+        IOpenInstanceCounter openInstances,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(compiled);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(bindings);
+        ArgumentNullException.ThrowIfNull(openInstances);
         if (compiled.Release is not { } release || compiled.Model is not { } model)
         {
             throw new ArgumentException("Only a compilation result with a release and a model can be activated.", nameof(compiled));
@@ -87,6 +93,7 @@ public static class ReleaseActivator
         var migrations = new MigrationContext(
             release.Id,
             token => ReadStoredEntityIdsAsync(store, manifest.Id, token),
+            (transaction, token) => ReadOldReleaseWorkAsync(store, openInstances, transaction, manifest.Id, release.Id, token),
             async (transaction, token) => ToDiagnostics(
                 model,
                 await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)));
@@ -117,6 +124,61 @@ public static class ReleaseActivator
         }
 
         return ids;
+    }
+
+    // The other releases of the application with open instances, and the fields their stored entities have.
+    private static async Task<IReadOnlyList<OldReleaseWork>> ReadOldReleaseWorkAsync(
+        IActiveReleaseStore store,
+        IOpenInstanceCounter openInstances,
+        DbTransaction transaction,
+        Guid applicationId,
+        Guid releaseId,
+        CancellationToken cancellationToken)
+    {
+        var work = new List<OldReleaseWork>();
+        var counts = await openInstances.CountByReleaseAsync(transaction, applicationId, cancellationToken);
+        foreach (var (id, count) in counts.OrderBy(pair => pair.Key))
+        {
+            if (id == releaseId || count == 0)
+            {
+                continue;
+            }
+
+            if (await store.GetReleaseAsync(id, cancellationToken) is not { } stored)
+            {
+                work.Add(new OldReleaseWork(id, count, null));
+                continue;
+            }
+
+            var fields = new Dictionary<Guid, IReadOnlySet<string>>();
+            foreach (var resource in stored.Resources)
+            {
+                using var document = JsonDocument.Parse(resource.Content);
+                var root = document.RootElement;
+                if (root.TryGetProperty("kind", out var kind) && kind.GetString() == "entity"
+                    && root.TryGetProperty("id", out var entityId) && Guid.TryParse(entityId.GetString(), out var parsedId))
+                {
+                    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (root.TryGetProperty("fields", out var entityFields) && entityFields.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var field in entityFields.EnumerateArray())
+                        {
+                            if (field.ValueKind == JsonValueKind.Object
+                                && field.TryGetProperty("name", out var name) && name.GetString() is { } fieldName)
+                            {
+                                names.Add(fieldName);
+                            }
+                        }
+                    }
+
+                    fields[parsedId] = names;
+                }
+            }
+
+            work.Add(new OldReleaseWork(id, count, fields));
+        }
+
+        return work;
     }
 
     private static List<Diagnostic> ToDiagnostics(ApplicationModel model, SetActiveReleaseResult set) =>

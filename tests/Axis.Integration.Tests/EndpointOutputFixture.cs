@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Server.Tests;
@@ -75,7 +76,7 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
             await using var data = DataDatabaseFixture.CreateContext(connection);
             var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None(Tenant));
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None(Tenant), OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
             _model = compiled.Model!;
         }

@@ -171,6 +171,7 @@ public static class DiagnosticCodes
     public const string MigrationChangeNotApplied = "AXC0175";
     public const string FillLeftNulls = "AXC0176";
     public const string ConvertFailed = "AXC0177";
+    public const string OldReleaseWorkOpen = "AXC0178";
 
     public const string UnknownScenarioRole = "AXC0180";
     public const string UnknownScenarioUser = "AXC0181";
