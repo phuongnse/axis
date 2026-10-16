@@ -28,9 +28,14 @@ public sealed record SchemaPlan(
 /// A change to the provisioning records. <see cref="MigrationChangeType.RenameField"/> renames the
 /// enum values recorded for <see cref="Field"/> to <see cref="To"/>,
 /// <see cref="MigrationChangeType.DropField"/> deletes those of <see cref="Field"/>, and
-/// <see cref="MigrationChangeType.DropEntity"/> deletes the entity's record and its enum values.
+/// <see cref="MigrationChangeType.DropEntity"/> deletes the entity's record and its enum values, and
+/// <see cref="MigrationChangeType.Convert"/> deletes the enum <see cref="Values"/> recorded for <see cref="Field"/>.
 /// </summary>
-public sealed record MigrationRecordChange(MigrationChangeType Type, Guid EntityId, string? Field, string? To);
+public sealed record MigrationRecordChange(MigrationChangeType Type, Guid EntityId, string? Field, string? To)
+{
+    /// <summary>The enum values a convert removes from the records.</summary>
+    public IReadOnlyList<string> Values { get; init; } = [];
+}
 
 /// <summary>One SQL statement of a plan, with the parameters its text names.</summary>
 public sealed record SchemaCommand(string Sql)
@@ -39,7 +44,16 @@ public sealed record SchemaCommand(string Sql)
 
     /// <summary>Set on a fill: the command returns the number of rows it left null.</summary>
     public FillTarget? Fill { get; init; }
+
+    /// <summary>Set on a statement of a convert: a failing statement, or a count above zero, names the change.</summary>
+    public ConvertTarget? Convert { get; init; }
 }
 
 /// <summary>The change of a pending <c>fill</c> migration, which names it in a diagnostic.</summary>
 public sealed record FillTarget(Guid MigrationId, string File, int ChangeIndex, string Field);
+
+/// <summary>
+/// The change of a pending <c>convert</c> migration, which names it in a diagnostic. When
+/// <see cref="CountsDisallowed"/> is set, the command returns the number of rows left with a value the field does not list.
+/// </summary>
+public sealed record ConvertTarget(Guid MigrationId, string File, int ChangeIndex, string Field, bool CountsDisallowed);

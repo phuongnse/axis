@@ -28,6 +28,10 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
     private const string RemarkField = """{ "name": "remark", "type": "text" }""";
     private const string StatusField = """{ "name": "status", "type": "enum", "values": ["draft", "done"] }""";
     private const string StateField = """{ "name": "state", "type": "enum", "values": ["draft", "done"] }""";
+    private const string TextQuantityField = """{ "name": "quantity", "type": "text" }""";
+    private const string IntegerQuantityField = """{ "name": "quantity", "type": "integer" }""";
+    private const string OpenStatusField = """{ "name": "status", "type": "enum", "values": ["draft", "cancelled", "done"] }""";
+    private const string ArchivedStatusField = """{ "name": "status", "type": "enum", "values": ["draft", "done", "archived"] }""";
     private const string PriorityField = """{ "name": "priority", "type": "integer" }""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -329,6 +333,144 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
             (DiagnosticCodes.FillLeftNulls, "migrations/0001-fill-note.json", "/changes/0/value", _migrationId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Empty(await ReadAppliedMigrationsAsync());
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_pending_convert_of_text_to_integer_holds_the_parsed_numbers_and_the_column_becomes_bigint()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, TextQuantityField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_quantity", "7"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-2"), ("f_quantity", " 42 "));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-3"), ("f_quantity", null));
+        folder
+            .With("entities/order.json", Order(NumberField, IntegerQuantityField))
+            .With("migrations/0001-convert-quantity.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "quantity", "value": "quantity" }]"""));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        var table = Assert.Single(await ReadTablesAsync(_orderId));
+        Assert.Equal("bigint", Assert.Single(table.Columns, column => column.Name == "f_quantity").Type);
+        Assert.DoesNotContain(table.Columns, column => column.Name == "axis_convert");
+        Assert.Equal(["PO-1: 7 v2", "PO-2: 42 v2", "PO-3:  v2"], await ReadScalarsAsync(
+            $"SELECT f_number || ': ' || coalesce(f_quantity::text, '') || ' v' || version FROM {EntityNaming.QualifiedTable(table.Name)} ORDER BY f_number"));
+        Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+        Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_pending_convert_that_maps_a_removed_enum_value_leaves_no_row_with_it_and_the_records_match_the_field()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, OpenStatusField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_status", "cancelled"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-2"), ("f_status", "done"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-3"), ("f_status", null));
+        folder
+            .With("entities/order.json", Order(NumberField, StatusField))
+            .With("migrations/0001-convert-status.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "status", "value": "if(status == 'cancelled', 'draft', status)" }]"""));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(_orderId));
+        Assert.Equal(["PO-1: draft v2", "PO-2: done v1", "PO-3:  v1"], await ReadScalarsAsync(
+            $"SELECT f_number || ': ' || coalesce(f_status, '') || ' v' || version FROM {table} ORDER BY f_number"));
+        Assert.Equal(["done", "draft"], (await ReadEnumRecordsAsync(_orderId)).Where(value => value.Field == "status").Select(value => value.Value).Order(StringComparer.Ordinal));
+        Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+        Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_convert_in_a_release_that_removes_one_enum_value_and_adds_another_can_map_to_the_added_value()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, OpenStatusField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_status", "cancelled"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-2"), ("f_status", "done"));
+        folder
+            .With("entities/order.json", Order(NumberField, ArchivedStatusField))
+            .With("migrations/0001-convert-status.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "status", "value": "if(status == 'cancelled', 'archived', status)" }]"""));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(_orderId));
+        Assert.Equal(["PO-1: archived v2", "PO-2: done v1"], await ReadScalarsAsync(
+            $"SELECT f_number || ': ' || coalesce(f_status, '') || ' v' || version FROM {table} ORDER BY f_number"));
+        Assert.Equal(["archived", "done", "draft"], (await ReadEnumRecordsAsync(_orderId)).Where(value => value.Field == "status").Select(value => value.Value).Order(StringComparer.Ordinal));
+        Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_convert_that_fails_for_one_row_gives_a_diagnostic_at_its_value_without_the_stored_text_and_applies_nothing()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, TextQuantityField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_quantity", "7"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-2"), ("f_quantity", "abc-secret"));
+        var before = await ReadStateAsync(_orderId);
+        folder
+            .With("entities/order.json", Order(NumberField, IntegerQuantityField))
+            .With("migrations/0001-convert-quantity.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "quantity", "value": "quantity" }]"""));
+
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ConvertFailed, "migrations/0001-convert-quantity.json", "/changes/0/value", _migrationId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.DoesNotContain("abc-secret", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Empty(await ReadAppliedMigrationsAsync());
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_type_change_without_a_convert_gives_a_diagnostic_at_the_type_and_applies_nothing()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, TextQuantityField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_quantity", "7"));
+        var before = await ReadStateAsync(_orderId);
+        folder.With("entities/order.json", Order(NumberField, IntegerQuantityField));
+
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/1/type"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task An_enum_convert_that_maps_to_a_value_the_field_does_not_list_gives_a_diagnostic_and_applies_nothing()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, OpenStatusField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_status", "cancelled"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-2"), ("f_status", "done"));
+        var before = await ReadStateAsync(_orderId);
+        folder
+            .With("entities/order.json", Order(NumberField, StatusField))
+            .With("migrations/0001-convert-status.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "status", "value": "if(status == 'cancelled', 'abandoned', status)" }]"""));
+
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ConvertFailed, "migrations/0001-convert-status.json", "/changes/0/value", _migrationId),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         Assert.Equal(before, await ReadStateAsync(_orderId));
         Assert.Empty(await ReadAppliedMigrationsAsync());

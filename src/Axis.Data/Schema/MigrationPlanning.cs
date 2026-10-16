@@ -4,6 +4,7 @@ using Axis.Data.Naming;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
 using Axis.Expressions.Syntax;
+using Axis.Expressions.Typing;
 
 namespace Axis.Data.Schema;
 
@@ -14,11 +15,14 @@ namespace Axis.Data.Schema;
 /// a migration covers is not reported, and a field that a <c>fill</c> covers may become required. A
 /// change that does not fit the stored schema is skipped: the table or the <c>from</c> column is
 /// missing, or the <c>to</c> column exists. If something is left over, the planner still reports it.
-/// A <c>fill</c> on a child entity, or of a field that a computed field reads, is refused, because
-/// activation cannot recompute computed fields yet.
+/// A <c>fill</c> or <c>convert</c> on a child entity, or of a field that a computed field reads, is
+/// refused, because activation cannot recompute computed fields yet.
 /// </summary>
 internal sealed class MigrationPlanning
 {
+    // Field columns start with f_, so this name cannot clash with one.
+    private const string StagingColumn = "axis_convert";
+
     private readonly ApplicationModel _model;
     private readonly IReadOnlyList<MigrationModel> _pending;
     private readonly IReadOnlyDictionary<string, Guid> _storedEntityIds;
@@ -61,12 +65,6 @@ internal sealed class MigrationPlanning
 
     private void Apply(MigrationModel migration, int index, MigrationChangeModel change)
     {
-        if (change.Type == MigrationChangeType.Convert)
-        {
-            NotApplied(migration, index, "The 'convert' change is not applied yet. Activation applies renameField, dropField, dropEntity and fill.");
-            return;
-        }
-
         var entityId = FindEntityId(migration.Entity);
         if (entityId is not { } id)
         {
@@ -93,6 +91,9 @@ internal sealed class MigrationPlanning
                 break;
             case MigrationChangeType.Fill:
                 Fill(migration, index, tableIndex, id, change);
+                break;
+            case MigrationChangeType.Convert:
+                Convert(migration, index, tableIndex, id, change);
                 break;
         }
     }
@@ -207,6 +208,143 @@ internal sealed class MigrationPlanning
             Fill = new FillTarget(migration.Id, migration.File, index, change.Field!),
         });
         _tables[tableIndex] = table with { Columns = columns };
+    }
+
+    // A convert writes the new value of each row from its expression. For an enum field it maps the rows that hold
+    // a removed value. Otherwise it changes the column to the field's new type through a staging column, because
+    // DDL cannot take the parameters that the value's literals need. Any other case plans nothing, so the planner
+    // reports what it reports today.
+    private void Convert(MigrationModel migration, int index, int tableIndex, Guid entityId, MigrationChangeModel change)
+    {
+        var table = _tables[tableIndex];
+        var column = EntityNaming.Column(change.Field!);
+
+        if (table.Columns.Any(candidate => candidate.Name == EntityNaming.OwnerColumn))
+        {
+            NotApplied(migration, index, "A 'convert' on a child entity is not applied yet: it must also change the owner's version and recompute the owner's computed fields.");
+            return;
+        }
+
+        var releaseEntity = _model.Entities.FirstOrDefault(entity => entity.Id == entityId);
+        var names = NamesAfter(migration, index, entityId, change.Field!);
+        var reader = releaseEntity?.Fields.FirstOrDefault(field => field.Computed is { } computed && Reads(computed.Syntax, names));
+        if (reader is not null)
+        {
+            NotApplied(migration, index, $"A 'convert' of '{change.Field}' is not applied yet: the computed field '{reader.Name}' reads it, and activation cannot recompute computed fields.");
+            return;
+        }
+
+        var existing = table.Columns.FirstOrDefault(candidate => candidate.Name == column);
+        var field = releaseEntity?.Fields.FirstOrDefault(candidate => names.Contains(candidate.Name));
+        if (existing is null || field is null)
+        {
+            return;
+        }
+
+        var expected = ColumnTypes.Render(field);
+        var recorded = _enumValues
+            .Where(value => value.EntityId == entityId && string.Equals(value.FieldName, change.Field, StringComparison.OrdinalIgnoreCase))
+            .Select(value => value.Value)
+            .ToList();
+        var isEnumConvert = field.Type == FieldType.Enum && recorded.Count > 0;
+        var isTypeConvert = field.Type != FieldType.Enum && recorded.Count == 0 && existing.Type != expected;
+        if (!isEnumConvert && !isTypeConvert)
+        {
+            return;
+        }
+
+        List<string> removed = [];
+        if (isEnumConvert)
+        {
+            removed = [.. recorded.Where(value => !field.Values!.Contains(value, StringComparer.Ordinal))];
+            if (removed.Count == 0)
+            {
+                return;
+            }
+        }
+
+        var unknown = false;
+        string Column(IReadOnlyList<string> path)
+        {
+            var name = EntityNaming.Column(path[0]);
+            if (path.Count == 1 && table.Columns.Any(candidate => candidate.Name == name))
+            {
+                return EntityNaming.Quote(name);
+            }
+
+            unknown = true;
+            Diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.UnknownMigrationField,
+                $"The value names '{string.Join('.', path)}', which is not a field stored in the entity's table.",
+                migration.File,
+                $"/changes/{index}/value",
+                migration.Id));
+            return "NULL";
+        }
+
+        var parsed = ExpressionParser.Parse(change.Value!);
+        if (!parsed.Succeeded)
+        {
+            throw new InvalidOperationException($"The convert value does not parse, though the compiler checked it: {parsed.Diagnostic.Message}");
+        }
+
+        var translated = SqlTranslator.Translate(parsed.Expression!, Column);
+        if (!translated.Succeeded)
+        {
+            throw new InvalidOperationException($"The convert value does not translate to SQL, though the compiler checked it: {translated.Diagnostic.Message}");
+        }
+
+        if (unknown)
+        {
+            return;
+        }
+
+        var version = table.Columns.Any(candidate => candidate.Name == EntityNaming.VersionColumn)
+            ? $", {EntityNaming.Quote(EntityNaming.VersionColumn)} = {EntityNaming.Quote(EntityNaming.VersionColumn)} + 1"
+            : "";
+        var quotedTable = EntityNaming.QualifiedTable(table.Name);
+        var quotedColumn = EntityNaming.Quote(column);
+
+        if (isEnumConvert)
+        {
+            // The mapping may produce any value the release lists, including one this release declares for the first time.
+            var kept = field.Values!.Distinct(StringComparer.Ordinal).ToList();
+            var parameters = new List<SqlValue>(translated.Parameters);
+            parameters.AddRange(removed.Select((value, position) => new SqlValue($"r{position}", ExpressionTypeKind.Text, value)));
+            parameters.AddRange(kept.Select((value, position) => new SqlValue($"k{position}", ExpressionTypeKind.Text, value)));
+            var removedList = string.Join(", ", removed.Select((_, position) => $"@r{position}"));
+            var keptList = kept.Count == 0 ? "" : $" AND {quotedColumn} NOT IN ({string.Join(", ", kept.Select((_, position) => $"@k{position}"))})";
+            Commands.Add(new SchemaCommand(
+                $"WITH converted AS (UPDATE {quotedTable} SET {quotedColumn} = {translated.Sql}{version} WHERE {quotedColumn} IN ({removedList}) RETURNING {quotedColumn}) "
+                + $"SELECT count(*) FROM converted WHERE {quotedColumn} IS NOT NULL{keptList}")
+            {
+                Parameters = parameters,
+                Convert = new ConvertTarget(migration.Id, migration.File, index, change.Field!, CountsDisallowed: true),
+            });
+            _enumValues.RemoveAll(value => value.EntityId == entityId
+                && string.Equals(value.FieldName, change.Field, StringComparison.OrdinalIgnoreCase)
+                && removed.Contains(value.Value, StringComparer.Ordinal));
+            RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.Convert, entityId, change.Field, null) { Values = removed });
+            return;
+        }
+
+        // Assigning to character varying(n) truncates a cast silently, so it casts to text and lets the ALTER check the length.
+        var cast = ColumnTypes.TryParseVarying(expected, out _) ? ColumnTypes.Text : expected;
+        var staging = EntityNaming.Quote(StagingColumn);
+        var alterTable = $"ALTER TABLE {quotedTable}";
+        var target = new ConvertTarget(migration.Id, migration.File, index, change.Field!, CountsDisallowed: false);
+        Commands.Add(new SchemaCommand($"{alterTable} ADD COLUMN {staging} {expected}") { Convert = target });
+        Commands.Add(new SchemaCommand($"UPDATE {quotedTable} SET {staging} = ({translated.Sql})::{cast}{version}")
+        {
+            Parameters = translated.Parameters,
+            Convert = target,
+        });
+        Commands.Add(new SchemaCommand($"{alterTable} ALTER COLUMN {quotedColumn} TYPE {expected} USING {staging}") { Convert = target });
+        Commands.Add(new SchemaCommand($"{alterTable} DROP COLUMN {staging}") { Convert = target });
+        _tables[tableIndex] = table with
+        {
+            Columns = [.. table.Columns.Select(candidate => candidate == existing ? existing with { Type = expected } : candidate)],
+        };
     }
 
     // The release names the field by its last name, so a rename after the fill gives the names to look for.

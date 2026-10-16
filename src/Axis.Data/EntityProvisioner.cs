@@ -23,8 +23,8 @@ namespace Axis.Data;
 /// </para>
 /// <para>
 /// The migrations of the model that no <c>axis.applied_migrations</c> row covers are pending. Their
-/// <c>renameField</c>, <c>dropField</c>, <c>dropEntity</c> and <c>fill</c> changes run first. A fill
-/// that leaves a null rolls everything back with a diagnostic. Each pending
+/// <c>renameField</c>, <c>dropField</c>, <c>dropEntity</c>, <c>fill</c> and <c>convert</c> changes run first. A fill
+/// that leaves a null, or a convert that fails for a row, rolls everything back with a diagnostic. Each pending
 /// migration gets a row when the transaction commits. When the migration context sets the active
 /// release, it is written in this transaction too, under the same lock as the history check. A
 /// refused name or site path rolls everything back, and no other activation can commit a migration
@@ -109,8 +109,22 @@ public static class EntityProvisioner
 
             foreach (var command in plan.Commands)
             {
-                var leftNull = await ExecuteAsync(connection, npgsqlTransaction, command, cancellationToken);
-                if (leftNull > 0 && command.Fill is { } fill)
+                long counted;
+                try
+                {
+                    counted = await ExecuteAsync(connection, npgsqlTransaction, command, cancellationToken);
+                }
+                catch (PostgresException exception) when (command.Convert is not null)
+                {
+                    // The message is fixed: PostgreSQL's own text can quote a stored value.
+                    await transaction.RollbackAsync(cancellationToken);
+                    context.ChangeTracker.Clear();
+                    return ConvertFailed(
+                        command.Convert,
+                        $"The convert of '{command.Convert.Field}' fails for a stored record ({exception.SqlState}). Change the value so it converts every record.");
+                }
+
+                if (counted > 0 && command.Fill is { } fill)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     context.ChangeTracker.Clear();
@@ -118,12 +132,19 @@ public static class EntityProvisioner
                         [
                             new Diagnostic(
                                 DiagnosticCodes.FillLeftNulls,
-                                $"The fill of '{fill.Field}' gives null for {leftNull} records. Change the value so it gives a value for every record.",
+                                $"The fill of '{fill.Field}' gives null for {counted} records. Change the value so it gives a value for every record.",
                                 fill.File,
                                 $"/changes/{fill.ChangeIndex}/value",
                                 fill.MigrationId),
                         ],
                         []);
+                }
+
+                if (counted > 0 && command.Convert is { CountsDisallowed: true } convert)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    context.ChangeTracker.Clear();
+                    return ConvertFailed(convert, $"The convert of '{convert.Field}' leaves {counted} records with a value the field does not list.");
                 }
             }
 
@@ -177,6 +198,11 @@ public static class EntityProvisioner
             throw;
         }
     }
+
+    private static ProvisioningResult ConvertFailed(ConvertTarget convert, string message) =>
+        new(
+            [new Diagnostic(DiagnosticCodes.ConvertFailed, message, convert.File, $"/changes/{convert.ChangeIndex}/value", convert.MigrationId)],
+            []);
 
     // The migration rows of this application, and those of the model's migrations whatever their application.
     private static Task<List<AppliedMigrationRow>> ReadAppliedMigrationsAsync(ApplicationModel model, DataDbContext context, CancellationToken cancellationToken)
@@ -246,6 +272,12 @@ public static class EntityProvisioner
                     $"DELETE FROM axis.provisioned_enum_values WHERE entity_id = {entityId} AND lower(field_name) = {field}",
                     cancellationToken);
                 break;
+            case MigrationChangeType.Convert:
+                var removed = change.Values.ToArray();
+                await context.Database.ExecuteSqlAsync(
+                    $"DELETE FROM axis.provisioned_enum_values WHERE entity_id = {entityId} AND lower(field_name) = {field} AND value = ANY({removed})",
+                    cancellationToken);
+                break;
             case MigrationChangeType.DropEntity:
                 // Its enum values go with it: the foreign key cascades.
                 await context.Database.ExecuteSqlAsync(
@@ -282,12 +314,13 @@ public static class EntityProvisioner
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    // A fill returns the number of rows it left null; any other command returns 0.
+    // A fill returns the number of rows it left null, and an enum convert the number of rows with an unlisted value.
+    // Any other command returns 0.
     private static async Task<long> ExecuteAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, SchemaCommand schemaCommand, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(schemaCommand.Sql, connection, transaction);
         DataSourceQueries.AddValues(command, schemaCommand.Parameters);
-        if (schemaCommand.Fill is null)
+        if (schemaCommand.Fill is null && schemaCommand.Convert is not { CountsDisallowed: true })
         {
             await command.ExecuteNonQueryAsync(cancellationToken);
             return 0;
