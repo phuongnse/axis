@@ -497,6 +497,8 @@ flowchart LR
      confused with a file. An application without pins has the hash of its
      resources alone. So installing a newer version in range gives the same
      folder a new hash and a new release, and the old release keeps its pin.
+     [Scenario](#test-scenarios) files under `scenarios/` are left out of the
+     release and its content hash *(planned for M6)*.
    - **Identity.** A release is unique per application `id` and content hash.
      Compiling an unchanged folder returns the stored release instead of
      storing a second one, also when two compiles run at the same time.
@@ -2102,3 +2104,133 @@ below. Both examples below compile, given that rule.
     (`AXC0068`);
   - has no record routes of its own;
   - has no `reference` or `child-collection` fields (`AXC0041`).
+
+## Test scenarios
+
+A `scenario` resource is a configuration-level test *(planned for M6)*. See
+[D32](../decisions.md#d32-test-scenarios--agreed). Scenario files live under
+`scenarios/`, one file per scenario. They compile with the application but stay
+out of the release and its content hash.
+
+This scenario submits a purchase request above the finance threshold. The
+manager is denied the finance decision. Both tasks are completed and the
+request ends `approved`:
+
+```json
+{
+  "id": "ee1ac8c8-74c5-4105-867a-1090a15746a7",
+  "kind": "scenario",
+  "name": "FinanceApprovalAboveThreshold",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["employee"],
+    "binh": ["department-manager"],
+    "lan": ["finance-reviewer"]
+  },
+  "stubs": [
+    {
+      "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" },
+      "output": { "orderNumber": "PO-1001" }
+    },
+    {
+      "operation": "payment-references/creditorReference",
+      "output": { "creditorReference": "RF18PR0001" }
+    }
+  ],
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "PurchaseRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "title": "Laptops",
+        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
+        "currency": "USD",
+        "status": "draft",
+        "lineItems": [{ "description": "Laptop", "quantity": 3, "unitPrice": 5000 }]
+      }
+    },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+    {
+      "type": "completeTask",
+      "record": "request",
+      "step": "financeApproval",
+      "outcome": "approve",
+      "as": "binh",
+      "expect": "denied"
+    },
+    { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "lan" },
+    {
+      "type": "expectInstance",
+      "process": "PurchaseRequestApproval",
+      "record": "request",
+      "state": "completed"
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": { "status": "approved", "purchaseOrderNumber": "PO-1001", "paymentReference": "RF18PR0001" }
+    }
+  ]
+}
+```
+
+- `users` maps a user id to its role names. Each role must be a declared
+  [`role`](#roles-and-policies). No identity provider takes part. The runner
+  gives each step the user's id and roles, as a session would.
+- `now` is a date-time with an offset. It fixes the time that expressions and
+  task due dates read, for the whole scenario. Timestamps that PostgreSQL
+  writes, such as `created_at`, keep the real clock.
+- `stubs` hold one output per connector operation or package operation. A stub
+  has the same shape as the process step that calls it. A call without a stub
+  fails the scenario.
+
+Every step has a `type`. These are the step kinds:
+
+| Step | Properties | What it does |
+| --- | --- | --- |
+| `createRecord` | `entity`, `values`, `as`, optional `save`, `expect` | Creates a record through the record command. `save` gives it an alias for later steps. |
+| `updateRecord` | `record`, `values`, `as`, `expect` | Updates the saved record through the record command. |
+| `deleteRecord` | `record`, `as`, `expect` | Deletes the saved record through the record command. |
+| `startProcess` | `process`, `record`, `as`, `expect` | Starts the process on the saved record. |
+| `completeTask` | `record`, `step`, `outcome`, optional `values`, `as`, `expect` | Completes the task of that step with the outcome. |
+| `expectRecord` | `record`, `values` | Asserts that the saved record holds these values. |
+| `expectInstance` | `process`, `record`, `state`, optional `step` | Asserts the state of the process instance on the record, and the step it waits at. |
+| `expectTask` | `record`, `step`, `assignee` or `state` | Asserts who the task is assigned to, or its state. |
+
+- `createRecord`, `updateRecord` and `deleteRecord` are the record actions.
+  They go through the record command, as the record API does.
+- Only actions may declare `expect`. With no `expect`, an action must succeed.
+  An unmet expectation fails the scenario:
+  - `"denied"` means 403.
+  - `"notFound"` means 404, for example a record outside every read filter.
+  - `"conflict"` means 409, for a unique value, a referenced record or a task
+    that is already completed.
+  - `{ "invalid": "lineItems/0/quantity" }` means a validation problem at that
+    path under `/values/`.
+- A step that has `expect` may not use `save`, because a failed action creates
+  no record.
+- The runner supplies the record's current `version` on updates and task
+  completions, so no step names one.
+- `completeTask` and `expectTask` use the newest task of that step for the
+  record. A returned request can create the same task again.
+- `assignee` is `{ "user": … }` or `{ "role": … }`. `state` uses the instance
+  and task states in [processes](processes.md#instance-states) and
+  [task states](processes.md#task-states).
+- Every reference to an entity, field, process, step, outcome, role, user or
+  alias is checked at compile. The diagnostic codes come with the build.
+
+To run the scenarios of an application folder, see
+[D32](../decisions.md#d32-test-scenarios--agreed):
+
+```sh
+dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string>
+```
+
+It writes JUnit to `artifacts/test-results/` and exits non-zero when a
+scenario fails.

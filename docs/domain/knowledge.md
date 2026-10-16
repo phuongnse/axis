@@ -246,6 +246,7 @@ not run in CI.
 **Axis rule:** test scenarios are a resource kind. They run against a
 temporary tenant database in CI, as specific users, and assert data, task and
 process outcomes, including denied actions.
+See [D32](../decisions.md#d32-test-scenarios--agreed).
 
 ## Operations
 
