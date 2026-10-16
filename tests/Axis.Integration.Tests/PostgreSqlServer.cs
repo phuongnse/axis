@@ -109,7 +109,7 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
     }
 
     /// <summary>The connection string to the maintenance database, which creates and drops the others.</summary>
-    private static async Task<string> AdminConnectionStringAsync() => (await _container.Value).GetConnectionString();
+    public static async Task<string> AdminConnectionStringAsync() => (await _container.Value).GetConnectionString();
 
     // CREATE DATABASE and DROP DATABASE cannot run in a transaction block, so each is its own command.
     private static async Task ExecuteAsync(string connectionString, string sql, CancellationToken cancellationToken)

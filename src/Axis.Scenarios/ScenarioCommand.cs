@@ -1,0 +1,117 @@
+using Axis.Configuration.Compilation;
+using Axis.Configuration.Loading;
+using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
+
+namespace Axis.Scenarios;
+
+/// <summary>
+/// The scenario runner as a command: it runs every scenario of an application folder, one at a
+/// time, each in its own temporary tenant database, and writes the results as JUnit. The exit code
+/// is 0 when every scenario passed, 1 when one failed and 2 when the arguments are wrong or the
+/// folder does not compile, which is a setup error and not a failing scenario, and 130 when it is cancelled.
+/// </summary>
+public static class ScenarioCommand
+{
+    public const int Passed = 0;
+    public const int Failed = 1;
+    public const int SetupError = 2;
+    public const int Cancelled = 130;
+
+    public const string DefaultResultsFolder = "artifacts/test-results";
+
+    private const string Usage = "Usage: Axis.Scenarios <folder> --server <connection string> [--results <folder>]";
+
+    public static async Task<int> RunAsync(string[] args, TextWriter output, CancellationToken cancellationToken)
+    {
+        if (!TryParse(args, out var folder, out var server, out var results))
+        {
+            await output.WriteLineAsync(Usage);
+            return SetupError;
+        }
+
+        var compiled = ApplicationCompiler.Compile(folder);
+        foreach (var diagnostic in compiled.Diagnostics)
+        {
+            await output.WriteLineAsync($"{diagnostic.Code} {diagnostic.File} {diagnostic.Path}: {diagnostic.Message}");
+        }
+
+        if (compiled.HasErrors || compiled.Model is null)
+        {
+            await output.WriteLineAsync($"The application folder '{folder}' does not compile. No scenario ran.");
+            return SetupError;
+        }
+
+        var application = compiled.Model.Manifest.Name;
+        var scenarios = ApplicationLoader.Load(folder).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).ToList();
+        var outcomes = new List<ScenarioResult>();
+        try
+        {
+            foreach (var scenario in scenarios)
+            {
+                var outcome = await ScenarioRunner.RunAsync(folder, scenario, server, NullLoggerFactory.Instance, cancellationToken);
+                outcomes.Add(outcome);
+                await output.WriteLineAsync(outcome.Failure is { } failure ? $"FAIL {outcome.Name}: {failure}" : $"PASS {outcome.Name}");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await output.WriteLineAsync("Cancelled. The running scenario's database was dropped.");
+            return Cancelled;
+        }
+
+        await JUnitWriter.WriteAsync(Path.Combine(results, $"scenarios-{application}.xml"), application, folder, outcomes, cancellationToken);
+        var failed = outcomes.Count(outcome => !outcome.Passed);
+        await output.WriteLineAsync($"{outcomes.Count} scenario(s), {failed} failed.");
+        return failed == 0 ? Passed : Failed;
+    }
+
+    private static bool TryParse(string[] args, out string folder, out string server, out string results)
+    {
+        folder = server = "";
+        results = DefaultResultsFolder;
+        if (args.Length == 0 || args[0].StartsWith("--", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        folder = args[0];
+        string? serverValue = null;
+        for (var index = 1; index < args.Length; index += 2)
+        {
+            if (index + 1 >= args.Length)
+            {
+                return false;
+            }
+
+            switch (args[index])
+            {
+                case "--server":
+                    serverValue = args[index + 1];
+                    break;
+                case "--results":
+                    results = args[index + 1];
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(serverValue))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = new NpgsqlConnectionStringBuilder(serverValue);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        server = serverValue;
+        return true;
+    }
+}

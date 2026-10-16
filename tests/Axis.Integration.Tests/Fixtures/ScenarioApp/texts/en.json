@@ -1,0 +1,14 @@
+{
+  "id": "0b7a4c11-3d52-4e8a-9a60-5c1f7e2d9a09",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Scenario",
+    "nav.notes": "Notes",
+    "notes.title": "Notes",
+    "role.clerk": "Clerk",
+    "role.reader": "Reader"
+  }
+}

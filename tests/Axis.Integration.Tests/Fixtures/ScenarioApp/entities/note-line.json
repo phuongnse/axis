@@ -1,0 +1,10 @@
+{
+  "id": "0b7a4c11-3d52-4e8a-9a60-5c1f7e2d9a0a",
+  "kind": "entity",
+  "name": "NoteLine",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "text", "type": "text", "required": true },
+    { "name": "price", "type": "decimal", "precision": 18, "scale": 2 }
+  ]
+}
