@@ -16,6 +16,12 @@ namespace Axis.Data;
 /// calls it only when a migration is pending, and only after it took the schema lock, so it never sees a release
 /// that another activation replaces while this one waits for the lock.
 /// </param>
+/// <param name="ReadOldReleaseWorkAsync">
+/// Reads, in the given provisioning transaction, the other releases of the application that still have running or
+/// waiting process instances pinned to them, with the fields their stored entities have. Provisioning calls it
+/// only when its plan holds a destructive change, and only after it took the schema lock and the start lock, so
+/// no instance starts on an older release while it counts.
+/// </param>
 /// <param name="SetActiveReleaseAsync">
 /// Writes the active release and its site paths in the given provisioning transaction, and gives the
 /// diagnostics of a refused name or site path. It runs after the plan is applied, just before the
@@ -24,11 +30,24 @@ namespace Axis.Data;
 public sealed record MigrationContext(
     Guid ReleaseId,
     Func<CancellationToken, Task<IReadOnlyDictionary<string, Guid>>> ReadStoredEntityIdsAsync,
+    Func<DbTransaction, CancellationToken, Task<IReadOnlyList<OldReleaseWork>>> ReadOldReleaseWorkAsync,
     Func<DbTransaction, CancellationToken, Task<IReadOnlyList<Diagnostic>>>? SetActiveReleaseAsync)
 {
     /// <summary>No release, no stored entities and no active release write.</summary>
     public static MigrationContext None { get; } = new(
         Guid.Empty,
         _ => Task.FromResult<IReadOnlyDictionary<string, Guid>>(new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase)),
+        (_, _) => Task.FromResult<IReadOnlyList<OldReleaseWork>>([]),
         null);
 }
+
+/// <summary>
+/// A release other than the one being activated that has running or waiting process instances pinned to it.
+/// </summary>
+/// <param name="ReleaseId">The release the instances are pinned to.</param>
+/// <param name="OpenInstances">The number of running and waiting instances.</param>
+/// <param name="FieldsByEntityId">
+/// The field names of each entity of the release's stored model by entity id, ignoring letter case. It is
+/// <see langword="null"/> when the stored release was not found, and then the release counts as using every column.
+/// </param>
+public sealed record OldReleaseWork(Guid ReleaseId, int OpenInstances, IReadOnlyDictionary<Guid, IReadOnlySet<string>>? FieldsByEntityId);

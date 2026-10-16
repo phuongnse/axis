@@ -5,6 +5,7 @@ using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Schema;
+using Axis.Processes.Instances;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -37,7 +38,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration, CancellationToken);
         Assert.NotNull(compiled.Release);
 
-        var first = await ReleaseActivator.ActivateAsync(compiled, store, data, ActivationBindings.None("default"), CancellationToken);
+        var first = await ReleaseActivator.ActivateAsync(compiled, store, data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
 
         Assert.Empty(first.Diagnostics);
         var table = Assert.Single(await ReadTablesAsync(_orderId));
@@ -48,7 +49,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Equal(1L, await CountActiveRowsAsync(_applicationId, _name));
         var recordsBefore = await ReadRecordsAsync(_applicationId);
 
-        var again = await ReleaseActivator.ActivateAsync(compiled, store, data, ActivationBindings.None("default"), CancellationToken);
+        var again = await ReleaseActivator.ActivateAsync(compiled, store, data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
 
         Assert.Empty(again.Diagnostics);
         AssertSameTables([table], await ReadTablesAsync(_orderId));
@@ -214,7 +215,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), CancellationToken);
+        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
 
         AssertNameActiveForOtherApplication(hiding);
         Assert.Empty(await ReadTablesAsync(_orderId));
@@ -316,7 +317,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), CancellationToken);
+        var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
 
         AssertSitePathActiveForOtherApplication(hiding, siteId);
         Assert.Empty(await ReadTablesAsync(_orderId));
@@ -484,7 +485,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, CancellationToken);
+        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, CancellationToken);
     }
 
     /// <summary>The active release read through a fresh store.</summary>

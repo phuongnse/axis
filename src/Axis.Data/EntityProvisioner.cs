@@ -37,6 +37,12 @@ namespace Axis.Data;
 /// it shared commits first, and one that did not yet waits and then pins the new release. An
 /// activation with no pending migration never takes it.
 /// </para>
+/// <para>
+/// When the plan holds a destructive change, a <c>renameField</c>, <c>dropField</c>, <c>dropEntity</c> or
+/// <c>convert</c> that plans a statement, the transaction asks the migration context for the other releases
+/// that still have running or waiting process instances. Such a release that has the changed column in its stored
+/// model refuses the activation with <see cref="DiagnosticCodes.OldReleaseWorkOpen"/> before any statement runs.
+/// </para>
 /// </summary>
 public static class EntityProvisioner
 {
@@ -119,6 +125,17 @@ public static class EntityProvisioner
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return new ProvisioningResult(plan.Diagnostics, []);
+            }
+
+            if (plan.DestructiveChanges.Count > 0)
+            {
+                var blocked = CheckOldReleaseWork(plan.DestructiveChanges, await migrations.ReadOldReleaseWorkAsync(npgsqlTransaction, cancellationToken));
+                if (blocked.Count > 0)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    context.ChangeTracker.Clear();
+                    return new ProvisioningResult(blocked, []);
+                }
             }
 
             foreach (var command in plan.Commands)
@@ -212,6 +229,35 @@ public static class EntityProvisioner
             throw;
         }
     }
+
+    // One diagnostic per migration and release. A release blocks a change when its stored model has the changed
+    // column, or when its stored model is gone, since nothing then shows that it does not use the column.
+    private static List<Diagnostic> CheckOldReleaseWork(IReadOnlyList<DestructiveChange> changes, IReadOnlyList<OldReleaseWork> oldReleases)
+    {
+        var diagnostics = new List<Diagnostic>();
+        foreach (var migration in changes.Select(change => change.Migration).DistinctBy(migration => migration.Id))
+        {
+            foreach (var release in oldReleases)
+            {
+                var blocks = changes.Any(change => change.Migration.Id == migration.Id && Blocks(change, release));
+                if (blocks)
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.OldReleaseWorkOpen,
+                        $"The migration '{migration.Name}' changes a column that release '{release.ReleaseId}' uses, and {release.OpenInstances} running or waiting process instances are pinned to it. Activate the release again once they end.",
+                        migration.File,
+                        "",
+                        migration.Id));
+                }
+            }
+        }
+
+        return DiagnosticOrder.Sort(diagnostics);
+    }
+
+    private static bool Blocks(DestructiveChange change, OldReleaseWork release) =>
+        release.FieldsByEntityId is not { } entities
+        || (entities.TryGetValue(change.EntityId, out var fields) && (change.Field is null || fields.Contains(change.Field)));
 
     private static ProvisioningResult ConvertFailed(ConvertTarget convert, string message) =>
         new(

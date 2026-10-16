@@ -1110,8 +1110,8 @@ work without the code its release pins.
 ## D30. Schema migrations — Agreed
 
 Activation applies the `renameField`, `dropField`, `dropEntity`, `fill` and
-`convert` migrations once per tenant. The start lock is built too. The
-old-release work check and the recompute of computed fields are not built yet
+`convert` migrations once per tenant. The start lock and the old-release work
+check are built too. The recompute of computed fields is not built yet
 *(planned for M6)*. Until
 the recompute is built, a `fill` or `convert` on a child entity and a `fill` or
 `convert` of a field that a computed field reads are refused. Migrations
@@ -1195,7 +1195,7 @@ The owner confirmed these points on issue #413 on 2026-10-15.
   - After taking both locks, activation counts `running` and `waiting`
     instances pinned to another release whose model has the affected
     column. For a rename, that is the `from` column.
-  - For each such release, a new diagnostic names the migration, the
+  - For each such release, `AXC0178` names the migration, the
     release and the number of open instances. Activation changes nothing.
     `fill` and additive changes never wait for old-release work.
   - **Start lock:** every transaction that reads the active release and

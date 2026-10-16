@@ -127,6 +127,7 @@ public static class SchemaPlanner
                     _newEnumValues)
                 {
                     RecordChanges = [.. migrations.RecordChanges],
+                    DestructiveChanges = [.. migrations.DestructiveChanges],
                 };
 
         private void PlanNewTable(EntityModel entity, string table, ChildOwner? childOwner)

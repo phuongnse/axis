@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Records;
+using Axis.Processes.Instances;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -161,7 +162,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration, CancellationToken);
         Assert.Empty(compiled.Diagnostics);
-        Assert.Empty((await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken)).Diagnostics);
+        Assert.Empty((await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken)).Diagnostics);
         return compiled.Model!;
     }
 }

@@ -3,6 +3,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
+using Axis.Processes.Instances;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -78,7 +79,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, CancellationToken);
+        return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, CancellationToken);
     }
 
     /// <summary>The sample's active release, read through a fresh store.</summary>

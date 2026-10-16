@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -71,7 +72,7 @@ public sealed class EndpointCallFixture : IAsyncLifetime
             await using var data = DataDatabaseFixture.CreateContext(connection);
             var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("a"));
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("a"), OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
             ReleaseId = compiled.Release!.Id;
             _model = compiled.Model!;

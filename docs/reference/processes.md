@@ -775,7 +775,7 @@ for texts. **Both** means different parts use different releases.
   old-release work starts a new instance on the active release. For writes,
   the record is read again with the active model before its triggers run.
   See [Starts from triggers](#starts-from-triggers).
-- **Start lock** *(built; the old-release count is planned for M6)*. Each
+- **Start lock** *(built)*. Each
   start takes `pg_advisory_xact_lock_shared` keyed on the application `id`,
   before it reads the active release, in the transaction that inserts the
   instance. It is the first statement of that transaction. This covers the

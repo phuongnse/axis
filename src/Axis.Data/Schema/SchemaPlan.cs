@@ -18,6 +18,12 @@ public sealed record SchemaPlan(
     /// <summary>The changes to the existing provisioning records that the migration statements imply, in order.</summary>
     public IReadOnlyList<MigrationRecordChange> RecordChanges { get; init; } = [];
 
+    /// <summary>
+    /// The destructive changes the commands make: a rename, a drop or a type change of a column, or a dropped table.
+    /// Activation checks them against the work that is still running on older releases.
+    /// </summary>
+    public IReadOnlyList<DestructiveChange> DestructiveChanges { get; init; } = [];
+
     /// <summary>The SQL text of each command, in order.</summary>
     public IReadOnlyList<string> Statements => [.. Commands.Select(command => command.Sql)];
 
@@ -36,6 +42,12 @@ public sealed record MigrationRecordChange(MigrationChangeType Type, Guid Entity
     /// <summary>The enum values a convert removes from the records.</summary>
     public IReadOnlyList<string> Values { get; init; } = [];
 }
+
+/// <summary>
+/// A change of a pending migration that renames, drops or converts a column of the entity with id <see cref="EntityId"/>
+/// (<see cref="Field"/> names the column's field), or drops its table (<see cref="Field"/> is <see langword="null"/>).
+/// </summary>
+public sealed record DestructiveChange(MigrationModel Migration, Guid EntityId, string? Field);
 
 /// <summary>One SQL statement of a plan, with the parameters its text names.</summary>
 public sealed record SchemaCommand(string Sql)

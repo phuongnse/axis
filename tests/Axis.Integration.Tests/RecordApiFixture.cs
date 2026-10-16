@@ -9,6 +9,7 @@ using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
+using Axis.Processes.Instances;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -99,7 +100,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             // Releases live in the tenant database, so the fixture is compiled once per tenant.
             var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "RecordsApp"), configuration);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"));
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
             _model = compiled.Model;
 
@@ -107,7 +108,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             {
                 var second = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "SecondApp"), configuration);
                 Assert.Empty(second.Diagnostics);
-                var secondActivated = await ReleaseActivator.ActivateAsync(second, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"));
+                var secondActivated = await ReleaseActivator.ActivateAsync(second, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
                 Assert.Empty(secondActivated.Diagnostics);
 
                 using var dormant = new TemporaryFolder().With(
