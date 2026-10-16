@@ -4,6 +4,7 @@ using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Presentation.Sites;
 using Axis.Processes.Instances;
+using Axis.Processes.Records;
 using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Http;
@@ -285,7 +286,7 @@ internal static class TaskEndpoints
             updated = written;
             readVersion = stored.Version;
             writtenVersion = written.Version;
-            fields = [.. RecordEndpoints.SetFields(entity, input)];
+            fields = [.. RecordCommand.SetFields(entity, input)];
         }
 
         var outcome = body.Outcome!;

@@ -53,7 +53,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items, decision, task, operation and end steps, task API, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
+  Axis.Processes/         work items, decision, task, operation and end steps, task API, the record command, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory
@@ -80,7 +80,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -573,8 +573,9 @@ The `role` and `policy` resource files are described in
   entity, a data source or a process start, and the record filters and the
   field set of an entity and an action. The record API, the data source
   endpoint and the process start endpoint call it, and apply the record
-  filters it answers. The record API, the data source endpoint and the task
-  API apply the field sets. The site endpoints call it to leave unreadable
+  filters it answers. The record command in `Axis.Processes` applies the
+  record filters and field sets for record API writes. The record API, the
+  data source endpoint and the task API apply the field sets. The site endpoints call it to leave unreadable
   pages out of navigation, to answer `403` for them, and to list a widget's
   readable fields, allowed actions and writable fields in page metadata.
 - **Only the server decides.** Page metadata and navigation follow the
