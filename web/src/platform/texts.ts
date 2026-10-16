@@ -13,11 +13,21 @@ export async function fetchTexts(locale: string, signal?: AbortSignal): Promise<
   return body.texts
 }
 
-/** Loads the texts of an application site for one locale. */
-export async function fetchSiteTexts(path: string, locale: string, signal?: AbortSignal): Promise<TextMap> {
-  const response = await apiFetch(`/api/sites/${encodeURIComponent(path)}/texts/${encodeURIComponent(locale)}`, {
-    signal,
-  })
+/**
+ * Loads the texts of an application site for one locale. With `release`, it loads the texts of that
+ * stored release of the site's application, active or not, instead of the active release's.
+ */
+export async function fetchSiteTexts(
+  path: string,
+  locale: string,
+  signal?: AbortSignal,
+  release?: string,
+): Promise<TextMap> {
+  const query = release === undefined ? '' : `?release=${encodeURIComponent(release)}`
+  const response = await apiFetch(
+    `/api/sites/${encodeURIComponent(path)}/texts/${encodeURIComponent(locale)}${query}`,
+    { signal },
+  )
   if (!response.ok) {
     throw new Error(`Loading the texts of site '${path}' in '${locale}' failed with status ${response.status}.`)
   }
@@ -58,4 +68,21 @@ export function useText(): (key: string) => string {
     throw new Error('useText must be used inside TextProvider.')
   }
   return text
+}
+
+/** The catalogs a key resolves through, and whether a missing current-locale key shows its name. */
+export interface TextCatalogs {
+  catalogs: readonly TextCatalog[]
+  development: boolean
+}
+
+export const TextCatalogsContext = createContext<TextCatalogs | null>(null)
+
+/** Returns the catalogs behind {@link useText}, to resolve a key through more catalogs first. */
+export function useTextCatalogs(): TextCatalogs {
+  const catalogs = useContext(TextCatalogsContext)
+  if (!catalogs) {
+    throw new Error('useTextCatalogs must be used inside TextProvider.')
+  }
+  return catalogs
 }

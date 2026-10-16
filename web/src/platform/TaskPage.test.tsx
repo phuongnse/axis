@@ -8,6 +8,7 @@ import { assignLocation } from './navigation'
 import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TaskPage } from './TaskPage'
 import { TextProvider } from './TextProvider'
+import type { TextCatalog } from './texts'
 
 vi.mock('./navigation')
 
@@ -34,6 +35,7 @@ const tasksPath = '/api/apps/PurchasingApp/tasks'
 const recordsPath = '/api/apps/PurchasingApp/entities/PurchaseRequest/records'
 const taskId = '0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01'
 const subjectId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
+const releaseId = '0192f4a0-1b2c-7d3e-8f40-5b6c7d8e9f02'
 const dueAt = '2026-10-13T02:05:00Z'
 
 const inboxWidget: WidgetMetadata = {
@@ -50,6 +52,7 @@ const inboxWidget: WidgetMetadata = {
 // The task read example of the processes reference, with a read-only title and an editable comment.
 const openTask = {
   id: taskId,
+  releaseId,
   process: 'PurchaseRequestApproval',
   instanceId: '0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b',
   step: 'managerApproval',
@@ -131,13 +134,15 @@ function answer({ status, body }: Answer) {
 }
 
 /**
- * Stubs `fetch` with the task read, the subject record read and the complete endpoint. Each read
- * of the task takes the next answer of `reads`, and the last one repeats. Returns the requests.
+ * Stubs `fetch` with the task read, the subject record read, the complete endpoint and the texts of
+ * the task's release. Each read of the task takes the next answer of `reads`, and the last one
+ * repeats. Returns the requests.
  */
 function stubTaskApi({
   reads = [{ status: 200, body: openTask }],
   complete = { status: 200, body: completedTask },
-}: { reads?: Answer[]; complete?: Answer } = {}) {
+  releaseTexts = { status: 200, body: { locale: 'en', texts: {} } },
+}: { reads?: Answer[]; complete?: Answer; releaseTexts?: Answer } = {}) {
   const requests: { method: string; url: string; body?: string }[] = []
   let taskReads = 0
   vi.stubGlobal(
@@ -154,6 +159,9 @@ function stubTaskApi({
       if (method === 'POST' && url === `${tasksPath}/${taskId}/complete`) {
         return answer(complete)
       }
+      if (method === 'GET' && url === `/api/sites/e2e/texts/en?release=${releaseId}`) {
+        return answer(releaseTexts)
+      }
       return answer({ status: 404 })
     }),
   )
@@ -167,11 +175,18 @@ function CurrentPath() {
   return <output data-testid="location">{useLocation().pathname}</output>
 }
 
-function renderPage() {
+function renderPage(outerCatalogs: TextCatalog[] = catalogs) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/tasks/${taskId}`]}>
-      <TextProvider catalogs={catalogs} development={false}>
-        <TaskPage sitePath="e2e" pageName="Tasks" widget={inboxWidget} taskId={taskId} locale="en" />
+      <TextProvider catalogs={outerCatalogs} development={false}>
+        <TaskPage
+          sitePath="e2e"
+          pageName="Tasks"
+          widget={inboxWidget}
+          taskId={taskId}
+          locale="en"
+          fallbackLocale="en"
+        />
       </TextProvider>
       <CurrentPath />
     </MemoryRouter>,
@@ -193,6 +208,30 @@ describe('TaskPage', () => {
     expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
     expect(screen.getByLabelText('Comments')).not.toHaveAttribute('readonly')
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Approve', 'Return', 'Reject'])
+  })
+
+  it("renders a label from the texts of the task's release when the site texts lack the key", async () => {
+    stubTaskApi({
+      releaseTexts: {
+        status: 200,
+        body: { locale: 'en', texts: { 'purchaseRequest.managerApproval': 'Manager review' } },
+      },
+    })
+    const { 'purchaseRequest.managerApproval': _removed, ...siteTexts } = texts
+
+    renderPage([{ texts: siteTexts, fallbackTexts: siteTexts }])
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Laptops for Q4')
+    expect(screen.getByText('Manager review')).toBeInTheDocument()
+  })
+
+  it("shows the load error when the texts of the task's release fail to load", async () => {
+    stubTaskApi({ releaseTexts: { status: 500 } })
+
+    renderPage()
+
+    expect(await screen.findByTestId('task-load-error')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('completes the task with the outcome, only the changed editable fields and the version, then goes to the inbox', async () => {

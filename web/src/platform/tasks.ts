@@ -12,6 +12,8 @@ export interface TaskSubject {
 /** An open task as the task API lists it. `dueAt` is `null` when the step has no `dueIn`. */
 export interface TaskListItem {
   id: string
+  /** The release the task started on. Its labels come from that release's texts. */
+  releaseId: string
   process: string
   step: string
   labelKey: string
@@ -43,6 +45,8 @@ export type TaskForm = FormMetadata & { entity: EntityMetadata }
  */
 export interface TaskItem {
   id: string
+  /** The release the task started on. Its labels come from that release's texts. */
+  releaseId: string
   process: string
   instanceId: string
   step: string

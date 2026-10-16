@@ -7,7 +7,9 @@ import { buildCompleteBody } from './recordBody'
 import { fetchRecord } from './records'
 import type { WidgetMetadata } from './site'
 import { assignedElsewhere, completeTask, fetchTask, type TaskItem } from './tasks'
-import { useText } from './texts'
+import { TextProvider } from './TextProvider'
+import { useText, useTextCatalogs } from './texts'
+import { useReleaseTexts } from './useReleaseTexts'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
 interface TaskPageProps {
@@ -19,6 +21,8 @@ interface TaskPageProps {
   taskId: string
   /** The UI locale, for formatting the due date and read-only values. */
   locale: string
+  /** The site's fallback locale, for the texts of the task's release. */
+  fallbackLocale: string
 }
 
 /** The task read, `null` when the task API has none with the id, or why it could not be shown. */
@@ -32,8 +36,12 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * the task with the outcome, the changed editable values and the record's `version`, then returns
  * to the inbox. A task that is not open, or that another completion decided first, shows that it is
  * already completed, with no form or buttons. A task assigned to someone else shows only that.
+ *
+ * The page shows the texts of the release the task started on, for the current and the fallback
+ * locale, before the site texts and the platform texts. So a label a newer release reworded or
+ * removed keeps its old text. If those texts fail to load, the page shows its load error.
  */
-export function TaskPage({ sitePath, pageName, widget, taskId, locale }: TaskPageProps) {
+export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
   const t = useText()
   const navigate = useNavigate()
   // The server sets the path on every task inbox.
@@ -42,6 +50,14 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale }: TaskPag
   const [task, setTask] = useState<TaskState>()
   // Set when completing answered that another completion came first.
   const [decided, setDecided] = useState(false)
+  const outer = useTextCatalogs()
+  const releaseIds = useMemo(() => (isTaskItem(task) ? [task.releaseId] : []), [task])
+  const releaseTexts = useReleaseTexts(sitePath, releaseIds, locale, fallbackLocale)
+  const releaseCatalog = isTaskItem(task) ? releaseTexts.catalogs.get(task.releaseId) : undefined
+  const catalogs = useMemo(
+    () => (releaseCatalog ? [releaseCatalog, ...outer.catalogs] : outer.catalogs),
+    [releaseCatalog, outer.catalogs],
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -75,11 +91,46 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale }: TaskPag
   if (task === assignedElsewhere) {
     return <Alert data-testid="task-assigned-elsewhere" type="warning" message={t('shell.task.assignedElsewhere')} />
   }
-  if (task === 'failed') {
+  if (task === 'failed' || releaseTexts.failed) {
     return <Alert data-testid="task-load-error" type="error" message={t('shell.task.loadFailed')} />
   }
+  // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
+  if (!releaseCatalog) {
+    return null
+  }
 
-  const open = task.state === 'open' && !decided
+  return (
+    <TextProvider catalogs={catalogs} development={outer.development}>
+      <TaskBody
+        task={task}
+        tasksPath={tasksPath}
+        locale={locale}
+        open={task.state === 'open' && !decided}
+        onDone={() => navigate(inboxPath)}
+        onAssignedElsewhere={() => setTask(assignedElsewhere)}
+        onDecided={() => void onDecided()}
+      />
+    </TextProvider>
+  )
+}
+
+function isTaskItem(task: TaskState | undefined): task is TaskItem {
+  return typeof task === 'object' && task !== null
+}
+
+interface TaskBodyProps {
+  task: TaskItem
+  tasksPath: string
+  locale: string
+  open: boolean
+  onDone: () => void
+  onAssignedElsewhere: () => void
+  onDecided: () => void
+}
+
+/** The task's label, subject and due date, and its form while it is open. It reads the release texts. */
+function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, onDecided }: TaskBodyProps) {
+  const t = useText()
   return (
     <Flex vertical gap="middle">
       <Typography.Title level={4}>{t(task.labelKey)}</Typography.Title>
@@ -99,9 +150,9 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale }: TaskPag
           task={task}
           tasksPath={tasksPath}
           locale={locale}
-          onDone={() => navigate(inboxPath)}
-          onAssignedElsewhere={() => setTask(assignedElsewhere)}
-          onDecided={() => void onDecided()}
+          onDone={onDone}
+          onAssignedElsewhere={onAssignedElsewhere}
+          onDecided={onDecided}
         />
       ) : (
         <Alert data-testid="task-completed" type="info" message={t('shell.task.completed')} />

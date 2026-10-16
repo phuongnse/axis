@@ -39,6 +39,7 @@ export function PageRoute({ form }: { form?: FormMode }) {
       sitePath={site.path}
       name={page}
       locale={locale}
+      fallbackLocale={site.locales.fallback}
       form={form}
       recordId={form === 'edit' ? id : null}
       returnTo={returnTo}
@@ -50,12 +51,13 @@ interface SitePageProps {
   sitePath: string
   name: string
   locale: string
+  fallbackLocale: string
   form?: FormMode
   recordId: string | null
   returnTo: string
 }
 
-function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePageProps) {
+function SitePage({ sitePath, name, locale, fallbackLocale, form, recordId, returnTo }: SitePageProps) {
   const t = useText()
   const [page, setPage] = useState<PageMetadata | null | 'failed'>()
 
@@ -90,7 +92,14 @@ function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePage
     }
     return (
       <PageContainer title={t(page.titleKey)}>
-        <TaskPage sitePath={sitePath} pageName={page.name} widget={widget} taskId={recordId} locale={locale} />
+        <TaskPage
+          sitePath={sitePath}
+          pageName={page.name}
+          widget={widget}
+          taskId={recordId}
+          locale={locale}
+          fallbackLocale={fallbackLocale}
+        />
       </PageContainer>
     )
   }
@@ -106,7 +115,13 @@ function SitePage({ sitePath, name, locale, form, recordId, returnTo }: SitePage
         <FormWidget widget={widget} recordId={recordId} returnTo={returnTo} locale={locale} />
       )}
       {widget?.type === 'taskInbox' && (
-        <TaskInboxWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
+        <TaskInboxWidget
+          sitePath={sitePath}
+          pageName={page.name}
+          widget={widget}
+          locale={locale}
+          fallbackLocale={fallbackLocale}
+        />
       )}
     </PageContainer>
   )
