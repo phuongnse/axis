@@ -40,7 +40,7 @@ public sealed class EventDeliveryFixture : IAsyncLifetime
         foreach (var (tenantId, tenant) in _tenants)
         {
             values[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
-            values[$"Tenants:{tenantId}:ConnectionString"] = tenant.ConnectionString;
+            values[$"Tenants:{tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenant.ConnectionString);
         }
 
         _settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();

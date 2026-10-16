@@ -78,12 +78,12 @@ public sealed class TaskApiFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", a.ConnectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(a.ConnectionString));
             builder.UseSetting("Tenants:a:Hosts:0", Host(TenantA));
-            builder.UseSetting("Tenants:a:ConnectionString", a.ConnectionString);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(a.ConnectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", a.ConnectionString);
             builder.UseSetting("Tenants:b:Hosts:0", Host(TenantB));
-            builder.UseSetting("Tenants:b:ConnectionString", b.ConnectionString);
+            builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(b.ConnectionString));
             builder.UseSetting("Tenants:b:SchemaConnectionString", b.ConnectionString);
             builder.UseTestOidc(TenantA, TenantB);
             builder.UseTestAuthentication(
@@ -97,9 +97,9 @@ public sealed class TaskApiFixture : IAsyncLifetime
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"Tenants:{TenantA}:Hosts:0"] = Host(TenantA),
-                [$"Tenants:{TenantA}:ConnectionString"] = a.ConnectionString,
+                [$"Tenants:{TenantA}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(a.ConnectionString),
                 [$"Tenants:{TenantB}:Hosts:0"] = Host(TenantB),
-                [$"Tenants:{TenantB}:ConnectionString"] = b.ConnectionString,
+                [$"Tenants:{TenantB}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(b.ConnectionString),
             })
             .Build();
         _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();

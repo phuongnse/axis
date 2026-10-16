@@ -88,9 +88,9 @@ public sealed class TriggerApiFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", _connectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(_connectionString));
             builder.UseSetting("Tenants:a:Hosts:0", Host);
-            builder.UseSetting("Tenants:a:ConnectionString", _connectionString);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", _connectionString);
             builder.UseTestOidc("a");
             builder.UseTestAuthentication(new TestIdentity("cara", "Cara Clerk", "clerk"));
@@ -102,7 +102,7 @@ public sealed class TriggerApiFixture : IAsyncLifetime
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Tenants:a:Hosts:0"] = Host,
-                ["Tenants:a:ConnectionString"] = _connectionString,
+                ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(_connectionString),
             })
             .Build();
         _worker = new ServiceCollection()

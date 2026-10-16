@@ -106,7 +106,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"Tenants:{_tenantId}:Hosts:0"] = $"{_tenantId}.example.test",
-                [$"Tenants:{_tenantId}:ConnectionString"] = _connectionString,
+                [$"Tenants:{_tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(_connectionString),
             })
             .Build();
         _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
@@ -367,7 +367,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public async Task WaitUntilBlockedOnLockAsync(Task run, CancellationToken cancellationToken)
     {
         var clock = Stopwatch.StartNew();
-        while (await CountAsync(
+        while (await AdminCountAsync(
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") != 1)
         {
             Assert.False(run.IsCompleted, "The step ended before it waited on a row lock.");
@@ -375,6 +375,13 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
         }
     }
+
+    /// <summary>
+    /// Runs <paramref name="sql"/>, a <c>SELECT count(*)</c>, on the tenant database as the PostgreSQL superuser,
+    /// which is the only role that sees or ends the sessions of other roles.
+    /// </summary>
+    public async Task<long> AdminCountAsync(string sql) =>
+        (long)(await PostgreSqlServer.AdminScalarAsync(ConnectionString, sql))!;
 
     /// <summary>Runs <paramref name="sql"/>, a <c>SELECT count(*)</c>, with the named parameters.</summary>
     public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters) =>

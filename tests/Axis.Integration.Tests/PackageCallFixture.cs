@@ -354,7 +354,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
-                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = _tenant.ConnectionString,
+                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(_tenant.ConnectionString),
                 [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Kind"] = "url",
                 [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Value"] = "https://test.example.test",
                 [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Kind"] = "secret",

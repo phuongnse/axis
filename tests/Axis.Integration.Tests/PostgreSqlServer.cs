@@ -23,12 +23,22 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
     /// </summary>
     public const int MaxConnections = 500;
 
+    /// <summary>The login role that owns every test database and runs startup activation.</summary>
+    public const string SchemaRole = "axis_schema";
+
+    /// <summary>The login role that servers and workers connect as. It gets row access only.</summary>
+    public const string RuntimeRole = "axis_runtime";
+
+    /// <summary>The development password of both roles.</summary>
+    public const string RolePassword = "axis";
+
     // The start takes no test's cancellation token, so cancelling one test does not fail the others.
     private static readonly Lazy<Task<PostgreSqlContainer>> _container = new(StartContainerAsync);
 
     /// <summary>
-    /// Creates a new database named <c>&lt;prefix&gt;_&lt;guid&gt;</c>, unique in the run, and returns
-    /// a connection string to it. The prefix is at most 30 lowercase letters, digits and underscores,
+    /// Creates a new database named <c>&lt;prefix&gt;_&lt;guid&gt;</c>, unique in the run, owned by
+    /// <see cref="SchemaRole"/>, and returns that role's connection string to it. Default privileges
+    /// give <see cref="RuntimeRole"/> row access to what the schema role creates. The prefix is at most 30 lowercase letters, digits and underscores,
     /// so the name stays within PostgreSQL's 63-character limit.
     /// </summary>
     public static async Task<string> CreateDatabaseAsync(string prefix, CancellationToken cancellationToken = default)
@@ -42,8 +52,47 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
 
         var name = $"{prefix}_{Guid.NewGuid():N}";
         var admin = await AdminConnectionStringAsync();
-        await ExecuteAsync(admin, $"""CREATE DATABASE "{name}" """, cancellationToken);
-        return new NpgsqlConnectionStringBuilder(admin) { Database = name }.ConnectionString;
+        await ExecuteAsync(admin, $"""CREATE DATABASE "{name}" OWNER {SchemaRole}""", cancellationToken);
+
+        // Default privileges are per database, so they run connected to the new one.
+        var adminToDatabase = new NpgsqlConnectionStringBuilder(admin) { Database = name }.ConnectionString;
+        await ExecuteAsync(
+            adminToDatabase,
+            $"""
+            ALTER DEFAULT PRIVILEGES FOR ROLE {SchemaRole} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {RuntimeRole};
+            ALTER DEFAULT PRIVILEGES FOR ROLE {SchemaRole} GRANT USAGE, SELECT ON SEQUENCES TO {RuntimeRole};
+            ALTER DEFAULT PRIVILEGES FOR ROLE {SchemaRole} GRANT USAGE ON SCHEMAS TO {RuntimeRole};
+            """,
+            cancellationToken);
+        return new NpgsqlConnectionStringBuilder(admin)
+        {
+            Database = name,
+            Username = SchemaRole,
+            Password = RolePassword,
+        }.ConnectionString;
+    }
+
+    /// <summary>The same database as <paramref name="connectionString"/>, as <see cref="RuntimeRole"/>.</summary>
+    public static string RuntimeConnectionString(string connectionString) =>
+        new NpgsqlConnectionStringBuilder(connectionString) { Username = RuntimeRole, Password = RolePassword }.ConnectionString;
+
+    /// <summary>
+    /// Runs <paramref name="sql"/> as the container's superuser on the same database as
+    /// <paramref name="connectionString"/> and returns the first column of the first row. Only a
+    /// superuser sees other roles' sessions in <c>pg_stat_activity</c> or ends them. The session does not
+    /// outlive the call, so it does not show up in later checks.
+    /// </summary>
+    public static async Task<object?> AdminScalarAsync(string connectionString, string sql, CancellationToken cancellationToken = default)
+    {
+        var admin = new NpgsqlConnectionStringBuilder(await AdminConnectionStringAsync())
+        {
+            Database = new NpgsqlConnectionStringBuilder(connectionString).Database,
+            Pooling = false,
+        }.ConnectionString;
+        await using var dataSource = NpgsqlDataSource.Create(admin);
+        await using var command = dataSource.CreateCommand(sql);
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is DBNull ? null : value;
     }
 
     /// <summary>Drops the database and ends every session still connected to it.</summary>
@@ -78,6 +127,10 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
         try
         {
             await container.StartAsync();
+            await ExecuteAsync(
+                container.GetConnectionString(),
+                $"CREATE ROLE {SchemaRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {RuntimeRole} LOGIN PASSWORD '{RolePassword}'",
+                CancellationToken.None);
             return container;
         }
         catch

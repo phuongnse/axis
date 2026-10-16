@@ -53,9 +53,9 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", database.ConnectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
-            builder.UseSetting("Tenants:default:ConnectionString", database.ConnectionString);
+            builder.UseSetting("Tenants:default:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
             builder.UseSetting("Tenants:default:SchemaConnectionString", database.ConnectionString);
             builder.UseTestOidc("default");
         });
@@ -72,15 +72,23 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         var tenantA = await database.CreateDatabaseAsync("tenant_a", CancellationToken);
         var tenantB = await database.CreateDatabaseAsync("tenant_b", CancellationToken);
 
+        // The runtime role cannot create tables, so the schema role creates the table the handlers use.
+        foreach (var tenant in new[] { tenantA, tenantB })
+        {
+            await using var dataSource = NpgsqlDataSource.Create(tenant);
+            await using var create = dataSource.CreateCommand("CREATE TABLE rows (value text NOT NULL)");
+            await create.ExecuteNonQueryAsync(CancellationToken);
+        }
+
         // A test host, not Program: the row endpoints exist only here.
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenants:a:Hosts:0"] = "a.example.test",
-            ["Tenants:a:ConnectionString"] = tenantA,
+            ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenantA),
             ["Tenants:b:Hosts:0"] = "b.example.test",
-            ["Tenants:b:ConnectionString"] = tenantB,
+            ["Tenants:b:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenantB),
             ["Tenants:a:Bindings:PurchasingSystemUrl:Kind"] = "url",
             ["Tenants:a:Bindings:PurchasingSystemUrl:Value"] = "https://a.example.test/api",
             ["Tenants:b:Bindings:PurchasingSystemUrl:Kind"] = "url",
@@ -93,7 +101,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         {
             await using var connection = await connections.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(
-                "CREATE TABLE IF NOT EXISTS rows (value text NOT NULL); INSERT INTO rows (value) VALUES (@value)",
+                "INSERT INTO rows (value) VALUES (@value)",
                 connection);
             command.Parameters.AddWithValue("value", value);
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -103,7 +111,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         {
             await using var connection = await connections.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(
-                "CREATE TABLE IF NOT EXISTS rows (value text NOT NULL); SELECT value FROM rows ORDER BY value",
+                "SELECT value FROM rows ORDER BY value",
                 connection);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             var values = new List<string>();

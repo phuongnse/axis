@@ -68,7 +68,7 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         try
         {
             await held.Arrived.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
-            Assert.Equal(0L, await tenant.CountAsync(
+            Assert.Equal(0L, await tenant.AdminCountAsync(
                 """
                 SELECT count(*) FROM pg_stat_activity
                 WHERE datname = current_database() AND pid <> pg_backend_pid()

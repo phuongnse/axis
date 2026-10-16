@@ -156,7 +156,7 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         {
             ["DOTNET_ENVIRONMENT"] = "Testing",
             ["Tenants__a__Hosts__0"] = TenantHost,
-            ["Tenants__a__ConnectionString"] = connectionString,
+            ["Tenants__a__ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
             ["Extensions__Path"] = packages,
             ["Worker__PollInterval"] = "00:00:00.05",
         })
@@ -308,9 +308,9 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", connectionString);
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:Hosts:0", TenantHost);
-            builder.UseSetting("Tenants:a:ConnectionString", connectionString);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);
             builder.UseSetting(PackageCatalog.PathSetting, packages);
             builder.UseTestOidc("a");
@@ -328,7 +328,7 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenants:a:Hosts:0"] = TenantHost,
-            ["Tenants:a:ConnectionString"] = connectionString,
+            ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
             [PackageCatalog.PathSetting] = packages,
             ["Worker:PollInterval"] = "00:00:00.05",
         });

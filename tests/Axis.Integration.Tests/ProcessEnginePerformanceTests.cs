@@ -83,7 +83,7 @@ public sealed class ProcessEnginePerformanceTests(ProcessStepFixture fixture) : 
         {
             ["Worker:PollInterval"] = "00:00:00.05",
             [$"Tenants:{ProcessStepFixture.TenantId}:Hosts:0"] = $"{ProcessStepFixture.TenantId}.example.test",
-            [$"Tenants:{ProcessStepFixture.TenantId}:ConnectionString"] = fixture.ConnectionString,
+            [$"Tenants:{ProcessStepFixture.TenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString),
         });
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
