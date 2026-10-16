@@ -755,6 +755,14 @@ for texts. **Both** means different parts use different releases.
   old-release work starts a new instance on the active release. For writes,
   the record is read again with the active model before its triggers run.
   See [Starts from triggers](#starts-from-triggers).
+- **Start lock** *(planned for M6)*. Each start takes
+  `pg_advisory_xact_lock_shared` keyed on the application `id`, before it
+  reads the active release, in the transaction that inserts the instance.
+  This covers the process start endpoint, inbound endpoint, trigger starts
+  and schedule fan-out. An activation with a pending migration takes the
+  same lock exclusively, after the schema lock and before counting
+  old-release work, and holds it to commit. Starts then read the new release.
+  See [Migrations](storage.md#migrations).
 - **Authorization.** Roles and policies always come from the active release,
   including for older tasks. The assignee check stays unchanged. The
   subject's display field comes from the task's release *(planned for M6)*,

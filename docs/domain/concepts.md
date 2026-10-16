@@ -26,6 +26,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. See [data sources](../reference/data-sources.md). | M2 |
 | **Sequence** | A `sequence` resource that hands out business numbers from a format such as `PR-{yyyy}-{n:5}`, giving `PR-2026-00042`. A `text` field names it and gets its number on create, in the create's transaction, so there are no gaps. When the format has a year, the counter restarts each UTC year. See [configuration](../reference/configuration.md#sequences). | M3 |
 | **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. A seed can be synced so changed values update the seeded records on start. | M1 (basic), M2 |
+| **Migration** | A `migration` resource that changes one entity's stored data in a way that is not additive: rename or drop a field, drop the entity, fill nulls or convert values. Activation runs it once per tenant, before additive provisioning, in the same transaction *(planned for M6)*. See [storage](../reference/storage.md#migrations). | M6 |
 
 **Field types** start with:
 
