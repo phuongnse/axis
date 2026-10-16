@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -44,6 +45,12 @@ public enum RecordCommandOutcome
 
     /// <summary>Storage refused the write, see <see cref="RecordCommandResult.Conflict"/>.</summary>
     Conflict,
+
+    /// <summary>
+    /// The active release is no longer the one the command was given, found under the start lock.
+    /// Nothing was written. The caller resolves the active release again and runs the command again.
+    /// </summary>
+    ReleaseChanged,
 }
 
 /// <summary>What conflicted when the outcome is <see cref="RecordCommandOutcome.Conflict"/>.</summary>
@@ -93,6 +100,10 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// that fails leaves none.
 /// A create or update also starts the processes of the data change triggers that match it, in the
 /// same transaction, as <c>system</c>. A write that fails starts none.
+/// A create or update takes the application's start lock shared, as the first statement of its write
+/// transaction. When the active release is no longer the given release, it writes nothing and the
+/// outcome is <see cref="RecordCommandOutcome.ReleaseChanged"/>, so the caller can run it again on the
+/// new release. A delete never starts a process and takes no lock.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
 /// covers, then the computed fields of the record as it will be stored and of its rows, then the
 /// entity's validations on that record, then storage. An update of an entity with computed fields
@@ -147,6 +158,15 @@ public static class RecordCommand
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The start lock comes first, before any entity table is touched in this transaction, so a
+            // migrating activation cannot deadlock with this write. A create or update can start a process
+            // whatever the release it was given declares, since the new release may add triggers.
+            if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != releaseId)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new RecordCommandResult(RecordCommandOutcome.ReleaseChanged);
+            }
+
             // The validations run in the write transaction, so their now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             if (RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now) is { } failures)
@@ -285,6 +305,15 @@ public static class RecordCommand
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The start lock comes first, before any entity table is touched in this transaction, so a
+            // migrating activation cannot deadlock with this write. A create or update can start a process
+            // whatever the release it was given declares, since the new release may add triggers.
+            if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != releaseId)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new RecordCommandResult(RecordCommandOutcome.ReleaseChanged);
+            }
+
             // The validations run in the write transaction, so their now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             if (RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now) is { } failures)

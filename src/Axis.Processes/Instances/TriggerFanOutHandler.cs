@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Data.Audit;
 using Axis.Data.DataSources;
 using Axis.Data.Records;
@@ -19,7 +20,7 @@ namespace Axis.Processes.Instances;
 /// a worker that stops loses at most its open batch and any worker continues after the cursor. A short
 /// batch deletes the item. The trigger and the data source come from the release the item
 /// names, which was active at the occurrence. The process, the records and the pin come from the
-/// release that is active now. With no active release, or one without the process, the occurrence
+/// release that is active now, read after the batch took the application's start lock shared. With no active release, or one without the process, the occurrence
 /// starts nothing. Each record gets a receipt in <c>axis.trigger_starts</c> keyed by the trigger,
 /// the occurrence and the record, so a run again after a crash starts nothing twice. A start marks
 /// the receipt <c>started</c>, and a skip leaves it <c>skipped</c> and is logged with its reason after the commit.
@@ -59,6 +60,10 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
             var stored = await models.GetAsync(context, releaseId, cancellationToken);
             trigger = stored.Triggers.First(candidate => candidate.Id == triggerId);
             var dataSource = stored.DataSources.First(candidate => candidate.Id == trigger.DataSource!.Id);
+
+            // The start lock comes before the active release is read and before any entity table, so a
+            // migrating activation cannot deadlock with this batch, and the release is the one the starts pin.
+            await StartLock.TakeSharedAsync(transaction, stored.Manifest.Id, cancellationToken);
             var active = await models.FindActiveAsync(context, stored.Manifest.Id, cancellationToken);
             var process = active?.Model.Processes.FirstOrDefault(candidate => candidate.Id == trigger.Process.Id);
             if (active is not { } current || process is null)

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Records;
@@ -22,6 +23,9 @@ namespace Axis.Server.Endpoints;
 /// The routes other systems call with a bearer token: the endpoint call and its status location.
 /// They take no session and no CSRF header. A request without a valid token is a <c>401</c> with
 /// <c>WWW-Authenticate: Bearer</c>, which never says which check failed.
+/// The transaction takes the application's start lock shared first. When the active release is no
+/// longer the one resolved, the call runs again from resolution on the new release, and answers 503
+/// after three attempts.
 /// A call is checked in order: bearer token (401), application and endpoint (404), the caller's
 /// <c>invoke</c> grant on the endpoint (403), content type (415), the body against the
 /// endpoint's input fields (400 keyed <c>/input/…</c>), and <c>Idempotency-Key</c> (400). One
@@ -76,35 +80,76 @@ internal static class InboundEndpoints
             return Unauthorized(request);
         }
 
+        // A release change under the start lock sends the call back to resolution, so every check runs on the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
+        {
+            var call = await CallOnceAsync(app, name, request, caller, resolver, database, tenants, loggerFactory, cancellationToken);
+            if (call.Committed is not { } committed)
+            {
+                if (call.Result is { } result)
+                {
+                    return result;
+                }
+
+                continue;
+            }
+
+            return await WaitAsync(database, committed, cancellationToken);
+        }
+
+        return ReleaseRetry.Changed();
+    }
+
+    /// <summary>
+    /// One attempt of a call, up to its commit. It has a result for an answer, and a
+    /// <see cref="CommittedCall"/> once the transaction committed. It has neither when the active
+    /// release changed while the call waited for the start lock, and nothing was written.
+    /// </summary>
+    private sealed record CallAttempt(IResult? Result = null, CommittedCall? Committed = null);
+
+    /// <summary>The call as committed, for the wait that follows.</summary>
+    private sealed record CommittedCall(ApplicationModel Application, EntityModel Entity, EndpointModel Endpoint, Guid RecordId, Guid InstanceId);
+
+    private static async Task<CallAttempt> CallOnceAsync(
+        string app,
+        string name,
+        HttpRequest request,
+        EndpointCallerIdentity caller,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
         // An unknown application and an unknown endpoint get the same answer: a caller has no need
         // to tell them apart.
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active
             || !active.Model.TryGetEndpoint(name, out var endpoint))
         {
-            return NotFound();
+            return new(NotFound());
         }
 
         var application = active.Model;
         if (!PolicyEvaluator.AllowsInvoke(application, caller.Roles, endpoint))
         {
-            return Grants.Forbidden();
+            return new(Grants.Forbidden());
         }
 
         if (!JsonRequest.IsJson(request))
         {
-            return JsonRequest.UnsupportedMediaType();
+            return new(JsonRequest.UnsupportedMediaType());
         }
 
         var body = await RecordEndpoints.ReadBodyAsync(request, cancellationToken);
         var parsed = RecordInputParser.ParseEndpointInput(body, endpoint, application);
         if (parsed.Errors is { } errors)
         {
-            return Results.ValidationProblem(errors);
+            return new(Results.ValidationProblem(errors));
         }
 
         if (!ProcessStartEndpoints.TryReadIdempotencyKey(request.Headers[ProcessStartEndpoints.IdempotencyKeyHeader], out var key))
         {
-            return ProcessStartEndpoints.IdempotencyKeyProblem();
+            return new(ProcessStartEndpoints.IdempotencyKeyProblem());
         }
 
         var entity = application.FindEntity(endpoint.Entity.Id)
@@ -117,7 +162,7 @@ internal static class InboundEndpoints
         var mapped = EndpointInputMapper.Map(application, entity, endpoint, parsed.Input!);
         if (mapped.Errors is { } mapErrors)
         {
-            return Results.ValidationProblem(mapErrors);
+            return new(Results.ValidationProblem(mapErrors));
         }
 
         // The creator fields are set before the computed fields and validations, as in a record API
@@ -126,7 +171,7 @@ internal static class InboundEndpoints
         var computed = RecordComputer.ComputeCreate(application, entity, values, mapped.Rows);
         if (computed.Errors is { } computeErrors)
         {
-            return Results.ValidationProblem(computeErrors);
+            return new(Results.ValidationProblem(computeErrors));
         }
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
@@ -135,6 +180,14 @@ internal static class InboundEndpoints
         var instanceId = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The start lock comes first, before any entity table is touched, so a migrating activation
+        // cannot deadlock with this call. The release is read again under it.
+        if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != active.ReleaseId)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new();
+        }
 
         // The receipt is claimed first, so a repeat answers from it even when a validation would
         // now refuse the input, and a concurrent repeat waits on the receipt's key. The parser
@@ -149,7 +202,7 @@ internal static class InboundEndpoints
                 var receipt = await EndpointReceipts.FindAsync(
                     connection, application.Manifest.Id, endpoint.Id, caller.Id, key, input, cancellationToken)
                     ?? throw new InvalidOperationException("The receipt of a claimed Idempotency-Key could not be found.");
-                return await RepeatAsync(connection, application, entity, endpoint, receipt, cancellationToken);
+                return new(await RepeatAsync(connection, application, entity, endpoint, receipt, cancellationToken));
             }
         }
 
@@ -158,14 +211,14 @@ internal static class InboundEndpoints
         if (RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now) is { } failures)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return Results.ValidationProblem(failures);
+            return new(Results.ValidationProblem(failures));
         }
 
         var result = await RecordCommands.CreateAsync(connection, application, entity, computed.Values, computed.Rows, recordId, cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);
-            return RecordEndpoints.WriteFailure(result);
+            return new(RecordEndpoints.WriteFailure(result));
         }
 
         await AuditRecords.AppendAsync(
@@ -212,18 +265,22 @@ internal static class InboundEndpoints
         if (started.Outcome != ProcessStartOutcome.Started)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return started.Outcome == ProcessStartOutcome.ConditionFailed
+            return new(started.Outcome == ProcessStartOutcome.ConditionFailed
                 ? Results.ValidationProblem(new Dictionary<string, string[]> { [InputPointer] = [started.TextKey!] })
-                : ProcessStartEndpoints.AlreadyRunning();
+                : ProcessStartEndpoints.AlreadyRunning());
         }
 
         await transaction.CommitAsync(cancellationToken);
-        if (endpoint.Wait is not { } wait)
-        {
-            return Results.Json(new EndpointCallResponse(record.Id, instanceId, ProcessStarts.Running), statusCode: StatusCodes.Status201Created);
-        }
+        return endpoint.Wait is null
+            ? new(Results.Json(new EndpointCallResponse(record.Id, instanceId, ProcessStarts.Running), statusCode: StatusCodes.Status201Created))
+            : new(Committed: new CommittedCall(application, entity, endpoint, record.Id, instanceId));
+    }
 
-        await transaction.DisposeAsync();
+    // Holds no connection between checks. The transaction of the attempt is already disposed.
+    private static async Task<IResult> WaitAsync(TenantDatabase database, CommittedCall call, CancellationToken cancellationToken)
+    {
+        var (application, entity, endpoint, recordId, instanceId) = call;
+        var wait = endpoint.Wait!.Value;
         await database.ReleaseConnectionAsync();
         var state = ProcessStarts.Running;
         var waitStart = Stopwatch.GetTimestamp();
@@ -234,9 +291,9 @@ internal static class InboundEndpoints
             state = (await ProcessStarts.FindInstanceAsync(polled, instanceId, cancellationToken))?.State ?? state;
             if (state == ProcessStarts.Completed)
             {
-                var output = await ReadOutputAsync(polled, application, entity, endpoint, record.Id, cancellationToken);
+                var output = await ReadOutputAsync(polled, application, entity, endpoint, recordId, cancellationToken);
                 await database.ReleaseConnectionAsync();
-                return Results.Json(new EndpointCallResponse(record.Id, instanceId, state, output), statusCode: StatusCodes.Status201Created);
+                return Results.Json(new EndpointCallResponse(recordId, instanceId, state, output), statusCode: StatusCodes.Status201Created);
             }
 
             await database.ReleaseConnectionAsync();
@@ -248,7 +305,7 @@ internal static class InboundEndpoints
             }
         }
 
-        return Results.Accepted(StatusLocation(application, endpoint, instanceId), new EndpointCallResponse(record.Id, instanceId, state));
+        return Results.Accepted(StatusLocation(application, endpoint, instanceId), new EndpointCallResponse(recordId, instanceId, state));
     }
 
     /// <summary>

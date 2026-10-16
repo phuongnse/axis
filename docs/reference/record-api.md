@@ -264,6 +264,10 @@ Policies add more checks. The full order is:
 11. On create and update, the new record outside every `create` or `update`
     filter, `403`.
 
+The `503` below is not a check of its own. It can follow any check that passed
+on a create or update, because the request runs those checks again on the new
+release.
+
 So a caller learns that a record exists only once they may read it. The field
 and value checks need the parsed body, so they come after it. The new record
 is checked as it is stored, inside the write transaction and after storage,
@@ -336,6 +340,11 @@ otherwise the answer is the stale-version `409`. See
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response
   never names a table, column or constraint.
+- **`503` for a changed release.** Create and update only. The application's
+  active release changed on each of three attempts, found under the
+  [start lock](processes.md#releases-and-running-work). The server already ran
+  the request again on the new release each time. Nothing was written, and the
+  client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
 
@@ -738,6 +747,11 @@ is the record API's:
 - **`415`.** A body without `Content-Type: application/json`.
 - **`422`.** The `Idempotency-Key` was used before by the same caller on the
   same endpoint with a different input.
+- **`503`.** The application's active release changed on each of three
+  attempts, found under the [start lock](processes.md#releases-and-running-work).
+  The server already ran the call again on the new release each time. Nothing
+  was written, and the caller may send the request again. The title is fixed:
+  "The application's active release changed while the request ran. Try again."
 
 ### Idempotency
 

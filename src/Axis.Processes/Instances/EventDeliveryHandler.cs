@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Processes.Work;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -12,8 +13,11 @@ namespace Axis.Processes.Instances;
 /// trigger, the item is deleted with no other write. Each trigger then gets its own transaction,
 /// which checks the claim and extends the lease, and inserts the trigger's receipt in
 /// <c>axis.trigger_starts</c> first. A receipt already there means the trigger handled the
-/// occurrence, so a delivery run again after a crash starts nothing twice. The transaction then
-/// evaluates the trigger's <c>when</c> on the stored payload, locks and reads the occurrence's
+/// occurrence, so a delivery run again after a crash starts nothing twice. The transaction first
+/// takes the application's start lock shared and reads the active release again, so it pins the
+/// release it finds under the lock. A trigger that this release no longer has is skipped with no
+/// receipt, and a trigger that only this release has is not delivered for the occurrence. The
+/// transaction then evaluates the trigger's <c>when</c> on the stored payload, locks and reads the occurrence's
 /// record, and starts the process for it as <c>system</c>, pinned to the active release. A start
 /// marks the receipt <c>started</c>. A skip leaves it <c>skipped</c> and is logged with its reason.
 /// A last transaction deletes the item.
@@ -60,7 +64,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
 
         foreach (var trigger in delivery.Triggers)
         {
-            if (!await DeliverAsync(item, connection, delivery, occurrence!, trigger, cancellationToken))
+            if (!await DeliverAsync(item, connection, occurrence!, trigger, cancellationToken))
             {
                 return WorkItemOutcome.LostClaim;
             }
@@ -113,7 +117,6 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
     private async Task<bool> DeliverAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        EventTriggers delivery,
         StoredEvent occurrence,
         TriggerModel trigger,
         CancellationToken cancellationToken)
@@ -128,7 +131,21 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
                 return false;
             }
 
-            skipped = await StartAsync(item, transaction, delivery, occurrence, trigger, cancellationToken);
+            // The start lock comes before any entity table is read, so a migrating activation cannot
+            // deadlock with this start. The active release is read again under it: an activation may
+            // have committed since the triggers were found, and a start pins the release it finds now.
+            await StartLock.TakeSharedAsync(transaction, occurrence.ApplicationId, cancellationToken);
+            var current = await EventTriggerStarts.FindAsync(
+                new WorkItemContext(item, connection, transaction),
+                models,
+                occurrence.ApplicationId,
+                occurrence.Event,
+                TriggerMode.Async,
+                cancellationToken);
+            var found = current?.Event is null ? null : current.Triggers.FirstOrDefault(candidate => candidate.Id == trigger.Id);
+            skipped = found is null
+                ? "the trigger is not in the active release"
+                : await StartAsync(item, transaction, current!, occurrence, found, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
 

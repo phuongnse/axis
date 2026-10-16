@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Work;
@@ -561,6 +562,10 @@ internal sealed partial class ConnectorCallHandler(
         var entity = target.Entity;
         if (values.Count > 0)
         {
+            // The write can start instances through data change triggers. The start lock comes before any
+            // entity table is read, so a migrating activation cannot deadlock with this transaction.
+            await StartLock.TakeSharedAsync(transaction, instance.ApplicationId, cancellationToken);
+
             // The lock makes the read below see the latest version, and a concurrent write of the
             // record waits until this transaction ends.
             await RecordCommands.LockAsync(connection, entity, instance.SubjectId, cancellationToken);

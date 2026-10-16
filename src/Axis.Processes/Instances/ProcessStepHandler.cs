@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Work;
@@ -24,7 +25,8 @@ namespace Axis.Processes.Instances;
 /// change trigger come from the application's active release, and
 /// its start runs as <c>system</c>, pinned to that release. A skipped <c>sync</c> start is logged
 /// and lets the step commit. A step that finds the instance at another revision than it loaded
-/// writes nothing. A step that throws is rolled back, and the failure callback then records the
+/// writes nothing. An operation step and a <c>raiseEvent</c> step take the application's start lock
+/// shared before they read an entity table, since they can start instances. A step that throws is rolled back, and the failure callback then records the
 /// error in the history and marks the instance <c>failed</c>.
 /// </summary>
 internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
@@ -112,6 +114,15 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (!process.TryGetStep(instance.Step, out var step))
         {
             throw Failure($"The process '{process.Name}' has no step '{instance.Step}'.", instance, input);
+        }
+
+        if (step is OperationStepModel or RaiseEventStepModel)
+        {
+            // These steps can start an instance: an operation through a data change trigger and a raised
+            // event through a sync trigger. The start lock comes before any entity table is read, so a
+            // migrating activation cannot deadlock with the step, and the active release read later is
+            // read under it. The step keeps the release the instance is pinned to.
+            await StartLock.TakeSharedAsync(context.Transaction, instance.ApplicationId, cancellationToken);
         }
 
         if (step is OperationStepModel)

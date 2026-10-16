@@ -331,7 +331,7 @@ child tables are in [Schema planning](#schema-planning).
 
 The migration resource, its compile checks and the once-per-tenant apply of
 `renameField`, `dropField`, `dropEntity`, `fill` and `convert` at activation are
-built. The start lock, the old-release work check and the recompute
+built, and so is the start lock. The old-release work check and the recompute
 of computed fields are *(planned for M6)*, and so are the rules, table rows
 and example below that use them. Until the recompute is built, a `fill` or
 `convert` on a child entity and a `fill` or `convert` of a field that a computed
@@ -347,7 +347,11 @@ Migrations run forward only.
   these steps in one transaction:
 
   1. Take the existing schema lock, `pg_advisory_xact_lock`. *(Built.)*
-  2. Take the application's start lock exclusively. *(Planned for M6.)*
+  2. Take the application's start lock exclusively. *(Built.)* An activation
+     with no pending migration skips this step. The pending migrations are
+     known only after reading `axis.applied_migrations`, so the lock comes
+     right after that read and before any changed-history diagnostic is acted on.
+     The schema lock already keeps those rows from changing in between.
   3. Check changed history. Any diagnostic stops the activation. *(Built.)*
   4. Count old-release work for the destructive changes below. Any such
      work stops the activation with a diagnostic. *(Planned for M6.)*
@@ -366,6 +370,10 @@ Migrations run forward only.
 
   The fixed lock order is schema lock, then start lock. Process starts
   never take the schema lock, so this order cannot deadlock with them.
+  A start takes the start lock as the first statement of its transaction,
+  before it reads or writes any entity table. Otherwise a start that already
+  holds a table lock could wait for the activation, which then needs an
+  exclusive lock on that table, and PostgreSQL would abort one of them.
 - **Changed history.** An applied migration with a changed content hash or
   a missing file is `AXC0174`. Nothing runs. A changed file is reported at
   that file with an empty path, and a missing file at `application.json`
@@ -383,15 +391,24 @@ Migrations run forward only.
   migration, the release and the count of open instances. Activation then
   changes nothing. A `fill` or an additive change never waits for old-release
   work.
-- **Start lock** *(planned for M6)*. Every transaction that reads the active release and
-  inserts a process instance takes `pg_advisory_xact_lock_shared` keyed on
-  the application `id`, before reading the active release. This covers the
-  process start endpoint, inbound endpoint, trigger starts and schedule
-  fan-out. An activation with a pending migration takes the same lock
-  exclusively, using `pg_advisory_xact_lock`, before counting old-release
-  work. It waits for open starts and holds new ones until commit. A start
-  either commits before the count and is counted, or reads the new release
-  after activation commits. See [Releases and running work](processes.md#releases-and-running-work).
+- **Start lock** *(built; the count it protects is planned for M6)*. Every
+  transaction that reads the active release and inserts a process instance
+  takes `pg_advisory_xact_lock_shared` keyed on the application `id`, before
+  it reads the active release. The key is a `bigint`: the XOR of the two
+  64-bit halves of the id. Another key can collide with it, which only makes
+  a start wait longer. This covers the process start endpoint, the inbound
+  endpoint, record API creates and updates, task completion, event delivery,
+  `sync` event triggers, update triggers from worker steps and schedule
+  fan-out. A record API create or update always takes it, because the new
+  release may add triggers. A delete never starts a process and does not. An
+  activation with a pending migration takes the same lock exclusively, using
+  `pg_advisory_xact_lock`, and holds it to commit. It waits for open starts
+  and holds new ones until commit. A start either commits before the
+  activation counts open work, or reads the new release after the activation
+  commits. An activation with no pending migration never takes the lock.
+  A request that finds a different active release under the lock runs
+  again on the new release. See
+  [Releases and running work](processes.md#releases-and-running-work).
 - **Failure.** Any failure rolls back migrations, additive provisioning,
   migration and provisioning records, the active release and its site paths.
   This includes a refused application name or site path at the upsert.
@@ -497,8 +514,8 @@ in an earlier release never waits for old-release work.
 
 ### Limits
 
-These limits apply to migrations. Those about `fill`, `convert`, the start lock
-and old-release work are *(planned for M6)*. Until the old-release check is
+These limits apply to migrations. Those about `fill`, `convert` and
+old-release work are *(planned for M6)*. Until the old-release check is
 built, a running or waiting process instance of an older release can fail at
 its next step after a rename or a drop.
 
@@ -508,9 +525,11 @@ its next step after a rename or a drop.
   exclusive start lock. A long fill delays them.
 - Operator cancel comes in M7. Until then, old work must finish before a
   destructive migration can run. There is no way to drain starts yet.
-- A record API request that resolved the previous release just before the
-  commit can fail once on a renamed or dropped column. The start lock covers
-  process starts only.
+- A record API create or update takes the start lock and runs again on the new
+  release when the active release changed. A list, a read, a history or a
+  delete that resolved the previous release just before the commit can still
+  fail once on a renamed or dropped column. The same holds for a create or
+  update that reads the stored record before it takes the lock.
 
 ## Audit records and sequence counters
 

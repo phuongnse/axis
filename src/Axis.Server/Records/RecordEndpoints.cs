@@ -45,6 +45,9 @@ namespace Axis.Server.Records;
 /// the record as it will be stored and of its rows (400), then the entity's validations on that
 /// record (400), then storage (404, 409). An update of an entity with computed fields or
 /// validations reads the stored record first, so an unknown record is a 404 there.
+/// A create or update that finds a different active release under the start lock runs again from
+/// the path check on the new release, and answers 503 after three attempts. Nothing is written by
+/// an attempt that finds a change.
 /// A delete is 204, or 404 or 409 from storage. A record's history is checked as a single read
 /// (404), then paging (400), and an unknown or deleted record is a 404. The problem titles never
 /// contain text from the request.
@@ -283,30 +286,40 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
-        if (model is null)
+        // A release change under the start lock sends the create back to resolution, so every check runs on the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            return notFound!;
+            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+            if (model is null)
+            {
+                return notFound!;
+            }
+
+            var connection = await database.GetConnectionAsync(cancellationToken);
+            var result = await RecordCommand.CreateAsync(
+                connection,
+                TenantId(tenants),
+                application!,
+                releaseId,
+                model,
+                Actor(user),
+                BodyReader(request),
+                loggerFactory,
+                cancellationToken);
+            if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
+            {
+                continue;
+            }
+
+            // The location uses the model's names, so a record has one URL whatever case the caller used.
+            return result is { Outcome: RecordCommandOutcome.Written, Record: { } created }
+                ? Results.Created(
+                    $"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}",
+                    RecordFieldAccess.Read(application, user.Roles, model).Visible(created))
+                : WriteFailure(result);
         }
 
-        var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordCommand.CreateAsync(
-            connection,
-            TenantId(tenants),
-            application!,
-            releaseId,
-            model,
-            Actor(user),
-            BodyReader(request),
-            loggerFactory,
-            cancellationToken);
-
-        // The location uses the model's names, so a record has one URL whatever case the caller used.
-        return result is { Outcome: RecordCommandOutcome.Written, Record: { } created }
-            ? Results.Created(
-                $"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}",
-                RecordFieldAccess.Read(application, user.Roles, model).Visible(created))
-            : WriteFailure(result);
+        return ReleaseRetry.Changed();
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -325,35 +338,45 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
-        if (model is null)
+        // A release change under the start lock sends the update back to resolution, so every check runs on the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            return notFound!;
+            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+            if (model is null)
+            {
+                return notFound!;
+            }
+
+            // The grant is checked before the id, so an id that is no record answers 403 to an actor
+            // with no grant and 404 to one with it.
+            if (!TryParseId(id, out var recordId))
+            {
+                return UnparsedId(application!, user, model, PolicyAction.Update);
+            }
+
+            var connection = await database.GetConnectionAsync(cancellationToken);
+            var result = await RecordCommand.UpdateAsync(
+                connection,
+                TenantId(tenants),
+                application!,
+                releaseId,
+                model,
+                recordId,
+                Actor(user),
+                BodyReader(request),
+                loggerFactory,
+                cancellationToken);
+            if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
+            {
+                continue;
+            }
+
+            return result is { Outcome: RecordCommandOutcome.Written, Record: { } updated }
+                ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(updated))
+                : WriteFailure(result);
         }
 
-        // The grant is checked before the id, so an id that is no record answers 403 to an actor
-        // with no grant and 404 to one with it.
-        if (!TryParseId(id, out var recordId))
-        {
-            return UnparsedId(application!, user, model, PolicyAction.Update);
-        }
-
-        var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordCommand.UpdateAsync(
-            connection,
-            TenantId(tenants),
-            application!,
-            releaseId,
-            model,
-            recordId,
-            Actor(user),
-            BodyReader(request),
-            loggerFactory,
-            cancellationToken);
-
-        return result is { Outcome: RecordCommandOutcome.Written, Record: { } updated }
-            ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(updated))
-            : WriteFailure(result);
+        return ReleaseRetry.Changed();
     }
 
     private static async Task<IResult> DeleteAsync(
@@ -446,10 +469,14 @@ internal static class RecordEndpoints
     private static bool TryParseId(string id, out Guid recordId) =>
         Guid.TryParseExact(id, "D", out recordId) && id.Length == 36;
 
+    // Buffered, so a write that runs again on a new release can read the body again.
     internal static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
     {
+        request.EnableBuffering();
+        request.Body.Position = 0;
         using var body = new MemoryStream();
         await request.Body.CopyToAsync(body, cancellationToken);
+        request.Body.Position = 0;
         return body.ToArray();
     }
 
@@ -463,6 +490,7 @@ internal static class RecordEndpoints
             RecordCommandOutcome.UnsupportedContent => JsonRequest.UnsupportedMediaType(),
             RecordCommandOutcome.Invalid => Results.ValidationProblem(result.Errors!),
             RecordCommandOutcome.StaleVersion => Conflict("The record has changed since this version was read."),
+            RecordCommandOutcome.ReleaseChanged => ReleaseRetry.Changed(),
             RecordCommandOutcome.Conflict => result.Conflict switch
             {
                 RecordConflict.UniqueValue => Results.ValidationProblem(

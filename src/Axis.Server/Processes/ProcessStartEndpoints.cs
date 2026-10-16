@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Unicode;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -26,7 +27,9 @@ namespace Axis.Server.Processes;
 /// record <c>process.started</c>, whose actor is the session user. A record the user may not read
 /// gets the same 400 as one that does not exist, so the two cannot be told apart. A repeat with a
 /// claimed key returns the stored response, or 422 for another record. A start that fails writes
-/// nothing. The problem titles never contain text from the request.
+/// nothing. The transaction takes the application's start lock shared first. When the active
+/// release is no longer the one resolved, the start runs again from resolution on the new release,
+/// and answers 503 after three attempts. The problem titles never contain text from the request.
 /// </summary>
 internal static class ProcessStartEndpoints
 {
@@ -58,6 +61,30 @@ internal static class ProcessStartEndpoints
             return Grants.SignInRequired();
         }
 
+        // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
+        {
+            if (await StartOnceAsync(app, process, request, user, resolver, database, tenants, loggerFactory, cancellationToken) is { } result)
+            {
+                return result;
+            }
+        }
+
+        return ReleaseRetry.Changed();
+    }
+
+    // Null when the active release changed while the start waited for the start lock. Nothing was written.
+    private static async Task<IResult?> StartOnceAsync(
+        string app,
+        string process,
+        HttpRequest request,
+        CurrentUserResponse user,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
         {
             return NotFound("No application is active under this name.");
@@ -101,6 +128,14 @@ internal static class ProcessStartEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The start lock comes first, before any entity table is touched, so a migrating activation
+        // cannot deadlock with this start. The release is read again under it.
+        if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != active.ReleaseId)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
 
         // The receipt is claimed first, so a repeat returns the stored response even when the
         // record has changed since, and a concurrent repeat waits on the receipt's key.
@@ -216,10 +251,14 @@ internal static class ProcessStartEndpoints
         }
     }
 
+    // Buffered, so a start that runs again on a new release can read the body again.
     private static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
     {
+        request.EnableBuffering();
+        request.Body.Position = 0;
         using var body = new MemoryStream();
         await request.Body.CopyToAsync(body, cancellationToken);
+        request.Body.Position = 0;
         return body.ToArray();
     }
 

@@ -609,6 +609,72 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(third.Release?.Id, await ReadActiveReleaseIdAsync());
     }
 
+    [Fact]
+    public async Task An_activation_without_a_pending_migration_does_not_wait_for_an_open_process_start()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        folder.With("entities/order.json", Order(NumberField, NoteField));
+        var second = await CompileAsync(folder);
+
+        // A start holds the start lock shared, as an open process start does until it commits.
+        await using var start = await OpenStartAsync();
+        var result = await ActivateAsync(second).WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
+        await start.Transaction.RollbackAsync(CancellationToken);
+    }
+
+    [Fact]
+    public async Task An_activation_with_a_pending_migration_waits_for_an_open_process_start_and_then_applies_it()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertOrderAsync("PO-1", "first note");
+        folder
+            .With("entities/order.json", Order(NumberField, RemarkField))
+            .With("migrations/0001-rename-note.json", RenameMigration(_migrationId, "note", "remark"));
+        var second = await CompileAsync(folder);
+
+        await using var start = await OpenStartAsync();
+        var activating = ActivateAsync(second);
+        await WaitUntilAsync(async () => activating.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0);
+
+        // The open start has not ended, so the migration cannot have run or the release changed.
+        Assert.False(activating.IsCompleted);
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+
+        await start.Transaction.RollbackAsync(CancellationToken);
+        var result = await activating.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
+        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+    }
+
+    // A connection with an open transaction that holds the application's start lock shared.
+    private async Task<OpenStart> OpenStartAsync()
+    {
+        var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        var transaction = await connection.BeginTransactionAsync(CancellationToken);
+        await StartLock.TakeSharedAsync(transaction, _applicationId, CancellationToken);
+        return new OpenStart(connection, transaction);
+    }
+
+    private sealed class OpenStart(NpgsqlConnection connection, NpgsqlTransaction transaction) : IAsyncDisposable
+    {
+        public NpgsqlTransaction Transaction => transaction;
+
+        public async ValueTask DisposeAsync()
+        {
+            await transaction.DisposeAsync();
+            await connection.DisposeAsync();
+        }
+    }
+
     // R1 has a note field and R2 renames it to remark, so one migration is applied.
     private async Task<TemporaryFolder> AppliedRenameAsync()
     {
