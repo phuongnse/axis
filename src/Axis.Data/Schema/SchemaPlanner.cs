@@ -349,7 +349,7 @@ public static class SchemaPlanner
                 }
                 else
                 {
-                    report($"The type of '{field.Name}' cannot change from {column.Type} to {expected}.", $"{path}/type");
+                    report($"The type of '{field.Name}' cannot change from {column.Type} to {expected}. Convert it with a convert change in a migration.", $"{path}/type");
                 }
             }
 
@@ -397,7 +397,7 @@ public static class SchemaPlanner
                 if (removed.Count > 0)
                 {
                     report(
-                        $"The enum field '{field.Name}' cannot drop the values {string.Join(", ", removed.Select(value => $"'{value}'"))}.",
+                        $"The enum field '{field.Name}' cannot drop the values {string.Join(", ", removed.Select(value => $"'{value}'"))}. Convert them with a convert change in a migration.",
                         $"{path}/values");
                 }
 

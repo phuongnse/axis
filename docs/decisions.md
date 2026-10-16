@@ -1109,11 +1109,11 @@ work without the code its release pins.
 
 ## D30. Schema migrations — Agreed
 
-Activation applies the `renameField`, `dropField`, `dropEntity` and `fill`
-migrations once per tenant. The start lock, the old-release work check, `convert`
+Activation applies the `renameField`, `dropField`, `dropEntity`, `fill` and
+`convert` migrations once per tenant. The start lock, the old-release work check
 and the recompute of computed fields are not built yet *(planned for M6)*. Until
-the recompute is built, a `fill` on a child entity and a `fill` of a field that
-a computed field reads are refused. Migrations
+the recompute is built, a `fill` or `convert` on a child entity and a `fill` or
+`convert` of a field that a computed field reads are refused. Migrations
 change entity storage in ways that are not additive, before provisioning.
 See [configuration](reference/configuration.md#resource-file-shape) for the
 resource shape and [storage](reference/storage.md#migrations) for planning,
@@ -1144,13 +1144,17 @@ The owner confirmed these points on issue #413 on 2026-10-15.
   - `convert`, with `field` and `value`, uses an expression over stored
     values to change the column to its new type or map removed enum values
     to kept ones.
-  - A type-changing `convert` is one
-    `ALTER TABLE ... ALTER COLUMN ... TYPE ... USING <value>`. An enum
-    mapping is one `UPDATE ... SET f = <value>`.
+  - A type-changing `convert` runs four statements in the activation
+    transaction. It adds a temporary nullable column `axis_convert`, fills it
+    with one parameterized `UPDATE ... SET axis_convert = (<value>)::<type>`,
+    runs `ALTER TABLE ... ALTER COLUMN ... TYPE ... USING axis_convert`, then
+    drops the temporary column. DDL cannot take parameters, and values are
+    always parameters. An enum mapping is one
+    `UPDATE ... SET f = <value> WHERE f IN (<removed values>)`.
   - Both expressions must translate to the
     [SQL subset](reference/expressions.md#sql-subset). An expression outside
     it is a compile diagnostic. Each fill or enum mapping uses one `UPDATE`.
-    A type conversion uses one `ALTER COLUMN` statement.
+    A type conversion uses one `UPDATE` and one `ALTER COLUMN` statement.
   - `fill` and `convert` increment `version` on every row they change.
     For child rows, they increment the owner's `version` instead. They
     write no per-row audit records. The `axis.applied_migrations` row is

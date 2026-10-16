@@ -123,15 +123,19 @@ application. The planner itself has no database
 access. It returns diagnostics, SQL statements and the new records to write.
 
 - **Migrations.** The planner first applies the pending `renameField`,
-  `dropField`, `dropEntity` and `fill` [migrations](#migrations) to its
-  catalog snapshot and its copy of the provisioning records, in ordinal path
-  order and file order. It then plans as today. A pending `convert` is
-  `AXC0175` until it is built *(planned for M6)*. So is a `fill` on a child
-  entity and a `fill` of a field that a computed field reads, because
-  activation cannot recompute computed fields yet. A `fill` that names, in its
-  value, a field that is not a column of the stored table is `AXC0171` at
-  `/changes/{i}/value`. A `fill` whose value leaves a `null` is `AXC0176` at
-  `/changes/{i}/value` when activation applies it. Removals and incompatible
+  `dropField`, `dropEntity`, `fill` and `convert` [migrations](#migrations) to
+  its catalog snapshot and its copy of the provisioning records, in ordinal path
+  order and file order. It then plans as today. A `convert` makes the planner
+  accept a type change, or enum values the release removes, where it gives
+  `AXC0016` without one. A `fill` or `convert` on a child entity, and a `fill`
+  or `convert` of a field that a computed field reads, are `AXC0175`, because
+  activation cannot recompute computed fields yet. A `fill` or `convert` that
+  names, in its value, a field that is not a column of the stored table is
+  `AXC0171` at `/changes/{i}/value`. A `fill` whose value leaves a `null` is
+  `AXC0176` at `/changes/{i}/value` when activation applies it. A `convert`
+  that fails for a stored row, or maps an enum value to one the field does not
+  list, is `AXC0177` at `/changes/{i}/value`. Switching a field between `enum`
+  and another type stays `AXC0016`, even with a `convert`. Removals and incompatible
   changes not covered by a migration keep `AXC0015`, `AXC0016` and
   `AXC0017`. A change that does not match the stored schema is skipped: the
   table does not exist, the `from` column is missing or the `to` column
@@ -252,12 +256,12 @@ child tables are in [Schema planning](#schema-planning).
 ## Migrations
 
 The migration resource, its compile checks and the once-per-tenant apply of
-`renameField`, `dropField`, `dropEntity` and `fill` at activation are built.
-The start lock, the old-release work check, `convert` and the recompute
+`renameField`, `dropField`, `dropEntity`, `fill` and `convert` at activation are
+built. The start lock, the old-release work check and the recompute
 of computed fields are *(planned for M6)*, and so are the rules, table rows
-and example below that use them. Until the recompute is built, a `fill` on a
-child entity and a `fill` of a field that a computed field reads are
-`AXC0175`. This section records
+and example below that use them. Until the recompute is built, a `fill` or
+`convert` on a child entity and a `fill` or `convert` of a field that a computed
+field reads are `AXC0175`. This section records
 [D30](../decisions.md#d30-schema-migrations--agreed).
 A [migration resource](configuration.md#resource-file-shape) changes one
 entity's storage and runs once per tenant, before additive provisioning.
@@ -274,9 +278,11 @@ Migrations run forward only.
   4. Count old-release work for the destructive changes below. Any such
      work stops the activation with a diagnostic. *(Planned for M6.)*
   5. Run pending migrations in ordinal path order, and changes in file order.
-     *(Built for `renameField`, `dropField`, `dropEntity` and `fill`. A
-     `fill` runs one `UPDATE` that counts the rows it left `null`. Any such row
-     is `AXC0176` and rolls the activation back.)*
+     *(Built for `renameField`, `dropField`, `dropEntity`, `fill` and `convert`.
+     A `fill` runs one `UPDATE` that counts the rows it left `null`. Any such row
+     is `AXC0176` and rolls the activation back. A `convert` that fails for a
+     row, or leaves an enum value the field does not list, is `AXC0177` and
+     rolls the activation back.)*
   6. Run additive DDL in the order used today. *(Built.)*
   7. Recompute affected stored computed fields for the changed rows,
      using the release being activated. *(Planned for M6.)*
@@ -340,18 +346,39 @@ Migrations run forward only.
 | `dropField` | `ALTER TABLE ... DROP COLUMN`, without `CASCADE` | Yes *(planned for M6)* |
 | `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes *(planned for M6)* |
 | `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` *(built, except for a child entity and a field a computed field reads)* | No |
-| `convert` | `ALTER COLUMN ... TYPE ... USING <value>` for a type change, or `UPDATE ... SET f = <value>` for an enum mapping | Yes |
+| `convert` | For a type change, `ADD COLUMN axis_convert`, `UPDATE ... SET axis_convert = (<value>)::<type>`, `ALTER COLUMN ... TYPE ... USING axis_convert`, then `DROP COLUMN axis_convert`. For removed enum values, `UPDATE ... SET f = <value> WHERE f IN (<removed>)` *(built, except for a child entity and a field a computed field reads)* | Yes *(planned for M6)* |
 | Additive changes | As in [Schema planning](#schema-planning) today | No |
 
 A `fill` on a missing column adds it as nullable before the `UPDATE`.
 The additive step afterwards adds `NOT NULL` for a required field. A
-type-changing `convert` is one `ALTER TABLE ... ALTER COLUMN ... TYPE ... USING`
-statement. An enum mapping is one `UPDATE`. Both values must translate to
-the [SQL subset](expressions.md#sql-subset).
+type-changing `convert` runs four statements, because DDL cannot take the
+parameters that a value's literals need. A temporary nullable column
+`axis_convert`, which no field column can clash with, takes the value from one
+parameterized `UPDATE`. `ALTER COLUMN ... TYPE ... USING axis_convert` then
+moves it into the field's column, and the temporary column is dropped. The
+`UPDATE` casts the value to the field's new column type, and that cast does
+the parsing, so `"value": "quantity"` turns a text `quantity` into an integer.
+PostgreSQL's cast rules decide what parses: `' 42 '` becomes 42, and `'42.0'`
+fails as an integer. A cast to a decimal with a smaller scale rounds. For a
+text field with a `maxLength`, the cast is to `text`, so the `ALTER` fails on
+a value that is too long instead of truncating it. An enum mapping is one
+`UPDATE` that changes only the rows holding a removed value, so other rows
+keep their value and their `version`. The removed values are then deleted from
+the recorded enum values. A `convert` between `enum` and another type is not
+built: it is `AXC0016`. A `convert` of a `reference` field to another type
+fails on its foreign key, as `AXC0177`. Both values must translate to the
+[SQL subset](expressions.md#sql-subset).
+
+A `convert` that cannot convert a row rolls the whole activation back. That
+covers unparsable text, a value that is too long, a required field left empty
+and a duplicate in a unique field. It is `AXC0177`, reported with a fixed
+message and the PostgreSQL error code. The message never quotes PostgreSQL's
+text, because that can hold a stored value. An enum mapping that leaves a
+value the field does not list is `AXC0177` too.
 
 Each `fill` and `convert` increments `version` on every row it changes.
 Child rows have no version, so changing them increments their owner's
-`version` *(planned for M6; a `fill` on a child entity is not applied yet)*. This prevents an edit begun before the migration from overwriting
+`version` *(planned for M6; a `fill` or `convert` on a child entity is not applied yet)*. This prevents an edit begun before the migration from overwriting
 a migrated value without a version conflict. There is no audit record for
 each changed row. The `axis.applied_migrations` row is the trace.
 

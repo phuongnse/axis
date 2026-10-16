@@ -170,4 +170,5 @@ public static class DiagnosticCodes
     public const string ChangedMigrationHistory = "AXC0174";
     public const string MigrationChangeNotApplied = "AXC0175";
     public const string FillLeftNulls = "AXC0176";
+    public const string ConvertFailed = "AXC0177";
 }

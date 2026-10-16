@@ -617,22 +617,116 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
-    public void Pending_convert_is_reported_as_not_applied_at_the_change_and_plans_nothing()
+    public void Pending_convert_of_a_changed_type_stages_the_value_casts_it_and_changes_the_column_type()
     {
         var stored = BaseModel();
-        var migration = Migration(
-            "Order",
-            new MigrationChangeModel(MigrationChangeType.DropField, "note", null, null, null),
-            new MigrationChangeModel(MigrationChangeType.Convert, "amount", null, null, "amount"));
+        var release = ChangeOrderField(stored, 5, field => field with { Type = FieldType.Integer });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Convert, "note", null, null, "note"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} ADD COLUMN {Quote("axis_convert")} bigint",
+                $"UPDATE {table} SET {Quote("axis_convert")} = ({Quote("f_note")})::bigint, {Quote("version")} = {Quote("version")} + 1",
+                $"ALTER TABLE {table} ALTER COLUMN {Quote("f_note")} TYPE bigint USING {Quote("axis_convert")}",
+                $"ALTER TABLE {table} DROP COLUMN {Quote("axis_convert")}",
+            ],
+            plan.Statements);
+        Assert.All(plan.Commands, command => Assert.Equal(new ConvertTarget(migration.Id, "migrations/0001-order.json", 0, "note", false), command.Convert));
+    }
+
+    [Fact]
+    public void Pending_convert_to_a_limited_text_casts_to_text_so_a_long_value_fails_instead_of_truncating()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrderField(stored, 5, field => field with { MaxLength = 5 });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Convert, "note", null, null, "note"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal($"ALTER TABLE {table} ADD COLUMN {Quote("axis_convert")} character varying(5)", plan.Statements[0]);
+        Assert.Contains("::text", plan.Statements[1], StringComparison.Ordinal);
+        Assert.Equal($"ALTER TABLE {table} ALTER COLUMN {Quote("f_note")} TYPE character varying(5) USING {Quote("axis_convert")}", plan.Statements[2]);
+    }
+
+    [Fact]
+    public void Pending_convert_of_removed_enum_values_updates_only_rows_holding_them_and_records_the_removal()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrderField(stored, 3, field => field with { Values = ["draft"] });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Convert, "status", null, null, "'draft'"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        var statement = Assert.Single(plan.Statements);
+        Assert.Equal(
+            $"WITH converted AS (UPDATE {table} SET {Quote("f_status")} = @f0, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_status")} IN (@r0) RETURNING {Quote("f_status")}) "
+            + $"SELECT count(*) FROM converted WHERE {Quote("f_status")} IS NOT NULL AND {Quote("f_status")} NOT IN (@k0)",
+            statement);
+        var command = plan.Commands[0];
+        Assert.Equal(
+            [
+                new SqlValue("f0", ExpressionTypeKind.Text, "draft"),
+                new SqlValue("r0", ExpressionTypeKind.Text, "submitted"),
+                new SqlValue("k0", ExpressionTypeKind.Text, "draft"),
+            ],
+            command.Parameters);
+        Assert.Equal(new ConvertTarget(migration.Id, "migrations/0001-order.json", 0, "status", true), command.Convert);
+        var change = Assert.Single(plan.RecordChanges);
+        Assert.Equal((MigrationChangeType.Convert, _orderId, "status"), (change.Type, change.EntityId, change.Field));
+        Assert.Equal(["submitted"], change.Values);
+        Assert.Empty(plan.NewEnumValues);
+    }
+
+    [Fact]
+    public void Removed_enum_values_without_a_convert_are_still_reported()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrderField(stored, 3, field => field with { Values = ["draft"] });
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "/fields/3/values"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Pending_convert_on_a_child_entity_is_reported_as_not_applied_and_plans_nothing()
+    {
+        var stored = ChildModel();
+        var migration = Migration("Line", new MigrationChangeModel(MigrationChangeType.Convert, "description", null, null, "description"));
 
         var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
 
         var diagnostic = Assert.Single(plan.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/1/type", migration.Id),
+            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/0/type", migration.Id),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         AssertNothingPlanned(plan);
-        Assert.Empty(plan.RecordChanges);
+    }
+
+    [Fact]
+    public void Pending_convert_of_a_field_a_computed_field_reads_is_reported_as_not_applied_and_plans_nothing()
+    {
+        var amount = Field("amount", FieldType.Integer);
+        var stored = ChangeOrder(
+            BaseModel(),
+            fields => [.. fields.Where(field => field.Name != "amount"), amount, Computed(Field("doubled", FieldType.Integer), "amount * 2", [amount])]);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Convert, "amount", null, null, "amount"));
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(DiagnosticCodes.MigrationChangeNotApplied, diagnostic.Code);
+        Assert.Contains("doubled", diagnostic.Message, StringComparison.Ordinal);
+        AssertNothingPlanned(plan);
     }
 
     [Fact]
