@@ -58,4 +58,7 @@ internal sealed class ReleaseModelCache(PackageCatalog packages)
             ?? throw new InvalidOperationException($"The release '{releaseId}' could not be found.");
         return _models.GetOrAdd(key, ReleaseCompiler.BuildModel(release, packages.Versions));
     }
+
+    /// <summary>The number of models cached for <paramref name="tenantId"/>.</summary>
+    internal int Count(string tenantId) => _models.Keys.Count(key => key.TenantId == tenantId);
 }

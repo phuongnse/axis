@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -79,9 +78,9 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
         Assert.Equal(PageSize, page.Items.Count);
 
         void Bind(NpgsqlCommand command) => TaskQueries.AddMayActParameters(command, application, "user-7", roles);
-        AssertUsesIndex(await ExplainAsync(TaskQueries.ListOpenCountSql, Bind), "ix_process_tasks_application_id_state_assignee");
-        AssertUsesIndex(
-            await ExplainAsync(TaskQueries.ListOpenPageSql, command => BindPage(Bind, command)),
+        QueryPlans.AssertUsesIndex(await QueryPlans.ExplainAsync(fixture.DataSource, TaskQueries.ListOpenCountSql, Bind, CancellationToken), "ix_process_tasks_application_id_state_assignee");
+        QueryPlans.AssertUsesIndex(
+            await QueryPlans.ExplainAsync(fixture.DataSource, TaskQueries.ListOpenPageSql, command => BindPage(Bind, command), CancellationToken),
             "ix_process_tasks_application_id_state_assignee");
     }
 
@@ -127,9 +126,9 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
             command.Parameters.AddWithValue("record", record);
         }
 
-        AssertUsesIndex(await ExplainAsync(AuditRecords.HistoryCountSql, Bind), "ix_audit_records_entity_id_record_id_occurred_at_id");
-        AssertUsesIndex(
-            await ExplainAsync(AuditRecords.HistoryPageSql, command => BindPage(Bind, command)),
+        QueryPlans.AssertUsesIndex(await QueryPlans.ExplainAsync(fixture.DataSource, AuditRecords.HistoryCountSql, Bind, CancellationToken), "ix_audit_records_entity_id_record_id_occurred_at_id");
+        QueryPlans.AssertUsesIndex(
+            await QueryPlans.ExplainAsync(fixture.DataSource, AuditRecords.HistoryPageSql, command => BindPage(Bind, command), CancellationToken),
             "ix_audit_records_entity_id_record_id_occurred_at_id");
     }
 
@@ -156,14 +155,14 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
             await AnalyzeAsync("axis.process_work_items");
 
             // EXPLAIN without ANALYZE plans the claim but does not run it, so no item is claimed.
-            var plan = await ExplainAsync(WorkItemQueue.ClaimSql, command =>
+            var plan = await QueryPlans.ExplainAsync(fixture.DataSource, WorkItemQueue.ClaimSql, command =>
             {
                 command.Parameters.AddWithValue("lease", NpgsqlDbType.Interval, TimeSpan.FromSeconds(30));
                 command.Parameters.AddWithValue("tenant", ProcessStepFixture.TenantId);
                 command.Parameters.AddWithValue("kinds", NpgsqlDbType.Array | NpgsqlDbType.Text, new[] { ProcessStarts.StepWorkItemKind });
-            });
+            }, CancellationToken);
 
-            AssertUsesIndex(plan, "ix_process_work_items_due_at");
+            QueryPlans.AssertUsesIndex(plan, "ix_process_work_items_due_at");
             Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE claim_token IS NOT NULL"));
         }
         finally
@@ -203,9 +202,9 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
 
         await AnalyzeAsync("axis.events");
 
-        var plan = await ExplainAsync(ProcessEvents.LoadSql, command => command.Parameters.AddWithValue("id", firstEvent));
+        var plan = await QueryPlans.ExplainAsync(fixture.DataSource, ProcessEvents.LoadSql, command => command.Parameters.AddWithValue("id", firstEvent), CancellationToken);
 
-        AssertUsesIndex(plan, "pk_events");
+        QueryPlans.AssertUsesIndex(plan, "pk_events");
     }
 
     [Fact]
@@ -230,16 +229,16 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
         await AnalyzeAsync("axis.endpoint_receipts");
 
         // Row 7 has endpoint 8 of 10 and caller 7 of 20.
-        var plan = await ExplainAsync(EndpointReceipts.FindSql, command =>
+        var plan = await QueryPlans.ExplainAsync(fixture.DataSource, EndpointReceipts.FindSql, command =>
         {
             command.Parameters.AddWithValue("application", application);
             command.Parameters.AddWithValue("endpoint", endpoints[7]);
             command.Parameters.AddWithValue("caller", "caller-7");
             command.Parameters.AddWithValue("key", "key-7");
             command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = "{}" });
-        });
+        }, CancellationToken);
 
-        AssertUsesIndex(plan, "pk_endpoint_receipts");
+        QueryPlans.AssertUsesIndex(plan, "pk_endpoint_receipts");
     }
 
     /// <summary>Adds the parameters of the first page to a page query.</summary>
@@ -248,33 +247,6 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
         bind(command);
         command.Parameters.AddWithValue("limit", PageSize);
         command.Parameters.AddWithValue("offset", 0L);
-    }
-
-    /// <summary>The plan contains a scan using <paramref name="index"/> and no full table read.</summary>
-    private static void AssertUsesIndex(string plan, string index)
-    {
-        var escaped = Regex.Escape(index);
-        Assert.Matches($@"(Index Scan|Index Only Scan)( Backward)? using {escaped} |Bitmap Index Scan on {escaped}\b", plan);
-        Assert.DoesNotContain("Seq Scan", plan, StringComparison.Ordinal);
-    }
-
-    /// <summary>Plans <paramref name="sql"/> with its parameters, writes the plan to the test output and returns it.</summary>
-    private async Task<string> ExplainAsync(string sql, Action<NpgsqlCommand> bind)
-    {
-        await using var command = fixture.DataSource.CreateCommand($"EXPLAIN (COSTS OFF) {sql}");
-        bind(command);
-        var lines = new List<string>();
-        await using (var reader = await command.ExecuteReaderAsync(CancellationToken))
-        {
-            while (await reader.ReadAsync(CancellationToken))
-            {
-                lines.Add(reader.GetString(0));
-            }
-        }
-
-        var plan = string.Join('\n', lines);
-        TestContext.Current.TestOutputHelper?.WriteLine(plan);
-        return plan;
     }
 
     /// <summary>Updates the planner's statistics of <paramref name="table"/>, as autovacuum does in production.</summary>
