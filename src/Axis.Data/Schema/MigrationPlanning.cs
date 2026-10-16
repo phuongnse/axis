@@ -20,6 +20,7 @@ namespace Axis.Data.Schema;
 internal sealed class MigrationPlanning
 {
     private readonly ApplicationModel _model;
+    private readonly IReadOnlyList<MigrationModel> _pending;
     private readonly IReadOnlyDictionary<string, Guid> _storedEntityIds;
     private readonly List<CatalogTable> _tables;
     private readonly List<ProvisionedEntity> _entities;
@@ -33,6 +34,7 @@ internal sealed class MigrationPlanning
         IReadOnlyDictionary<string, Guid> storedEntityIds)
     {
         _model = model;
+        _pending = pending;
         _storedEntityIds = storedEntityIds;
         _tables = [.. catalog.Tables];
         _entities = [.. records.Entities];
@@ -124,7 +126,8 @@ internal sealed class MigrationPlanning
         }
 
         var releaseEntity = _model.Entities.FirstOrDefault(entity => entity.Id == entityId);
-        var reader = releaseEntity?.Fields.FirstOrDefault(field => field.Computed is { } computed && Reads(computed.Syntax, change.Field!));
+        var names = NamesAfter(migration, index, entityId, change.Field!);
+        var reader = releaseEntity?.Fields.FirstOrDefault(field => field.Computed is { } computed && Reads(computed.Syntax, names));
         if (reader is not null)
         {
             NotApplied(migration, index, $"A 'fill' of '{change.Field}' is not applied yet: the computed field '{reader.Name}' reads it, and activation cannot recompute computed fields.");
@@ -206,16 +209,43 @@ internal sealed class MigrationPlanning
         _tables[tableIndex] = table with { Columns = columns };
     }
 
-    // Field names match ignoring letter case.
-    private static bool Reads(ExpressionNode node, string field) => node switch
+    // The release names the field by its last name, so a rename after the fill gives the names to look for.
+    private HashSet<string> NamesAfter(MigrationModel migration, int index, Guid entityId, string field)
     {
-        NameNode name => string.Equals(name.Name, field, StringComparison.OrdinalIgnoreCase),
-        MemberNode member => Reads(member.Target, field),
-        CallNode call => call.Arguments.Any(argument => Reads(argument, field)),
-        UnaryNode unary => Reads(unary.Operand, field),
-        BinaryNode binary => Reads(binary.Left, field) || Reads(binary.Right, field),
-        IsNullNode isNull => Reads(isNull.Operand, field),
-        InNode inNode => Reads(inNode.Operand, field) || inNode.Items.Any(item => Reads(item, field)),
+        var names = new HashSet<string>([field], StringComparer.OrdinalIgnoreCase);
+        var after = false;
+        foreach (var candidate in _pending)
+        {
+            for (var next = 0; next < candidate.Changes.Count; next++)
+            {
+                if (!after)
+                {
+                    after = candidate == migration && next == index;
+                    continue;
+                }
+
+                var change = candidate.Changes[next];
+                if (change.Type == MigrationChangeType.RenameField
+                    && names.Contains(change.From!)
+                    && FindEntityId(candidate.Entity) == entityId)
+                {
+                    names.Add(change.To!);
+                }
+            }
+        }
+
+        return names;
+    }
+
+    private static bool Reads(ExpressionNode node, HashSet<string> fields) => node switch
+    {
+        NameNode name => fields.Contains(name.Name),
+        MemberNode member => Reads(member.Target, fields),
+        CallNode call => call.Arguments.Any(argument => Reads(argument, fields)),
+        UnaryNode unary => Reads(unary.Operand, fields),
+        BinaryNode binary => Reads(binary.Left, fields) || Reads(binary.Right, fields),
+        IsNullNode isNull => Reads(isNull.Operand, fields),
+        InNode inNode => Reads(inNode.Operand, fields) || inNode.Items.Any(item => Reads(item, fields)),
         _ => false,
     };
 

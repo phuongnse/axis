@@ -774,6 +774,25 @@ public sealed class SchemaPlannerTests
         AssertNothingPlanned(plan);
     }
 
+    [Fact]
+    public void Pending_fill_followed_by_a_rename_of_a_field_a_computed_field_reads_is_reported_as_not_applied_and_plans_nothing()
+    {
+        var stored = BaseModel();
+        var gross = Field("gross", FieldType.Integer);
+        var release = ChangeOrder(BaseModel(), fields => [.. fields.Where(field => field.Name != "amount"), gross, Computed(Field("doubled", FieldType.Integer), "gross * 2", [gross])]);
+        var migration = Migration(
+            "Order",
+            new MigrationChangeModel(MigrationChangeType.Fill, "amount", null, null, "0"),
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "amount", "gross", null));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.MigrationChangeNotApplied);
+        Assert.Equal("/changes/0/type", diagnostic.Path);
+        Assert.Contains("doubled", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(plan.Statements, statement => statement.Contains("UPDATE", StringComparison.Ordinal));
+    }
+
     private static string Quote(string identifier) => EntityNaming.Quote(identifier);
 
     private static MigrationModel Migration(string entity, params MigrationChangeModel[] changes) =>

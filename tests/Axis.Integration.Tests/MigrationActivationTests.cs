@@ -374,6 +374,31 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
     }
 
     [Fact]
+    public async Task A_fill_followed_by_a_rename_of_a_field_a_computed_field_reads_gives_a_not_applied_diagnostic_and_applies_nothing()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, """{ "name": "amount", "type": "integer" }"""));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertOrderAsync("PO-1");
+        var before = await ReadStateAsync(_orderId);
+        folder
+            .With("entities/order.json", Order(NumberField, """{ "name": "total", "type": "integer" }""", """{ "name": "doubled", "type": "integer", "expression": "total * 2" }"""))
+            .With("migrations/0001-fill-amount.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "amount", "value": "0" }, { "type": "renameField", "from": "amount", "to": "total" }]"""));
+        var compiled = await CompileAsync(folder);
+        Assert.Empty(compiled.Diagnostics);
+
+        var result = await ActivateAsync(compiled);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-fill-amount.json", "/changes/0/type"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Empty(await ReadAppliedMigrationsAsync());
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
     public async Task An_activation_without_a_pending_migration_cannot_overwrite_a_release_that_another_activation_commits_while_it_waits()
     {
         using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
