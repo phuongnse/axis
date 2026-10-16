@@ -452,7 +452,9 @@ complete it with an outcome. The user is the user of the
 
 **Who may act.** The user may act on a task when they are its assignee, or
 when the task's assignee is a role and the user holds it. The user's roles
-are the roles kept in their session. This is checked on every request, at
+are the roles kept in their session. A role counts only when the active
+release declares it, so a task assigned to a role the active release no
+longer declares can be listed, read or completed by nobody. This is checked on every request, at
 the moment of action. Policies add to this check and never replace it.
 
 **Policies on tasks.** These follow
@@ -471,7 +473,7 @@ the moment of action. Policies add to this check and never replace it.
 - Field write grants do not apply to the values of a task completion. The
   form decides which fields are editable.
 - `subject.label` uses the subject entity's display field from the task's
-  release *(planned for M6)*. Readability still comes from the active
+  release. Readability still comes from the active
   release's policies. The label is `null` when the user may not read that
   field, as in the record API's [label rule](record-api.md#record-shape).
 
@@ -509,8 +511,8 @@ by `createdAt`, then by `id`.
 - `releaseId` names the task's release *(planned for M6)*. The inbox loads
   the texts of each release its rows name, so each step label uses its own
   release's texts.
-- `subject.label` is the value of the display field from the task's release
-  *(planned for M6)*. It is `null` when the active release's policies do not
+- `subject.label` is the value of the display field from the task's release.
+  It is `null` when the active release's policies do not
   let the user read that field.
 - `dueAt` is `null` when the step has no `dueIn`.
 
@@ -557,8 +559,8 @@ state:
 
 - `releaseId` names the task's release *(planned for M6)*. The task page
   loads its texts with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`.
-- `subject.label` uses the display field from the task's release
-  *(planned for M6)*. The active release's policies decide whether the user
+- `subject.label` uses the display field from the task's release. The active
+  release's policies decide whether the user
   may read it. Otherwise the label is `null`.
 - `assignee` has the user id or the role name, and the other is `null`.
 - `form` is the step's form in the task's release, so a task pinned to an
@@ -627,7 +629,7 @@ of these checks.
   }
   ```
 - **`403`.** The user is not the assignee and does not hold the assignee
-  role. This applies to reading one task as well as completing it.
+  role, or the active release no longer declares that role. This applies to reading one task as well as completing it.
 
   ```json
   {
@@ -740,7 +742,7 @@ for texts. **Both** means different parts use different releases.
 | Site, site list and page endpoints | Active | Describe sites and pages of active applications. |
 | Texts endpoint without `release` | Active | Serves the active release's texts. |
 | Texts endpoint with `release` | Pinned | Serves any stored release of the site's application *(planned for M6)*. An unknown id, a non-UUID or another application's release answers `404`. |
-| Task list | Both | Step and subject labels use the task's release. The subject's display field and loading that release's texts are *(planned for M6)*. Policies come from the active release. |
+| Task list | Both | Step and subject labels use the task's release. Loading that release's texts is *(planned for M6)*. Policies and roles come from the active release. |
 | Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too *(planned for M6)*. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
@@ -765,9 +767,9 @@ for texts. **Both** means different parts use different releases.
   See [Migrations](storage.md#migrations).
 - **Authorization.** Roles and policies always come from the active release,
   including for older tasks. The assignee check stays unchanged. The
-  subject's display field comes from the task's release *(planned for M6)*,
-  but the active policies decide whether it is readable. Removing or renaming
-  a policy can deny access to an old task's subject record or fields.
+  subject's display field comes from the task's release, but the active
+  policies decide whether it is readable. Removing or renaming a policy can
+  deny access to an old task's subject record or fields.
 - **Pinned texts** *(planned for M6)*. Each release carries its own texts.
   The inbox and task page load them using the task's `releaseId`. Old texts
   stay readable by id for as long as the release is stored, even after its

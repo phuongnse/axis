@@ -1,6 +1,7 @@
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
+using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
@@ -152,6 +153,35 @@ public sealed class TaskApiFixture : IAsyncLifetime
         command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
         return requestId;
+    }
+
+    /// <summary>Deletes the request <paramref name="id"/> of <paramref name="tenant"/>.</summary>
+    public async Task DeleteRequestAsync(string tenant, Guid id)
+    {
+        Assert.True(Model.TryGetEntity("Request", out var request));
+        await using var command = DataSource(tenant).CreateCommand(
+            $"DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} WHERE {Column("id")} = @id");
+        command.Parameters.AddWithValue("id", id);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    /// <summary>
+    /// Inserts the request <paramref name="id"/> of <paramref name="tenant"/> titled
+    /// <see cref="RequestTitle"/>, with <paramref name="code"/> in a <c>code</c> field that only a
+    /// later release declares.
+    /// </summary>
+    public async Task InsertRequestWithCodeAsync(string tenant, Guid id, string code)
+    {
+        Assert.True(Model.TryGetEntity("Request", out var request));
+        await using var command = DataSource(tenant).CreateCommand(
+            $"""
+            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("code")})
+            VALUES (@id, @title, @code)
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("title", RequestTitle(id));
+        command.Parameters.AddWithValue("code", code);
+        await command.ExecuteNonQueryAsync();
     }
 
     /// <summary>
@@ -307,6 +337,33 @@ public sealed class TaskApiFixture : IAsyncLifetime
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Compiles and activates a copy of the StepApp fixture on <paramref name="tenant"/> as a new
+    /// release, with <paramref name="edit"/> applied to each file. It gets the file's path relative
+    /// to the folder and its content, and returns the new content, or null to leave the file out.
+    /// Returns the new release's id.
+    /// </summary>
+    public async Task<Guid> ActivateEditedAsync(string tenant, Func<string, string, string?> edit)
+    {
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
+        {
+            var path = Path.GetRelativePath(_appFolder, file);
+            if (edit(path, await File.ReadAllTextAsync(file)) is { } content)
+            {
+                folder.With(path, content);
+            }
+        }
+
+        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(_tenants[tenant].ConnectionString).Options);
+        await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(_tenants[tenant].ConnectionString).Options);
+        var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration);
+        Assert.Empty(compiled.Diagnostics);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"));
+        Assert.Empty(activated.Diagnostics);
+        return compiled.Release!.Id;
     }
 
     private NpgsqlDataSource DataSource(string tenant) => _tenants[tenant].DataSource;

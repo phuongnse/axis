@@ -536,8 +536,10 @@ The `role` and `policy` resource files are described in
   [data sources](reference/data-sources.md#authorization).
 - **Processes and tasks.** A process start needs a `start` grant on the
   process and read access to the subject record. The task assignee check
-  stays, and it is enough to list, read and complete a task. The task form
-  leaves out fields the user may not read. See
+  stays, and it is enough to list, read and complete a task. A role assignee
+  counts only when the active release declares the role. The task form
+  leaves out fields the user may not read, and the subject label uses the
+  display field of the task's release. See
   [processes](reference/processes.md#task-api).
 - **System work.** The worker, seed data and `updateRecord` steps run as
   `system`. Policies do not check them.

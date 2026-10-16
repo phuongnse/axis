@@ -108,6 +108,19 @@ public static class PolicyEvaluator
         return Grants(application, roles).Any(grant => grant.Endpoint?.Id == endpoint.Id && grant.Actions.Contains(PolicyAction.Invoke));
     }
 
+    /// <summary>
+    /// The claim values in <paramref name="roles"/> that name a role <paramref name="application"/>
+    /// declares, compared exactly. Any other value is not a role of the application.
+    /// </summary>
+    public static IReadOnlyList<string> HeldRoles(ApplicationModel application, IEnumerable<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(roles);
+
+        var declared = application.Roles.Select(role => role.Name).ToHashSet(StringComparer.Ordinal);
+        return [.. roles.Where(declared.Contains).Distinct(StringComparer.Ordinal)];
+    }
+
     /// <summary>The grants of every policy that names a role the user holds.</summary>
     private static IEnumerable<GrantModel> Grants(ApplicationModel application, IEnumerable<string> roles) =>
         Policies(application, roles).SelectMany(policy => policy.Grants);
@@ -116,8 +129,7 @@ public static class PolicyEvaluator
     private static IEnumerable<PolicyModel> Policies(ApplicationModel application, IEnumerable<string> roles)
     {
         // A claim value counts only when it names a declared role, compared exactly.
-        var declared = application.Roles.Select(role => role.Name).ToHashSet(StringComparer.Ordinal);
-        var held = roles.Where(declared.Contains).ToHashSet(StringComparer.Ordinal);
+        var held = HeldRoles(application, roles).ToHashSet(StringComparer.Ordinal);
         return application.Policies.Where(policy => policy.Roles.Any(held.Contains));
     }
 }
