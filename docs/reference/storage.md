@@ -158,8 +158,10 @@ What each database role may do:
   tenant and the setting. So do two settings that name the same user, and a
   runtime database role that is a superuser, owns the `axis` or `entities`
   schema, or may create objects in either. The server runs all of these
-  checks. The worker runs only the check on the runtime database role, because
-  it holds no `SchemaConnectionString`.
+  checks. The worker validates `ConnectionString` and the runtime database
+  role. The server also validates `SchemaConnectionString` and that the two
+  settings name different users, because the worker holds no
+  `SchemaConnectionString`.
 
 Which connection string each step uses:
 
