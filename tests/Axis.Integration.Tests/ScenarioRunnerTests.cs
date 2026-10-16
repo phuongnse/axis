@@ -523,6 +523,104 @@ public sealed class ScenarioRunnerTests
         Assert.True(result.Passed, result.Failure);
     }
 
+    public static TheoryData<string> SampleApplications()
+    {
+        var data = new TheoryData<string>();
+        foreach (var manifest in Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "samples", "apps"), "application.json", SearchOption.AllDirectories))
+        {
+            data.Add(Path.GetFileName(Path.GetDirectoryName(manifest))!);
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(SampleApplications))]
+    public async Task The_scenarios_of_every_sample_application_pass(string application)
+    {
+        var root = RepositoryRoot();
+        var output = new StringWriter();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [
+                Path.Combine(root, "samples", "apps", application),
+                "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
+                "--extensions", SamplePackages.Path,
+                "--results", Path.Combine(root, "artifacts", "test-results"),
+            ],
+            output,
+            CancellationToken);
+
+        Assert.True(exitCode == 0, output.ToString());
+        if (application == "purchase-requests")
+        {
+            var suite = XDocument.Load(Path.Combine(root, "artifacts", "test-results", "scenarios-PurchaseRequests.xml")).Root!.Element("testsuite")!;
+            Assert.Equal("5", suite.Attribute("tests")!.Value);
+            Assert.Equal("0", suite.Attribute("failures")!.Value);
+        }
+    }
+
+    [Fact]
+    public async Task A_raised_finance_threshold_fails_the_finance_scenario_at_the_step_that_no_longer_holds()
+    {
+        using var folder = new TemporaryFolder();
+        var source = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            folder.With(Path.GetRelativePath(source, file), File.ReadAllText(file));
+        }
+
+        const string rule = "rules/finance-threshold.json";
+        var raised = File.ReadAllText(Path.Combine(folder.Path, rule)).Replace("\"expression\": \"10000\"", "\"expression\": \"20000\"");
+        Assert.Contains("20000", raised);
+        folder.With(rule, raised);
+        using var results = new TemporaryFolder();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [folder.Path, "--server", await PostgreSqlServer.AdminConnectionStringAsync(), "--extensions", SamplePackages.Path, "--results", results.Path],
+            new StringWriter(),
+            CancellationToken);
+
+        Assert.Equal(1, exitCode);
+        var cases = XDocument.Load(Path.Combine(results.Path, "scenarios-PurchaseRequests.xml")).Descendants("testcase").ToList();
+        var failing = Assert.Single(cases, testCase => testCase.Attribute("name")!.Value == "FinanceApprovalAboveThreshold");
+        Assert.StartsWith("Step ", Assert.Single(failing.Elements("failure")).Attribute("message")!.Value);
+    }
+
+    [Fact]
+    public async Task An_extensions_folder_that_does_not_exist_exits_with_2_and_writes_no_junit_file()
+    {
+        using var results = new TemporaryFolder();
+        var output = new StringWriter();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [
+                Path.Combine(RepositoryRoot(), "samples", "apps", "purchase-requests"),
+                "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
+                "--extensions", Path.Combine(results.Path, "missing"),
+                "--results", results.Path,
+            ],
+            output,
+            CancellationToken);
+
+        Assert.Equal(2, exitCode);
+        Assert.Empty(Directory.GetFileSystemEntries(results.Path));
+        Assert.Contains("does not exist", output.ToString());
+    }
+
+    /// <summary>The repository folder, found by walking up from the test output to <c>Axis.slnx</c>.</summary>
+    private static string RepositoryRoot()
+    {
+        var folder = new DirectoryInfo(AppContext.BaseDirectory);
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Axis.slnx")))
+        {
+            folder = folder.Parent;
+        }
+
+        return folder?.FullName
+            ?? throw new InvalidOperationException($"Axis.slnx was not found in any folder above '{AppContext.BaseDirectory}'.");
+    }
+
     private static async Task<ScenarioResult> RunAsync(
         TemporaryFolder folder, string name, int workItemLimit = ScenarioRunner.WorkItemLimit, PackageCatalog? packages = null)
     {

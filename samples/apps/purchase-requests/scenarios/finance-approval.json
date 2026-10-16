@@ -1,0 +1,61 @@
+{
+  "id": "ee1ac8c8-74c5-4105-867a-1090a15746a7",
+  "kind": "scenario",
+  "name": "FinanceApprovalAboveThreshold",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["employee"],
+    "binh": ["department-manager"],
+    "lan": ["finance-reviewer"]
+  },
+  "stubs": [
+    {
+      "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" },
+      "output": { "orderNumber": "PO-1001" }
+    },
+    {
+      "operation": "payment-references/creditorReference",
+      "output": { "creditorReference": "RF18PR0001" }
+    }
+  ],
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "PurchaseRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "title": "Laptops",
+        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
+        "currency": "USD",
+        "status": "draft",
+        "lineItems": [{ "description": "Laptop", "quantity": 3, "unitPrice": 5000 }]
+      }
+    },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+    {
+      "type": "expectInstance",
+      "process": "PurchaseRequestApproval",
+      "record": "request",
+      "state": "waiting",
+      "step": "financeApproval"
+    },
+    { "type": "expectTask", "record": "request", "step": "financeApproval", "assignee": { "role": "finance-reviewer" } },
+    { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "lan" },
+    {
+      "type": "expectInstance",
+      "process": "PurchaseRequestApproval",
+      "record": "request",
+      "state": "completed"
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": { "status": "approved", "purchaseOrderNumber": "PO-1001", "paymentReference": "RF18PR0001" }
+    }
+  ]
+}

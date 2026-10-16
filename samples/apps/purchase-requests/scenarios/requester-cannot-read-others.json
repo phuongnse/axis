@@ -1,0 +1,30 @@
+{
+  "id": "5b97473d-ab62-4fd9-a610-016ffb81b7e3",
+  "kind": "scenario",
+  "name": "RequesterCannotReadAnotherRequest",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["employee"],
+    "chau": ["employee"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "PurchaseRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "title": "Chairs",
+        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
+        "currency": "USD",
+        "status": "draft",
+        "lineItems": [{ "description": "Chair", "quantity": 2, "unitPrice": 1500 }]
+      }
+    },
+    { "type": "updateRecord", "record": "request", "as": "chau", "values": { "title": "x" }, "expect": "notFound" },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "chau", "expect": "notFound" },
+    { "type": "expectRecord", "record": "request", "values": { "title": "Chairs" } }
+  ]
+}

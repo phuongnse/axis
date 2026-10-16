@@ -74,7 +74,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution, which installs the sample extension package in `artifacts/extensions` | |
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
-| `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
+| `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 | `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. The one
@@ -87,6 +87,11 @@ goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
 summary per suite and the failed tests with their `file:line`. On GitHub Actions
 the summary goes to the job summary and each failed test becomes an error
 annotation.
+
+Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
+The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
+A failure names the scenario and the step. To run them by hand, run
+`dotnet run --project src/Axis.Scenarios -- <folder> --server <cs> --extensions artifacts/extensions`.
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server

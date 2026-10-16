@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Loading;
+using Axis.Configuration.Packages;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
@@ -10,6 +11,8 @@ namespace Axis.Scenarios;
 /// time, each in its own temporary tenant database, and writes the results as JUnit. The exit code
 /// is 0 when every scenario passed, 1 when one failed and 2 when the arguments are wrong or the
 /// folder does not compile, which is a setup error and not a failing scenario, and 130 when it is cancelled.
+/// With <c>--extensions</c> the application is compiled against the extension packages installed in that
+/// folder, and no package code runs. Problems with an installed package are printed and the run carries on.
 /// </summary>
 public static class ScenarioCommand
 {
@@ -20,18 +23,29 @@ public static class ScenarioCommand
 
     public const string DefaultResultsFolder = "artifacts/test-results";
 
-    private const string Usage = "Usage: Axis.Scenarios <folder> --server <connection string> [--results <folder>]";
+    private const string Usage = "Usage: Axis.Scenarios <folder> --server <connection string> [--extensions <folder>] [--results <folder>]";
 
     public static async Task<int> RunAsync(string[] args, TextWriter output, CancellationToken cancellationToken)
     {
-        if (!TryParse(args, out var folder, out var server, out var results))
+        if (!TryParse(args, out var folder, out var server, out var extensions, out var results))
         {
             await output.WriteLineAsync(Usage);
             return SetupError;
         }
 
-        var compiled = ApplicationCompiler.Compile(folder);
-        foreach (var diagnostic in compiled.Diagnostics)
+        PackageCatalog catalog;
+        try
+        {
+            catalog = PackageCatalog.Load(extensions);
+        }
+        catch (InvalidOperationException exception)
+        {
+            await output.WriteLineAsync(exception.Message);
+            return SetupError;
+        }
+
+        var compiled = ApplicationCompiler.Compile(folder, catalog.Versions);
+        foreach (var diagnostic in catalog.Diagnostics.Concat(compiled.Diagnostics))
         {
             await output.WriteLineAsync($"{diagnostic.Code} {diagnostic.File} {diagnostic.Path}: {diagnostic.Message}");
         }
@@ -49,7 +63,7 @@ public static class ScenarioCommand
         {
             foreach (var scenario in scenarios)
             {
-                var outcome = await ScenarioRunner.RunAsync(folder, scenario, server, NullLoggerFactory.Instance, cancellationToken);
+                var outcome = await ScenarioRunner.RunAsync(folder, scenario, server, NullLoggerFactory.Instance, cancellationToken, packages: catalog);
                 outcomes.Add(outcome);
                 await output.WriteLineAsync(outcome.Failure is { } failure ? $"FAIL {outcome.Name}: {failure}" : $"PASS {outcome.Name}");
             }
@@ -66,9 +80,10 @@ public static class ScenarioCommand
         return failed == 0 ? Passed : Failed;
     }
 
-    private static bool TryParse(string[] args, out string folder, out string server, out string results)
+    private static bool TryParse(string[] args, out string folder, out string server, out string? extensions, out string results)
     {
         folder = server = "";
+        extensions = null;
         results = DefaultResultsFolder;
         if (args.Length == 0 || args[0].StartsWith("--", StringComparison.Ordinal))
         {
@@ -88,6 +103,9 @@ public static class ScenarioCommand
             {
                 case "--server":
                     serverValue = args[index + 1];
+                    break;
+                case "--extensions":
+                    extensions = args[index + 1];
                     break;
                 case "--results":
                     results = args[index + 1];
