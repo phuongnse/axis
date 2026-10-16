@@ -2,7 +2,7 @@ using Axis.Configuration.Model;
 using Axis.Data.Records;
 using Axis.Policy;
 
-namespace Axis.Server.Records;
+namespace Axis.Processes.Records;
 
 /// <summary>
 /// The fields of an entity a user may read through the record API, and the reference labels they
@@ -11,7 +11,7 @@ namespace Axis.Server.Records;
 /// when the user may read the reference field and the target entity's display field. The target's
 /// record filters do not hide it.
 /// </summary>
-internal sealed class RecordFieldAccess
+public sealed class RecordFieldAccess
 {
     private readonly HashSet<string> _labelled;
 

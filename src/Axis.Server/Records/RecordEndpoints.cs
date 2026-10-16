@@ -4,7 +4,7 @@ using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
-using Axis.Processes.Instances;
+using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
@@ -187,7 +187,7 @@ internal static class RecordEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } filters
-            && await MatchAsync(connection, null, application!, model, recordId, filters, user, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            && await RecordCommand.MatchAsync(connection, null, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
         {
             return RecordNotFound();
         }
@@ -243,7 +243,7 @@ internal static class RecordEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         var readable = read.Filters is { } filters
-            ? await MatchAsync(connection, null, application!, model, recordId, filters, user, loggerFactory, cancellationToken) is { Found: true, Matched: true }
+            ? await RecordCommand.MatchAsync(connection, null, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is { Found: true, Matched: true }
             : await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not null;
         if (!readable)
         {
@@ -265,8 +265,9 @@ internal static class RecordEndpoints
         return Results.Ok(new RecordHistoryResponse(items, pageNumber, size, result.TotalCount));
     }
 
-    // The body is read here rather than bound, so the parser reports every body problem by JSON
-    // Pointer and the content type is checked before any of the body is read.
+    // The body is read through a callback, so the command reads it only after the grant and filter
+    // checks. The parser reports every body problem by JSON Pointer, and the content type is
+    // checked before any of the body is read.
     private static async Task<IResult> CreateAsync(
         string app,
         string entity,
@@ -288,79 +289,20 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var access = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Create);
-        if (!access.Granted)
-        {
-            return Grants.Forbidden();
-        }
-
-        if (!JsonRequest.IsJson(request))
-        {
-            return JsonRequest.UnsupportedMediaType();
-        }
-
-        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, application!, RecordOperation.Create);
-        if (parsed.Errors is { } errors)
-        {
-            return Results.ValidationProblem(errors);
-        }
-
-        if (RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application!, user.Roles, model, PolicyAction.Create)) is { } unwritable)
-        {
-            return Grants.UnwritableFields(unwritable);
-        }
-
-        // The creator fields are set before the computed fields and validations, so they see the
-        // record as it will be stored.
-        var input = parsed.Input!;
-        var values = RecordCreator.WithCreator(model, input.Values, user.Id);
-        var computed = RecordComputer.ComputeCreate(application!, model, values, input.Rows);
-        if (computed.Errors is { } computeErrors)
-        {
-            return Results.ValidationProblem(computeErrors);
-        }
-
         var connection = await database.GetConnectionAsync(cancellationToken);
-        RecordWriteResult result;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
-        {
-            // The validations run in the write transaction, so their now() is its start time.
-            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (RecordValidator.ValidateCreate(application!, model, computed.Values, computed.Rows, now) is { } failures)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return Results.ValidationProblem(failures);
-            }
-
-            result = await RecordCommands.CreateAsync(connection, application!, model, computed.Values, computed.Rows, cancellationToken: cancellationToken);
-            var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
-            var outside = written is not null
-                && !await WithinFiltersAsync(connection, transaction, application!, model, written.Id, access, user, loggerFactory, cancellationToken);
-            await CompleteAsync(
-                transaction,
-                written is not null && !outside
-                    ? RecordAudit(user, AuditActions.RecordCreated, application!, model, written.Id, written.Version)
-                    : null,
-                () => DataChangeTriggerStarts.StartAsync(
-                    transaction,
-                    TenantId(tenants),
-                    application!,
-                    releaseId,
-                    model,
-                    DataChangeKinds.Create,
-                    written!,
-                    changedFields: null,
-                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                    cancellationToken),
-                cancellationToken);
-            if (outside)
-            {
-                return Grants.OutsideFilter();
-            }
-        }
+        var result = await RecordCommand.CreateAsync(
+            connection,
+            TenantId(tenants),
+            application!,
+            releaseId,
+            model,
+            Actor(user),
+            BodyReader(request),
+            loggerFactory,
+            cancellationToken);
 
         // The location uses the model's names, so a record has one URL whatever case the caller used.
-        return result is { Outcome: RecordWriteOutcome.Written, Record: { } created }
+        return result is { Outcome: RecordCommandOutcome.Written, Record: { } created }
             ? Results.Created(
                 $"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}",
                 RecordFieldAccess.Read(application, user.Roles, model).Visible(created))
@@ -389,147 +331,27 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var access = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Update);
-        if (!access.Granted)
-        {
-            return Grants.Forbidden();
-        }
-
+        // The grant is checked before the id, so an id that is no record answers 403 to an actor
+        // with no grant and 404 to one with it.
         if (!TryParseId(id, out var recordId))
         {
-            return RecordNotFound();
-        }
-
-        // An update needs the stored record to be readable, then to match an update filter. Each
-        // check gives the version it saw, which the body must name, so a write in between cannot
-        // carry the record past them.
-        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
-        if (!read.Granted)
-        {
-            return RecordNotFound();
+            return UnparsedId(application!, user, model, PolicyAction.Update);
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var checkedVersions = new List<long>();
-        if (read.Filters is { } readFilters)
-        {
-            var match = await MatchAsync(connection, null, application!, model, recordId, readFilters, user, loggerFactory, cancellationToken);
-            if (match is not { Found: true, Matched: true })
-            {
-                return RecordNotFound();
-            }
+        var result = await RecordCommand.UpdateAsync(
+            connection,
+            TenantId(tenants),
+            application!,
+            releaseId,
+            model,
+            recordId,
+            Actor(user),
+            BodyReader(request),
+            loggerFactory,
+            cancellationToken);
 
-            checkedVersions.Add(match.Version);
-        }
-
-        if (access.Filters is { } updateFilters)
-        {
-            var match = await MatchAsync(connection, null, application!, model, recordId, updateFilters, user, loggerFactory, cancellationToken);
-            if (!match.Found)
-            {
-                return RecordNotFound();
-            }
-
-            if (!match.Matched)
-            {
-                return Grants.OutsideFilter();
-            }
-
-            checkedVersions.Add(match.Version);
-        }
-
-        if (!JsonRequest.IsJson(request))
-        {
-            return JsonRequest.UnsupportedMediaType();
-        }
-
-        var parsed = RecordInputParser.Parse(await ReadBodyAsync(request, cancellationToken), model, application!, RecordOperation.Update);
-        if (parsed.Errors is { } errors)
-        {
-            return Results.ValidationProblem(errors);
-        }
-
-        if (RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application!, user.Roles, model, PolicyAction.Update)) is { } unwritable)
-        {
-            return Grants.UnwritableFields(unwritable);
-        }
-
-        var input = parsed.Input!;
-        if (checkedVersions.Any(version => version != input.Version))
-        {
-            return WriteFailure(new RecordWriteResult(RecordWriteOutcome.StaleVersion));
-        }
-
-        // The stored record is read outside the write transaction. The client read its version
-        // earlier, so a write that passes the version check finds the record as computed here and
-        // validated below.
-        Record? stored = null;
-        if (model.Validations.Count > 0 || model.HasComputedFields)
-        {
-            stored = await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken);
-            if (stored is null)
-            {
-                return RecordNotFound();
-            }
-        }
-
-        var computed = RecordComputer.ComputeUpdate(application!, model, stored, input.Values, input.Rows);
-        if (computed.Errors is { } computeErrors)
-        {
-            return Results.ValidationProblem(computeErrors);
-        }
-
-        RecordWriteResult result;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
-        {
-            // The validations run in the write transaction, so their now() is its start time.
-            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (RecordValidator.ValidateUpdate(application!, model, stored, computed.Values, computed.Rows, now) is { } failures)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return Results.ValidationProblem(failures);
-            }
-
-
-            // A trigger with fields compares the record before and after the write. The row lock
-            // makes this read the version the update replaces.
-            Record? before = null;
-            if (DataChangeTriggerStarts.NeedsPreviousRecord(application!, model)
-                && await RecordCommands.LockAsync(connection, model, recordId, cancellationToken))
-            {
-                before = await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken);
-            }
-
-            result = await RecordCommands.UpdateAsync(connection, application!, model, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
-            var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
-            var outside = written is not null
-                && !await WithinFiltersAsync(connection, transaction, application!, model, written.Id, access, user, loggerFactory, cancellationToken);
-            await CompleteAsync(
-                transaction,
-                written is not null && !outside
-                    ? RecordAudit(user, AuditActions.RecordUpdated, application!, model, written.Id, written.Version, SetFields(model, input))
-                    : null,
-                () => DataChangeTriggerStarts.StartAsync(
-                    transaction,
-                    TenantId(tenants),
-                    application!,
-                    releaseId,
-                    model,
-                    DataChangeKinds.Update,
-                    written!,
-                    before is null
-                        ? null
-                        : DataChangeTriggerStarts.ChangedFields(model, before, written!, input.Rows.Select(rows => rows.Collection.Name)),
-                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                    cancellationToken),
-                cancellationToken);
-            if (outside)
-            {
-                return Grants.OutsideFilter();
-            }
-        }
-
-        return result is { Outcome: RecordWriteOutcome.Written, Record: { } updated }
+        return result is { Outcome: RecordCommandOutcome.Written, Record: { } updated }
             ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(updated))
             : WriteFailure(result);
     }
@@ -555,115 +377,27 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var access = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Delete);
-        if (!access.Granted)
-        {
-            return Grants.Forbidden();
-        }
-
         if (!TryParseId(id, out var recordId))
         {
-            return RecordNotFound();
-        }
-
-        // A delete needs the stored record to be readable, then to match a delete filter.
-        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
-        if (!read.Granted)
-        {
-            return RecordNotFound();
+            return UnparsedId(application!, user, model, PolicyAction.Delete);
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        RecordDeleteResult result;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
-        {
-            // The row is locked first, so the filters see the version that is deleted.
-            if (read.Filters is not null || access.Filters is not null)
-            {
-                if (!await RecordCommands.LockAsync(connection, model, recordId, cancellationToken)
-                    || (read.Filters is { } readFilters
-                        && await MatchAsync(connection, transaction, application!, model, recordId, readFilters, user, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return RecordNotFound();
-                }
-
-                if (!await WithinFiltersAsync(connection, transaction, application!, model, recordId, access, user, loggerFactory, cancellationToken))
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return Grants.OutsideFilter();
-                }
-            }
-
-            result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);
-            await CompleteAsync(
-                transaction,
-                result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
-                    ? RecordAudit(user, AuditActions.RecordDeleted, application!, model, recordId, version)
-                    : null,
-                beforeCommit: null,
-                cancellationToken);
-        }
-
-        return result.Outcome switch
-        {
-            RecordDeleteOutcome.Deleted => Results.NoContent(),
-            RecordDeleteOutcome.NotFound => RecordNotFound(),
-            // Names no table or constraint: the referencing entity is not part of the response.
-            RecordDeleteOutcome.Referenced => Conflict("Another record references this record."),
-            var outcome => throw new InvalidOperationException($"Unexpected delete outcome {outcome}."),
-        };
+        var result = await RecordCommand.DeleteAsync(connection, application!, model, recordId, Actor(user), loggerFactory, cancellationToken);
+        return result.Outcome == RecordCommandOutcome.Deleted ? Results.NoContent() : WriteFailure(result);
     }
 
-    /// <summary>
-    /// Whether the record with <paramref name="recordId"/> matches a filter of
-    /// <paramref name="access"/>, or <see langword="true"/> when it reaches every record. Run it
-    /// inside <paramref name="transaction"/> to check a record as the transaction wrote it.
-    /// </summary>
-    private static async Task<bool> WithinFiltersAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
-        ApplicationModel application,
-        EntityModel model,
-        Guid recordId,
-        RecordAccess access,
-        CurrentUserResponse user,
-        ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken) =>
-        access.Filters is not { } filters
-        || (await MatchAsync(connection, transaction, application, model, recordId, filters, user, loggerFactory, cancellationToken)).Matched;
+    private static RecordActor Actor(CurrentUserResponse user) => new(user.Id, user.DisplayName, user.Roles);
 
-    /// <summary>
-    /// Checks the record with <paramref name="recordId"/> against <paramref name="filters"/> for
-    /// <paramref name="user"/>, and logs the policy and grant of each filter that failed for it.
-    /// </summary>
-    internal static async Task<RecordFilterMatch> MatchAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction? transaction,
-        ApplicationModel application,
-        EntityModel model,
-        Guid recordId,
-        IReadOnlyList<RecordFilter> filters,
-        CurrentUserResponse user,
-        ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken)
-    {
-        var match = await RecordFilters.MatchAsync(
-            connection, transaction, application, model, recordId, Expressions(filters), user.Id, cancellationToken);
-        if (match.Failed.Count > 0)
-        {
-            var logger = Logger(loggerFactory);
-            foreach (var index in match.Failed)
-            {
-                RecordFilterLog.FilterFailed(logger, filters[index].Policy, filters[index].Grant, model.Name);
-            }
-        }
+    private static RecordBodyReader BodyReader(HttpRequest request) =>
+        async cancellationToken => JsonRequest.IsJson(request) ? await ReadBodyAsync(request, cancellationToken) : null;
 
-        return match;
-    }
+    // An id that names no record is a 403 when the user has no grant for the action, as the grant
+    // comes before the id, and a 404 otherwise.
+    private static IResult UnparsedId(ApplicationModel application, CurrentUserResponse user, EntityModel model, PolicyAction action) =>
+        PolicyEvaluator.Access(application, user.Roles, model, action).Granted ? RecordNotFound() : Grants.Forbidden();
 
-    private static List<ExpressionModel> Expressions(IReadOnlyList<RecordFilter> filters) =>
-        [.. filters.Select(filter => filter.Expression)];
+    private static List<ExpressionModel> Expressions(IReadOnlyList<RecordFilter> filters) => RecordCommand.Expressions(filters);
 
     private static ILogger Logger(ILoggerFactory loggerFactory) => loggerFactory.CreateLogger(typeof(RecordEndpoints).FullName!);
 
@@ -688,79 +422,8 @@ internal static class RecordEndpoints
             : (null, null, NotFound("The application has no entity with this name."), Guid.Empty);
     }
 
-    /// <summary>
-    /// Appends <paramref name="audit"/>, runs <paramref name="beforeCommit"/> and commits the write
-    /// when it succeeded, which is when there is an audit record, and rolls back every write
-    /// otherwise. Disposing the transaction rolls back on an exception, so a write whose audit
-    /// record or trigger start fails is not committed.
-    /// </summary>
-    private static async Task CompleteAsync(
-        NpgsqlTransaction transaction,
-        AuditEntry? audit,
-        Func<Task>? beforeCommit,
-        CancellationToken cancellationToken)
-    {
-        if (audit is not null)
-        {
-            await AuditRecords.AppendAsync(transaction, audit, cancellationToken);
-            if (beforeCommit is not null)
-            {
-                await beforeCommit();
-            }
-
-            await transaction.CommitAsync(cancellationToken);
-        }
-        else
-        {
-            await transaction.RollbackAsync(cancellationToken);
-        }
-    }
-
     private static string TenantId(ITenantContextAccessor tenants) =>
         (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
-
-    /// <summary>
-    /// The audit record of a record write. Its details hold the record's version, and on update
-    /// the names of the fields the body sets. They never hold a field value. Its actor is
-    /// <paramref name="user"/>, with their display name.
-    /// </summary>
-    private static AuditEntry RecordAudit(
-        CurrentUserResponse user,
-        string action,
-        ApplicationModel application,
-        EntityModel model,
-        Guid recordId,
-        long version,
-        IEnumerable<string>? fields = null)
-    {
-        var details = new JsonObject { ["version"] = version };
-        if (fields is not null)
-        {
-            details["fields"] = new JsonArray([.. fields.Select(name => JsonValue.Create(name))]);
-        }
-
-        return new AuditEntry(
-            user.Id,
-            action,
-            application.Manifest.Id,
-            model.Id,
-            recordId,
-            ProcessInstanceId: null,
-            details,
-            user.DisplayName);
-    }
-
-    /// <summary>
-    /// The declared names of the fields and child collections an update body sets, in declaration
-    /// order. A field sent with its stored value is listed too, and a computed field never is.
-    /// </summary>
-    internal static IEnumerable<string> SetFields(EntityModel model, RecordInput input)
-    {
-        var named = input.Values.Select(value => value.Field.Name)
-            .Concat(input.Rows.Select(rows => rows.Collection.Name))
-            .ToHashSet(StringComparer.Ordinal);
-        return model.Fields.Select(field => field.Name).Where(named.Contains);
-    }
 
     /// <summary>
     /// The details of an audit record with only the field names the user may read in its
@@ -789,6 +452,31 @@ internal static class RecordEndpoints
         await request.Body.CopyToAsync(body, cancellationToken);
         return body.ToArray();
     }
+
+    internal static IResult WriteFailure(RecordCommandResult result) =>
+        result.Outcome switch
+        {
+            RecordCommandOutcome.Denied => Grants.Forbidden(),
+            RecordCommandOutcome.OutsideFilters => Grants.OutsideFilter(),
+            RecordCommandOutcome.UnwritableFields => Grants.UnwritableFields(result.Errors!),
+            RecordCommandOutcome.NotFound => RecordNotFound(),
+            RecordCommandOutcome.UnsupportedContent => JsonRequest.UnsupportedMediaType(),
+            RecordCommandOutcome.Invalid => Results.ValidationProblem(result.Errors!),
+            RecordCommandOutcome.StaleVersion => Conflict("The record has changed since this version was read."),
+            RecordCommandOutcome.Conflict => result.Conflict switch
+            {
+                RecordConflict.UniqueValue => Results.ValidationProblem(
+                    result.Errors!,
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "A value must be unique."),
+                // Names no table or constraint: the referencing entity is not part of the response.
+                RecordConflict.Referenced => Conflict("Another record references this record."),
+                // Names no column or constraint: the storage names are not part of the API.
+                RecordConflict.Schema => Conflict("The stored schema does not match the active model."),
+                var conflict => throw new InvalidOperationException($"Unexpected conflict {conflict}."),
+            },
+            var outcome => throw new InvalidOperationException($"Unexpected record command outcome {outcome}."),
+        };
 
     internal static IResult WriteFailure(RecordWriteResult result) =>
         result.Outcome switch

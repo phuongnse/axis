@@ -1,0 +1,69 @@
+using System.Text;
+using Axis.Processes.Records;
+using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
+
+namespace Axis.Integration.Tests;
+
+/// <summary>The record command called directly, with no HTTP request or session.</summary>
+public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
+{
+    private const string TenantId = RecordApiFixture.TenantA;
+
+    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
+    private static Task<byte[]?> Body(CancellationToken cancellationToken) =>
+        Task.FromResult<byte[]?>(Encoding.UTF8.GetBytes("""{ "values": { "name": "Desk", "quantity": 3, "active": true } }"""));
+
+    [Fact]
+    public async Task Create_without_a_create_grant_is_denied_and_writes_nothing()
+    {
+        await fixture.ResetAsync();
+        Assert.True(fixture.Model.TryGetEntity("Item", out var item));
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantId));
+        await connection.OpenAsync(CancellationToken);
+        var auditBefore = await fixture.AuditRecordCountAsync(TenantId);
+
+        var result = await RecordCommand.CreateAsync(
+            connection,
+            TenantId,
+            fixture.Model,
+            Guid.NewGuid(),
+            item,
+            new RecordActor("rita", "Rita Reader", ["reader"]),
+            Body,
+            NullLoggerFactory.Instance,
+            CancellationToken);
+
+        Assert.Equal(RecordCommandOutcome.Denied, result.Outcome);
+        Assert.Null(result.Record);
+        Assert.Equal(0, (await fixture.TableShapeAsync(TenantId, "Item")).RowCount);
+        Assert.Equal(auditBefore, await fixture.AuditRecordCountAsync(TenantId));
+    }
+
+    [Fact]
+    public async Task Create_with_a_create_grant_writes_the_record_and_audits_the_actor()
+    {
+        await fixture.ResetAsync();
+        Assert.True(fixture.Model.TryGetEntity("Item", out var item));
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantId));
+        await connection.OpenAsync(CancellationToken);
+
+        var result = await RecordCommand.CreateAsync(
+            connection,
+            TenantId,
+            fixture.Model,
+            Guid.NewGuid(),
+            item,
+            new RecordActor("cmd-actor", "Command Actor", ["employee"]),
+            Body,
+            NullLoggerFactory.Instance,
+            CancellationToken);
+
+        Assert.Equal(RecordCommandOutcome.Written, result.Outcome);
+        var audit = Assert.Single(await fixture.AuditRecordsAsync(TenantId, result.Record!.Id));
+        Assert.Equal("record.created", audit.Action);
+        Assert.Equal("cmd-actor", audit.Actor);
+        Assert.Equal("Command Actor", audit.ActorName);
+    }
+}

@@ -150,6 +150,9 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
 
 ## Create, update and delete
 
+Writes go through the record command in `Axis.Processes`, which hosts without
+HTTP also call. The record API maps its outcome to the responses below.
+
 - **Create.** `POST` takes `{ "values": { ... } }`. The record gets a new
   version 7 UUID as its id and `version` 1. Fields the body leaves out are
   SQL `NULL`. The response is `201` with the record, and `Location` is

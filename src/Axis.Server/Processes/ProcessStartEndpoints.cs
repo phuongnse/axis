@@ -5,6 +5,7 @@ using Axis.Core.Tenancy;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
+using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Records;
@@ -123,7 +124,7 @@ internal static class ProcessStartEndpoints
         if (!await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken)
             || !read.Granted
             || (read.Filters is { } filters
-                && await RecordEndpoints.MatchAsync(connection, transaction, application, entity, subjectId, filters, user, loggerFactory, cancellationToken)
+                && await RecordCommand.MatchAsync(connection, transaction, application, entity, subjectId, filters, user.Id, loggerFactory, cancellationToken)
                     is not { Found: true, Matched: true })
             || await RecordQueries.GetAsync(connection, application, entity, subjectId, cancellationToken) is not { } record)
         {
