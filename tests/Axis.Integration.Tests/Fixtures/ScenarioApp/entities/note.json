@@ -1,0 +1,12 @@
+{
+  "id": "0b7a4c11-3d52-4e8a-9a60-5c1f7e2d9a02",
+  "kind": "entity",
+  "name": "Note",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "title", "type": "text", "required": true },
+    { "name": "quantity", "type": "integer" },
+    { "name": "dueAt", "type": "date-time" },
+    { "name": "lines", "type": "child-collection", "target": "NoteLine" }
+  ]
+}

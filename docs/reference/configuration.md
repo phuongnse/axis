@@ -2177,7 +2177,8 @@ A `scenario` resource is a configuration-level test. See
 `scenarios/`, one file per scenario. They compile with the application but stay
 out of the release and its content hash. A file is a scenario because its `kind`
 is `scenario`, wherever it is in the folder. The resource kind and its compile
-checks exist. Running scenarios is still *(planned for M6)*.
+checks exist. The runner runs record actions and `expectRecord` steps. The
+other steps and the use of `stubs` and `now` are *(planned for M6)*.
 
 This scenario submits a purchase request above the finance threshold. The
 manager is denied the finance decision. Both tasks are completed and the
@@ -2297,8 +2298,39 @@ To run the scenarios of an application folder, see
 [D32](../decisions.md#d32-test-scenarios--agreed):
 
 ```sh
-dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string>
+dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string> [--results <folder>]
 ```
 
-It writes JUnit to `artifacts/test-results/` and exits non-zero when a
-scenario fails.
+The runner runs the scenarios one at a time. Each gets a new
+`axis_scenario_<uuid>` database, which the runner drops when the scenario ends,
+whether it passed or failed. The `--server` login must be allowed to create
+databases. A scenario runs as the tenant `scenario`, with no deployment
+bindings and no installed extension packages, so an application that declares a
+package or binds a connector cannot run yet. A user's display name is their id.
+
+What runs now:
+
+- `createRecord`, `updateRecord` and `deleteRecord` without `expect`. Any outcome
+  other than success fails the scenario and names the outcome, such as `Denied`.
+- `expectRecord`. Numbers compare by value, so 5000 equals 5000.00. Date-times
+  compare as instants. A child collection must have as many rows as expected, and
+  each expected row is compared on the fields it names.
+
+*(planned for M6)*: `startProcess`, `completeTask`, `expectInstance`, `expectTask`
+and any action with `expect`. A scenario that uses a step type that does not run
+yet fails with `step type '<type>' is not supported yet`. An action with `expect`
+fails with `expect is not supported yet`.
+
+A failure names the step and what differed, for example
+`Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops
+a scenario at its first failing step.
+
+It writes `scenarios-<application name>.xml`, a JUnit file with one test case per
+scenario, to `artifacts/test-results/`, or to the folder of `--results`. The exit
+code is:
+
+- `0` when every scenario passed.
+- `1` when a scenario failed.
+- `2` when the arguments are wrong or the folder does not compile. The runner
+  prints the problems and writes no JUnit file.
+- `130` when the run was cancelled.
