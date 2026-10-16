@@ -167,7 +167,9 @@ export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
 
 # The init script gives both roles the development password axis. The bootstrap superuser axis keeps $password.
 export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_runtime;Password=axis"
-export AXIS_E2E_SCHEMA_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_schema;Password=axis"
+# Only Playwright, which starts the server, gets the schema role. It is not exported here, so the
+# worker below never inherits it.
+schema_database="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_schema;Password=axis"
 export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 
 # The worker waits until the server, which Playwright starts, has migrated the database. It runs
@@ -200,7 +202,7 @@ run_worker() {
 run_worker &
 worker_pid=$!
 
-run_suite playwright tests/e2e npm test --prefix tests/e2e
+AXIS_E2E_SCHEMA_DATABASE="$schema_database" run_suite playwright tests/e2e npm test --prefix tests/e2e
 playwright_status=$status
 
 worker_failed=0
