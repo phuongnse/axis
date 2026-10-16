@@ -8,6 +8,7 @@ using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -159,8 +160,10 @@ public sealed class ActiveApplicationResolverTests(DataDatabaseFixture database)
 
     private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled)
     {
-        await using var configuration = database.CreateConfigurationContext();
-        await using var data = database.CreateContext();
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken);
     }
 }

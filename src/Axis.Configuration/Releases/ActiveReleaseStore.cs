@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using Axis.Configuration.Storage;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ namespace Axis.Configuration.Releases;
 
 /// <summary>
 /// The active releases stored through <see cref="ConfigurationDbContext"/>. Reads do not track, and
-/// writes are raw SQL statements in one transaction, so the context's change tracker is never
+/// writes are raw SQL statements in one transaction, either its own or the caller's, so the context's change tracker is never
 /// affected.
 /// </summary>
 public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActiveReleaseStore
@@ -81,8 +82,53 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(sitePaths);
 
-        var paths = sitePaths.ToArray();
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var result = await WriteAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        if (result.Conflict != ActiveReleaseConflict.None)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return result;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<SetActiveReleaseResult> TrySetInTransactionAsync(
+        DbTransaction transaction,
+        Guid applicationId,
+        string name,
+        Guid releaseId,
+        IReadOnlyList<string> sitePaths,
+        DateTimeOffset activatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(sitePaths);
+
+        // EF throws InvalidOperationException here when the transaction is on another connection.
+        await context.Database.UseTransactionAsync(transaction, cancellationToken);
+        try
+        {
+            return await WriteAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        }
+        finally
+        {
+            await context.Database.UseTransactionAsync(null, cancellationToken);
+        }
+    }
+
+    // Runs the statements in the context's current transaction. A conflict is returned, never rolled back.
+    private async Task<SetActiveReleaseResult> WriteAsync(
+        Guid applicationId,
+        string name,
+        Guid releaseId,
+        IReadOnlyList<string> sitePaths,
+        DateTimeOffset activatedAt,
+        CancellationToken cancellationToken)
+    {
+        var paths = sitePaths.ToArray();
         try
         {
             // The release row comes first, so the site rows' foreign key target exists on a first
@@ -121,12 +167,10 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
                     ConstraintName: ConfigurationDbContext.ActiveSitePathIndex,
                 })
                 {
-                    await transaction.RollbackAsync(cancellationToken);
                     return new SetActiveReleaseResult(ActiveReleaseConflict.SitePath, path);
                 }
             }
 
-            await transaction.CommitAsync(cancellationToken);
             return SetActiveReleaseResult.Set;
         }
         catch (PostgresException exception) when (exception is
@@ -135,7 +179,6 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
             ConstraintName: ConfigurationDbContext.ActiveReleaseNameIndex,
         })
         {
-            await transaction.RollbackAsync(cancellationToken);
             return new SetActiveReleaseResult(ActiveReleaseConflict.Name);
         }
     }

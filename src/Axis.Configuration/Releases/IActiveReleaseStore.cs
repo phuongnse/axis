@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Axis.Configuration.Storage;
 
 namespace Axis.Configuration.Releases;
@@ -37,6 +38,22 @@ public interface IActiveReleaseStore
     /// site paths.
     /// </summary>
     Task<SetActiveReleaseResult> TrySetAsync(
+        Guid applicationId,
+        string name,
+        Guid releaseId,
+        IReadOnlyList<string> sitePaths,
+        DateTimeOffset activatedAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Does what <see cref="TrySetAsync"/> does inside <paramref name="transaction"/>, which the
+    /// caller opened on the same connection as this store. It never commits or rolls back. After a
+    /// conflict, the caller must roll back, because a refused statement can leave the transaction
+    /// unusable. Throws <see cref="InvalidOperationException"/> when the transaction belongs to
+    /// another connection.
+    /// </summary>
+    Task<SetActiveReleaseResult> TrySetInTransactionAsync(
+        DbTransaction transaction,
         Guid applicationId,
         string name,
         Guid releaseId,

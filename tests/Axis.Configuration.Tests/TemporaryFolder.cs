@@ -23,6 +23,12 @@ internal sealed class TemporaryFolder : IDisposable
         return this;
     }
 
+    public TemporaryFolder Without(string relativePath)
+    {
+        File.Delete(System.IO.Path.Combine(Path, relativePath));
+        return this;
+    }
+
     /// <summary>
     /// Removes every permission from a folder (the root when <paramref name="relativePath"/> is
     /// empty) so it cannot be listed. The permissions are restored on dispose. Unix only.

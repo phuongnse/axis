@@ -509,7 +509,9 @@ flowchart LR
      compile returns the diagnostics only.
 5. **Activate.** The current tenant schema is compared with the entity
    definitions of the release. Pending [migrations](storage.md#migrations)
-   run first *(planned for M6)*, then additive changes are planned and applied.
+   run first: a `renameField`, `dropField` or `dropEntity` is applied once per
+   tenant, and a pending `fill` or `convert` is `AXC0175` until it is built
+   *(planned for M6)*. Then additive changes are planned and applied.
    Other incompatible changes stay rejected with a diagnostic. See
    [Schema planning](storage.md#schema-planning). The release becomes active
    for new work only after that has completed successfully.
@@ -543,31 +545,21 @@ flowchart LR
      application took the name after the check, the upsert is refused and
      activation returns the same `AXC0020`. When another application took a
      site path after the check, the unique index refuses it and activation
-     returns one `AXC0031` for that path. With a pending migration, a refused
-     name or site path at the upsert rolls back the migrations and provisioning
-     too *(planned for M6)*.
-   - **Transactions.** Provisioning runs in its own transaction (DDL,
-     provisioning records and the schema lock). The active release and its
-     `axis.active_sites` rows are written afterwards, after provisioning
-     committed, in one short transaction of their own. A refused name or path
-     leaves neither written. No other configuration statement runs while the
-     provisioning transaction is open, so the caller may use one tenant
-     connection for both or two connections. Activation must run outside an
-     explicit transaction. With a pending migration, the migrations,
-     provisioning, the active release and its `axis.active_sites` rows are
-     written in one transaction instead *(planned for M6)*.
-   - **Failure after provisioning.** This applies to activations without a
-     pending migration. When writing the active release fails
-     after provisioning committed, the error propagates. The new tables and
-     columns stay, recorded for the application, and the previous release
-     stays active and keeps serving: it reads and writes only its own
-     columns, so only a new required column on a table that had no rows
-     rejects its inserts. Activating again is safe because provisioning is
-     additive. An activation that loses the name or a site path to a
-     concurrent one also
-     leaves its provisioned tables in place, recorded for its application
-     `id` and not active. With a pending migration, nothing stays applied
-     after a failed activation *(planned for M6)*.
+     returns one `AXC0031` for that path. A refused name or site path at the
+     upsert rolls back the migrations and provisioning too.
+   - **Transactions.** The schema lock, the migration history check, the
+     migrations, provisioning, the active release and its `axis.active_sites`
+     rows are written in one transaction. Holding the lock from the history
+     check to the commit keeps another activation from committing a rename
+     or drop in between, which would let an older release become active
+     against tables it does not match. The active release store and the data
+     context must therefore share one tenant connection, or the store throws
+     before anything commits. Activation must run outside an explicit
+     transaction.
+   - **Failure.** Nothing stays applied after a failed activation: not the
+     migrations, the new tables and columns, nor their provisioning records.
+     The previous release stays active. An activation that loses the name or
+     a site path to a concurrent one leaves nothing behind either.
    - **Re-activation.** Activating the active release again provisions
      nothing, keeps its site paths and changes only its activation time. A
      release that renames a site path frees the old path for another
@@ -608,9 +600,9 @@ sorted by file and then path.
 | `AXC0012` | A reference or child collection field's `target` names no loaded entity. Not reported when the target names an entity file in the folder that was not loaded because of its own errors. |
 | `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. This includes `required` on a computed field, and an `expression` on a `reference` or `child-collection` field. A `sequence` on a field that is not `text`, is `required`, has an `expression` or belongs to a child entity is reported once, at `/fields/{i}/sequence`. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference or child collection, `values` on an enum. |
-| `AXC0015` | An entity table has a column whose field was removed. Reported at `/fields` of the entity file. |
+| `AXC0015` | An entity table has a column whose field was removed and that no pending `renameField` or `dropField` migration covers. Reported at `/fields` of the entity file. |
 | `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
-| `AXC0017` | An entity provisioned for the application is missing from it. Reported at `application.json` with an empty path. |
+| `AXC0017` | An entity provisioned for the application is missing from it and no pending `dropEntity` migration covers it. Reported at `application.json` with an empty path. |
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
@@ -754,6 +746,8 @@ sorted by file and then path.
 | `AXC0171` | A `renameField`'s `from`, or a `dropField`'s or `convert`'s `field`, names no field of the entity as it is at that change. Reported at `/changes/{i}/from` or `/changes/{i}/field`. |
 | `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
 | `AXC0173` | A `fill`'s or `convert`'s `field` is not a field of the entity in the release. A child-collection field does not count. Reported at `/changes/{i}/field`. |
+| `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. |
+| `AXC0175` | A pending migration holds a `fill` or `convert`, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until those changes are built. |
 
 ## Startup activation
 
@@ -823,7 +817,7 @@ development or E2E server serves a real application without a separate step.
   only updates its activation time. After a failure, the next start
   activates again safely because provisioning is additive. A failed activation
   with a pending migration leaves nothing applied, so the next start runs the
-  migrations again *(planned for M6)*.
+  migrations again.
 
 ## Resource file shape
 
@@ -987,8 +981,9 @@ computed fields come later:
   [SQL subset](expressions.md#sql-subset).
 
 A `migration` resource changes one entity's storage before additive provisioning.
-The resource and its compile checks are built. Applying migrations at
-activation is *(planned for M6)*. See
+The resource, its compile checks and the once-per-tenant apply of `renameField`,
+`dropField` and `dropEntity` at activation are built. Applying `fill` and
+`convert` is *(planned for M6)*. See
 [D30](../decisions.md#d30-schema-migrations--agreed) and
 [migrations](storage.md#migrations) for activation and old-release work.
 

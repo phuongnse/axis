@@ -28,7 +28,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     recorded enum value) and `axis.sequence_counters` (the last number of
     each sequence and period), with history in `axis.__data_migrations`.
     It also owns `axis.applied_migrations`, the migrations applied once per
-    tenant *(planned for M6)*. See [Migrations](#migrations).
+    tenant. See [Migrations](#migrations).
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -122,11 +122,23 @@ entities and any entity recorded with one of its entity `id`s, whatever its
 application. The planner itself has no database
 access. It returns diagnostics, SQL statements and the new records to write.
 
-- **Migrations** *(planned for M6)*. The planner first applies pending
-  [migrations](#migrations) to its catalog snapshot: rename or drop columns
-  or tables, convert types and mark filled columns as having no nulls.
-  It then plans as today. Removals and incompatible changes not covered by
-  a migration keep `AXC0015`, `AXC0016` and `AXC0017`.
+- **Migrations.** The planner first applies the pending `renameField`,
+  `dropField` and `dropEntity` [migrations](#migrations) to its catalog
+  snapshot and its copy of the provisioning records, in ordinal path order
+  and file order. It then plans as today. A pending `fill` or `convert` is
+  `AXC0175` until it is built *(planned for M6)*. Removals and incompatible
+  changes not covered by a migration keep `AXC0015`, `AXC0016` and
+  `AXC0017`. A change that does not match the stored schema is skipped: the
+  table does not exist, the `from` column is missing or the `to` column
+  already exists. The migration is still recorded when activation succeeds,
+  so a fresh tenant activates a release that has migrations. A skip cannot
+  lose data, because a leftover column or table still gives `AXC0015` or
+  `AXC0017`. A migration's `entity` name is looked up first in the
+  application's active release, read from its stored resources, because that
+  release describes the tables that hold the data now and only it has a
+  dropped entity. It is then looked up in the release being activated. A
+  rename also renames the field in the recorded enum values, and a drop
+  deletes them.
 - **System columns.** `id` and `version` are created with the table, or
   `id`, `owner_id` and `position` for a child table (see **Child table**
   below). `version` is added to an existing table other than a child table
@@ -192,9 +204,9 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Order.** Every `CREATE TABLE` comes first, then the `ALTER TABLE` column
   changes, then every `ADD CONSTRAINT ... FOREIGN KEY`, so references between
   entities, cycles and self-references need no further ordering. Pending
-  migrations run before these additive statements, then stored computed
-  fields affected by a `fill` or `convert` are recomputed *(planned for M6)*.
-  See [Order of statements](#migrations).
+  migration statements run before these additive statements, then stored
+  computed fields affected by a `fill` or `convert` are recomputed
+  *(planned for M6)*. See [Order of statements](#migrations).
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
 
@@ -231,40 +243,47 @@ child tables are in [Schema planning](#schema-planning).
 
 ## Migrations
 
-The migration resource and its compile checks are built. Applying
-migrations at activation is *(planned for M6)*. This section records
+The migration resource, its compile checks and the once-per-tenant apply of
+`renameField`, `dropField` and `dropEntity` at activation are built. The
+start lock, the old-release work check, `fill`, `convert` and the recompute
+of computed fields are *(planned for M6)*, and so are the rules, table rows
+and example below that use them. This section records
 [D30](../decisions.md#d30-schema-migrations--agreed).
 A [migration resource](configuration.md#resource-file-shape) changes one
 entity's storage and runs once per tenant, before additive provisioning.
-Migrations run forward only. The following rules, table and example are
-planned for M6.
+Migrations run forward only.
 
 - **Pending.** A migration is pending when `axis.applied_migrations` has
   no matching row for its resource `id` in the tenant database.
 - **Order of statements.** An activation with a pending migration runs
   these steps in one transaction:
 
-  1. Take the existing schema lock, `pg_advisory_xact_lock`.
-  2. Take the application's start lock exclusively.
-  3. Check changed history. Any diagnostic stops the activation.
+  1. Take the existing schema lock, `pg_advisory_xact_lock`. *(Built.)*
+  2. Take the application's start lock exclusively. *(Planned for M6.)*
+  3. Check changed history. Any diagnostic stops the activation. *(Built.)*
   4. Count old-release work for the destructive changes below. Any such
-     work stops the activation with a diagnostic.
+     work stops the activation with a diagnostic. *(Planned for M6.)*
   5. Run pending migrations in ordinal path order, and changes in file order.
-  6. Run additive DDL in the order used today.
+     *(Built for `renameField`, `dropField` and `dropEntity`.)*
+  6. Run additive DDL in the order used today. *(Built.)*
   7. Recompute affected stored computed fields for the changed rows,
-     using the release being activated.
-  8. Write `axis.applied_migrations` and the provisioning records.
-  9. Upsert the active release and its `axis.active_sites` rows.
-  10. Commit, releasing both locks.
+     using the release being activated. *(Planned for M6.)*
+  8. Write `axis.applied_migrations` and the provisioning records. *(Built.)*
+  9. Upsert the active release and its `axis.active_sites` rows. *(Built.)*
+  10. Commit, releasing both locks. *(Built.)*
 
   The fixed lock order is schema lock, then start lock. Process starts
   never take the schema lock, so this order cannot deadlock with them.
 - **Changed history.** An applied migration with a changed content hash or
-  a missing file is a new diagnostic. Nothing runs. Activating a release
+  a missing file is `AXC0174`. Nothing runs. A changed file is reported at
+  that file with an empty path, and a missing file at `application.json`
+  with an empty path. The `resourceId` is the migration `id`. The hash is
+  the SHA-256 of the file's canonical JSON alone, without its path, so
+  moving a file does not count as changing it. Activating a release
   that lacks an applied migration file is refused, so an older release
   without that file cannot be activated again. The way back is a new
   release with a new forward migration.
-- **Old-release work.** After taking both locks, count `running` and
+- **Old-release work** *(planned for M6)*. After taking both locks, count `running` and
   `waiting` process instances pinned to a release other than the one being
   activated whose model has the column the change affects. This applies to
   `renameField` (its `from` column), `dropField`, `dropEntity` (its tables'
@@ -272,7 +291,7 @@ planned for M6.
   migration, the release and the count of open instances. Activation then
   changes nothing. A `fill` or an additive change never waits for old-release
   work.
-- **Start lock.** Every transaction that reads the active release and
+- **Start lock** *(planned for M6)*. Every transaction that reads the active release and
   inserts a process instance takes `pg_advisory_xact_lock_shared` keyed on
   the application `id`, before reading the active release. This covers the
   process start endpoint, inbound endpoint, trigger starts and schedule
@@ -285,8 +304,15 @@ planned for M6.
   migration and provisioning records, the active release and its site paths.
   This includes a refused application name or site path at the upsert.
   The active release does not change. A retry runs the pending migrations
-  again because nothing stayed applied.
-- **Computed fields.** A `fill` or `convert` recomputes, in the same
+  again because nothing stayed applied. A `dropEntity` that a remaining
+  foreign key blocks surfaces as a database exception, not a diagnostic, and
+  everything still rolls back. The active release is always written through
+  the active release store in the provisioning transaction, under the schema
+  lock held since the migration history check, so another activation cannot
+  commit a rename or drop between them. The store and the data context
+  must therefore share one tenant connection. A store on another connection
+  throws before anything commits.
+- **Computed fields** *(planned for M6)*. A `fill` or `convert` recomputes, in the same
   transaction, every stored computed field that reads the changed field.
   It may read it directly, through a rule or through a child aggregate.
   Only the changed rows are recomputed, and for changed child rows, their
@@ -298,9 +324,9 @@ planned for M6.
 
 | Change | SQL | Waits for old-release work |
 | --- | --- | --- |
-| `renameField` | `ALTER TABLE ... RENAME COLUMN`, plus `RENAME CONSTRAINT` for its `uq_` and `fk_` names, which hash the column name | Yes |
-| `dropField` | `ALTER TABLE ... DROP COLUMN` | Yes |
-| `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes |
+| `renameField` | `ALTER TABLE ... RENAME COLUMN`, plus `RENAME CONSTRAINT` for its `uq_` and `fk_` names, which hash the column name | Yes *(planned for M6)* |
+| `dropField` | `ALTER TABLE ... DROP COLUMN`, without `CASCADE` | Yes *(planned for M6)* |
+| `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes *(planned for M6)* |
 | `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` | No |
 | `convert` | `ALTER COLUMN ... TYPE ... USING <value>` for a type change, or `UPDATE ... SET f = <value>` for an enum mapping | Yes |
 | Additive changes | As in [Schema planning](#schema-planning) today | No |
@@ -319,15 +345,16 @@ each changed row. The `axis.applied_migrations` row is the trace.
 
 ### Applied migrations
 
-`Axis.Data` owns `axis.applied_migrations` in each tenant database
-*(planned for M6)*. It records a migration only when activation commits.
+`Axis.Data` owns `axis.applied_migrations` in each tenant database. It
+records a migration only when activation commits. The table has an index on
+`application_id`.
 
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `migration_id` | `uuid` | Primary key, the migration resource `id` |
 | `application_id` | `uuid` | The application `id` |
 | `release_id` | `uuid` | The release that applied the migration |
-| `content_hash` | `text` | SHA-256 of the file's canonical JSON, hashed as for release content |
+| `content_hash` | `varchar(64)` | SHA-256 of the file's canonical JSON as lower-case hex, without its path |
 | `applied_at` | `timestamptz` | When the migration was applied |
 
 ### Example: renaming a field while a task waits
@@ -357,7 +384,10 @@ in an earlier release never waits for old-release work.
 
 ### Limits
 
-These limits apply to migrations *(planned for M6)*:
+These limits apply to migrations. Those about `fill`, `convert`, the start lock
+and old-release work are *(planned for M6)*. Until the old-release check is
+built, a running or waiting process instance of an older release can fail at
+its next step after a rename or a drop.
 
 - A large `fill` or `convert` holds the schema lock and its row locks until
   commit. There are no batched backfills.

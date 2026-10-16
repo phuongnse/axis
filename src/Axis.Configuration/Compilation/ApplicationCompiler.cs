@@ -276,7 +276,7 @@ public static class ApplicationCompiler
             Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules)).ToList(),
-            Migrations = loaded.Migrations.Select(MigrationChecker.Build).ToList(),
+            Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = packages,
         };
         return result with

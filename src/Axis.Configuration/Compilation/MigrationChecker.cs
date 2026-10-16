@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
@@ -75,8 +77,11 @@ internal static class MigrationChecker
         }
     }
 
-    /// <summary>Builds a checked migration. Its values stay as expression text.</summary>
-    public static MigrationModel Build(MigrationResource migration) =>
+    /// <summary>
+    /// Builds a checked migration. Its values stay as expression text. <paramref name="content"/> is
+    /// the file's canonical JSON, which gives the content hash.
+    /// </summary>
+    public static MigrationModel Build(MigrationResource migration, string content) =>
         new()
         {
             Id = migration.Id,
@@ -86,6 +91,7 @@ internal static class MigrationChecker
             Changes = migration.Changes
                 .Select(change => new MigrationChangeModel(ParseType(change.Type), change.Field, change.From, change.To, change.Value))
                 .ToList(),
+            ContentHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))),
         };
 
     /// <summary>

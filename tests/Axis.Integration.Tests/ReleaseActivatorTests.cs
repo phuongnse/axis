@@ -209,14 +209,16 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Equal(otherActive, await FindActiveAsync(otherApplicationId));
 
         // A store that does not see the other application, as when it activates concurrently,
-        // provisions the tables and is then refused the name.
-        await using var configuration = database.CreateConfigurationContext();
-        await using var data = database.CreateContext();
+        // is refused the name at the write, and provisioning rolls back with it.
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), CancellationToken);
 
         AssertNameActiveForOtherApplication(hiding);
-        Assert.Single(await ReadTablesAsync(_orderId));
-        Assert.Equal(_applicationId, Assert.Single((await ReadRecordsAsync(_applicationId)).Entities).ApplicationId);
+        Assert.Empty(await ReadTablesAsync(_orderId));
+        Assert.Empty((await ReadRecordsAsync(_applicationId)).Entities);
         Assert.Null(await FindActiveAsync(_applicationId));
         Assert.Equal(otherActive, await FindActiveAsync(otherApplicationId));
     }
@@ -309,14 +311,16 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Equal(1L, await CountActiveSiteRowsAsync(otherApplicationId, _sitePath));
 
         // A store that does not see the other application's path, as when it activates
-        // concurrently, provisions the tables and is then refused the path by the unique index.
-        await using var configuration = database.CreateConfigurationContext();
-        await using var data = database.CreateContext();
+        // concurrently, is refused the path by the unique index, and provisioning rolls back with it.
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         var hiding = await ReleaseActivator.ActivateAsync(compiled, new ConflictHidingStore(new ActiveReleaseStore(configuration)), data, ActivationBindings.None("default"), CancellationToken);
 
         AssertSitePathActiveForOtherApplication(hiding, siteId);
-        Assert.Single(await ReadTablesAsync(_orderId));
-        Assert.Equal(_applicationId, Assert.Single((await ReadRecordsAsync(_applicationId)).Entities).ApplicationId);
+        Assert.Empty(await ReadTablesAsync(_orderId));
+        Assert.Empty((await ReadRecordsAsync(_applicationId)).Entities);
         Assert.Null(await FindActiveAsync(_applicationId));
         Assert.Equal(0L, await CountActiveSiteRowsAsync(_applicationId, _sitePath));
         Assert.Equal(otherActive, await FindActiveAsync(otherApplicationId));
@@ -476,8 +480,10 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
 
     private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled, ActivationBindings bindings)
     {
-        await using var configuration = database.CreateConfigurationContext();
-        await using var data = database.CreateContext();
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         return await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, CancellationToken);
     }
 
@@ -567,36 +573,5 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         {
             Assert.Equal(expectedTable.Columns, actualTable.Columns);
         }
-    }
-
-    /// <summary>
-    /// A store that never finds an active release by name or site path, as when another activation
-    /// takes the name or path concurrently.
-    /// </summary>
-    private sealed class ConflictHidingStore(IActiveReleaseStore inner) : IActiveReleaseStore
-    {
-        public Task<ActiveRelease?> FindByNameAsync(string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult<ActiveRelease?>(null);
-
-        public Task<ActiveRelease?> FindByApplicationIdAsync(Guid applicationId, CancellationToken cancellationToken = default) =>
-            inner.FindByApplicationIdAsync(applicationId, cancellationToken);
-
-        public Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default) =>
-            inner.GetReleaseAsync(releaseId, cancellationToken);
-
-        public Task<IReadOnlyList<ActiveRelease>> ListAsync(CancellationToken cancellationToken = default) =>
-            inner.ListAsync(cancellationToken);
-
-        public Task<ActiveRelease?> FindBySitePathAsync(string path, CancellationToken cancellationToken = default) =>
-            Task.FromResult<ActiveRelease?>(null);
-
-        public Task<SetActiveReleaseResult> TrySetAsync(
-            Guid applicationId,
-            string name,
-            Guid releaseId,
-            IReadOnlyList<string> sitePaths,
-            DateTimeOffset activatedAt,
-            CancellationToken cancellationToken = default) =>
-            inner.TrySetAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
     }
 }

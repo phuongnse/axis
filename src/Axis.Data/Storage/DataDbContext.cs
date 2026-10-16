@@ -4,7 +4,7 @@ namespace Axis.Data.Storage;
 
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
-/// <c>entities</c> schema, the counters of the sequences and the audit records. The caller
+/// <c>entities</c> schema, the migrations applied to it, the counters of the sequences and the audit records. The caller
 /// supplies the connection to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
@@ -20,6 +20,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<ProvisionedEntityRow> ProvisionedEntities => Set<ProvisionedEntityRow>();
 
     public DbSet<ProvisionedEnumValueRow> ProvisionedEnumValues => Set<ProvisionedEnumValueRow>();
+
+    public DbSet<AppliedMigrationRow> AppliedMigrations => Set<AppliedMigrationRow>();
 
     public DbSet<SequenceCounterRow> SequenceCounters => Set<SequenceCounterRow>();
 
@@ -54,6 +56,18 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             value.Property(v => v.EntityId).HasColumnName("entity_id");
             value.Property(v => v.FieldName).HasColumnName("field_name");
             value.Property(v => v.Value).HasColumnName("value");
+        });
+
+        modelBuilder.Entity<AppliedMigrationRow>(migration =>
+        {
+            migration.ToTable("applied_migrations");
+            migration.HasKey(m => m.MigrationId).HasName("pk_applied_migrations");
+            migration.Property(m => m.MigrationId).HasColumnName("migration_id").ValueGeneratedNever();
+            migration.Property(m => m.ApplicationId).HasColumnName("application_id");
+            migration.Property(m => m.ReleaseId).HasColumnName("release_id");
+            migration.Property(m => m.ContentHash).HasColumnName("content_hash").HasMaxLength(64);
+            migration.Property(m => m.AppliedAt).HasColumnName("applied_at");
+            migration.HasIndex(m => m.ApplicationId).HasDatabaseName("ix_applied_migrations_application_id");
         });
 
         modelBuilder.Entity<SequenceCounterRow>(counter =>

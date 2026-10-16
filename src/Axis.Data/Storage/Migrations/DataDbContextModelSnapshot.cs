@@ -23,6 +23,39 @@ namespace Axis.Data.Storage.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Axis.Data.Storage.AppliedMigrationRow", b =>
+                {
+                    b.Property<Guid>("MigrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("migration_id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.HasKey("MigrationId")
+                        .HasName("pk_applied_migrations");
+
+                    b.HasIndex("ApplicationId")
+                        .HasDatabaseName("ix_applied_migrations_application_id");
+
+                    b.ToTable("applied_migrations", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.AuditRecordRow", b =>
                 {
                     b.Property<Guid>("Id")

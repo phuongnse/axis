@@ -6,8 +6,10 @@ namespace Axis.Data.Schema;
 
 /// <summary>
 /// Plans the entity table changes for a compiled application by comparing it with the tenant
-/// catalog and the provisioning records. Only additive changes are planned; anything that could
-/// lose or reject existing data is reported as a diagnostic, and then nothing is planned at all.
+/// catalog and the provisioning records. The pending <c>renameField</c>, <c>dropField</c> and
+/// <c>dropEntity</c> migrations are applied to the catalog and the records first, and their
+/// statements come first in the plan. Other changes are additive only; anything that could lose or
+/// reject existing data is reported as a diagnostic, and then nothing is planned at all.
 /// </summary>
 public static class SchemaPlanner
 {
@@ -18,9 +20,26 @@ public static class SchemaPlanner
     private static readonly string _ownerDefinition = $"{EntityNaming.Quote(EntityNaming.OwnerColumn)} uuid NOT NULL";
     private static readonly string _positionDefinition = $"{EntityNaming.Quote(EntityNaming.PositionColumn)} integer NOT NULL";
 
-    public static SchemaPlan Plan(ApplicationModel model, CatalogSnapshot catalog, ProvisioningRecords records)
+    public static SchemaPlan Plan(ApplicationModel model, CatalogSnapshot catalog, ProvisioningRecords records) =>
+        Plan(model, catalog, records, [], new Dictionary<string, Guid>());
+
+    /// <summary>
+    /// Plans <paramref name="model"/> after applying <paramref name="pending"/>, which come in path
+    /// order. <paramref name="storedEntityIds"/> maps an entity name to the id its stored table was
+    /// provisioned under, as the application's active release has it.
+    /// </summary>
+    public static SchemaPlan Plan(
+        ApplicationModel model,
+        CatalogSnapshot catalog,
+        ProvisioningRecords records,
+        IReadOnlyList<MigrationModel> pending,
+        IReadOnlyDictionary<string, Guid> storedEntityIds)
     {
-        var planning = new Planning(model, catalog, records);
+        ArgumentNullException.ThrowIfNull(pending);
+        ArgumentNullException.ThrowIfNull(storedEntityIds);
+
+        var migrations = new MigrationPlanning(model, catalog, records, pending, storedEntityIds);
+        var planning = new Planning(model, migrations);
         foreach (var entity in model.Entities)
         {
             planning.PlanEntity(entity);
@@ -30,19 +49,21 @@ public static class SchemaPlanner
         return planning.ToPlan();
     }
 
-    private sealed class Planning(ApplicationModel model, CatalogSnapshot catalog, ProvisioningRecords records)
+    private sealed class Planning(ApplicationModel model, MigrationPlanning migrations)
     {
+        private readonly ProvisioningRecords _records = migrations.Records;
+
         // Creates run first, then column changes, then foreign keys, so every referenced table
         // exists before a foreign key points at it; cycles and self-references need no ordering.
         private readonly List<string> _creates = [];
         private readonly List<string> _alters = [];
         private readonly List<string> _foreignKeys = [];
-        private readonly List<Diagnostic> _diagnostics = [];
+        private readonly List<Diagnostic> _diagnostics = [.. migrations.Diagnostics];
         private readonly List<ProvisionedEntity> _newEntities = [];
         private readonly List<ProvisionedEnumValue> _newEnumValues = [];
 
         private readonly Dictionary<string, CatalogTable> _tablesByName =
-            catalog.Tables.ToDictionary(table => table.Name, StringComparer.Ordinal);
+            migrations.Catalog.Tables.ToDictionary(table => table.Name, StringComparer.Ordinal);
 
         // The compiler gives each child entity exactly one owner: the child collection field that names it.
         private readonly Dictionary<Guid, ChildOwner> _ownersByChildId = model.Entities
@@ -55,7 +76,7 @@ public static class SchemaPlanner
         {
             // Tables are keyed by entity id, so an id recorded for another application would share
             // its table, for example in an application copied with only its manifest id changed.
-            var owner = records.Entities.FirstOrDefault(recorded => recorded.EntityId == entity.Id && recorded.ApplicationId != model.Manifest.Id);
+            var owner = _records.Entities.FirstOrDefault(recorded => recorded.EntityId == entity.Id && recorded.ApplicationId != model.Manifest.Id);
             if (owner is not null)
             {
                 _diagnostics.Add(new Diagnostic(
@@ -82,13 +103,13 @@ public static class SchemaPlanner
         public void CheckRemovedEntities()
         {
             var modelIds = model.Entities.Select(entity => entity.Id).ToHashSet();
-            foreach (var recorded in records.Entities)
+            foreach (var recorded in _records.Entities)
             {
                 if (recorded.ApplicationId == model.Manifest.Id && !modelIds.Contains(recorded.EntityId))
                 {
                     _diagnostics.Add(new Diagnostic(
                         DiagnosticCodes.RemovedEntity,
-                        $"The entity with id '{recorded.EntityId}' was removed, but its table '{recorded.TableName}' exists. Removing an entity is not supported yet.",
+                        $"The entity with id '{recorded.EntityId}' was removed, but its table '{recorded.TableName}' exists. Drop it with a dropEntity change in a migration.",
                         model.Manifest.File,
                         "",
                         recorded.EntityId));
@@ -99,7 +120,10 @@ public static class SchemaPlanner
         public SchemaPlan ToPlan() =>
             _diagnostics.Count > 0
                 ? new SchemaPlan(DiagnosticOrder.Sort(_diagnostics), [], [], [])
-                : new SchemaPlan([], [.. _creates, .. _alters, .. _foreignKeys], _newEntities, _newEnumValues);
+                : new SchemaPlan([], [.. migrations.Statements, .. _creates, .. _alters, .. _foreignKeys], _newEntities, _newEnumValues)
+                {
+                    RecordChanges = [.. migrations.RecordChanges],
+                };
 
         private void PlanNewTable(EntityModel entity, string table, ChildOwner? childOwner)
         {
@@ -130,7 +154,7 @@ public static class SchemaPlanner
                 AddOwnerForeignKey(table, childOwner);
             }
 
-            if (!records.Entities.Any(recorded => recorded.EntityId == entity.Id))
+            if (!_records.Entities.Any(recorded => recorded.EntityId == entity.Id))
             {
                 _newEntities.Add(new ProvisionedEntity(entity.Id, model.Manifest.Id, table));
             }
@@ -193,7 +217,7 @@ public static class SchemaPlanner
                 {
                     _diagnostics.Add(new Diagnostic(
                         DiagnosticCodes.RemovedField,
-                        $"The column '{column.Name}' has no field. Removing a field is not supported yet.",
+                        $"The column '{column.Name}' has no field. Drop it with a dropField change in a migration, or rename it with a renameField change.",
                         entity.File,
                         "/fields",
                         entity.Id));
@@ -386,7 +410,7 @@ public static class SchemaPlanner
 
         // Field names match ignoring letter case, like the column name; values match ordinally.
         private List<string> RecordedEnumValues(EntityModel entity, FieldModel field) =>
-            records.EnumValues
+            _records.EnumValues
                 .Where(recorded => recorded.EntityId == entity.Id && string.Equals(recorded.FieldName, field.Name, StringComparison.OrdinalIgnoreCase))
                 .Select(recorded => recorded.Value)
                 .ToList();

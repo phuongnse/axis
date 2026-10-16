@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
@@ -12,12 +13,12 @@ namespace Axis.Data;
 /// name with the right kind, provisions the
 /// entity tables and then sets the active release with its site paths.
 /// <para>
-/// Provisioning runs in its own transaction, and the active release and its site paths are written
-/// afterwards in a separate short transaction. No store call runs while the provisioning
-/// transaction is open, so the store and <see cref="DataDbContext"/> may share one open tenant
-/// connection or use two. When writing the active release fails after provisioning committed, the
-/// exception propagates: the new tables and columns stay, recorded for the application, and the
-/// previous release stays active. Activating again is safe because provisioning is additive.
+/// Provisioning, the pending migrations and the active release write run in one transaction under
+/// the schema lock, so the migration history check and the write see the same history: no other
+/// activation can commit a rename or drop between them. A refused name or site path, or any failure,
+/// rolls everything back and the previous release stays active. The store and
+/// <see cref="DataDbContext"/> must share one open tenant connection, or the store throws before
+/// anything commits.
 /// </para>
 /// </summary>
 public static class ReleaseActivator
@@ -78,23 +79,50 @@ public static class ReleaseActivator
             return new ActivationResult(badBindings);
         }
 
-        var provisioned = await EntityProvisioner.ProvisionAsync(model, data, cancellationToken);
-        if (provisioned.Diagnostics.Count > 0)
+        var sitePaths = model.Sites.Select(site => site.Path).ToList();
+        var migrations = new MigrationContext(
+            release.Id,
+            token => ReadStoredEntityIdsAsync(store, manifest.Id, token),
+            async (transaction, token) => ToDiagnostics(
+                model,
+                await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)));
+        var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
+        return new ActivationResult(provisioned.Diagnostics);
+    }
+
+    // The entity ids of the application's active release by entity name: the tables that hold its data now.
+    private static async Task<IReadOnlyDictionary<string, Guid>> ReadStoredEntityIdsAsync(IActiveReleaseStore store, Guid applicationId, CancellationToken cancellationToken)
+    {
+        var ids = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        if (await store.FindByApplicationIdAsync(applicationId, cancellationToken) is not { } active
+            || await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is not { } stored)
         {
-            return new ActivationResult(provisioned.Diagnostics);
+            return ids;
         }
 
-        // Another application can take the name or a site path between the checks above and this write.
-        var sitePaths = model.Sites.Select(site => site.Path).ToList();
-        var set = await store.TrySetAsync(manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, cancellationToken);
-        return set.Conflict switch
+        foreach (var resource in stored.Resources)
         {
-            ActiveReleaseConflict.None => new ActivationResult([]),
-            ActiveReleaseConflict.Name => new ActivationResult([NameActiveForOtherApplication(model)]),
-            ActiveReleaseConflict.SitePath => new ActivationResult([SitePathActiveForOtherApplication(model.Sites.Single(site => site.Path == set.SitePath))]),
+            using var document = JsonDocument.Parse(resource.Content);
+            var root = document.RootElement;
+            if (root.TryGetProperty("kind", out var kind) && kind.GetString() == "entity"
+                && root.TryGetProperty("name", out var name) && name.GetString() is { } entityName
+                && root.TryGetProperty("id", out var id) && Guid.TryParse(id.GetString(), out var entityId))
+            {
+                ids[entityName] = entityId;
+            }
+        }
+
+        return ids;
+    }
+
+    private static List<Diagnostic> ToDiagnostics(ApplicationModel model, SetActiveReleaseResult set) =>
+        set.Conflict switch
+        {
+            ActiveReleaseConflict.None => [],
+            ActiveReleaseConflict.Name => [NameActiveForOtherApplication(model)],
+            ActiveReleaseConflict.SitePath => [SitePathActiveForOtherApplication(model.Sites.Single(site => site.Path == set.SitePath))],
             _ => throw new InvalidOperationException($"Unknown active release conflict '{set.Conflict}'."),
         };
-    }
 
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: those of the connectors,

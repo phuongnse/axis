@@ -139,8 +139,10 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
                 return _model;
             }
 
-            await using var configuration = fixture.CreateConfigurationContext();
-            await using var data = fixture.CreateContext();
+            await using var connection = new NpgsqlConnection(fixture.ConnectionString);
+            await connection.OpenAsync(CancellationToken);
+            await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+            await using var data = DataDatabaseFixture.CreateContext(connection);
             var compiled = await ReleaseCompiler.CompileAsync(
                 Path.Combine(AppContext.BaseDirectory, "Fixtures", "PolicyPerformanceApp"), configuration, CancellationToken);
             Assert.Empty(compiled.Diagnostics);
