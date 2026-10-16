@@ -323,6 +323,10 @@ internal sealed partial class ConnectorCallHandler(
         {
             var url = baseUrl.TrimEnd('/') + operation.Path.Replace("{idempotencyKey}", call.Id.ToString("D"), StringComparison.Ordinal);
             using var request = new HttpRequestMessage(new HttpMethod(operation.Method), url);
+
+            // The request says which operation it is for. Only scenario stubs read these options.
+            request.Options.Set(ConnectorClient.ConnectorOption, connector.Name);
+            request.Options.Set(ConnectorClient.OperationOption, operation.Name);
             if (request.Method != HttpMethod.Get)
             {
                 request.Content = new StringContent(call.Input ?? "{}", Encoding.UTF8, "application/json");

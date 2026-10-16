@@ -48,7 +48,8 @@ internal sealed partial class PackageCallHandler(
     IDeploymentBindings bindings,
     ConnectorCallSettings settings,
     PackageHttpTransport transport,
-    ILogger<PackageCallHandler> logger) : IExternalWorkItemHandler
+    ILogger<PackageCallHandler> logger,
+    Func<InstalledPackage, string, IOperation>? createOperation = null) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
     internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
@@ -300,7 +301,7 @@ internal sealed partial class PackageCallHandler(
     /// at the step's timeout. The result holds the output, or the error of an exception as its type
     /// name and whether it is retryable, or says that the run timed out. Worker shutdown is not caught.
     /// </summary>
-    private static async Task<Run> RunAsync(
+    private async Task<Run> RunAsync(
         Target target,
         LoadedPackageCall call,
         Dictionary<string, object?> input,
@@ -311,7 +312,7 @@ internal sealed partial class PackageCallHandler(
         timeout.CancelAfter(target.Step.Timeout);
         try
         {
-            var operation = target.Package.CreateOperation(call.Operation);
+            var operation = createOperation is null ? target.Package.CreateOperation(call.Operation) : createOperation(target.Package, call.Operation);
 
             // An operation that ignores its token keeps running, but the worker stops waiting for it.
             var output = await operation.RunAsync(input, context, timeout.Token).WaitAsync(timeout.Token);
