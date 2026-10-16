@@ -14,6 +14,7 @@ public sealed class TenantResolutionTests
     [
         "Tenants:default:Hosts:0=localhost",
         $"Tenants:default:ConnectionString={UnreachableDatabase}",
+        $"Tenants:default:SchemaConnectionString={UnreachableDatabase}",
     ];
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;

@@ -81,8 +81,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", a.ConnectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host(TenantA));
             builder.UseSetting("Tenants:a:ConnectionString", a.ConnectionString);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", a.ConnectionString);
             builder.UseSetting("Tenants:b:Hosts:0", Host(TenantB));
             builder.UseSetting("Tenants:b:ConnectionString", b.ConnectionString);
+            builder.UseSetting("Tenants:b:SchemaConnectionString", b.ConnectionString);
             builder.UseTestOidc(TenantA, TenantB);
             builder.UseTestAuthentication(
                 new TestIdentity("maria", "Maria Manager", "finance"),

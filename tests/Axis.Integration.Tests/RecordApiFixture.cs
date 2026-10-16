@@ -127,8 +127,10 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", ConnectionString(TenantA));
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", ConnectionString(TenantA));
+            builder.UseSetting("Tenants:a:SchemaConnectionString", ConnectionString(TenantA));
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", ConnectionString(TenantB));
+            builder.UseSetting("Tenants:b:SchemaConnectionString", ConnectionString(TenantB));
             builder.UseTestOidc("a", "b");
             builder.UseTestAuthentication(
                 new TestIdentity("anna", "Anna Employee", "employee"),

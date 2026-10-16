@@ -29,6 +29,10 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
 builder.Services.AddTenancy(builder.Configuration, builder.Environment);
+
+// Fails startup when a tenant has no schema connection string. Only startup activation uses it,
+// and the worker never reads it.
+builder.Services.AddSingleton(TenantSchemaConnections.Load(builder.Configuration));
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.

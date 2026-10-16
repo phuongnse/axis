@@ -29,6 +29,7 @@ public sealed class DatabaseReadinessTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("ConnectionStrings:Platform", database.ConnectionString);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", database.ConnectionString);
+            builder.UseSetting("Tenants:default:SchemaConnectionString", database.ConnectionString);
             builder.UseTestOidc("default");
         });
         using var client = factory.CreateClient();

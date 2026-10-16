@@ -120,6 +120,7 @@ public sealed class PresentationEndpointTests
             builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
         });

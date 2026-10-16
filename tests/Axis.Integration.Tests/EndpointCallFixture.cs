@@ -83,6 +83,7 @@ public sealed class EndpointCallFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", _connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host);
             builder.UseSetting("Tenants:a:ConnectionString", _connectionString);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", _connectionString);
             builder.UseTestOidc("a");
             builder.UseTestEndpointCallers(
                 new TestIdentity("importer-system", "Importer System", "importer"),

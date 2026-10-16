@@ -118,6 +118,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
             builder.UseSetting("ConnectionStrings:Platform", connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", TenantHost);
             builder.UseSetting("Tenants:a:ConnectionString", connectionString);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);
             builder.UseSetting(PackageCatalog.PathSetting, packagePath);
             builder.UseTestOidc("a");
             builder.ConfigureLogging(logging => logging.AddProvider(logs));

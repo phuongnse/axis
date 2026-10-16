@@ -108,15 +108,18 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   module; values are always parameters. Configuration can never supply raw SQL.
   Request text, such as the entity segment, `sort` and `values` names, is
   matched against the model's declared names and never used as an identifier.
-- **Database credentials** *(planned for M6)*. Runtime access and schema
-  changes will use different database roles. Until then, each tenant has one
-  connection string. See [Database roles](#database-roles).
+- **Database credentials.** Each tenant has two connection strings.
+  `SchemaConnectionString` serves startup activation only, and
+  `ConnectionString` serves everything else. *(planned for M6)* Runtime access
+  and schema changes will use different database roles. Until then, both
+  settings name the same database user. See [Database roles](#database-roles).
 
 ## Database roles
 
-*(planned for M6)* See
-[D31](../decisions.md#d31-separate-database-roles--agreed). Today, each
-tenant has one connection string, and one database user does everything.
+See [D31](../decisions.md#d31-separate-database-roles--agreed). The two
+settings and the connection each step uses are built. *(planned for M6)* The
+two database roles themselves, the grants and the start checks are still to
+come. Today both settings name the same database user, which does everything.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
   and `entities` schemas. The runtime database role reads and writes data, and
@@ -155,7 +158,8 @@ What each database role may do:
   disable the trigger. It guards against mistakes by Axis, not against a
   database administrator.
 - **Start checks.** A missing or blank setting stops the start, naming the
-  tenant and the setting. So do two settings that name the same user, and a
+  tenant and the setting. The server does this today. *(planned for M6)* So do
+  two settings that name the same user, and a
   runtime database role that is a superuser, owns the `axis` or `entities`
   schema, or may create objects in either. The server runs all of these
   checks. The worker validates `ConnectionString` and the runtime database
@@ -163,7 +167,7 @@ What each database role may do:
   settings name different users, because the worker holds no
   `SchemaConnectionString`.
 
-Which connection string each step uses:
+Which connection string each step uses. The server does this today:
 
 | Step | Connection string |
 | --- | --- |
@@ -176,8 +180,9 @@ Which connection string each step uses:
 | Server requests: record API, data sources, process starts, endpoints, tasks, sites | `ConnectionString` |
 | Worker | `ConnectionString` only |
 
-The server holds both connection strings for its whole life, because it
-activates at startup. Moving activation out of the server comes with tenant
+The server holds both connection strings for its whole life. It opens the
+schema connection only during startup activation, and closes it when each
+tenant is done. Moving activation out of the server comes with tenant
 provisioning in M9.
 
 ## Schema planning

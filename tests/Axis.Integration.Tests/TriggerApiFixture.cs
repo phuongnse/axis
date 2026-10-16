@@ -91,6 +91,7 @@ public sealed class TriggerApiFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", _connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host);
             builder.UseSetting("Tenants:a:ConnectionString", _connectionString);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", _connectionString);
             builder.UseTestOidc("a");
             builder.UseTestAuthentication(new TestIdentity("cara", "Cara Clerk", "clerk"));
             builder.UseTestEndpointCallers(new TestIdentity("ticket-system", "Ticket System", "importer"));

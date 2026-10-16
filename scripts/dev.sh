@@ -49,8 +49,10 @@ AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PUR
 if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis;Password=axis"
   # The worker reads the same tenant connection string, so this export moves it too.
+  # Only the server reads the schema connection string. Startup activation uses it.
   export ConnectionStrings__Platform="$connection"
   export Tenants__default__ConnectionString="$connection"
+  export Tenants__default__SchemaConnectionString="$connection"
 fi
 if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
   # The server signs people in at the moved Keycloak.

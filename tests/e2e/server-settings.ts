@@ -38,6 +38,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
     Tenants__default__Hosts__0: '127.0.0.1',
     Tenants__default__ConnectionString: connectionString,
+    Tenants__default__SchemaConnectionString: connectionString,
     // The development realm and its client, as in appsettings.Development.json.
     Tenants__default__Oidc__Authority: `${keycloakUrl}/realms/axis`,
     Tenants__default__Oidc__ClientId: 'axis',

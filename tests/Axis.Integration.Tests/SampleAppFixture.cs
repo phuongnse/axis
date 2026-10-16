@@ -88,6 +88,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Platform", _connectionString);
             builder.UseSetting($"Tenants:{Tenant}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{Tenant}:ConnectionString", _connectionString);
+            builder.UseSetting($"Tenants:{Tenant}:SchemaConnectionString", _connectionString);
             builder.UseTestOidc(Tenant);
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");

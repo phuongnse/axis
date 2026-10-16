@@ -1231,7 +1231,9 @@ partial commits that leave storage and the active release disagreeing.
 Each tenant gets two database roles, one for runtime access and one for
 schema changes *(planned for M6)*. Runtime code can then read and write
 data, but it cannot change the schema, a stored release, the active release
-or the provisioning records. Today every tenant uses one connection string.
+or the provisioning records. Today the server reads both connection strings
+and startup activation uses `SchemaConnectionString`. Installations pass one
+user in both until the roles land.
 See [storage](reference/storage.md#database-roles) for the grants and the
 connection string of each step.
 The owner confirmed these points for issue #414 on 2026-10-16.

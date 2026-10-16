@@ -311,6 +311,7 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
             builder.UseSetting("ConnectionStrings:Platform", connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", TenantHost);
             builder.UseSetting("Tenants:a:ConnectionString", connectionString);
+            builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);
             builder.UseSetting(PackageCatalog.PathSetting, packages);
             builder.UseTestOidc("a");
             if (folder is not null)
