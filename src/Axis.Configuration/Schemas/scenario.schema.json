@@ -55,7 +55,6 @@
     "stub": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["output"],
       "properties": {
         "connector": {
           "type": "object",
@@ -70,9 +69,13 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*$"
         },
-        "output": { "type": "object" }
+        "output": { "type": "object" },
+        "outcome": { "const": "failed" }
       },
-      "oneOf": [{ "required": ["connector"] }, { "required": ["operation"] }]
+      "allOf": [
+        { "oneOf": [{ "required": ["connector"] }, { "required": ["operation"] }] },
+        { "oneOf": [{ "required": ["output"] }, { "required": ["outcome"] }] }
+      ]
     },
     "assignee": {
       "type": "object",

@@ -115,6 +115,42 @@ public sealed class ScenarioCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void A_stub_with_outcome_failed_and_no_output_compiles()
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario("""
+            "users": { "anna": ["employee"] },
+            "stubs": [
+              { "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "outcome": "failed" },
+              { "operation": "payment-references/creditorReference", "outcome": "failed" }
+            ],
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "output": {}, "outcome": "failed" }""")]
+    [InlineData("""{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" } }""")]
+    [InlineData("""{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "outcome": "succeeded" }""")]
+    public void A_stub_needs_exactly_one_of_output_and_a_failed_outcome(string stub)
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
+            "users": { "anna": ["employee"] },
+            "stubs": [{{stub}}],
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File) == (DiagnosticCodes.SchemaViolation, ScenarioFile));
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData("2026-99-99T99:99:99Z")]
     [InlineData("2026-02-30T09:00:00Z")]

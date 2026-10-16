@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
@@ -20,9 +21,11 @@ namespace Axis.Scenarios;
 /// Runs one scenario against its own temporary tenant database. The database is created, migrated,
 /// given the compiled and activated application and its seed data, and dropped when the scenario
 /// ends, whether it passed or failed. The scenario runs as the tenant <see cref="TenantId"/> with
-/// no deployment bindings and no extension packages. Each step runs as its user, with the roles the
-/// scenario gives that user. The first failing step ends the scenario. After each action the runner
-/// runs the due process steps in-process, so the process reaches its next wait. The scenario's
+/// placeholder deployment bindings, never a real URL or secret. It reads the manifests of the
+/// installed extension packages it is given, and runs none of their code. Each step runs as its user,
+/// with the roles the scenario gives that user. The first failing step ends the scenario. After each
+/// action the runner runs the due process steps and the connector and package calls in-process, so
+/// the process reaches its next wait. The scenario's stubs answer the calls. The scenario's
 /// <c>now</c> reaches every connection as the PostgreSQL setting <c>axis.now</c>, which the
 /// transaction time and the SQL of <c>now()</c> read. Times that PostgreSQL writes itself, such as
 /// <c>created_at</c>, keep the real clock.
@@ -32,7 +35,7 @@ public static class ScenarioRunner
     /// <summary>The tenant id every scenario runs under.</summary>
     public const string TenantId = "scenario";
 
-    /// <summary>The most process step work items that may run after one action.</summary>
+    /// <summary>The most work items that may run after one action.</summary>
     public const int WorkItemLimit = 1000;
 
     /// <summary>
@@ -40,6 +43,8 @@ public static class ScenarioRunner
     /// server of <paramref name="serverConnectionString"/>, whose login may create databases.
     /// A cancelled run still drops the database, then throws <see cref="OperationCanceledException"/>.
     /// An action that makes more than <paramref name="workItemLimit"/> work items run fails the scenario.
+    /// <paramref name="packages"/> are the installed extension packages whose manifests the application
+    /// is compiled against, or null for none.
     /// </summary>
     public static async Task<ScenarioResult> RunAsync(
         string folder,
@@ -47,8 +52,10 @@ public static class ScenarioRunner
         string serverConnectionString,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken,
-        int workItemLimit = WorkItemLimit)
+        int workItemLimit = WorkItemLimit,
+        PackageCatalog? packages = null)
     {
+        packages ??= PackageCatalog.Empty;
         var stopwatch = Stopwatch.StartNew();
         var database = $"axis_scenario_{Guid.NewGuid():N}";
         ScenarioResult Result(string? failure) => new(scenario.Name, scenario.File, database, stopwatch.Elapsed, failure);
@@ -76,7 +83,7 @@ public static class ScenarioRunner
                 builder.Options = string.IsNullOrEmpty(builder.Options) ? option : builder.Options + " " + option;
             }
 
-            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, loggerFactory, workItemLimit, cancellationToken);
+            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, loggerFactory, workItemLimit, packages, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -112,6 +119,7 @@ public static class ScenarioRunner
         string connectionString,
         ILoggerFactory loggerFactory,
         int workItemLimit,
+        PackageCatalog packages,
         CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);
@@ -123,14 +131,13 @@ public static class ScenarioRunner
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
 
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, [], cancellationToken);
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, cancellationToken);
         if (compiled.Release is null || compiled.Model is null)
         {
             return Setup("could not be compiled", compiled.Diagnostics);
         }
 
-        var bindings = new ActivationBindings(TenantId, new Dictionary<string, ActivationBinding>(), AllowHttp: false);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, cancellationToken);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ScenarioBindings.ForActivation(compiled.Model), OpenInstanceCounter.Instance, cancellationToken);
         if (activated.Diagnostics.Count > 0)
         {
             return Setup("could not be activated", activated.Diagnostics);
@@ -147,7 +154,7 @@ public static class ScenarioRunner
         }
 
         var steps = new ScenarioSteps(connection, model, compiled.Release.Id, scenario, loggerFactory);
-        var work = new ScenarioWork(connectionString, loggerFactory, workItemLimit);
+        using var work = new ScenarioWork(connectionString, loggerFactory, workItemLimit, packages, new ScenarioStubs(scenario.Stubs));
         for (var index = 0; index < scenario.Steps.Count; index++)
         {
             var step = scenario.Steps[index];

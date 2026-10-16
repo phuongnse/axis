@@ -2184,7 +2184,8 @@ out of the release and its content hash. A file is a scenario because its `kind`
 is `scenario`, wherever it is in the folder. The resource kind and its compile
 checks exist. The runner runs record actions, process starts and task
 completions, with or without `expect`, and the `expectRecord`, `expectInstance`
-and `expectTask` steps. It sets `now`. The use of `stubs` is *(planned for M6)*.
+and `expectTask` steps. It sets `now`. It answers connector and package calls
+from `stubs`.
 
 This scenario submits a purchase request above the finance threshold. The
 manager is denied the finance decision. Both tasks are completed and the
@@ -2260,9 +2261,26 @@ request ends `approved`:
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.
-- `stubs` hold one output per connector operation or package operation. A stub
-  has the same shape as the process step that calls it. A call without a stub
-  fails the scenario.
+- `stubs` hold one answer per connector operation or package operation. A stub
+  names a `connector` with its `operation`, or a package operation written
+  `<package>/<operation>`. It gives either an `output` or `"outcome": "failed"`,
+  never both. A connector stub matches the connector and the operation ignoring
+  letter case. A package stub matches the package id exactly and the operation
+  ignoring letter case. One stub answers every call of its operation with the
+  same output.
+  - `output` is the answer of a successful call. The call writes it to the
+    subject fields and the process moves on, as a real call would.
+  - `"outcome": "failed"` makes the call fail at once with no retry. The
+    instance ends `failed`, which `expectInstance` can check.
+  - A call that is reached and has no stub fails the scenario at that action.
+    The failure names the process step and the operation.
+  - The compile step checks that a stub names an operation and its outputs. It
+    does not check the output's value types. A connector output that does not
+    fit leaves the call `unknown` or retried. A package output that does not fit
+    fails the instance.
+  - No real system or package code runs. The scenario tenant has placeholder
+    deployment bindings for every connector and package binding the application
+    names, never a real URL or secret.
 
 Every step has a `type`. These are the step kinds:
 
@@ -2320,8 +2338,9 @@ The runner runs the scenarios one at a time. Each gets a new
 `axis_scenario_<uuid>` database, which the runner drops when the scenario ends,
 whether it passed or failed. The `--server` login must be allowed to create
 databases. A scenario runs as the tenant `scenario`, with no deployment
-bindings and no installed extension packages, so an application that declares a
-package or binds a connector cannot run yet. A user's display name is their id.
+real bindings. The runner API reads the manifests of the extension packages it is
+given and runs none of their code. The command loads no packages yet, so it cannot
+compile an application that declares a package. A user's display name is their id.
 
 What runs now:
 
@@ -2355,6 +2374,11 @@ What runs now:
   items of the scenario's tenant in-process, until none is due. So the process
   reaches its next wait: an open task, or its end. If one action makes more than
   1,000 items run, the scenario fails at that step.
+- **Connector and package calls.** The same loop runs the `connector.call` and
+  `package.call` items. They are the real handlers, so output mapping, resume,
+  history, audit records and data change triggers behave as they do on a worker.
+  Only the HTTP request of a connector call and the package operation are replaced
+  by the scenario's `stubs`. See `stubs` above.
 - **The current time.** With `now` set, the runner gives every connection of the
   scenario the PostgreSQL setting `axis.now`. The transaction time reads it
   instead of PostgreSQL `now()`. So `now()` in expressions, in policy and data
@@ -2362,10 +2386,9 @@ What runs now:
   number all use it. Timestamps that PostgreSQL writes itself, such as
   `created_at`, keep the real clock.
 
-*(planned for M6)*: stubs, connector and package calls, event deliveries and
-schedule triggers. Only the `process.step` items run, so event deliveries and
-schedule triggers stay queued and do not fail the scenario. An application with a
-connector or a package cannot run in a scenario yet.
+*(planned for M6)*: event deliveries and schedule triggers. Only the
+`process.step`, `connector.call` and `package.call` items run, so event deliveries
+and schedule triggers stay queued and do not fail the scenario.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

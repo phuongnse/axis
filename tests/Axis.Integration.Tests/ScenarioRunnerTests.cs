@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Scenarios;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,6 +12,8 @@ public sealed class ScenarioRunnerTests
 {
     private const string Clerk = """{ "anna": ["clerk"] }""";
     private const string Reader = """{ "rita": ["reader"] }""";
+
+    private static readonly Lazy<PackageCatalog> _packages = new(() => PackageCatalog.Load(SamplePackages.Path));
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -429,11 +432,103 @@ public sealed class ScenarioRunnerTests
         Assert.Contains("more than 2 work items", result.Failure);
     }
 
-    private static async Task<ScenarioResult> RunAsync(TemporaryFolder folder, string name, int workItemLimit = ScenarioRunner.WorkItemLimit)
+    private const string ApproveBelowThreshold = CreateRequest + StartApproval + """
+        { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+        """;
+
+    private const string OrderStub = """{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "output": { "orderNumber": "PO-1001" } }""";
+
+    private const string ReferenceStub = """{ "operation": "payment-references/creditorReference", "output": { "creditorReference": "RF00STUB" } }""";
+
+    [Fact]
+    public async Task A_connector_stub_answers_the_purchase_order_call_and_the_process_completes_with_its_order_number()
+    {
+        using var folder = CallApplication(Scenario("ConnectorStub", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "approved", "purchaseOrderNumber": "PO-1001" } }
+            """, stubs: $"{OrderStub}, {ReferenceStub}"));
+
+        var result = await RunAsync(folder, "ConnectorStub", packages: _packages.Value);
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_package_operation_stub_writes_a_value_the_real_package_cannot_produce_to_the_subject_field()
+    {
+        using var folder = CallApplication(Scenario("PackageStub", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "paymentReference": "RF00STUB" } }
+            """, stubs: $"{OrderStub}, {ReferenceStub}"));
+
+        var result = await RunAsync(folder, "PackageStub", packages: _packages.Value);
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_connector_call_with_no_stub_fails_the_action_and_names_the_step_and_the_operation()
+    {
+        using var folder = CallApplication(Scenario("NoConnectorStub", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" }
+            """, stubs: ReferenceStub));
+
+        var result = await RunAsync(folder, "NoConnectorStub", packages: _packages.Value);
+
+        Assert.False(result.Passed);
+        Assert.StartsWith("Step 3 (completeTask): ", result.Failure);
+        Assert.Contains("'createPurchaseOrder'", result.Failure);
+        Assert.Contains("PurchasingSystem/createPurchaseOrder", result.Failure);
+        Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
+    public async Task A_package_call_with_no_stub_fails_the_action_and_names_the_step_and_the_operation()
+    {
+        using var folder = CallApplication(Scenario("NoPackageStub", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" }
+            """, stubs: OrderStub));
+
+        var result = await RunAsync(folder, "NoPackageStub", packages: _packages.Value);
+
+        Assert.False(result.Passed);
+        Assert.StartsWith("Step 3 (completeTask): ", result.Failure);
+        Assert.Contains("'assignPaymentReference'", result.Failure);
+        Assert.Contains("payment-references/creditorReference", result.Failure);
+    }
+
+    [Fact]
+    public async Task A_connector_stub_with_outcome_failed_leaves_the_instance_failed_without_retries()
+    {
+        using var folder = CallApplication(Scenario("FailedConnector", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "failed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "approved" } }
+            """, stubs: """{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "outcome": "failed" }"""));
+
+        var result = await RunAsync(folder, "FailedConnector", packages: _packages.Value);
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_package_stub_with_outcome_failed_leaves_the_instance_failed()
+    {
+        using var folder = CallApplication(Scenario("FailedPackage", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "failed" },
+            { "type": "expectRecord", "record": "request", "values": { "purchaseOrderNumber": "PO-1001" } }
+            """, stubs: $$"""{{OrderStub}}, { "operation": "payment-references/creditorReference", "outcome": "failed" }"""));
+
+        var result = await RunAsync(folder, "FailedPackage", packages: _packages.Value);
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    private static async Task<ScenarioResult> RunAsync(
+        TemporaryFolder folder, string name, int workItemLimit = ScenarioRunner.WorkItemLimit, PackageCatalog? packages = null)
     {
         var scenario = Axis.Configuration.Loading.ApplicationLoader.Load(folder.Path).Scenarios.Single(candidate => candidate.Name == name);
         return await ScenarioRunner.RunAsync(
-            folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), NullLoggerFactory.Instance, CancellationToken, workItemLimit);
+            folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), NullLoggerFactory.Instance, CancellationToken, workItemLimit, packages);
     }
 
     private static async Task<bool> DatabaseExistsAsync(string name)
@@ -454,14 +549,24 @@ public sealed class ScenarioRunnerTests
     /// <summary>A copy of the ScenarioPurchaseApp fixture, a purchase request with an approval process, with the scenario added.</summary>
     private static TemporaryFolder PurchaseApplication((string Name, string Json) scenario) => Application("ScenarioPurchaseApp", [scenario]);
 
-    private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios)
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioCallApp files over it: after approval the process
+    /// calls the purchasing system connector and the payment references package. Its scenarios need the sample package.
+    /// </summary>
+    private static TemporaryFolder CallApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioCallApp");
+
+    private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios, string? overlay = null)
     {
         var folder = new TemporaryFolder();
-        var source = Path.Combine(AppContext.BaseDirectory, "Fixtures", fixture);
-        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        foreach (var name in overlay is null ? [fixture] : new[] { fixture, overlay })
         {
-            var relative = Path.GetRelativePath(source, file);
-            folder.With(relative, File.ReadAllText(file));
+            var source = Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
+            foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(source, file);
+                folder.With(relative, File.ReadAllText(file));
+            }
         }
 
         foreach (var (name, json) in scenarios)
@@ -472,7 +577,7 @@ public sealed class ScenarioRunnerTests
         return folder;
     }
 
-    private static (string Name, string Json) Scenario(string name, string users, string steps, string? now = null) => (name, $$"""
+    private static (string Name, string Json) Scenario(string name, string users, string steps, string? now = null, string? stubs = null) => (name, $$"""
         {
           "id": "{{Guid.NewGuid()}}",
           "kind": "scenario",
@@ -480,6 +585,7 @@ public sealed class ScenarioRunnerTests
           "formatVersion": 1,
           {{(now is null ? "" : $"\"now\": \"{now}\",")}}
           "users": {{users}},
+          {{(stubs is null ? "" : $"\"stubs\": [{stubs}],")}}
           "steps": [{{steps}}]
         }
         """);

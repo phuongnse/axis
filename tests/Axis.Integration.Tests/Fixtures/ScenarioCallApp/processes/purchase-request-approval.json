@@ -1,0 +1,169 @@
+{
+  "id": "b9807fa4-262f-4ea7-8bcf-2782403da367",
+  "kind": "process",
+  "name": "PurchaseRequestApproval",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'submitted'",
+        "submittedAt": "now()"
+      },
+      "next": "managerApproval"
+    },
+    {
+      "name": "managerApproval",
+      "type": "task",
+      "label": {
+        "textKey": "purchaseRequest.managerApproval"
+      },
+      "assignee": {
+        "user": "manager"
+      },
+      "form": "PurchaseRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        {
+          "name": "approve",
+          "label": {
+            "textKey": "task.approve"
+          },
+          "next": "financeCheck"
+        },
+        {
+          "name": "return",
+          "label": {
+            "textKey": "task.return"
+          },
+          "next": "markReturned"
+        },
+        {
+          "name": "reject",
+          "label": {
+            "textKey": "task.reject"
+          },
+          "next": "markRejected"
+        }
+      ]
+    },
+    {
+      "name": "financeCheck",
+      "type": "decision",
+      "branches": [
+        {
+          "when": "amount >= FinanceThreshold()",
+          "next": "financeApproval"
+        }
+      ],
+      "otherwise": "markApproved"
+    },
+    {
+      "name": "financeApproval",
+      "type": "task",
+      "label": {
+        "textKey": "purchaseRequest.financeApproval"
+      },
+      "assignee": {
+        "role": "finance-reviewer"
+      },
+      "form": "PurchaseRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        {
+          "name": "approve",
+          "label": {
+            "textKey": "task.approve"
+          },
+          "next": "markApproved"
+        },
+        {
+          "name": "return",
+          "label": {
+            "textKey": "task.return"
+          },
+          "next": "markReturned"
+        },
+        {
+          "name": "reject",
+          "label": {
+            "textKey": "task.reject"
+          },
+          "next": "markRejected"
+        }
+      ]
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'approved'"
+      },
+      "next": "createPurchaseOrder"
+    },
+    {
+      "name": "createPurchaseOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": {
+        "name": "PurchasingSystem",
+        "operation": "createPurchaseOrder"
+      },
+      "input": {
+        "requestNumber": "number",
+        "amount": "amount"
+      },
+      "output": {
+        "orderNumber": "purchaseOrderNumber"
+      },
+      "retry": {
+        "attempts": 5,
+        "backoff": "PT30S"
+      },
+      "next": "assignPaymentReference"
+    },
+    {
+      "name": "assignPaymentReference",
+      "type": "operation",
+      "operation": "payment-references/creditorReference",
+      "input": {
+        "reference": "number"
+      },
+      "output": {
+        "creditorReference": "paymentReference"
+      },
+      "retry": {
+        "attempts": 3,
+        "backoff": "PT10S"
+      },
+      "next": "done"
+    },
+    {
+      "name": "markReturned",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'returned'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'rejected'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "done",
+      "type": "end"
+    }
+  ]
+}
