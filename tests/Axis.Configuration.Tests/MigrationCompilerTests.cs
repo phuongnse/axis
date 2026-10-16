@@ -167,6 +167,38 @@ public sealed class MigrationCompilerTests
         Assert.NotNull(result.Model);
     }
 
+    [Theory]
+    [InlineData("fill", "'a'")]
+    [InlineData("convert", "'a'")]
+    public void A_fill_or_convert_after_a_drop_of_the_entity_is_not_checked_against_the_fields(string type, string value)
+    {
+        using var folder = Folder().With("migrations/a.json", Migration("DropAndReturn", FirstId, "Note", $$"""
+            [
+              { "type": "dropEntity" },
+              { "type": "{{type}}", "field": "missing", "value": "{{value}}" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("title")]
+    [InlineData("TITLE")]
+    public void A_rename_to_the_same_name_is_a_field_that_already_exists(string to)
+    {
+        using var folder = Folder().With("migrations/a.json", Migration("RenameTitle", FirstId, "Note", $$"""
+            [{ "type": "renameField", "from": "title", "to": "{{to}}" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MigrationFieldAlreadyExists, "/changes/0/to"), (diagnostic.Code, diagnostic.Path));
+    }
+
     [Fact]
     public void A_rename_without_a_destination_is_a_schema_violation()
     {

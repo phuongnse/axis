@@ -140,7 +140,10 @@ internal static class MigrationChecker
                 diagnostics.Add(new Diagnostic(code, message, migration.File, path, migration.Id));
 
             var missingAfter = false;
-            if (change.Type is "fill" or "convert" && after[k] is { } afterState && !afterState.ContainsKey(change.Field!))
+            if (change.Type is "fill" or "convert"
+                && !droppedBefore[k]
+                && after[k] is { } afterState
+                && !afterState.ContainsKey(change.Field!))
             {
                 missingAfter = true;
                 Report(
@@ -154,7 +157,9 @@ internal static class MigrationChecker
                 case "renameField":
                     if (names is not null)
                     {
-                        if (!names.Remove(change.From!))
+                        // Both names are checked before the set changes, so renaming a field to its own
+                        // name, or to the same name in another case, is reported.
+                        if (!names.Contains(change.From!))
                         {
                             Report(
                                 DiagnosticCodes.UnknownMigrationField,
@@ -162,13 +167,16 @@ internal static class MigrationChecker
                                 $"/changes/{index}/from");
                         }
 
-                        if (!names.Add(change.To!))
+                        if (names.Contains(change.To!))
                         {
                             Report(
                                 DiagnosticCodes.MigrationFieldAlreadyExists,
                                 $"The field '{change.To}' already exists in the entity '{migration.Entity}' at this change.",
                                 $"/changes/{index}/to");
                         }
+
+                        names.Remove(change.From!);
+                        names.Add(change.To!);
                     }
 
                     break;
