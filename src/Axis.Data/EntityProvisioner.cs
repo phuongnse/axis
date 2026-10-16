@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Data.DataSources;
 using Axis.Data.Naming;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
@@ -22,7 +23,8 @@ namespace Axis.Data;
 /// </para>
 /// <para>
 /// The migrations of the model that no <c>axis.applied_migrations</c> row covers are pending. Their
-/// <c>renameField</c>, <c>dropField</c> and <c>dropEntity</c> changes run first, and each pending
+/// <c>renameField</c>, <c>dropField</c>, <c>dropEntity</c> and <c>fill</c> changes run first. A fill
+/// that leaves a null rolls everything back with a diagnostic. Each pending
 /// migration gets a row when the transaction commits. When the migration context sets the active
 /// release, it is written in this transaction too, under the same lock as the history check. A
 /// refused name or site path rolls everything back, and no other activation can commit a migration
@@ -105,9 +107,24 @@ public static class EntityProvisioner
                 return new ProvisioningResult(plan.Diagnostics, []);
             }
 
-            foreach (var statement in plan.Statements)
+            foreach (var command in plan.Commands)
             {
-                await ExecuteAsync(connection, npgsqlTransaction, statement, cancellationToken);
+                var leftNull = await ExecuteAsync(connection, npgsqlTransaction, command, cancellationToken);
+                if (leftNull > 0 && command.Fill is { } fill)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    context.ChangeTracker.Clear();
+                    return new ProvisioningResult(
+                        [
+                            new Diagnostic(
+                                DiagnosticCodes.FillLeftNulls,
+                                $"The fill of '{fill.Field}' gives null for {leftNull} records. Change the value so it gives a value for every record.",
+                                fill.File,
+                                $"/changes/{fill.ChangeIndex}/value",
+                                fill.MigrationId),
+                        ],
+                        []);
+                }
             }
 
             foreach (var change in plan.RecordChanges)
@@ -263,5 +280,19 @@ public static class EntityProvisioner
     {
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    // A fill returns the number of rows it left null; any other command returns 0.
+    private static async Task<long> ExecuteAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, SchemaCommand schemaCommand, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(schemaCommand.Sql, connection, transaction);
+        DataSourceQueries.AddValues(command, schemaCommand.Parameters);
+        if (schemaCommand.Fill is null)
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            return 0;
+        }
+
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
     }
 }

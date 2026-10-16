@@ -509,9 +509,10 @@ flowchart LR
      compile returns the diagnostics only.
 5. **Activate.** The current tenant schema is compared with the entity
    definitions of the release. Pending [migrations](storage.md#migrations)
-   run first: a `renameField`, `dropField` or `dropEntity` is applied once per
-   tenant, and a pending `fill` or `convert` is `AXC0175` until it is built
-   *(planned for M6)*. Then additive changes are planned and applied.
+   run first: a `renameField`, `dropField`, `dropEntity` or `fill` is applied
+   once per tenant, and a pending `convert` is `AXC0175` until it is built
+   *(planned for M6)*. A `fill` makes a field that was `null` in some rows
+   `NOT NULL` when the release requires it. Then additive changes are planned and applied.
    Other incompatible changes stay rejected with a diagnostic. See
    [Schema planning](storage.md#schema-planning). The release becomes active
    for new work only after that has completed successfully.
@@ -747,7 +748,8 @@ sorted by file and then path.
 | `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
 | `AXC0173` | A `fill`'s or `convert`'s `field` is not a field of the entity in the release. A child-collection field does not count. Reported at `/changes/{i}/field`. |
 | `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. |
-| `AXC0175` | A pending migration holds a `fill` or `convert`, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until those changes are built. |
+| `AXC0175` | A pending migration holds a `convert`, a `fill` on a child entity or a `fill` of a field that a computed field reads, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until activation can recompute computed fields and apply `convert`. |
+| `AXC0176` | A pending `fill` leaves a `null` in some row, because its value is `null` for that row. Reported at `/changes/{i}/value` of the migration file, with the number of rows in the message. Nothing is applied. |
 
 ## Startup activation
 
@@ -982,7 +984,7 @@ computed fields come later:
 
 A `migration` resource changes one entity's storage before additive provisioning.
 The resource, its compile checks and the once-per-tenant apply of `renameField`,
-`dropField` and `dropEntity` at activation are built. Applying `fill` and
+`dropField`, `dropEntity` and `fill` at activation are built. Applying
 `convert` is *(planned for M6)*. See
 [D30](../decisions.md#d30-schema-migrations--agreed) and
 [migrations](storage.md#migrations) for activation and old-release work.

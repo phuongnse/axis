@@ -123,10 +123,15 @@ application. The planner itself has no database
 access. It returns diagnostics, SQL statements and the new records to write.
 
 - **Migrations.** The planner first applies the pending `renameField`,
-  `dropField` and `dropEntity` [migrations](#migrations) to its catalog
-  snapshot and its copy of the provisioning records, in ordinal path order
-  and file order. It then plans as today. A pending `fill` or `convert` is
-  `AXC0175` until it is built *(planned for M6)*. Removals and incompatible
+  `dropField`, `dropEntity` and `fill` [migrations](#migrations) to its
+  catalog snapshot and its copy of the provisioning records, in ordinal path
+  order and file order. It then plans as today. A pending `convert` is
+  `AXC0175` until it is built *(planned for M6)*. So is a `fill` on a child
+  entity and a `fill` of a field that a computed field reads, because
+  activation cannot recompute computed fields yet. A `fill` that names, in its
+  value, a field that is not a column of the stored table is `AXC0171` at
+  `/changes/{i}/value`. A `fill` whose value leaves a `null` is `AXC0176` at
+  `/changes/{i}/value` when activation applies it. Removals and incompatible
   changes not covered by a migration keep `AXC0015`, `AXC0016` and
   `AXC0017`. A change that does not match the stored schema is skipped: the
   table does not exist, the `from` column is missing or the `to` column
@@ -171,7 +176,9 @@ access. It returns diagnostics, SQL statements and the new records to write.
     field.
 - **Missing column.** It is added. `NOT NULL` is added only when the table
   has no rows; a required field added to a table with rows is `AXC0016` at
-  `/fields/{i}/required`. A unique field also gets its unique constraint.
+  `/fields/{i}/required`, unless a pending `fill` covers it. The `fill` adds
+  the column as nullable and fills it, and the planner then makes it
+  `NOT NULL`. A unique field also gets its unique constraint.
 - **Existing column.**
   - The type must equal the expected type. Widening text
     (`character varying(n)` to a larger `n` or to `text`) is applied.
@@ -180,7 +187,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
     `/fields/{i}/type`.
   - Dropping `required` drops `NOT NULL`, and dropping `unique` drops the
     unique constraint. Adding either to an existing column is `AXC0016` at
-    `/fields/{i}/required` or `/fields/{i}/unique`.
+    `/fields/{i}/required` or `/fields/{i}/unique`. A pending `fill` of the
+    field allows `required`: the column becomes `NOT NULL` after the `fill`.
   - A reference column without a foreign key gets one. A foreign key that
     points at another table than the target's is `AXC0016` at
     `/fields/{i}/target`.
@@ -244,10 +252,12 @@ child tables are in [Schema planning](#schema-planning).
 ## Migrations
 
 The migration resource, its compile checks and the once-per-tenant apply of
-`renameField`, `dropField` and `dropEntity` at activation are built. The
-start lock, the old-release work check, `fill`, `convert` and the recompute
+`renameField`, `dropField`, `dropEntity` and `fill` at activation are built.
+The start lock, the old-release work check, `convert` and the recompute
 of computed fields are *(planned for M6)*, and so are the rules, table rows
-and example below that use them. This section records
+and example below that use them. Until the recompute is built, a `fill` on a
+child entity and a `fill` of a field that a computed field reads are
+`AXC0175`. This section records
 [D30](../decisions.md#d30-schema-migrations--agreed).
 A [migration resource](configuration.md#resource-file-shape) changes one
 entity's storage and runs once per tenant, before additive provisioning.
@@ -264,7 +274,9 @@ Migrations run forward only.
   4. Count old-release work for the destructive changes below. Any such
      work stops the activation with a diagnostic. *(Planned for M6.)*
   5. Run pending migrations in ordinal path order, and changes in file order.
-     *(Built for `renameField`, `dropField` and `dropEntity`.)*
+     *(Built for `renameField`, `dropField`, `dropEntity` and `fill`. A
+     `fill` runs one `UPDATE` that counts the rows it left `null`. Any such row
+     is `AXC0176` and rolls the activation back.)*
   6. Run additive DDL in the order used today. *(Built.)*
   7. Recompute affected stored computed fields for the changed rows,
      using the release being activated. *(Planned for M6.)*
@@ -327,7 +339,7 @@ Migrations run forward only.
 | `renameField` | `ALTER TABLE ... RENAME COLUMN`, plus `RENAME CONSTRAINT` for its `uq_` and `fk_` names, which hash the column name | Yes *(planned for M6)* |
 | `dropField` | `ALTER TABLE ... DROP COLUMN`, without `CASCADE` | Yes *(planned for M6)* |
 | `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes *(planned for M6)* |
-| `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` | No |
+| `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` *(built, except for a child entity and a field a computed field reads)* | No |
 | `convert` | `ALTER COLUMN ... TYPE ... USING <value>` for a type change, or `UPDATE ... SET f = <value>` for an enum mapping | Yes |
 | Additive changes | As in [Schema planning](#schema-planning) today | No |
 
@@ -339,7 +351,7 @@ the [SQL subset](expressions.md#sql-subset).
 
 Each `fill` and `convert` increments `version` on every row it changes.
 Child rows have no version, so changing them increments their owner's
-`version`. This prevents an edit begun before the migration from overwriting
+`version` *(planned for M6; a `fill` on a child entity is not applied yet)*. This prevents an edit begun before the migration from overwriting
 a migrated value without a version conflict. There is no audit record for
 each changed row. The `axis.applied_migrations` row is the trace.
 

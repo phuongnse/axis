@@ -21,7 +21,7 @@ public enum MigrationChangeType
 
 /// <summary>
 /// A compiled migration: an ordered list of changes to the storage of one entity. Activation
-/// applies a pending <c>renameField</c>, <c>dropField</c> or <c>dropEntity</c> once. A change's value stays the expression text, because translating it to SQL needs the
+/// applies a pending <c>renameField</c>, <c>dropField</c>, <c>dropEntity</c> or <c>fill</c> once. A change's value stays the expression text, because translating it to SQL needs the
 /// stored schema, which is known only when a release is activated.
 /// </summary>
 public sealed record MigrationModel

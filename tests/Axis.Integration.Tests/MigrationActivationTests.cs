@@ -23,6 +23,8 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
 
     private const string NumberField = """{ "name": "number", "type": "text", "required": true, "maxLength": 20 }""";
     private const string NoteField = """{ "name": "note", "type": "text" }""";
+    private const string RequiredNoteField = """{ "name": "note", "type": "text", "required": true }""";
+    private const string RequiredStatusField = """{ "name": "status", "type": "enum", "required": true, "values": ["draft", "done"] }""";
     private const string RemarkField = """{ "name": "remark", "type": "text" }""";
     private const string StatusField = """{ "name": "status", "type": "enum", "values": ["draft", "done"] }""";
     private const string StateField = """{ "name": "state", "type": "enum", "values": ["draft", "done"] }""";
@@ -228,21 +230,145 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
     }
 
     [Fact]
-    public async Task A_pending_fill_gives_a_diagnostic_and_applies_nothing()
+    public async Task A_pending_fill_writes_the_value_into_the_null_rows_only_and_the_column_becomes_not_null()
     {
         using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertOrderAsync("PO-1", null);
+        await InsertOrderAsync("PO-2", "kept");
+        await InsertOrderAsync("PO-3", null);
+        folder
+            .With("entities/order.json", Order(NumberField, RequiredNoteField))
+            .With("migrations/0001-fill-note.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "note", "value": "'n/a'" }]"""));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(["PO-1: n/a", "PO-2: kept", "PO-3: n/a"], await ReadOrderNotesAsync());
+        var column = Assert.Single(Assert.Single(await ReadTablesAsync(_orderId)).Columns, column => column.Name == "f_note");
+        Assert.True(column.NotNull);
+        Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+        Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_pending_fill_of_a_value_over_another_field_writes_it_per_row()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertOrderAsync("PO-1", null);
+        await InsertOrderAsync("PO-2", null);
+        folder
+            .With("entities/order.json", Order(NumberField, RequiredNoteField))
+            .With("migrations/0001-fill-note.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "note", "value": "number" }]"""));
+
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+
+        Assert.Equal(["PO-1: PO-1", "PO-2: PO-2"], await ReadOrderNotesAsync());
+    }
+
+    [Fact]
+    public async Task A_new_required_enum_field_with_a_fill_is_added_to_a_table_with_rows_and_each_row_gets_the_value()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertOrderAsync("PO-1");
+        await InsertOrderAsync("PO-2");
+        folder
+            .With("entities/order.json", Order(NumberField, RequiredStatusField))
+            .With("migrations/0001-fill-status.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "status", "value": "'draft'" }]"""));
+        var compiled = await CompileAsync(folder);
+        Assert.Empty(compiled.Diagnostics);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(["draft", "draft"], await ReadScalarsAsync($"SELECT f_status FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} ORDER BY f_number"));
+        var column = Assert.Single(Assert.Single(await ReadTablesAsync(_orderId)).Columns, column => column.Name == "f_status");
+        Assert.True(column.NotNull);
+        Assert.Equal(["done", "draft"], (await ReadEnumRecordsAsync(_orderId)).Where(value => value.Field == "status").Select(value => value.Value).Order(StringComparer.Ordinal));
+        Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_required_field_added_to_a_table_with_rows_without_a_fill_gives_a_diagnostic_and_applies_nothing()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField));
         var first = await CompileAsync(folder);
         Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertOrderAsync("PO-1");
         var before = await ReadStateAsync(_orderId);
-        folder.With("migrations/0001-fill-note.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "note", "value": "'n/a'" }]"""));
+        folder.With("entities/order.json", Order(NumberField, RequiredStatusField));
 
         var result = await ActivateAsync(await CompileAsync(folder));
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-fill-note.json", "/changes/0/type"),
+            (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/1/required"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_fill_that_gives_null_for_some_row_gives_a_diagnostic_at_its_value_and_applies_nothing()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertOrderAsync("PO-1", null);
+        await InsertOrderAsync("PO-2", null);
+        var before = await ReadStateAsync(_orderId);
+        folder
+            .With("entities/order.json", Order(NumberField, RequiredNoteField))
+            .With("migrations/0001-fill-note.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "note", "value": "if(number == 'PO-1', 'x', null)" }]"""));
+
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.FillLeftNulls, "migrations/0001-fill-note.json", "/changes/0/value", _migrationId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Equal(before, await ReadStateAsync(_orderId));
+        Assert.Empty(await ReadAppliedMigrationsAsync());
+        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_fill_increments_the_version_of_each_row_it_changes_and_no_other()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertOrderAsync("PO-1", null);
+        await InsertOrderAsync("PO-2", "kept");
+        folder
+            .With("entities/order.json", Order(NumberField, NoteField))
+            .With("migrations/0001-fill-note.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "note", "value": "'n/a'" }]"""));
+
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+
+        Assert.Equal(["PO-1: 2", "PO-2: 1"], await ReadScalarsAsync($"SELECT f_number || ': ' || version FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} ORDER BY f_number"));
+    }
+
+    [Fact]
+    public async Task A_fill_of_a_child_entity_gives_a_not_applied_diagnostic_and_applies_nothing()
+    {
+        using var folder = Application()
+            .With("entities/invoice.json", Invoice())
+            .With("entities/line.json", Line());
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        var before = await ReadStateAsync(_invoiceId, _lineId);
+        folder.With("migrations/0001-fill-description.json", Migration(_migrationId, "Line", """[{ "type": "fill", "field": "description", "value": "'n/a'" }]"""));
+
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-fill-description.json", "/changes/0/type"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(before, await ReadStateAsync(_invoiceId, _lineId));
         Assert.Empty(await ReadAppliedMigrationsAsync());
         Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
     }
@@ -411,6 +537,9 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         return id;
     }
 
+    // For an order that has no note field.
+    private Task InsertOrderAsync(string number) => InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", number));
+
     private async Task InsertAsync(Guid entityId, params (string Column, object? Value)[] values)
     {
         await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
@@ -424,6 +553,10 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
 
         await command.ExecuteNonQueryAsync(CancellationToken);
     }
+
+    // Each order as "number: note", in number order.
+    private Task<List<string>> ReadOrderNotesAsync() =>
+        ReadScalarsAsync($"SELECT f_number || ': ' || f_note FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} ORDER BY f_number");
 
     private async Task ExecuteAsync(string sql)
     {

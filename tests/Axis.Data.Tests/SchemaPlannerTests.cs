@@ -3,6 +3,8 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Data.Naming;
 using Axis.Data.Schema;
+using Axis.Expressions.Sql;
+using Axis.Expressions.Typing;
 using static Axis.Data.Tests.Models;
 
 namespace Axis.Data.Tests;
@@ -615,23 +617,161 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
-    public void Pending_fill_and_convert_are_reported_as_not_applied_at_the_change_and_plan_nothing()
+    public void Pending_convert_is_reported_as_not_applied_at_the_change_and_plans_nothing()
     {
         var stored = BaseModel();
         var migration = Migration(
             "Order",
             new MigrationChangeModel(MigrationChangeType.DropField, "note", null, null, null),
-            new MigrationChangeModel(MigrationChangeType.Fill, "amount", null, null, "0"),
             new MigrationChangeModel(MigrationChangeType.Convert, "amount", null, null, "amount"));
 
         var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
 
+        var diagnostic = Assert.Single(plan.Diagnostics);
         Assert.Equal(
-            [(DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/1/type"), (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/2/type")],
-            plan.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)));
-        Assert.All(plan.Diagnostics, diagnostic => Assert.Equal(migration.Id, diagnostic.ResourceId));
+            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/1/type", migration.Id),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         AssertNothingPlanned(plan);
         Assert.Empty(plan.RecordChanges);
+    }
+
+    [Fact]
+    public void Pending_fill_of_an_existing_nullable_column_plans_the_fill_then_not_null_when_the_field_becomes_required()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrderField(stored, 4, field => field with { Required = true });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "amount", null, null, "0"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"WITH filled AS (UPDATE {table} SET {Quote("f_amount")} = @f0, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_amount")} IS NULL RETURNING {Quote("f_amount")}) SELECT count(*) FROM filled WHERE {Quote("f_amount")} IS NULL",
+                $"ALTER TABLE {table} ALTER COLUMN {Quote("f_amount")} SET NOT NULL",
+            ],
+            plan.Statements);
+        var fill = plan.Commands[0];
+        Assert.Equal([new SqlValue("f0", ExpressionTypeKind.Integer, 0L)], fill.Parameters);
+        Assert.Equal(new FillTarget(migration.Id, "migrations/0001-order.json", 0, "amount"), fill.Fill);
+        Assert.Null(plan.Commands[1].Fill);
+    }
+
+    [Fact]
+    public void Pending_fill_of_a_missing_required_enum_column_adds_it_without_not_null_then_fills_it_then_makes_it_not_null()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrder(stored, fields => [.. fields, Field("level", FieldType.Enum, required: true, values: ["low", "high"])]);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "level", null, null, "'low'"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} ADD COLUMN {Quote("f_level")} text",
+                $"WITH filled AS (UPDATE {table} SET {Quote("f_level")} = @f0, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_level")} IS NULL RETURNING {Quote("f_level")}) SELECT count(*) FROM filled WHERE {Quote("f_level")} IS NULL",
+                $"ALTER TABLE {table} ALTER COLUMN {Quote("f_level")} SET NOT NULL",
+            ],
+            plan.Statements);
+        Assert.Equal(
+            [new ProvisionedEnumValue(_orderId, "level", "low"), new ProvisionedEnumValue(_orderId, "level", "high")],
+            plan.NewEnumValues);
+    }
+
+    [Fact]
+    public void Pending_fill_of_a_missing_unique_column_adds_its_constraint_after_the_fill()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrder(stored, fields => [.. fields, Field("tag", FieldType.Text, unique: true, maxLength: 10)]);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "tag", null, null, "code"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} ADD COLUMN {Quote("f_tag")} character varying(10)",
+                $"WITH filled AS (UPDATE {table} SET {Quote("f_tag")} = {Quote("f_code")}, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_tag")} IS NULL RETURNING {Quote("f_tag")}) SELECT count(*) FROM filled WHERE {Quote("f_tag")} IS NULL",
+                $"ALTER TABLE {table} ADD CONSTRAINT {Quote(EntityNaming.Unique(OrderTable, "f_tag"))} UNIQUE ({Quote("f_tag")})",
+            ],
+            plan.Statements);
+    }
+
+    [Fact]
+    public void Pending_fill_value_that_names_a_field_without_a_column_gives_an_unknown_field_diagnostic_at_the_value()
+    {
+        var stored = BaseModel();
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "note", null, null, "missing"));
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownMigrationField, "migrations/0001-order.json", "/changes/0/value"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Pending_fill_of_a_field_the_release_no_longer_has_and_the_table_lacks_is_skipped()
+    {
+        var stored = BaseModel();
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "gone", null, null, "0"));
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Existing_required_field_without_a_fill_still_cannot_become_required()
+    {
+        var stored = BaseModel();
+        var release = ChangeOrderField(stored, 4, field => field with { Required = true });
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "/fields/4/required"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Pending_fill_on_a_child_entity_is_reported_as_not_applied_and_plans_nothing()
+    {
+        var stored = ChildModel();
+        var migration = Migration("Line", new MigrationChangeModel(MigrationChangeType.Fill, "description", null, null, "'x'"));
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/0/type", migration.Id),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Pending_fill_of_a_field_a_computed_field_reads_is_reported_as_not_applied_and_plans_nothing()
+    {
+        var amount = Field("amount", FieldType.Integer);
+        var stored = ChangeOrder(
+            BaseModel(),
+            fields => [.. fields.Where(field => field.Name != "amount"), amount, Computed(Field("doubled", FieldType.Integer), "amount * 2", [amount])]);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "amount", null, null, "0"));
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/0/type"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("doubled", diagnostic.Message, StringComparison.Ordinal);
+        AssertNothingPlanned(plan);
     }
 
     private static string Quote(string identifier) => EntityNaming.Quote(identifier);

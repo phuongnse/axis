@@ -6,9 +6,9 @@ namespace Axis.Data.Schema;
 
 /// <summary>
 /// Plans the entity table changes for a compiled application by comparing it with the tenant
-/// catalog and the provisioning records. The pending <c>renameField</c>, <c>dropField</c> and
-/// <c>dropEntity</c> migrations are applied to the catalog and the records first, and their
-/// statements come first in the plan. Other changes are additive only; anything that could lose or
+/// catalog and the provisioning records. The pending <c>renameField</c>, <c>dropField</c>,
+/// <c>dropEntity</c> and <c>fill</c> migrations are applied to the catalog and the records first, and
+/// their commands come first in the plan. A field that a <c>fill</c> covers may become required. Other changes are additive only; anything that could lose or
 /// reject existing data is reported as a diagnostic, and then nothing is planned at all.
 /// </summary>
 public static class SchemaPlanner
@@ -120,7 +120,11 @@ public static class SchemaPlanner
         public SchemaPlan ToPlan() =>
             _diagnostics.Count > 0
                 ? new SchemaPlan(DiagnosticOrder.Sort(_diagnostics), [], [], [])
-                : new SchemaPlan([], [.. migrations.Statements, .. _creates, .. _alters, .. _foreignKeys], _newEntities, _newEnumValues)
+                : new SchemaPlan(
+                    [],
+                    [.. migrations.Commands, .. _creates.Concat(_alters).Concat(_foreignKeys).Select(sql => new SchemaCommand(sql))],
+                    _newEntities,
+                    _newEnumValues)
                 {
                     RecordChanges = [.. migrations.RecordChanges],
                 };
@@ -199,7 +203,14 @@ public static class SchemaPlanner
                 var path = $"/fields/{index}";
                 if (columnsByName.TryGetValue(EntityNaming.Column(field.Name), out var column))
                 {
-                    PlanExistingColumn(entity, table, field, column, path, Report);
+                    if (column.AddedByFill)
+                    {
+                        PlanNewColumn(entity, table, field, path, Report, addColumn: false);
+                    }
+                    else
+                    {
+                        PlanExistingColumn(entity, table, field, column, path, Report);
+                    }
                 }
                 else
                 {
@@ -260,21 +271,34 @@ public static class SchemaPlanner
             return true;
         }
 
-        private void PlanNewColumn(EntityModel entity, CatalogTable table, FieldModel field, string path, Action<string, string> report)
+        // A column that a pending fill added already exists, without NOT NULL, and holds no nulls: only a required field changes it.
+        private void PlanNewColumn(EntityModel entity, CatalogTable table, FieldModel field, string path, Action<string, string> report, bool addColumn = true)
         {
             var column = EntityNaming.Column(field.Name);
-            var notNull = "";
-            if (field.Required)
+            var alterTable = $"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)}";
+            if (!addColumn)
             {
-                if (table.HasRows)
+                if (field.Required)
                 {
-                    report($"The required field '{field.Name}' cannot be added to a table that already has records.", $"{path}/required");
+                    _alters.Add($"{alterTable} ALTER COLUMN {EntityNaming.Quote(column)} SET NOT NULL");
+                }
+            }
+            else
+            {
+                var notNull = "";
+                if (field.Required)
+                {
+                    if (table.HasRows)
+                    {
+                        report($"The required field '{field.Name}' cannot be added to a table that already has records.", $"{path}/required");
+                    }
+
+                    notNull = " NOT NULL";
                 }
 
-                notNull = " NOT NULL";
+                _alters.Add($"{alterTable} ADD COLUMN {EntityNaming.Quote(column)} {ColumnTypes.Render(field)}{notNull}");
             }
 
-            _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD COLUMN {EntityNaming.Quote(column)} {ColumnTypes.Render(field)}{notNull}");
             if (field.Unique)
             {
                 _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD CONSTRAINT {EntityNaming.Quote(EntityNaming.Unique(table.Name, column))} UNIQUE ({EntityNaming.Quote(column)})");
@@ -335,7 +359,14 @@ public static class SchemaPlanner
             }
             else if (!column.NotNull && field.Required)
             {
-                report($"The existing field '{field.Name}' cannot become required.", $"{path}/required");
+                if (column.Filled)
+                {
+                    _alters.Add($"{alterTable} ALTER COLUMN {quotedColumn} SET NOT NULL");
+                }
+                else
+                {
+                    report($"The existing field '{field.Name}' cannot become required.", $"{path}/required");
+                }
             }
 
             if (column.Unique && !field.Unique)
