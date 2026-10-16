@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -21,6 +22,9 @@ namespace Axis.Server.Processes;
 /// id, or to a role they hold. A request is checked in order:
 /// signed-in user (401), application (404), then for a list the paging (400), and for a read or a
 /// completion the task id and the task's application (404) and who may act (403).
+/// A completion takes the application's start lock shared first. When the active release is no
+/// longer the one resolved, it runs again from resolution on the new release, and answers 503
+/// after three attempts.
 /// A completion then locks the task and checks that it is open (409), then the content type (415),
 /// the body (400) and the record write of its values (400, 409). One transaction writes the values,
 /// closes the task, resumes the instance on the outcome's next step and appends the audit record
@@ -166,37 +170,51 @@ internal static class TaskEndpoints
             return SignInRequired();
         }
 
-        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        // A release change under the start lock sends the completion back to resolution, so every check runs on the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            return ApplicationNotFound();
-        }
-
-        if (!TryParseId(id, out var taskId))
-        {
-            return TaskNotFound();
-        }
-
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
-        var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
-        var connection = await database.GetConnectionAsync(cancellationToken);
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
-        {
-            // The lock makes a concurrent completion of the task wait until this one commits or
-            // rolls back, and then find the task as it was left.
-            var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
-            var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, roles, tenantId, loggerFactory, cancellationToken);
-            if (failure is not null)
+            if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return failure;
+                return ApplicationNotFound();
             }
 
-            await transaction.CommitAsync(cancellationToken);
+            if (!TryParseId(id, out var taskId))
+            {
+                return TaskNotFound();
+            }
+
+            var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+            var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
+            var connection = await database.GetConnectionAsync(cancellationToken);
+            await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+            {
+                // The start lock comes first, before any table is touched, so a migrating activation
+                // cannot deadlock with this completion. The release is read again under it.
+                if (await StartLock.TakeSharedAsync(transaction, active.Model.Manifest.Id, cancellationToken) != active.ReleaseId)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    continue;
+                }
+
+                // The lock makes a concurrent completion of the task wait until this one commits or
+                // rolls back, and then find the task as it was left.
+                var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
+                var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, roles, tenantId, loggerFactory, cancellationToken);
+                if (failure is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return failure;
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
+                ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
+            return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, completed, cancellationToken));
         }
 
-        var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
-            ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, completed, cancellationToken));
+        return ReleaseRetry.Changed();
     }
 
     /// <summary>

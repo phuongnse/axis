@@ -53,7 +53,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             connection,
             TenantId,
             fixture.Model,
-            Guid.NewGuid(),
+            await ActiveReleaseIdAsync(connection),
             item,
             new RecordActor("cmd-actor", "Command Actor", ["employee"]),
             Body,
@@ -65,5 +65,38 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
         Assert.Equal("record.created", audit.Action);
         Assert.Equal("cmd-actor", audit.Actor);
         Assert.Equal("Command Actor", audit.ActorName);
+    }
+
+    [Fact]
+    public async Task Create_given_a_release_that_is_not_the_active_one_writes_nothing_and_reports_the_change()
+    {
+        await fixture.ResetAsync();
+        Assert.True(fixture.Model.TryGetEntity("Item", out var item));
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantId));
+        await connection.OpenAsync(CancellationToken);
+        var auditBefore = await fixture.AuditRecordCountAsync(TenantId);
+
+        var result = await RecordCommand.CreateAsync(
+            connection,
+            TenantId,
+            fixture.Model,
+            Guid.NewGuid(),
+            item,
+            new RecordActor("cmd-actor", "Command Actor", ["employee"]),
+            Body,
+            NullLoggerFactory.Instance,
+            CancellationToken);
+
+        Assert.Equal(RecordCommandOutcome.ReleaseChanged, result.Outcome);
+        Assert.Null(result.Record);
+        Assert.Equal(0, (await fixture.TableShapeAsync(TenantId, "Item")).RowCount);
+        Assert.Equal(auditBefore, await fixture.AuditRecordCountAsync(TenantId));
+    }
+
+    private async Task<Guid> ActiveReleaseIdAsync(NpgsqlConnection connection)
+    {
+        await using var command = new NpgsqlCommand("SELECT release_id FROM axis.active_releases WHERE application_id = @id", connection);
+        command.Parameters.AddWithValue("id", fixture.Model.Manifest.Id);
+        return Assert.IsType<Guid>(await command.ExecuteScalarAsync(CancellationToken));
     }
 }

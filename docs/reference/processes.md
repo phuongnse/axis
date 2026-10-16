@@ -354,6 +354,11 @@ are problem details, as in the [record API](record-api.md#errors).
   process and subject record.
 - **`422`.** The `Idempotency-Key` was used before with a different subject
   record.
+- **`503`.** The application's active release changed on each of three
+  attempts, found under the [start lock](#releases-and-running-work). The
+  server already ran the start again on the new release each time. Nothing was
+  written, and the client may send the request again. The title is fixed:
+  "The application's active release changed while the request ran. Try again."
 
 The `201` has no `Location` header, because there is no endpoint to read an
 instance yet.
@@ -694,6 +699,19 @@ of these checks.
   answer as in the record API's [errors](record-api.md#errors), such as a
   `409` for a unique value, or a `404` when the subject record no longer
   exists.
+- **`503` for a changed release.** The application's active release changed on
+  each of three attempts, found under the [start lock](#releases-and-running-work).
+  The server already ran the completion again on the new release each time.
+  Nothing was written, and the client may send the request again. It is not in
+  the check order, because it can follow any check that passed.
+
+  ```json
+  {
+    "type": "https://tools.ietf.org/html/rfc9110#section-15.6.4",
+    "title": "The application's active release changed while the request ran. Try again.",
+    "status": 503
+  }
+  ```
 
 ### Completing a task
 
@@ -757,14 +775,22 @@ for texts. **Both** means different parts use different releases.
   old-release work starts a new instance on the active release. For writes,
   the record is read again with the active model before its triggers run.
   See [Starts from triggers](#starts-from-triggers).
-- **Start lock** *(planned for M6)*. Each start takes
-  `pg_advisory_xact_lock_shared` keyed on the application `id`, before it
-  reads the active release, in the transaction that inserts the instance.
-  This covers the process start endpoint, inbound endpoint, trigger starts
-  and schedule fan-out. An activation with a pending migration takes the
-  same lock exclusively, after the schema lock and before counting
-  old-release work, and holds it to commit. Starts then read the new release.
-  See [Migrations](storage.md#migrations).
+- **Start lock** *(built; the old-release count is planned for M6)*. Each
+  start takes `pg_advisory_xact_lock_shared` keyed on the application `id`,
+  before it reads the active release, in the transaction that inserts the
+  instance. It is the first statement of that transaction. This covers the
+  process start endpoint, the inbound endpoint, record API creates and
+  updates, task completion, event delivery, `sync` event triggers, update
+  triggers from worker steps and schedule fan-out. An activation with a
+  pending migration takes the same lock exclusively, after the schema lock,
+  and holds it to commit. Starts then read the new release. An activation
+  with no pending migration never takes it. A server request that finds a
+  different active release under the lock runs again on the new release. The
+  process start endpoint, the [inbound endpoint](record-api.md#responses),
+  task completion and record creates and updates answer `503` after three
+  release changes. Event delivery reads the active release again in each
+  trigger's transaction, and skips a trigger that the new release no longer
+  has. See [Migrations](storage.md#migrations).
 - **Authorization.** Roles and policies always come from the active release,
   including for older tasks. The assignee check stays unchanged. The
   subject's display field comes from the task's release, but the active

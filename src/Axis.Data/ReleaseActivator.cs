@@ -20,6 +20,10 @@ namespace Axis.Data;
 /// <see cref="DataDbContext"/> must share one open tenant connection, or the store throws before
 /// anything commits.
 /// </para>
+/// <para>
+/// When a migration is pending, the same transaction holds the application's <see cref="StartLock"/>
+/// exclusively until it commits, so a process start either commits first or waits and pins the new release.
+/// </para>
 /// </summary>
 public static class ReleaseActivator
 {

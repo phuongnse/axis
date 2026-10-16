@@ -1110,8 +1110,9 @@ work without the code its release pins.
 ## D30. Schema migrations — Agreed
 
 Activation applies the `renameField`, `dropField`, `dropEntity`, `fill` and
-`convert` migrations once per tenant. The start lock, the old-release work check
-and the recompute of computed fields are not built yet *(planned for M6)*. Until
+`convert` migrations once per tenant. The start lock is built too. The
+old-release work check and the recompute of computed fields are not built yet
+*(planned for M6)*. Until
 the recompute is built, a `fill` or `convert` on a child entity and a `fill` or
 `convert` of a field that a computed field reads are refused. Migrations
 change entity storage in ways that are not additive, before provisioning.

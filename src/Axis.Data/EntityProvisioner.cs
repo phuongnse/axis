@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
 using Axis.Data.DataSources;
 using Axis.Data.Naming;
 using Axis.Data.Schema;
@@ -29,6 +30,12 @@ namespace Axis.Data;
 /// release, it is written in this transaction too, under the same lock as the history check. A
 /// refused name or site path rolls everything back, and no other activation can commit a migration
 /// between the check and the write.
+/// </para>
+/// <para>
+/// With a pending migration the transaction also takes the application's <see cref="StartLock"/>
+/// exclusively, right after the history check, and holds it until commit. A process start that took
+/// it shared commits first, and one that did not yet waits and then pins the new release. An
+/// activation with no pending migration never takes it.
 /// </para>
 /// </summary>
 public static class EntityProvisioner
@@ -88,6 +95,13 @@ public static class EntityProvisioner
             await ExecuteAsync(connection, npgsqlTransaction, $"CREATE SCHEMA IF NOT EXISTS {EntityNaming.Quote(EntityNaming.Schema)}", cancellationToken);
 
             var history = CheckHistory(model, await ReadAppliedMigrationsAsync(model, context, cancellationToken));
+            if (history.Pending.Count > 0)
+            {
+                // Taken before any diagnostic is acted on, since only the read above tells whether a migration is pending.
+                // The schema lock keeps the rows from changing in between. Open starts finish first, and new ones wait.
+                await StartLock.TakeExclusiveAsync(npgsqlTransaction, model.Manifest.Id, cancellationToken);
+            }
+
             if (history.Diagnostics.Count > 0)
             {
                 await transaction.RollbackAsync(cancellationToken);

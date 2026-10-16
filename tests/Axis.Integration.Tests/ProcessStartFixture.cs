@@ -155,6 +155,41 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         return releaseId;
     }
 
+    /// <summary>
+    /// Compiles a copy of ProcessApp with a new <c>note</c> field and a migration that fills it, so
+    /// the release has a pending migration, and activates it through the store that
+    /// <paramref name="wrap"/> returns. Returns the new release's id once the activation commits.
+    /// </summary>
+    public async Task<Guid> ActivateMigratingReleaseAsync(Func<IActiveReleaseStore, IActiveReleaseStore> wrap)
+    {
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(_appFolder, file);
+            var content = await File.ReadAllTextAsync(file);
+            folder.With(
+                relative,
+                relative == Path.Combine("entities", "request.json")
+                    ? content.Replace(
+                        """{ "name": "status", "type": "text" }""",
+                        """{ "name": "status", "type": "text" }, { "name": "note", "type": "text" }""",
+                        StringComparison.Ordinal)
+                    : content);
+        }
+
+        folder.With(
+            "migrations/0001-fill-note.json",
+            $$"""
+            { "id": "{{Guid.NewGuid()}}", "kind": "migration", "name": "FillNote", "formatVersion": 1, "entity": "Request", "changes": [{ "type": "fill", "field": "note", "value": "'n/a'" }] }
+            """);
+        var (releaseId, _) = await ActivateAsync(folder.Path, wrap);
+        return releaseId;
+    }
+
+    /// <summary>The number of lock requests that wait on an advisory lock.</summary>
+    public Task<long> CountWaitingAdvisoryLocksAsync() =>
+        CountAsync("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted");
+
     /// <summary>The id of the release active for ProcessApp now.</summary>
     public async Task<Guid> ActiveReleaseIdAsync()
     {
@@ -163,7 +198,7 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         return Assert.IsType<ActiveRelease>(active).ReleaseId;
     }
 
-    private async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder)
+    private async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder, Func<IActiveReleaseStore, IActiveReleaseStore>? wrap = null)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
@@ -171,7 +206,8 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("a"));
+        IActiveReleaseStore store = new ActiveReleaseStore(configuration);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, wrap?.Invoke(store) ?? store, data, ActivationBindings.None("a"));
         Assert.Empty(activated.Diagnostics);
         return (compiled.Release!.Id, compiled.Model!);
     }
