@@ -167,4 +167,6 @@ public static class DiagnosticCodes
     public const string UnknownMigrationField = "AXC0171";
     public const string MigrationFieldAlreadyExists = "AXC0172";
     public const string MigrationFieldNotInEntity = "AXC0173";
+    public const string ChangedMigrationHistory = "AXC0174";
+    public const string MigrationChangeNotApplied = "AXC0175";
 }

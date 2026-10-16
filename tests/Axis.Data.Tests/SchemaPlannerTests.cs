@@ -492,6 +492,164 @@ public sealed class SchemaPlannerTests
         AssertNothingPlanned(plan);
     }
 
+    [Fact]
+    public void Pending_rename_renames_the_column_and_its_constraints_and_the_recorded_enum_values_before_the_additive_changes()
+    {
+        var stored = BaseModel();
+        var renamed = ChangeOrder(stored, fields => [.. fields.Select(field => field.Name switch
+        {
+            "code" => field with { Name = "number" },
+            "customer" => field with { Name = "buyer" },
+            "status" => field with { Name = "state" },
+            _ => field,
+        }), Field("priority", FieldType.Integer)]);
+        var migration = Migration(
+            "Order",
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "code", "number", null),
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "customer", "buyer", null),
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "status", "state", null));
+
+        var plan = SchemaPlanner.Plan(renamed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var alter = $"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)}";
+        Assert.Equal(
+            [
+                $"{alter} RENAME COLUMN {Quote("f_code")} TO {Quote("f_number")}",
+                $"{alter} RENAME CONSTRAINT {Quote(EntityNaming.Unique(OrderTable, "f_code"))} TO {Quote(EntityNaming.Unique(OrderTable, "f_number"))}",
+                $"{alter} RENAME COLUMN {Quote("f_customer")} TO {Quote("f_buyer")}",
+                $"{alter} RENAME CONSTRAINT {Quote(EntityNaming.ForeignKey(OrderTable, "f_customer"))} TO {Quote(EntityNaming.ForeignKey(OrderTable, "f_buyer"))}",
+                $"{alter} RENAME COLUMN {Quote("f_status")} TO {Quote("f_state")}",
+                $"{alter} ADD COLUMN {Quote("f_priority")} bigint",
+            ],
+            plan.Statements);
+        Assert.Equal(
+            [
+                new MigrationRecordChange(MigrationChangeType.RenameField, _orderId, "code", "number"),
+                new MigrationRecordChange(MigrationChangeType.RenameField, _orderId, "customer", "buyer"),
+                new MigrationRecordChange(MigrationChangeType.RenameField, _orderId, "status", "state"),
+            ],
+            plan.RecordChanges);
+        Assert.Empty(plan.NewEnumValues);
+    }
+
+    [Fact]
+    public void Pending_drop_field_drops_the_column_without_cascade_and_the_recorded_enum_values()
+    {
+        var stored = BaseModel();
+        var dropped = ChangeOrder(stored, fields => [.. fields.Where(field => field.Name is not ("note" or "status"))]);
+        var migration = Migration(
+            "Order",
+            new MigrationChangeModel(MigrationChangeType.DropField, "note", null, null, null),
+            new MigrationChangeModel(MigrationChangeType.DropField, "status", null, null, null));
+
+        var plan = SchemaPlanner.Plan(dropped, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)} DROP COLUMN {Quote("f_note")}",
+                $"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)} DROP COLUMN {Quote("f_status")}",
+            ],
+            plan.Statements);
+        Assert.Equal(
+            [
+                new MigrationRecordChange(MigrationChangeType.DropField, _orderId, "note", null),
+                new MigrationRecordChange(MigrationChangeType.DropField, _orderId, "status", null),
+            ],
+            plan.RecordChanges);
+    }
+
+    [Fact]
+    public void Pending_drop_entity_drops_the_child_table_first_without_cascade_and_records_both_entities()
+    {
+        var stored = ChildModel();
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.DropEntity, null, null, null, null));
+
+        var plan = SchemaPlanner.Plan(Application(), Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([$"DROP TABLE {EntityNaming.QualifiedTable(LineTable)}", $"DROP TABLE {EntityNaming.QualifiedTable(OrderTable)}"], plan.Statements);
+        Assert.Equal(
+            [
+                new MigrationRecordChange(MigrationChangeType.DropEntity, _lineId, null, null),
+                new MigrationRecordChange(MigrationChangeType.DropEntity, _orderId, null, null),
+            ],
+            plan.RecordChanges);
+    }
+
+    [Fact]
+    public void Pending_changes_that_do_not_fit_the_stored_schema_are_skipped_and_what_is_left_is_still_reported()
+    {
+        var stored = BaseModel();
+        var removed = ChangeOrder(stored, fields => [.. fields.Where(field => field.Name != "note")]);
+        var migration = Migration(
+            "Order",
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "missing", "other", null),
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "note", "amount", null),
+            new MigrationChangeModel(MigrationChangeType.DropField, "missing", null, null, null));
+
+        var plan = SchemaPlanner.Plan(removed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal((DiagnosticCodes.RemovedField, "entities/order.json"), (diagnostic.Code, diagnostic.File));
+        AssertNothingPlanned(plan);
+        Assert.Empty(plan.RecordChanges);
+    }
+
+    [Fact]
+    public void Pending_change_of_an_entity_without_a_stored_table_is_skipped()
+    {
+        var model = BaseModel();
+        var migration = Migration(
+            "Order",
+            new MigrationChangeModel(MigrationChangeType.RenameField, null, "note", "remark", null),
+            new MigrationChangeModel(MigrationChangeType.DropEntity, null, null, null, null));
+
+        var plan = SchemaPlanner.Plan(model, CatalogSnapshot.Empty, ProvisioningRecords.Empty, [migration], StoredIds(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Empty(plan.RecordChanges);
+        Assert.Equal(model.Entities.Count, plan.Statements.Count(statement => statement.StartsWith("CREATE TABLE", StringComparison.Ordinal)));
+        Assert.DoesNotContain(plan.Statements, statement => statement.Contains("RENAME", StringComparison.Ordinal) || statement.StartsWith("DROP", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Pending_fill_and_convert_are_reported_as_not_applied_at_the_change_and_plan_nothing()
+    {
+        var stored = BaseModel();
+        var migration = Migration(
+            "Order",
+            new MigrationChangeModel(MigrationChangeType.DropField, "note", null, null, null),
+            new MigrationChangeModel(MigrationChangeType.Fill, "amount", null, null, "0"),
+            new MigrationChangeModel(MigrationChangeType.Convert, "amount", null, null, "amount"));
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Equal(
+            [(DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/1/type"), (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/2/type")],
+            plan.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)));
+        Assert.All(plan.Diagnostics, diagnostic => Assert.Equal(migration.Id, diagnostic.ResourceId));
+        AssertNothingPlanned(plan);
+        Assert.Empty(plan.RecordChanges);
+    }
+
+    private static string Quote(string identifier) => EntityNaming.Quote(identifier);
+
+    private static MigrationModel Migration(string entity, params MigrationChangeModel[] changes) =>
+        new()
+        {
+            Id = Guid.Parse("55555555-5555-4555-8555-555555555555"),
+            Name = "Change",
+            File = "migrations/0001-order.json",
+            Entity = entity,
+            Changes = changes,
+            ContentHash = new string('a', 64),
+        };
+
+    private static Dictionary<string, Guid> StoredIds(ApplicationModel model) =>
+        model.Entities.ToDictionary(entity => entity.Name, entity => entity.Id, StringComparer.OrdinalIgnoreCase);
+
     private static EntityModel Line() =>
         Entity(
             _lineId,

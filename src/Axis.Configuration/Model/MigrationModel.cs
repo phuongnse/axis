@@ -20,8 +20,8 @@ public enum MigrationChangeType
 }
 
 /// <summary>
-/// A compiled migration: an ordered list of changes to the storage of one entity. Nothing applies
-/// it yet. A change's value stays the expression text, because translating it to SQL needs the
+/// A compiled migration: an ordered list of changes to the storage of one entity. Activation
+/// applies a pending <c>renameField</c>, <c>dropField</c> or <c>dropEntity</c> once. A change's value stays the expression text, because translating it to SQL needs the
 /// stored schema, which is known only when a release is activated.
 /// </summary>
 public sealed record MigrationModel
@@ -41,6 +41,12 @@ public sealed record MigrationModel
 
     /// <summary>The changes, in file order.</summary>
     public required IReadOnlyList<MigrationChangeModel> Changes { get; init; }
+
+    /// <summary>
+    /// The SHA-256 of the file's canonical JSON as lower-case hex, without its path, so moving the
+    /// file does not change it. Activation records it, and a later activation compares it.
+    /// </summary>
+    public required string ContentHash { get; init; }
 }
 
 /// <summary>
