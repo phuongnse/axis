@@ -18,6 +18,9 @@
 # fails if it never answers. The server and the worker run in Development, because only
 # Development lets a connector call the stub over http. Their purchasing system bindings point at
 # the stub, so an approved purchase request creates its purchase order there.
+# PostgreSQL loads samples/postgres/init-roles.sql on its first start, which creates the database
+# roles axis_schema and axis_runtime. The server runs startup activation as axis_schema and serves
+# requests as axis_runtime. The worker runs only as axis_runtime and gets no schema connection string.
 # A Compose smoke test then builds the image and runs the stack on free ports. It is skipped
 # when $NEXKIT_BASE_SHA shows that nothing it covers changed.
 set -euo pipefail
@@ -59,7 +62,8 @@ cleanup() {
 trap cleanup EXIT
 
 docker run -d --name "$container" -e POSTGRES_USER=axis -e POSTGRES_DB=axis \
-  -e POSTGRES_PASSWORD="$password" -p 127.0.0.1::5432 "$image" >/dev/null
+  -e POSTGRES_PASSWORD="$password" -p 127.0.0.1::5432 \
+  -v "$PWD/samples/postgres/init-roles.sql:/docker-entrypoint-initdb.d/init-roles.sql:ro" "$image" >/dev/null
 port="$(docker port "$container" 5432/tcp | head -n1 | sed 's/.*://')"
 
 # Keycloak starts now and imports the realm while PostgreSQL and the build get ready.
@@ -69,7 +73,8 @@ docker run -d --name "$keycloak_container" \
   "$keycloak_image" start-dev --import-realm >/dev/null
 keycloak_port="$(docker port "$keycloak_container" 8080/tcp | head -n1 | sed 's/.*://')"
 
-# Check over TCP: the image's initialization server listens only on the Unix socket.
+# Check over TCP: the image's initialization server listens only on the Unix socket, so the check
+# succeeds only after the init scripts have run.
 timeout="${AXIS_E2E_POSTGRES_TIMEOUT:-60}"
 ready=0
 reason="was not ready after $timeout seconds"
@@ -160,7 +165,11 @@ export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
 : >"$AXIS_E2E_SERVER_LOG"
 : >"$AXIS_E2E_WORKER_LOG"
 
-export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis;Password=$password"
+# The init script gives both roles the development password axis. The bootstrap superuser axis keeps $password.
+export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_runtime;Password=axis"
+# Only Playwright, which starts the server, gets the schema role. It is not exported here, so the
+# worker below never inherits it.
+schema_database="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_schema;Password=axis"
 export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 
 # The worker waits until the server, which Playwright starts, has migrated the database. It runs
@@ -193,7 +202,7 @@ run_worker() {
 run_worker &
 worker_pid=$!
 
-run_suite playwright tests/e2e npm test --prefix tests/e2e
+AXIS_E2E_SCHEMA_DATABASE="$schema_database" run_suite playwright tests/e2e npm test --prefix tests/e2e
 playwright_status=$status
 
 worker_failed=0

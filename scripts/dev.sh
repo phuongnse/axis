@@ -8,6 +8,8 @@
 # activates the edited configuration. The worker and the SPA keep running. Ctrl+C stops the
 # server, the worker and the SPA. PostgreSQL, Keycloak and the purchasing system stub keep
 # running.
+# The server runs startup activation as the database role axis_schema and serves requests as
+# axis_runtime. The worker runs only as axis_runtime. Docker Compose creates both roles.
 # The sample extension package payment-references is built first, into artifacts/extensions,
 # which the server and the worker read through Extensions:Path.
 # AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_SERVER_PORT and
@@ -46,13 +48,15 @@ fi
 log "Starting PostgreSQL on port $postgres_port, Keycloak on port $keycloak_port and the purchasing system stub on port $purchasing_port"
 AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PURCHASING_PORT="$purchasing_port" \
   docker compose up -d --build --wait --wait-timeout 180 postgres keycloak purchasing
+schema_connection=""
 if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
-  connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis;Password=axis"
+  runtime_connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis_runtime;Password=axis"
   # The worker reads the same tenant connection string, so this export moves it too.
-  # Only the server reads the schema connection string. Startup activation uses it.
-  export ConnectionStrings__Platform="$connection"
-  export Tenants__default__ConnectionString="$connection"
-  export Tenants__default__SchemaConnectionString="$connection"
+  export ConnectionStrings__Platform="$runtime_connection"
+  export Tenants__default__ConnectionString="$runtime_connection"
+  # Only the server reads the schema connection string, and startup activation uses it. It is
+  # not exported, so the worker never holds the schema credentials.
+  schema_connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis_schema;Password=axis"
 fi
 if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
   # The server signs people in at the moved Keycloak.
@@ -188,7 +192,9 @@ trap 'interrupted=1' INT TERM
 generation=0
 start_server() {
   generation=$((generation + 1))
-  (cd src/Axis.Server && ASPNETCORE_ENVIRONMENT=Development DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true \
+  # With the default port the server reads the schema connection string from appsettings.Development.json.
+  (cd src/Axis.Server && export ASPNETCORE_ENVIRONMENT=Development DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+    if [ -n "$schema_connection" ]; then export Tenants__default__SchemaConnectionString="$schema_connection"; fi
     exec dotnet watch --non-interactive -- --urls "http://localhost:$server_port") \
     </dev/null > >(prefix server "$state/server-exited-$generation") 2>&1 &
   server=$!
