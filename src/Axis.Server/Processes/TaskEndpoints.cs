@@ -26,12 +26,14 @@ namespace Axis.Server.Processes;
 /// <c>task.completed</c>. A completion with values then starts the data change triggers of the
 /// update, from the active release, in the same transaction. A completion that fails writes nothing. A task shows its process, step,
 /// outcomes and form as the release its instance is pinned to declares them, and a completion
-/// uses that release too. Its subject label is the record's display field in the active release.
+/// uses that release too. Its subject label is the record's display field in the task's release.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
+/// A role assignee counts only when the active release declares the role, so a user whose role the
+/// active release drops can no longer list, read or complete the task.
 /// The user's <c>read</c> grants on the subject entity in the active release decide which fields a
 /// task shows. Its form and entity leave out the fields they do not cover, matched by name, and a
 /// form section left with no field is dropped. The subject label is null unless they cover the
-/// display field, and a completion refuses a value for a field they do not cover as one the form
+/// display field of the task's release, and a completion refuses a value for a field they do not cover as one the form
 /// does not make editable. The problem titles never contain text from the request.
 /// </summary>
 internal static class TaskEndpoints
@@ -70,18 +72,25 @@ internal static class TaskEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await TaskQueries.ListOpenAsync(
-            connection, active.Model.Manifest.Id, user.Id, user.Roles, pageNumber, size, cancellationToken);
-        var labels = await ReadLabelsAsync(connection, active.Model, result.Items, cancellationToken);
-        var readable = new Dictionary<Guid, IReadOnlySet<string>?>();
-        var items = new List<TaskListItem>(result.Items.Count);
+            connection, active.Model.Manifest.Id, user.Id, roles, pageNumber, size, cancellationToken);
+        var steps = new List<(ProcessTaskRow Task, ApplicationModel Release, ProcessModel Process, TaskStepModel Step)>(result.Items.Count);
         foreach (var task in result.Items)
         {
             var (release, process, step) = await TaskStepAsync(resolver, task, cancellationToken);
+            steps.Add((task, release, process, step));
+        }
+
+        var labels = await ReadLabelsAsync(connection, [.. steps.Select(entry => (entry.Task, entry.Release))], cancellationToken);
+        var readable = new Dictionary<Guid, IReadOnlySet<string>?>();
+        var items = new List<TaskListItem>(steps.Count);
+        foreach (var (task, release, process, step) in steps)
+        {
             if (!readable.TryGetValue(task.SubjectEntityId, out var fields))
             {
-                fields = Readable(active.Model, user.Roles, task.SubjectEntityId);
+                fields = Readable(active.Model, roles, task.SubjectEntityId);
                 readable[task.SubjectEntityId] = fields;
             }
 
@@ -90,7 +99,7 @@ internal static class TaskEndpoints
                 process.Name,
                 step.Name,
                 step.Label.TextKey,
-                Subject(release, active.Model, task, labels, fields),
+                Subject(release, task, labels, fields),
                 task.DueAt?.UtcDateTime,
                 task.CreatedAt.UtcDateTime));
         }
@@ -129,12 +138,13 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        if (!TaskQueries.MayAct(task, user.Id, user.Roles))
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        if (!TaskQueries.MayAct(task, user.Id, roles))
         {
             return AssignedToSomeoneElse();
         }
 
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user.Roles, task, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, task, cancellationToken));
     }
 
     // The body is read here rather than bound, so every body problem is reported by JSON Pointer,
@@ -164,6 +174,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -171,7 +182,7 @@ internal static class TaskEndpoints
             // The lock makes a concurrent completion of the task wait until this one commits or
             // rolls back, and then find the task as it was left.
             var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
-            var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, tenantId, loggerFactory, cancellationToken);
+            var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, roles, tenantId, loggerFactory, cancellationToken);
             if (failure is not null)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -183,7 +194,7 @@ internal static class TaskEndpoints
 
         var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
             ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user.Roles, completed, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, completed, cancellationToken));
     }
 
     /// <summary>
@@ -198,6 +209,7 @@ internal static class TaskEndpoints
         ActiveApplication current,
         ProcessTaskRow? task,
         CurrentUserResponse user,
+        IReadOnlyList<string> roles,
         string tenantId,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -208,7 +220,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        if (!TaskQueries.MayAct(task, user.Id, user.Roles))
+        if (!TaskQueries.MayAct(task, user.Id, roles))
         {
             return AssignedToSomeoneElse();
         }
@@ -227,7 +239,7 @@ internal static class TaskEndpoints
         var form = FormOf(release, task, step);
         var entity = release.FindEntity(task.SubjectEntityId)
             ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
-        var readable = Readable(active, user.Roles, task.SubjectEntityId);
+        var readable = Readable(active, roles, task.SubjectEntityId);
         var body = TaskCompletionBody.Read(await RecordEndpoints.ReadBodyAsync(request, cancellationToken), step, form, entity, release, readable);
         if (body.Errors is { } errors)
         {
@@ -321,8 +333,8 @@ internal static class TaskEndpoints
         ProcessTaskRow task,
         CancellationToken cancellationToken)
     {
-        var labels = await ReadLabelsAsync(connection, active, [task], cancellationToken);
         var (release, process, step) = await TaskStepAsync(resolver, task, cancellationToken);
+        var labels = await ReadLabelsAsync(connection, [(task, release)], cancellationToken);
         var formModel = FormOf(release, task, step);
         var form = ApplicationSites.DescribeForm(release, formModel.Name);
         var entity = ApplicationSites.DescribeEntity(release, formModel.Entity.Name);
@@ -346,7 +358,7 @@ internal static class TaskEndpoints
             new TaskAssignee(
                 task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null,
                 task.AssigneeKind == ProcessTasks.RoleAssignee ? task.Assignee : null),
-            Subject(release, active, task, labels, readable),
+            Subject(release, task, labels, readable),
             new TaskForm(form.Name, sections, entity),
             [.. step.Outcomes.Select(outcome => new TaskOutcome(outcome.Name, outcome.Label.TextKey))],
             task.DueAt?.UtcDateTime,
@@ -375,28 +387,27 @@ internal static class TaskEndpoints
     }
 
     /// <summary>
-    /// The subject labels of <paramref name="tasks"/>, by subject record id, read through the
-    /// display field of the active release with one query per subject entity. A subject whose
-    /// entity or display field is not in the active release has no label.
+    /// The subject labels of <paramref name="tasks"/>, by release id and subject record id, read
+    /// through the display field of each task's own release with one query per release and subject
+    /// entity. A subject whose entity or display field is not in its release has no label.
     /// </summary>
-    private static async Task<IReadOnlyDictionary<Guid, string>> ReadLabelsAsync(
+    private static async Task<IReadOnlyDictionary<(Guid ReleaseId, Guid SubjectId), string>> ReadLabelsAsync(
         NpgsqlConnection connection,
-        ApplicationModel active,
-        IReadOnlyList<ProcessTaskRow> tasks,
+        IReadOnlyList<(ProcessTaskRow Task, ApplicationModel Release)> tasks,
         CancellationToken cancellationToken)
     {
-        var labels = new Dictionary<Guid, string>();
-        foreach (var group in tasks.GroupBy(task => task.SubjectEntityId))
+        var labels = new Dictionary<(Guid, Guid), string>();
+        foreach (var group in tasks.GroupBy(entry => (entry.Task.ReleaseId, entry.Task.SubjectEntityId)))
         {
-            if (active.FindEntity(group.Key) is not { } entity)
+            if (group.First().Release.FindEntity(group.Key.SubjectEntityId) is not { } entity)
             {
                 continue;
             }
 
-            var ids = group.Select(task => task.SubjectId).Distinct().ToList();
+            var ids = group.Select(entry => entry.Task.SubjectId).Distinct().ToList();
             foreach (var (subjectId, label) in await RecordQueries.ReadDisplayLabelsAsync(connection, entity, ids, cancellationToken))
             {
-                labels[subjectId] = label;
+                labels[(group.Key.ReleaseId, subjectId)] = label;
             }
         }
 
@@ -405,20 +416,19 @@ internal static class TaskEndpoints
 
     /// <summary>
     /// The subject of <paramref name="task"/>, with its label only when <paramref name="readable"/>
-    /// covers the display field of the subject entity in the <paramref name="active"/> release.
+    /// covers the display field of the subject entity in the task's <paramref name="release"/>.
+    /// <paramref name="readable"/> comes from the active release.
     /// </summary>
     private static TaskSubject Subject(
         ApplicationModel release,
-        ApplicationModel active,
         ProcessTaskRow task,
-        IReadOnlyDictionary<Guid, string> labels,
+        IReadOnlyDictionary<(Guid ReleaseId, Guid SubjectId), string> labels,
         IReadOnlySet<string>? readable)
     {
         var entity = release.FindEntity(task.SubjectEntityId)
             ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
-        var labelled = active.FindEntity(task.SubjectEntityId)?.DisplayField is { } displayField
-            && (readable is null || readable.Contains(displayField));
-        return new TaskSubject(entity.Name, task.SubjectId, labelled ? labels.GetValueOrDefault(task.SubjectId) : null);
+        var labelled = entity.DisplayField is { } displayField && (readable is null || readable.Contains(displayField));
+        return new TaskSubject(entity.Name, task.SubjectId, labelled ? labels.GetValueOrDefault((task.ReleaseId, task.SubjectId)) : null);
     }
 
     /// <summary>
