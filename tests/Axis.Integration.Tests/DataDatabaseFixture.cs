@@ -50,6 +50,7 @@ public sealed class DataDatabaseFixture : IAsyncLifetime
             .UseNpgsql(ConnectionString)
             .Options);
         await processes.Database.MigrateAsync();
+        await PostgreSqlServer.GrantRuntimeRoleAsync(ConnectionString);
     }
 
     public async ValueTask DisposeAsync() => await _database.DisposeAsync();

@@ -22,6 +22,7 @@ public sealed class ConfigurationDatabaseFixture : IAsyncLifetime
         await _database.InitializeAsync();
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
+        await PostgreSqlServer.GrantRuntimeRoleAsync(ConnectionString);
     }
 
     public async ValueTask DisposeAsync() => await _database.DisposeAsync();

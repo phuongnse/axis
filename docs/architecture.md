@@ -164,8 +164,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - in the server, a tenant has no `SchemaConnectionString`, or one that is only
   whitespace. This applies even when no application folder is activated at
   startup;
-- *(planned for M6)* in the server, both connection strings name the same
-  user;
+- in the server, both connection strings name the same user;
 - *(planned for M6)* in the server and the worker, the runtime database role
   is a superuser, owns the `axis` or `entities` schema, or may create objects
   in either;

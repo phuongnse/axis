@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Axis.Data.Storage;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -37,8 +38,8 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
 
     /// <summary>
     /// Creates a new database named <c>&lt;prefix&gt;_&lt;guid&gt;</c>, unique in the run, owned by
-    /// <see cref="SchemaRole"/>, and returns that role's connection string to it. Default privileges
-    /// give <see cref="RuntimeRole"/> row access to what the schema role creates. The prefix is at most 30 lowercase letters, digits and underscores,
+    /// <see cref="SchemaRole"/>, and returns that role's connection string to it. <see cref="RuntimeRole"/>
+    /// has no rights in it until a server starts or <see cref="GrantRuntimeRoleAsync"/> runs. The prefix is at most 30 lowercase letters, digits and underscores,
     /// so the name stays within PostgreSQL's 63-character limit.
     /// </summary>
     public static async Task<string> CreateDatabaseAsync(string prefix, CancellationToken cancellationToken = default)
@@ -54,22 +55,23 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
         var admin = await AdminConnectionStringAsync();
         await ExecuteAsync(admin, $"""CREATE DATABASE "{name}" OWNER {SchemaRole}""", cancellationToken);
 
-        // Default privileges are per database, so they run connected to the new one.
-        var adminToDatabase = new NpgsqlConnectionStringBuilder(admin) { Database = name }.ConnectionString;
-        await ExecuteAsync(
-            adminToDatabase,
-            $"""
-            ALTER DEFAULT PRIVILEGES FOR ROLE {SchemaRole} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {RuntimeRole};
-            ALTER DEFAULT PRIVILEGES FOR ROLE {SchemaRole} GRANT USAGE, SELECT ON SEQUENCES TO {RuntimeRole};
-            ALTER DEFAULT PRIVILEGES FOR ROLE {SchemaRole} GRANT USAGE ON SCHEMAS TO {RuntimeRole};
-            """,
-            cancellationToken);
         return new NpgsqlConnectionStringBuilder(admin)
         {
             Database = name,
             Username = SchemaRole,
             Password = RolePassword,
         }.ConnectionString;
+    }
+
+    /// <summary>
+    /// Runs the server's grant step on the database that <paramref name="schemaConnectionString"/> names, for
+    /// fixtures that migrate a database themselves. Call it after the migrations.
+    /// </summary>
+    public static async Task GrantRuntimeRoleAsync(string schemaConnectionString, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(schemaConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await RuntimeRoleGrants.ApplyAsync(connection, RuntimeRole, cancellationToken);
     }
 
     /// <summary>The same database as <paramref name="connectionString"/>, as <see cref="RuntimeRole"/>.</summary>

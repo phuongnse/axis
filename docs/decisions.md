@@ -1230,11 +1230,12 @@ partial commits that leave storage and the active release disagreeing.
 ## D31. Separate database roles — Agreed
 
 Each tenant gets two database roles, one for runtime access and one for
-schema changes *(planned for M6)*. Runtime code can then read and write
-data, but it cannot change the schema, a stored release, the active release
-or the provisioning records. Today the server reads both connection strings
-and startup activation uses `SchemaConnectionString`. Installations pass one
-user in both until the roles land.
+schema changes. Runtime code can then read and write data, but it cannot
+change the schema, a stored release, the active release or the provisioning
+records. The server reads both connection strings, startup activation uses
+`SchemaConnectionString`, and the server grants the runtime database role its
+rights at every start. The start checks for a superuser, a schema owner or a
+role that may create objects are *(planned for M6)*.
 See [storage](reference/storage.md#database-roles) for the grants and the
 connection string of each step.
 The owner confirmed these points for issue #414 on 2026-10-16.
@@ -1266,8 +1267,9 @@ The owner confirmed these points for issue #414 on 2026-10-16.
     tables in `entities`, and `SELECT` only on new tables in `axis`. A
     migration that adds an `axis` table that runtime writes grants those rights
     explicitly. Sequences in both schemas get `USAGE` and `SELECT`.
-  - The schema database role grants these rights in a migration. The runtime
-    database role name comes from the user of `ConnectionString`.
+  - The schema database role grants these rights in a migration, or in a grant
+    step that runs with the migrations. The runtime database role name comes
+    from the user of `ConnectionString`.
   - The start stops when the runtime database role is a superuser, owns the
     `axis` or `entities` schema, or may create objects in either.
 - **Stored releases:** a trigger refuses every `UPDATE`, `DELETE` and

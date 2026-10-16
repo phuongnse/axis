@@ -96,6 +96,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             await using var data = DataDatabaseFixture.CreateContext(connection);
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
+            await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString);
 
             // Releases live in the tenant database, so the fixture is compiled once per tenant.
             var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "RecordsApp"), configuration);

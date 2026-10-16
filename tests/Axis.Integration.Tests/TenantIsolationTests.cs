@@ -72,11 +72,13 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         var tenantA = await database.CreateDatabaseAsync("tenant_a", CancellationToken);
         var tenantB = await database.CreateDatabaseAsync("tenant_b", CancellationToken);
 
-        // The runtime role cannot create tables, so the schema role creates the table the handlers use.
+        // The runtime role cannot create tables, so the schema role creates the table the handlers use
+        // and grants the runtime role row access to it.
         foreach (var tenant in new[] { tenantA, tenantB })
         {
             await using var dataSource = NpgsqlDataSource.Create(tenant);
-            await using var create = dataSource.CreateCommand("CREATE TABLE rows (value text NOT NULL)");
+            await using var create = dataSource.CreateCommand(
+                $"CREATE TABLE rows (value text NOT NULL); GRANT SELECT, INSERT, UPDATE, DELETE ON rows TO {PostgreSqlServer.RuntimeRole}");
             await create.ExecuteNonQueryAsync(CancellationToken);
         }
 

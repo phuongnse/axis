@@ -402,6 +402,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
             await processes.Database.MigrateAsync();
+            await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString);
         }
 
         var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
