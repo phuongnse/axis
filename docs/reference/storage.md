@@ -53,8 +53,9 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     a release and its resources are only inserted together. Saving fails when
     a stored release or resource is modified or deleted, or when a resource is
     added to a stored release. Bulk operations (`ExecuteUpdate`,
-    `ExecuteDelete`) and raw SQL bypass this guard; a database-level guard
-    is a later change.
+    `ExecuteDelete`) and raw SQL bypass this guard. A database trigger that
+    refuses `UPDATE`, `DELETE` and `TRUNCATE` on the release tables is
+    planned, see [Database roles](#database-roles) *(planned for M6)*.
 - **Entity tables.** These are generated per entity in the tenant database and
   live in the `entities` schema, separate from the `axis` system tables.
   `Axis.Data` plans them (see [Schema planning](#schema-planning)) and
@@ -108,8 +109,74 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   Request text, such as the entity segment, `sort` and `values` names, is
   matched against the model's declared names and never used as an identifier.
 - **Database credentials** *(planned for M6)*. Runtime access and schema
-  changes will use different database roles. M1 uses one connection string per
-  tenant.
+  changes will use different database roles. Until then, each tenant has one
+  connection string. See [Database roles](#database-roles).
+
+## Database roles
+
+*(planned for M6)* See
+[D31](../decisions.md#d31-separate-database-roles--agreed). Today, each
+tenant has one connection string, and one database user does everything.
+
+- **Two database roles per tenant.** The schema database role owns the `axis`
+  and `entities` schemas. The runtime database role reads and writes data, and
+  can change nothing about the schema. "Database role" always means this
+  PostgreSQL role. It is not the application `role` resource of
+  [D24](../decisions.md#d24-roles-and-policies--agreed).
+- **Two settings.** `ConnectionString` is for the runtime database role, and
+  `SchemaConnectionString` is for the schema database role. See
+  [tenant configuration](../architecture.md#tenant-configuration). There is no
+  fallback to one connection string.
+
+What each database role may do:
+
+| Objects | Schema database role | Runtime database role |
+| --- | --- | --- |
+| `entities` tables | Owns them | Read and write rows |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters` | Owns them | Read and write rows |
+| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, the `__*_migrations` tables | Owns them | Read only |
+| Release tables: `releases`, `release_resources`, `release_packages` | Insert and read. The trigger refuses update, delete and truncate | Read only |
+| Sequences in `axis` and `entities` | Owns them | `USAGE`, `SELECT` |
+| Create, alter, drop | Yes | No |
+
+- **Default privileges.** The schema database role sets default privileges. A
+  new table in `entities` gives the runtime database role `SELECT`, `INSERT`,
+  `UPDATE` and `DELETE`. A new table in `axis` gives it `SELECT` only.
+- **Explicit grants.** A migration that adds an `axis` table that runtime
+  writes grants those rights on it explicitly. A new system table is read-only
+  until someone decides otherwise.
+- **Role name.** The runtime database role is the user of `ConnectionString`.
+  The schema database role grants its rights in a migration, or in a grant step
+  that runs with the migrations, because the name comes from configuration.
+- **Release trigger.** A trigger refuses every `UPDATE`, `DELETE` and
+  `TRUNCATE` on the three release tables, for every database role. It replaces
+  the change-tracking guard described above for `Axis.Configuration`. A stored release can no longer be deleted at all.
+  Cleaning up old releases needs a later decision. A superuser can still
+  disable the trigger. It guards against mistakes by Axis, not against a
+  database administrator.
+- **Start checks.** A missing or blank setting stops the start, naming the
+  tenant and the setting. So do two settings that name the same user, and a
+  runtime database role that is a superuser, owns the `axis` or `entities`
+  schema, or may create objects in either. The server runs all of these
+  checks. The worker runs only the check on the runtime database role, because
+  it holds no `SchemaConnectionString`.
+
+Which connection string each step uses:
+
+| Step | Connection string |
+| --- | --- |
+| EF Core migrations of configuration, data and processes | `SchemaConnectionString` |
+| Compiling a folder and storing its release | `SchemaConnectionString` |
+| Activation: migrations, provisioning, active release, site paths | `SchemaConnectionString` |
+| Schedule trigger state | `ConnectionString` |
+| Seed records | `ConnectionString` |
+| Start release check (`AXC0146`) and the runtime database role check, in the server and the worker | `ConnectionString` |
+| Server requests: record API, data sources, process starts, endpoints, tasks, sites | `ConnectionString` |
+| Worker | `ConnectionString` only |
+
+The server holds both connection strings for its whole life, because it
+activates at startup. Moving activation out of the server comes with tenant
+provisioning in M9.
 
 ## Schema planning
 

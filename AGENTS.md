@@ -97,7 +97,10 @@ Docker. `docker compose logs server` shows the activation diagnostics,
 and `docker compose logs worker` shows the worker output. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
 `AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports
-are published on `127.0.0.1` only.
+are published on `127.0.0.1` only. *(planned for M6)* Docker Compose, `scripts/dev.sh`,
+`scripts/e2e.sh` and the test fixtures will create two database roles, `axis_schema` and
+`axis_runtime`, with development passwords. Today they use the single `axis` user. See
+[database roles](docs/reference/storage.md#database-roles).
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
