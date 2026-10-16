@@ -307,7 +307,8 @@ internal sealed class MigrationPlanning
 
         if (isEnumConvert)
         {
-            var kept = recorded.Where(value => !removed.Contains(value, StringComparer.Ordinal)).ToList();
+            // The mapping may produce any value the release lists, including one this release declares for the first time.
+            var kept = field.Values!.Distinct(StringComparer.Ordinal).ToList();
             var parameters = new List<SqlValue>(translated.Parameters);
             parameters.AddRange(removed.Select((value, position) => new SqlValue($"r{position}", ExpressionTypeKind.Text, value)));
             parameters.AddRange(kept.Select((value, position) => new SqlValue($"k{position}", ExpressionTypeKind.Text, value)));

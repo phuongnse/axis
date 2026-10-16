@@ -31,6 +31,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
     private const string TextQuantityField = """{ "name": "quantity", "type": "text" }""";
     private const string IntegerQuantityField = """{ "name": "quantity", "type": "integer" }""";
     private const string OpenStatusField = """{ "name": "status", "type": "enum", "values": ["draft", "cancelled", "done"] }""";
+    private const string ArchivedStatusField = """{ "name": "status", "type": "enum", "values": ["draft", "done", "archived"] }""";
     private const string PriorityField = """{ "name": "priority", "type": "integer" }""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -384,6 +385,28 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
             $"SELECT f_number || ': ' || coalesce(f_status, '') || ' v' || version FROM {table} ORDER BY f_number"));
         Assert.Equal(["done", "draft"], (await ReadEnumRecordsAsync(_orderId)).Where(value => value.Field == "status").Select(value => value.Value).Order(StringComparer.Ordinal));
         Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+        Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task A_convert_in_a_release_that_removes_one_enum_value_and_adds_another_can_map_to_the_added_value()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, OpenStatusField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-1"), ("f_status", "cancelled"));
+        await InsertAsync(_orderId, ("id", Guid.NewGuid()), ("f_number", "PO-2"), ("f_status", "done"));
+        folder
+            .With("entities/order.json", Order(NumberField, ArchivedStatusField))
+            .With("migrations/0001-convert-status.json", Migration(_migrationId, "Order", """[{ "type": "convert", "field": "status", "value": "if(status == 'cancelled', 'archived', status)" }]"""));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(_orderId));
+        Assert.Equal(["PO-1: archived v2", "PO-2: done v1"], await ReadScalarsAsync(
+            $"SELECT f_number || ': ' || coalesce(f_status, '') || ' v' || version FROM {table} ORDER BY f_number"));
+        Assert.Equal(["archived", "done", "draft"], (await ReadEnumRecordsAsync(_orderId)).Where(value => value.Field == "status").Select(value => value.Value).Order(StringComparer.Ordinal));
         Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
     }
 
