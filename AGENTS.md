@@ -97,12 +97,16 @@ Docker. `docker compose logs server` shows the activation diagnostics,
 and `docker compose logs worker` shows the worker output. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
 `AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports
-are published on `127.0.0.1` only. The integration test fixtures already create two database
+are published on `127.0.0.1` only. The integration test fixtures create two database
 roles, `axis_schema` and `axis_runtime`, with the development password `axis`. They own each test
 database with `axis_schema`, run servers and workers as `axis_runtime`, and run startup activation as
-`axis_schema`. *(planned for M6)* Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` will create the
-two roles too. Today they use the single `axis` user, and the server also gets `SchemaConnectionString`
-with it. Only startup activation uses that setting, and the worker never reads it. See
+`axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the same. PostgreSQL loads
+`samples/postgres/init-roles.sql` on its first start, which creates the two roles and makes
+`axis_schema` own the tenant database. The server uses `axis_schema` for `SchemaConnectionString` and
+`axis_runtime` for every other connection string. The worker uses only `axis_runtime` and gets no
+`SchemaConnectionString`. `axis` stays the bootstrap superuser, for setup and health checks only.
+PostgreSQL runs init scripts only on an empty volume, so an existing local Compose volume needs
+`docker compose down -v` once. That deletes its data. See
 [database roles](docs/reference/storage.md#database-roles).
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development

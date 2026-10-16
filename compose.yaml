@@ -8,6 +8,10 @@
 # All four ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206),
 # AXIS_POSTGRES_PORT (default 5432), AXIS_KEYCLOAK_PORT (default 8080) and AXIS_PURCHASING_PORT
 # (default 5207) change the host ports.
+# PostgreSQL loads samples/postgres/init-roles.sql on its first start. It creates the two database
+# roles: the server runs startup activation as axis_schema and serves requests as axis_runtime, and
+# the worker runs only as axis_runtime. axis stays the bootstrap superuser. PostgreSQL runs that
+# file only on an empty volume, so a volume from before the roles needs `docker compose down -v`.
 services:
   postgres:
     image: postgres:18-alpine
@@ -19,6 +23,7 @@ services:
       - "127.0.0.1:${AXIS_POSTGRES_PORT:-5432}:5432"
     volumes:
       - axis-postgres:/var/lib/postgresql
+      - ./samples/postgres/init-roles.sql:/docker-entrypoint-initdb.d/init-roles.sql:ro
     # Check over TCP: the image's initialization server listens only on the Unix socket.
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "axis", "-d", "axis"]
@@ -52,10 +57,10 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__Platform: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
-      Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
+      ConnectionStrings__Platform: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
+      Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       # Only the server reads this setting. Startup activation uses it.
-      Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
+      Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
       # The sample extension package payment-references, which the image holds, that the sample declares.
       Extensions__Path: /extensions
@@ -88,7 +93,7 @@ services:
       DOTNET_ENVIRONMENT: Development
       # The sample extension package payment-references, which the image holds.
       Extensions__Path: /extensions
-      Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis
+      Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
 
   # The purchasing system stub from tests/Axis.PurchasingStub. It keeps its orders in memory.

@@ -94,6 +94,17 @@ test('the stack runs from source', { timeout }, async () => {
   const purchasing = await fetch(`${purchasingUrl}/health`)
   assert.equal(purchasing.status, 200)
 
+  // Activation ran as axis_schema, so that role owns the database and the schemas it created.
+  const psql = (sql) =>
+    compose(['exec', '-T', 'postgres', 'psql', '-U', 'axis', '-d', 'axis', '-tAc', sql]).stdout.trim()
+  assert.equal(psql("select datdba::regrole from pg_database where datname = 'axis'"), 'axis_schema')
+  assert.equal(
+    psql(
+      "select string_agg(nspname || '=' || nspowner::regrole, ',' order by nspname) from pg_namespace where nspname in ('axis','entities')",
+    ),
+    'axis=axis_schema,entities=axis_schema',
+  )
+
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
   // The worker polls once a second, so it finds the migrated database soon after the server is up.
@@ -143,4 +154,20 @@ test('the default ports are 5206, 5432, 8080 and 5207 on 127.0.0.1', () => {
   assert.deepEqual(published('postgres'), ['127.0.0.1:5432->5432'])
   assert.deepEqual(published('keycloak'), ['127.0.0.1:8080->8080'])
   assert.deepEqual(published('purchasing'), ['127.0.0.1:5207->8080'])
+})
+
+test('the server runs on both database roles and the worker only on the runtime role', () => {
+  const config = compose(['config', '--format', 'json'])
+  assert.equal(config.status, 0, config.stderr)
+  const { services } = JSON.parse(config.stdout)
+  const server = services.server.environment
+  assert.match(server.ConnectionStrings__Platform, /Username=axis_runtime;/)
+  assert.match(server.Tenants__default__ConnectionString, /Username=axis_runtime;/)
+  assert.match(server.Tenants__default__SchemaConnectionString, /Username=axis_schema;/)
+  const worker = services.worker.environment
+  assert.deepEqual(
+    Object.keys(worker).filter((key) => /SchemaConnectionString/.test(key)),
+    [],
+  )
+  assert.match(worker.Tenants__default__ConnectionString, /Username=axis_runtime;/)
 })

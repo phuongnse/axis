@@ -20,7 +20,11 @@ function required(name: string, meaning: string): string {
   return value
 }
 
-const connectionString = required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string')
+const connectionString = required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string of the runtime role')
+const schemaConnectionString = required(
+  'AXIS_E2E_SCHEMA_DATABASE',
+  'the PostgreSQL connection string of the schema role',
+)
 const keycloakUrl = required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')
 const purchasingUrl = required('AXIS_E2E_PURCHASING_URL', 'the address of the purchasing system stub')
 
@@ -38,7 +42,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
     Tenants__default__Hosts__0: '127.0.0.1',
     Tenants__default__ConnectionString: connectionString,
-    Tenants__default__SchemaConnectionString: connectionString,
+    Tenants__default__SchemaConnectionString: schemaConnectionString,
     // The development realm and its client, as in appsettings.Development.json.
     Tenants__default__Oidc__Authority: `${keycloakUrl}/realms/axis`,
     Tenants__default__Oidc__ClientId: 'axis',

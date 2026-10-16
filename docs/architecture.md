@@ -144,10 +144,9 @@ Each tenant also gets `SchemaConnectionString`, or
 both, and only startup activation uses `SchemaConnectionString`. The worker
 never reads it and starts with only `ConnectionString`. This is a breaking
 setting change: every installation must add the setting, and there is no
-fallback to one connection string. *(planned for M6)* The second database role
-itself is still to come. Until it does, `appsettings.Development.json`,
-Docker Compose, `scripts/dev.sh` and the E2E server pass the same `axis` user
-in both settings. See [database roles](reference/storage.md#database-roles) and
+fallback to one connection string. `appsettings.Development.json`,
+Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
+`SchemaConnectionString` and `axis_runtime` in the other settings. See [database roles](reference/storage.md#database-roles) and
 [D31](decisions.md#d31-separate-database-roles--agreed).
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
