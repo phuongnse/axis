@@ -23,8 +23,10 @@ namespace Axis.Data;
 /// <para>
 /// The migrations of the model that no <c>axis.applied_migrations</c> row covers are pending. Their
 /// <c>renameField</c>, <c>dropField</c> and <c>dropEntity</c> changes run first, and each pending
-/// migration gets a row when the transaction commits. With a pending migration, the active release
-/// is written in this transaction too, so a refused name or site path rolls everything back.
+/// migration gets a row when the transaction commits. When the migration context sets the active
+/// release, it is written in this transaction too, under the same lock as the history check. A
+/// refused name or site path rolls everything back, and no other activation can commit a migration
+/// between the check and the write.
 /// </para>
 /// </summary>
 public static class EntityProvisioner
@@ -53,8 +55,8 @@ public static class EntityProvisioner
 
     /// <summary>
     /// Plans <paramref name="model"/> against the tenant database behind <paramref name="context"/>,
-    /// applying its pending migrations first, and applies the plan when it has no diagnostics. With a
-    /// pending migration it then writes the active release through
+    /// applying its pending migrations first, and applies the plan when it has no diagnostics. When
+    /// <paramref name="migrations"/> can set the active release, it then writes it through
     /// <see cref="MigrationContext.SetActiveReleaseAsync"/> before it commits, and sets
     /// <see cref="ProvisioningResult.ActiveReleaseSet"/>. An applied migration whose file changed or
     /// is gone gives a diagnostic and nothing is applied. Call it outside an explicit transaction.
@@ -132,10 +134,10 @@ public static class EntityProvisioner
             }));
             await context.SaveChangesAsync(cancellationToken);
 
-            var activeReleaseSet = history.Pending.Count > 0;
-            if (activeReleaseSet)
+            var activeReleaseSet = migrations.SetActiveReleaseAsync is not null;
+            if (migrations.SetActiveReleaseAsync is { } setActiveRelease)
             {
-                var refused = await migrations.SetActiveReleaseAsync(transaction.GetDbTransaction(), cancellationToken);
+                var refused = await setActiveRelease(transaction.GetDbTransaction(), cancellationToken);
                 if (refused.Count > 0)
                 {
                     await transaction.RollbackAsync(cancellationToken);

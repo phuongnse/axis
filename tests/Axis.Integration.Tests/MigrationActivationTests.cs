@@ -247,6 +247,38 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
     }
 
+    [Fact]
+    public async Task An_activation_without_a_pending_migration_cannot_overwrite_a_release_that_another_activation_commits_while_it_waits()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        var first = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(first)).Diagnostics);
+        await InsertOrderAsync("PO-1", "first note");
+        folder
+            .With("entities/order.json", Order(NumberField, RemarkField))
+            .With("migrations/0001-rename-note.json", RenameMigration(_migrationId, "note", "remark"));
+        var second = await CompileAsync(folder);
+
+        // The older release activates again and stops at the active release write. Its history check
+        // is behind it, and its transaction still holds the schema lock.
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var older = ActivateAsync(first, store => new PausingStore(store, reached, release));
+        await reached.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
+
+        // The newer release must wait for the lock. Without it, it commits the rename now and the older
+        // release overwrites it with tables it does not match.
+        var newer = ActivateAsync(second);
+        await WaitUntilAsync(async () => newer.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0);
+        release.SetResult();
+
+        Assert.Empty((await older).Diagnostics);
+        Assert.Empty((await newer).Diagnostics);
+        Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
+        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
+    }
+
     // R1 has a note field and R2 renames it to remark, so one migration is applied.
     private async Task<TemporaryFolder> AppliedRenameAsync()
     {
@@ -409,6 +441,23 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         }
 
         return rows;
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (!await condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold in time.");
+            await Task.Delay(50, CancellationToken);
+        }
+    }
+
+    private async Task<long> CountWaitingAdvisoryLocksAsync()
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted");
+        return Assert.IsType<long>(await command.ExecuteScalarAsync(CancellationToken));
     }
 
     private async Task<Guid?> ReadActiveReleaseIdAsync()

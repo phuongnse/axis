@@ -545,33 +545,21 @@ flowchart LR
      application took the name after the check, the upsert is refused and
      activation returns the same `AXC0020`. When another application took a
      site path after the check, the unique index refuses it and activation
-     returns one `AXC0031` for that path. With a pending migration, a refused
-     name or site path at the upsert rolls back the migrations and provisioning
-     too.
-   - **Transactions.** Provisioning runs in its own transaction (DDL,
-     provisioning records and the schema lock). The active release and its
-     `axis.active_sites` rows are written afterwards, after provisioning
-     committed, in one short transaction of their own. A refused name or path
-     leaves neither written. No other configuration statement runs while the
-     provisioning transaction is open, so the caller may use one tenant
-     connection for both or two connections. Activation must run outside an
-     explicit transaction. With a pending migration, the migrations,
-     provisioning, the active release and its `axis.active_sites` rows are
-     written in one transaction instead. The active release store and the
-     data context must then share one tenant connection, or the store throws
-     before anything commits.
-   - **Failure after provisioning.** This applies to activations without a
-     pending migration. When writing the active release fails
-     after provisioning committed, the error propagates. The new tables and
-     columns stay, recorded for the application, and the previous release
-     stays active and keeps serving: it reads and writes only its own
-     columns, so only a new required column on a table that had no rows
-     rejects its inserts. Activating again is safe because provisioning is
-     additive. An activation that loses the name or a site path to a
-     concurrent one also
-     leaves its provisioned tables in place, recorded for its application
-     `id` and not active. With a pending migration, nothing stays applied
-     after a failed activation.
+     returns one `AXC0031` for that path. A refused name or site path at the
+     upsert rolls back the migrations and provisioning too.
+   - **Transactions.** The schema lock, the migration history check, the
+     migrations, provisioning, the active release and its `axis.active_sites`
+     rows are written in one transaction. Holding the lock from the history
+     check to the commit keeps another activation from committing a rename
+     or drop in between, which would let an older release become active
+     against tables it does not match. The active release store and the data
+     context must therefore share one tenant connection, or the store throws
+     before anything commits. Activation must run outside an explicit
+     transaction.
+   - **Failure.** Nothing stays applied after a failed activation: not the
+     migrations, the new tables and columns, nor their provisioning records.
+     The previous release stays active. An activation that loses the name or
+     a site path to a concurrent one leaves nothing behind either.
    - **Re-activation.** Activating the active release again provisions
      nothing, keeps its site paths and changes only its activation time. A
      release that renames a site path frees the old path for another

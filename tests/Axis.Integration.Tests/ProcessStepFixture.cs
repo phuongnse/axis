@@ -550,8 +550,10 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     internal async Task<(ReleaseCompilationResult Compiled, ActivationResult Activated)> TryActivateAsync(
         string folder, IReadOnlyCollection<PackageVersion> packages, ActivationBindings bindings)
     {
-        await using var configuration = CreateConfigurationContext();
-        await using var data = CreateDataContext();
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings);

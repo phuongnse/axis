@@ -363,8 +363,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
             }
         }
 
-        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(_tenants[tenant].ConnectionString).Options);
-        await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(_tenants[tenant].ConnectionString).Options);
+        await using var connection = new NpgsqlConnection(_tenants[tenant].ConnectionString);
+        await connection.OpenAsync();
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration);
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"));
@@ -389,8 +391,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
     private async Task<Tenant> CreateTenantAsync(string databasePrefix)
     {
         var connectionString = await _database.CreateDatabaseAsync(databasePrefix);
-        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connectionString).Options);
-        await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options);
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options))
         {
             await configuration.Database.MigrateAsync();

@@ -13,19 +13,11 @@ namespace Axis.Data;
 /// name with the right kind, provisions the
 /// entity tables and then sets the active release with its site paths.
 /// <para>
-/// Without a pending migration, provisioning runs in its own transaction, and the active release and
-/// its site paths are written afterwards in a separate short transaction. No store call runs while
-/// the provisioning transaction is open, so the store and <see cref="DataDbContext"/> may share one
-/// open tenant connection or use two. When writing the active release fails after provisioning
-/// committed, the exception propagates: the new tables and columns stay, recorded for the
-/// application, and the previous release stays active. Activating again is safe because
-/// provisioning is additive.
-/// </para>
-/// <para>
-/// With a pending migration, the active release and its site paths are written in the provisioning
-/// transaction, after the migrations and the additive changes. A refused name or site path, or any
-/// failure, rolls everything back and the previous release stays active. The store and
-/// <see cref="DataDbContext"/> must then share one open tenant connection, or the store throws before
+/// Provisioning, the pending migrations and the active release write run in one transaction under
+/// the schema lock, so the migration history check and the write see the same history: no other
+/// activation can commit a rename or drop between them. A refused name or site path, or any failure,
+/// rolls everything back and the previous release stays active. The store and
+/// <see cref="DataDbContext"/> must share one open tenant connection, or the store throws before
 /// anything commits.
 /// </para>
 /// </summary>
@@ -88,28 +80,16 @@ public static class ReleaseActivator
         }
 
         var sitePaths = model.Sites.Select(site => site.Path).ToList();
-        var migrations = model.Migrations.Count > 0
-            ? new MigrationContext(
-                release.Id,
-                await ReadStoredEntityIdsAsync(store, manifest.Id, cancellationToken),
-                async (transaction, token) => ToDiagnostics(
-                    model,
-                    await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)))
-            : MigrationContext.None;
+        var migrations = new MigrationContext(
+            release.Id,
+            model.Migrations.Count > 0
+                ? await ReadStoredEntityIdsAsync(store, manifest.Id, cancellationToken)
+                : MigrationContext.None.StoredEntityIds,
+            async (transaction, token) => ToDiagnostics(
+                model,
+                await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)));
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
-        if (provisioned.Diagnostics.Count > 0)
-        {
-            return new ActivationResult(provisioned.Diagnostics);
-        }
-
-        if (provisioned.ActiveReleaseSet)
-        {
-            return new ActivationResult([]);
-        }
-
-        // Another application can take the name or a site path between the checks above and this write.
-        var set = await store.TrySetAsync(manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, cancellationToken);
-        return new ActivationResult(ToDiagnostics(model, set));
+        return new ActivationResult(provisioned.Diagnostics);
     }
 
     // The entity ids of the application's active release by entity name: the tables that hold its data now.

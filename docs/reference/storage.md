@@ -306,10 +306,12 @@ Migrations run forward only.
   The active release does not change. A retry runs the pending migrations
   again because nothing stayed applied. A `dropEntity` that a remaining
   foreign key blocks surfaces as a database exception, not a diagnostic, and
-  everything still rolls back. With a pending migration, the active release
-  is written through the active release store in the provisioning
-  transaction, so the store and the data context must share one tenant
-  connection. A store on another connection throws before anything commits.
+  everything still rolls back. The active release is always written through
+  the active release store in the provisioning transaction, under the schema
+  lock held since the migration history check, so another activation cannot
+  commit a rename or drop between them. The store and the data context
+  must therefore share one tenant connection. A store on another connection
+  throws before anything commits.
 - **Computed fields** *(planned for M6)*. A `fill` or `convert` recomputes, in the same
   transaction, every stored computed field that reads the changed field.
   It may read it directly, through a rule or through a child aggregate.

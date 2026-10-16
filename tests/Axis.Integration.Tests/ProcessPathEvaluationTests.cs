@@ -155,8 +155,10 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
                   ] }
                 """);
 
-        await using var configuration = database.CreateConfigurationContext();
-        await using var data = database.CreateContext();
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration, CancellationToken);
         Assert.Empty(compiled.Diagnostics);
         Assert.Empty((await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), CancellationToken)).Diagnostics);

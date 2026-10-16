@@ -89,8 +89,10 @@ public sealed class RecordApiFixture : IAsyncLifetime
             var connectionString = await _database.CreateDatabaseAsync($"records_{tenant}");
             _connectionStrings[tenant] = connectionString;
             _dataSources[tenant] = NpgsqlDataSource.Create(connectionString);
-            await using var configuration = CreateConfigurationContext(connectionString);
-            await using var data = CreateDataContext(connectionString);
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+            await using var data = DataDatabaseFixture.CreateContext(connection);
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
 
@@ -371,12 +373,6 @@ public sealed class RecordApiFixture : IAsyncLifetime
 
         return request;
     }
-
-    private static ConfigurationDbContext CreateConfigurationContext(string connectionString) =>
-        new(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connectionString).Options);
-
-    private static DataDbContext CreateDataContext(string connectionString) =>
-        new(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options);
 }
 
 /// <summary>An audit record as stored, with its details as the text PostgreSQL renders for <c>jsonb</c>.</summary>
