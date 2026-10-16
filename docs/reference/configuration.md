@@ -458,8 +458,9 @@ flowchart LR
        operation is `AXC0191` at `/stubs/{i}/output/{key}`. The types of the
        output values are not checked.
      - A malformed file, such as an unknown step `type`, a missing or forbidden
-       step property, `save` together with `expect`, or `expect` on an
-       expectation step, is `AXC0004`.
+       step property, `save` together with `expect`, `expect` on an
+       expectation step, or a `now` that is not a real date and time, such as
+       `2026-02-30T09:00:00Z`, is `AXC0004`.
      - A scenario error is an error like any other, so a folder with one does
        not compile or activate.
 

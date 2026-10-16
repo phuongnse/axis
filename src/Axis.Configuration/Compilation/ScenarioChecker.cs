@@ -63,7 +63,7 @@ internal static class ScenarioChecker
                         Report(
                             DiagnosticCodes.UnknownScenarioRole,
                             $"The role '{roles[index]}' was not found. No loaded role has that name.",
-                            $"/users/{user}/{index}");
+                            $"/users/{Escape(user)}/{index}");
                     }
                 }
             }
@@ -274,7 +274,7 @@ internal static class ScenarioChecker
     {
         foreach (var (key, value) in values)
         {
-            var valuePath = $"{path}/{key}";
+            var valuePath = $"{path}/{Escape(key)}";
             var field = entity.Fields.FirstOrDefault(candidate => Same(candidate.Name, key));
             if (field is null)
             {
@@ -421,10 +421,14 @@ internal static class ScenarioChecker
                 report(
                     DiagnosticCodes.UnknownStubOutput,
                     $"The output '{key}' was not found. The operation has no output field with that name.",
-                    $"{path}/output/{key}");
+                    $"{path}/output/{Escape(key)}");
             }
         }
     }
+
+    /// <summary>Escapes a property name as an RFC 6901 JSON Pointer segment.</summary>
+    private static string Escape(string segment) =>
+        segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
 
     private static bool Same(string left, string right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 }

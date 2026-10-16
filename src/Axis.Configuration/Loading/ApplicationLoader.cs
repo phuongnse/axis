@@ -513,7 +513,30 @@ public static class ApplicationLoader
     private static bool Validate(string file, JsonElement root, string kind, Guid? resourceId, List<Diagnostic> diagnostics)
     {
         ResourceSchemas.TryGet(kind, out var schema);
-        return SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, file, resourceId, diagnostics);
+        var valid = SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, file, resourceId, diagnostics);
+        return valid && (kind != ResourceKinds.Scenario || CheckScenarioNow(file, root, resourceId, diagnostics));
+    }
+
+    /// <summary>
+    /// Checks that the <c>now</c> of a scenario is a real moment. The schema pattern limits each part's
+    /// range, and this rejects a date the calendar does not have, such as 30 February.
+    /// </summary>
+    private static bool CheckScenarioNow(string file, JsonElement root, Guid? resourceId, List<Diagnostic> diagnostics)
+    {
+        if (root.TryGetProperty("now", out var now)
+            && now.GetString() is { } text
+            && !DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.SchemaViolation,
+                $"The value '{text}' is not a real date and time. Use an RFC 3339 timestamp such as 2026-03-01T09:00:00Z.",
+                file,
+                "/now",
+                resourceId));
+            return false;
+        }
+
+        return true;
     }
 
     private static void CheckDuplicates(

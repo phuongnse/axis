@@ -115,6 +115,68 @@ public sealed class ScenarioCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Theory]
+    [InlineData("2026-99-99T99:99:99Z")]
+    [InlineData("2026-02-30T09:00:00Z")]
+    [InlineData("2026-02-29T09:00:00Z")]
+    [InlineData("2026-10-01T24:00:00Z")]
+    [InlineData("2026-10-01T09:60:00Z")]
+    [InlineData("2026-10-01T09:00:00+25:00")]
+    [InlineData("2026-10-01T09:00:00")]
+    public void A_now_that_is_not_a_real_timestamp_is_a_schema_violation(string now)
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
+            "now": "{{now}}",
+            "users": { "anna": ["employee"] },
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path) == (DiagnosticCodes.SchemaViolation, ScenarioFile, "/now"));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("2026-10-01T09:00:00Z")]
+    [InlineData("2028-02-29T23:59:59.123+07:00")]
+    public void A_now_that_is_a_real_timestamp_compiles(string now)
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
+            "now": "{{now}}",
+            "users": { "anna": ["employee"] },
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void A_path_escapes_a_slash_and_a_tilde_in_a_user_id_a_value_key_and_an_output_key()
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario("""
+            "users": { "a/b": ["ghost-role"], "c~d": ["employee"] },
+            "stubs": [
+              { "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "output": { "x/y~z": 1 } }
+            ],
+            "steps": [
+              { "type": "createRecord", "entity": "PurchaseRequest", "as": "c~d", "save": "request", "values": { "p/q~r": 1 } }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownScenarioField, "/steps/0/values/p~1q~0r"),
+                (DiagnosticCodes.UnknownStubOutput, "/stubs/0/output/x~1y~0z"),
+                (DiagnosticCodes.UnknownScenarioRole, "/users/a~1b/0"),
+            ],
+            result.Diagnostics.Where(diagnostic => diagnostic.File == ScenarioFile).Select(diagnostic => (diagnostic.Code, diagnostic.Path)).ToArray());
+    }
+
     [Fact]
     public void Adding_or_changing_a_scenario_keeps_the_content_hash_and_the_resources()
     {
