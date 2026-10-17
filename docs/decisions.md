@@ -1546,7 +1546,7 @@ that rule.
 Authorized users can retry a failed process instance, cancel running or
 waiting work, and resolve a call whose outcome is unknown. Each is an audited
 command that needs its own grant. Cancel and retry are built. Resolve is
-*(planned for M7)*. See
+built for connector calls, and for package calls it is *(planned for M7)*. See
 [processes](reference/processes.md#operator-commands) for the routes, the
 states each command accepts, the errors and a walkthrough.
 The owner confirmed these points on issue #478 on 2026-10-17. The owner made

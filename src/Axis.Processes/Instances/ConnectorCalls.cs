@@ -226,6 +226,27 @@ public static class ConnectorCalls
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Settles the <c>unknown</c> call <paramref name="id"/> as <paramref name="state"/>, <c>succeeded</c> or
+    /// <c>failed</c>, at the transaction's time, for an operator. Its stored input, last status and last
+    /// error are kept, so inspection still shows what was sent and what the system last answered. Throws
+    /// when the call is not unknown.
+    /// </summary>
+    internal static async Task ResolveAsync(NpgsqlTransaction transaction, Guid id, string state, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.connector_calls SET state = @state, settled_at = now() WHERE id = @id AND state = @unknown",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        command.Parameters.AddWithValue("unknown", Unknown);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+        {
+            throw new InvalidOperationException($"The connector call {id} is not unknown, so it cannot be resolved.");
+        }
+    }
+
     private static async Task SetStateAsync(
         NpgsqlTransaction transaction,
         Guid id,

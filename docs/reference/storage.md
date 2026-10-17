@@ -886,7 +886,8 @@ These limits apply to migrations.
   can drain it by cancelling the `running` and `waiting` old-release
   instances, see [Cancel](processes.md#cancel). A call that is
   `sending` or `unknown` must settle or be
-  [resolved](processes.md#resolve) *(planned for M7)* first. A `failed`
+  [resolved](processes.md#resolve) first. *(Resolving a package call is planned
+  for M7.)* A `failed`
   instance does not block the migration, and a [retry](processes.md#retry)
   of one is refused when the migration changed a column it
   uses. There is no way to pause starts yet.
