@@ -21,7 +21,7 @@ public sealed class ProcessInstanceRow
     /// <summary>The release the instance is pinned to.</summary>
     public required Guid ReleaseId { get; init; }
 
-    /// <summary><c>running</c>, <c>waiting</c>, <c>completed</c> or <c>failed</c>.</summary>
+    /// <summary><c>running</c>, <c>waiting</c>, <c>completed</c>, <c>failed</c> or <c>cancelled</c>.</summary>
     public required string State { get; init; }
 
     /// <summary>Starts at 1 and grows with each change of the instance.</summary>

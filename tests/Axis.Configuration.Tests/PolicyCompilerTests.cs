@@ -139,11 +139,11 @@ public sealed class PolicyCompilerTests
     [Theory]
     [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update' and 'delete'.")]
     [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start' and 'inspect'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start', 'inspect' and 'cancel'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
     [InlineData("""{ "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update' and 'delete'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["inspect"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'inspect'. It takes only 'invoke'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start' and 'inspect'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start', 'inspect' and 'cancel'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "fields": ["owner"] }""", "/grants/0/fields", "An endpoint grant has no 'fields'. Only an entity grant limits fields.")]
     [InlineData("""{ "process": "RequestReview", "endpoint": "SubmitRequest", "actions": ["start"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
@@ -185,6 +185,18 @@ public sealed class PolicyCompilerTests
         var grant = Assert.Single(Assert.Single(result.Model!.Policies).Grants);
         Assert.Equal(new ProcessReference(Guid.Parse(ProcessId), "RequestReview"), grant.Process);
         Assert.Equal([PolicyAction.Start, PolicyAction.Inspect], grant.Actions);
+    }
+
+    [Fact]
+    public void A_cancel_grant_on_a_process_compiles()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["cancel"] }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var grant = Assert.Single(Assert.Single(result.Model!.Policies).Grants);
+        Assert.Equal([PolicyAction.Cancel], grant.Actions);
     }
 
     [Fact]
@@ -397,6 +409,23 @@ public sealed class PolicyCompilerTests
         Assert.False(PolicyEvaluator.AllowsInspect(model, ["Employee"], process));
         Assert.False(PolicyEvaluator.AllowsInspect(withoutInspect, ["employee"], otherProcess));
         Assert.True(PolicyEvaluator.AllowsStart(withoutInspect, ["employee"], otherProcess));
+    }
+
+    [Fact]
+    public void Cancel_is_allowed_only_by_a_cancel_grant_on_the_process_for_a_declared_role_held()
+    {
+        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "cancel"] }]"""));
+        using var startOnly = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]"""));
+        var model = Compile(granted);
+        Assert.True(model.TryGetProcess("RequestReview", out var process));
+        var withoutCancel = Compile(startOnly);
+        Assert.True(withoutCancel.TryGetProcess("RequestReview", out var otherProcess));
+
+        Assert.True(PolicyEvaluator.AllowsCancel(model, ["employee"], process));
+        Assert.False(PolicyEvaluator.AllowsCancel(model, ["manager"], process));
+        Assert.False(PolicyEvaluator.AllowsCancel(model, ["Employee"], process));
+        Assert.False(PolicyEvaluator.AllowsCancel(withoutCancel, ["employee"], otherProcess));
+        Assert.False(PolicyEvaluator.AllowsInspect(model, ["employee"], process));
     }
 
     private static ApplicationModel Compile(TemporaryFolder folder)

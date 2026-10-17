@@ -21,6 +21,9 @@ public static class ProcessTasks
     /// <summary>The state of a task whose decision is recorded.</summary>
     public const string Completed = "completed";
 
+    /// <summary>The state of a task that an operator's cancel of its instance closed. It has no outcome.</summary>
+    public const string Cancelled = "cancelled";
+
     /// <summary>The assignee kind of a task assigned to one user id.</summary>
     public const string UserAssignee = "user";
 

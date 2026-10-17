@@ -29,6 +29,9 @@ public static class ConnectorCalls
     /// <summary>The state of a call that settled with an error.</summary>
     public const string Failed = "failed";
 
+    /// <summary>The state of a call that was still <c>pending</c> when an operator cancelled its instance. It is never sent.</summary>
+    public const string Cancelled = "cancelled";
+
     /// <summary>
     /// Inserts <paramref name="call"/> as <c>pending</c> with no attempts. It is created at the
     /// transaction's time. A second call for the same instance and step violates the unique index.
