@@ -377,12 +377,12 @@ This section records
 [D33](../decisions.md#d33-recomputing-stored-computed-fields--agreed). The
 stamp, the fingerprint, the inline recompute at activation, the stamp clearing
 of a `fill` or `convert`, the inline limit, the pending state and the worker
-backfill are built. Activation recomputes every row of an entity whose computed
+backfill are built, and so are the restart by a newer activation and the writes
+of older releases. Activation recomputes every row of an entity whose computed
 definitions changed, and the rows a `fill` or `convert` changed, in its own
 transaction, up to the inline limit. Above the limit it leaves the entity
 pending and the worker recomputes it. What reads answer while a field is
-pending, a newer activation while it is pending, and the writes of older
-releases are planned for M7.
+pending is planned for M7.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -432,9 +432,8 @@ in batches.
   `axis.pending_computed_fields` and a `computed.backfill` work item, then
   commits without touching a row. The computed field is now *pending*: its
   stored values may still come from an older expression. The pending row lists
-  every computed field of the entity and of its child entities. Activation
-  fails and rolls back when the entity is already pending, because the
-  restart below is planned.
+  every computed field of the entity and of its child entities. Activating a
+  newer release while the entity is pending restarts it, see *Restart*.
 - **Stamp.** Each table that is not a child table has the system column
   `computed_release_id uuid NULL`. It names the release that last computed the
   row. Adding it is cheap on a large table, because it is nullable and has no
@@ -490,19 +489,44 @@ in batches.
   target itself, because a release found again by content hash may come back
   without its fingerprints. After a large `fill` the backfill also recomputes
   rows stamped by an older release that has no stored fingerprints.
-- **Older-release writes.** A write whose release has a different fingerprint
-  from the active release's inserts the pending row and the `computed.backfill`
-  work item in its own transaction, when they are missing. It compares two
-  stored fingerprints, so the check is cheap. Without this, a row that pinned
-  work writes after the backfill ends would stay stale with no pending flag.
-  The insert and the final delete of a backfill lock the same pending row, so
-  a write cannot slip between the last check and the delete.
+- **Older-release writes** *(built)*. A write whose release has a different
+  fingerprint from the active release's inserts the pending row and the
+  `computed.backfill` work item in its own transaction, when they are missing.
+  It compares two stored fingerprints, so the check is cheap. Without this, a
+  row that pinned work writes after the backfill ends would stay stale with no
+  pending flag.
+  - Four paths can write under a release that is not the active one: a task
+    completion, a process step update, and a connector or package result
+    write. Each calls the check right after its record write. A write on the
+    active release, such as the record API, an inbound endpoint or seed data,
+    adds nothing. Neither does a write whose release stores the same
+    fingerprint as the active release. A release with no stored fingerprint
+    counts as different.
+  - The write takes a `FOR KEY SHARE` lock on the pending row, after it locked
+    the record row. That lock conflicts only with the delete of a backfill's
+    last batch, so it blocks neither activation nor other writes. When there is
+    no pending row, the write inserts one. Its target is the active release, and
+    its fields are the computed fields of the write's own release model.
+  - The work item stores the trace and span ids of the write, as the work item
+    of an activation does. One helper inserts every `computed.backfill` work
+    item, and it inserts none when the entity has one.
+  - The final delete of a backfill locks the same pending row, so a write
+    cannot slip between the last check and the delete. See *End*.
 - **Batches** *(built)*. The worker claims a `computed.backfill` work item and runs one
   batch of 500 rows, in `ORDER BY id`, in its own transaction.
   - It selects out-of-date rows with their `version`, recomputes them with the
-    target release, and runs
+    application's active release, and runs
     `UPDATE ... WHERE id = $1 AND version = $2`. A row whose version changed is
     skipped. A later batch takes it if its stamp is still out of date.
+  - The pending row can name a release older than the active one, when a write
+    inserted it while an activation was still committing. The batch then
+    computes with the active release, and the up-to-date releases are those
+    whose stored fingerprint for the entity equals the active release's.
+    Computing with the old target would roll the table back to old values.
+  - A batch holds no lock on the pending row. Pinned writes lock the record row
+    before the pending row, so a batch that held the pending row while it
+    updated rows could deadlock with them. Only the last check locks it, see
+    *End*.
   - The update does not change `version`. It writes no audit record and starts
     no trigger. A higher `version` would give a user who is editing the record
     a `409` for a change they did not make.
@@ -524,12 +548,26 @@ in batches.
   id and the child row id, because child rows have their own ids. Before it
   recomputes an entity, activation deletes the error rows of that entity and of
   its child entities, because it computes every row again.
-- **Restart.** Activating a release while a field is pending sets the target
-  to the new release. It recomputes `current_release_ids`, merges the pending
-  fields and applies the inline limit again. The backfill continues with the
-  newest release.
-- **End** *(built)*. The batch that finds no out-of-date row deletes the pending row and
-  its work item. The field is no longer pending.
+- **Restart** *(built)*. Activating a release while a field is pending sets the
+  target to the new release. It recomputes `current_release_ids`, merges the
+  pending fields and applies the inline limit again. The backfill continues
+  with the newest release. This holds for every pending entity of the
+  application, also when its fingerprint did not change.
+  - Inline: activation counts the rows that are out of date for the new
+    release's current releases. When there are at most
+    `Activation:InlineRecomputeLimit`, it recomputes them in its own
+    transaction. If none is left, it deletes the pending row and the work item.
+  - Above the limit, it updates the pending row and keeps the work item. The
+    merged field list can hold a name that only an older release had, such as
+    a renamed computed field, until a later restart replaces it.
+- **End** *(built)*. The batch that finds no out-of-date row locks the pending row
+  `FOR UPDATE`, checks the table again, and deletes the row and completes its work
+  item if still no row is out of date. The lock waits for a write that holds the
+  row `FOR KEY SHARE`, and the check then sees that write's row. If a row is out
+  of date, the batch reschedules the item and the row stays. A write after the
+  delete finds no pending row and inserts a new one. The field is no longer
+  pending. When the active release no longer has the entity, the batch deletes
+  the pending row and the item without a batch.
 - **While pending.**
   - A single read, and the engine's reads of one subject record, compute a
     pending field with the active release and do not store the result. A
@@ -542,8 +580,8 @@ in batches.
     [data sources](data-sources.md#errors).
 
 Tables, both owned by `Axis.Data`. The runtime database role may write both.
-Activation writes both, and the worker writes them too. A record write that
-finds an older release will write them too *(planned for M7)*. The work item
+Activation writes both, and the worker writes them too. So does a record write
+that finds an older release. The work item
 of a pending entity holds the entity `id` in `axis.process_work_items.entity_id`.
 
 `axis.pending_computed_fields`, one row per entity with a pending field:
@@ -582,9 +620,8 @@ UUIDs of the same application, as in the
 [migrations example](#example-renaming-a-field-while-a-task-waits). The table
 holds about 50,000 purchase requests. R2 changes the `amount` expression of the
 line item, so `amount` and the aggregate `total` of the request become
-pending. Steps 1, 4, 5, 7 and 8 are built. What reads answer while pending
-(steps 2 and 3) and the writes of older releases (steps 6 and 9) are planned
-for M7.
+pending. Steps 1 and 4 to 9 are built. What reads answer while pending
+(steps 2 and 3) is planned for M7.
 
 1. R2 is activated. Activation counts 50,000 affected rows, which is more than
    10,000. It inserts the pending row for the purchase request, with R2 as the

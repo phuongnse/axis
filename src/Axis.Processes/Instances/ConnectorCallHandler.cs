@@ -701,6 +701,7 @@ internal sealed partial class ConnectorCallHandler(
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
             }
 
+            await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity, call.ReleaseId, cancellationToken);
             updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(

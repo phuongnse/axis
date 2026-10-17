@@ -270,6 +270,20 @@ public sealed class TaskApiFixture : IAsyncLifetime
         return await command.ExecuteScalarAsync() is Guid stamp ? stamp : null;
     }
 
+    /// <summary>The number of rows in <c>axis.pending_computed_fields</c> of <paramref name="tenant"/>.</summary>
+    public async Task<long> CountPendingComputedFieldsAsync(string tenant)
+    {
+        await using var command = DataSource(tenant).CreateCommand("SELECT count(*) FROM axis.pending_computed_fields");
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
+    /// <summary>The number of <c>computed.backfill</c> work items of <paramref name="tenant"/>.</summary>
+    public async Task<long> CountBackfillItemsAsync(string tenant)
+    {
+        await using var command = DataSource(tenant).CreateCommand("SELECT count(*) FROM axis.process_work_items WHERE kind = 'computed.backfill'");
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     /// <summary>
     /// The state of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>, its
     /// task and its subject record, and the number of its audit records, history rows and work items.

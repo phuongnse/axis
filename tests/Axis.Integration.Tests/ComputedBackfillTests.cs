@@ -220,6 +220,214 @@ public sealed class ComputedBackfillTests(DataDatabaseFixture database) : IClass
         Assert.Equal(0L, await CountWorkItemsAsync());
     }
 
+    [Fact]
+    public async Task Activating_a_third_release_while_pending_targets_it_merges_the_fields_and_the_backfill_ends_with_its_values()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        var rows = await InsertOrdersAsync(25, first.Release!.Id);
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 3")));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second);
+        Assert.Equal([WorkItemOutcome.Rescheduled], await RunBatchesAsync(maximum: 1));
+        await ExecuteAsync("UPDATE axis.pending_computed_fields SET fields = fields || ARRAY['legacy'] WHERE entity_id = @entity");
+
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 4")));
+        var third = await CompileAsync(folder);
+        var result = await ActivateAsync(third);
+
+        Assert.Empty(result.Diagnostics);
+        var pending = Assert.Single(await ReadPendingAsync());
+        Assert.Equal(third.Release!.Id, pending.TargetReleaseId);
+        Assert.Equal([third.Release.Id], pending.CurrentReleaseIds);
+        Assert.Equal(["legacy", "total"], pending.Fields);
+        Assert.Equal(1L, await CountWorkItemsAsync());
+
+        var outcomes = await RunBatchesAsync();
+
+        Assert.Equal(WorkItemOutcome.Completed, outcomes[^1]);
+        foreach (var (id, quantity) in rows)
+        {
+            var order = await ReadOrderAsync(id);
+            Assert.Equal((1L, (Guid?)third.Release.Id, (long?)(quantity * 4)), (order.Version, order.Stamp, order.Total));
+        }
+
+        Assert.Empty(await ReadPendingAsync());
+        Assert.Equal(0L, await CountWorkItemsAsync());
+    }
+
+    [Fact]
+    public async Task Activating_a_third_release_while_pending_recomputes_inline_when_few_rows_are_out_of_date()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        var rows = await InsertOrdersAsync(25, first.Release!.Id);
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 3")));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second);
+        await ExecuteAsync(
+            $"""UPDATE {OrderTable} SET "computed_release_id" = @release WHERE "id" IN (SELECT "id" FROM {OrderTable} ORDER BY "id" OFFSET 5)""",
+            parameters => parameters.AddWithValue("release", second.Release!.Id));
+        Assert.Single(await ReadPendingAsync());
+
+        // The third release changes no computed definition, so the rows the second release stamped are up to date.
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 3"), """{ "name": "note", "type": "text" }"""));
+        var third = await CompileAsync(folder);
+        var result = await ActivateAsync(third);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(await ReadPendingAsync());
+        Assert.Equal(0L, await CountWorkItemsAsync());
+        var recomputed = 0;
+        foreach (var (id, quantity) in rows)
+        {
+            var order = await ReadOrderAsync(id);
+            if (order.Stamp == third.Release!.Id)
+            {
+                recomputed++;
+                Assert.Equal((1L, (long?)(quantity * 3)), (order.Version, order.Total));
+            }
+            else
+            {
+                Assert.Equal((1L, (Guid?)second.Release!.Id, (long?)(quantity * 2)), (order.Version, order.Stamp, order.Total));
+            }
+        }
+
+        Assert.Equal(5, recomputed);
+    }
+
+    [Fact]
+    public async Task A_write_that_overlaps_the_last_batch_either_keeps_the_backfill_going_or_inserts_a_new_pending_row()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        var rows = await InsertOrdersAsync(25, first.Release!.Id);
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 3")));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second);
+        Assert.Equal([WorkItemOutcome.Rescheduled], await RunBatchesAsync(maximum: 1));
+        var model = first.Model!;
+        var owner = model.FindEntity(_orderId)!;
+        var touched = rows[7];
+
+        // An older-release write holds the pending row while the last batch, which finds nothing, wants to end the backfill.
+        WorkItemOutcome lastBatch;
+        await using (var writer = new NpgsqlConnection(database.ConnectionString))
+        {
+            await writer.OpenAsync(CancellationToken);
+            await using var writerTransaction = await writer.BeginTransactionAsync(CancellationToken);
+            await using (var update = new NpgsqlCommand(
+                $"""UPDATE {OrderTable} SET "computed_release_id" = @release WHERE "id" = @id""", writer, writerTransaction))
+            {
+                update.Parameters.AddWithValue("release", first.Release.Id);
+                update.Parameters.AddWithValue("id", touched.Id);
+                await update.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            await ComputedBackfill.MarkStaleWriteAsync(writer, writerTransaction, _tenant, model, owner, first.Release.Id, CancellationToken);
+
+            var batch = Task.Run(async () => (await RunBatchesAsync(maximum: 1))[0], CancellationToken);
+            await WaitForLockWaitAsync("pending_computed_fields");
+            await writerTransaction.CommitAsync(CancellationToken);
+            lastBatch = await batch;
+        }
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, lastBatch);
+        Assert.Single(await ReadPendingAsync());
+        Assert.Equal(1L, await CountWorkItemsAsync());
+
+        var later = await RunBatchesAsync();
+
+        Assert.Equal(WorkItemOutcome.Completed, later[^1]);
+        var restamped = await ReadOrderAsync(touched.Id);
+        Assert.Equal((Guid?)second.Release!.Id, restamped.Stamp);
+        Assert.Empty(await ReadPendingAsync());
+        Assert.Equal(0L, await CountWorkItemsAsync());
+
+        // After the final delete, a write of the older release finds no pending row and inserts a new one.
+        using var activity = new Activity("test").Start();
+        await using (var writer = new NpgsqlConnection(database.ConnectionString))
+        {
+            await writer.OpenAsync(CancellationToken);
+            await using var writerTransaction = await writer.BeginTransactionAsync(CancellationToken);
+            await ComputedBackfill.MarkStaleWriteAsync(writer, writerTransaction, _tenant, model, owner, first.Release.Id, CancellationToken);
+            await writerTransaction.CommitAsync(CancellationToken);
+        }
+
+        var pending = Assert.Single(await ReadPendingAsync());
+        Assert.Equal(second.Release.Id, pending.TargetReleaseId);
+        Assert.Equal([second.Release.Id], pending.CurrentReleaseIds);
+        Assert.Equal(["total"], pending.Fields);
+        Assert.Equal((activity.TraceId.ToHexString(), activity.SpanId.ToHexString()), await ReadWorkItemTraceAsync());
+    }
+
+    [Fact]
+    public async Task A_write_of_a_release_with_the_active_releases_fingerprint_or_the_active_release_marks_nothing_pending()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 2"), """{ "name": "note", "type": "text" }"""));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
+        var owner = second.Model!.FindEntity(_orderId)!;
+        await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, _tenant, second.Model, owner, first.Release!.Id, CancellationToken);
+        await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, _tenant, second.Model, owner, second.Release!.Id, CancellationToken);
+        await transaction.CommitAsync(CancellationToken);
+
+        Assert.Empty(await ReadPendingAsync());
+        Assert.Equal(0L, await CountWorkItemsAsync());
+    }
+
+    [Fact]
+    public async Task A_backfill_whose_pending_row_targets_an_older_release_than_the_active_one_computes_with_the_active_release()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 3")));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second);
+        var rows = await InsertOrdersAsync(25, first.Release!.Id);
+
+        // A write inserted this pending row while the second release was still committing, so it names the first.
+        await ExecuteAsync(
+            """
+            INSERT INTO axis.pending_computed_fields (entity_id, application_id, target_release_id, current_release_ids, fields, created_at)
+            VALUES (@entity, @application, @first, @current, ARRAY['total'], now());
+            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, entity_id)
+            VALUES (@item, @tenant, @kind, now(), @entity)
+            """,
+            parameters =>
+            {
+                parameters.AddWithValue("application", _applicationId);
+                parameters.AddWithValue("first", first.Release.Id);
+                parameters.AddWithValue("current", new[] { first.Release.Id });
+                parameters.AddWithValue("item", Guid.NewGuid());
+                parameters.AddWithValue("tenant", _tenant);
+                parameters.AddWithValue("kind", ComputedBackfill.WorkItemKind);
+            });
+
+        var outcomes = await RunBatchesAsync();
+
+        Assert.Equal(WorkItemOutcome.Completed, outcomes[^1]);
+        foreach (var (id, quantity) in rows)
+        {
+            var order = await ReadOrderAsync(id);
+            Assert.Equal((1L, (Guid?)second.Release!.Id, (long?)(quantity * 3)), (order.Version, order.Stamp, order.Total));
+        }
+
+        Assert.Empty(await ReadPendingAsync());
+        Assert.Equal(0L, await CountWorkItemsAsync());
+    }
+
     /// <summary>Claims and runs the tenant's backfill item until it completes, or <paramref name="maximum"/> batches ran. Returns the outcomes.</summary>
     private async Task<List<WorkItemOutcome>> RunBatchesAsync(int maximum = 10)
     {
@@ -243,15 +451,18 @@ public sealed class ComputedBackfillTests(DataDatabaseFixture database) : IClass
     }
 
     // The batch is blocked when a backend of this database waits on a lock in an update of the order table.
-    private async Task WaitForBlockedUpdateAsync()
+    private Task WaitForBlockedUpdateAsync() => WaitForLockWaitAsync(EntityNaming.Table(_orderId));
+
+    // Waits until a backend of this database waits on a lock in a statement that mentions the text.
+    private async Task WaitForLockWaitAsync(string statementText)
     {
         await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline)
         {
             await using var command = dataSource.CreateCommand(
-                "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%' || @table || '%'");
-            command.Parameters.AddWithValue("table", EntityNaming.Table(_orderId));
+                "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%' || @text || '%'");
+            command.Parameters.AddWithValue("text", statementText);
             if ((long)(await command.ExecuteScalarAsync(CancellationToken))! > 0)
             {
                 return;
@@ -260,7 +471,28 @@ public sealed class ComputedBackfillTests(DataDatabaseFixture database) : IClass
             await Task.Delay(50, CancellationToken);
         }
 
-        Assert.Fail("The batch never waited on the user's update.");
+        Assert.Fail($"No backend ever waited on a lock in a statement that mentions '{statementText}'.");
+    }
+
+    // Runs the statement with the order entity id as @entity.
+    private async Task ExecuteAsync(string sql, Action<NpgsqlParameterCollection>? parameters = null)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("entity", _orderId);
+        parameters?.Invoke(command.Parameters);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+    }
+
+    private async Task<(string? TraceId, string? SpanId)> ReadWorkItemTraceAsync()
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT trace_id, span_id FROM axis.process_work_items WHERE entity_id = @entity AND kind = @kind");
+        command.Parameters.AddWithValue("entity", _orderId);
+        command.Parameters.AddWithValue("kind", ComputedBackfill.WorkItemKind);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        return (reader.GetString(0), reader.GetString(1));
     }
 
     private static string Total(string expression) =>
