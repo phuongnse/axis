@@ -110,6 +110,7 @@ public sealed partial class WorkItemRunner
     public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);
+        var start = Stopwatch.GetTimestamp();
         _handlers.TryGetValue(item.Kind, out var handler);
         IExternalWorkItemHandler? externalHandler = null;
         if (handler is null && !_externalHandlers.TryGetValue(item.Kind, out externalHandler))
@@ -133,7 +134,7 @@ public sealed partial class WorkItemRunner
             await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
             if (handler is null)
             {
-                return Finish(activity, await externalHandler!.ExecuteAsync(item, connection, cancellationToken));
+                return Finish(activity, item, start, await externalHandler!.ExecuteAsync(item, connection, cancellationToken));
             }
 
             Exception? error = null;
@@ -155,11 +156,11 @@ public sealed partial class WorkItemRunner
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         LogLostClaim(item.Id, item.Kind, item.TenantId);
-                        return Finish(activity, WorkItemOutcome.LostClaim);
+                        return Finish(activity, item, start, WorkItemOutcome.LostClaim);
                     }
 
                     await transaction.CommitAsync(cancellationToken);
-                    return Finish(activity, WorkItemOutcome.Completed);
+                    return Finish(activity, item, start, WorkItemOutcome.Completed);
                 }
 
                 await transaction.RollbackAsync(cancellationToken);
@@ -175,12 +176,12 @@ public sealed partial class WorkItemRunner
             {
                 await failure.RollbackAsync(cancellationToken);
                 LogLostClaim(item.Id, item.Kind, item.TenantId);
-                return Finish(activity, WorkItemOutcome.LostClaim);
+                return Finish(activity, item, start, WorkItemOutcome.LostClaim);
             }
 
             await handler.OnFailedAsync(new WorkItemContext(item, connection, failure), error, cancellationToken);
             await failure.CommitAsync(cancellationToken);
-            return Finish(activity, WorkItemOutcome.Failed);
+            return Finish(activity, item, start, WorkItemOutcome.Failed);
         }
         catch (Exception exception)
         {
@@ -210,16 +211,16 @@ public sealed partial class WorkItemRunner
         return true;
     }
 
-    private static WorkItemOutcome Finish(Activity? activity, WorkItemOutcome outcome)
+    private static WorkItemOutcome Finish(Activity? activity, ClaimedWorkItem item, long start, WorkItemOutcome outcome)
     {
-        activity?.SetTag(
-            AxisTelemetry.OutcomeTag,
-            outcome switch
-            {
-                WorkItemOutcome.Failed => "failed",
-                WorkItemOutcome.LostClaim => "fenced",
-                _ => "completed",
-            });
+        var name = outcome switch
+        {
+            WorkItemOutcome.Failed => "failed",
+            WorkItemOutcome.LostClaim => "fenced",
+            _ => "completed",
+        };
+        activity?.SetTag(AxisTelemetry.OutcomeTag, name);
+        AxisMetrics.RecordWorkItem(item.TenantId, item.Kind, name, Stopwatch.GetElapsedTime(start));
         return outcome;
     }
 
