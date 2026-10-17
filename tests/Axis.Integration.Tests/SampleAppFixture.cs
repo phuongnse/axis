@@ -253,6 +253,10 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public static Task<HttpResponseMessage> CancelAsync(HttpClient client, Guid instanceId, string body) =>
         SendAsync(client, HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instanceId:D}/cancel", body);
 
+    /// <summary>Retries the failed approval instance <paramref name="instanceId"/> with the JSON <paramref name="body"/>. The caller disposes the response.</summary>
+    public static Task<HttpResponseMessage> RetryAsync(HttpClient client, Guid instanceId, string body) =>
+        SendAsync(client, HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instanceId:D}/retry", body);
+
     /// <summary>The request's number and purchase order number, read through the record API.</summary>
     public static async Task<(string Number, string? PurchaseOrderNumber)> NumbersAsync(HttpClient client, Guid subject)
     {
