@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Tests;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -232,6 +233,70 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         await ScheduleTriggerFixture.RunUntilIdleAsync("g", fixture.NewWorker(), CancellationToken);
 
         await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored);
+    }
+
+    [Fact]
+    public async Task Fan_out_over_a_data_source_filter_that_reads_a_pending_field_starts_nothing_and_keeps_its_item_until_the_backfill_ends()
+    {
+        var tenant = fixture.Tenant("i");
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(fixture.Folder, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(fixture.Folder, file);
+            var content = await File.ReadAllTextAsync(file, CancellationToken);
+            content = relativePath switch
+            {
+                "entities/request.json" => content.Replace(
+                    "\"fields\": [",
+                    "\"fields\": [\n    { \"name\": \"doubled\", \"type\": \"integer\", \"expression\": \"divisor * 2\" },",
+                    StringComparison.Ordinal),
+                "data-sources/large-requests.json" => content.Replace("amount >= minAmount", "amount >= minAmount and doubled > 0", StringComparison.Ordinal),
+                _ => content,
+            };
+            folder.With(relativePath, content);
+        }
+
+        var large = new[] { await tenant.InsertRequestAsync(2000m, 1), await tenant.InsertRequestAsync(1500m, 1) };
+
+        // R1 computes doubled inline. R2 changes its expression and leaves the backfill to the worker.
+        await tenant.ActivateAsync(folder.Path, []);
+        folder.With("entities/request.json", (await File.ReadAllTextAsync(Path.Combine(folder.Path, "entities", "request.json"), CancellationToken)).Replace("divisor * 2", "divisor * 3", StringComparison.Ordinal));
+        await tenant.ActivateAsync(folder.Path, [], inlineRecomputeLimit: 0);
+        Assert.Equal(1L, await tenant.CountAsync("SELECT count(*) FROM axis.pending_computed_fields"));
+        await DueAtAsync(tenant, _occurrence);
+        var worker = fixture.NewWorker();
+
+        // The schedule item, then the fan-out, which the pending field refuses.
+        await fixture.RunAsync("i", worker, 2, CancellationToken);
+
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_instances"));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts"));
+        Assert.Equal(
+            (true, true),
+            (
+                (bool)(await tenant.ScalarAsync("SELECT due_at > now() FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)))!,
+                (bool)(await tenant.ScalarAsync("SELECT claim_token IS NULL FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)))!));
+        Assert.Contains(
+            fixture.Logs.Entries,
+            entry => entry.StartsWith("Warning:", StringComparison.Ordinal) && entry.Contains("being recomputed", StringComparison.Ordinal));
+
+        // Only the backfill is due. Then the fan-out runs again, as it does after its lease.
+        await ScheduleTriggerFixture.RunUntilIdleAsync("i", worker, CancellationToken);
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.pending_computed_fields"));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts"));
+        await tenant.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind));
+
+        await fixture.RunAsync("i", worker, 1, CancellationToken);
+
+        var occurrence = Assert.Single(await tenant.TriggerSchedulesAsync()).LastOccurrenceAt ?? throw new InvalidOperationException("No occurrence ran.");
+        foreach (var id in large)
+        {
+            var instance = Assert.Single(await InstancesAsync(tenant, id));
+            Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id, occurrence));
+        }
+
+        Assert.Equal(2L, await tenant.CountAsync("SELECT count(*) FROM axis.trigger_starts WHERE outcome = 'started'"));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind)));
     }
 
     [Fact]

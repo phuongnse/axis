@@ -536,11 +536,18 @@ public sealed class ProcessStepFixture : IAsyncLifetime
 
     private Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(string folder) => ActivateAsync(folder, []);
 
-    /// <summary>Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it. Returns the release's id and model.</summary>
+    /// <summary>
+    /// Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it.
+    /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
+    /// more to the backfill. Returns the release's id and model.
+    /// </summary>
     internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(
-        string folder, IReadOnlyCollection<PackageVersion> packages, ActivationBindings? bindings = null)
+        string folder,
+        IReadOnlyCollection<PackageVersion> packages,
+        ActivationBindings? bindings = null,
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
     {
-        var (compiled, activated) = await TryActivateAsync(folder, packages, bindings ?? StepAppBindings(_tenantId));
+        var (compiled, activated) = await TryActivateAsync(folder, packages, bindings ?? StepAppBindings(_tenantId), inlineRecomputeLimit);
         Assert.Empty(activated.Diagnostics);
         await using (var connection = await DataSource.OpenConnectionAsync())
         {
@@ -556,7 +563,10 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// and the activation result, which may hold diagnostics. It writes no schedules.
     /// </summary>
     internal async Task<(ReleaseCompilationResult Compiled, ActivationResult Activated)> TryActivateAsync(
-        string folder, IReadOnlyCollection<PackageVersion> packages, ActivationBindings bindings)
+        string folder,
+        IReadOnlyCollection<PackageVersion> packages,
+        ActivationBindings bindings,
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
@@ -564,7 +574,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance);
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit);
         return (compiled, activated);
     }
 

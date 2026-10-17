@@ -531,9 +531,8 @@ The `role` and `policy` resource files are described in
   per filtered grant, so reads and writes give the same answer and a filter
   that fails denies through its own grant only. The user id is a parameter,
   never part of the SQL text. A read filter that reads a pending computed
-  field fails closed with a `409`, in the record API and the process endpoints.
-  The data sources keep their root read filter on a pending field *(planned
-  for M7)*.
+  field fails closed with a `409`, in the record API, the process endpoints and
+  the data sources.
 - **Writes.**
   - A create needs the new record to match the filter of a `create` grant.
   - An update needs the stored record to be readable, otherwise `404`. It
