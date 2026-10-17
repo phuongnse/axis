@@ -1400,8 +1400,8 @@ pending, and the writes of older releases. A single read, the response of an
 update, the engine's reads of a subject record and process start conditions
 compute a pending field on the spot and store nothing. The record API and the
 process endpoints refuse a sort, a search or a policy filter that reads a
-pending field with `409`. The same refusals in data sources are
-*(planned for M7)*. See
+pending field with `409`. Data sources refuse the same way, and a schedule
+fan-out over a pending field waits for the backfill. See
 [storage](reference/storage.md#recomputing-computed-fields) for the steps and
 a walkthrough.
 The owner confirmed these points on issue #473 on 2026-10-17.

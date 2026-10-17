@@ -234,9 +234,10 @@ grants, the record filters, the fields and the joined targets are built.
 - **Record filters.** The root entity's read filters are combined with OR and
   added to the data source's own `filter` with AND, in SQL, before any
   grouping. So rows, groups, measures and `totalCount` cover only the
-  records the user may read. *(planned for M7)* A root read filter that
-  reads a [pending field](storage.md#recomputing-computed-fields) is a `409`
-  and no rows come back. See [Errors](#errors).
+  records the user may read. A root read filter that reads a
+  [pending field](storage.md#recomputing-computed-fields) is a `409` and no
+  rows come back. It is checked right after the grants, before the query, so
+  a bad `sort` does not hide it. See [Errors](#errors).
 - **Fields.** Every projected field must be one the user may read, otherwise
   the whole data source is a `403`. This covers every entry of `fields`,
   also in a grouped data source, and so every field that a measure
@@ -271,7 +272,7 @@ grants, the record filters, the fields and the joined targets are built.
   invalid.
 - **Unknown parameters.** They are ignored.
 - **Required parameter.** A required parameter that is not given is invalid.
-- **Pending fields** *(planned for M7)*. A data source has no single read. A
+- **Pending fields.** A data source has no single read. A
   projected [pending field](storage.md#recomputing-computed-fields) shows its
   stored value, which may come from an older expression. A query is refused
   with the `409` in [Errors](#errors) when its `sort`, its default `sort`,
@@ -370,8 +371,10 @@ fixed and never contain text from the request.
 
 A request is checked in this order, and the first failure is the response:
 the session, then the path, then the grants, then the query, then the
-database. The readable fields are checked with the grants. *(planned for M7)*
-The pending fields are checked after the query and before the database.
+database. The readable fields are checked with the grants. A root read filter
+that reads a pending field is checked right after the grants, before the
+query. The pending fields of the `sort`, `filter` and `aggregate` are checked
+after the query and before the database.
 
 - **`401`.** A request without a session, or with a session from another
   tenant. It comes before the path, so it is a `401` even for an unknown
@@ -387,13 +390,13 @@ The pending fields are checked after the query and before the database.
   `page`, `pageSize`, `sort` and the parameter names. It covers a bad value, a
   missing required value and a repeated parameter. Every invalid parameter is
   reported in the same response.
-- **`409` for a pending field** *(planned for M7)*. The `sort`, default
+- **`409` for a pending field.** The `sort`, default
   `sort`, `filter`, `groupBy` field or measure reads a field that is being
   recomputed. The title is fixed: "A field is being recomputed." `errors` is
   keyed `sort`, `filter` or `aggregate`, with a message that names the field.
   The request is valid, so this is a state conflict, not a `400`. A sum over
   stale totals would be the same silent failure.
-- **`409` for a policy that reads a pending field** *(planned for M7)*. A root
+- **`409` for a policy that reads a pending field.** A root
   read filter of the user's grants reads a field that is being recomputed. No
   rows come back. The title is fixed: "Your access to this entity cannot be
   checked while a field is being recomputed." There is no `errors`, and the

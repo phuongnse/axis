@@ -422,12 +422,14 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// release, with <paramref name="edit"/> applied to each file. It gets the file's path relative
     /// to the folder and its content, and returns the new content, or null to leave the file out.
     /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
-    /// more to the backfill. Returns the new release's id.
+    /// more to the backfill. Each file of <paramref name="added"/>, keyed by its path relative to the folder, is
+    /// written as well. Returns the new release's id.
     /// </summary>
     public async Task<Guid> ActivateEditedAsync(
         string tenant,
         Func<string, string, string?> edit,
-        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
+        IReadOnlyDictionary<string, string>? added = null)
     {
         using var folder = new TemporaryFolder();
         foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
@@ -437,6 +439,11 @@ public sealed class TaskApiFixture : IAsyncLifetime
             {
                 folder.With(path, content);
             }
+        }
+
+        foreach (var (path, content) in added ?? new Dictionary<string, string>())
+        {
+            folder.With(path, content);
         }
 
         await using var connection = new NpgsqlConnection(_tenants[tenant].ConnectionString);
