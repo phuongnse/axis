@@ -110,7 +110,7 @@ internal static class EventTriggerStarts
         {
             ProcessStartOutcome.Started => (instanceId, null),
             ProcessStartOutcome.AlreadyRunning => (null, "the process already runs for the record"),
-            _ => (null, started.Error is { } error ? $"the start condition failed: {Clause(error)}" : "the start condition is not true"),
+            _ => (null, started.ErrorKind is { } kind ? $"the start condition failed: {kind}" : "the start condition is not true"),
         };
     }
 
@@ -154,14 +154,11 @@ internal static class EventTriggerStarts
         var result = ExpressionInterpreter.Evaluate(when.Syntax, when.Check, new ExpressionValues(values), null, now);
         if (result.Error is { } error)
         {
-            return $"the when failed: {Clause(error.Message)}";
+            return $"the when failed: {error.Kind}";
         }
 
         return result.Value is true ? null : "the when is not true";
     }
-
-    /// <summary>An error message without its closing period, to fit inside the log line.</summary>
-    private static string Clause(string message) => message.TrimEnd('.');
 }
 
 /// <summary>

@@ -190,8 +190,10 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
 
         var errors = logs.Entries.Where(entry => entry.StartsWith("Error", StringComparison.Ordinal)).ToList();
         Assert.Equal(2, errors.Count);
-        Assert.Contains(errors, entry => entry.Contains("binding 'PurchasingSystemToken' is a secret", StringComparison.Ordinal));
-        Assert.Contains(errors, entry => entry.Contains("Call refused with token [secret]", StringComparison.Ordinal));
+
+        // A failed item names its exception type only: the message and inner exceptions can quote values.
+        Assert.All(errors, entry => Assert.Contains("failed with System.InvalidOperationException", entry, StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("is a secret", StringComparison.Ordinal) || entry.Contains("Call refused", StringComparison.Ordinal));
         Assert.All(logs.Entries, entry =>
         {
             Assert.DoesNotContain(TokenValue, entry, StringComparison.Ordinal);

@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using Record = Axis.Data.Records.Record;
@@ -75,6 +76,13 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>The release of StepApp that the fixture activated first.</summary>
     public Guid FirstReleaseId { get; private set; }
 
+    /// <summary>Every log entry the worker's services wrote.</summary>
+    internal LogCollector Logs { get; } = new();
+
+    /// <summary>The worker's services.</summary>
+    internal IServiceProvider Services =>
+        _services ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     /// <summary>The worker's work item runner, with the process step handler registered.</summary>
     public WorkItemRunner Runner =>
         (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
@@ -110,7 +118,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
                 [$"Tenants:{_tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(_connectionString),
             })
             .Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
+        _services = new ServiceCollection().AddLogging(logging => logging.AddProvider(Logs)).AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()

@@ -1639,9 +1639,9 @@ resolution are authorized, audited commands.
 
 ## D36. Correlated logs, metrics and traces — Agreed
 
-The server and the worker emit correlated logs, metrics and traces. Traces and
-the stored `trace_id` are built. Metrics, OTLP logs, the log scope and the
-problem details `traceId` are *(planned for M7)*. See
+The server and the worker emit correlated logs, metrics and traces. Traces,
+the stored `trace_id`, OTLP logs, the log scope and the problem details
+`traceId` are built. Metrics are *(planned for M7)*. See
 [telemetry](architecture.md#telemetry) for the spans and what telemetry never
 holds.
 The owner confirmed these points on issue #479 on 2026-10-17.

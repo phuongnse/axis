@@ -918,15 +918,15 @@ development or E2E server serves a real application without a separate step.
 ## Telemetry export
 
 The server and the worker export traces with OpenTelemetry, see
-[Telemetry](../architecture.md#telemetry). Metrics and logs are *(planned for
-M7)*. They read the standard variables:
+[Telemetry](../architecture.md#telemetry). They export logs too. Metrics are
+*(planned for M7)*. They read the standard variables:
 
 | Variable | Meaning |
 | --- | --- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | The OTLP endpoint for all signals. With no endpoint, nothing is exported |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | The endpoint for traces only |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | *(planned for M7)* The endpoint for metrics only |
-| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | *(planned for M7)* The endpoint for logs only |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | The endpoint for logs only |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | The OTLP protocol |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Headers sent with every export |
 | `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker` |

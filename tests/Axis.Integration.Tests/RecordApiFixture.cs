@@ -67,6 +67,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
     /// <summary>Every log entry the server wrote.</summary>
     internal LogCollector Logs => _logs;
 
+    /// <summary>The services of the test host.</summary>
+    internal IServiceProvider Services => (_factory ?? throw new InvalidOperationException("The test host is not started.")).Services;
+
     /// <summary>The compiled model of the RecordsApp fixture, the same in both tenants.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
 

@@ -1371,6 +1371,10 @@ and the kind of expression error, such as
 write stores its field pointers and message keys, as above. See
 [Step errors](#step-errors-in-inspection).
 
+The failure is also logged at Warning level with the step name, the instance id
+and the same fixed text as the history row. A failed work item is logged with
+its exception type only.
+
 ## Connector calls
 
 This section follows
@@ -2295,7 +2299,8 @@ back with its event, and the raising instance becomes `failed`.
 
 Every skip for a `when`, a `startCondition`, a receipt or a process that
 already runs is logged at Information level with the trigger, the record and
-the reason. A run-time error is logged with its message. A data change
+the reason. A run-time error is logged with its kind, such as
+`DivisionByZero`, never its message, which can quote a value. A data change
 trigger that does not list the write in `on`, or whose `fields` an update did
 not change, is passed over without a log line, because it was never a
 candidate. A skip is never tried again, so a process never starts long after

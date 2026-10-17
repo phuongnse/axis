@@ -229,7 +229,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
 
         return started.Outcome == ProcessStartOutcome.AlreadyRunning
             ? "the process already runs for the record"
-            : started.Error is { } error ? $"the start condition failed: {error.TrimEnd('.')}" : "the start condition is not true";
+            : started.ErrorKind is { } kind ? $"the start condition failed: {kind}" : "the start condition is not true";
     }
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of occurrence {OccurrenceAt}: {Reason}.")]
