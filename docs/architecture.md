@@ -70,6 +70,7 @@ tests/
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
+  postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles
   packages/               the sample extension package payment-references and its unit tests
 ```
 
@@ -80,7 +81,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios` (the console host that runs an application's test scenarios), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -130,7 +131,7 @@ The `Tenants` section of the server configuration is keyed by tenant id:
 
 ```json
 "Tenants": {
-  "default": { "Hosts": [ "localhost" ], "ConnectionString": "Host=..." }
+  "default": { "Hosts": [ "localhost" ], "ConnectionString": "Host=...;Username=axis_runtime", "SchemaConnectionString": "Host=...;Username=axis_schema" }
 }
 ```
 
@@ -165,7 +166,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   whitespace. This applies even when no application folder is activated at
   startup;
 - in the server, both connection strings name the same user;
-- *(planned for M6)* in the server and the worker, the runtime database role
+- *(planned for M7)* in the server and the worker, the runtime database role
   is a superuser, owns the `axis` or `entities` schema, or may create objects
   in either;
 - a binding has a missing `Kind` or one other than `url` or `secret`, a blank
@@ -618,7 +619,7 @@ to the draft. Only another grant can make it readable.
 
 ## Process engine (D11)
 
-- **Release pinning** *(planned for M6)*. New work starts on the active
+- **Release pinning.** New work starts on the active
   release, and running work keeps its steps, tasks, forms, texts and package
   versions until it ends. Roles and policies use the active release, see
   [releases and running work](reference/processes.md#releases-and-running-work)
@@ -673,7 +674,7 @@ Moved to [reference/frontend.md](reference/frontend.md).
 | Integration | xUnit + Testcontainers PostgreSQL and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm |
 | Frontend unit | Vitest + Testing Library | Shared components and metadata rendering |
 | End to end | Playwright | Real server + real database + SPA, user journeys and denied access |
-| Scenario | Axis.Scenarios + Testcontainers PostgreSQL | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries and schedule triggers are *(planned for M6)* |
+| Scenario | Axis.Scenarios + Testcontainers PostgreSQL | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries and schedule triggers are *(planned for M7)* |
 
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).

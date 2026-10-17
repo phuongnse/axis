@@ -2392,7 +2392,7 @@ What runs now:
   number all use it. Timestamps that PostgreSQL writes itself, such as
   `created_at`, keep the real clock.
 
-*(planned for M6)*: event deliveries and schedule triggers. Only the
+*(planned for M7)*: event deliveries and schedule triggers. Only the
 `process.step`, `connector.call` and `package.call` items run, so event deliveries
 and schedule triggers stay queued and do not fail the scenario.
 

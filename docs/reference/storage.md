@@ -124,7 +124,7 @@ database roles, `axis_schema` and `axis_runtime`, own each test database with
 `axis_schema`, run the server and worker as `axis_runtime`, and run activation
 as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
 same: `samples/postgres/init-roles.sql` creates the roles and grants them
-nothing. *(planned for M6)* The start checks for a superuser, a schema owner or
+nothing. *(planned for M7)* The start checks for a superuser, a schema owner or
 a role that may create objects are still to come.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
@@ -176,7 +176,7 @@ What each database role may do:
 - **Start checks.** A missing or blank setting stops the start, naming the
   tenant and the setting. The server does this today. So does a
   `ConnectionString` that names no user, and two settings that name the same
-  user. *(planned for M6)* So does a
+  user. *(planned for M7)* So does a
   runtime database role that is a superuser, owns the `axis` or `entities`
   schema, or may create objects in either. The server runs all of these
   checks. The worker validates `ConnectionString` and the runtime database
@@ -310,7 +310,7 @@ access. It returns diagnostics, SQL statements and the new records to write.
   entities, cycles and self-references need no further ordering. Pending
   migration statements run before these additive statements, then stored
   computed fields affected by a `fill` or `convert` are recomputed
-  *(planned for M6)*. See [Order of statements](#migrations).
+  *(planned for M7)*. See [Order of statements](#migrations).
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
 
@@ -343,14 +343,14 @@ child tables are in [Schema planning](#schema-planning).
   transaction, and one run-time error would stop the activation. Additive
   computed fields are still not backfilled, but a migration's `fill` or
   `convert` recomputes the computed fields that read the changed field
-  *(planned for M6)*. See [Migrations](#migrations).
+  *(planned for M7)*. See [Migrations](#migrations).
 
 ## Migrations
 
 The migration resource, its compile checks and the once-per-tenant apply of
 `renameField`, `dropField`, `dropEntity`, `fill` and `convert` at activation are
 built, and so are the start lock and the old-release work check. The recompute
-of computed fields is *(planned for M6)*, and so are the rules, table rows
+of computed fields is *(planned for M7)*, and so are the rules, table rows
 and example steps below that use it. Until the recompute is built, a `fill` or
 `convert` on a child entity and a `fill` or `convert` of a field that a computed
 field reads are `AXC0175`. This section records
@@ -383,7 +383,7 @@ Migrations run forward only.
      rolls the activation back.)*
   6. Run additive DDL in the order used today. *(Built.)*
   7. Recompute affected stored computed fields for the changed rows,
-     using the release being activated. *(Planned for M6.)*
+     using the release being activated. *(Planned for M7.)*
   8. Write `axis.applied_migrations` and the provisioning records. *(Built.)*
   9. Upsert the active release and its `axis.active_sites` rows. *(Built.)*
   10. Commit, releasing both locks. *(Built.)*
@@ -448,7 +448,7 @@ Migrations run forward only.
   commit a rename or drop between them. The store and the data context
   must therefore share one tenant connection. A store on another connection
   throws before anything commits.
-- **Computed fields** *(planned for M6)*. A `fill` or `convert` recomputes, in the same
+- **Computed fields** *(planned for M7)*. A `fill` or `convert` recomputes, in the same
   transaction, every stored computed field that reads the changed field.
   It may read it directly, through a rule or through a child aggregate.
   Only the changed rows are recomputed, and for changed child rows, their
@@ -496,7 +496,7 @@ value the field does not list is `AXC0177` too.
 
 Each `fill` and `convert` increments `version` on every row it changes.
 Child rows have no version, so changing them increments their owner's
-`version` *(planned for M6; a `fill` or `convert` on a child entity is not applied yet)*. This prevents an edit begun before the migration from overwriting
+`version` *(planned for M7; a `fill` or `convert` on a child entity is not applied yet)*. This prevents an edit begun before the migration from overwriting
 a migrated value without a version conflict. There is no audit record for
 each changed row. The `axis.applied_migrations` row is the trace.
 
@@ -518,7 +518,7 @@ records a migration only when activation commits. The table has an index on
 
 This example uses the purchase request migration in
 [configuration](configuration.md#resource-file-shape). Its recompute of
-computed fields is *(planned for M6)*.
+computed fields is *(planned for M7)*.
 R1 and R2 stand for stored release UUIDs of the same application.
 
 1. R1 is active. An employee submits a purchase request. Its process
@@ -532,7 +532,7 @@ R1 and R2 stand for stored release UUIDs of the same application.
 4. The manager approves. The instance runs to `completed`.
 5. Once no `running` or `waiting` instance is pinned to R1, activating R2
    applies the rename and fill, provisions the required constraint,
-   recomputes affected computed fields *(planned for M6)* and switches the active release and
+   recomputes affected computed fields *(planned for M7)* and switches the active release and
    site paths in one transaction.
 
 New submissions while R1 is active also count. On a busy application, the
@@ -543,7 +543,7 @@ in an earlier release never waits for old-release work.
 ### Limits
 
 These limits apply to migrations. Those about the recompute of computed
-fields by a `fill` or `convert` are *(planned for M6)*.
+fields by a `fill` or `convert` are *(planned for M7)*.
 
 - A large `fill` or `convert` holds the schema lock and its row locks until
   commit. There are no batched backfills.
