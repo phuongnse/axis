@@ -1961,7 +1961,7 @@ The `cancel` action of a `process` grant lets a user cancel that process's
 instances, see [Cancel](processes.md#cancel). The `retry` action lets a user
 retry its failed instances, see [Retry](processes.md#retry). The `resolve`
 action lets a user settle an unknown connector call, see
-[Resolve](processes.md#resolve). Package calls are *(planned for M7)*.
+[Resolve](processes.md#resolve). That covers a connector call and a package call.
 Each is checked on its own, and none implies another. `start` implies none of
 them. A grant takes no `filter` or `fields`, as for `start`. The finance
 reviewer policy above lets its reviewers cancel, retry and resolve an approval. An operator role

@@ -38,7 +38,7 @@ built. The `inspect` grant, the instance list and the instance detail with its
 `calls` and the `sensitive` flag are built. The inspector widget is planned
 for M7, see [Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
-resolve is built for connector calls, and *(planned for M7)* for package calls,
+resolve is built for connector and package calls,
 see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -1824,8 +1824,7 @@ again with the stored input under the same operation identity.
   fixed sentence, one for a timeout and one for a call found `sending`. The
   call keeps its stored input, and it writes no `operation.called` audit record
   and no `process.failed`, because it has not settled. Packages have no
-  lookup, so an operator resolves it, see [Resolve](#resolve). *(Resolving a
-  package call is planned for M7.)*
+  lookup, so an operator resolves it, see [Resolve](#resolve).
 - **Audit.** Each settled call writes one audit record `operation.called`,
   with actor `system` and details
   `{ "package", "version", "operation", "operationId", "attempts", "outcome" }`.
@@ -1839,9 +1838,8 @@ again with the stored input under the same operation identity.
 ## Operator commands
 
 This section follows
-[D35](../decisions.md#d35-operator-retry-cancel-and-resolve--agreed). Cancel and
-retry are built. Resolve is built for connector calls, and package calls are
-*(planned for M7)*. Three
+[D35](../decisions.md#d35-operator-retry-cancel-and-resolve--agreed). Cancel,
+retry and resolve are built. Three
 commands let an authorized user act on process work that the engine cannot
 finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
 `running` or `waiting` instance. **Resolve** settles a connector or package
@@ -2004,9 +2002,7 @@ Resolve takes a call that is `unknown`, on an instance that is `waiting` on the
 call's step. The operator has checked what the other system did, and says so.
 It works for a connector call with no lookup and for a package call, which has
 none. It also works for a connector call that waits for its lookup, in place of
-the lookup. Connector calls are built. Package calls are *(planned for M7)*,
-and until then a package call's id on the route is a `404`, like any id that is
-not a connector call of the instance.
+the lookup.
 
 One transaction does this:
 
@@ -2050,7 +2046,8 @@ One transaction does this:
    record, and it shows who settled it by hand.
 
 A resolved call keeps its last HTTP status and last error from its final
-attempt. Only its state and its settled time change. A resolve records no
+attempt. Only its state and its settled time change, and a package call also
+clears its stored input. A resolve records no
 instance-ended metric, as a cancel does not.
 
 A resolve with a mistake in `output` is a `400` and does not fail the
@@ -2098,8 +2095,7 @@ and then the `409` checks.
     this process exists with this id.";
   - an instance whose subject record the user may not read;
   - for a resolve, an unknown `{callId}`, a `{callId}` that is not a UUID in the
-    hyphenated form, or a call of another instance. A package call's id is
-    also a `404` until package resolve is built. The title is "No call of this
+    hyphenated form, or a call of another instance. The title is "No call of this
     instance exists with this id.".
 - **`400`.** The body is a validation problem keyed by JSON Pointer. Every
   invalid part is reported in the same response.
