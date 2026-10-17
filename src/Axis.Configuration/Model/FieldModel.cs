@@ -50,6 +50,12 @@ public sealed record FieldModel
     public bool Creator { get; init; }
 
     /// <summary>
+    /// Whether the field's value never appears in process inspection. The record API ignores it, and
+    /// it changes no table.
+    /// </summary>
+    public bool Sensitive { get; init; }
+
+    /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no
     /// column: its rows live in the child entity's table.
     /// </summary>

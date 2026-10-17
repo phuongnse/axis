@@ -2072,7 +2072,7 @@ user's id, and policies use it, for example `requester == currentUser()`:
 
 ### Sensitive fields
 
-*(planned for M7)* A field can declare `"sensitive": true`. Its value never
+A field can declare `"sensitive": true`. Its value never
 appears in [process inspection](processes.md#values-and-masking), for any
 user:
 
@@ -2100,7 +2100,10 @@ user:
 - **Allowed fields.** `sensitive` is allowed on every type except
   `child-collection`, and on the fields of a child entity. On a
   `child-collection` field it is `AXC0013` at `/fields/{i}/sensitive`. A value
-  that is not a boolean is `AXC0004`.
+  that is not a boolean is `AXC0004`. Even `"sensitive": false` on a
+  `child-collection` field is `AXC0013`, as `required` and `unique` are. A
+  `child-collection` field in a call mapping counts as sensitive when any field
+  of its child entity is sensitive.
 - **Two releases.** A field counts as sensitive when the release an instance is
   pinned to or the active release marks it.
 
@@ -2144,7 +2147,7 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](#record-creator).
-- `sensitive` *(planned for M7)* is allowed on every type except
+- `sensitive` is allowed on every type except
   `child-collection`. It defaults to `false`. On a `child-collection` field it
   is `AXC0013` at `/fields/{i}/sensitive`. See
   [Sensitive fields](#sensitive-fields).

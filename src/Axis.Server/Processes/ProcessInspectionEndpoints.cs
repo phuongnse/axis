@@ -31,7 +31,8 @@ namespace Axis.Server.Processes;
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
 /// its tasks and its calls. A call lists its attempts and lookups, and its stored input only when
 /// the user may read every field that the step's input and output mapping reads or writes, on any
-/// entity. Otherwise the input is null and marked hidden. The pinned release gives the fields the
+/// entity, and none of them is sensitive in the pinned or the active release. Otherwise the input is
+/// null and marked hidden. The pinned release gives the fields the
 /// mapping uses and the active release gives the fields the user may read. The checks run in the order of the list, then the id
 /// is parsed. A <c>read</c> filter that reads a computed field that is being recomputed is a 409,
 /// as in the list, before any instance is looked up. A malformed id, an unknown id, an instance of another process, and an instance whose
@@ -279,7 +280,8 @@ internal static class ProcessInspectionEndpoints
                         mappings[call.Step] = fields = MappedFields(pinned, pinnedProcess, pinnedSubject, call.Step);
                     }
 
-                    var hidden = call.Input is not null && !Readable(application, user.Roles, fields);
+                    var hidden = call.Input is not null
+                        && (!Readable(application, user.Roles, fields) || Sensitive(pinned, application, fields));
                     return new ProcessInstanceCall(
                         call.Id,
                         call.Kind,
@@ -346,6 +348,39 @@ internal static class ProcessInspectionEndpoints
         }
 
         return true;
+    }
+
+    // A field counts as sensitive when the pinned or the active release marks it, so a release that
+    // adds or removes the flag exposes no instance on an older release. A child collection counts
+    // when any field of its child entity is sensitive, because the mapping lists child rows only
+    // through the owner's collection field.
+    private static bool Sensitive(ApplicationModel pinned, ApplicationModel active, IReadOnlySet<MappedField>? fields)
+    {
+        if (fields is null)
+        {
+            return true;
+        }
+
+        foreach (var mapped in fields)
+        {
+            foreach (var release in new[] { pinned, active })
+            {
+                if (release.FindEntity(mapped.EntityId) is not { } entity || !entity.TryGetField(mapped.Field, out var field))
+                {
+                    continue;
+                }
+
+                if (field.Sensitive
+                    || (field.Type == FieldType.ChildCollection
+                        && release.FindEntity(field.Target!.Id) is { } child
+                        && child.Fields.Any(candidate => candidate.Sensitive)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static ProcessGraph Graph(ProcessModel model) =>
@@ -442,7 +477,8 @@ internal sealed record ProcessInstanceTask(
 /// A connector call or package call of the instance, with its attempts and lookups. A connector
 /// call has <paramref name="Connector"/> and a package call has <paramref name="Package"/> and
 /// <paramref name="Version"/>. <paramref name="Input"/> is null, and <paramref name="InputHidden"/> true,
-/// when the user may not read every field the step's mapping uses.
+/// when the user may not read every field the step's mapping uses, or when one of them is sensitive
+/// in the pinned or the active release.
 /// </summary>
 internal sealed record ProcessInstanceCall(
     Guid Id,

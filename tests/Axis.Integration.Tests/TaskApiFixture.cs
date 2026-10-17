@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
+using Axis.Data.Schema;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
@@ -519,6 +520,15 @@ public sealed class TaskApiFixture : IAsyncLifetime
         var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", fixture), configuration);
         Assert.Empty(compiled.Diagnostics);
         return compiled.Release!.Id;
+    }
+
+    /// <summary>The catalog description of the table of the entity <paramref name="entityId"/> on <paramref name="tenant"/>.</summary>
+    public async Task<CatalogTable> ReadTableAsync(string tenant, Guid entityId)
+    {
+        await using var connection = new NpgsqlConnection(_tenants[tenant].ConnectionString);
+        await connection.OpenAsync();
+        var catalog = await CatalogReader.ReadAsync(connection, null, CancellationToken.None);
+        return Assert.Single(catalog.Tables, table => table.Name == EntityNaming.Table(entityId));
     }
 
     private NpgsqlDataSource DataSource(string tenant) => _tenants[tenant].DataSource;

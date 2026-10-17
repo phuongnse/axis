@@ -669,6 +669,11 @@ public static class ApplicationCompiler
             {
                 report(DiagnosticCodes.InvalidConstraint, "'unique' does not apply to child-collection fields.", $"{path}/unique");
             }
+
+            if (field.Sensitive is not null)
+            {
+                report(DiagnosticCodes.InvalidConstraint, "'sensitive' does not apply to child-collection fields.", $"{path}/sensitive");
+            }
         }
 
         // Reports a type-specific property on a field of another type. Returns whether it fits.
@@ -1232,6 +1237,7 @@ public static class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            Sensitive = field.Sensitive == true,
         };
     }
 
