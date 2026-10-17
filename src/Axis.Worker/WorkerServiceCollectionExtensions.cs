@@ -1,4 +1,5 @@
 using Axis.Configuration.Packages;
+using Axis.Core.Telemetry;
 using Axis.Processes;
 using Axis.Tenancy;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -32,6 +33,11 @@ public static class WorkerServiceCollectionExtensions
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.PollInterval)}' must be positive.");
         }
 
+        if (options.MetricsInterval <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.MetricsInterval)}' must be positive.");
+        }
+
         var health = new HealthOptions();
         configuration.GetSection(HealthOptions.SectionName).Bind(health);
         if (string.IsNullOrWhiteSpace(health.Urls))
@@ -51,7 +57,10 @@ public static class WorkerServiceCollectionExtensions
             .AddCheck<WorkerLoopHealthCheck>("loop", tags: [WorkerHealthEndpoints.LiveTag, WorkerHealthEndpoints.ReadyTag])
             .AddCheck<TenantMigrationsHealthCheck>("migrations", tags: [WorkerHealthEndpoints.ReadyTag]);
         services.AddSingleton<StartupCheckState>();
+        services.AddSingleton<AxisGauges>();
+        services.AddSingleton<WorkerGauges>();
         services.AddHostedService<WorkerService>();
+        services.AddHostedService<WorkerMetricsService>();
         return services;
     }
 }

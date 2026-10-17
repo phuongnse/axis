@@ -35,16 +35,39 @@ internal sealed class MetricCollector : IDisposable
     public bool HasPoint(string name, params (string Key, string Value)[] tags) =>
         Metrics.Where(metric => metric.Name == name)
             .SelectMany(metric => metric.MetricPoints)
-            .Any(point =>
-            {
-                var pointTags = new Dictionary<string, object?>();
-                foreach (var tag in point.Tags)
-                {
-                    pointTags[tag.Key] = tag.Value;
-                }
+            .Any(point => Matches(point, tags));
 
-                return tags.All(tag => pointTags.TryGetValue(tag.Key, out var value) && Equals(value, tag.Value));
-            });
+    /// <summary>
+    /// The value of the latest gauge point of <paramref name="name"/> that has every one of
+    /// <paramref name="tags"/>, or <see langword="null"/> when there is none.
+    /// </summary>
+    public double? GaugeValue(string name, params (string Key, string Value)[] tags)
+    {
+        double? value = null;
+        foreach (var metric in Metrics.Where(metric => metric.Name == name))
+        {
+            foreach (var point in metric.MetricPoints)
+            {
+                if (Matches(point, tags))
+                {
+                    value = metric.MetricType == MetricType.LongGauge ? point.GetGaugeLastValueLong() : point.GetGaugeLastValueDouble();
+                }
+            }
+        }
+
+        return value;
+    }
+
+    private static bool Matches(MetricPoint point, (string Key, string Value)[] tags)
+    {
+        var pointTags = new Dictionary<string, object?>();
+        foreach (var tag in point.Tags)
+        {
+            pointTags[tag.Key] = tag.Value;
+        }
+
+        return tags.All(tag => pointTags.TryGetValue(tag.Key, out var value) && Equals(value, tag.Value));
+    }
 
     public void Dispose() => _provider.Dispose();
 
