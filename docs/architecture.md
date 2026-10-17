@@ -170,7 +170,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   whitespace. This applies even when no application folder is activated at
   startup;
 - in the server, both connection strings name the same user;
-- *(planned for M7)* in the server and the worker, the runtime database role
+- in the server and the worker, the runtime database role
   is a superuser, owns the `axis` or `entities` schema, or may create objects
   in either;
 - a binding has a missing `Kind` or one other than `url` or `secret`, a blank

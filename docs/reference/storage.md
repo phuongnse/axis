@@ -129,8 +129,8 @@ database roles, `axis_schema` and `axis_runtime`, own each test database with
 `axis_schema`, run the server and worker as `axis_runtime`, and run activation
 as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
 same: `samples/postgres/init-roles.sql` creates the roles and grants them
-nothing. *(planned for M7)* The start checks for a superuser, a schema owner or
-a role that may create objects are still to come.
+nothing. The server and the worker run the start checks for a superuser, a
+schema owner or a role that may create objects.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
   and `entities` schemas. The runtime database role reads and writes data, and
@@ -181,13 +181,23 @@ What each database role may do:
 - **Start checks.** A missing or blank setting stops the start, naming the
   tenant and the setting. The server does this today. So does a
   `ConnectionString` that names no user, and two settings that name the same
-  user. *(planned for M7)* So does a
-  runtime database role that is a superuser, owns the `axis` or `entities`
-  schema, or may create objects in either. The server runs all of these
-  checks. The worker validates `ConnectionString` and the runtime database
-  role. The server also validates `SchemaConnectionString` and that the two
-  settings name different users, because the worker holds no
-  `SchemaConnectionString`.
+  user. So does a runtime database role that is a superuser, owns the `axis` or
+  `entities` schema, or may create objects in either. A role that is a member
+  of the role that owns a schema counts as its owner, because it can `SET ROLE`
+  to the owner. The message names the tenant, the role and the first failed
+  check, in the order superuser, owner, `CREATE`, with `axis` before
+  `entities`. It never holds the connection string or the password. The
+  server runs the role check after its grant step, so a fresh database with the
+  right roles starts, and again in its start-time release check, which runs for
+  every tenant even when no folder is activated. The worker runs it once for
+  each tenant, when the tenant's database counts as migrated and before it
+  claims any work of that tenant. The server skips the check for a tenant
+  whose database it cannot reach, as the release check does. The checks do not
+  cover `CREATE` on the database itself, ownership of single tables or
+  `CREATEROLE`. The server runs all the other checks. The worker validates
+  `ConnectionString` and the runtime database role. The server also validates
+  `SchemaConnectionString` and that the two settings name different users,
+  because the worker holds no `SchemaConnectionString`.
 
 Which connection string each step uses. The server does this today:
 

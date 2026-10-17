@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
@@ -9,7 +10,8 @@ using Npgsql;
 namespace Axis.Server.Applications;
 
 /// <summary>
-/// Checks, for every configured tenant, that each release in use finds the extension package
+/// Checks, for every configured tenant, that the runtime database role can only read and write rows,
+/// that each release in use finds the extension package
 /// versions it pins installed, and rebuilds it from its stored files. A release is in use when it
 /// is active or has a running or waiting process instance. The check runs in
 /// <see cref="StartingAsync"/>, after <see cref="StartupActivation"/> and before the server
@@ -72,6 +74,7 @@ internal sealed partial class StartupReleaseCheck(
         IReadOnlyList<Diagnostic>? diagnostics;
         try
         {
+            await RuntimeRoleCheck.CheckAsync(connection, tenantId, cancellationToken);
             diagnostics = await PinnedReleaseCheck.CheckAsync(connection, tenantId, packages.Versions, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

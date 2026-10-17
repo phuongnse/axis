@@ -1229,8 +1229,9 @@ schema changes. Runtime code can then read and write data, but it cannot
 change the schema, a stored release, the active release or the provisioning
 records. The server reads both connection strings, startup activation uses
 `SchemaConnectionString`, and the server grants the runtime database role its
-rights at every start. The start checks for a superuser, a schema owner or a
-role that may create objects are *(planned for M7)*.
+rights at every start. The server and the worker refuse to start when the
+runtime database role is a superuser, owns a schema or may create objects in
+one.
 See [storage](reference/storage.md#database-roles) for the grants and the
 connection string of each step.
 The owner confirmed these points for issue #414 on 2026-10-16.
