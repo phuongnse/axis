@@ -365,10 +365,9 @@ are problem details, as in the [record API](record-api.md#errors).
   written, and the client may send the request again. The title is fixed:
   "The application's active release changed while the request ran. Try again."
 
-The `201` has no `Location` header, because there is no endpoint to read an
-instance yet. The [instance detail](#instance-detail) exists, but the `201`
-still has no `Location`, because reading an instance needs an `inspect`
-grant, which the user who started it may not hold.
+The `201` has no `Location` header. Reading an instance needs an `inspect`
+grant, which the user who started it may not hold. See the
+[instance detail](#instance-detail).
 
 A start needs a session, a `start` grant on the process and read access to
 the subject record, as [Authorization](../architecture.md#authorization)
