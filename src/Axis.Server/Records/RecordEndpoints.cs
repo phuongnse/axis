@@ -195,9 +195,14 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
-        return await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is { } record
-            ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(record))
-            : RecordNotFound();
+        if (await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not { } record)
+        {
+            return RecordNotFound();
+        }
+
+        // A computed field that is pending shows as the active release computes it. The read stores nothing.
+        record = await PendingComputedReads.ApplyAsync(connection, null, application!, model, record, cancellationToken);
+        return Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(record));
     }
 
     // Every audit record that names the record is listed, whoever wrote it: the record API, a

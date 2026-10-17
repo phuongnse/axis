@@ -360,6 +360,13 @@ public static class RecordCommand
             }
         }
 
+        // The response shows a pending computed field as the active release computes it. A write that leaves
+        // out the rows of a collection with computed fields stamps nothing, so the row can still be out of date.
+        if (result is { Outcome: RecordWriteOutcome.Written, Record: { } updated })
+        {
+            result = result with { Record = await PendingComputedReads.ApplyAsync(connection, null, application, model, updated, cancellationToken) };
+        }
+
         return WriteResult(result);
     }
 
