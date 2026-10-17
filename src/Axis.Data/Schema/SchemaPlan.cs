@@ -24,6 +24,12 @@ public sealed record SchemaPlan(
     /// </summary>
     public IReadOnlyList<DestructiveChange> DestructiveChanges { get; init; } = [];
 
+    /// <summary>
+    /// The entities whose rows a <c>fill</c> or <c>convert</c> changes, or whose child rows it changes. The commands clear
+    /// the release stamp of those rows, and activation recomputes the rows with a cleared stamp after the commands.
+    /// </summary>
+    public IReadOnlyList<Guid> RecomputedEntityIds { get; init; } = [];
+
     /// <summary>The SQL text of each command, in order.</summary>
     public IReadOnlyList<string> Statements => [.. Commands.Select(command => command.Sql)];
 

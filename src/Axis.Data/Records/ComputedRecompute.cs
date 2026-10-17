@@ -19,12 +19,18 @@ namespace Axis.Data.Records;
 /// The rows of the entity and its child entities from earlier recomputes are deleted first, because every
 /// record is computed again.
 /// </para>
+/// <para>
+/// A recompute can be limited to the records whose stamp is <c>NULL</c>, the rows that a migration <c>fill</c>
+/// or <c>convert</c> changed, or whose child rows it changed. It then deletes only the error rows of those
+/// records and of their child rows.
+/// </para>
 /// </summary>
 internal static class ComputedRecompute
 {
     /// <summary>
     /// Recomputes every record of <paramref name="owner"/>, an entity that is not a child entity, with
-    /// <paramref name="releaseId"/>, on <paramref name="connection"/> inside <paramref name="transaction"/>.
+    /// <paramref name="releaseId"/>, on <paramref name="connection"/> inside <paramref name="transaction"/>. With
+    /// <paramref name="unstampedOnly"/> it recomputes only the records whose stamp is <c>NULL</c>.
     /// </summary>
     public static async Task RecomputeAsync(
         NpgsqlConnection connection,
@@ -32,7 +38,8 @@ internal static class ComputedRecompute
         ApplicationModel application,
         EntityModel owner,
         Guid releaseId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool unstampedOnly = false)
     {
         var collections = owner.Fields
             .Where(field => field.Type == FieldType.ChildCollection)
@@ -41,33 +48,68 @@ internal static class ComputedRecompute
                 application.FindEntity(field.Target!.Id) ?? throw new InvalidOperationException("The application has no entity for the child collection.")))
             .ToList();
 
-        await using (var delete = new NpgsqlCommand("DELETE FROM axis.computed_field_errors WHERE entity_id = ANY(@ids)", connection, transaction))
+        var table = RecordQueries.Table(owner);
+        var idColumn = EntityNaming.Quote(EntityNaming.IdColumn);
+        var stamp = EntityNaming.Quote(EntityNaming.ComputedReleaseColumn);
+        var unstamped = unstampedOnly ? $" WHERE {stamp} IS NULL" : "";
+
+        // One reader at a time can be open on a connection, so the ids are read before any other command runs.
+        async Task<List<Guid>> ReadIdsAsync()
         {
+            var found = new List<Guid>();
+            await using var list = new NpgsqlCommand($"SELECT {idColumn} FROM {table}{unstamped} ORDER BY {idColumn}", connection, transaction);
+            await using var reader = await list.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                found.Add(reader.GetGuid(0));
+            }
+
+            return found;
+        }
+
+        List<Guid>? ids = null;
+        if (unstampedOnly)
+        {
+            ids = await ReadIdsAsync();
+            if (ids.Count == 0)
+            {
+                return;
+            }
+
+            await using (var delete = new NpgsqlCommand("DELETE FROM axis.computed_field_errors WHERE entity_id = @entity AND record_id = ANY(@ids)", connection, transaction))
+            {
+                delete.Parameters.AddWithValue("entity", owner.Id);
+                delete.Parameters.AddWithValue("ids", ids.ToArray());
+                await delete.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            foreach (var collection in collections)
+            {
+                await using var delete = new NpgsqlCommand(
+                    $"DELETE FROM axis.computed_field_errors WHERE entity_id = @entity AND record_id IN (SELECT {idColumn} FROM {RecordQueries.Table(collection.Child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = ANY(@ids))",
+                    connection,
+                    transaction);
+                delete.Parameters.AddWithValue("entity", collection.Child.Id);
+                delete.Parameters.AddWithValue("ids", ids.ToArray());
+                await delete.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+        else
+        {
+            await using var delete = new NpgsqlCommand("DELETE FROM axis.computed_field_errors WHERE entity_id = ANY(@ids)", connection, transaction);
             delete.Parameters.AddWithValue("ids", new[] { owner.Id }.Concat(collections.Select(collection => collection.Child.Id)).ToArray());
             await delete.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        var table = RecordQueries.Table(owner);
-        var idColumn = EntityNaming.Quote(EntityNaming.IdColumn);
-        var stamp = EntityNaming.Quote(EntityNaming.ComputedReleaseColumn);
         if (!owner.HasComputedFields && collections.All(collection => !collection.Child.HasComputedFields))
         {
-            await using var stampOnly = new NpgsqlCommand($"UPDATE {table} SET {stamp} = @release", connection, transaction);
+            await using var stampOnly = new NpgsqlCommand($"UPDATE {table} SET {stamp} = @release{unstamped}", connection, transaction);
             stampOnly.Parameters.AddWithValue("release", releaseId);
             await stampOnly.ExecuteNonQueryAsync(cancellationToken);
             return;
         }
 
-        // One reader at a time can be open on a connection, so the ids are read before any other command runs.
-        var ids = new List<Guid>();
-        await using (var list = new NpgsqlCommand($"SELECT {idColumn} FROM {table} ORDER BY {idColumn}", connection, transaction))
-        await using (var reader = await list.ExecuteReaderAsync(cancellationToken))
-        {
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                ids.Add(reader.GetGuid(0));
-            }
-        }
+        ids ??= await ReadIdsAsync();
 
         foreach (var id in ids)
         {

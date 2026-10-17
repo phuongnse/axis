@@ -495,50 +495,52 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
     }
 
     [Fact]
-    public async Task A_fill_of_a_child_entity_gives_a_not_applied_diagnostic_and_applies_nothing()
+    public async Task A_fill_of_a_child_entity_fills_its_rows_and_changes_only_the_owners_that_had_one()
     {
         using var folder = Application()
             .With("entities/invoice.json", Invoice())
             .With("entities/line.json", Line());
         var first = await CompileAsync(folder);
         Assert.Empty((await ActivateAsync(first)).Diagnostics);
-        var before = await ReadStateAsync(_invoiceId, _lineId);
+        var withNull = Guid.NewGuid();
+        var withoutNull = Guid.NewGuid();
+        await InsertAsync(_invoiceId, ("id", withNull), ("f_number", "INV-1"));
+        await InsertAsync(_invoiceId, ("id", withoutNull), ("f_number", "INV-2"));
+        await InsertAsync(_lineId, ("id", Guid.NewGuid()), ("owner_id", withNull), ("position", 0), ("f_description", null));
+        await InsertAsync(_lineId, ("id", Guid.NewGuid()), ("owner_id", withNull), ("position", 1), ("f_description", "kept"));
+        await InsertAsync(_lineId, ("id", Guid.NewGuid()), ("owner_id", withoutNull), ("position", 0), ("f_description", "kept"));
+        var invoices = EntityNaming.QualifiedTable(EntityNaming.Table(_invoiceId));
+        await ExecuteAsync($"UPDATE {invoices} SET computed_release_id = '{first.Release!.Id}'");
         folder.With("migrations/0001-fill-description.json", Migration(_migrationId, "Line", """[{ "type": "fill", "field": "description", "value": "'n/a'" }]"""));
+        var second = await CompileAsync(folder);
 
-        var result = await ActivateAsync(await CompileAsync(folder));
+        Assert.Empty((await ActivateAsync(second)).Diagnostics);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-fill-description.json", "/changes/0/type"),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Equal(before, await ReadStateAsync(_invoiceId, _lineId));
-        Assert.Empty(await ReadAppliedMigrationsAsync());
-        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+            ["INV-1/0: n/a", "INV-1/1: kept", "INV-2/0: kept"],
+            await ReadScalarsAsync($"SELECT i.f_number || '/' || l.position || ': ' || l.f_description FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_lineId))} l JOIN {invoices} i ON i.id = l.owner_id ORDER BY i.f_number, l.position"));
+        Assert.Equal(
+            [$"INV-1: 2, {second.Release!.Id}", $"INV-2: 1, {first.Release.Id}"],
+            await ReadScalarsAsync($"SELECT f_number || ': ' || version || ', ' || computed_release_id FROM {invoices} ORDER BY f_number"));
     }
 
     [Fact]
-    public async Task A_fill_followed_by_a_rename_of_a_field_a_computed_field_reads_gives_a_not_applied_diagnostic_and_applies_nothing()
+    public async Task A_fill_followed_by_a_rename_of_a_field_a_computed_field_reads_recomputes_the_row()
     {
         using var folder = Application().With("entities/order.json", Order(NumberField, """{ "name": "amount", "type": "integer" }"""));
         var first = await CompileAsync(folder);
         Assert.Empty((await ActivateAsync(first)).Diagnostics);
         await InsertOrderAsync("PO-1");
-        var before = await ReadStateAsync(_orderId);
         folder
             .With("entities/order.json", Order(NumberField, """{ "name": "total", "type": "integer" }""", """{ "name": "doubled", "type": "integer", "expression": "total * 2" }"""))
             .With("migrations/0001-fill-amount.json", Migration(_migrationId, "Order", """[{ "type": "fill", "field": "amount", "value": "0" }, { "type": "renameField", "from": "amount", "to": "total" }]"""));
-        var compiled = await CompileAsync(folder);
-        Assert.Empty(compiled.Diagnostics);
+        var second = await CompileAsync(folder);
 
-        var result = await ActivateAsync(compiled);
+        Assert.Empty((await ActivateAsync(second)).Diagnostics);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-fill-amount.json", "/changes/0/type"),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Equal(before, await ReadStateAsync(_orderId));
-        Assert.Empty(await ReadAppliedMigrationsAsync());
-        Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
+            [$"PO-1: 0, 0, {second.Release!.Id}"],
+            await ReadScalarsAsync($"SELECT f_number || ': ' || f_total || ', ' || f_doubled || ', ' || computed_release_id FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))}"));
     }
 
     [Fact]

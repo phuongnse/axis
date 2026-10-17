@@ -1,3 +1,4 @@
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
 using Axis.Data;
@@ -18,6 +19,7 @@ public sealed class ComputedRecomputeActivationTests(DataDatabaseFixture databas
     private readonly Guid _applicationId = Guid.NewGuid();
     private readonly Guid _orderId = Guid.NewGuid();
     private readonly Guid _lineId = Guid.NewGuid();
+    private readonly Guid _migrationId = Guid.NewGuid();
     private readonly string _name = $"App{Guid.NewGuid():N}";
 
     private const string Quantity = """{ "name": "quantity", "type": "integer" }""";
@@ -170,6 +172,73 @@ public sealed class ComputedRecomputeActivationTests(DataDatabaseFixture databas
         Assert.Equal((2L, (Guid?)first.Release.Id, (long?)6), await ReadOrderStampAsync(order));
     }
 
+    [Fact]
+    public async Task A_fill_of_a_field_a_computed_field_reads_recomputes_the_filled_rows_and_leaves_the_others()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        var filledOne = await InsertOrderAsync(version: 1, stamp: first.Release!.Id, quantity: null);
+        var filledTwo = await InsertOrderAsync(version: 1, stamp: first.Release.Id, quantity: null);
+        var other = await InsertOrderAsync(version: 4, stamp: first.Release.Id, quantity: 5, total: 10);
+
+        folder.With("migrations/0001-fill-quantity.json", Migration("Order", """[{ "type": "fill", "field": "quantity", "value": "3" }]"""));
+        var second = await CompileAsync(folder);
+        var result = await ActivateAsync(second);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal((2L, (Guid?)second.Release!.Id, (long?)6), await ReadOrderStampAsync(filledOne));
+        Assert.Equal((2L, (Guid?)second.Release.Id, (long?)6), await ReadOrderStampAsync(filledTwo));
+        Assert.Equal((4L, (Guid?)first.Release.Id, (long?)10), await ReadOrderStampAsync(other));
+        Assert.Equal(0L, await CountErrorsAsync());
+    }
+
+    [Fact]
+    public async Task A_convert_of_a_child_field_recomputes_the_child_amount_and_the_owners_total_and_changes_the_owners_version()
+    {
+        using var folder = SizedLinesFolder(["small", "large", "huge"]);
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        var changed = await InsertOrderWithSizedLinesAsync(first.Release!.Id, [("huge", 1), ("small", 1)], total: 2);
+        var unchanged = await InsertOrderWithSizedLinesAsync(first.Release.Id, [("small", 1)], total: 1);
+
+        folder
+            .With("entities/line.json", SizedLineFile(["small", "large"]))
+            .With("migrations/0001-convert-size.json", Migration("Line", """[{ "type": "convert", "field": "size", "value": "if(size == 'huge', 'large', size)" }]"""));
+        var second = await CompileAsync(folder);
+        var result = await ActivateAsync(second);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal((2L, (Guid?)second.Release!.Id, (long?)11), await ReadOrderStampAsync(changed));
+        Assert.Equal([10L, 1L], await ReadAmountsAsync(changed));
+        Assert.Equal((1L, (Guid?)first.Release.Id, (long?)1), await ReadOrderStampAsync(unchanged));
+        Assert.Equal(0L, await CountErrorsAsync());
+    }
+
+    [Fact]
+    public async Task A_fill_that_leaves_a_row_null_on_a_field_a_computed_field_reads_rolls_back_and_recomputes_nothing()
+    {
+        using var folder = OrderFolder(Quantity, Note, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        var filled = await InsertOrderAsync(version: 3, stamp: first.Release!.Id, quantity: null);
+        var left = await InsertOrderAsync(version: 5, stamp: first.Release.Id, quantity: null);
+        await SetNoteAsync(filled, "a");
+        await SetNoteAsync(left, "b");
+
+        folder.With("migrations/0001-fill-quantity.json", Migration("Order", """[{ "type": "fill", "field": "quantity", "value": "if(note == 'a', 3, null)" }]"""));
+        var result = await ActivateAsync(await CompileAsync(folder));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.FillLeftNulls, diagnostic.Code);
+        Assert.Equal((3L, (Guid?)first.Release.Id, (long?)null), await ReadOrderStampAsync(filled));
+        Assert.Equal((5L, (Guid?)first.Release.Id, (long?)null), await ReadOrderStampAsync(left));
+        Assert.Null(await ReadQuantityAsync(filled));
+        Assert.Null(await ReadQuantityAsync(left));
+        Assert.Equal(first.Release.Id, (await FindActiveAsync())?.ReleaseId);
+        Assert.Equal(0L, await CountErrorsAsync());
+    }
+
     private async Task<RecordWriteResult> UpdateNoteAsync(ReleaseCompilationResult compiled, Guid releaseId, Guid orderId, long version, bool rows)
     {
         var model = compiled.Model!;
@@ -212,6 +281,67 @@ public sealed class ComputedRecomputeActivationTests(DataDatabaseFixture databas
 
     private TemporaryFolder LinesFolder(string amount) =>
         OrderFolder(Note, Lines, Total("sum(lines, amount)")).With("entities/line.json", LineFile(amount));
+
+    private string Migration(string entity, string changes) =>
+        $$"""
+        { "id": "{{_migrationId}}", "kind": "migration", "name": "M{{_migrationId:N}}", "formatVersion": 1, "entity": "{{entity}}", "changes": {{changes}} }
+        """;
+
+    private string SizedLineFile(string[] sizes) =>
+        $$"""
+        { "id": "{{_lineId}}", "kind": "entity", "name": "Line", "formatVersion": 1,
+          "fields": [ { "name": "size", "type": "enum", "values": [{{string.Join(", ", sizes.Select(size => $"\"{size}\""))}}] },
+                      { "name": "amount", "type": "integer", "expression": "if(size == 'large', 10, 1)" } ] }
+        """;
+
+    private TemporaryFolder SizedLinesFolder(string[] sizes) =>
+        OrderFolder(Note, Lines, Total("sum(lines, amount)")).With("entities/line.json", SizedLineFile(sizes));
+
+    private async Task SetNoteAsync(Guid id, string note)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand($"""UPDATE {OrderTable} SET "f_note" = @note WHERE "id" = @id""");
+        command.Parameters.AddWithValue("note", note);
+        command.Parameters.AddWithValue("id", id);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+    }
+
+    private async Task<long?> ReadQuantityAsync(Guid id)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand($"""SELECT "f_quantity" FROM {OrderTable} WHERE "id" = @id""");
+        command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteScalarAsync(CancellationToken) is long quantity ? quantity : null;
+    }
+
+    /// <summary>An order and one line per size and amount, holding the values the first release stored.</summary>
+    private async Task<Guid> InsertOrderWithSizedLinesAsync(Guid stamp, (string Size, long Amount)[] lines, long total)
+    {
+        var id = Guid.NewGuid();
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using (var command = dataSource.CreateCommand(
+            $"""INSERT INTO {OrderTable} ("id", "version", "computed_release_id", "f_note", "f_total") VALUES (@id, 1, @stamp, 'n', @total)"""))
+        {
+            command.Parameters.AddWithValue("id", id);
+            command.Parameters.AddWithValue("stamp", stamp);
+            command.Parameters.AddWithValue("total", total);
+            await command.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        for (var position = 0; position < lines.Length; position++)
+        {
+            await using var command = dataSource.CreateCommand(
+                $"""INSERT INTO {LineTable} ("id", "owner_id", "position", "f_size", "f_amount") VALUES (@id, @owner, @position, @size, @amount)""");
+            command.Parameters.AddWithValue("id", Guid.NewGuid());
+            command.Parameters.AddWithValue("owner", id);
+            command.Parameters.AddWithValue("position", position);
+            command.Parameters.AddWithValue("size", lines[position].Size);
+            command.Parameters.AddWithValue("amount", lines[position].Amount);
+            await command.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        return id;
+    }
 
     private async Task<ReleaseCompilationResult> CompileAsync(TemporaryFolder folder)
     {

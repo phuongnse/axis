@@ -239,10 +239,12 @@ access. It returns diagnostics, SQL statements and the new records to write.
   its catalog snapshot and its copy of the provisioning records, in ordinal path
   order and file order. It then plans as today. A `convert` makes the planner
   accept a type change, or enum values the release removes, where it gives
-  `AXC0016` without one. A `fill` or `convert` on a child entity, and a `fill`
-  or `convert` of a field that a computed field reads, are `AXC0175`, because
-  activation cannot recompute computed fields yet. A `fill` or `convert` that
-  names, in its value, a field that is not a column of the stored table is
+  `AXC0016` without one. A `fill` or `convert` clears the release stamp of the
+  rows it changes. On a child entity it also increments the owner's `version`
+  and clears the owner's stamp, for each owner of a changed row. Activation then
+  recomputes those rows, see
+  [Recomputing computed fields](#recomputing-computed-fields). A `fill` or
+  `convert` that names, in its value, a field that is not a column of the stored table is
   `AXC0171` at `/changes/{i}/value`. A `fill` whose value leaves a `null` is
   `AXC0176` at `/changes/{i}/value` when activation applies it. A `convert`
   that fails for a stored row, or maps an enum value to one the field does not
@@ -370,11 +372,11 @@ child tables are in [Schema planning](#schema-planning).
 
 This section records
 [D33](../decisions.md#d33-recomputing-stored-computed-fields--agreed). The
-stamp, the fingerprint and the inline recompute at activation are built. Activation
-recomputes every row of an entity whose computed definitions changed, however
-many rows there are, in its own transaction. The inline limit, the pending
-state, the worker backfill and the stamp clearing of a `fill` or `convert` are
-planned for M7.
+stamp, the fingerprint, the inline recompute at activation and the stamp clearing
+of a `fill` or `convert` are built. Activation recomputes every row of an entity
+whose computed definitions changed, and the rows a `fill` or `convert` changed,
+however many rows there are, in its own transaction. The inline limit, the
+pending state and the worker backfill are planned for M7.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -403,6 +405,14 @@ in batches.
   nothing because the tables are new. A row is updated only when its `version`
   still matches the version that was read, so a concurrent write is never
   overwritten.
+  - Then, for each entity that a `fill` or `convert` touched, and that the
+    step did not just recompute whole, it recomputes the owner rows whose
+    stamp is `NULL`. The entity is the one whose rows the migration changed,
+    or the owner of a changed child entity. It recomputes the computed fields
+    of the owner and its child entities, deletes the error rows of those
+    records only, and stamps the rows. It does this even when no computed field
+    reads the changed field, which only stamps the rows again. Rows that
+    already had a `NULL` stamp are recomputed too.
 - **Inline.** *(Planned for M7: the limit.)* When the count of affected rows is at most
   `Activation:InlineRecomputeLimit`, activation recomputes them in its own
   transaction, with the release being activated. It stamps each row. The limit
@@ -431,10 +441,11 @@ in batches.
     their release. A collection whose child entity has no computed field does
     not count. A `NULL` stamp counts as not up to date.
   - Child rows recompute with their owner and carry no stamp.
-  - *(planned for M7)* A `fill` or `convert` sets the stamp to `NULL` on every
-    row it changes and on the owner row of every changed child row. Their
-    computed inputs changed, so the old stamp no longer proves the row is up to
-    date.
+  - A `fill` or `convert` sets the stamp to `NULL` on every row it changes and
+    on the owner row of every changed child row. Their computed inputs changed,
+    so the old stamp no longer proves the row is up to date. Activation then
+    recomputes the rows of each touched entity that have a `NULL` stamp, and
+    stamps them with the release being activated.
 - **Fingerprint.** Each release stores, for each entity that is not a child
   entity, one hash of the computed definitions of the entity and its child
   entities, and of every rule their expressions call. It is written with the
@@ -455,7 +466,8 @@ in batches.
   fingerprint for the entity equals the target release's. The pending row
   keeps the ids of those releases as `current_release_ids`. A row with a `NULL`
   stamp is not known to be up to date. Today only an activation that changes
-  its entity's computed definitions, or a later full write, fixes it. The
+  its entity's computed definitions, an activation whose `fill` or `convert`
+  touches the entity, or a later full write, fixes it. The
   backfill that picks such rows up is planned for M7. It will treat a row with
   no stamp as out of date only while the entity has a pending field. Otherwise every
   release that changes nothing about a computed field would recompute every
@@ -585,11 +597,9 @@ pending.
 The migration resource, its compile checks and the once-per-tenant apply of
 `renameField`, `dropField`, `dropEntity`, `fill` and `convert` at activation are
 built, and so are the start lock and the old-release work check. The recompute
-of computed fields at activation is built too. Its use by a `fill` or `convert`
-is *(planned for M7)*, and so are the rules, table rows
-and example steps below that use it. Until then, a `fill` or
-`convert` on a child entity and a `fill` or `convert` of a field that a computed
-field reads are `AXC0175`. This section records
+of computed fields at activation is built too, and so is its use by a `fill` or
+`convert`, on a child entity or a field that a computed field reads. Rule calls
+in computed fields remain unbuilt (`AXC0050`). This section records
 [D30](../decisions.md#d30-schema-migrations--agreed).
 A [migration resource](configuration.md#resource-file-shape) changes one
 entity's storage and runs once per tenant, before additive provisioning.
@@ -621,8 +631,10 @@ Migrations run forward only.
   7. Recompute inline or mark pending, see
      [Recomputing computed fields](#recomputing-computed-fields), using the
      release being activated. *(Built for the inline recompute, which has no
-     limit yet. Marking pending is planned for M7.)* An activation without a
-     pending migration runs the same step after its additive DDL.
+     limit yet. It also recomputes the rows that a `fill` or `convert` changed,
+     and the owners of changed child rows. Marking pending is planned for
+     M7.)* An activation without a pending migration runs the same step after
+     its additive DDL.
   8. Write `axis.applied_migrations` and the provisioning records. *(Built.)*
   9. Upsert the active release and its `axis.active_sites` rows. *(Built.)*
   10. Commit, releasing both locks. *(Built.)*
@@ -689,20 +701,21 @@ Migrations run forward only.
   commit a rename or drop between them. The store and the data context
   must therefore share one tenant connection. A store on another connection
   throws before anything commits.
-- **Computed fields** *(planned for M7)*. A `fill` or `convert` of a field
-  that a computed field reads recomputes through
+- **Computed fields.** A `fill` or `convert` of a field that a computed field
+  reads recomputes through
   [Recomputing computed fields](#recomputing-computed-fields). `fill` and
-  `convert` clear the stamp of the rows they change. Rule calls in computed
-  fields remain unbuilt (`AXC0050`), so the case through a rule describes
-  future behaviour.
+  `convert` clear the stamp of the rows they change, and of the owner of each
+  changed child row. Activation recomputes those rows inline. Rule calls in
+  computed fields remain unbuilt (`AXC0050`), so the case through a rule
+  describes future behaviour.
 
 | Change | SQL | Waits for old-release work |
 | --- | --- | --- |
 | `renameField` | `ALTER TABLE ... RENAME COLUMN`, plus `RENAME CONSTRAINT` for its `uq_` and `fk_` names, which hash the column name | Yes |
 | `dropField` | `ALTER TABLE ... DROP COLUMN`, without `CASCADE` | Yes |
 | `dropEntity` | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records. | Yes |
-| `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` *(built, except for a child entity and a field a computed field reads)* | No |
-| `convert` | For a type change, `ADD COLUMN axis_convert`, `UPDATE ... SET axis_convert = (<value>)::<type>`, `ALTER COLUMN ... TYPE ... USING axis_convert`, then `DROP COLUMN axis_convert`. For removed enum values, `UPDATE ... SET f = <value> WHERE f IN (<removed>)` *(built, except for a child entity and a field a computed field reads)* | Yes |
+| `fill` | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL` | No |
+| `convert` | For a type change, `ADD COLUMN axis_convert`, `UPDATE ... SET axis_convert = (<value>)::<type>`, `ALTER COLUMN ... TYPE ... USING axis_convert`, then `DROP COLUMN axis_convert`. For removed enum values, `UPDATE ... SET f = <value> WHERE f IN (<removed>)` | Yes |
 | Additive changes | As in [Schema planning](#schema-planning) today | No |
 
 A `fill` on a missing column adds it as nullable before the `UPDATE`.
@@ -734,7 +747,7 @@ value the field does not list is `AXC0177` too.
 
 Each `fill` and `convert` increments `version` on every row it changes.
 Child rows have no version, so changing them increments their owner's
-`version` *(planned for M7; a `fill` or `convert` on a child entity is not applied yet)*. This prevents an edit begun before the migration from overwriting
+`version`, in the same statement. This prevents an edit begun before the migration from overwriting
 a migrated value without a version conflict. There is no audit record for
 each changed row. The `axis.applied_migrations` row is the trace.
 
@@ -755,8 +768,7 @@ records a migration only when activation commits. The table has an index on
 ### Example: renaming a field while a task waits
 
 This example uses the purchase request migration in
-[configuration](configuration.md#resource-file-shape). Its recompute of
-computed fields is *(planned for M7)*.
+[configuration](configuration.md#resource-file-shape).
 R1 and R2 stand for stored release UUIDs of the same application.
 
 1. R1 is active. An employee submits a purchase request. Its process
@@ -770,7 +782,7 @@ R1 and R2 stand for stored release UUIDs of the same application.
 4. The manager approves. The instance runs to `completed`.
 5. Once no `running` or `waiting` instance is pinned to R1, activating R2
    applies the rename and fill, provisions the required constraint,
-   recomputes affected computed fields *(planned for M7)* and switches the active release and
+   recomputes affected computed fields and switches the active release and
    site paths in one transaction.
 
 New submissions while R1 is active also count. On a busy application, the
@@ -780,13 +792,13 @@ in an earlier release never waits for old-release work.
 
 ### Limits
 
-These limits apply to migrations. Those about the recompute of computed
-fields by a `fill` or `convert` are *(planned for M7)*.
+These limits apply to migrations. The inline limit on the recompute of
+computed fields by a `fill` or `convert` is *(planned for M7)*.
 
 - A large `fill` or `convert` holds the schema lock and its row locks until
   commit. The `fill` itself is not batched. The recompute of the computed
-  fields that read it is batched above the inline limit
-  *(planned for M7)*.
+  fields that read it runs inline in the same transaction, however many rows
+  it covers. It is batched above the inline limit *(planned for M7)*.
 - Process starts for the application wait while activation holds the
   exclusive start lock. A long fill delays them.
 - Old work must finish before a destructive migration can run. *(Planned for
