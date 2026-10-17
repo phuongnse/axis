@@ -1818,7 +1818,7 @@ the record API, data source grants with root read filters and field checks,
 and process `start` grants. The `endpoint` grant with its `invoke` action and
 its compile checks are built too, and the endpoint call enforces it. So is the
 `inspect` action on a `process` grant, which the process instance list
-enforces, see [Process inspection](processes.md#process-inspection). Each
+and the instance detail enforce, see [Process inspection](processes.md#process-inspection). Each
 compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:

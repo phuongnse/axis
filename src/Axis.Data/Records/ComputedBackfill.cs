@@ -167,7 +167,7 @@ internal static class ComputedBackfill
     /// </summary>
     public static async Task<(Guid Target, Guid[] Current)> ResolveTargetAsync(
         NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        NpgsqlTransaction? transaction,
         Guid entityId,
         Guid applicationId,
         Guid storedTarget,
@@ -263,7 +263,7 @@ internal static class ComputedBackfill
     /// </summary>
     public static async Task<Guid[]> CurrentReleaseIdsAsync(
         NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        NpgsqlTransaction? transaction,
         Guid entityId,
         Guid releaseId,
         string? fingerprint,

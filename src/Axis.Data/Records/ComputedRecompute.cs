@@ -110,7 +110,7 @@ internal static class ComputedRecompute
         }
     }
 
-    private static List<Collection> CollectionsOf(ApplicationModel application, EntityModel owner) =>
+    internal static List<Collection> CollectionsOf(ApplicationModel application, EntityModel owner) =>
         owner.Fields
             .Where(field => field.Type == FieldType.ChildCollection)
             .Select(field => new Collection(
@@ -166,22 +166,28 @@ internal static class ComputedRecompute
         }
     }
 
-    private static async Task RecomputeRecordAsync(
+    /// <summary>
+    /// Computes the computed fields of the record with <paramref name="id"/> and of its child rows from the
+    /// stored values, with the expressions of <paramref name="owner"/> and the child entities of
+    /// <paramref name="collections"/>, and writes nothing. Returns <see langword="null"/> when the record does not
+    /// exist. The child values are in collection order and then position order, for the child entities that have
+    /// computed fields. A field that failed has <c>NULL</c> and a <see cref="Failure"/>.
+    /// </summary>
+    internal static async Task<Computed?> ComputeRecordAsync(
         NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        NpgsqlTransaction? transaction,
         EntityModel owner,
         List<Collection> collections,
-        Guid releaseId,
         Guid id,
         CancellationToken cancellationToken)
     {
         if (await RecordQueries.FindRowAsync(connection, owner, id, cancellationToken) is not { } record)
         {
-            return;
+            return null;
         }
 
         var failures = new List<Failure>();
-        var childUpdates = new List<(EntityModel Child, Guid RowId, List<RecordValue> Values)>();
+        var childValues = new List<ChildValues>();
         var allExact = true;
         var items = new Dictionary<string, List<ExpressionValues>>(StringComparer.Ordinal);
         foreach (var (collection, child) in collections)
@@ -215,7 +221,7 @@ internal static class ComputedRecompute
                         failures.AddRange(computedFields.Select(field => new Failure(child.Id, rowId, field.Name, Messages.NotEvaluable)));
                     }
 
-                    childUpdates.Add((child, rowId, [.. computedFields.Select(field => results.GetValueOrDefault(field.Name) ?? new RecordValue(field, null))]));
+                    childValues.Add(new ChildValues(collection.Name, child, rowId, [.. computedFields.Select(field => results.GetValueOrDefault(field.Name) ?? new RecordValue(field, null))]));
                 }
 
                 // The owner's aggregates read every column of the row: the new computed values and the stored rest.
@@ -263,6 +269,25 @@ internal static class ComputedRecompute
             ownerValues.AddRange(computedFields.Select(field => results.GetValueOrDefault(field.Name) ?? new RecordValue(field, null)));
         }
 
+        return new Computed(record, ownerValues, childValues, failures);
+    }
+
+    private static async Task RecomputeRecordAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        EntityModel owner,
+        List<Collection> collections,
+        Guid releaseId,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        if (await ComputeRecordAsync(connection, transaction, owner, collections, id, cancellationToken) is not { } computed)
+        {
+            return;
+        }
+
+        var (record, ownerValues, childUpdates, failures) = computed;
+
         // The owner goes first. Its version guard decides whether the rows read are still the stored ones.
         await using (var update = new NpgsqlCommand { Connection = connection, Transaction = transaction })
         {
@@ -280,7 +305,7 @@ internal static class ComputedRecompute
             }
         }
 
-        foreach (var (child, rowId, values) in childUpdates)
+        foreach (var (_, child, rowId, values) in childUpdates)
         {
             await using var update = new NpgsqlCommand { Connection = connection, Transaction = transaction };
             update.Parameters.AddWithValue("id", rowId);
@@ -326,7 +351,7 @@ internal static class ComputedRecompute
     /// <summary>Reads the id and the stored values of each row of <paramref name="child"/> owned by <paramref name="ownerId"/>, in position order.</summary>
     private static async Task<List<(Guid Id, JsonObject Values)>> ReadRowsAsync(
         NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        NpgsqlTransaction? transaction,
         EntityModel child,
         Guid ownerId,
         CancellationToken cancellationToken)
@@ -357,7 +382,13 @@ internal static class ComputedRecompute
         return rows;
     }
 
-    private sealed record Collection(FieldModel Field, EntityModel Child);
+    internal sealed record Collection(FieldModel Field, EntityModel Child);
 
-    private sealed record Failure(Guid EntityId, Guid RecordId, string Field, string Error);
+    internal sealed record Failure(Guid EntityId, Guid RecordId, string Field, string Error);
+
+    /// <summary>The computed values of the child row <paramref name="RowId"/> of the collection <paramref name="Collection"/>.</summary>
+    internal sealed record ChildValues(string Collection, EntityModel Child, Guid RowId, List<RecordValue> Values);
+
+    /// <summary>The stored record, the owner's computed values, those of its child rows and the failures, as <see cref="ComputeRecordAsync"/> works them out.</summary>
+    internal sealed record Computed(Record Stored, List<RecordValue> Owner, List<ChildValues> Children, List<Failure> Failures);
 }

@@ -1,0 +1,7 @@
+{
+  "id": "5b7c1d3e-8a24-4f6b-9d10-3e2a4c6f8b15",
+  "kind": "role",
+  "name": "inspector",
+  "formatVersion": 1,
+  "label": { "textKey": "role.inspector" }
+}

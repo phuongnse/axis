@@ -1396,8 +1396,11 @@ activation. Large tables recompute in the worker, in batches. The recompute at
 activation of a changed or added computed field, and of the rows a migration
 `fill` or `convert` changed, is built, and so are the inline limit, the
 pending state, the worker backfill, a newer activation while a field is
-pending, and the writes of older releases. What reads answer while a field is
-pending is *(planned for M7)*. See
+pending, and the writes of older releases. A single read, the response of an
+update, the engine's reads of a subject record and process start conditions
+compute a pending field on the spot and store nothing. The rest of what reads
+answer while a field is pending, such as the `409` for a sort, is
+*(planned for M7)*. See
 [storage](reference/storage.md#recomputing-computed-fields) for the steps and
 a walkthrough.
 The owner confirmed these points on issue #473 on 2026-10-17.

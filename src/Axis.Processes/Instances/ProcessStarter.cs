@@ -11,7 +11,8 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Starts a process instance on a subject record inside the caller's transaction, as the process
 /// start endpoint, the endpoint call and an event trigger's delivery do. It checks the start
-/// condition against the record as stored, inserts the running instance pinned to
+/// condition against the record the caller passes. Callers that start on a pending computed field pass
+/// the record computed with <see cref="PendingComputedReads"/>. It inserts the running instance pinned to
 /// <c>releaseId</c>, queues its first work item and appends the audit record
 /// <c>process.started</c>. The instance insert runs in a savepoint, so a start that finds the
 /// process already running leaves the transaction usable. It never commits or rolls back: the

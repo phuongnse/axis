@@ -84,6 +84,12 @@ internal static class EventTriggerStarts
             return (null, "the record no longer exists");
         }
 
+        // The start condition reads the record with its pending computed fields computed by this release.
+        if (process.StartCondition is not null)
+        {
+            record = await PendingComputedReads.ApplyAsync(connection, transaction, model, entity, record, cancellationToken);
+        }
+
         var instanceId = Guid.CreateVersion7();
         var started = await ProcessStarter.StartAsync(
             connection,

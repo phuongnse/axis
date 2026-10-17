@@ -142,6 +142,11 @@ public static partial class DataChangeTriggerStarts
         ArgumentNullException.ThrowIfNull(logger);
 
         var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
+
+        // The when and the start condition read the record with its pending computed fields computed by the
+        // release the triggers come from. It is worked out once, at the first trigger that needs it. The changed
+        // fields and the id stay on the written record.
+        Record? computed = null;
         foreach (var trigger in application.Triggers)
         {
             if (trigger.Type != TriggerType.DataChange
@@ -154,10 +159,11 @@ public static partial class DataChangeTriggerStarts
                 continue;
             }
 
+            computed ??= await PendingComputedReads.ApplyAsync(connection, transaction, application, entity, written, cancellationToken);
             if (trigger.When is { } when)
             {
                 var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-                var evaluated = await RecordExpressions.EvaluateAsync(connection, application, entity, written, when, now, cancellationToken);
+                var evaluated = await RecordExpressions.EvaluateAsync(connection, application, entity, computed, when, now, cancellationToken);
                 if (evaluated.Value is not true)
                 {
                     LogSkipped(
@@ -183,7 +189,7 @@ public static partial class DataChangeTriggerStarts
                 process,
                 subject,
                 written.Id,
-                written,
+                computed,
                 Guid.CreateVersion7(),
                 AuditActors.System,
                 actorName: null,

@@ -499,9 +499,11 @@ A record with a child collection holds its rows inside `values`:
   record, including an update with no values, and stores it in the same
   statement as the other values. Child rows are calculated before the owner.
   A record stored before its computed field existed reads `null` until its
-  next write. *(planned for M7)* A single read, and the response of a create
-  or update, return a pending field computed with the active release. A
-  run-time error there reads `null`. A list shows the stored value. See
+  next write. A single read, and the response of an update, return a pending
+  field computed with the active release when the row's stamp is out of date.
+  A create always computes with the active release, so its response needs no
+  such step. A run-time error there reads `null`, and the read answers `200`.
+  The read stores nothing. A list shows the stored value. See
   [Recomputing computed fields](storage.md#recomputing-computed-fields).
 - **Aggregates.** An aggregate of the owner, such as `sum(lineItems, amount)`,
   reads the rows the write stores. When the body sends the collection, it

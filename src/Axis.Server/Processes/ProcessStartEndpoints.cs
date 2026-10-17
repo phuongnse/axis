@@ -167,6 +167,12 @@ internal static class ProcessStartEndpoints
             return SubjectProblem("No record of the process's entity has this id.");
         }
 
+        // The start condition reads the record with its pending computed fields computed by the active release.
+        if (model.StartCondition is not null)
+        {
+            record = await PendingComputedReads.ApplyAsync(connection, transaction, application, entity, record, cancellationToken);
+        }
+
         var started = await ProcessStarter.StartAsync(
             connection,
             transaction,
