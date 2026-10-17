@@ -739,7 +739,7 @@ sorted by file and then path.
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 | `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
-| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, `inspect` and `cancel`, and *(planned for M7)* `retry` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, `inspect`, `cancel` and `retry`, and *(planned for M7)* `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
 | `AXC0092` | A policy grant's `entity`, `dataSource`, `process` or `endpoint` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint`. Not reported when the name is a file that was not loaded because of its own errors. |
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
@@ -1927,7 +1927,7 @@ outcomes:
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "dataSource": "RequestsByDepartment", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["cancel"] }
+    { "process": "PurchaseRequestApproval", "actions": ["cancel", "retry"] }
   ]
 }
 ```
@@ -1938,8 +1938,8 @@ outcomes:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`, `inspect` and `cancel`, and *(planned for M7)*
-    `retry` and `resolve`;
+  - a `process` takes `start`, `inspect`, `cancel` and `retry`, and *(planned
+    for M7)* `resolve`;
   - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
@@ -1961,13 +1961,14 @@ outcomes:
   See [Combining grants](../architecture.md#combining-grants).
 
 The `cancel` action of a `process` grant lets a user cancel that process's
-instances, see [Cancel](processes.md#cancel). The `retry` and `resolve` actions
-are *(planned for M7)*, and the compiler refuses them until they are built. They
-will let a user run the other [operator commands](processes.md#operator-commands).
+instances, see [Cancel](processes.md#cancel). The `retry` action lets a user
+retry its failed instances, see [Retry](processes.md#retry). The `resolve`
+action is *(planned for M7)*, and the compiler refuses it until it is built. It
+will let a user run the other [operator command](processes.md#operator-commands).
 Each is checked on its own, and none implies another. `start` implies none of
 them. A grant takes no `filter` or `fields`, as for `start`. The finance
-reviewer policy above lets its reviewers cancel an approval. When retry and
-resolve are built, an operator role could hold:
+reviewer policy above lets its reviewers cancel and retry an approval. When
+resolve is built, an operator role could hold:
 
 ```json
 { "process": "PurchaseRequestApproval", "actions": ["retry", "cancel", "resolve"] }
@@ -2035,9 +2036,8 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`start`, `invoke`, `inspect` and `cancel`, and a grant has no other properties. A problem there is
-`AXC0004`. *(Planned for M7.)* The list will also hold `retry` and
-`resolve`.
+`start`, `invoke`, `inspect`, `cancel` and `retry`, and a grant has no other properties. A problem there is
+`AXC0004`. *(Planned for M7.)* The list will also hold `resolve`.
 
 ### Record creator
 

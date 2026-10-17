@@ -19,6 +19,8 @@ public static class AuditActions
 
     public const string ProcessCancelled = "process.cancelled";
 
+    public const string ProcessRetried = "process.retried";
+
     public const string TaskCreated = "task.created";
 
     public const string TaskCompleted = "task.completed";

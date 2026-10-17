@@ -508,12 +508,13 @@ The `role` and `policy` resource files are described in
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
   `read`, `create`, `update` and `delete` on an entity, `read` on a data
-  source, or `start`, `inspect` and `cancel` on a process. `inspect` lists a process's
+  source, or `start`, `inspect`, `cancel` and `retry` on a process. `inspect` lists a process's
   instances, see [process inspection](reference/processes.md#process-inspection).
   `cancel` stops a running or waiting instance, see
-  [Cancel](reference/processes.md#cancel). *(Planned for M7.)* A process will
-  also take `retry` and `resolve`, each checked on its own, for the other
-  [operator commands](reference/processes.md#operator-commands). An entity grant may also have a record
+  [Cancel](reference/processes.md#cancel). `retry` runs a failed instance
+  again, see [Retry](reference/processes.md#retry). *(Planned for M7.)* A
+  process will also take `resolve`, checked on its own, for the other
+  [operator command](reference/processes.md#operator-commands). An entity grant may also have a record
   `filter` and a `fields` list. A user's grants are the grants of every
   policy they match.
 - **Default-deny.**
@@ -568,8 +569,9 @@ The `role` and `policy` resource files are described in
   [data sources](reference/data-sources.md#authorization).
 - **Processes and tasks.** A process start needs a `start` grant on the
   process and read access to the subject record. An operator cancel needs
-  the `cancel` grant and the same read access. *(Planned for M7.)* An operator
-  retry or resolve will need the matching grant and the same read access. The task assignee check
+  the `cancel` grant and the same read access, and so does an operator retry
+  with the `retry` grant. *(Planned for M7.)* An operator resolve will need the
+  matching grant and the same read access. The task assignee check
   stays, and it is enough to list, read and complete a task. A role assignee
   counts only when the active release declares the role. The task form
   leaves out fields the user may not read, and the subject label uses the

@@ -37,8 +37,10 @@ authorized users see an instance's graph, path, tasks and calls, is partly
 built. The `inspect` grant, the instance list and the instance detail without
 `calls` are built. The detail's `calls` and the rest of the section are
 planned for M7, see [Process inspection](#process-inspection). Operator cancel
-is built, see [Cancel](#cancel). Operator retry and resolve are *(planned for
-M7)*, see [Operator commands](#operator-commands).
+and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
+resolve is *(planned for M7)*, see [Operator commands](#operator-commands). The
+retry of a failed call step and the retry's migration check are *(planned for
+M7)* too.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -445,8 +447,7 @@ caller, and its details add the endpoint's name.
 Only `running` and `waiting` block a new start for the same process and
 record. A `failed` or `cancelled` instance does not, so it never locks its
 record. An operator can cancel a `running` or `waiting` instance, see
-[Cancel](#cancel). An operator can retry a `failed` instance *(planned for M7)*,
-see [Operator commands](#operator-commands).
+[Cancel](#cancel). An operator can retry a `failed` instance, see [Retry](#retry).
 
 ## Task states
 
@@ -1123,7 +1124,7 @@ for texts. **Both** means different parts use different releases.
 | Instance detail | Both | The graph and the step names use the instance's release. Roles and policies come from the active release. The `sensitive` flag, which comes from the active release and counts from the pinned release too, applies with `calls` *(planned for M7)*. See [Values and masking](#values-and-masking). |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
-| Operator retry *(planned for M7)* | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
+| Operator retry | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
 | Operator resolve *(planned for M7)* | Both | The output check and the record write use the pinned release. The `resolve` grant and data change triggers come from the active release. |
 | `raiseEvent` | Both | The occurrence holds the pinned release. Its `sync` triggers come from the active release. |
 | `event.deliver` | Active | Reads `async` event triggers from the release active at delivery. |
@@ -1148,9 +1149,9 @@ for texts. **Both** means different parts use different releases.
   different active release under the lock runs again on the new release. The
   process start endpoint, the [inbound endpoint](record-api.md#responses),
   task completion and record creates and updates answer `503` after three
-  release changes. *(Planned for M7.)* Operator [retry](#retry) and
-  [resolve](#resolve) take it too, as the first statement of their
-  transaction, and answer `503` after three release changes. Event delivery reads the active release again in each
+  release changes. Operator [retry](#retry) takes it too, as the first
+  statement of its transaction, and answers `503` after three release changes.
+  *(Planned for M7.)* [Resolve](#resolve) takes it the same way. Event delivery reads the active release again in each
   trigger's transaction, and skips a trigger that the new release no longer
   has. See [Migrations](storage.md#migrations).
 - **Authorization.** Roles and policies always come from the active release,
@@ -1206,8 +1207,8 @@ its form and texts, and raises `FinanceThreshold()` to 15000.
   error in the history and sets the instance to `failed`. No step is retried.
   A `callConnector` step retries its call under its retry policy, see
   [Connector calls](#connector-calls). So does a package operation step, see
-  [Package operations](#package-operations). *(Planned for M7.)* An operator
-  can retry a `failed` instance, see [Operator commands](#operator-commands).
+  [Package operations](#package-operations). An operator can retry a `failed`
+  instance, see [Retry](#retry).
 - **Revision.** An instance's revision is a counter that starts at 1 and goes
   up each time the instance changes. A step changes the instance only at the
   revision it loaded.
@@ -1810,8 +1811,8 @@ again with the stored input under the same operation identity.
 ## Operator commands
 
 This section follows
-[D35](../decisions.md#d35-operator-retry-cancel-and-resolve--agreed). Only cancel
-is built. Retry and resolve are *(planned for M7)*. Three
+[D35](../decisions.md#d35-operator-retry-cancel-and-resolve--agreed). Cancel and
+retry are built. Resolve is *(planned for M7)*. Three
 commands let an authorized user act on process work that the engine cannot
 finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
 `running` or `waiting` instance. **Resolve** settles a connector or package
@@ -1852,8 +1853,8 @@ the instance id and `{callId}` is the call's operation identity. A success is
 
 A `process` grant takes the actions `retry`, `cancel` and `resolve`, as well as
 `start` and `inspect`, see [Authorization](../architecture.md#authorization).
-Only `cancel` is accepted so far. `retry` and `resolve` are refused when the
-application compiles, until they are built. Each is checked
+Only `cancel` and `retry` are accepted so far. `resolve` is refused when the
+application compiles, until it is built. Each is checked
 on its own, and none implies another. The subject record must also be readable
 by the user, by the same rule as a start. A subject record the user may not
 read makes the instance an unknown instance, `404`, so the user cannot tell the
@@ -1874,13 +1875,14 @@ One transaction does this:
 2. It locks the instance and requires it to be `failed`, otherwise `409`.
 3. It requires that no other `running` or `waiting` instance exists for the
    process and the subject record, otherwise `409`.
-4. It requires that no applied `renameField`, `dropField`, `dropEntity` or
+4. *(Planned for M7.)* It requires that no applied `renameField`, `dropField`, `dropEntity` or
    `convert` migration changed a column that the pinned release uses,
    otherwise `409`. It uses the same has-the-column test as `AXC0178`, see
    [Migrations](storage.md#migrations). That check counts only `running` and
    `waiting` instances, so a `failed` instance never blocks a destructive
    migration. Without this check, the retry would run old steps against a
-   changed table.
+   changed table. Until then, a retry after such a migration can run old
+   steps against a changed table. Most likely the step fails again.
 5. It sets the instance to `running` on the same step, with the next revision,
    and clears `ended_at`.
 6. It inserts a `process.step` work item for the step.
@@ -1894,12 +1896,14 @@ The worker then runs the step as usual, see [Running a step](#running-a-step).
 It reads the subject record as it is now. A step that failed because of the
 record's data can succeed after the record is fixed.
 
-A `callConnector` step or a package operation step whose call row is `failed`
-stages the call again under the **same operation identity**, see
+*(Planned for M7.)* A `callConnector` step or a package operation step whose
+call row is `failed` stages the call again under the **same operation identity**, see
 [Staging and the call](#staging-and-the-call). The input is evaluated again
 on purpose, so the retry sends the current data. A failed connector call keeps
 its stored input, but the retry still evaluates it again. A failed package
 call's stored input is cleared when it settles. The attempts count from zero.
+Until then, a retried call step runs again but fails again, because a step may
+stage only one call. Nothing is sent and nothing is written but the new failure.
 
 **Risks.** A retry of a connector call sends it again under the same
 idempotency key. Some systems replay their stored failure for a key they have
@@ -2058,9 +2062,9 @@ answers `404` for the instance, the subject record and the call, and then the
 
   | Command | Cause |
   | --- | --- |
-  | Retry | The instance is not `failed`. |
-  | Retry | Another instance of the process is `running` or `waiting` for the record. |
-  | Retry | An applied migration renamed, dropped or converted a column that the pinned release uses. |
+  | Retry | The instance is not `failed`. The title is "The instance is not failed.". |
+  | Retry | Another instance of the process is `running` or `waiting` for the record. A start that commits first on the unique index gives the same answer. The title is the start endpoint's: "A running or waiting instance of this process already exists for this record.". |
+  | Retry | *(Planned for M7.)* An applied migration renamed, dropped or converted a column that the pinned release uses. |
   | Cancel | The instance is not `running` or `waiting`. The title is "The instance is not running or waiting.". |
   | Cancel | A call of the instance is `sending` or `unknown`. The problem names the call in a `callId` member. The title is "A call of this instance may have reached the other system. It must settle or be resolved first.". |
   | Resolve | The call is not `unknown`. |
