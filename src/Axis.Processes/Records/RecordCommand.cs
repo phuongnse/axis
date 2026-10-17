@@ -51,6 +51,12 @@ public enum RecordCommandOutcome
     /// Nothing was written. The caller resolves the active release again and runs the command again.
     /// </summary>
     ReleaseChanged,
+
+    /// <summary>
+    /// A record filter of the actor's grants reads a computed field that is being recomputed, so the access it
+    /// decides cannot be checked. Nothing was written.
+    /// </summary>
+    PendingFilter,
 }
 
 /// <summary>What conflicted when the outcome is <see cref="RecordCommandOutcome.Conflict"/>.</summary>
@@ -84,7 +90,11 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// for an actor, with no HTTP request or session. The record API calls it, and so can any other
 /// host. Every command is checked in order: the actor's grant for the entity and the action
 /// (denied), then the stored record against the record filters (not found, outside the filters),
-/// and only then the body. A request that is not JSON is unsupported content, checked before any
+/// and only then the body. A <c>read</c> filter that reads a computed field that is being recomputed
+/// is a pending filter, checked before the stored record, so before not found. An <c>update</c> or
+/// <c>delete</c> filter that reads one is a pending filter too, checked after the stored record is
+/// found and before it is outside the filters. The filter's result is then not used, because a stale
+/// stored value can neither allow nor deny. A request that is not JSON is unsupported content, checked before any
 /// of the body is read.
 /// A grant with a record filter reaches only the records that match it, and the grants combine
 /// with OR. An update or a delete of a record that matches no <c>read</c> filter, or by an actor
@@ -236,6 +246,11 @@ public static class RecordCommand
         var checkedVersions = new List<long>();
         if (read.Filters is { } readFilters)
         {
+            if (await ReadsPendingAsync(connection, null, application, model, readFilters, loggerFactory, cancellationToken))
+            {
+                return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
+            }
+
             var match = await MatchAsync(connection, null, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken);
             if (match is not { Found: true, Matched: true })
             {
@@ -251,6 +266,11 @@ public static class RecordCommand
             if (!match.Found)
             {
                 return new RecordCommandResult(RecordCommandOutcome.NotFound);
+            }
+
+            if (await ReadsPendingAsync(connection, null, application, model, updateFilters, loggerFactory, cancellationToken))
+            {
+                return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
             }
 
             if (!match.Matched)
@@ -399,12 +419,26 @@ public static class RecordCommand
             // The row is locked first, so the filters see the version that is deleted.
             if (read.Filters is not null || access.Filters is not null)
             {
+                if (read.Filters is { } pendingRead
+                    && await ReadsPendingAsync(connection, transaction, application, model, pendingRead, loggerFactory, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
+                }
+
                 if (!await RecordCommands.LockAsync(connection, model, recordId, cancellationToken)
                     || (read.Filters is { } readFilters
                         && await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return new RecordCommandResult(RecordCommandOutcome.NotFound);
+                }
+
+                if (access.Filters is { } pendingDelete
+                    && await ReadsPendingAsync(connection, transaction, application, model, pendingDelete, loggerFactory, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
                 }
 
                 if (!await WithinFiltersAsync(connection, transaction, application, model, recordId, access, actor.Id, loggerFactory, cancellationToken))
@@ -461,6 +495,43 @@ public static class RecordCommand
         }
 
         return match;
+    }
+
+    /// <summary>
+    /// Whether a filter of <paramref name="filters"/> reads a computed field that is being recomputed, in
+    /// <paramref name="transaction"/> when it is not <see langword="null"/>. A path through reference fields
+    /// reads a field of each entity on it. The pending state is read once per entity, not per record, so the
+    /// answer does not tell whether any record exists. A line names the policy, the grant and the entity of
+    /// each filter that does, never a value.
+    /// </summary>
+    public static async Task<bool> ReadsPendingAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        ApplicationModel application,
+        EntityModel model,
+        IReadOnlyList<RecordFilter> filters,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var read = filters.Select(filter => RecordFilters.FieldsRead(application, model, filter.Expression)).ToList();
+        var entityIds = read.SelectMany(fields => fields.Select(field => field.Entity.Id)).Distinct().ToList();
+        var pending = await PendingComputedFields.ReadAsync(connection, transaction, entityIds, cancellationToken);
+        if (pending.Count == 0)
+        {
+            return false;
+        }
+
+        var refused = false;
+        for (var index = 0; index < filters.Count; index++)
+        {
+            if (read[index].Any(field => pending.TryGetValue(field.Entity.Id, out var names) && names.Contains(field.Field)))
+            {
+                RecordFilterLog.FilterPending(loggerFactory.CreateLogger(typeof(RecordCommand).FullName!), filters[index].Policy, filters[index].Grant, model.Name);
+                refused = true;
+            }
+        }
+
+        return refused;
     }
 
     /// <summary>
