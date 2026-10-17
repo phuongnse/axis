@@ -243,6 +243,76 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.True(call.GetProperty("inputHidden").GetBoolean());
     }
 
+    [Fact]
+    public async Task A_sensitive_field_is_in_the_record_but_the_input_that_maps_it_is_hidden_from_a_user_who_may_read_it()
+    {
+        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount"));
+        var subject = await fixture.InsertRequestAsync(TenantB, null, amount: 500m);
+        var instance = await fixture.StartAsync(TenantB, "DepartmentOrder", subject);
+        await fixture.InsertConnectorCallAsync(TenantB, instance, "createOrder", """{"reference":"Sales","amount":500}""");
+
+        using var client = fixture.CreateClient().SignedInAs("ada");
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/entities/Request/records/{subject:D}", Host(TenantB));
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var record = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(500, record.RootElement.GetProperty("values").GetProperty("amount").GetDecimal());
+
+        using var body = await GetOkAsync(TenantB, "DepartmentOrder", instance, "ada");
+        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
+        Assert.True(call.GetProperty("inputHidden").GetBoolean());
+        Assert.DoesNotContain("500", call.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_instance_pinned_to_a_release_that_marks_a_field_sensitive_keeps_its_input_hidden_after_a_newer_release_drops_the_flag()
+    {
+        var flagged = await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount"));
+        var subject = await fixture.InsertRequestAsync(TenantB, null, amount: 500m);
+        var instance = await fixture.StartAsync(TenantB, "DepartmentOrder", subject, flagged);
+        await fixture.InsertConnectorCallAsync(TenantB, instance, "createOrder", """{"reference":"Sales","amount":500}""");
+        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("divisor"));
+
+        using var body = await GetOkAsync(TenantB, "DepartmentOrder", instance, "ada");
+
+        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
+        Assert.True(call.GetProperty("inputHidden").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Adding_the_sensitive_flag_in_a_new_release_changes_no_table()
+    {
+        Assert.True(fixture.Model.TryGetEntity("Request", out var request));
+        var before = await fixture.ReadTableAsync(TenantB, request.Id);
+
+        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount", "department"));
+
+        var after = await fixture.ReadTableAsync(TenantB, request.Id);
+        Assert.Equal(before.Columns, after.Columns);
+    }
+
+    // Edits the Request entity so that each of the named fields declares "sensitive": true.
+    private static Func<string, string, string?> MarkSensitive(params string[] fields) =>
+        (path, content) =>
+        {
+            if (path != Path.Combine("entities", "request.json"))
+            {
+                return content;
+            }
+
+            foreach (var field in fields)
+            {
+                var start = content.IndexOf($"{{ \"name\": \"{field}\"", StringComparison.Ordinal);
+                Assert.True(start >= 0, $"The Request entity has no field {field}.");
+                var end = content.IndexOf(" }", start, StringComparison.Ordinal);
+                content = content.Insert(end, ", \"sensitive\": true");
+            }
+
+            return content;
+        };
+
     private async Task<(Guid Instance, Guid Call)> StartWithCallAsync(string tenant, string inputJson)
     {
         var subject = await fixture.InsertRequestAsync(tenant, null);

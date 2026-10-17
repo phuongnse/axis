@@ -581,8 +581,7 @@ The `role` and `policy` resource files are described in
   process needs an `inspect` grant on the process, and an instance is listed
   only when its subject record is readable. The instance detail needs the
   same. It also shows a call's input only when the user may read every field
-  its mapping reads or writes. A `sensitive` field is never shown *(planned
-  for M7)*. See
+  its mapping reads or writes. A `sensitive` field is never shown. See
   [process inspection](reference/processes.md#process-inspection).
 - **System work.** The worker, seed data and `updateRecord` steps run as
   `system`. Policies do not check them.

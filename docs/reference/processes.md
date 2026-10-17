@@ -35,7 +35,7 @@ processes when something happens, see
 [Events and triggers](#events-and-triggers). Process inspection, where
 authorized users see an instance's graph, path, tasks and calls, is partly
 built. The `inspect` grant, the instance list and the instance detail with its
-`calls` are built. The `sensitive` flag and the inspector widget are planned
+`calls` and the `sensitive` flag are built. The inspector widget is planned
 for M7, see [Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
 resolve is *(planned for M7)*, see [Operator commands](#operator-commands).
@@ -768,7 +768,7 @@ where an instance is, what it did and why it failed or waits. Two routes list
 the instances of a process and read one of them. The `inspect` grant and the
 [instance list](#instance-list) and the [instance detail](#instance-detail)
 are built, with the detail's `calls`. The `sensitive` flag, which hides more
-values, and the widget are *(planned for M7)*.
+values, is built too. The widget is *(planned for M7)*.
 The user is the user of the
 [session](../architecture.md#sign-in-and-the-session). The
 [process inspector widget](frontend.md) shows the same data.
@@ -1012,13 +1012,15 @@ evaluated input that the call sent, so it holds field values.
   user may read comes from the policies of the active release, as for
   [tasks](#task-api) and [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
   A field that the active release no longer has counts as unreadable.
-- **Sensitive fields** *(planned for M7, #495)*. A field that declares
+- **Sensitive fields.** A field that declares
   [`sensitive`](configuration.md#sensitive-fields) is never shown in
   inspection, for any user. A call whose mapping reads or writes one has its
   `input` hidden. A field counts as sensitive when the pinned release or the
   active release marks it. So a release that adds or removes the flag does not
   expose instances that still run on an older release. The record API still
-  shows the field to users whose grants cover it.
+  shows the field to users whose grants cover it. A `child-collection` field in
+  a mapping counts as sensitive when any field of its child entity is
+  sensitive, in either release.
 - **`inputHidden`.** It is `true` only when the rule above hides an `input`
   that is stored. It is `false` when `input` is shown, and when the input is
   no longer stored: `input` is then `null` too. A package call keeps its
@@ -1139,7 +1141,7 @@ for texts. **Both** means different parts use different releases.
 | Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Instance list | Active | Roles and policies come from the active release. |
-| Instance detail | Both | The graph and the step names use the instance's release. So do the fields a call's mapping reads or writes. Roles and policies come from the active release, and so do the fields the user may read. The `sensitive` flag, which comes from the active release and counts from the pinned release too, is *(planned for M7, #495)*. See [Values and masking](#values-and-masking). |
+| Instance detail | Both | The graph and the step names use the instance's release. So do the fields a call's mapping reads or writes. Roles and policies come from the active release, and so do the fields the user may read. The `sensitive` flag counts when the pinned release or the active release marks the field. See [Values and masking](#values-and-masking). |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
