@@ -461,7 +461,7 @@ flowchart LR
        step property, `save` together with `expect`, `expect` on an
        expectation step, or a `now` that is not a real date and time, such as
        `2026-02-30T09:00:00Z`, is `AXC0004`.
-     - *(planned for M7)* An `advanceTime` step whose `by` is not a positive
+     - An `advanceTime` step whose `by` is not a positive
        duration in the form of a task's `dueIn` is `AXC0193` at
        `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is
        `AXC0194` at `/steps/{i}`.
@@ -822,13 +822,10 @@ sorted by file and then path.
 | `AXC0189` | A value in a step's `values` does not fit its field's type: not a valid text, number, boolean, date, reference or listed enum value, or a child collection that is not an array of objects. Reported at `/steps/{i}/values/{key}`. |
 | `AXC0190` | A stub names no loaded connector, no operation of the connector, no package of the application, or no operation of the pinned package. Reported at `/stubs/{i}/connector/name`, `/stubs/{i}/connector/operation` or `/stubs/{i}/operation`. |
 | `AXC0191` | A key in a stub's `output` names no output field of the operation. Reported at `/stubs/{i}/output/{key}`. |
+| `AXC0193` | An `advanceTime` step's `by` is not a positive duration in the form of a task's `dueIn`. Reported at `/steps/{i}/by`. |
+| `AXC0194` | An `advanceTime` step in a scenario without `now`. Reported at `/steps/{i}`. |
 
-*(planned for M7)* Two more codes come with `advanceTime`. They join the table
-when the step is built, because the table lists only codes that the compiler
-declares. `AXC0193` is an `advanceTime` step whose `by` is not a positive
-duration in the form of a task's `dueIn`, reported at `/steps/{i}/by`.
-`AXC0194` is an `advanceTime` step in a scenario without `now`, reported at
-`/steps/{i}`. Issue #477 takes `AXC0192`.
+`AXC0192` is reserved for issue #477.
 
 ## Startup activation
 
@@ -2345,7 +2342,7 @@ Every step has a `type`. These are the step kinds:
 | `expectRecord` | `record`, `values` | Asserts that the saved record holds these values. |
 | `expectInstance` | `process`, `record`, `state`, optional `step` | Asserts the state of the process instance on the record, and the step it waits at. |
 | `expectTask` | `record`, `step`, `assignee` or `state` | Asserts who the task is assigned to, or its state. |
-| `advanceTime` | `by` | *(planned for M7)* Moves the scenario's `now` forward by `by`, then runs the work items that are due. |
+| `advanceTime` | `by` | Moves the scenario's `now` forward by `by`, then runs the work items that are due. |
 
 - `createRecord`, `updateRecord`, `deleteRecord`, `startProcess` and
   `completeTask` are the actions. The record actions go through the record
@@ -2379,7 +2376,7 @@ Every step has a `type`. These are the step kinds:
   alias is checked at compile. See the **Scenarios** bullet of the
   [Resolve step](#configuration-pipeline) for the checks and their codes.
 
-*(planned for M7)* `advanceTime`:
+`advanceTime`:
 
 - `by` has the form of a task's `dueIn`: weeks, such as `P2W`, or days with an
   optional time part, such as `P1D`, `PT2H` or `P1DT12H`. It must be positive.
@@ -2524,11 +2521,9 @@ What runs now:
   source filters, task due dates, step history times and the year of a sequence
   number all use it. Timestamps that PostgreSQL writes itself, such as
   `created_at`, keep the real clock.
-
-Schedule triggers are *(planned for M7)*. They run through
-[`advanceTime`](#test-scenarios), as described above. Until then the
-`trigger.schedule` and `trigger.fanOut` items stay queued after an action and do
-not fail the scenario.
+- **Schedule triggers.** They run only through [`advanceTime`](#test-scenarios),
+  as described above. After an action the `trigger.schedule` and `trigger.fanOut`
+  items stay queued and do not fail the scenario.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

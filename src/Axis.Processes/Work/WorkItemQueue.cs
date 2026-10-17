@@ -1,21 +1,24 @@
 using System.Diagnostics.CodeAnalysis;
+using Axis.Expressions.Sql;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace Axis.Processes.Work;
 
 /// <summary>
-/// Reads and writes <c>axis.process_work_items</c> over a connection to a tenant database. Lease
-/// times use the database clock, so workers on different machines agree when a lease expires.
+/// Reads and writes <c>axis.process_work_items</c> over a connection to a tenant database. Due times
+/// read the transaction time, which a test scenario's <c>axis.now</c> fixes, and are the real time
+/// otherwise. Lease times use the database clock, so workers on different machines agree when a
+/// lease expires.
 /// </summary>
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "It is the queue of ready work items.")]
 public static class WorkItemQueue
 {
-    internal const string ClaimSql = """
+    internal const string ClaimSql = $"""
         UPDATE axis.process_work_items w
         SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
         FROM (SELECT id FROM axis.process_work_items
-              WHERE tenant_id = @tenant AND kind = ANY(@kinds) AND due_at <= now()
+              WHERE tenant_id = @tenant AND kind = ANY(@kinds) AND due_at <= {SqlTranslator.NowSql}
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
@@ -150,9 +153,9 @@ public static class WorkItemQueue
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(item);
         await using var command = new NpgsqlCommand(
-            """
+            $"""
             UPDATE axis.process_work_items
-            SET due_at = now() + @delay, claim_token = NULL, lease_expires_at = NULL
+            SET due_at = {SqlTranslator.NowSql} + @delay, claim_token = NULL, lease_expires_at = NULL
             WHERE id = @id AND claim_token = @token
             """,
             connection,
@@ -208,9 +211,9 @@ public static class WorkItemQueue
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(item);
         await using var command = new NpgsqlCommand(
-            """
+            $"""
             UPDATE axis.process_work_items
-            SET cursor = @cursor, due_at = now(), claim_token = NULL, lease_expires_at = NULL
+            SET cursor = @cursor, due_at = {SqlTranslator.NowSql}, claim_token = NULL, lease_expires_at = NULL
             WHERE id = @id AND claim_token = @token
             """,
             connection,

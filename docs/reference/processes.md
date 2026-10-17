@@ -2093,8 +2093,9 @@ database, with history in `axis.__processes_migrations` (see
   `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
   `claim_token` of its current claim. A step's item also has the
   `process_instance_id` of its instance. A worker claims only items of the
-  tenant it polls and only kinds it has a handler for. Lease times use the
-  database clock. Completed and failed items are deleted. A `connector.call`
+  tenant it polls and only kinds it has a handler for. The claim compares
+  `due_at` with the transaction time, which a test scenario's `axis.now` fixes.
+  Lease times use the database clock. Completed and failed items are deleted. A `connector.call`
   item sends or reconciles one connector call. It has the
   `process_instance_id` of the call's instance and the `connector_call_id` of
   the call. See [Connector calls](#connector-calls). The item's `due_at`

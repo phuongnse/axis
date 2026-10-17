@@ -17,6 +17,7 @@ public sealed record ScenarioStepDefinition
     public const string ExpectRecord = "expectRecord";
     public const string ExpectInstance = "expectInstance";
     public const string ExpectTask = "expectTask";
+    public const string AdvanceTime = "advanceTime";
 
     /// <summary>The step type, one of the constants of this record.</summary>
     public required string Type { get; init; }
@@ -56,4 +57,7 @@ public sealed record ScenarioStepDefinition
     /// <c>conflict</c>, or an object with <c>invalid</c>. Null when the action must succeed.
     /// </summary>
     public JsonElement? Expect { get; init; }
+
+    /// <summary>How far an <c>advanceTime</c> step moves the scenario's <c>now</c>, as an ISO 8601 duration.</summary>
+    public string? By { get; init; }
 }
