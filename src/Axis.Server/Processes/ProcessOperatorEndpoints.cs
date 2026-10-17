@@ -32,7 +32,8 @@ namespace Axis.Server.Processes;
 /// transaction takes the application's start lock shared first, because the retry makes an instance
 /// active again, and runs <see cref="ProcessRetryCommand"/>. It answers the same 409 for a
 /// <c>read</c> filter on a field that is being recomputed, before it looks for the instance, 409
-/// for an instance that is not failed, and 409 when another instance of the process is running or waiting for the record.
+/// for an instance that is not failed, 409 when another instance of the process is running or waiting for the record, and
+/// 409 when an applied migration changed a column that the instance's pinned release uses.
 /// When the active release is no longer the one resolved, the retry runs again from resolution on
 /// the new release, and answers 503 after three attempts. A retry that is refused writes nothing.
 /// The problem titles never contain text from the request.
@@ -261,6 +262,9 @@ internal static class ProcessOperatorEndpoints
                 ProcessRetryOutcome.NotFailed => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "The instance is not failed."),
+                ProcessRetryOutcome.MigrationChanged => Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "A migration changed a column that the instance's release uses."),
                 _ => ProcessStartEndpoints.AlreadyRunning(),
             };
         }

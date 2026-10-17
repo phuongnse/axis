@@ -38,8 +38,7 @@ built. The `inspect` grant, the instance list and the instance detail with its
 `calls` are built. The `sensitive` flag and the inspector widget are planned
 for M7, see [Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
-resolve is *(planned for M7)*, see [Operator commands](#operator-commands). The
-retry's migration check is *(planned for M7)* too.
+resolve is *(planned for M7)*, see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -1899,14 +1898,23 @@ One transaction does this:
 2. It locks the instance and requires it to be `failed`, otherwise `409`.
 3. It requires that no other `running` or `waiting` instance exists for the
    process and the subject record, otherwise `409`.
-4. *(Planned for M7.)* It requires that no applied `renameField`, `dropField`, `dropEntity` or
+4. It requires that no applied `renameField`, `dropField`, `dropEntity` or
    `convert` migration changed a column that the pinned release uses,
    otherwise `409`. It uses the same has-the-column test as `AXC0178`, see
    [Migrations](storage.md#migrations). That check counts only `running` and
    `waiting` instances, so a `failed` instance never blocks a destructive
    migration. Without this check, the retry would run old steps against a
-   changed table. Until then, a retry after such a migration can run old
-   steps against a changed table. Most likely the step fails again.
+   changed table. Only migrations applied since the pinned release count:
+   those of the application whose file the pinned release does not hold. The
+   release was activated after it applied every migration it holds, and its
+   model already reflects them. Activation stores the columns each migration
+   changed in `axis.applied_migrations`, see
+   [Applied migrations](storage.md#applied-migrations), and the retry reads
+   them back. A row stored before the columns were recorded counts as having
+   changed every column. A pinned release whose stored content is missing
+   counts as using every column, so any applied destructive migration of the
+   application refuses the retry. A refused instance stays `failed`. The
+   operator starts a new instance for the record.
 5. It sets the instance to `running` on the same step, with the next revision,
    and clears `ended_at`.
 6. It inserts a `process.step` work item for the step.
@@ -2097,7 +2105,7 @@ and then the `409` checks.
   | --- | --- |
   | Retry | The instance is not `failed`. The title is "The instance is not failed.". |
   | Retry | Another instance of the process is `running` or `waiting` for the record. A start that commits first on the unique index gives the same answer. The title is the start endpoint's: "A running or waiting instance of this process already exists for this record.". |
-  | Retry | *(Planned for M7.)* An applied migration renamed, dropped or converted a column that the pinned release uses. |
+  | Retry | An applied migration renamed, dropped or converted a column that the pinned release uses. The title is "A migration changed a column that the instance's release uses.". |
   | Cancel | The instance is not `running` or `waiting`. The title is "The instance is not running or waiting.". |
   | Cancel | A call of the instance is `sending` or `unknown`. The problem names the call in a `callId` member. The title is "A call of this instance may have reached the other system. It must settle or be resolved first.". |
   | Resolve | The call is not `unknown`. |
