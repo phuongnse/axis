@@ -1,0 +1,10 @@
+{
+  "id": "e1b0ae31-67ad-4c04-886f-f4618b8a8a2e",
+  "kind": "event",
+  "name": "PurchaseRequestApproved",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "fields": [
+    { "name": "title", "type": "text" }
+  ]
+}

@@ -24,8 +24,9 @@ namespace Axis.Scenarios;
 /// placeholder deployment bindings, never a real URL or secret. It reads the manifests of the
 /// installed extension packages it is given, and runs none of their code. Each step runs as its user,
 /// with the roles the scenario gives that user. The first failing step ends the scenario. After each
-/// action the runner runs the due process steps and the connector and package calls in-process, so
-/// the process reaches its next wait. The scenario's stubs answer the calls. The scenario's
+/// action the runner runs the due process steps, the connector and package calls and the event
+/// deliveries in-process, so the process reaches its next wait. Schedule triggers stay queued. The
+/// scenario's stubs answer the calls. The scenario's
 /// <c>now</c> reaches every connection as the PostgreSQL setting <c>axis.now</c>, which the
 /// transaction time and the SQL of <c>now()</c> read. Times that PostgreSQL writes itself, such as
 /// <c>created_at</c>, keep the real clock.

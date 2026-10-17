@@ -2385,12 +2385,16 @@ What runs now:
 - **Process steps.** After each action, the runner runs the `process.step` work
   items of the scenario's tenant in-process, until none is due. So the process
   reaches its next wait: an open task, or its end. If one action makes more than
-  1,000 items run, the scenario fails at that step.
+  1,000 items run, of any kind, the scenario fails at that step.
 - **Connector and package calls.** The same loop runs the `connector.call` and
   `package.call` items. They are the real handlers, so output mapping, resume,
   history, audit records and data change triggers behave as they do on a worker.
   Only the HTTP request of a connector call and the package operation are replaced
   by the scenario's `stubs`. See `stubs` above.
+- **Event deliveries.** The same loop runs the `event.deliver` items with the real
+  handler. So an `async` event trigger starts its process, and that process runs
+  to its next wait before the next step. See
+  [event delivery](processes.md#event-delivery).
 - **The current time.** With `now` set, the runner gives every connection of the
   scenario the PostgreSQL setting `axis.now`. The transaction time reads it
   instead of PostgreSQL `now()`. So `now()` in expressions, in policy and data
@@ -2398,9 +2402,8 @@ What runs now:
   number all use it. Timestamps that PostgreSQL writes itself, such as
   `created_at`, keep the real clock.
 
-*(planned for M7)*: event deliveries and schedule triggers. Only the
-`process.step`, `connector.call` and `package.call` items run, so event deliveries
-and schedule triggers stay queued and do not fail the scenario.
+Schedule triggers are *(planned for M7)*. The `trigger.schedule` and
+`trigger.fanOut` items stay queued and do not fail the scenario.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

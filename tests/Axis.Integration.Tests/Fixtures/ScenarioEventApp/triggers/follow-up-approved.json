@@ -1,0 +1,10 @@
+{
+  "id": "9e790764-2b6a-48b4-b80b-064bb43b3103",
+  "kind": "trigger",
+  "name": "FollowUpApproved",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "PurchaseRequestApproved",
+  "mode": "async",
+  "process": "ApprovalFollowUp"
+}
