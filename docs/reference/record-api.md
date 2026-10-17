@@ -148,13 +148,14 @@ table.
 The paging parameters are digits only: a sign, a space or a repeated parameter
 (`page=1&page=2`) is invalid.
 
-*(planned for M7)* A `sort` or `search` that names a
+A `sort` or `search` that names a
 [pending field](storage.md#recomputing-computed-fields) is a `409`. For
 `search`, that is the display field. The title is fixed: "A field is being
 recomputed." `errors` is keyed `sort` or `search`, with a message that names
-the field. The request is valid, so this is a state conflict, not a `400`. A
-list with no `sort` or `search` on a pending field answers with the stored
-values. A single read computes the pending field on the spot.
+the field. The request is valid, so this is a state conflict, not a `400`. It
+is only reported once the query is valid. A list with no `sort` or `search` on
+a pending field answers with the stored values. A single read computes the
+pending field on the spot.
 
 ## Create, update and delete
 
@@ -262,14 +263,15 @@ Policies add more checks. The full order is:
 4. A grant for the action on the entity, `403`.
 5. The stored record: unknown or outside every read filter, `404`. On
    update and delete, a user with no `read` grant on the entity cannot see
-   the record either, so it is a `404`. *(planned for M7)* A read filter that
-   reads a pending field is a `409` first, before the `404`.
+   the record either, so it is a `404`. A read filter that reads a pending field
+   is a `409` first, before the `404`. That holds for a list too, and for a
+   history.
 6. On update and delete, the stored record outside every `update` or
-   `delete` filter, `403`. *(planned for M7)* An `update` or `delete` filter
-   that reads a pending field of the stored record is a `409` first, before
-   the `403`.
+   `delete` filter, `403`. An `update` or `delete` filter that reads a pending
+   field of the stored record is a `409` first, before the `403`.
 7. The content type, `415`.
-8. The query of a list, or the body, `400`.
+8. The query of a list, or the body, `400`. Then, on a list, a `sort` or
+   `search` on a pending field, `409`.
 9. Fields the user may not write, `403`.
 10. The computed fields and the validations, `400`, then storage.
 11. On create and update, the new record outside every `create` or `update`
@@ -314,20 +316,23 @@ otherwise the answer is the stale-version `409`. See
   server logs the policy name and the grant's index. Another grant can still
   match the record. A list whose combined read filters fail is a `400` with
   a fixed title, because PostgreSQL cannot fail one branch of an `or`.
-- **`409` for a pending field** *(planned for M7)*. A `sort` or `search`
+- **`409` for a pending field.** A `sort` or `search`
   names a field that is being recomputed. The title is fixed: "A field is being
   recomputed." `errors` is keyed `sort` or `search`, with a message that names
   the field. See [Paging and sorting](#paging-and-sorting).
-- **`409` for a policy that reads a pending field** *(planned for M7)*. A
+- **`409` for a policy that reads a pending field.** A
   `read` filter of the user's grants reads a field that is being recomputed.
-  It covers a list and a single read. An `update` or `delete` filter does the
-  same on the stored record. Read filters fail closed, as
+  It covers a list, a single read and a history. An `update` or `delete`
+  filter does the same on the stored record. A filter that reads a field of
+  another entity through a reference counts when that entity is pending.
+  Nothing is written. Read filters fail closed, as
   [D12](../decisions.md#d12-authorization-is-server-side-and-default-deny--agreed) requires, because a
   stale value could allow or deny wrongly. The title is fixed: "Your access to
   this entity cannot be checked while a field is being recomputed." There is no
   `errors`, and the response names no field or policy. The server logs the
   policy name and the grant's index, never a record value. The answer comes
-  before the `404`, so it holds until the backfill ends.
+  before the `404`, so it holds until the backfill ends, and it is the same
+  whether the record exists or not. It also comes before the query `400`.
 - **`403` for a field write.** The body writes a field that no `create` or
   `update` grant of the user covers. It has the `errors` shape of a `400`,
   keyed `/values/<field>`, and lists every such field. A child collection is

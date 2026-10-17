@@ -25,7 +25,9 @@ namespace Axis.Server.Processes;
 /// locks the subject record, checks that the user may read it and reads it (400), checks the start
 /// condition (400), inserts the instance (409) and its first work item, and appends the audit
 /// record <c>process.started</c>, whose actor is the session user. A record the user may not read
-/// gets the same 400 as one that does not exist, so the two cannot be told apart. A repeat with a
+/// gets the same 400 as one that does not exist, so the two cannot be told apart. Before it locks
+/// the record, the transaction answers 409 when a <c>read</c> filter of the user's grants reads a
+/// computed field that is being recomputed, whatever the record. A repeat with a
 /// claimed key returns the stored response, or 422 for another record. A start that fails writes
 /// nothing. The transaction takes the application's start lock shared first. When the active
 /// release is no longer the one resolved, the start runs again from resolution on the new release,
@@ -152,10 +154,20 @@ internal static class ProcessStartEndpoints
                     title: "This Idempotency-Key was used with a different subject record.");
         }
 
+        // A read filter on a field that is being recomputed decides nothing, so it is refused before the
+        // record is looked up. An activation that leaves fields pending holds the start lock exclusively,
+        // so the check cannot race it.
+        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, transaction, application, entity, pendingFilters, loggerFactory, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Grants.PendingFilter();
+        }
+
         // The lock makes the read below and the start condition see the latest version, and a
         // concurrent write of the record waits until this start commits or rolls back. A record
         // the user may not read does not exist for them.
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
         if (!await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken)
             || !read.Granted
             || (read.Filters is { } filters

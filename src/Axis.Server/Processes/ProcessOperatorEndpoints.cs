@@ -22,15 +22,17 @@ namespace Axis.Server.Processes;
 /// <c>{ "reason": "&lt;text&gt;" }</c> with a reason of 1 to 500 characters. An <c>id</c> that is
 /// not a hyphenated UUID is a 404, as is an instance of another process or one whose subject
 /// record the user may not read. Then one transaction runs <see cref="ProcessCancelCommand"/>,
-/// which answers 409 for an instance that is not running or waiting, and 409 with the call's id
+/// which answers 409, before it looks for the instance, when a <c>read</c> filter of the user reads
+/// a computed field that is being recomputed, 409 for an instance that is not running or waiting, and 409 with the call's id
 /// in <c>callId</c> when a call may have reached the other system. A cancel that is refused
 /// writes nothing. The cancel takes no start lock, because it writes no record and starts no
 /// trigger. A retry at <c>POST /api/apps/{app}/processes/{process}/instances/{id}/retry</c> sends a
 /// <c>failed</c> instance back to <c>running</c> on its failed step and answers 200 with the instance.
 /// It is checked in the same order with the user's <c>retry</c> grant and the same body. Then one
 /// transaction takes the application's start lock shared first, because the retry makes an instance
-/// active again, and runs <see cref="ProcessRetryCommand"/>. It answers 409 for an instance that is
-/// not failed, and 409 when another instance of the process is running or waiting for the record.
+/// active again, and runs <see cref="ProcessRetryCommand"/>. It answers the same 409 for a
+/// <c>read</c> filter on a field that is being recomputed, before it looks for the instance, 409
+/// for an instance that is not failed, and 409 when another instance of the process is running or waiting for the record.
 /// When the active release is no longer the one resolved, the retry runs again from resolution on
 /// the new release, and answers 503 after three attempts. A retry that is refused writes nothing.
 /// The problem titles never contain text from the request.
@@ -128,6 +130,7 @@ internal static class ProcessOperatorEndpoints
             return result.Outcome switch
             {
                 ProcessCancelOutcome.NotFound => InstanceNotFound(),
+                ProcessCancelOutcome.PendingFilter => Grants.PendingFilter(),
                 ProcessCancelOutcome.NotActive => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "The instance is not running or waiting."),
@@ -254,6 +257,7 @@ internal static class ProcessOperatorEndpoints
             return result.Outcome switch
             {
                 ProcessRetryOutcome.NotFound => InstanceNotFound(),
+                ProcessRetryOutcome.PendingFilter => Grants.PendingFilter(),
                 ProcessRetryOutcome.NotFailed => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "The instance is not failed."),

@@ -785,9 +785,12 @@ internal sealed partial class PackageCallHandler(
         return WorkItemOutcome.Failed;
     }
 
-    /// <summary>The row of the attempt the worker makes, numbered as the call counts it. A package call has no HTTP status.</summary>
+    /// <summary>
+    /// The row of the attempt the worker makes. Its number is the next attempt number of the call, which
+    /// carries on after an operator retry. A package call has no HTTP status.
+    /// </summary>
     private static CallAttempt AttemptRow(Attempt attempt, string outcome, string? error) =>
-        new(CallAttempts.Attempt, attempt.Attempts, attempt.StartedAt, outcome, null, error);
+        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, null, error);
 
     private static CallTags Tags(ClaimedWorkItem item, Attempt attempt) =>
         new(item.TenantId, attempt.Application, AxisTelemetry.PackageTag, attempt.Call.Package, attempt.Call.Operation);

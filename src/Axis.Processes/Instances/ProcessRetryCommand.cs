@@ -24,6 +24,12 @@ public enum ProcessRetryOutcome
 
     /// <summary>Another instance of the process is <c>running</c> or <c>waiting</c> for the same record.</summary>
     AlreadyRunning,
+
+    /// <summary>
+    /// A <c>read</c> filter of the user reads a computed field that is being recomputed, so no instance can be
+    /// checked against it. Nothing was written.
+    /// </summary>
+    PendingFilter,
 }
 
 /// <summary>
@@ -36,7 +42,8 @@ public sealed record ProcessRetryResult(ProcessRetryOutcome Outcome, Guid? Relea
 /// Sends a <c>failed</c> instance back to <c>running</c> on the step that failed, in the caller's
 /// transaction. The user's <c>retry</c> grant and the application's start lock are the caller's.
 /// The instance's subject record must be readable by the user, or the instance does not exist for
-/// them. The instance keeps its pinned release and its step. It gets the next revision and no end
+/// them. When a <c>read</c> filter of the user reads a computed field that is being recomputed, the
+/// retry is refused first, before the instance is found. The instance keeps its pinned release and its step. It gets the next revision and no end
 /// time, and a <c>process.step</c> work item runs the step again with the record as it is then.
 /// Another <c>running</c> or <c>waiting</c> instance for the same record refuses the retry, which
 /// the explicit check and the unique index on active instances both catch. A history row with
@@ -73,6 +80,14 @@ public static class ProcessRetryCommand
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        // A read filter on a field that is being recomputed decides nothing. It is checked before the instance
+        // is found, so it tells nothing about the instance.
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, transaction, active, entity, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return new ProcessRetryResult(ProcessRetryOutcome.PendingFilter);
+        }
 
         var instance = await LockInstanceAsync(transaction, instanceId, cancellationToken);
         if (instance is null || instance.ApplicationId != active.Manifest.Id || instance.ProcessId != process.Id)

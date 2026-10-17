@@ -4,6 +4,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Records;
+using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Worker;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Record = Axis.Data.Records.Record;
 
 namespace Axis.Integration.Tests;
@@ -302,6 +304,35 @@ public sealed class PackageCallFixture : IAsyncLifetime
         var activated = await _tenant.ActivateAsync(folder.Path, catalog.Versions, _bindings);
         Assert.NotEqual(ReleaseId, activated.ReleaseId);
         return activated;
+    }
+
+    /// <summary>
+    /// Retries the failed instance <paramref name="instanceId"/> of <paramref name="process"/> as an operator
+    /// with full access would, which queues its step again. Asserts the retry and commits it.
+    /// </summary>
+    public async Task RetryAsync(string process, Guid instanceId, CancellationToken cancellationToken)
+    {
+        var model = Model;
+        Assert.True(model.TryGetProcess(process, out var processModel));
+        Assert.True(model.TryGetEntity(processModel.Entity.Name, out var entity));
+        await using var connection = await _tenant.DataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var result = await ProcessRetryCommand.RetryAsync(
+            connection,
+            transaction,
+            _tenant.Tenant,
+            model,
+            processModel,
+            entity,
+            instanceId,
+            new RecordAccess(true, null),
+            "maria",
+            "Maria",
+            "Fixed",
+            NullLoggerFactory.Instance,
+            cancellationToken);
+        Assert.Equal(ProcessRetryOutcome.Retried, result.Outcome);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>

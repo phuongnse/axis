@@ -151,6 +151,54 @@ public static class RecordFilters
             : new RecordFilterMatch(false, 0, false, failed);
     }
 
+    /// <summary>
+    /// The entity and the field name of every field that <paramref name="filter"/> reads, in the order the
+    /// translation finds them, with the body of each rule it calls inlined. Each step of a path through
+    /// reference fields reads a field of the entity before it, so a path reads one field of each entity on it.
+    /// </summary>
+    public static IReadOnlyList<(EntityModel Entity, string Field)> FieldsRead(
+        ApplicationModel application, EntityModel entity, ExpressionModel filter)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(filter);
+
+        var read = new List<(EntityModel, string)>();
+        var translated = SqlTranslator.Translate(
+            filter.Syntax,
+            names =>
+            {
+                var current = entity;
+                for (var index = 0; index < names.Count; index++)
+                {
+                    if (!current.TryGetField(names[index], out var field))
+                    {
+                        throw new InvalidOperationException(
+                            $"The compiler let through the policy filter path '{string.Join('.', names)}' that does not resolve.");
+                    }
+
+                    read.Add((current, field.Name));
+                    if (index < names.Count - 1)
+                    {
+                        current = field.Target is { } target && application.FindEntity(target.Id) is { } next
+                            ? next
+                            : throw new InvalidOperationException(
+                                $"The compiler let through the policy filter path '{string.Join('.', names)}' that does not resolve.");
+                    }
+                }
+
+                return "NULL";
+            },
+            filter.Check,
+            "g0f");
+        if (!translated.Succeeded)
+        {
+            throw new InvalidOperationException($"The compiler let through a policy filter outside the SQL subset: {translated.Diagnostic.Message}");
+        }
+
+        return read;
+    }
+
     private static async Task ReleaseAsync(NpgsqlTransaction? transaction, CancellationToken cancellationToken)
     {
         if (transaction is not null)

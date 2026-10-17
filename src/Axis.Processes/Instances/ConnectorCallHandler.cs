@@ -1026,9 +1026,9 @@ internal sealed partial class ConnectorCallHandler(
     private static CallTags Tags(ClaimedWorkItem item, Attempt attempt) =>
         new(item.TenantId, attempt.Application, AxisTelemetry.ConnectorTag, attempt.Call.Connector, attempt.Call.Operation);
 
-    /// <summary>The row of the attempt the worker makes, numbered as the call counts it.</summary>
+    /// <summary>The row of the attempt the worker makes. Its number is the next attempt number of the call, which carries on after an operator retry.</summary>
     private static CallAttempt AttemptRow(Attempt attempt, string outcome, int? status, string? error) =>
-        new(CallAttempts.Attempt, attempt.Attempts, attempt.StartedAt, outcome, status, error);
+        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, status, error);
 
     /// <summary>The row of a lookup. Its number is the next lookup number of the call.</summary>
     private static CallAttempt LookupRow(Attempt attempt, string outcome, int? status, string? error) =>

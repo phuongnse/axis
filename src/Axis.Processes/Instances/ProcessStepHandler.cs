@@ -180,6 +180,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         NewTask? task = null;
         NewConnectorCall? call = null;
         NewPackageCall? packageCall = null;
+        var restagesCall = false;
+        var restagesPackageCall = false;
         NewEvent? occurrence = null;
         switch (step)
         {
@@ -247,8 +249,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 }
 
                 var (connector, operation) = FindOperation(model, callStep, instance, input);
+
+                // An operator retry leaves the failed call of this step. It is staged again under its id.
+                var failedCallId = await ConnectorCalls.FindFailedAsync(context.Transaction, instance.Id, step.Name, cancellationToken);
+                restagesCall = failedCallId is not null;
                 call = new NewConnectorCall(
-                    Guid.CreateVersion7(),
+                    failedCallId ?? Guid.CreateVersion7(),
                     instance.Id,
                     step.Name,
                     instance.ReleaseId,
@@ -315,8 +321,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                         $"The package '{packageStep.Package}' {packageStep.Version} has no operation '{packageStep.Operation}' installed.",
                         instance,
                         input);
+                var failedPackageCallId = await PackageCalls.FindFailedAsync(context.Transaction, instance.Id, step.Name, cancellationToken);
+                restagesPackageCall = failedPackageCallId is not null;
                 packageCall = new NewPackageCall(
-                    Guid.CreateVersion7(),
+                    failedPackageCallId ?? Guid.CreateVersion7(),
                     instance.Id,
                     step.Name,
                     instance.ReleaseId,
@@ -402,12 +410,26 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
         if (call is not null)
         {
-            await ConnectorCalls.InsertAsync(context.Transaction, call, cancellationToken);
+            if (restagesCall)
+            {
+                await ConnectorCalls.RestageAsync(context.Transaction, call, cancellationToken);
+            }
+            else
+            {
+                await ConnectorCalls.InsertAsync(context.Transaction, call, cancellationToken);
+            }
         }
 
         if (packageCall is not null)
         {
-            await PackageCalls.InsertAsync(context.Transaction, packageCall, cancellationToken);
+            if (restagesPackageCall)
+            {
+                await PackageCalls.RestageAsync(context.Transaction, packageCall, cancellationToken);
+            }
+            else
+            {
+                await PackageCalls.InsertAsync(context.Transaction, packageCall, cancellationToken);
+            }
         }
 
         if (occurrence is not null)

@@ -3,7 +3,8 @@ namespace Axis.PurchasingStub;
 /// <summary>
 /// A stand-in for the purchasing system that the purchase request sample's connector calls. It
 /// creates purchase orders under an idempotency key, finds them by key, and can lose or hold back a
-/// response on purpose after it has stored the order. Orders live in memory only.
+/// response on purpose after it has stored the order. It can also answer <c>503</c> for a request and
+/// store no order. Orders live in memory only.
 /// </summary>
 public static class PurchasingStubApp
 {
@@ -28,6 +29,11 @@ public static class PurchasingStubApp
             if (string.IsNullOrWhiteSpace(body?.RequestNumber) || body.Amount is null)
             {
                 return Results.Problem("requestNumber and amount are required.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (store.IsUnavailable(body.RequestNumber))
+            {
+                return Results.Problem("The purchasing system is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
             }
 
             var (order, created, drop, hold) = store.Create(key, body.RequestNumber, body.SupplierCode, body.Amount.Value);
@@ -76,6 +82,18 @@ public static class PurchasingStubApp
         app.MapPost("/test/drop-request/{requestNumber}", (string requestNumber, PurchaseOrderStore store) =>
         {
             store.DropRequest(requestNumber);
+            return Results.NoContent();
+        });
+
+        app.MapPost("/test/unavailable-request/{requestNumber}", (string requestNumber, PurchaseOrderStore store) =>
+        {
+            store.MakeUnavailable(requestNumber);
+            return Results.NoContent();
+        });
+
+        app.MapPost("/test/available-request/{requestNumber}", (string requestNumber, PurchaseOrderStore store) =>
+        {
+            store.MakeAvailable(requestNumber);
             return Results.NoContent();
         });
 

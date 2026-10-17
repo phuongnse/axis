@@ -1398,8 +1398,9 @@ activation of a changed or added computed field, and of the rows a migration
 pending state, the worker backfill, a newer activation while a field is
 pending, and the writes of older releases. A single read, the response of an
 update, the engine's reads of a subject record and process start conditions
-compute a pending field on the spot and store nothing. The rest of what reads
-answer while a field is pending, such as the `409` for a sort, is
+compute a pending field on the spot and store nothing. The record API and the
+process endpoints refuse a sort, a search or a policy filter that reads a
+pending field with `409`. The same refusals in data sources are
 *(planned for M7)*. See
 [storage](reference/storage.md#recomputing-computed-fields) for the steps and
 a walkthrough.
