@@ -899,6 +899,28 @@ development or E2E server serves a real application without a separate step.
   with a pending migration leaves nothing applied, so the next start runs the
   migrations again.
 
+## Telemetry export
+
+*(planned for M7)* The server and the worker export traces, metrics and logs
+with OpenTelemetry, see [Telemetry](../architecture.md#telemetry). They read
+the standard variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | The OTLP endpoint for all signals. With no endpoint, nothing is exported |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | The endpoint for traces only |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | The endpoint for metrics only |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | The endpoint for logs only |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | The OTLP protocol |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Headers sent with every export |
+| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker` |
+| `OTEL_RESOURCE_ATTRIBUTES` | More resource attributes |
+
+With no endpoint, nothing is exported and logs still go to the console. The
+headers may carry a collector token, so they come from the environment and
+never from a committed file. Docker Compose and `scripts/dev.sh` set no
+endpoint and start no collector.
+
 ## Resource file shape
 
 ```json
