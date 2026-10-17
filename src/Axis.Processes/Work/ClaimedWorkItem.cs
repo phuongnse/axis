@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Axis.Processes.Work;
 
 /// <summary>A work item a worker holds until <see cref="LeaseExpiresAt"/>, by the database clock.</summary>
@@ -12,6 +14,7 @@ namespace Axis.Processes.Work;
 /// <param name="Cursor">The last record id a <c>trigger.fanOut</c> item handled, or <see langword="null"/> before its first batch and for other work.</param>
 /// <param name="Lease">The length the item was claimed for.</param>
 /// <param name="EntityId">The entity a <c>computed.backfill</c> item recomputes, or <see langword="null"/> for other work.</param>
+/// <param name="QueuedBy">The span that queued the item, which the item's run links to, or <see langword="null"/> when the item stores none.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
     string TenantId,
@@ -27,4 +30,5 @@ public sealed record ClaimedWorkItem(
     DateTimeOffset? OccurrenceAt,
     Guid? Cursor,
     TimeSpan Lease,
-    Guid? EntityId);
+    Guid? EntityId,
+    ActivityContext? QueuedBy = null);

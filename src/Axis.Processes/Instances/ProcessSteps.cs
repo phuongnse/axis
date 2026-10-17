@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Axis.Core.Telemetry;
 using Axis.Expressions.Sql;
 using Npgsql;
 using NpgsqlTypes;
@@ -191,8 +192,8 @@ internal static class ProcessSteps
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_step_history
-                (id, process_instance_id, step, revision, input, output, decision, error, started_at, finished_at)
-            VALUES (@id, @instance, @step, @revision, @input, @output, @decision, @error, @started, clock_timestamp())
+                (id, process_instance_id, step, revision, input, output, decision, error, started_at, finished_at, trace_id)
+            VALUES (@id, @instance, @step, @revision, @input, @output, @decision, @error, @started, clock_timestamp(), @trace)
             """,
             Connection(transaction),
             transaction);
@@ -205,6 +206,7 @@ internal static class ProcessSteps
         command.Parameters.Add(new NpgsqlParameter("decision", NpgsqlDbType.Text) { Value = (object?)occurrence.Decision ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)occurrence.Error ?? DBNull.Value });
         command.Parameters.AddWithValue("started", occurrence.StartedAt.ToUniversalTime());
+        command.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

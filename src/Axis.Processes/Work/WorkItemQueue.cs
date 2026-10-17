@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using Axis.Core.Telemetry;
 using Axis.Expressions.Sql;
 using Npgsql;
 using NpgsqlTypes;
@@ -22,7 +24,7 @@ public static class WorkItemQueue
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id
+        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id
         """;
 
     /// <summary>
@@ -52,8 +54,8 @@ public static class WorkItemQueue
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id, event_id, package_call_id, trigger_id, release_id, occurrence_at)
-            VALUES (@id, @tenant, @kind, @due, @instance, @call, @event, @packageCall, @trigger, @release, @occurrence)
+            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id, event_id, package_call_id, trigger_id, release_id, occurrence_at, trace_id, span_id)
+            VALUES (@id, @tenant, @kind, @due, @instance, @call, @event, @packageCall, @trigger, @release, @occurrence, @trace, @span)
             """,
             connection,
             transaction);
@@ -68,6 +70,8 @@ public static class WorkItemQueue
         command.Parameters.Add(new NpgsqlParameter("trigger", NpgsqlDbType.Uuid) { Value = (object?)triggerId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = (object?)releaseId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("occurrence", NpgsqlDbType.TimestampTz) { Value = occurrenceAt is { } occurrence ? occurrence.ToUniversalTime() : DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("span", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentSpanId() ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return id;
     }
@@ -111,8 +115,19 @@ public static class WorkItemQueue
             await reader.IsDBNullAsync(11, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(11),
             await reader.IsDBNullAsync(12, cancellationToken) ? null : reader.GetGuid(12),
             lease,
-            await reader.IsDBNullAsync(13, cancellationToken) ? null : reader.GetGuid(13));
+            await reader.IsDBNullAsync(13, cancellationToken) ? null : reader.GetGuid(13),
+            QueuedBy(
+                await reader.IsDBNullAsync(14, cancellationToken) ? null : reader.GetString(14),
+                await reader.IsDBNullAsync(15, cancellationToken) ? null : reader.GetString(15)));
     }
+
+    /// <summary>The span that queued an item, or <see langword="null"/> when the item stores none or an id that is not hex of the right length.</summary>
+    private static ActivityContext? QueuedBy(string? traceId, string? spanId) =>
+        traceId is { Length: 32 } && spanId is { Length: 16 } && IsHex(traceId) && IsHex(spanId)
+            ? new ActivityContext(ActivityTraceId.CreateFromString(traceId), ActivitySpanId.CreateFromString(spanId), ActivityTraceFlags.Recorded, isRemote: true)
+            : null;
+
+    private static bool IsHex(string text) => text.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
 
     /// <summary>
     /// Sets the item's lease to end <paramref name="length"/> after the database's current time, in

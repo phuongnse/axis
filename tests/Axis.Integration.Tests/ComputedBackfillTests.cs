@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
@@ -55,6 +56,28 @@ public sealed class ComputedBackfillTests(DataDatabaseFixture database) : IClass
             var order = await ReadOrderAsync(id);
             Assert.Equal((1L, (Guid?)first.Release.Id, (long?)(quantity * 2)), (order.Version, order.Stamp, order.Total));
         }
+    }
+
+    [Fact]
+    public async Task The_backfill_item_stores_the_trace_and_span_of_the_activation_that_queued_it()
+    {
+        using var folder = OrderFolder(Quantity, Total("quantity * 2"));
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first);
+        await InsertOrdersAsync(25, first.Release!.Id);
+
+        folder.With("entities/order.json", OrderFile(Quantity, Total("quantity * 3")));
+        var second = await CompileAsync(folder);
+        using var activity = new Activity("test").Start();
+        await ActivateAsync(second);
+
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT trace_id, span_id FROM axis.process_work_items WHERE entity_id = @entity AND kind = @kind");
+        command.Parameters.AddWithValue("entity", _orderId);
+        command.Parameters.AddWithValue("kind", ComputedBackfill.WorkItemKind);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal((activity.TraceId.ToHexString(), activity.SpanId.ToHexString()), (reader.GetString(0), reader.GetString(1)));
     }
 
     [Fact]

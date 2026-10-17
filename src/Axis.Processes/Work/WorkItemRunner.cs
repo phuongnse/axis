@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
@@ -115,6 +117,15 @@ public sealed partial class WorkItemRunner
             throw new InvalidOperationException($"No work item handler is registered for kind '{item.Kind}'.");
         }
 
+        // The run starts a new trace, so it does not nest under whatever span the caller has. It links to the span that queued the item.
+        var previousActivity = Activity.Current;
+        Activity.Current = null;
+        using var activity = AxisTelemetry.Source.StartActivity(
+            AxisTelemetry.WorkItemRun,
+            ActivityKind.Internal,
+            default(ActivityContext),
+            [new(AxisTelemetry.TenantTag, item.TenantId), new(AxisTelemetry.WorkItemKindTag, item.Kind)],
+            item.QueuedBy is { } queuedBy ? [new ActivityLink(queuedBy)] : null);
         var previous = _accessor.Current;
         _accessor.Current = new TenantContext(item.TenantId);
         try
@@ -122,7 +133,7 @@ public sealed partial class WorkItemRunner
             await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
             if (handler is null)
             {
-                return await externalHandler!.ExecuteAsync(item, connection, cancellationToken);
+                return Finish(activity, await externalHandler!.ExecuteAsync(item, connection, cancellationToken));
             }
 
             Exception? error = null;
@@ -135,6 +146,7 @@ public sealed partial class WorkItemRunner
                 catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     error = exception;
+                    AxisTelemetry.RecordFailure(activity, exception);
                 }
 
                 if (error is null)
@@ -143,11 +155,11 @@ public sealed partial class WorkItemRunner
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         LogLostClaim(item.Id, item.Kind, item.TenantId);
-                        return WorkItemOutcome.LostClaim;
+                        return Finish(activity, WorkItemOutcome.LostClaim);
                     }
 
                     await transaction.CommitAsync(cancellationToken);
-                    return WorkItemOutcome.Completed;
+                    return Finish(activity, WorkItemOutcome.Completed);
                 }
 
                 await transaction.RollbackAsync(cancellationToken);
@@ -162,16 +174,25 @@ public sealed partial class WorkItemRunner
             {
                 await failure.RollbackAsync(cancellationToken);
                 LogLostClaim(item.Id, item.Kind, item.TenantId);
-                return WorkItemOutcome.LostClaim;
+                return Finish(activity, WorkItemOutcome.LostClaim);
             }
 
             await handler.OnFailedAsync(new WorkItemContext(item, connection, failure), error, cancellationToken);
             await failure.CommitAsync(cancellationToken);
-            return WorkItemOutcome.Failed;
+            return Finish(activity, WorkItemOutcome.Failed);
+        }
+        catch (Exception exception)
+        {
+            AxisTelemetry.RecordFailure(activity, exception);
+            throw;
         }
         finally
         {
             _accessor.Current = previous;
+
+            // Stopping first leaves the caller's span current, whatever stopping sets.
+            activity?.Stop();
+            Activity.Current = previousActivity;
         }
     }
 
@@ -186,6 +207,19 @@ public sealed partial class WorkItemRunner
 
         await ExecuteAsync(item, cancellationToken);
         return true;
+    }
+
+    private static WorkItemOutcome Finish(Activity? activity, WorkItemOutcome outcome)
+    {
+        activity?.SetTag(
+            AxisTelemetry.OutcomeTag,
+            outcome switch
+            {
+                WorkItemOutcome.Failed => "failed",
+                WorkItemOutcome.LostClaim => "fenced",
+                _ => "completed",
+            });
+        return outcome;
     }
 
     private static InvalidOperationException DuplicateKind(string kind) =>

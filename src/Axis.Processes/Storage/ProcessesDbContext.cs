@@ -86,6 +86,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             history.Property(h => h.Error).HasColumnName("error");
             history.Property(h => h.StartedAt).HasColumnName("started_at");
             history.Property(h => h.FinishedAt).HasColumnName("finished_at");
+            history.Property(h => h.TraceId).HasColumnName("trace_id");
             history.HasIndex(h => h.ProcessInstanceId).HasDatabaseName("ix_process_step_history_process_instance_id");
             history.HasOne<ProcessInstanceRow>()
                 .WithMany()
@@ -205,6 +206,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             attempt.Property(a => a.Outcome).HasColumnName("outcome");
             attempt.Property(a => a.HttpStatus).HasColumnName("http_status");
             attempt.Property(a => a.Error).HasColumnName("error");
+            attempt.Property(a => a.TraceId).HasColumnName("trace_id");
 
             // The call is in one of two tables, so there is no foreign key. Each attempt and lookup has its own number.
             attempt.HasIndex(a => new { a.CallId, a.Kind, a.Number })
@@ -308,6 +310,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.OccurrenceAt).HasColumnName("occurrence_at");
             item.Property(i => i.Cursor).HasColumnName("cursor");
             item.Property(i => i.EntityId).HasColumnName("entity_id");
+            item.Property(i => i.TraceId).HasColumnName("trace_id");
+            item.Property(i => i.SpanId).HasColumnName("span_id");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");

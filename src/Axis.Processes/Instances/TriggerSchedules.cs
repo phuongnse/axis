@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Core.Telemetry;
 using Axis.Data.Records;
 using Npgsql;
 using NpgsqlTypes;
@@ -67,10 +68,11 @@ public static class TriggerSchedules
 
             await using var item = new NpgsqlCommand(
                 """
-                INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, trigger_id)
-                VALUES (@id, @tenant, @kind, @next, @trigger)
+                INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, trigger_id, trace_id, span_id)
+                VALUES (@id, @tenant, @kind, @next, @trigger, @trace, @span)
                 ON CONFLICT (trigger_id) WHERE kind = 'trigger.schedule' DO UPDATE
-                SET due_at = EXCLUDED.due_at, claim_token = NULL, lease_expires_at = NULL
+                SET due_at = EXCLUDED.due_at, claim_token = NULL, lease_expires_at = NULL,
+                    trace_id = EXCLUDED.trace_id, span_id = EXCLUDED.span_id
                 """,
                 connection,
                 transaction);
@@ -79,6 +81,8 @@ public static class TriggerSchedules
             item.Parameters.AddWithValue("kind", ProcessStarts.TriggerScheduleWorkItemKind);
             item.Parameters.AddWithValue("next", due.ToUniversalTime());
             item.Parameters.AddWithValue("trigger", trigger.Id);
+            item.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
+            item.Parameters.Add(new NpgsqlParameter("span", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentSpanId() ?? DBNull.Value });
             await item.ExecuteNonQueryAsync(cancellationToken);
         }
 

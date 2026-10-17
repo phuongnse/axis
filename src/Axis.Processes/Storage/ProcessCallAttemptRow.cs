@@ -39,4 +39,7 @@ public sealed class ProcessCallAttemptRow
 
     /// <summary>A fixed text, such as a timeout. It holds no body, no exception message and no secret.</summary>
     public string? Error { get; init; }
+
+    /// <summary>The trace id of the run that made the attempt or lookup, or <see langword="null"/> when no span was current.</summary>
+    public string? TraceId { get; init; }
 }

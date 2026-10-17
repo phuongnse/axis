@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Extensions;
@@ -162,6 +164,36 @@ internal sealed partial class PackageCallHandler(
             return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
+        using var span = AxisTelemetry.Source.StartActivity(
+            AxisTelemetry.PackageCall,
+            ActivityKind.Internal,
+            default(ActivityContext),
+            [
+                new(AxisTelemetry.TenantTag, item.TenantId),
+                new(AxisTelemetry.ApplicationTag, target.Model.Manifest.Name),
+                new(AxisTelemetry.PackageTag, target.Package.Manifest.Id),
+                new(AxisTelemetry.OperationTag, target.Operation.Name),
+            ]);
+        try
+        {
+            return await RunCallAsync(item, connection, attempt, target, input, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            AxisTelemetry.RecordFailure(span, exception);
+            throw;
+        }
+    }
+
+    /// <summary>Resolves the bindings, runs the operation and settles the call by its result.</summary>
+    private async Task<WorkItemOutcome> RunCallAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        Dictionary<string, object?> input,
+        CancellationToken cancellationToken)
+    {
         // The bindings are resolved before the operation runs, so a missing one leaves nothing run.
         if (!TryCreateContext(item, target, attempt.Call, out var context, out var bindingError))
         {

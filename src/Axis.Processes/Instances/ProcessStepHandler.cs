@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Work;
@@ -109,6 +111,29 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     {
         var model = await models.GetAsync(context, instance.ReleaseId, cancellationToken);
         var process = model.Processes.Single(candidate => candidate.Id == instance.ProcessId);
+        using var activity = AxisTelemetry.Source.StartActivity(
+            AxisTelemetry.ProcessStep,
+            ActivityKind.Internal,
+            default(ActivityContext),
+            [
+                new(AxisTelemetry.TenantTag, context.Item.TenantId),
+                new(AxisTelemetry.ApplicationTag, model.Manifest.Name),
+                new(AxisTelemetry.ProcessTag, process.Name),
+                new(AxisTelemetry.StepTag, instance.Step),
+            ]);
+        try
+        {
+            await RunStepCoreAsync(context, instance, input, model, process, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            AxisTelemetry.RecordFailure(activity, exception);
+            throw;
+        }
+    }
+
+    private async Task RunStepCoreAsync(WorkItemContext context, LoadedInstance instance, JsonObject input, ApplicationModel model, ProcessModel process, CancellationToken cancellationToken)
+    {
         var entity = model.FindEntity(instance.SubjectEntityId)
             ?? throw Failure($"The release has no entity '{instance.SubjectEntityId}'.", instance, input);
         if (!process.TryGetStep(instance.Step, out var step))
