@@ -889,6 +889,14 @@ one transaction:
    stored version, and a user's write of the same record waits until the
    step's transaction ends. A `callConnector` or `raiseEvent` step only
    reads the record, so it takes no lock.
+   *(planned for M7)* Every read of the subject record computes a
+   [pending field](storage.md#recomputing-computed-fields) with the active
+   release and does not store the result. That covers decisions, `set`
+   expressions, connector and package inputs, `raiseEvent` fields and task
+   assignees. A run-time error reads `null`. An instance pinned to an older
+   release reads the same way. An `updateRecord` write under a release that is
+   out of date for the entity marks the field pending again, as described in
+   [Recomputing computed fields](storage.md#recomputing-computed-fields).
    - A **decision** evaluates its branches in order and takes the first `when`
      that is true. A `when` that gives `null` counts as false. When no branch
      is true, it takes `otherwise`. The instance stays `running` on the next
@@ -1679,6 +1687,11 @@ runs again after the lease expires, as event delivery does, and the receipts
 make each record start at most once per occurrence. A data error in the data
 source's filter, an SQLSTATE of class 22, is different. It is logged as a
 warning and the item is deleted, because trying again would fail the same way.
+*(planned for M7)* A fan-out whose data source reads a
+[pending field](storage.md#recomputing-computed-fields) is different again. It
+is refused with a `409`, and the item is not deleted. It runs again after the
+lease, because deleting it would drop the schedule run, and starting from old
+values is the failure the pending state removes.
 
 A worker that stops in the middle of the occurrence loses only its open batch.
 The next worker claims the item and continues after the stored cursor. Each
@@ -1751,7 +1764,8 @@ database, with history in `axis.__processes_migrations` (see
   the call. See [Package operations](#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](#event-delivery). It has
   the `event_id` of the occurrence.
-  Two more kinds come with [schedules](#schedules):
+  Two more kinds come with [schedules](#schedules), and a third with
+  [computed fields](storage.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
     also has the `trigger_id`, and its `due_at` is the next occurrence. A
     partial unique index allows one such item for each trigger.
@@ -1759,6 +1773,10 @@ database, with history in `axis.__processes_migrations` (see
     Its item also has the `trigger_id`, the `release_id` that was active at
     the occurrence and the `occurrence_at` time. Its `cursor` is the last
     record id it handled, and is null before its first batch.
+  - `computed.backfill` *(planned for M7)* recomputes the out-of-date rows of
+    one entity. Its item also has the `entity_id`, and each claim runs one
+    batch. See
+    [Recomputing computed fields](storage.md#recomputing-computed-fields).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's

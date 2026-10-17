@@ -1206,24 +1206,20 @@ The owner confirmed these points on issue #413 on 2026-10-15.
     before the count and holds it to commit. A start either commits before
     the count and is counted, or reads the new release after activation
     commits. No start can slip between the count and the switch.
-- **Computed fields:**
-  - A `fill` or `convert` recomputes, in the same transaction, every stored
-    computed field that reads the changed field. It may read it directly,
-    through a rule or through a child aggregate.
-  - Only the changed rows are recomputed, and for changed child rows,
-    their owners. Recompute last, after additive statements, using the
-    release being activated, so every column its model reads exists.
-  - A run-time error rolls back activation. A migration never leaves a
-    stored computed value stale. Rule calls in computed fields remain
-    unbuilt (`AXC0050`), so that case describes future behaviour.
+- **Computed fields:** a `fill` or `convert` of a field that a computed field
+  reads recomputes the changed rows, and their owners for changed child rows,
+  as [D33](#d33-recomputing-stored-computed-fields--agreed) describes. Rule
+  calls in computed fields remain unbuilt (`AXC0050`), so that case describes
+  future behaviour.
 
 *Why:* [D11](#d11-durable-process-engine--agreed) and
 [D29](#d29-release-pinning-and-text-resources--agreed) keep running work on
 its release. Destructive changes must wait until that work stops reading
 the old columns. The start lock keeps that check true until activation
 commits. [D17](#d17-entity-logic-and-child-collections--agreed) stores computed
-values with their records, so migrations must recompute affected values in
-the same transaction. [Execution](domain/knowledge.md#execution) rules out
+values with their records, so migrations must recompute affected values, as
+[D33](#d33-recomputing-stored-computed-fields--agreed) describes.
+[Execution](domain/knowledge.md#execution) rules out
 partial commits that leave storage and the active release disagreeing.
 
 ## D31. Separate database roles — Agreed
@@ -1373,3 +1369,62 @@ A unique database that the runner always drops keeps a failed run from
 leaving data behind or touching a real tenant. The work item limit stops a
 looping process from hanging CI. See
 [testing applications](domain/knowledge.md#testing-applications).
+
+## D33. Recomputing stored computed fields — Agreed
+
+A stored computed field stays correct when its expression or its inputs
+change. One recompute covers a changed expression, a computed field added to a
+table with rows and a migration `fill` or `convert`. Small tables recompute at
+activation. Large tables recompute in the worker, in batches. The design is
+*(planned for M7)*. See
+[storage](reference/storage.md#recomputing-computed-fields) for the steps and
+a walkthrough.
+The owner confirmed these points on issue #473 on 2026-10-17.
+
+- **One mechanism for three cases:**
+  - A changed computed expression.
+  - A computed field added to a table with rows.
+  - A migration `fill` or `convert` of a field that a computed field reads.
+- **Small tables at activation:**
+  - When the affected rows are at most the inline limit, activation
+    recomputes them in its own transaction, using the release being
+    activated, as D30 says.
+  - The limit is the server setting `Activation:InlineRecomputeLimit`. It
+    defaults to 10,000 affected rows.
+- **Large tables in the worker:**
+  - Above the limit, activation marks the computed field **pending** and
+    commits.
+  - The worker then recomputes the affected rows in batches. Each batch runs in
+    its own transaction, with the release being activated.
+- **Release stamp:**
+  - Each row records the release that computed it. Every write already
+    recomputes with its release, so it stamps that release.
+  - The backfill works until no row of the table carries an older stamp.
+  - A write made under an older release, by work pinned to it, stamps the older
+    release. The backfill then takes that row again.
+- **Concurrent writes:** a batch updates a row only if its version is
+  unchanged since the batch read it. A batch never overwrites a concurrent
+  write.
+- **Reading one record:** while a field is pending, the record API computes it
+  on read for a row with an older stamp.
+- **Row errors:** a row whose expression fails at run time gets `NULL`. The
+  field and the error are recorded, for operators to see and fix. The work
+  goes on.
+- **Newer release:** activating another release while a field is pending makes
+  the backfill continue with the newest release.
+- **Filters and sorts:** a filter or sort on a pending field is refused with
+  an error that names the field and says it is being recomputed. It is not
+  answered with a flag.
+- **Pending is accepted:** for a large table, a short, clearly marked period
+  in which lists may not reflect the new expression is accepted.
+
+*Why:* [D17](#d17-entity-logic-and-child-collections--agreed) stores computed
+values with their records, so a release that changes them must correct the
+stored values. [D29](#d29-release-pinning-and-text-resources--agreed) keeps
+running work on its release, so a row can be written under an older release
+after activation. The stamp finds those rows.
+[D30](#d30-schema-migrations--agreed) recomputed in the activation
+transaction, which does not scale to large tables and stopped activation on one
+row error. [Execution](domain/knowledge.md#execution) asks that stored state
+and the active release not disagree silently. A list that filters on old values
+without warning is that failure, so Axis refuses it.
