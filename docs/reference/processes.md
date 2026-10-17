@@ -32,7 +32,9 @@ worker runs the operation and records its result, see
 step's retry policy are built too. The capability limits of package operations are built too. So are
 triggers, which start
 processes when something happens, see
-[Events and triggers](#events-and-triggers). Operator retry, cancel and
+[Events and triggers](#events-and-triggers). Process inspection, where
+authorized users see an instance's graph, path, tasks and calls, is planned
+for M7, see [Process inspection](#process-inspection). Operator retry, cancel and
 resolve are *(planned for M7)*, see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -362,7 +364,9 @@ are problem details, as in the [record API](record-api.md#errors).
   "The application's active release changed while the request ran. Try again."
 
 The `201` has no `Location` header, because there is no endpoint to read an
-instance yet.
+instance yet. *(planned for M7)* It stays without one after the
+[inspection endpoints](#process-inspection) exist, because reading an
+instance needs an `inspect` grant, which the user who started it may not hold.
 
 A start needs a session, a `start` grant on the process and read access to
 the subject record, as [Authorization](../architecture.md#authorization)
@@ -745,6 +749,319 @@ The form, the outcomes and the record write all use the release the instance
 is pinned to. When any part fails, nothing is written. The worker then runs
 the next step as usual.
 
+## Process inspection
+
+*(planned for M7)* This section follows
+[D34](../decisions.md#d34-process-inspection--agreed). Authorized users see
+where an instance is, what it did and why it failed or waits. Two routes list
+the instances of a process and read one of them. Nothing here is built yet.
+The user is the user of the
+[session](../architecture.md#sign-in-and-the-session). The
+[process inspector widget](frontend.md) shows the same data.
+
+**Grant.** A `process` grant takes a new action, `inspect`, next to `start`.
+See [Roles and policies](configuration.md#roles-and-policies). The grant
+decides who may inspect, and the signed-in user needs nothing else. A user who
+holds only `start` cannot inspect, and a user who holds only `inspect` cannot
+start.
+
+**Order of checks.** A request is checked in this order, and the first
+failure is the response:
+
+1. The session, `401`. The title is the record API's "Sign in to read or
+   write this data.".
+2. The application and the process, `404`. An unknown application or one with
+   no active release has the title "No application is active under this
+   name.". An unknown process has the title "The application has no process
+   with this name.".
+3. The `inspect` grant on the process, `403`. The title is the record API's
+   "You have no grant for this action.". The grant comes from the policies of
+   the active release.
+4. The query parameters of the list, `400`.
+5. For the detail, the instance, `404`. An `{id}` that is not a UUID in the
+   hyphenated form, an unknown id, an instance of another process or
+   application, and an instance whose subject record the user may not read all
+   give one answer, with the title "No instance of this process exists with
+   this id.". So the user cannot tell them apart.
+
+Both routes only read. They write no audit record.
+
+### Instance list
+
+`GET /api/apps/{app}/processes/{process}/instances?state=&subject=&page=&pageSize=`
+lists the instances of the process, whatever release they are pinned to.
+
+- `page` and `pageSize` follow the record API's
+  [paging rules](record-api.md#paging-and-sorting). There is no `sort` or
+  `search`.
+- `state` is optional. It is one of `running`, `waiting`, `completed` and
+  `failed`. Any other value is a `400` keyed `state`.
+- `subject` is optional. It is a record id in the hyphenated UUID form.
+  Anything else is a `400` keyed `subject`.
+- Instances are ordered by `created_at` descending, then by `id` descending.
+- The subject entity's read filters of the user's `read` grants go into the
+  SQL. An instance whose subject record the user may not read is left out of
+  the page and of `totalCount`. A user with no `read` grant on the subject
+  entity sees an empty list.
+- A `subject` filter that names a record the user may not read, or that does
+  not exist, gives an empty page. It is not a `404`. A list never reveals that
+  a hidden record exists.
+
+```json
+{
+  "items": [
+    {
+      "id": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
+      "subjectId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+      "state": "waiting",
+      "step": "managerApproval",
+      "releaseId": "0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01",
+      "createdAt": "2026-10-10T02:05:00.123456Z",
+      "endedAt": null
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 1
+}
+```
+
+- `step` is the step the instance runs next, or waits on. `endedAt` is `null`
+  until the instance is `completed` or `failed`.
+
+### Instance detail
+
+`GET /api/apps/{app}/processes/{process}/instances/{id}` returns one instance
+in any state. The body has these parts:
+
+- `id`, `process`, `subjectId`, `releaseId`, `state`, `step`, `createdAt` and
+  `endedAt`, as in the list. `process` is the process name.
+- `graph` is the graph of the release the instance is pinned to:
+  `{ "start", "steps": [ { "name", "type", "labelKey", "transitions" } ] }`.
+  - `type` is the step type: `decision`, `task`, `operation` or `end`.
+  - `labelKey` is the step's label text key, or `null` when it has none.
+  - `transitions` is a list of `{ "next", "on" }`, one for each step the step
+    can lead to. `on` is the zero-based index of a decision branch, as in the
+    history's `decision`, `otherwise`, the name of a task outcome, or `null`
+    for an operation's `next`. An `end` step has none.
+- `path` is the history rows of the instance, ordered by `finished_at`, then
+  by `id`. Each is
+  `{ "step", "startedAt", "finishedAt", "decision", "output", "error" }`.
+  - `decision` and `output` are the stored values, see
+    [Tables](#tables). `output` holds no field values.
+  - `error` is the stored error, see
+    [Step errors](#step-errors-in-inspection).
+  - The history's `input` is not returned. It holds only the subject id and
+    version, which the instance already has.
+- `tasks` are the tasks of the instance, ordered by `createdAt`, then by `id`.
+  Each is
+  `{ "id", "step", "assigneeKind", "assignee", "state", "outcome", "completedBy", "createdAt", "completedAt" }`.
+  `assigneeKind` is `user` or `role`. `outcome`, `completedBy` and
+  `completedAt` are `null` while the task is `open`. A task row holds no field
+  values.
+- `calls` are the connector and package calls of the instance, ordered by
+  `createdAt`, then by `id`. Each is
+  `{ "id", "kind", "step", "connector" or "package" with "version", "operation", "state", "attempts", "input", "inputHidden" }`.
+  - `kind` is `connector` or `package`. A connector call has `connector`. A
+    package call has `package` and `version`, the version its release pins.
+  - `state` is the call's state: `pending`, `sending`, `unknown`,
+    `succeeded` or `failed`.
+  - `attempts` lists the rows of [Attempts](#attempts) for the call, ordered
+    by `startedAt`, then by `id`. Each is
+    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error" }`,
+    with `kind` either `attempt` or `lookup`.
+  - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
+  - A call has no output. The engine writes the outputs of a call straight to
+    the subject record and stores no response body.
+
+```json
+{
+  "id": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
+  "process": "PurchaseRequestApproval",
+  "subjectId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+  "releaseId": "0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01",
+  "state": "waiting",
+  "step": "registerPurchase",
+  "createdAt": "2026-10-10T02:05:00.123456Z",
+  "endedAt": null,
+  "graph": {
+    "start": "managerApproval",
+    "steps": [
+      {
+        "name": "managerApproval",
+        "type": "task",
+        "labelKey": "purchaseRequest.managerApproval",
+        "transitions": [
+          { "next": "registerPurchase", "on": "approve" },
+          { "next": "done", "on": "reject" }
+        ]
+      },
+      {
+        "name": "registerPurchase",
+        "type": "operation",
+        "labelKey": null,
+        "transitions": [{ "next": "done", "on": null }]
+      },
+      { "name": "done", "type": "end", "labelKey": null, "transitions": [] }
+    ]
+  },
+  "path": [
+    {
+      "step": "managerApproval",
+      "startedAt": "2026-10-10T02:05:00.123456Z",
+      "finishedAt": "2026-10-10T02:05:00.130000Z",
+      "decision": null,
+      "output": { "state": "waiting", "taskId": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01" },
+      "error": null
+    }
+  ],
+  "tasks": [
+    {
+      "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01",
+      "step": "managerApproval",
+      "assigneeKind": "role",
+      "assignee": "manager",
+      "state": "completed",
+      "outcome": "approve",
+      "completedBy": "binh",
+      "createdAt": "2026-10-10T02:05:00.123456Z",
+      "completedAt": "2026-10-10T04:00:00.000000Z"
+    }
+  ],
+  "calls": [
+    {
+      "id": "0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c",
+      "kind": "connector",
+      "step": "registerPurchase",
+      "connector": "PurchasingSystem",
+      "operation": "createOrder",
+      "state": "pending",
+      "attempts": [
+        {
+          "kind": "attempt",
+          "number": 1,
+          "startedAt": "2026-10-10T04:00:01.000000Z",
+          "finishedAt": "2026-10-10T04:00:03.000000Z",
+          "outcome": "retryable",
+          "httpStatus": 503,
+          "error": null
+        }
+      ],
+      "input": null,
+      "inputHidden": true
+    }
+  ]
+}
+```
+
+The example shortens the lists. The graph, the path and the tasks are the
+same for every user who may inspect the instance. Only a call's `input`
+differs between users.
+
+### Values and masking
+
+Inspection shows no stored field value except a call's `input`. The history's
+`input` and `output` hold only ids, versions, step names and outcomes, and a
+task row holds none, so they need no masking. A call's `input` is the
+evaluated input that the call sent, so it holds field values.
+
+- **The hiding rule.** A call's `input` is shown only when the user may read
+  every field that the call's mapping reads or writes. The mapping is the
+  step's `input` and its `output`. Otherwise `input` is `null` and
+  `inputHidden` is `true`. This fails closed: a partly readable input is never
+  shown, and the user sees none of it.
+- **Which fields count.** The fields are every field the mapping reads or
+  writes, on any entity, not only the subject entity.
+  - A path through `reference` fields counts every field along the path.
+  - A named rule that a mapping expression uses counts the fields the rule
+    reads, and so does every rule that rule uses.
+  - A child field counts through the owner's grant, because child rows are
+    read through their owner's `fields` list.
+  - The `output` mapping counts, even though no output value is stored or
+    shown. A user who may not read a field that the call writes sees no
+    input.
+- **Readable.** A field is readable when it is in the union of the `fields`
+  of the user's `read` grants on its entity, from the policies of the active
+  release. A grant with no `fields` covers every field. A user with no `read`
+  grant on an entity reads none of its fields. Only the `fields` lists are
+  used here. The record filters of the grants are not, because they select
+  records and a call input is not a record.
+- **Pinned and active release.** The fields a mapping reads or writes come
+  from the step in the release the instance is pinned to. Which of them the
+  user may read comes from the policies of the active release, as for
+  [tasks](#task-api) and [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
+  A field that the active release no longer has counts as unreadable.
+- **Sensitive fields.** A field that declares
+  [`sensitive`](configuration.md#sensitive-fields) is never shown in
+  inspection, for any user. A call whose mapping reads or writes one has its
+  `input` hidden. A field counts as sensitive when the pinned release or the
+  active release marks it. So a release that adds or removes the flag does not
+  expose instances that still run on an older release. The record API still
+  shows the field to users whose grants cover it.
+- **`inputHidden`.** It is `true` only when the rule above hides an `input`
+  that is stored. It is `false` when `input` is shown, and when the input is
+  no longer stored: `input` is then `null` too. A package call keeps its
+  input only while the call is `pending` or `unknown`, and clears it when it
+  settles, so inspection shows a settled package call with `input` `null` and
+  `inputHidden` `false`.
+
+### Call input kept
+
+A connector call keeps its input after it settles, whether it succeeded or
+failed. Today it clears it. The kept input lets inspection show what was sent.
+It is still never copied to history, audit records or logs, and inspection
+shows it only under the [masking rule](#values-and-masking). Package calls
+keep today's rule: their input is cleared when the call settles, see
+[Staging a package call](#staging-a-package-call).
+
+### Attempts
+
+`axis.process_call_attempts` holds one row per attempt and per lookup of a
+connector or package call, see [Tables](#tables). Today a call row counts its
+attempts and keeps only the last status and error, so earlier ones are lost.
+
+- **Attempt.** One send of a connector call, or one run of a package
+  operation. Its outcome is `succeeded`, `retryable`, `unknown` or `failed`,
+  the classes of [Call outcomes](#call-outcomes) and
+  [Package call outcomes](#package-call-outcomes).
+- **Lookup.** One lookup of [reconciliation](#reconciliation). Its outcome is
+  `found`, `notFound` or `failed`. Package calls have none.
+- **Numbers.** `number` counts attempts and lookups apart, each from 1.
+- **Writing.** The outcome transaction of the attempt or lookup writes its
+  row, in the same transaction that updates the call. A rolled back outcome
+  leaves no row. A worker that crashes after it sends leaves no row either. The
+  next worker finds the call still `sending` and writes that attempt's row
+  with the outcome `unknown`.
+- **Content.** A row holds the times, the outcome, the HTTP status and a fixed
+  error text. It never holds a request or response body, an exception message
+  or a secret.
+
+### Step errors in inspection
+
+The `error` of a path entry is the history's stored error. In M7 the engine
+stores it as one of these, and never as the exception message, because a
+message can hold a value:
+
+- The exception type, such as `System.DivideByZeroException`.
+- A fixed text that names the step, the property, the field pointer or the
+  message key, such as the refused-write text of
+  [Running a step](#running-a-step). It holds no value.
+
+History rows written before this change may still hold exception messages.
+Inspection shows them as stored.
+
+### Inspection errors
+
+Errors are problem details, as in the [record API](record-api.md#errors). The
+titles are fixed and never contain text from the request.
+
+- **`401`.** Nobody is signed in.
+- **`404`.** An unknown application, process or instance, as the order of
+  checks says.
+- **`403`.** The user has no `inspect` grant on the process.
+- **`400`.** A list parameter is invalid: `page`, `pageSize`, `state` or
+  `subject`, keyed by its name. The detail has none.
+
 ## Releases and running work
 
 New work starts on the active release. Running work stays on its pinned
@@ -768,6 +1085,7 @@ for texts. **Both** means different parts use different releases.
 | Task list | Both | Step and subject labels use the task's release. Their texts load from it too. Policies and roles come from the active release. |
 | Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
+| Instance list and detail *(planned for M7)* | Both | The graph and the step names use the instance's release. Roles, policies and the `sensitive` flag come from the active release, and the pinned release's flag counts too. See [Values and masking](#values-and-masking). |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry *(planned for M7)* | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
@@ -987,6 +1305,12 @@ the audit record `process.failed` with
 details `{ "step" }` and the actor `system`. It does nothing when the instance
 has changed since the step loaded it. No step is retried.
 
+*(planned for M7)* The error in the history row is never the exception
+message, because a message can hold a value. It is the exception type, such as
+`System.DivideByZeroException`, or a fixed text that names the step, the
+property, the field pointer or the message key. The refused-write text above
+already fits. See [Step errors](#step-errors-in-inspection).
+
 ## Connector calls
 
 This section follows
@@ -1102,8 +1426,10 @@ So a second start for the same record is blocked, as with an open task.
 `failed`, because a unique index lets a step stage only one call. It reuses the
 row instead of inserting one, in the same transaction. The row keeps its id, so
 the operation identity and the idempotency key do not change. The step
-evaluates the input again from the subject record as it is now, because a
-failed call's stored input is cleared when it settles. It sets the call to
+evaluates the input again from the subject record as it is now, on purpose, so
+the retry sends the current data. *(Planned for M7: a failed connector call
+keeps its stored input, but the step still evaluates it again.)* A failed
+package call's stored input is cleared when it settles. It sets the call to
 `pending` with that input, 0 attempts and 0 lookups, and clears the last status
 and the last error. Everything else is as above. See [Retry](#retry).
 
@@ -1141,7 +1467,9 @@ never resends blind.
    rules, as `updateRecord` does. An optional output that the body leaves
    out leaves its field unchanged, and an explicit `null` writes `null`. A
    refused write, such as a failed validation, fails the call instead.
-2. It sets the call to `succeeded` and clears its stored input.
+2. It sets the call to `succeeded` and clears its stored input. *(planned
+   for M7)* It keeps the stored input instead, see
+   [Call input kept](#call-input-kept).
 3. It sets the instance to `running` on `next`, with a new revision.
 4. It writes the history row of the step, at the revision the instance
    waited at. Its output is `{ "operationId", "outcome", "next" }`, plus
@@ -1168,7 +1496,9 @@ the item is deleted, and a history row with output
 No `connector.called` is written, because the call has not settled.
 
 **A failed call settles** too. The call becomes `failed` and its stored input
-is cleared, with the last status and the error on the call row. The instance
+is cleared, with the last status and the error on the call row. *(planned for
+M7)* The stored input is kept instead, see
+[Call input kept](#call-input-kept). The instance
 becomes `failed`, with the error in a history row whose output is
 `{ "operationId", "outcome": "failed" }`. The transaction writes
 `connector.called`, with the same details as a successful call, and
@@ -1176,7 +1506,9 @@ becomes `failed`, with the error in a history row whose output is
 
 No request or response body is ever stored. The stored input lives only on
 the call row until the call settles. It never appears in history, audit
-records or logs.
+records or logs. *(planned for M7)* A connector call keeps its input after it
+settles. It is still never copied to history, audit records or logs, and
+inspection shows it only under the [masking rule](#values-and-masking).
 
 ### Call outcomes
 
@@ -1521,9 +1853,11 @@ record's data can succeed after the record is fixed.
 
 A `callConnector` step or a package operation step whose call row is `failed`
 stages the call again under the **same operation identity**, see
-[Staging and the call](#staging-and-the-call). The input is evaluated again,
-because a failed call's stored input is cleared when it settles. The attempts
-count from zero.
+[Staging and the call](#staging-and-the-call). The input is evaluated again
+on purpose, so the retry sends the current data. *(Planned for M7: a failed
+connector call keeps its stored input, but the retry still evaluates it
+again.)* A failed package call's stored input is cleared when it settles. The
+attempts count from zero.
 
 **Risks.** A retry of a connector call sends it again under the same
 idempotency key. Some systems replay their stored failure for a key they have
@@ -1595,7 +1929,9 @@ One transaction does this:
    fields to the subject record with the record update rules, as a successful
    outcome does. An `output` that does not fit, or a write that the record
    refuses, is a `400`. Nothing changes and the call stays `unknown`.
-   - It sets the call to `succeeded` and clears its stored input.
+   - It sets the call to `succeeded` and clears its stored input. *(planned
+     for M7)* A connector call keeps the stored input instead, see
+     [Call input kept](#call-input-kept).
    - It sets the instance to `running` on `next`, with the next revision.
    - It writes the history row of the step, at the revision the instance
      waited at. Its output is
@@ -1603,7 +1939,9 @@ One transaction does this:
      `subjectVersion` when it wrote output fields.
    - It writes `record.updated` when it wrote output fields, and inserts the
      work item of the next step.
-4. For `failed`, it sets the call to `failed` and clears its stored input. It
+4. For `failed`, it sets the call to `failed` and clears its stored input.
+   *(planned for M7)* A connector call keeps the stored input instead, see
+   [Call input kept](#call-input-kept). It
    sets the instance to `failed` with `ended_at`, and writes a history row
    with output `{ "operationId", "outcome": "failed", "resolved": true }` and
    a fixed error sentence. It writes `process.failed` with details
@@ -2068,6 +2406,7 @@ database, with history in `axis.__processes_migrations` (see
 
 - `axis.process_instances`: one row per instance, with its process, subject
   record, release, state, revision and `step`, the step it runs next. Its
+  `created_at` is the start of the start transaction. Its
   `ended_at` is the time it became `completed`, `failed` or `cancelled`
   *(planned for M7)*, and is null before. A retry clears it.
   A partial unique index on
@@ -2085,7 +2424,7 @@ database, with history in `axis.__processes_migrations` (see
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
   | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. *(Planned for M7.)* `{ "command": "retry" }` or `{ "command": "cancel" }` for an operator command. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
-  | `error` | `text`, null | The error of a failed step |
+  | `error` | `text`, null | The error of a failed step. *(planned for M7)* The exception type, or a fixed text that names the step, property, field pointer or message key. Never the exception message or a value, see [Step errors](#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
   | `trace_id` | `text` | *(planned for M7)* The 32-hex trace id of the run that wrote the row. For a task completion or a start through the server, it is the request's trace |
@@ -2166,11 +2505,31 @@ database, with history in `axis.__processes_migrations` (see
   | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed`. `cancelled` *(planned for M7)* |
   | `attempts` | `integer` | The attempts made so far, the first one included |
   | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
-  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles or is cancelled. Never copied to history, audit records or logs |
+  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles or is cancelled. *(planned for M7)* Kept after the call settles, but still cleared when the call is cancelled. Never copied to history, audit records or logs, and shown only through [inspection](#values-and-masking) |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
+- `axis.process_call_attempts` *(planned for M7)*: one row per attempt and per
+  lookup of a connector or package call, see
+  [Attempts](#attempts). Times use the database clock. The outcome transaction
+  of an attempt or a lookup writes its row. A call found still `sending` has
+  no row for its lost attempt, so the next worker that finds it writes that
+  row, with the outcome `unknown`. There is no column for a request or
+  response body.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID |
+  | `call_kind` | `text` | `connector` or `package` |
+  | `call_id` | `uuid` | The call, in `axis.connector_calls` or `axis.package_calls` |
+  | `kind` | `text` | `attempt` or `lookup` |
+  | `number` | `integer` | The number of the attempt or lookup, counted per `kind`, starting at 1 |
+  | `started_at` | `timestamptz` | When the attempt or lookup started |
+  | `finished_at` | `timestamptz` | When its outcome was recorded |
+  | `outcome` | `text` | For an attempt: `succeeded`, `retryable`, `unknown` or `failed`. For a lookup: `found`, `notFound` or `failed` |
+  | `http_status` | `integer`, null | The HTTP status, when one answered. Null for a package call and when none answered |
+  | `error` | `text`, null | A fixed text, such as a timeout. It holds no body, no exception message and no secret |
 - `axis.package_calls`: one row per staged package call, see
   [Package operations](#package-operations). A unique index on
   (`process_instance_id`, `step`) lets a step stage only one call. Times use

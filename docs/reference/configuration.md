@@ -89,7 +89,11 @@ flowchart LR
      allowed when the table's data source has an `aggregate`, because a group
      is not a record (`AXC0022`). A `taskInbox` widget names none of
      `entity`, `dataSource` and `form` (`AXC0060` at that property), and no
-     `formPage` (`AXC0022`). `actions` are allowed only on a `form` widget
+     `formPage` (`AXC0022`). A `processInspector` widget *(planned for M7)*
+     needs a `process` that names a loaded process, otherwise it is `AXC0192`
+     at `/widgets/{i}/process`. It names none of `entity`, `dataSource` and
+     `form` (`AXC0060` at that property), and no `formPage` (`AXC0022`).
+     `actions` are allowed only on a `form` widget
      (`AXC0060` at `/widgets/{i}/actions`). An action's `process` must name a
      loaded process (`AXC0087`) over the entity of the form's records
      (`AXC0088`), both at `/widgets/{i}/actions/{j}/process`. A navigation entry
@@ -666,7 +670,7 @@ sorted by file and then path.
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 | `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
-| `AXC0022` | A widget's `formPage` is set on a `form` or `taskInbox` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`. |
+| `AXC0022` | A widget's `formPage` is set on a `form`, `taskInbox` or `processInspector` *(planned for M7)* widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`. |
 | `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
 | `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
 | `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |
@@ -704,7 +708,7 @@ sorted by file and then path.
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 | `AXC0058` | A path in a data source filter or a process condition takes more than 3 hops, such as `a.b.c.d.name`. Reported at the JSON Pointer of the expression string, such as `/filter` or `/steps/0/branches/0/when`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
-| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. Or a `taskInbox` widget names an `entity`, `dataSource` or `form`, reported at that property. Or a `table` or `taskInbox` widget has `actions`, reported at `/widgets/{i}/actions`. |
+| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. Or a `taskInbox` or `processInspector` *(planned for M7)* widget names an `entity`, `dataSource` or `form`, reported at that property. Or a `table` or `taskInbox` widget has `actions`, reported at `/widgets/{i}/actions`. |
 | `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |
 | `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
@@ -735,7 +739,7 @@ sorted by file and then path.
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 | `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
-| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and *(planned for M7)* `retry`, `cancel` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and *(planned for M7)* `inspect`, `retry`, `cancel` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
 | `AXC0092` | A policy grant's `entity`, `dataSource`, `process` or `endpoint` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint`. Not reported when the name is a file that was not loaded because of its own errors. |
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
@@ -825,7 +829,10 @@ sorted by file and then path.
 | `AXC0193` | An `advanceTime` step's `by` is not a positive duration in the form of a task's `dueIn`. Reported at `/steps/{i}/by`. |
 | `AXC0194` | An `advanceTime` step in a scenario without `now`. Reported at `/steps/{i}`. |
 
-`AXC0192` is reserved for issue #477.
+*(planned for M7)* `AXC0192` is not in the table yet, because the table lists the codes in
+`DiagnosticCodes`. A `processInspector` widget's `process` that names no loaded process,
+ignoring letter case, is `AXC0192`, reported at `/widgets/{i}/process`. The code joins the table
+when the widget is built.
 
 ## Startup activation
 
@@ -1808,7 +1815,9 @@ and the policy checks are built. So are matching the roles claim and
 enforcing every grant. That covers entity grants with filters and fields on
 the record API, data source grants with root read filters and field checks,
 and process `start` grants. The `endpoint` grant with its `invoke` action and
-its compile checks are built too, and the endpoint call enforces it. Each
+its compile checks are built too, and the endpoint call enforces it. The
+`inspect` action on a `process` grant is planned for M7, see
+[Process inspection](processes.md#process-inspection). Each
 compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
@@ -1927,8 +1936,8 @@ outcomes:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`, and *(planned for M7)* `retry`, `cancel` and
-    `resolve`;
+  - a `process` takes `start`, and *(planned for M7)* `inspect`, `retry`,
+    `cancel` and `resolve`;
   - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
@@ -2005,7 +2014,8 @@ Compile checks, each a compile error:
 - A target that names no loaded entity, data source, process or endpoint,
   ignoring letter case, is `AXC0092`.
 - An action that the target's kind does not take, such as `start` on an
-  entity or `read` on an endpoint, is `AXC0091`.
+  entity or `read` on an endpoint, is `AXC0091`. *(planned for M7)* `inspect`
+  on anything but a process is `AXC0091` too.
 - A grant on a child entity is `AXC0093`. Child rows are read and written
   through their owner's grants.
 - A `filter` or `fields` on a `dataSource`, `process` or `endpoint` grant is
@@ -2020,7 +2030,7 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`start` and `invoke`, and a grant has no other properties. A problem there is
+`start`, `invoke` and, *(planned for M7)*, `inspect`, and a grant has no other properties. A problem there is
 `AXC0004`. *(Planned for M7.)* The list also holds `retry`, `cancel` and
 `resolve`.
 
@@ -2055,6 +2065,40 @@ user's id, and policies use it, for example `requester == currentUser()`:
   be combined with `required: true`, `expression` or `sequence`, and a child
   entity's field cannot have it. Each is `AXC0013` at `/fields/{i}/creator`.
 
+### Sensitive fields
+
+*(planned for M7)* A field can declare `"sensitive": true`. Its value never
+appears in [process inspection](processes.md#values-and-masking), for any
+user:
+
+```json
+{
+  "id": "6b0f3c1e-8a52-4d7b-9e14-0c5a7d2f9b36",
+  "kind": "entity",
+  "name": "Supplier",
+  "formatVersion": 1,
+  "label": { "textKey": "supplier.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "bankAccount", "type": "text", "maxLength": 34, "sensitive": true }
+  ]
+}
+```
+
+- **Effect.** A call input that reads or writes the field is hidden in
+  inspection, as [Values and masking](processes.md#values-and-masking) says.
+  The record API ignores the flag and still shows the field to users whose
+  grants cover it.
+- **Default.** `sensitive` defaults to `false`. It changes no table, so adding
+  or removing it needs no migration.
+- **Allowed fields.** `sensitive` is allowed on every type except
+  `child-collection`, and on the fields of a child entity. On a
+  `child-collection` field it is `AXC0013` at `/fields/{i}/sensitive`. A value
+  that is not a boolean is `AXC0004`.
+- **Two releases.** A field counts as sensitive when the release an instance is
+  pinned to or the active release marks it.
+
 ## Entity field types and constraints
 
 A field property is allowed only on the types that have an entry for it below.
@@ -2064,17 +2108,17 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | | | | | yes | yes | yes |
-| `integer` | yes | yes | | | | | | yes | | |
-| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | | |
-| `boolean` | yes | yes | | | | | | yes | | |
-| `date` | yes | yes | | | | | | yes | | |
-| `date-time` | yes | yes | | | | | | yes | | |
-| `enum` | yes | yes | | | | | needed | yes | | |
-| `reference` | yes | yes | | | | needed | | | | |
-| `child-collection` | | | | | | needed | | | | |
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | | | | | yes | yes | yes | yes |
+| `integer` | yes | yes | | | | | | yes | | | yes |
+| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
+| `boolean` | yes | yes | | | | | | yes | | | yes |
+| `date` | yes | yes | | | | | | yes | | | yes |
+| `date-time` | yes | yes | | | | | | yes | | | yes |
+| `enum` | yes | yes | | | | | needed | yes | | | yes |
+| `reference` | yes | yes | | | | needed | | | | | yes |
+| `child-collection` | | | | | | needed | | | | | |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
@@ -2095,6 +2139,10 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](#record-creator).
+- `sensitive` *(planned for M7)* is allowed on every type except
+  `child-collection`. It defaults to `false`. On a `child-collection` field it
+  is `AXC0013` at `/fields/{i}/sensitive`. See
+  [Sensitive fields](#sensitive-fields).
 
 ## Entity logic
 
