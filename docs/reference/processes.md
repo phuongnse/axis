@@ -360,6 +360,13 @@ are problem details, as in the [record API](record-api.md#errors).
   message text key.
 - **`409`.** A `running` or `waiting` instance already exists for this
   process and subject record.
+- **`409` for a policy that reads a pending field.** A `read` filter of the
+  user's grants on the subject entity reads a
+  [pending field](storage.md#recomputing-computed-fields). The title is the
+  record API's "Your access to this entity cannot be checked while a field is
+  being recomputed.", with no `errors`, see
+  [the record API](record-api.md#errors). It comes before the subject record
+  is looked up, so it is the same for a record that does not exist.
 - **`422`.** The `Idempotency-Key` was used before with a different subject
   record.
 - **`503`.** The application's active release changed on each of three
@@ -399,8 +406,10 @@ One transaction then does the rest:
 
 1. With a key, it stores the receipt first. When the key is taken, it rolls
    back and answers from the stored receipt, or with the `422`.
-2. It locks the subject record, checks that the user may read it, and reads
-   it. A missing one, or one the user may not read, is the `400`. The lock
+2. It answers the policy `409` when a `read` filter of the user reads a
+   pending field, whatever the record. A repeat with a used key has already
+   been answered by step 1. Then it locks the subject record, checks that the
+   user may read it, and reads it. A missing one, or one the user may not read, is the `400`. The lock
    makes the start condition see the latest version, and an edit of the
    record waits until the start commits or rolls back.
 3. It evaluates the `startCondition` on the record, with any pending computed
@@ -785,7 +794,9 @@ failure is the response:
    "You have no grant for this action.". The grant comes from the policies of
    the active release.
 4. The query parameters of the list, `400`.
-5. For the detail, the instance, `404`. An `{id}` that is not a UUID in the
+5. A `read` filter of the user on the subject entity that reads a pending
+   field, `409`. For the detail, a malformed `{id}` is a `404` first.
+6. For the detail, the instance, `404`. An `{id}` that is not a UUID in the
    hyphenated form, an unknown id, an instance of another process or
    application, and an instance whose subject record the user may not read all
    give one answer, with the title "No instance of this process exists with
@@ -1091,6 +1102,11 @@ titles are fixed and never contain text from the request.
 - **`403`.** The user has no `inspect` grant on the process.
 - **`400`.** A list parameter is invalid: `page`, `pageSize`, `state` or
   `subject`, keyed by its name. The detail has none.
+- **`409`.** A `read` filter of the user's grants on the subject entity reads a
+  [pending field](storage.md#recomputing-computed-fields). The title is the
+  record API's "Your access to this entity cannot be checked while a field is
+  being recomputed.", with no `errors`. It comes before any instance is looked
+  up, so it holds for an unknown instance too.
 - **`400`.** A read filter of the user fails at run time with a database data
   error for some record, in the list only. The title is the record list's "A
   record filter could not be evaluated for these records.". The server logs
@@ -1864,7 +1880,9 @@ shows.
 ### Retry
 
 Retry takes an instance that is `failed`. The instance stays on its pinned
-release.
+release. Before it looks for the instance, it answers the policy `409` when a
+`read` filter of the user reads a pending field, see
+[Operator command errors](#operator-command-errors).
 
 One transaction does this:
 
@@ -1919,6 +1937,9 @@ outcome of one was sent again under the idempotency key or
 Cancel takes an instance that is `running` or `waiting`. It does not undo
 steps that already ran, because there is no compensation yet
 ([D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed)).
+Before it locks anything, it answers the policy `409` when a `read` filter of
+the user reads a pending field, see
+[Operator command errors](#operator-command-errors).
 
 One transaction does this:
 
@@ -2029,9 +2050,10 @@ A request is checked in this order, and the first failure is the response:
 5. The content type, `415`.
 6. The body, `400`.
 
-One transaction then checks the instance, and for a resolve the call. It
-answers `404` for the instance, the subject record and the call, and then the
-`409` checks.
+One transaction then checks the instance, and for a resolve the call. A cancel
+or a retry first answers the policy `409` below, before it looks for the
+instance. It answers `404` for the instance, the subject record and the call,
+and then the `409` checks.
 
 - **`401`.** Nobody is signed in. The title is the record API's "Sign in to
   read or write this data.".
@@ -2058,6 +2080,11 @@ answers `404` for the instance, the subject record and the call, and then the
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".
+- **`409` for a policy that reads a pending field.** Cancel and retry only. A
+  `read` filter of the user's grants on the subject entity reads a
+  [pending field](storage.md#recomputing-computed-fields). The title is the
+  record API's "Your access to this entity cannot be checked while a field is
+  being recomputed.", with no `errors`. Nothing is written.
 - **`409`.** The state does not allow the command. Nothing is written.
 
   | Command | Cause |

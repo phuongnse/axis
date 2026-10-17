@@ -49,8 +49,14 @@ namespace Axis.Server.Records;
 /// the path check on the new release, and answers 503 after three attempts. Nothing is written by
 /// an attempt that finds a change.
 /// A delete is 204, or 404 or 409 from storage. A record's history is checked as a single read
-/// (404), then paging (400), and an unknown or deleted record is a 404. The problem titles never
-/// contain text from the request.
+/// (404), then paging (400), and an unknown or deleted record is a 404.
+/// A <c>read</c> filter of the user's grants that reads a computed field that is being recomputed
+/// makes a list, a single read and a history a 409 that names no field or policy. It comes before
+/// the query and before any 404, so it also covers an unknown id. An update or a delete is the same
+/// 409 before its 404 for a <c>read</c> filter, and after the 404 and before the 403 for an
+/// <c>update</c> or <c>delete</c> filter. Nothing is written. A list whose valid <c>sort</c> or
+/// <c>search</c> names such a field is a 409 with the problem at <c>sort</c> or <c>search</c>. The
+/// problem titles never contain text from the request.
 /// </summary>
 internal static class RecordEndpoints
 {
@@ -100,6 +106,13 @@ internal static class RecordEndpoints
             return Grants.Forbidden();
         }
 
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, null, application!, model, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
         var fields = RecordFieldAccess.Read(application!, user.Roles, model);
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
@@ -137,7 +150,26 @@ internal static class RecordEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        var connection = await database.GetConnectionAsync(cancellationToken);
+        // A sort or a search on a computed field that is being recomputed would order or match by a stale stored value.
+        var pending = await PendingComputedFields.ReadAsync(connection, null, [model.Id], cancellationToken);
+        if (pending.TryGetValue(model.Id, out var pendingNames))
+        {
+            if (order is not null && pendingNames.Contains(order.Field.Name))
+            {
+                errors["sort"] = [$"The field '{order.Field.Name}' is being recomputed."];
+            }
+
+            if (!string.IsNullOrEmpty(search) && model.DisplayField is { } display && pendingNames.Contains(display))
+            {
+                errors["search"] = [$"The field '{display}' is being recomputed."];
+            }
+
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors, statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
+            }
+        }
+
         var condition = read.Filters is { } filters
             ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
             : null;
@@ -189,6 +221,12 @@ internal static class RecordEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, null, application!, model, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
         if (read.Filters is { } filters
             && await RecordCommand.MatchAsync(connection, null, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
         {
@@ -243,13 +281,19 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, null, application!, model, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         if (!PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size))
         {
             return Results.ValidationProblem(errors);
         }
 
-        var connection = await database.GetConnectionAsync(cancellationToken);
         var readable = read.Filters is { } filters
             ? await RecordCommand.MatchAsync(connection, null, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is { Found: true, Matched: true }
             : await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not null;
@@ -496,6 +540,7 @@ internal static class RecordEndpoints
             RecordCommandOutcome.Invalid => Results.ValidationProblem(result.Errors!),
             RecordCommandOutcome.StaleVersion => Conflict("The record has changed since this version was read."),
             RecordCommandOutcome.ReleaseChanged => ReleaseRetry.Changed(),
+            RecordCommandOutcome.PendingFilter => Grants.PendingFilter(),
             RecordCommandOutcome.Conflict => result.Conflict switch
             {
                 RecordConflict.UniqueValue => Results.ValidationProblem(

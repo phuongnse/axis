@@ -279,6 +279,13 @@ public sealed class TaskApiFixture : IAsyncLifetime
         return (long)(await command.ExecuteScalarAsync())!;
     }
 
+    /// <summary>The number of process instances of <paramref name="tenant"/>.</summary>
+    public async Task<long> CountInstancesAsync(string tenant)
+    {
+        await using var command = DataSource(tenant).CreateCommand("SELECT count(*) FROM axis.process_instances");
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     /// <summary>The number of <c>computed.backfill</c> work items of <paramref name="tenant"/>.</summary>
     public async Task<long> CountBackfillItemsAsync(string tenant)
     {
@@ -439,7 +446,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration);
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(
-            compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"), OpenInstanceCounter.Instance, inlineRecomputeLimit);
+            compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings(tenant), OpenInstanceCounter.Instance, inlineRecomputeLimit);
         Assert.Empty(activated.Diagnostics);
         return compiled.Release!.Id;
     }

@@ -383,8 +383,10 @@ definitions changed, and the rows a `fill` or `convert` changed, in its own
 transaction, up to the inline limit. Above the limit it leaves the entity
 pending and the worker recomputes it. A single read, the response of an update,
 the engine's reads of a subject record and process start conditions answer
-while a field is pending as the "While pending" list below says. The rest of
-what reads answer is planned for M7.
+while a field is pending as the "While pending" list below says. So do the
+refusals of the record API and the process endpoints, for a sort or search on a
+pending field and for a policy filter that reads one. The same refusals in data
+sources are planned for M7.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -581,10 +583,17 @@ in batches.
     the same name and type in both releases. The inbound endpoint's output and
     the test scenario runner show the stored values.
   - A list, a data source and a projection show the stored value.
-  - A sort, search, filter or grouping that reads a pending field is refused
-    with `409`. A policy read filter that reads one is refused too.
-    See the [record API](record-api.md#paging-and-sorting) and
-    [data sources](data-sources.md#errors).
+  - *(Built for the record API and the process endpoints.)* A record list
+    sort or search that names a pending field is refused with `409`. A policy
+    `read` filter that reads one is refused too, for a list, a single read, a
+    history, a process start, the process instance list, the instance detail
+    and an operator cancel or retry, and so is an `update` or `delete` filter.
+    The check reads the pending state of the entity, not the stamp of a row, so
+    it holds until the backfill ends. See the
+    [record API](record-api.md#paging-and-sorting).
+  - *(Planned for M7.)* A data source sort, filter or grouping that reads a
+    pending field is refused with `409`, and so is a root read filter that
+    reads one. See [data sources](data-sources.md#errors).
 
 Tables, both owned by `Axis.Data`. The runtime database role may write both.
 Activation writes both, and the worker writes them too. So does a record write
@@ -627,7 +636,8 @@ UUIDs of the same application, as in the
 [migrations example](#example-renaming-a-field-while-a-task-waits). The table
 holds about 50,000 purchase requests. R2 changes the `amount` expression of the
 line item, so `amount` and the aggregate `total` of the request become
-pending. Steps 1 and 3 to 9 are built. The `409` of step 2 is planned for M7.
+pending. Every step is built, and the record API answers step 2. The same refusal in
+a data source is planned for M7.
 
 1. R2 is activated. Activation counts 50,000 affected rows, which is more than
    10,000. It inserts the pending row for the purchase request, with R2 as the

@@ -119,8 +119,17 @@ internal sealed class ScenarioSteps(
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        // A record the user may not read does not exist for them.
+        // A read filter on a field that is being recomputed decides nothing, so it comes before the record is looked up.
         var read = PolicyEvaluator.Access(model, roles, entity, PolicyAction.Read);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, transaction, model, entity, pendingFilters, loggerFactory, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            Check(step, Failed("conflict", "PendingFilter"));
+            return;
+        }
+
+        // A record the user may not read does not exist for them.
         if (!await RecordCommands.LockAsync(connection, entity, id, cancellationToken)
             || !read.Granted
             || (read.Filters is { } filters
@@ -287,7 +296,7 @@ internal sealed class ScenarioSteps(
         {
             RecordCommandOutcome.Denied or RecordCommandOutcome.OutsideFilters or RecordCommandOutcome.UnwritableFields => "denied",
             RecordCommandOutcome.NotFound => "notFound",
-            RecordCommandOutcome.Conflict or RecordCommandOutcome.StaleVersion => "conflict",
+            RecordCommandOutcome.Conflict or RecordCommandOutcome.StaleVersion or RecordCommandOutcome.PendingFilter => "conflict",
             RecordCommandOutcome.Invalid => "invalid",
             _ => null,
         };
