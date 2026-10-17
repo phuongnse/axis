@@ -1295,6 +1295,7 @@ given users and asserts the outcomes, including denied actions. See
 [configuration](reference/configuration.md#test-scenarios) for the resource
 shape and a purchase request example.
 The owner confirmed these points for issue #415 on 2026-10-16.
+The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
 
 - **Scenario resource:**
   - A new `scenario` resource kind has one file per scenario, under
@@ -1339,6 +1340,20 @@ The owner confirmed these points for issue #415 on 2026-10-16.
   - `stubs` give the output of each connector operation and package
     operation that the scenario calls. A call without a stub fails the
     scenario.
+- **Advancing time** *(planned for M7)*:
+  - A new step, `advanceTime`, has `by`, a positive ISO 8601 duration such as
+    `P1D` or `PT2H`.
+  - It needs the scenario's `now`. A scenario without `now` that uses it
+    fails to compile.
+  - It moves `now` forward by `by`. Every later step reads the new time.
+  - The runner then runs every work item that is due at the new time, until
+    none is due. Schedule triggers and their fan-outs are included. The limit
+    of 1,000 work items applies per step.
+  - Schedules catch up as on a worker after an outage. Only the latest
+    occurrence at or before the new time runs, once. The rules of
+    [schedules](reference/processes.md#schedules) apply unchanged. To fire a
+    daily schedule three times, a scenario advances one day three times.
+  - Time never goes back. No step sets an earlier time.
 - **Where it runs:**
   - A new console project, `Axis.Scenarios`, runs every scenario of an
     application folder against a PostgreSQL server:
@@ -1356,8 +1371,8 @@ The owner confirmed these points for issue #415 on 2026-10-16.
   - **Stubs only.** Scenarios never call a real external system, and never
     run real package code. Package operations get unit tests in their own
     project.
-  - **Fixed time.** One `now` per scenario. Advancing time to fire schedules
-    comes later.
+  - **Time moves forward only.** A scenario starts at its `now`, and only
+    `advanceTime` moves it, forward. *(planned for M7)*
   - **New project.** `Axis.Scenarios` is a new host next to the server and
     the worker.
 
@@ -1367,7 +1382,8 @@ CI can run them. A scenario sets users and roles itself, so it checks
 [D24](#d24-roles-and-policies--agreed) denials without an identity provider.
 A unique database that the runner always drops keeps a failed run from
 leaving data behind or touching a real tenant. The work item limit stops a
-looping process from hanging CI. See
+looping process from hanging CI. Advancing time lets CI test schedule
+triggers. See
 [testing applications](domain/knowledge.md#testing-applications).
 
 ## D33. Recomputing stored computed fields — Agreed
