@@ -194,11 +194,11 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
     /// <summary>
     /// Starts <paramref name="process"/> in <paramref name="tenant"/> for the request
-    /// <paramref name="subjectId"/>, pinned to the tenant's StepApp release, as the start endpoint
+    /// <paramref name="subjectId"/>, pinned to <paramref name="releaseId"/> or else the tenant's first StepApp release, as the start endpoint
     /// does: the instance is <c>running</c> at revision 1 on the process's start step, with its
     /// first work item due a minute ago. Returns the instance id.
     /// </summary>
-    public async Task<Guid> StartAsync(string tenant, string process, Guid subjectId)
+    public async Task<Guid> StartAsync(string tenant, string process, Guid subjectId, Guid? releaseId = null)
     {
         Assert.True(Model.TryGetProcess(process, out var model));
         Assert.True(Model.TryGetEntity("Request", out var request));
@@ -214,7 +214,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 ProcessId = model.Id,
                 SubjectEntityId = request.Id,
                 SubjectId = subjectId,
-                ReleaseId = _tenants[tenant].ReleaseId,
+                ReleaseId = releaseId ?? _tenants[tenant].ReleaseId,
                 State = ProcessStarts.Running,
                 Revision = 1,
                 Step = model.Start,
@@ -230,6 +230,14 @@ public sealed class TaskApiFixture : IAsyncLifetime
         await transaction.CommitAsync();
         return instanceId;
     }
+
+    /// <summary>A service of the real server, such as a model cache.</summary>
+    public T ServerService<T>() where T : notnull =>
+        (_factory ?? throw new InvalidOperationException("The test host is not started.")).Services.GetRequiredService<T>();
+
+    /// <summary>A service of the worker's container, such as a model cache.</summary>
+    public T WorkerService<T>() where T : notnull =>
+        (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<T>();
 
     /// <summary>Claims and runs the due work items of <paramref name="tenant"/> until none is left.</summary>
     public async Task RunUntilIdleAsync(string tenant, CancellationToken cancellationToken)

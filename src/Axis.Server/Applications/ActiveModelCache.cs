@@ -18,4 +18,7 @@ internal sealed class ActiveModelCache
     /// <summary>Adds <paramref name="model"/> unless another one is already cached, and returns the cached one.</summary>
     public ApplicationModel GetOrAdd(string tenantId, Guid releaseId, ApplicationModel model) =>
         _models.GetOrAdd((tenantId, releaseId), model);
+
+    /// <summary>The number of models cached for <paramref name="tenantId"/>.</summary>
+    internal int Count(string tenantId) => _models.Keys.Count(key => key.TenantId == tenantId);
 }
