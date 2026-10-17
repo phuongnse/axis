@@ -16,6 +16,9 @@ public static class SchemaPlanner
     // The version column definition, rendered the same in CREATE TABLE and ADD COLUMN.
     private static readonly string _versionDefinition = $"{EntityNaming.Quote(EntityNaming.VersionColumn)} bigint NOT NULL DEFAULT 1";
 
+    // The computed release column definition: nullable and without a default, so existing rows stay unstamped.
+    private static readonly string _computedReleaseDefinition = $"{EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} uuid";
+
     // The system columns of a child table, in place of the version column.
     private static readonly string _ownerDefinition = $"{EntityNaming.Quote(EntityNaming.OwnerColumn)} uuid NOT NULL";
     private static readonly string _positionDefinition = $"{EntityNaming.Quote(EntityNaming.PositionColumn)} integer NOT NULL";
@@ -132,9 +135,9 @@ public static class SchemaPlanner
 
         private void PlanNewTable(EntityModel entity, string table, ChildOwner? childOwner)
         {
-            // A child table has no version: its rows live under the owner's version.
+            // A child table has no version and no computed release: its rows live under the owner's.
             var definitions = new List<string> { $"{EntityNaming.Quote(EntityNaming.IdColumn)} uuid NOT NULL" };
-            definitions.AddRange(childOwner is null ? [_versionDefinition] : [_ownerDefinition, _positionDefinition]);
+            definitions.AddRange(childOwner is null ? [_versionDefinition, _computedReleaseDefinition] : [_ownerDefinition, _positionDefinition]);
             var constraints = new List<string>
             {
                 $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(table))} PRIMARY KEY ({EntityNaming.Quote(EntityNaming.IdColumn)})",
@@ -175,13 +178,19 @@ public static class SchemaPlanner
             string[] systemColumns;
             if (childOwner is null)
             {
-                systemColumns = [EntityNaming.IdColumn, EntityNaming.VersionColumn];
+                systemColumns = [EntityNaming.IdColumn, EntityNaming.VersionColumn, EntityNaming.ComputedReleaseColumn];
 
-                // System columns are never compared; only a missing version column is added. Its
-                // default fills existing rows, so this holds even when the table has rows.
+                // System columns are never compared; only a missing version or computed release column is
+                // added. The version default fills existing rows, and the computed release column has no
+                // default, so its existing rows stay null. Both hold even when the table has rows.
                 if (!columnsByName.ContainsKey(EntityNaming.VersionColumn))
                 {
                     _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD COLUMN {_versionDefinition}");
+                }
+
+                if (!columnsByName.ContainsKey(EntityNaming.ComputedReleaseColumn))
+                {
+                    _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD COLUMN {_computedReleaseDefinition}");
                 }
             }
             else

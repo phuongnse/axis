@@ -214,7 +214,7 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(failures));
         }
 
-        var result = await RecordCommands.CreateAsync(connection, application, entity, computed.Values, computed.Rows, recordId, cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, recordId, cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);

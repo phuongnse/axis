@@ -4,9 +4,9 @@ namespace Axis.Configuration.Storage;
 
 /// <summary>
 /// The configuration module's tables in a tenant database. The caller supplies the connection to
-/// the tenant database. Releases are immutable: saving fails when a stored release, resource or
-/// package pin is modified or deleted, or when a resource or pin is added to a release that is not
-/// added in the same save.
+/// the tenant database. Releases are immutable: saving fails when a stored release, resource,
+/// package pin or computed fingerprint is modified or deleted, or when a resource, pin or
+/// fingerprint is added to a release that is not added in the same save.
 /// This guard covers change tracking only; bulk operations and raw SQL bypass it.
 /// </summary>
 public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : DbContext(options)
@@ -35,6 +35,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<ReleaseResource> ReleaseResources => Set<ReleaseResource>();
 
     public DbSet<ReleasePackage> ReleasePackages => Set<ReleasePackage>();
+
+    public DbSet<ReleaseComputedFingerprint> ReleaseComputedFingerprints => Set<ReleaseComputedFingerprint>();
 
     public DbSet<ActiveReleaseRow> ActiveReleases => Set<ActiveReleaseRow>();
 
@@ -78,6 +80,11 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
                 .HasForeignKey(package => package.ReleaseId)
                 .HasConstraintName("fk_release_packages_releases_release_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            release.HasMany(r => r.ComputedFingerprints)
+                .WithOne()
+                .HasForeignKey(fingerprint => fingerprint.ReleaseId)
+                .HasConstraintName("fk_release_computed_fingerprints_releases_release_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ReleaseResource>(resource =>
@@ -96,6 +103,15 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             package.Property(p => p.ReleaseId).HasColumnName("release_id");
             package.Property(p => p.PackageId).HasColumnName("package_id").HasMaxLength(100);
             package.Property(p => p.Version).HasColumnName("version").HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<ReleaseComputedFingerprint>(fingerprint =>
+        {
+            fingerprint.ToTable("release_computed_fingerprints");
+            fingerprint.HasKey(f => new { f.ReleaseId, f.EntityId }).HasName("pk_release_computed_fingerprints");
+            fingerprint.Property(f => f.ReleaseId).HasColumnName("release_id");
+            fingerprint.Property(f => f.EntityId).HasColumnName("entity_id");
+            fingerprint.Property(f => f.Fingerprint).HasColumnName("fingerprint").HasMaxLength(64);
         });
 
         modelBuilder.Entity<ActiveReleaseRow>(active =>
@@ -133,7 +149,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     {
         // Entries() detects changes first, so property changes on tracked entities are seen here.
         var entries = ChangeTracker.Entries()
-            .Where(entry => entry.Entity is Release or ReleaseResource or ReleasePackage)
+            .Where(entry => entry.Entity is Release or ReleaseResource or ReleasePackage or ReleaseComputedFingerprint)
             .ToList();
         var addedReleaseIds = entries
             .Where(entry => entry is { Entity: Release, State: EntityState.Added })
@@ -158,6 +174,12 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             {
                 throw new InvalidOperationException(
                     $"A stored release is immutable; the package '{package.PackageId}' can only be added together with its release.");
+            }
+
+            if (entry is { Entity: ReleaseComputedFingerprint fingerprint, State: EntityState.Added } && !addedReleaseIds.Contains(fingerprint.ReleaseId))
+            {
+                throw new InvalidOperationException(
+                    $"A stored release is immutable; the computed fingerprint of entity '{fingerprint.EntityId}' can only be added together with its release.");
             }
         }
     }

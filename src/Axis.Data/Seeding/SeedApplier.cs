@@ -29,10 +29,13 @@ public static class SeedApplier
 
     /// <summary>
     /// Applies <paramref name="model"/>'s seeds over <paramref name="connection"/>, whose entity
-    /// tables are provisioned for the model. Must run outside an explicit transaction.
+    /// tables are provisioned for the model. Every written record is stamped with
+    /// <paramref name="releaseId"/>, the release of <paramref name="model"/>. Must run outside an
+    /// explicit transaction.
     /// </summary>
     public static async Task<SeedResult> ApplyAsync(
         ApplicationModel model,
+        Guid releaseId,
         NpgsqlConnection connection,
         CancellationToken cancellationToken = default)
     {
@@ -95,7 +98,7 @@ public static class SeedApplier
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.UpdateAsync(connection, model, entity, id, existing.Version, computed.Values, computed.Rows, cancellationToken);
+                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, id, existing.Version, computed.Values, computed.Rows, cancellationToken);
                 }
                 else
                 {
@@ -106,7 +109,7 @@ public static class SeedApplier
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.CreateAsync(connection, model, entity, computed.Values, computed.Rows, id, cancellationToken);
+                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, id, cancellationToken);
                 }
             }
             else
@@ -123,7 +126,7 @@ public static class SeedApplier
                     return NotComputed(seed, index, errors);
                 }
 
-                result = await RecordCommands.CreateAsync(connection, model, entity, computed.Values, computed.Rows, id, cancellationToken);
+                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, id, cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)

@@ -21,7 +21,8 @@ public static class RecordCommands
     private const string WriteAlias = "w";
 
     /// <summary>
-    /// Inserts a record with version 1, holding <paramref name="values"/> and SQL <c>NULL</c> or the
+    /// Inserts a record with version 1, stamped with <paramref name="releaseId"/>, the release that
+    /// computed its stored values, holding <paramref name="values"/> and SQL <c>NULL</c> or the
     /// column default for every other field, and the rows of each collection in
     /// <paramref name="rows"/>. Its id is <paramref name="id"/>, such as a seed record's fixed id,
     /// or a new version 7 id when <paramref name="id"/> is not given. Each field that names a
@@ -34,6 +35,7 @@ public static class RecordCommands
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
+        Guid releaseId,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         Guid? id = null,
@@ -53,8 +55,14 @@ public static class RecordCommands
         values = await WithSequenceNumbersAsync(connection, application, entity, values, cancellationToken);
         await using var command = new NpgsqlCommand { Connection = connection };
         command.Parameters.AddWithValue("id", id ?? Guid.CreateVersion7());
-        var columns = new List<string> { EntityNaming.Quote(EntityNaming.IdColumn), EntityNaming.Quote(EntityNaming.VersionColumn) };
-        var placeholders = new List<string> { "@id", "1" };
+        command.Parameters.AddWithValue("release", releaseId);
+        var columns = new List<string>
+        {
+            EntityNaming.Quote(EntityNaming.IdColumn),
+            EntityNaming.Quote(EntityNaming.VersionColumn),
+            EntityNaming.Quote(EntityNaming.ComputedReleaseColumn),
+        };
+        var placeholders = new List<string> { "@id", "1", "@release" };
         for (var index = 0; index < values.Count; index++)
         {
             columns.Add(EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name)));
@@ -71,7 +79,8 @@ public static class RecordCommands
 
     /// <summary>
     /// Sets <paramref name="values"/> on the record with <paramref name="id"/>, replaces all the
-    /// rows of each collection in <paramref name="rows"/> and increments its version, when its
+    /// rows of each collection in <paramref name="rows"/>, stamps it with <paramref name="releaseId"/>,
+    /// the release that computed its stored values, and increments its version, when its
     /// version is <paramref name="version"/>. Fields and collections not named are left untouched;
     /// no values and no rows only increments the version. The caller must hold a transaction when
     /// <paramref name="rows"/> is not empty, and roll it back unless the record is
@@ -81,6 +90,7 @@ public static class RecordCommands
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
+        Guid releaseId,
         Guid id,
         long version,
         IReadOnlyList<RecordValue> values,
@@ -104,12 +114,14 @@ public static class RecordCommands
         await using var command = new NpgsqlCommand { Connection = connection };
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("version", version);
+        command.Parameters.AddWithValue("release", releaseId);
         var assignments = new List<string>();
         for (var index = 0; index < values.Count; index++)
         {
             assignments.Add($"{EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name))} = {AddValue(command, index, values[index])}");
         }
 
+        assignments.Add($"{EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} = @release");
         assignments.Add($"{versionColumn} = {versionColumn} + 1");
         command.CommandText = WithLabels(
             entity,
@@ -136,12 +148,14 @@ public static class RecordCommands
     /// lock it first with <see cref="LockAsync"/> so it is the latest version. Roll the
     /// transaction back unless the record is <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
+    /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
     /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a validation.</param>
     public static async Task<RecordWriteResult> SetAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
+        Guid releaseId,
         Record stored,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
         DateTimeOffset now,
@@ -187,7 +201,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await UpdateAsync(connection, application, entity, stored.Id, stored.Version, computed.Values, computed.Rows, cancellationToken);
+        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cancellationToken);
     }
 
     /// <summary>

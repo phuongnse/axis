@@ -147,7 +147,7 @@ public static class ScenarioRunner
         var model = compiled.Model;
         if (model.Seeds.Count > 0)
         {
-            var seeded = await SeedApplier.ApplyAsync(model, connection, cancellationToken);
+            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, connection, cancellationToken);
             if (seeded.Diagnostics.Count > 0)
             {
                 return Setup("could not be seeded", seeded.Diagnostics);
