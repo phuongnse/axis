@@ -2033,7 +2033,7 @@ configuration (see
 | --- | --- | --- |
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
 | `Worker:PollInterval` | `00:00:01` | How long the worker waits before it polls again when it found no work. |
-| `Health:Urls` *(planned for M7)* | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else. |
+| `Health:Urls` | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else. |
 
 As environment variables they are `Worker__LeaseDuration`,
 `Worker__PollInterval` and `Health__Urls`. What the health endpoints answer is

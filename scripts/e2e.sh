@@ -181,10 +181,11 @@ export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 # delays the other specs' work only briefly.
 # The worker runs in Development, as the server does, because only Development lets a connector
 # call the stub over http. It gets the same purchasing system bindings as the server.
+# Its health endpoints listen on a free port, so a worker under scripts/dev.sh does not hold the address.
 run_worker() {
   local child
   while true; do
-    DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
+    DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
       Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
       Extensions__Path="$root/artifacts/extensions" \
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \

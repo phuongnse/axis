@@ -206,6 +206,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       purchasing: await freePort(),
       server: await freePort(),
       web: await freePort(),
+      workerHealth: await freePort(),
     }
     env = {
       ...process.env,
@@ -215,6 +216,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       AXIS_PURCHASING_PORT: String(ports.purchasing),
       AXIS_SERVER_PORT: String(ports.server),
       AXIS_WEB_PORT: String(ports.web),
+      Health__Urls: `http://127.0.0.1:${ports.workerHealth}`,
       MSBUILDDISABLENODEREUSE: '1',
     }
   })
@@ -249,9 +251,14 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
 
     // The worker starts only after the server has migrated the tenant databases.
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
-    const listening = run.stdout.indexOf('Now listening on')
+    const listening = run.stdout.search(/\[server\].*Now listening on/)
     assert.ok(listening >= 0, run.stdout)
     assert.ok(run.stdout.indexOf('[worker]') > listening, `Worker output before the server listened:\n${run.stdout}`)
+
+    // The worker answers ready on its health address once it has found the tenant database migrated.
+    const workerReady = await fetch(`http://127.0.0.1:${ports.workerHealth}/health/ready`)
+    assert.equal(workerReady.status, 200)
+    assert.equal((await workerReady.json()).status, 'Healthy')
 
     const page = await fetch(`http://localhost:${ports.web}/`)
     assert.equal(page.status, 200)
@@ -307,7 +314,8 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     // starts it again. It prints "Exited" on the way, which must not end the session.
     const file = path.join(copy, 'src/Axis.Server/Health/DatabaseHealthCheck.cs')
     const original = fs.readFileSync(file, 'utf8')
-    const listening = () => run.stdout.split('Now listening on').length - 1
+    // The worker logs the same line for its health address.
+    const listening = () => run.stdout.split('\n').filter((line) => /\[server\].*Now listening on/.test(line)).length
     const run = startDev()
     try {
       await waitReady(run)
