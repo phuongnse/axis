@@ -1394,8 +1394,10 @@ change. One recompute covers a changed expression, a computed field added to a
 table with rows and a migration `fill` or `convert`. Small tables recompute at
 activation. Large tables recompute in the worker, in batches. The recompute at
 activation of a changed or added computed field, and of the rows a migration
-`fill` or `convert` changed, is built, with no limit yet. The rest is
-*(planned for M7)*. See
+`fill` or `convert` changed, is built, and so are the inline limit, the
+pending state and the worker backfill. What reads answer while a field is
+pending, a newer activation while it is pending, and the writes of older
+releases are *(planned for M7)*. See
 [storage](reference/storage.md#recomputing-computed-fields) for the steps and
 a walkthrough.
 The owner confirmed these points on issue #473 on 2026-10-17.

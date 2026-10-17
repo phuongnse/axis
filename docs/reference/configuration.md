@@ -862,11 +862,13 @@ development or E2E server serves a real application without a separate step.
   committed is logged with the folder and tenant too. The previously active
   release stays active, and the first failing tenant stops the whole start,
   so no server runs with some tenants on old releases and others on new ones.
-- **Recompute limit** *(planned for M7)*. `Activation:InlineRecomputeLimit`
-  is the most affected rows that activation recomputes in its own transaction
-  when a release changes stored computed fields. It defaults to 10,000. The
-  environment variable is `Activation__InlineRecomputeLimit`. Above the limit,
-  the field becomes pending and the worker recomputes the rows in batches. See
+- **Recompute limit** *(built)*. `Activation:InlineRecomputeLimit`
+  is the most affected rows of one entity that activation recomputes in its
+  own transaction when a release changes stored computed fields, or when a
+  migration `fill` or `convert` changes the rows they read. It defaults to
+  10,000. The environment variable is `Activation__InlineRecomputeLimit`.
+  Above the limit, the entity becomes pending and the worker recomputes the
+  rows in batches. See
   [Recomputing computed fields](storage.md#recomputing-computed-fields).
 - **Seeding.** After a folder is activated in a tenant, the step inserts
   every seed record whose id the entity table does not hold yet, so

@@ -32,8 +32,9 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     It also owns `axis.applied_migrations`, the migrations applied once per
     tenant. See [Migrations](#migrations). It also owns
     `axis.computed_field_errors`, for the
-    [recompute of computed fields](#recomputing-computed-fields). *(planned for M7)*
-    It will also own `axis.pending_computed_fields`.
+    [recompute of computed fields](#recomputing-computed-fields). It also owns
+    `axis.pending_computed_fields`, the entities whose recompute the worker
+    finishes in batches.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -151,7 +152,7 @@ What each database role may do:
 | Objects | Schema database role | Runtime database role |
 | --- | --- | --- |
 | `entities` tables | Owns them | Read and write rows |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, and *(planned for M7)* `pending_computed_fields` | Owns them | Read and write rows |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them | Read and write rows |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables | Owns them | Read only |
 | Release tables: `releases`, `release_resources`, `release_packages` | Insert and read. The trigger refuses update, delete and truncate | Read only |
 | Sequences in `axis` and `entities` | Owns them | `USAGE`, `SELECT` |
@@ -336,8 +337,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   changes, then every `ADD CONSTRAINT ... FOREIGN KEY`, so references between
   entities, cycles and self-references need no further ordering. Pending
   migration statements run before these additive statements. Then stored
-  computed fields are recomputed inline. Marking them pending above the inline
-  limit is *(planned for M7)*.
+  computed fields are recomputed inline, or marked pending above the inline
+  limit for the worker to recompute.
   See [Order of statements](#migrations) and
   [Recomputing computed fields](#recomputing-computed-fields).
 - **Errors.** When any diagnostic exists, the plan has no statements and no
@@ -374,11 +375,14 @@ child tables are in [Schema planning](#schema-planning).
 
 This section records
 [D33](../decisions.md#d33-recomputing-stored-computed-fields--agreed). The
-stamp, the fingerprint, the inline recompute at activation and the stamp clearing
-of a `fill` or `convert` are built. Activation recomputes every row of an entity
-whose computed definitions changed, and the rows a `fill` or `convert` changed,
-however many rows there are, in its own transaction. The inline limit, the
-pending state and the worker backfill are planned for M7.
+stamp, the fingerprint, the inline recompute at activation, the stamp clearing
+of a `fill` or `convert`, the inline limit, the pending state and the worker
+backfill are built. Activation recomputes every row of an entity whose computed
+definitions changed, and the rows a `fill` or `convert` changed, in its own
+transaction, up to the inline limit. Above the limit it leaves the entity
+pending and the worker recomputes it. What reads answer while a field is
+pending, a newer activation while it is pending, and the writes of older
+releases are planned for M7.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -414,16 +418,23 @@ in batches.
     of the owner and its child entities, deletes the error rows of those
     records only, and stamps the rows. It does this even when no computed field
     reads the changed field, which only stamps the rows again. Rows that
-    already had a `NULL` stamp are recomputed too.
-- **Inline.** *(Planned for M7: the limit.)* When the count of affected rows is at most
-  `Activation:InlineRecomputeLimit`, activation recomputes them in its own
+    already had a `NULL` stamp are recomputed too. Above the inline limit
+    the rows go to the backfill instead, see *Inline* and *Pending*.
+- **Inline** *(built)*. Activation counts the affected rows of each entity.
+  For a changed computed definition that is every row of the table. For a
+  `fill` or `convert` it is the rows of the entity left with a `NULL` stamp.
+  An entity with both counts every row once. When the count is at most
+  `Activation:InlineRecomputeLimit`, activation recomputes the rows in its own
   transaction, with the release being activated. It stamps each row. The limit
   is a [server setting](configuration.md#startup-activation) and defaults to
   10,000.
-- **Pending.** Above the limit, activation writes a row in
+- **Pending** *(built)*. Above the limit, activation writes a row in
   `axis.pending_computed_fields` and a `computed.backfill` work item, then
-  commits. The computed field is now *pending*: its stored values may still
-  come from an older expression.
+  commits without touching a row. The computed field is now *pending*: its
+  stored values may still come from an older expression. The pending row lists
+  every computed field of the entity and of its child entities. Activation
+  fails and rolls back when the entity is already pending, because the
+  restart below is planned.
 - **Stamp.** Each table that is not a child table has the system column
   `computed_release_id uuid NULL`. It names the release that last computed the
   row. Adding it is cheap on a large table, because it is nullable and has no
@@ -447,7 +458,9 @@ in batches.
     on the owner row of every changed child row. Their computed inputs changed,
     so the old stamp no longer proves the row is up to date. Activation then
     recomputes the rows of each touched entity that have a `NULL` stamp, and
-    stamps them with the release being activated.
+    stamps them with the release being activated. Above the inline limit it
+    leaves them to the backfill, which recomputes and stamps them with the
+    same release.
 - **Fingerprint.** Each release stores, for each entity that is not a child
   entity, one hash of the computed definitions of the entity and its child
   entities, and of every rule their expressions call. It is written with the
@@ -469,11 +482,14 @@ in batches.
   keeps the ids of those releases as `current_release_ids`. A row with a `NULL`
   stamp is not known to be up to date. Today only an activation that changes
   its entity's computed definitions, an activation whose `fill` or `convert`
-  touches the entity, or a later full write, fixes it. The
-  backfill that picks such rows up is planned for M7. It will treat a row with
-  no stamp as out of date only while the entity has a pending field. Otherwise every
-  release that changes nothing about a computed field would recompute every
-  row of every table.
+  touches the entity, or a later full write, fixes it. The backfill treats a
+  row with no stamp as out of date, but only while the entity has a pending
+  field. Otherwise every release that changes nothing about a computed field
+  would recompute every row of every table. The pending row keeps the releases
+  whose stored fingerprint for the entity equals the target's, and always the
+  target itself, because a release found again by content hash may come back
+  without its fingerprints. After a large `fill` the backfill also recomputes
+  rows stamped by an older release that has no stored fingerprints.
 - **Older-release writes.** A write whose release has a different fingerprint
   from the active release's inserts the pending row and the `computed.backfill`
   work item in its own transaction, when they are missing. It compares two
@@ -481,7 +497,7 @@ in batches.
   work writes after the backfill ends would stay stale with no pending flag.
   The insert and the final delete of a backfill lock the same pending row, so
   a write cannot slip between the last check and the delete.
-- **Batches.** The worker claims a `computed.backfill` work item and runs one
+- **Batches** *(built)*. The worker claims a `computed.backfill` work item and runs one
   batch of 500 rows, in `ORDER BY id`, in its own transaction.
   - It selects out-of-date rows with their `version`, recomputes them with the
     target release, and runs
@@ -490,8 +506,13 @@ in batches.
   - The update does not change `version`. It writes no audit record and starts
     no trigger. A higher `version` would give a user who is editing the record
     a `409` for a change they did not make.
-  - The work item stays queued, so the next claim runs the next batch, until
-    a batch finds no out-of-date row.
+  - The work item is made due again at once, so the next claim runs the next
+    batch, until a batch finds no out-of-date row. A batch keeps no cursor. It
+    selects the first 500 out-of-date rows again, so a skipped row is taken
+    by a later batch. A row that users keep updating can be skipped batch
+    after batch, and then the item stays queued until the row is left alone.
+  - A row whose expression fails gets `NULL` and an error row, as at
+    activation. The batch deletes the error rows of its records first.
 - **Row errors** *(built for the recompute at activation)*. A row whose
   expression fails at run time, or reads a decimal that cannot be held exactly,
   gets `NULL` and its stamp. The recompute inserts a row in
@@ -507,7 +528,7 @@ in batches.
   to the new release. It recomputes `current_release_ids`, merges the pending
   fields and applies the inline limit again. The backfill continues with the
   newest release.
-- **End.** The batch that finds no out-of-date row deletes the pending row and
+- **End** *(built)*. The batch that finds no out-of-date row deletes the pending row and
   its work item. The field is no longer pending.
 - **While pending.**
   - A single read, and the engine's reads of one subject record, compute a
@@ -521,10 +542,9 @@ in batches.
     [data sources](data-sources.md#errors).
 
 Tables, both owned by `Axis.Data`. The runtime database role may write both.
-The worker writes them and so does a record write that finds an older
-release. `axis.computed_field_errors` is built, and activation writes it.
-`axis.pending_computed_fields` is *(planned for M7)*, and its name below is the
-planned name.
+Activation writes both, and the worker writes them too. A record write that
+finds an older release will write them too *(planned for M7)*. The work item
+of a pending entity holds the entity `id` in `axis.process_work_items.entity_id`.
 
 `axis.pending_computed_fields`, one row per entity with a pending field:
 
@@ -562,7 +582,9 @@ UUIDs of the same application, as in the
 [migrations example](#example-renaming-a-field-while-a-task-waits). The table
 holds about 50,000 purchase requests. R2 changes the `amount` expression of the
 line item, so `amount` and the aggregate `total` of the request become
-pending.
+pending. Steps 1, 4, 5, 7 and 8 are built. What reads answer while pending
+(steps 2 and 3) and the writes of older releases (steps 6 and 9) are planned
+for M7.
 
 1. R2 is activated. Activation counts 50,000 affected rows, which is more than
    10,000. It inserts the pending row for the purchase request, with R2 as the
@@ -632,10 +654,10 @@ Migrations run forward only.
   6. Run additive DDL in the order used today. *(Built.)*
   7. Recompute inline or mark pending, see
      [Recomputing computed fields](#recomputing-computed-fields), using the
-     release being activated. *(Built for the inline recompute, which has no
-     limit yet. It also recomputes the rows that a `fill` or `convert` changed,
-     and the owners of changed child rows. Marking pending is planned for
-     M7.)* An activation without a pending migration runs the same step after
+     release being activated. *(Built, including the inline limit and marking
+     pending. It also recomputes the rows that a `fill` or `convert` changed,
+     and the owners of changed child rows, or leaves them pending above the
+     limit.)* An activation without a pending migration runs the same step after
      its additive DDL.
   8. Write `axis.applied_migrations` and the provisioning records. *(Built.)*
   9. Upsert the active release and its `axis.active_sites` rows. *(Built.)*
@@ -707,7 +729,8 @@ Migrations run forward only.
   reads recomputes through
   [Recomputing computed fields](#recomputing-computed-fields). `fill` and
   `convert` clear the stamp of the rows they change, and of the owner of each
-  changed child row. Activation recomputes those rows inline. Rule calls in
+  changed child row. Activation recomputes those rows inline, or leaves them
+  pending for the worker above the inline limit. Rule calls in
   computed fields remain unbuilt (`AXC0050`), so the case through a rule
   describes future behaviour.
 
@@ -794,13 +817,13 @@ in an earlier release never waits for old-release work.
 
 ### Limits
 
-These limits apply to migrations. The inline limit on the recompute of
-computed fields by a `fill` or `convert` is *(planned for M7)*.
+These limits apply to migrations.
 
 - A large `fill` or `convert` holds the schema lock and its row locks until
   commit. The `fill` itself is not batched. The recompute of the computed
-  fields that read it runs inline in the same transaction, however many rows
-  it covers. It is batched above the inline limit *(planned for M7)*.
+  fields that read it runs inline in the same transaction, up to the inline
+  limit. Above the limit the rows go to the worker, which recomputes them in
+  batches.
 - Process starts for the application wait while activation holds the
   exclusive start lock. A long fill delays them.
 - Old work must finish before a destructive migration can run. *(Planned for

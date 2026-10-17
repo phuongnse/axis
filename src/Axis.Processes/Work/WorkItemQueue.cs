@@ -22,7 +22,7 @@ public static class WorkItemQueue
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor
+        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id
         """;
 
     /// <summary>
@@ -110,7 +110,8 @@ public static class WorkItemQueue
             await reader.IsDBNullAsync(10, cancellationToken) ? null : reader.GetGuid(10),
             await reader.IsDBNullAsync(11, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(11),
             await reader.IsDBNullAsync(12, cancellationToken) ? null : reader.GetGuid(12),
-            lease);
+            lease,
+            await reader.IsDBNullAsync(13, cancellationToken) ? null : reader.GetGuid(13));
     }
 
     /// <summary>

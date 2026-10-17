@@ -678,6 +678,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
 
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
                     b.Property<Guid?>("EventId")
                         .HasColumnType("uuid")
                         .HasColumnName("event_id");

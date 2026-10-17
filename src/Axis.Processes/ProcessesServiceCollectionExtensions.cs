@@ -9,8 +9,9 @@ public static class ProcessesServiceCollectionExtensions
     /// <summary>
     /// Registers the work item runner, the handler that runs process steps, the handler that sends
     /// connector calls, the handler that runs package operation calls, the handler that delivers
-    /// raised events to their triggers, the handler that runs the occurrences of schedule triggers
-    /// and the handler that starts their processes for the records of their data sources. The runner
+    /// raised events to their triggers, the handler that runs the occurrences of schedule triggers,
+    /// the handler that starts their processes for the records of their data sources, and the handler that
+    /// backfills the computed values of an entity that activation left pending. The runner
     /// runs the registered <see cref="IWorkItemHandler"/> and <see cref="IExternalWorkItemHandler"/>
     /// services and needs the tenancy services.
     /// </summary>
@@ -31,6 +32,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IExternalWorkItemHandler, EventDeliveryHandler>();
         services.AddSingleton<IExternalWorkItemHandler, TriggerScheduleHandler>();
         services.AddSingleton<IExternalWorkItemHandler, TriggerFanOutHandler>();
+        services.AddSingleton<IExternalWorkItemHandler, ComputedBackfillHandler>();
         return services;
     }
 }

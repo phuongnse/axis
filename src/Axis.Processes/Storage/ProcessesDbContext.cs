@@ -307,6 +307,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ReleaseId).HasColumnName("release_id");
             item.Property(i => i.OccurrenceAt).HasColumnName("occurrence_at");
             item.Property(i => i.Cursor).HasColumnName("cursor");
+            item.Property(i => i.EntityId).HasColumnName("entity_id");
             item.HasIndex(i => i.DueAt).HasDatabaseName("ix_process_work_items_due_at");
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");

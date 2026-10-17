@@ -35,6 +35,7 @@ public static class RuntimeRoleGrants
         "audit_records",
         "sequence_counters",
         "computed_field_errors",
+        "pending_computed_fields",
     };
 
     /// <summary>

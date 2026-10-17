@@ -30,6 +30,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
 
     public DbSet<ComputedFieldErrorRow> ComputedFieldErrors => Set<ComputedFieldErrorRow>();
 
+    public DbSet<PendingComputedFieldRow> PendingComputedFields => Set<PendingComputedFieldRow>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
 
@@ -93,6 +95,18 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             error.Property(e => e.ReleaseId).HasColumnName("release_id");
             error.Property(e => e.Error).HasColumnName("error");
             error.Property(e => e.OccurredAt).HasColumnName("occurred_at");
+        });
+
+        modelBuilder.Entity<PendingComputedFieldRow>(pending =>
+        {
+            pending.ToTable("pending_computed_fields");
+            pending.HasKey(p => p.EntityId).HasName("pk_pending_computed_fields");
+            pending.Property(p => p.EntityId).HasColumnName("entity_id").ValueGeneratedNever();
+            pending.Property(p => p.ApplicationId).HasColumnName("application_id");
+            pending.Property(p => p.TargetReleaseId).HasColumnName("target_release_id");
+            pending.Property(p => p.CurrentReleaseIds).HasColumnName("current_release_ids");
+            pending.Property(p => p.Fields).HasColumnName("fields");
+            pending.Property(p => p.CreatedAt).HasColumnName("created_at");
         });
 
         // A trigger added by the migration rejects every update, delete and truncate.
