@@ -3,6 +3,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Data.DataSources;
 using Axis.Data.Naming;
+using Axis.Data.Records;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,13 @@ namespace Axis.Data;
 /// <c>convert</c> that plans a statement, the transaction asks the migration context for the other releases
 /// that still have running or waiting process instances. Such a release that has the changed column in its stored
 /// model refuses the activation with <see cref="DiagnosticCodes.OldReleaseWorkOpen"/> before any statement runs.
+/// </para>
+/// <para>
+/// After the additive statements, when the migration context can read the active release's fingerprints, the
+/// transaction recomputes the stored computed values of each entity whose computed definitions differ from the
+/// active release's, with the release being activated. A computed field that fails for a record gets <c>NULL</c>
+/// and a row in <c>axis.computed_field_errors</c>, and the activation goes on. Activating the active release again
+/// recomputes nothing.
 /// </para>
 /// </summary>
 public static class EntityProvisioner
@@ -179,6 +187,11 @@ public static class EntityProvisioner
                 }
             }
 
+            if (migrations.ReadActiveComputedFingerprintsAsync is { } readActiveFingerprints)
+            {
+                await RecomputeChangedEntitiesAsync(model, migrations.ReleaseId, await readActiveFingerprints(cancellationToken), connection, npgsqlTransaction, cancellationToken);
+            }
+
             foreach (var change in plan.RecordChanges)
             {
                 await ApplyRecordChangeAsync(context, change, cancellationToken);
@@ -227,6 +240,35 @@ public static class EntityProvisioner
             // The transaction rolls back on dispose; forget records that were never stored.
             context.ChangeTracker.Clear();
             throw;
+        }
+    }
+
+    // Step 7: recomputes the stored computed values of each entity whose computed definitions differ from the active
+    // release's. A missing fingerprint counts as different, so the first activation of an application recomputes
+    // every entity, which costs nothing on tables that are new. Activating the active release again recomputes nothing,
+    // even when it stored no fingerprints, so a restart does not recompute every table.
+    private static async Task RecomputeChangedEntitiesAsync(
+        ApplicationModel model,
+        Guid releaseId,
+        ActiveComputedFingerprints active,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (active.ActiveReleaseId == releaseId)
+        {
+            return;
+        }
+
+        foreach (var (entityId, fingerprint) in ComputedFingerprints.Compute(model))
+        {
+            if (active.Fingerprints.TryGetValue(entityId, out var current) && current == fingerprint)
+            {
+                continue;
+            }
+
+            var entity = model.FindEntity(entityId) ?? throw new InvalidOperationException("The model has no entity for its fingerprint.");
+            await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
         }
     }
 

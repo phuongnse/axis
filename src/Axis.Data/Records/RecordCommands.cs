@@ -79,9 +79,13 @@ public static class RecordCommands
 
     /// <summary>
     /// Sets <paramref name="values"/> on the record with <paramref name="id"/>, replaces all the
-    /// rows of each collection in <paramref name="rows"/>, stamps it with <paramref name="releaseId"/>,
-    /// the release that computed its stored values, and increments its version, when its
-    /// version is <paramref name="version"/>. Fields and collections not named are left untouched;
+    /// rows of each collection in <paramref name="rows"/>, and increments its version, when its
+    /// version is <paramref name="version"/>. It stamps the record with <paramref name="releaseId"/>, the
+    /// release that computed its stored values, only when <paramref name="rows"/> holds every collection
+    /// whose child entity has computed fields, because the rows of a collection that is left out are not
+    /// computed again. Otherwise it keeps the stamp when it already is <paramref name="releaseId"/> and
+    /// sets it to <c>NULL</c> when it is not, which means the record is not known to be up to date.
+    /// Fields and collections not named are left untouched;
     /// no values and no rows only increments the version. The caller must hold a transaction when
     /// <paramref name="rows"/> is not empty, and roll it back unless the record is
     /// <see cref="RecordWriteOutcome.Written"/>.
@@ -121,7 +125,11 @@ public static class RecordCommands
             assignments.Add($"{EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name))} = {AddValue(command, index, values[index])}");
         }
 
-        assignments.Add($"{EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} = @release");
+        var stamp = EntityNaming.Quote(EntityNaming.ComputedReleaseColumn);
+        var recomputesEveryRow = entity.Fields
+            .Where(field => field.Type == FieldType.ChildCollection && application.FindEntity(field.Target!.Id) is { HasComputedFields: true })
+            .All(field => rows.Any(collection => collection.Collection.Name == field.Name));
+        assignments.Add(recomputesEveryRow ? $"{stamp} = @release" : $"{stamp} = CASE WHEN {stamp} = @release THEN @release END");
         assignments.Add($"{versionColumn} = {versionColumn} + 1");
         command.CommandText = WithLabels(
             entity,

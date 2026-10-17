@@ -33,6 +33,15 @@ public sealed record MigrationContext(
     Func<DbTransaction, CancellationToken, Task<IReadOnlyList<OldReleaseWork>>> ReadOldReleaseWorkAsync,
     Func<DbTransaction, CancellationToken, Task<IReadOnlyList<Diagnostic>>>? SetActiveReleaseAsync)
 {
+    /// <summary>
+    /// Reads the application's active release and the fingerprints of its computed definitions. Provisioning
+    /// calls it under the schema lock, after the additive statements, and recomputes the stored computed values
+    /// of each entity whose fingerprint in the release being activated is missing from them or differs. It
+    /// recomputes nothing when the active release is the one being activated. When it is <see langword="null"/>,
+    /// provisioning recomputes nothing.
+    /// </summary>
+    public Func<CancellationToken, Task<ActiveComputedFingerprints>>? ReadActiveComputedFingerprintsAsync { get; init; }
+
     /// <summary>No release, no stored entities and no active release write.</summary>
     public static MigrationContext None { get; } = new(
         Guid.Empty,
@@ -40,6 +49,16 @@ public sealed record MigrationContext(
         (_, _) => Task.FromResult<IReadOnlyList<OldReleaseWork>>([]),
         null);
 }
+
+/// <summary>
+/// The release that is active for an application and its fingerprints by entity id.
+/// </summary>
+/// <param name="ActiveReleaseId">The active release, or <see langword="null"/> before the first activation.</param>
+/// <param name="Fingerprints">
+/// The fingerprints the active release stores. A release stored before fingerprints existed has none, and
+/// then every entity counts as changed.
+/// </param>
+public sealed record ActiveComputedFingerprints(Guid? ActiveReleaseId, IReadOnlyDictionary<Guid, string> Fingerprints);
 
 /// <summary>
 /// A release other than the one being activated that has running or waiting process instances pinned to it.

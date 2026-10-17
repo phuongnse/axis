@@ -1110,9 +1110,9 @@ work without the code its release pins.
 
 Activation applies the `renameField`, `dropField`, `dropEntity`, `fill` and
 `convert` migrations once per tenant. The start lock and the old-release work
-check are built too. The recompute of computed fields is not built yet
-*(planned for M7)*. Until
-the recompute is built, a `fill` or `convert` on a child entity and a `fill` or
+check are built too. The recompute of computed fields at activation is built,
+but its use by a `fill` or `convert` is not yet *(planned for M7)*. Until
+then, a `fill` or `convert` on a child entity and a `fill` or
 `convert` of a field that a computed field reads are refused. Migrations
 change entity storage in ways that are not additive, before provisioning.
 See [configuration](reference/configuration.md#resource-file-shape) for the
@@ -1393,8 +1393,9 @@ triggers. See
 A stored computed field stays correct when its expression or its inputs
 change. One recompute covers a changed expression, a computed field added to a
 table with rows and a migration `fill` or `convert`. Small tables recompute at
-activation. Large tables recompute in the worker, in batches. The design is
-*(planned for M7)*. See
+activation. Large tables recompute in the worker, in batches. The recompute at
+activation of a changed or added computed field is built, with no limit yet. The
+rest is *(planned for M7)*. See
 [storage](reference/storage.md#recomputing-computed-fields) for the steps and
 a walkthrough.
 The owner confirmed these points on issue #473 on 2026-10-17.
@@ -1415,8 +1416,13 @@ The owner confirmed these points on issue #473 on 2026-10-17.
   - The worker then recomputes the affected rows in batches. Each batch runs in
     its own transaction, with the release being activated.
 - **Release stamp:**
-  - Each row records the release that computed it. Every write already
-    recomputes with its release, so it stamps that release.
+  - Each row records the release that computed it. A create, and an update
+    that sends every child collection whose child entity has computed fields,
+    recompute with their release, so they stamp that release.
+  - An update that leaves out such a collection did not recompute its rows. It
+    keeps the stamp only when it already names the update's release, and
+    otherwise sets it to `NULL`, which means the row is not known to be up to
+    date.
   - The backfill works until no row of the table carries an older stamp.
   - A write made under an older release, by work pinned to it, stamps the older
     release. The backfill then takes that row again.

@@ -142,7 +142,7 @@ public static class RecordComputer
     }
 
     /// <summary>Starts a record with every column field that is not computed set to null.</summary>
-    private static Dictionary<string, (object? Value, bool Exact)> NewRecord(EntityModel entity)
+    internal static Dictionary<string, (object? Value, bool Exact)> NewRecord(EntityModel entity)
     {
         var record = new Dictionary<string, (object? Value, bool Exact)>(StringComparer.OrdinalIgnoreCase);
         foreach (var field in RecordQueries.Columns(entity).Where(field => !field.IsComputed))
@@ -164,7 +164,6 @@ public static class RecordComputer
         string prefix,
         SortedDictionary<string, string[]> errors)
     {
-        var results = new Dictionary<string, RecordValue>(StringComparer.Ordinal);
         var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();
         if (inexact.Count > 0)
         {
@@ -174,9 +173,23 @@ public static class RecordComputer
                 errors.TryAdd($"{prefix}/{field!.Name}", [Messages.NotEvaluable]);
             }
 
-            return results;
+            return [];
         }
 
+        return EvaluateComputed(entity, record, (field, message) => errors.TryAdd($"{prefix}/{field.Name}", [message]));
+    }
+
+    /// <summary>
+    /// Evaluates each computed field of <paramref name="entity"/> over <paramref name="record"/>, whose
+    /// values must all be exact, and gives the value of each that succeeded by the field's declared name.
+    /// <paramref name="onFailure"/> gets each field that failed, with its fixed message.
+    /// </summary>
+    internal static Dictionary<string, RecordValue> EvaluateComputed(
+        EntityModel entity,
+        Dictionary<string, (object? Value, bool Exact)> record,
+        Action<FieldModel, string> onFailure)
+    {
+        var results = new Dictionary<string, RecordValue>(StringComparer.Ordinal);
         var values = new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
         foreach (var field in entity.Fields.Where(field => field.IsComputed))
         {
@@ -185,7 +198,7 @@ public static class RecordComputer
             var message = result.Succeeded ? ToRecordValue(field, result.Value, out value) : Messages.NotComputable;
             if (message is not null)
             {
-                errors.TryAdd($"{prefix}/{field.Name}", [message]);
+                onFailure(field, message);
             }
             else
             {

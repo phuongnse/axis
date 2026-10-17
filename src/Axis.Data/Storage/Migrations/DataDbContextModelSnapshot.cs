@@ -111,6 +111,39 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("audit_records", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.ComputedFieldErrorRow", b =>
+                {
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.Property<string>("Field")
+                        .HasColumnType("text")
+                        .HasColumnName("field");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.HasKey("EntityId", "RecordId", "Field")
+                        .HasName("pk_computed_field_errors");
+
+                    b.ToTable("computed_field_errors", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.ProvisionedEntityRow", b =>
                 {
                     b.Property<Guid>("EntityId")
