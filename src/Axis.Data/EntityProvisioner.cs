@@ -252,7 +252,9 @@ public static class EntityProvisioner
     // with a cleared stamp in each entity that a fill or convert touched, except an entity it just recomputed whole.
     // An entity with more affected rows than the inline limit is not recomputed here. It is marked pending, and the
     // worker backfills it. The affected rows of a changed entity are all its rows, and those of a fill or convert
-    // are the rows left with no stamp.
+    // are the rows left with no stamp. An entity that is already pending restarts instead, whether or not its
+    // fingerprint changed: the rows still out of date for the release being activated are counted, and the limit
+    // applies to them. See RestartPendingAsync.
     private static async Task RecomputeChangedEntitiesAsync(
         ApplicationModel model,
         MigrationContext migrations,
@@ -265,17 +267,25 @@ public static class EntityProvisioner
         var releaseId = migrations.ReleaseId;
         var limit = migrations.InlineRecomputeLimit;
         var fingerprints = ComputedFingerprints.Compute(model);
+        var pending = await ReadPendingEntityIdsAsync(connection, transaction, model.Manifest.Id, cancellationToken);
         var recomputed = new HashSet<Guid>();
         if (active.ActiveReleaseId != releaseId)
         {
             foreach (var (entityId, fingerprint) in fingerprints)
             {
+                var entity = model.FindEntity(entityId) ?? throw new InvalidOperationException("The model has no entity for its fingerprint.");
+                if (pending.Contains(entityId))
+                {
+                    await RestartPendingAsync(connection, transaction, model, migrations, entity, fingerprint, cancellationToken);
+                    recomputed.Add(entityId);
+                    continue;
+                }
+
                 if (active.Fingerprints.TryGetValue(entityId, out var current) && current == fingerprint)
                 {
                     continue;
                 }
 
-                var entity = model.FindEntity(entityId) ?? throw new InvalidOperationException("The model has no entity for its fingerprint.");
                 if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: false, cancellationToken) <= limit)
                 {
                     await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
@@ -296,7 +306,11 @@ public static class EntityProvisioner
                 continue;
             }
 
-            if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: true, cancellationToken) <= limit)
+            if (pending.Contains(entityId))
+            {
+                await RestartPendingAsync(connection, transaction, model, migrations, entity, fingerprints[entityId], cancellationToken);
+            }
+            else if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: true, cancellationToken) <= limit)
             {
                 await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken, unstampedOnly: true);
             }
@@ -305,6 +319,58 @@ public static class EntityProvisioner
                 await MarkPendingAsync(connection, transaction, model, migrations, entity, fingerprints[entityId], cancellationToken);
             }
         }
+    }
+
+    // Read without a lock. A write of an older release that marks an entity pending takes the start lock first,
+    // so none can commit a new pending row while this activation holds the exclusive start lock.
+    private static async Task<HashSet<Guid>> ReadPendingEntityIdsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid applicationId,
+        CancellationToken cancellationToken)
+    {
+        var pending = new HashSet<Guid>();
+        await using var read = new NpgsqlCommand("SELECT entity_id FROM axis.pending_computed_fields WHERE application_id = @application", connection, transaction);
+        read.Parameters.AddWithValue("application", applicationId);
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            pending.Add(reader.GetGuid(0));
+        }
+
+        return pending;
+    }
+
+    // Restarts the backfill of a pending entity with the release being activated. The up-to-date releases are those
+    // whose fingerprint for the entity equals this release's. When no more rows are out of date than the limit, the
+    // activation recomputes them itself, and the entity stops being pending if none is left. Otherwise the pending
+    // row targets this release, merges its fields, and the worker continues.
+    private static async Task RestartPendingAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ApplicationModel model,
+        MigrationContext migrations,
+        EntityModel entity,
+        string fingerprint,
+        CancellationToken cancellationToken)
+    {
+        var releaseId = migrations.ReleaseId;
+        var current = await ComputedBackfill.CurrentReleaseIdsAsync(connection, transaction, entity.Id, releaseId, fingerprint, cancellationToken);
+        if (await ComputedBackfill.CountOutOfDateAsync(connection, transaction, entity, current, cancellationToken) <= migrations.InlineRecomputeLimit)
+        {
+            var ids = await ComputedBackfill.ReadOutOfDateIdsAsync(connection, transaction, entity, current, cancellationToken);
+            await ComputedRecompute.RecomputeIdsAsync(connection, transaction, model, entity, releaseId, ids, cancellationToken);
+            if (await ComputedBackfill.TryEndAsync(connection, transaction, entity, cancellationToken, current))
+            {
+                await using var delete = new NpgsqlCommand("DELETE FROM axis.process_work_items WHERE kind = @kind AND entity_id = @entity", connection, transaction);
+                delete.Parameters.AddWithValue("kind", ComputedBackfill.WorkItemKind);
+                delete.Parameters.AddWithValue("entity", entity.Id);
+                await delete.ExecuteNonQueryAsync(cancellationToken);
+                return;
+            }
+        }
+
+        await MarkPendingAsync(connection, transaction, model, migrations, entity, fingerprint, cancellationToken);
     }
 
     private static async Task<long> CountRowsAsync(

@@ -168,6 +168,7 @@ public static class TaskCompletionCommand
                     : new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result);
             }
 
+            await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, release, entity, task.ReleaseId, cancellationToken);
             previous = stored;
             updated = written;
             readVersion = stored.Version;

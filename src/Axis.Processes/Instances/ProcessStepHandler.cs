@@ -364,6 +364,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
             }
 
+            await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity, instance.ReleaseId, cancellationToken);
             updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
