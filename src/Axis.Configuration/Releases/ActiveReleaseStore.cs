@@ -71,6 +71,12 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
         return release;
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetComputedFingerprintsAsync(Guid releaseId, CancellationToken cancellationToken = default) =>
+        await context.ReleaseComputedFingerprints
+            .AsNoTracking()
+            .Where(row => row.ReleaseId == releaseId)
+            .ToDictionaryAsync(row => row.EntityId, row => row.Fingerprint, cancellationToken);
+
     public async Task<SetActiveReleaseResult> TrySetAsync(
         Guid applicationId,
         string name,

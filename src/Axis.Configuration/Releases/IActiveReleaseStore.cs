@@ -20,6 +20,13 @@ public interface IActiveReleaseStore
     /// </summary>
     Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads the fingerprints of the computed definitions of the release <paramref name="releaseId"/>
+    /// by entity id; see <see cref="ComputedFingerprints"/>. A release stored before fingerprints existed,
+    /// or one that does not exist, gives none.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, string>> GetComputedFingerprintsAsync(Guid releaseId, CancellationToken cancellationToken = default);
+
     /// <summary>Lists every active release, ordered by manifest name ignoring letter case.</summary>
     Task<IReadOnlyList<ActiveRelease>> ListAsync(CancellationToken cancellationToken = default);
 

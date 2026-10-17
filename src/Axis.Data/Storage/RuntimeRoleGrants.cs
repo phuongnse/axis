@@ -33,6 +33,7 @@ public static class RuntimeRoleGrants
         "trigger_starts",
         "audit_records",
         "sequence_counters",
+        "computed_field_errors",
     };
 
     /// <summary>

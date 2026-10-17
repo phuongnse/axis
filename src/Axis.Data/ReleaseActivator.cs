@@ -12,7 +12,8 @@ namespace Axis.Data;
 /// application is active under the manifest name or holds one of its site paths, checks that the
 /// tenant has every deployment binding its connectors and the package operations its processes use
 /// name with the right kind, provisions the
-/// entity tables and then sets the active release with its site paths.
+/// entity tables and then sets the active release with its site paths. Between the two it recomputes the stored
+/// computed values of each entity whose computed definitions differ from the previously active release's.
 /// <para>
 /// Provisioning, the pending migrations and the active release write run in one transaction under
 /// the schema lock, so the migration history check and the write see the same history: no other
@@ -96,7 +97,10 @@ public static class ReleaseActivator
             (transaction, token) => ReadOldReleaseWorkAsync(store, openInstances, transaction, manifest.Id, release.Id, token),
             async (transaction, token) => ToDiagnostics(
                 model,
-                await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)));
+                await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)))
+        {
+            ReadActiveComputedFingerprintsAsync = token => ReadActiveComputedFingerprintsAsync(store, manifest.Id, token),
+        };
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
         return new ActivationResult(provisioned.Diagnostics);
     }
@@ -125,6 +129,12 @@ public static class ReleaseActivator
 
         return ids;
     }
+
+    // The application's active release with its fingerprints; none before the first activation.
+    private static async Task<ActiveComputedFingerprints> ReadActiveComputedFingerprintsAsync(IActiveReleaseStore store, Guid applicationId, CancellationToken cancellationToken) =>
+        await store.FindByApplicationIdAsync(applicationId, cancellationToken) is { } active
+            ? new ActiveComputedFingerprints(active.ReleaseId, await store.GetComputedFingerprintsAsync(active.ReleaseId, cancellationToken))
+            : new ActiveComputedFingerprints(null, new Dictionary<Guid, string>());
 
     // The other releases of the application with open instances, and the fields their stored entities have.
     private static async Task<IReadOnlyList<OldReleaseWork>> ReadOldReleaseWorkAsync(

@@ -19,6 +19,9 @@ internal sealed class PausingStore(IActiveReleaseStore inner, TaskCompletionSour
     public Task<Release?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default) =>
         inner.GetReleaseAsync(releaseId, cancellationToken);
 
+    public Task<IReadOnlyDictionary<Guid, string>> GetComputedFingerprintsAsync(Guid releaseId, CancellationToken cancellationToken = default) =>
+        inner.GetComputedFingerprintsAsync(releaseId, cancellationToken);
+
     public Task<IReadOnlyList<ActiveRelease>> ListAsync(CancellationToken cancellationToken = default) =>
         inner.ListAsync(cancellationToken);
 

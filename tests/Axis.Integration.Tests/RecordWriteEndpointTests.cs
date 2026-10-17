@@ -100,14 +100,27 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
         var stampSql = $"""SELECT computed_release_id FROM {table} WHERE id = '{id}'""";
         Assert.Equal(active, await fixture.ScalarAsync(TenantA, stampSql));
 
-        // Clearing the stamp shows that the update writes it again.
+        // Clearing the stamp shows that the update writes it again. Item has a child collection with a
+        // computed field, so only an update that sends the parts has recomputed every row it holds.
         await fixture.ExecuteAsync(TenantA, $"""UPDATE {table} SET computed_release_id = NULL WHERE id = '{id}'""");
         Assert.Null(await fixture.ScalarAsync(TenantA, stampSql));
 
-        using var updated = await PatchJsonAsync(id, """{ "version": 1, "values": { "quantity": 5 } }""", HttpStatusCode.OK);
+        using var updated = await PatchJsonAsync(id, """{ "version": 1, "values": { "quantity": 5, "parts": [] } }""", HttpStatusCode.OK);
 
         Assert.Equal(2, updated.RootElement.GetProperty("version").GetInt64());
         Assert.Equal(active, await fixture.ScalarAsync(TenantA, stampSql));
+
+        // An update that leaves the parts out did not recompute them, and keeps the stamp only because it names the release.
+        using var withoutParts = await PatchJsonAsync(id, """{ "version": 2, "values": { "quantity": 6 } }""", HttpStatusCode.OK);
+
+        Assert.Equal(3, withoutParts.RootElement.GetProperty("version").GetInt64());
+        Assert.Equal(active, await fixture.ScalarAsync(TenantA, stampSql));
+        await fixture.ExecuteAsync(TenantA, $"""UPDATE {table} SET computed_release_id = '{Guid.NewGuid()}' WHERE id = '{id}'""");
+
+        using var otherStamp = await PatchJsonAsync(id, """{ "version": 3, "values": { "quantity": 7 } }""", HttpStatusCode.OK);
+
+        Assert.Equal(4, otherStamp.RootElement.GetProperty("version").GetInt64());
+        Assert.Null(await fixture.ScalarAsync(TenantA, stampSql));
     }
 
     [Fact]

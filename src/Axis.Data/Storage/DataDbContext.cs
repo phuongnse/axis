@@ -4,7 +4,8 @@ namespace Axis.Data.Storage;
 
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
-/// <c>entities</c> schema, the migrations applied to it, the counters of the sequences and the audit records. The caller
+/// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records and the
+/// computed fields whose expression failed for a record. The caller
 /// supplies the connection to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
@@ -26,6 +27,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<SequenceCounterRow> SequenceCounters => Set<SequenceCounterRow>();
 
     public DbSet<AuditRecordRow> AuditRecords => Set<AuditRecordRow>();
+
+    public DbSet<ComputedFieldErrorRow> ComputedFieldErrors => Set<ComputedFieldErrorRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -78,6 +81,18 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             counter.Property(c => c.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
             counter.Property(c => c.Period).HasColumnName("period").ValueGeneratedNever();
             counter.Property(c => c.LastValue).HasColumnName("last_value").ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<ComputedFieldErrorRow>(error =>
+        {
+            error.ToTable("computed_field_errors");
+            error.HasKey(e => new { e.EntityId, e.RecordId, e.Field }).HasName("pk_computed_field_errors");
+            error.Property(e => e.EntityId).HasColumnName("entity_id");
+            error.Property(e => e.RecordId).HasColumnName("record_id");
+            error.Property(e => e.Field).HasColumnName("field");
+            error.Property(e => e.ReleaseId).HasColumnName("release_id");
+            error.Property(e => e.Error).HasColumnName("error");
+            error.Property(e => e.OccurredAt).HasColumnName("occurred_at");
         });
 
         // A trigger added by the migration rejects every update, delete and truncate.
