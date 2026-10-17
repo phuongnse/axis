@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -37,10 +36,6 @@ public sealed class DatabaseReadinessTests(PostgreSqlFixture database) : IClassF
         var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<HealthBody>(TestContext.Current.CancellationToken);
-        Assert.Equal("Healthy", body?.Status);
-        Assert.Equal("Healthy", body?.Checks["database"]);
+        Assert.Equal("""{"status":"Healthy"}""", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
-
-    private sealed record HealthBody(string Status, Dictionary<string, string> Checks);
 }

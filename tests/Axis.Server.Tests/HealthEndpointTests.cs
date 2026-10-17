@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -19,8 +18,7 @@ public sealed class HealthEndpointTests
         var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<HealthBody>(TestContext.Current.CancellationToken);
-        Assert.Equal("Healthy", body?.Status);
+        Assert.Equal("""{"status":"Healthy"}""", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -32,9 +30,7 @@ public sealed class HealthEndpointTests
         var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<HealthBody>(TestContext.Current.CancellationToken);
-        Assert.Equal("Unhealthy", body?.Status);
-        Assert.Equal("Unhealthy", body?.Checks["database"]);
+        Assert.Equal("""{"status":"Unhealthy"}""", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -73,6 +69,4 @@ public sealed class HealthEndpointTests
                 builder.UseSetting("ConnectionStrings:Platform", connectionString);
             }
         });
-
-    private sealed record HealthBody(string Status, Dictionary<string, string> Checks);
 }

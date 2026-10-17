@@ -1610,7 +1610,8 @@ content.
 
 The server's readiness covers the platform database and startup activation, and
 one tenant database that is down makes the server degraded, not unhealthy. The
-worker gets its own health endpoints. The design is *(planned for M7)*. See
+worker gets its own health endpoints. The server's readiness is built. The
+worker's health endpoints and the tenant metric are *(planned for M7)*. See
 [health checks](architecture.md#health-checks-planned-for-m7) for the answers
 of each endpoint.
 The owner confirmed these points on issue #480 on 2026-10-17.
