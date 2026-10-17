@@ -12,6 +12,8 @@
     "request.decide": "Decide on the request",
     "requestDecision.main": "Decision",
     "requestReview.main": "Request",
+    "role.auditor": "Auditor",
+    "role.clerk": "Clerk",
     "role.finance": "Finance",
     "role.inspector": "Inspector",
     "role.reviewer": "Reviewer",

@@ -37,6 +37,10 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("applied_at");
 
+                    b.Property<string>("ChangedColumns")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("changed_columns");
+
                     b.Property<string>("ContentHash")
                         .IsRequired()
                         .HasMaxLength(64)

@@ -531,9 +531,8 @@ The `role` and `policy` resource files are described in
   per filtered grant, so reads and writes give the same answer and a filter
   that fails denies through its own grant only. The user id is a parameter,
   never part of the SQL text. A read filter that reads a pending computed
-  field fails closed with a `409`, in the record API and the process endpoints.
-  The data sources keep their root read filter on a pending field *(planned
-  for M7)*.
+  field fails closed with a `409`, in the record API, the process endpoints and
+  the data sources.
 - **Writes.**
   - A create needs the new record to match the filter of a `create` grant.
   - An update needs the stored record to be readable, otherwise `404`. It
@@ -581,9 +580,9 @@ The `role` and `policy` resource files are described in
   [processes](reference/processes.md#task-api). Listing the instances of a
   process needs an `inspect` grant on the process, and an instance is listed
   only when its subject record is readable. The instance detail needs the
-  same. *(planned for M7)* It also shows a call's input only when the user
-  may read every field its mapping reads or writes, and a `sensitive` field is
-  never shown. See
+  same. It also shows a call's input only when the user may read every field
+  its mapping reads or writes. A `sensitive` field is never shown *(planned
+  for M7)*. See
   [process inspection](reference/processes.md#process-inspection).
 - **System work.** The worker, seed data and `updateRecord` steps run as
   `system`. Policies do not check them.

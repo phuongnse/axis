@@ -8,6 +8,7 @@
     { "entity": "Request", "actions": ["read"], "filter": "department is null" },
     { "process": "RoleApprove", "actions": ["inspect"] },
     { "process": "Break", "actions": ["inspect"] },
-    { "process": "Divide", "actions": ["inspect"] }
+    { "process": "Divide", "actions": ["inspect"] },
+    { "process": "DepartmentOrder", "actions": ["inspect"] }
   ]
 }

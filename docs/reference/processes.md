@@ -34,12 +34,11 @@ triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers). Process inspection, where
 authorized users see an instance's graph, path, tasks and calls, is partly
-built. The `inspect` grant, the instance list and the instance detail without
-`calls` are built. The detail's `calls` and the rest of the section are
-planned for M7, see [Process inspection](#process-inspection). Operator cancel
+built. The `inspect` grant, the instance list and the instance detail with its
+`calls` are built. The `sensitive` flag and the inspector widget are planned
+for M7, see [Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
-resolve is *(planned for M7)*, see [Operator commands](#operator-commands). The
-retry's migration check is *(planned for M7)* too.
+resolve is *(planned for M7)*, see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -768,8 +767,8 @@ This section follows
 where an instance is, what it did and why it failed or waits. Two routes list
 the instances of a process and read one of them. The `inspect` grant and the
 [instance list](#instance-list) and the [instance detail](#instance-detail)
-are built, without the detail's `calls`. The `calls` and the rest of this
-section are *(planned for M7)*.
+are built, with the detail's `calls`. The `sensitive` flag, which hides more
+values, and the widget are *(planned for M7)*.
 The user is the user of the
 [session](../architecture.md#sign-in-and-the-session). The
 [process inspector widget](frontend.md) shows the same data.
@@ -879,7 +878,7 @@ in any state. The body has these parts:
   `assigneeKind` is `user` or `role`. `outcome`, `completedBy` and
   `completedAt` are `null` while the task is `open`. A task row holds no field
   values.
-- `calls` *(planned for M7)* are the connector and package calls of the instance, ordered by
+- `calls` are the connector and package calls of the instance, ordered by
   `createdAt`, then by `id`. Each is
   `{ "id", "kind", "step", "connector" or "package" with "version", "operation", "state", "attempts", "input", "inputHidden" }`.
   - `kind` is `connector` or `package`. A connector call has `connector`. A
@@ -893,7 +892,8 @@ in any state. The body has these parts:
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
   - A call has no output. The engine writes the outputs of a call straight to
     the subject record and stores no response body.
-  - Until then the response has no `calls` key.
+  - A connector call has no `package` or `version` key, and a package call
+    has no `connector` key.
 
 ```json
 {
@@ -1012,7 +1012,7 @@ evaluated input that the call sent, so it holds field values.
   user may read comes from the policies of the active release, as for
   [tasks](#task-api) and [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
   A field that the active release no longer has counts as unreadable.
-- **Sensitive fields.** A field that declares
+- **Sensitive fields** *(planned for M7, #495)*. A field that declares
   [`sensitive`](configuration.md#sensitive-fields) is never shown in
   inspection, for any user. A call whose mapping reads or writes one has its
   `input` hidden. A field counts as sensitive when the pinned release or the
@@ -1139,7 +1139,7 @@ for texts. **Both** means different parts use different releases.
 | Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Instance list | Active | Roles and policies come from the active release. |
-| Instance detail | Both | The graph and the step names use the instance's release. Roles and policies come from the active release. The `sensitive` flag, which comes from the active release and counts from the pinned release too, applies with `calls` *(planned for M7)*. See [Values and masking](#values-and-masking). |
+| Instance detail | Both | The graph and the step names use the instance's release. So do the fields a call's mapping reads or writes. Roles and policies come from the active release, and so do the fields the user may read. The `sensitive` flag, which comes from the active release and counts from the pinned release too, is *(planned for M7, #495)*. See [Values and masking](#values-and-masking). |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
@@ -1898,14 +1898,23 @@ One transaction does this:
 2. It locks the instance and requires it to be `failed`, otherwise `409`.
 3. It requires that no other `running` or `waiting` instance exists for the
    process and the subject record, otherwise `409`.
-4. *(Planned for M7.)* It requires that no applied `renameField`, `dropField`, `dropEntity` or
+4. It requires that no applied `renameField`, `dropField`, `dropEntity` or
    `convert` migration changed a column that the pinned release uses,
    otherwise `409`. It uses the same has-the-column test as `AXC0178`, see
    [Migrations](storage.md#migrations). That check counts only `running` and
    `waiting` instances, so a `failed` instance never blocks a destructive
    migration. Without this check, the retry would run old steps against a
-   changed table. Until then, a retry after such a migration can run old
-   steps against a changed table. Most likely the step fails again.
+   changed table. Only migrations applied since the pinned release count:
+   those of the application whose file the pinned release does not hold. The
+   release was activated after it applied every migration it holds, and its
+   model already reflects them. Activation stores the columns each migration
+   changed in `axis.applied_migrations`, see
+   [Applied migrations](storage.md#applied-migrations), and the retry reads
+   them back. A row stored before the columns were recorded counts as having
+   changed every column. A pinned release whose stored content is missing
+   counts as using every column, so any applied destructive migration of the
+   application refuses the retry. A refused instance stays `failed`. The
+   operator starts a new instance for the record.
 5. It sets the instance to `running` on the same step, with the next revision,
    and clears `ended_at`.
 6. It inserts a `process.step` work item for the step.
@@ -2096,7 +2105,7 @@ and then the `409` checks.
   | --- | --- |
   | Retry | The instance is not `failed`. The title is "The instance is not failed.". |
   | Retry | Another instance of the process is `running` or `waiting` for the record. A start that commits first on the unique index gives the same answer. The title is the start endpoint's: "A running or waiting instance of this process already exists for this record.". |
-  | Retry | *(Planned for M7.)* An applied migration renamed, dropped or converted a column that the pinned release uses. |
+  | Retry | An applied migration renamed, dropped or converted a column that the pinned release uses. The title is "A migration changed a column that the instance's release uses.". |
   | Cancel | The instance is not `running` or `waiting`. The title is "The instance is not running or waiting.". |
   | Cancel | A call of the instance is `sending` or `unknown`. The problem names the call in a `callId` member. The title is "A call of this instance may have reached the other system. It must settle or be resolved first.". |
   | Resolve | The call is not `unknown`. |
@@ -2433,11 +2442,14 @@ runs again after the lease expires, as event delivery does, and the receipts
 make each record start at most once per occurrence. A data error in the data
 source's filter, an SQLSTATE of class 22, is different. It is logged as a
 warning and the item is deleted, because trying again would fail the same way.
-*(planned for M7)* A fan-out whose data source reads a
-[pending field](storage.md#recomputing-computed-fields) is different again. It
-is refused with a `409`, and the item is not deleted. It runs again after the
-lease, because deleting it would drop the schedule run, and starting from old
-values is the failure the pending state removes.
+A fan-out whose data source reads a
+[pending field](storage.md#recomputing-computed-fields) in its `filter` or its
+grouping is different again. The worker starts nothing and writes no receipt.
+It logs a warning, keeps the item and its cursor, and makes the item due again
+one lease later. There is no HTTP `409`, because no request is waiting. The
+item is not deleted, because deleting it would drop the schedule run, and
+starting from old values is the failure the pending state removes. The fan-out
+ignores the data source's `sort`, so a pending sort field does not stop it.
 
 A worker that stops in the middle of the occurrence loses only its open batch.
 The next worker claims the item and continues after the stored cursor. Each

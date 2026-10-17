@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
@@ -99,6 +100,33 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(0, await CountProvisionedEntitiesAsync(_invoiceId, _lineId));
         Assert.Equal(2, (await ReadAppliedMigrationsAsync()).Count);
         Assert.Equal(compiled.Release?.Id, await ReadActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task Activation_stores_the_columns_each_applied_migration_changed_and_an_empty_list_for_a_fill()
+    {
+        var fillId = Guid.NewGuid();
+        using var folder = Application().With("entities/order.json", Order(NumberField, NoteField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        folder
+            .With("entities/order.json", Order(NumberField))
+            .With("migrations/0001-drop-note.json", Migration(_migrationId, "Order", """[{ "type": "dropField", "field": "note" }]"""));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        folder
+            .With("entities/order.json", Order(NumberField, RequiredNoteField))
+            .With("migrations/0002-fill-note.json", Migration(fillId, "Order", """[{ "type": "fill", "field": "note", "value": "'n/a'" }]"""));
+
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+
+        var columns = await ReadChangedColumnsAsync();
+        Assert.Equal(2, columns.Count);
+        using var dropped = JsonDocument.Parse(columns[_migrationId]!);
+        var drop = Assert.Single(dropped.RootElement.EnumerateArray());
+        Assert.Equal(["entityId", "field"], drop.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(_orderId, drop.GetProperty("entityId").GetGuid());
+        Assert.Equal("note", drop.GetProperty("field").GetString());
+        using var filled = JsonDocument.Parse(columns[fillId]!);
+        Assert.Empty(filled.RootElement.EnumerateArray());
     }
 
     [Fact]
@@ -972,6 +1000,21 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         while (await reader.ReadAsync(CancellationToken))
         {
             rows.Add(new AppliedMigration(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetFieldValue<DateTimeOffset>(3)));
+        }
+
+        return rows;
+    }
+
+    private async Task<Dictionary<Guid, string?>> ReadChangedColumnsAsync()
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT migration_id, changed_columns::text FROM axis.applied_migrations WHERE application_id = @id");
+        command.Parameters.AddWithValue("id", _applicationId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new Dictionary<Guid, string?>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows[reader.GetGuid(0)] = reader.IsDBNull(1) ? null : reader.GetString(1);
         }
 
         return rows;

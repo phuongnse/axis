@@ -385,8 +385,8 @@ pending and the worker recomputes it. A single read, the response of an update,
 the engine's reads of a subject record and process start conditions answer
 while a field is pending as the "While pending" list below says. So do the
 refusals of the record API and the process endpoints, for a sort or search on a
-pending field and for a policy filter that reads one. The same refusals in data
-sources are planned for M7.
+pending field and for a policy filter that reads one. Data sources and schedule
+fan-outs refuse the same way.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -591,9 +591,11 @@ in batches.
     The check reads the pending state of the entity, not the stamp of a row, so
     it holds until the backfill ends. See the
     [record API](record-api.md#paging-and-sorting).
-  - *(Planned for M7.)* A data source sort, filter or grouping that reads a
-    pending field is refused with `409`, and so is a root read filter that
-    reads one. See [data sources](data-sources.md#errors).
+  - A data source sort, filter or grouping that reads a pending field is
+    refused with `409`, and so is a root read filter that reads one. A schedule
+    fan-out whose data source filter or grouping reads one starts nothing and
+    runs again one lease later. See [data sources](data-sources.md#errors) and
+    [schedules](processes.md#schedules).
 
 Tables, both owned by `Axis.Data`. The runtime database role may write both.
 Activation writes both, and the worker writes them too. So does a record write
@@ -636,8 +638,8 @@ UUIDs of the same application, as in the
 [migrations example](#example-renaming-a-field-while-a-task-waits). The table
 holds about 50,000 purchase requests. R2 changes the `amount` expression of the
 line item, so `amount` and the aggregate `total` of the request become
-pending. Every step is built, and the record API answers step 2. The same refusal in
-a data source is planned for M7.
+pending. Every step is built, and the record API answers step 2. A data
+source refuses the same way.
 
 1. R2 is activated. Activation counts 50,000 affected rows, which is more than
    10,000. It inserts the pending row for the purchase request, with R2 as the
@@ -842,6 +844,7 @@ records a migration only when activation commits. The table has an index on
 | `release_id` | `uuid` | The release that applied the migration |
 | `content_hash` | `varchar(64)` | SHA-256 of the file's canonical JSON as lower-case hex, without its path |
 | `applied_at` | `timestamptz` | When the migration was applied |
+| `changed_columns` | `jsonb`, null | The columns the migration changed, as `[{ entityId, field }]`; null for rows applied before it was recorded |
 
 ### Example: renaming a field while a task waits
 
@@ -885,7 +888,7 @@ These limits apply to migrations.
   `sending` or `unknown` must settle or be
   [resolved](processes.md#resolve) *(planned for M7)* first. A `failed`
   instance does not block the migration, and a [retry](processes.md#retry)
-  *(planned for M7)* of one is refused when the migration changed a column it
+  of one is refused when the migration changed a column it
   uses. There is no way to pause starts yet.
 - A record API create or update takes the start lock and runs again on the new
   release when the active release changed. A list, a read, a history or a

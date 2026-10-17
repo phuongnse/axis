@@ -231,6 +231,50 @@ public static class DataSourceQueries
         return (translated.Sql, translated.Parameters);
     }
 
+    /// <summary>
+    /// The entity id, the field name and the dotted path of every field the data source's filter reads,
+    /// in the order the translation finds them, with the body of each rule it calls inlined. A bare
+    /// name that is a parameter reads no field. Each step of a path through reference fields reads a
+    /// field of the entity before it.
+    /// </summary>
+    internal static IReadOnlyList<(Guid EntityId, string Field, string Path)> FilterFieldsRead(
+        ApplicationModel application, DataSourceModel dataSource)
+    {
+        var read = new List<(Guid, string, string)>();
+        if (dataSource.Filter is not { } filter)
+        {
+            return read;
+        }
+
+        var translated = SqlTranslator.Translate(
+            filter.Syntax,
+            names =>
+            {
+                if (names.Count == 1
+                    && dataSource.Parameters.Any(parameter => string.Equals(parameter.Name, names[0], StringComparison.OrdinalIgnoreCase)))
+                {
+                    return "NULL";
+                }
+
+                var entityId = dataSource.Entity.Id;
+                var path = string.Join('.', names);
+                foreach (var field in ResolvePath(application, dataSource, names))
+                {
+                    read.Add((entityId, field.Name, path));
+                    entityId = field.Target?.Id ?? Guid.Empty;
+                }
+
+                return "NULL";
+            },
+            filter.Check);
+        if (!translated.Succeeded)
+        {
+            throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
+        }
+
+        return read;
+    }
+
     /// <summary>The fields a filter path names, from the root entity through each reference's target, ignoring letter case.</summary>
     private static List<FieldModel> ResolvePath(ApplicationModel application, DataSourceModel dataSource, IReadOnlyList<string> names)
     {

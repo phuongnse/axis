@@ -26,7 +26,7 @@ namespace Axis.Integration.Tests;
 /// migrations applied and the StepApp fixture activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. The test authentication scheme signs in
 /// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, <c>rita</c>, who holds
-/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
+/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
 /// a test runs the work items that create tasks itself.
 /// </summary>
@@ -91,6 +91,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 new TestIdentity("fiona", "Fiona Finance", "finance"),
                 new TestIdentity("rita", "Rita Reviewer", "reviewer"),
                 new TestIdentity("ines", "Ines Inspector", "inspector"),
+                new TestIdentity("ada", "Ada Auditor", "auditor"),
+                new TestIdentity("carl", "Carl Clerk", "clerk"),
                 new TestIdentity("otto", "Otto Other", "employee"));
         });
 
@@ -145,22 +147,23 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
     /// <summary>
     /// Inserts a request of <paramref name="tenant"/> titled <see cref="RequestTitle"/> with an
-    /// optional <paramref name="department"/> and <paramref name="divisor"/>, and returns its id. The id is
+    /// optional <paramref name="department"/>, <paramref name="divisor"/> and <paramref name="amount"/>, and returns its id. The id is
     /// <paramref name="id"/>, or a new one.
     /// </summary>
-    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null)
+    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null, decimal? amount = null)
     {
         Assert.True(Model.TryGetEntity("Request", out var request));
         var requestId = id ?? Guid.NewGuid();
         await using var command = DataSource(tenant).CreateCommand(
             $"""
-            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("department")}, {Column("divisor")})
-            VALUES (@id, @title, @department, @divisor)
+            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("department")}, {Column("divisor")}, {Column("amount")})
+            VALUES (@id, @title, @department, @divisor, @amount)
             """);
         command.Parameters.AddWithValue("id", requestId);
         command.Parameters.AddWithValue("title", RequestTitle(requestId));
         command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("divisor", NpgsqlDbType.Bigint) { Value = (object?)divisor ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("amount", NpgsqlDbType.Numeric) { Value = (object?)amount ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
         return requestId;
     }
@@ -248,6 +251,54 @@ public sealed class TaskApiFixture : IAsyncLifetime
         while (await runner.RunNextAsync(tenant, _lease, cancellationToken))
         {
         }
+    }
+
+    /// <summary>
+    /// Inserts a <c>pending</c> connector call of the step <paramref name="step"/> of the instance
+    /// <paramref name="instanceId"/> in <paramref name="tenant"/>, to <c>Purchasing</c>
+    /// <c>createOrder</c> on the tenant's first release, with the stored input
+    /// <paramref name="inputJson"/>. Returns the call's id.
+    /// </summary>
+    public async Task<Guid> InsertConnectorCallAsync(string tenant, Guid instanceId, string step, string inputJson)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = DataSource(tenant).CreateCommand(
+            """
+            INSERT INTO axis.connector_calls (id, process_instance_id, step, release_id, connector, operation, state, attempts, input)
+            VALUES (@id, @instance, @step, @release, 'Purchasing', 'createOrder', 'pending', 0, @input::jsonb)
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("step", step);
+        command.Parameters.AddWithValue("release", _tenants[tenant].ReleaseId);
+        command.Parameters.AddWithValue("input", inputJson);
+        await command.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    /// <summary>
+    /// Inserts an attempt or lookup, by <paramref name="kind"/>, of the connector call
+    /// <paramref name="callId"/> in <paramref name="tenant"/>, started at <paramref name="startedAt"/>
+    /// and finished a second later.
+    /// </summary>
+    public async Task InsertCallAttemptAsync(
+        string tenant, Guid callId, string kind, int number, DateTimeOffset startedAt, string outcome, int? httpStatus, string? error = null)
+    {
+        await using var command = DataSource(tenant).CreateCommand(
+            """
+            INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error)
+            VALUES (@id, 'connector', @call, @kind, @number, @startedAt, @finishedAt, @outcome, @status, @error)
+            """);
+        command.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("call", callId);
+        command.Parameters.AddWithValue("kind", kind);
+        command.Parameters.AddWithValue("number", number);
+        command.Parameters.AddWithValue("startedAt", startedAt);
+        command.Parameters.AddWithValue("finishedAt", startedAt.AddSeconds(1));
+        command.Parameters.AddWithValue("outcome", outcome);
+        command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)httpStatus ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)error ?? DBNull.Value });
+        await command.ExecuteNonQueryAsync();
     }
 
     /// <summary>The id of the one task of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>.</summary>
@@ -422,12 +473,14 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// release, with <paramref name="edit"/> applied to each file. It gets the file's path relative
     /// to the folder and its content, and returns the new content, or null to leave the file out.
     /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
-    /// more to the backfill. Returns the new release's id.
+    /// more to the backfill. Each file of <paramref name="added"/>, keyed by its path relative to the folder, is
+    /// written as well. Returns the new release's id.
     /// </summary>
     public async Task<Guid> ActivateEditedAsync(
         string tenant,
         Func<string, string, string?> edit,
-        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
+        IReadOnlyDictionary<string, string>? added = null)
     {
         using var folder = new TemporaryFolder();
         foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
@@ -437,6 +490,11 @@ public sealed class TaskApiFixture : IAsyncLifetime
             {
                 folder.With(path, content);
             }
+        }
+
+        foreach (var (path, content) in added ?? new Dictionary<string, string>())
+        {
+            folder.With(path, content);
         }
 
         await using var connection = new NpgsqlConnection(_tenants[tenant].ConnectionString);
