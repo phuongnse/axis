@@ -603,7 +603,9 @@ Migrations run forward only.
   a start wait longer. This covers the process start endpoint, the inbound
   endpoint, record API creates and updates, task completion, event delivery,
   `sync` event triggers, update triggers from worker steps and schedule
-  fan-out. A record API create or update always takes it, because the new
+  fan-out. *(Planned for M7.)* Operator
+  [retry](processes.md#retry) and [resolve](processes.md#resolve) take it
+  too. A record API create or update always takes it, because the new
   release may add triggers. A delete never starts a process and does not. An
   activation with a pending migration takes the same lock exclusively, using
   `pg_advisory_xact_lock`, and holds it to commit. It waits for open starts
@@ -725,8 +727,13 @@ fields by a `fill` or `convert` are *(planned for M7)*.
   *(planned for M7)*.
 - Process starts for the application wait while activation holds the
   exclusive start lock. A long fill delays them.
-- Operator cancel comes in M7. Until then, old work must finish before a
-  destructive migration can run. There is no way to drain starts yet.
+- Old work must finish before a destructive migration can run. *(Planned for
+  M7.)* An operator can drain it by cancelling the `running` and `waiting`
+  old-release instances, see [Cancel](processes.md#cancel). A call that is
+  `sending` or `unknown` must settle or be
+  [resolved](processes.md#resolve) first. A `failed` instance does not block
+  the migration, and a [retry](processes.md#retry) of one is refused when the
+  migration changed a column it uses. There is no way to pause starts yet.
 - A record API create or update takes the start lock and runs again on the new
   release when the active release changed. A list, a read, a history or a
   delete that resolved the previous release just before the commit can still
@@ -742,7 +749,9 @@ schema of the tenant database.
   written in the same transaction as the action it records. The record API
   and the process [start endpoint](processes.md#start-endpoint) write them,
   and so do [process steps](processes.md#running-a-step) and
-  [task completions](processes.md#completing-a-task).
+  [task completions](processes.md#completing-a-task). *(Planned for M7.)* So
+  do the [operator commands](processes.md#operator-commands), with the user as
+  actor.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

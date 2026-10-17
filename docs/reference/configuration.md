@@ -735,7 +735,7 @@ sorted by file and then path.
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 | `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
-| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and *(planned for M7)* `retry`, `cancel` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
 | `AXC0092` | A policy grant's `entity`, `dataSource`, `process` or `endpoint` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint`. Not reported when the name is a file that was not loaded because of its own errors. |
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
@@ -1908,7 +1908,8 @@ outcomes:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`;
+  - a `process` takes `start`, and *(planned for M7)* `retry`, `cancel` and
+    `resolve`;
   - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
@@ -1928,6 +1929,16 @@ outcomes:
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](../architecture.md#combining-grants).
+
+*(Planned for M7.)* The `retry`, `cancel` and `resolve` actions of a `process`
+grant let a user run the [operator commands](processes.md#operator-commands)
+on that process's instances. Each is checked on its own, and none implies
+another. `start` implies none of them. A grant takes no `filter` or `fields`,
+as for `start`. For example, an operator role could hold:
+
+```json
+{ "process": "PurchaseRequestApproval", "actions": ["retry", "cancel", "resolve"] }
+```
 
 A policy also grants inbound [endpoints](#endpoint-resource). The target is
 `endpoint`, and its only action is `invoke`. An `endpoint` grant takes no
@@ -1991,7 +2002,8 @@ Compile checks, each a compile error:
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
 `start` and `invoke`, and a grant has no other properties. A problem there is
-`AXC0004`.
+`AXC0004`. *(Planned for M7.)* The list also holds `retry`, `cancel` and
+`resolve`.
 
 ### Record creator
 
