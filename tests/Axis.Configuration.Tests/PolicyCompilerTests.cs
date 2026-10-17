@@ -139,9 +139,11 @@ public sealed class PolicyCompilerTests
     [Theory]
     [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update' and 'delete'.")]
     [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start' and 'inspect'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start'.")]
+    [InlineData("""{ "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update' and 'delete'.")]
+    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["inspect"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'inspect'. It takes only 'invoke'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start' and 'inspect'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "fields": ["owner"] }""", "/grants/0/fields", "An endpoint grant has no 'fields'. Only an entity grant limits fields.")]
     [InlineData("""{ "process": "RequestReview", "endpoint": "SubmitRequest", "actions": ["start"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
@@ -158,6 +160,31 @@ public sealed class PolicyCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.InvalidGrant, PolicyFile, path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
         Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_action_outside_the_schema_enum_is_a_schema_violation()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["frobnicate"] }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_start_and_inspect_grant_on_a_process_compiles_with_both_actions()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "inspect"] }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var grant = Assert.Single(Assert.Single(result.Model!.Policies).Grants);
+        Assert.Equal(new ProcessReference(Guid.Parse(ProcessId), "RequestReview"), grant.Process);
+        Assert.Equal([PolicyAction.Start, PolicyAction.Inspect], grant.Actions);
     }
 
     [Fact]
@@ -353,6 +380,23 @@ public sealed class PolicyCompilerTests
         Assert.False(PolicyEvaluator.AllowsStart(model, ["manager"], process));
         Assert.False(PolicyEvaluator.AllowsStart(model, ["Employee"], process));
         Assert.False(PolicyEvaluator.AllowsStart(withoutStart, ["employee"], otherProcess));
+    }
+
+    [Fact]
+    public void Inspect_is_allowed_only_by_an_inspect_grant_on_the_process_for_a_declared_role_held()
+    {
+        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "inspect"] }]"""));
+        using var startOnly = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]"""));
+        var model = Compile(granted);
+        Assert.True(model.TryGetProcess("RequestReview", out var process));
+        var withoutInspect = Compile(startOnly);
+        Assert.True(withoutInspect.TryGetProcess("RequestReview", out var otherProcess));
+
+        Assert.True(PolicyEvaluator.AllowsInspect(model, ["employee"], process));
+        Assert.False(PolicyEvaluator.AllowsInspect(model, ["manager"], process));
+        Assert.False(PolicyEvaluator.AllowsInspect(model, ["Employee"], process));
+        Assert.False(PolicyEvaluator.AllowsInspect(withoutInspect, ["employee"], otherProcess));
+        Assert.True(PolicyEvaluator.AllowsStart(withoutInspect, ["employee"], otherProcess));
     }
 
     private static ApplicationModel Compile(TemporaryFolder folder)

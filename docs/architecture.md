@@ -508,9 +508,10 @@ The `role` and `policy` resource files are described in
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
   `read`, `create`, `update` and `delete` on an entity, `read` on a data
-  source, or `start` on a process. *(Planned for M7.)* A process also takes
-  `inspect`, see [process inspection](reference/processes.md#process-inspection),
-  and `retry`, `cancel` and `resolve`, each checked on its own, for the
+  source, or `start` and `inspect` on a process. `inspect` lists a process's
+  instances, see [process inspection](reference/processes.md#process-inspection).
+  *(Planned for M7.)* A process also takes `retry`, `cancel` and `resolve`,
+  each checked on its own, for the
   [operator commands](reference/processes.md#operator-commands). An entity grant may also have a record
   `filter` and a `fields` list. A user's grants are the grants of every
   policy they match.
@@ -572,9 +573,10 @@ The `role` and `policy` resource files are described in
   counts only when the active release declares the role. The task form
   leaves out fields the user may not read, and the subject label uses the
   display field of the task's release. See
-  [processes](reference/processes.md#task-api). *(planned for M7)* Inspecting
-  an instance needs an `inspect` grant on the process, and the instance's
-  subject record must be readable. A call's input is shown only when the user
+  [processes](reference/processes.md#task-api). Listing the instances of a
+  process needs an `inspect` grant on the process, and an instance is listed
+  only when its subject record is readable. *(planned for M7)* The instance
+  detail needs the same, and shows a call's input only when the user
   may read every field its mapping reads or writes, and a `sensitive` field is
   never shown. See
   [process inspection](reference/processes.md#process-inspection).
