@@ -396,8 +396,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   record API and the data source endpoint answer `401`, and an application
   page starts a sign-in that cannot complete.
   - It holds the purchase request users with fixed ids: `anna` and `lan`
-    the employees, `binh` and `chau` the department managers, and `dung` the
-    finance reviewer. Seed data and E2E journeys already name these ids.
+    the employees, `binh` and `chau` the department managers, `dung` the
+    finance reviewer, and `giang` the operator. Seed data and E2E journeys already name these ids.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds

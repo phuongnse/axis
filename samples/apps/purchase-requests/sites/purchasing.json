@@ -11,6 +11,7 @@
     { "page": "MyTasks", "label": { "textKey": "nav.myTasks" } },
     { "page": "RequestsByDepartment", "label": { "textKey": "nav.requestsByDepartment" } },
     { "page": "Departments", "label": { "textKey": "nav.departments" } },
-    { "page": "Suppliers", "label": { "textKey": "nav.suppliers" } }
+    { "page": "Suppliers", "label": { "textKey": "nav.suppliers" } },
+    { "page": "Approvals", "label": { "textKey": "nav.approvals" } }
   ]
 }
