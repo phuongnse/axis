@@ -894,6 +894,14 @@ can be read as its history (D21).
     `processInstanceId` and `details`, as stored. `actorName` is the display
     name stored with the audit record. It is `null` for `system`,
     `anonymous` and audit records written before names were stored.
+  - *(planned for M7)* Each item also has `inspectPath`. It is the
+    [instance detail](processes.md#instance-detail) path of the entry's
+    process instance, such as
+    `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances/0192f4a9-…`,
+    when the user holds an `inspect` grant on the entry's process. It is `null`
+    when the user holds none, and when the entry has no instance. The server
+    decides, so a client never guesses it from roles. The path leads to a
+    `404` when the user may not read the instance's subject record.
   - The history needs a session and a `read` grant on the entity. Without a
     session it is a `401`, and without the grant a `403`, before the record
     is read. A record outside every read filter is a `404`. The `fields` of
