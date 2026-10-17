@@ -99,7 +99,9 @@ with the purchase request sample at http://localhost:5206, the worker, and the p
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. `docker compose logs server` shows the activation diagnostics,
-and `docker compose logs worker` shows the worker output. The Keycloak admin console login is
+and `docker compose logs worker` shows the worker output. `docker compose ps` shows the worker
+healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The worker's
+health address `http://127.0.0.1:5208` stays inside its container. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
 `AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports
 are published on `127.0.0.1` only. The integration test fixtures create two database
@@ -160,6 +162,9 @@ works on a fresh clone:
   `AXIS_PURCHASING_PORT` is set, it points the server's and the worker's
   `Tenants__default__Bindings__PurchasingSystemUrl__Value` at the purchasing
   system stub on that port.
+- The worker serves `/health/live` and `/health/ready` at `http://127.0.0.1:5208` and
+  answers `404` elsewhere. `Health__Urls` moves that address. Two workers on one machine
+  need different addresses.
 - Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running with
   its data, and Keycloak and the purchasing system stub keep running. Run
   `docker compose down` to stop them.

@@ -114,6 +114,18 @@ test('the stack runs from source', { timeout }, async () => {
     logs = compose(['logs', 'worker']).stdout
   }
   assert.match(logs, /Tenant default is ready for work/, logs)
+
+  // `up --wait` returned, so the worker's health check on /health/ready passed.
+  const ps = compose(['ps', '--format', 'json', 'worker'])
+  assert.equal(ps.status, 0, ps.stderr)
+  // Newer Compose versions print one JSON object per line, older ones an array.
+  const text = ps.stdout.trim()
+  const containers = text.startsWith('[') ? JSON.parse(text) : text.split('\n').map((line) => JSON.parse(line))
+  assert.deepEqual(
+    containers.map((container) => container.Health),
+    ['healthy'],
+    ps.stdout,
+  )
 })
 
 test('a broken application folder stops the server', { timeout }, () => {
@@ -170,4 +182,12 @@ test('the server runs on both database roles and the worker only on the runtime 
     [],
   )
   assert.match(worker.Tenants__default__ConnectionString, /Username=axis_runtime;/)
+})
+
+test('the worker checks /health/ready and publishes no port', () => {
+  const config = compose(['config', '--format', 'json'])
+  assert.equal(config.status, 0, config.stderr)
+  const { services } = JSON.parse(config.stdout)
+  assert.equal(services.worker.ports, undefined)
+  assert.match(services.worker.healthcheck.test.join(' '), /\/health\/ready/)
 })

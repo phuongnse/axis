@@ -21,6 +21,7 @@ internal sealed partial class WorkerService(
     TenantOptions tenants,
     WorkerOptions options,
     WorkItemRunner runner,
+    WorkerHealth health,
     ITenantConnectionFactory connections,
     ITenantContextAccessor accessor,
     PackageCatalog packages,
@@ -38,6 +39,7 @@ internal sealed partial class WorkerService(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            health.Polled();
             var ranAny = false;
             foreach (var tenantId in _tenantIds)
             {
@@ -74,12 +76,16 @@ internal sealed partial class WorkerService(
                 await CheckRuntimeRoleAsync(tenantId, stoppingToken);
                 await CheckReleasesAsync(tenantId, stoppingToken);
                 _ready.Add(tenantId);
+                health.TenantMigrated();
                 LogReady(tenantId);
             }
 
             while (await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken))
             {
                 ran = true;
+
+                // A worker with a steady stream of items still polls. One item that hangs does not.
+                health.Polled();
             }
         }
         catch (Exception exception) when (exception is not StartupCheckException

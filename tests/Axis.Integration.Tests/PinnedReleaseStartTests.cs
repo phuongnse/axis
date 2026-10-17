@@ -159,6 +159,9 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
             ["Tenants__a__ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
             ["Extensions__Path"] = packages,
             ["Worker__PollInterval"] = "00:00:00.05",
+
+            // Any free port, so a worker that runs under scripts/dev.sh does not hold the address.
+            ["Health__Urls"] = "http://127.0.0.1:0",
         })
         {
             process.StartInfo.Environment[key] = value;

@@ -1699,8 +1699,8 @@ content.
 
 The server's readiness covers the platform database and startup activation, and
 one tenant database that is down makes the server degraded, not unhealthy. The
-worker gets its own health endpoints. The server's readiness is built. The
-worker's health endpoints and the tenant metric are *(planned for M7)*. See
+worker gets its own health endpoints. The server's readiness and the worker's
+health endpoints are built. The tenant metric is *(planned for M7)*. See
 [health checks](architecture.md#health-checks-planned-for-m7) for the answers
 of each endpoint.
 The owner confirmed these points on issue #480 on 2026-10-17.
@@ -1728,8 +1728,8 @@ The owner confirmed these points on issue #480 on 2026-10-17.
   - Docker Compose gives the worker a health check on `/health/ready`.
 
 *Why:* [Operations](domain/knowledge.md#operations) asks that failed and stuck
-work is visible. Today the worker has no health endpoint, so a stuck worker
-shows only when work piles up, and Compose cannot wait for it. The server's
+work is visible. Without a health endpoint, a stuck worker shows only when
+work piles up, and Compose cannot wait for it. The server's
 readiness ignores tenant databases and activation. Degraded, not unhealthy,
 follows [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed): one
 tenant must not take the others offline. `/health` needs no session, so the

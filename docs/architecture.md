@@ -24,7 +24,7 @@ flowchart LR
   data source endpoint, the process start endpoint, the task API and the site
   endpoints require a session.
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
-  address *(planned for M7)*, see [health checks](#health-checks-planned-for-m7).
+  address, see [health checks](#health-checks-planned-for-m7).
   It runs work items, and through them
   the `decision`, `task`, `operation` and `end` steps of process instances.
   Operation steps include `updateRecord`, `callConnector` calls with their
@@ -765,8 +765,7 @@ holds table and column names.
 
 The server's `/health/live` and `/health/ready` work as described below, as
 [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed)
-says. The worker's health endpoints and the tenant metric are *(planned for
-M7)*. The worker has no health endpoint yet.
+says. The tenant metric is *(planned for M7)*.
 
 **The answer.** Each endpoint answers JSON of the form
 `{ "status": "Healthy" | "Degraded" | "Unhealthy" }` and nothing else.

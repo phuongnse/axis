@@ -1,6 +1,6 @@
 # Builds Axis from source and runs the server with the purchase request sample. The server is
-# the last stage, so it is the default target. The worker stage runs the worker host, and the
-# purchasing stage runs the purchasing system stub from tests/Axis.PurchasingStub.
+# the last stage, so it is the default target. The worker stage runs the worker host with its health
+# endpoints, and the purchasing stage runs the purchasing system stub from tests/Axis.PurchasingStub.
 # For local use: the Development environment and the sample credentials are not for production.
 
 # The SPA. Vite writes it to ../src/Axis.Server/wwwroot, the server's web root.
@@ -27,7 +27,8 @@ RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -o /worker
 RUN dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj -c Release \
     && test -f /src/artifacts/extensions/payment-references/1.0.0/axis-package.json
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS worker
+# The ASP.NET Core base, because the worker serves its health endpoints. It has bash but no curl.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS worker
 WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
