@@ -688,7 +688,7 @@ The server and the worker emit correlated logs, metrics and traces with
 OpenTelemetry and W3C trace context. Traces and their stored correlation are
 built. So are the OTLP logs, the log scope, the problem details `traceId`,
 the standard metrics and the work item duration, process instance and call
-attempt metrics. The gauges stay *(planned for M7)*. See
+attempt metrics and the work item and pending computed field gauges. See
 [D36](decisions.md#d36-correlated-logs-metrics-and-traces--agreed).
 
 ### Signals and export

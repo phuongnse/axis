@@ -1,3 +1,4 @@
+using Axis.Core.Telemetry;
 using Npgsql;
 
 namespace Axis.Data.Records;
@@ -42,5 +43,33 @@ public static class PendingComputedFields
         }
 
         return pending;
+    }
+
+    /// <summary>
+    /// Counts the pending computed field names of each application that has an active release, summed over
+    /// its pending entities. An application with nothing pending counts 0. Pending rows of an application
+    /// with no active release are left out.
+    /// </summary>
+    public static async Task<IReadOnlyList<PendingFieldsGauge>> CountByApplicationAsync(
+        NpgsqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT a.name, coalesce(sum(cardinality(p.fields)), 0)::bigint
+            FROM axis.active_releases a
+            LEFT JOIN axis.pending_computed_fields p ON p.application_id = a.application_id
+            GROUP BY a.name
+            """,
+            connection);
+        var rows = new List<PendingFieldsGauge>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new PendingFieldsGauge(reader.GetString(0), reader.GetInt64(1)));
+        }
+
+        return rows;
     }
 }

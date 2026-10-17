@@ -10,4 +10,7 @@ public sealed class WorkerOptions
 
     /// <summary>How long the worker waits before it polls again when it found no work.</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>How often the worker reads each tenant database for the due work item and pending computed field gauges.</summary>
+    public TimeSpan MetricsInterval { get; set; } = TimeSpan.FromSeconds(30);
 }

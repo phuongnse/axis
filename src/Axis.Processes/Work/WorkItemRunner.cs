@@ -55,6 +55,9 @@ public sealed partial class WorkItemRunner
         _kinds = [.. _handlers.Keys.Concat(_externalHandlers.Keys).Order(StringComparer.Ordinal)];
     }
 
+    /// <summary>The kinds this runner has a handler for, in ordinal order.</summary>
+    public IReadOnlyList<string> Kinds => _kinds;
+
     /// <summary>
     /// Returns whether every processes migration is applied to the tenant database. A database
     /// without the migrations history table has every migration pending.

@@ -331,6 +331,13 @@ public sealed class TaskApiFixture : IAsyncLifetime
         return (long)(await command.ExecuteScalarAsync())!;
     }
 
+    /// <summary>The number of pending field names in <c>axis.pending_computed_fields</c> of <paramref name="tenant"/>, summed over its rows.</summary>
+    public async Task<long> SumPendingComputedFieldNamesAsync(string tenant)
+    {
+        await using var command = DataSource(tenant).CreateCommand("SELECT coalesce(sum(cardinality(fields)), 0)::bigint FROM axis.pending_computed_fields");
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     /// <summary>The number of process instances of <paramref name="tenant"/>.</summary>
     public async Task<long> CountInstancesAsync(string tenant)
     {

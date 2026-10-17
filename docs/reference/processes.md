@@ -2492,10 +2492,11 @@ configuration (see
 | --- | --- | --- |
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
 | `Worker:PollInterval` | `00:00:01` | How long the worker waits before it polls again when it found no work. |
+| `Worker:MetricsInterval` | `00:00:30` | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive. |
 | `Health:Urls` | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else. |
 
 As environment variables they are `Worker__LeaseDuration`,
-`Worker__PollInterval` and `Health__Urls`. What the health endpoints answer is
+`Worker__PollInterval`, `Worker__MetricsInterval` and `Health__Urls`. What the health endpoints answer is
 in [health checks](../architecture.md#health-checks-planned-for-m7).
 
 The server migrates the tenant databases, and the worker does not. Before it
@@ -2508,7 +2509,7 @@ work and starts claiming. So the worker can start before the server.
 
 The worker emits these metrics, next to the standard ASP.NET Core, HttpClient
 and .NET runtime metrics. Attributes name things and never hold values, see
-[Telemetry](../architecture.md#telemetry). The gauges are *(planned for M7)*.
+[Telemetry](../architecture.md#telemetry).
 A metric is recorded in the transaction that writes the end or the attempt. So
 a transaction that rolls back after its write, such as a `fenced` run, can count
 the same end or attempt again when the item is retried. An ended instance whose
@@ -2517,12 +2518,24 @@ release cannot be loaded is counted without `axis.application` and
 
 | Metric | Instrument | Unit | Attributes |
 | --- | --- | --- | --- |
-| `axis.work_items.due` | gauge | items | *(planned for M7)* `axis.tenant`, `axis.work_item.kind` |
-| `axis.work_items.oldest_due_age` | gauge | s | *(planned for M7)* `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
+| `axis.work_items.due` | gauge | items | `axis.tenant`, `axis.work_item.kind` |
+| `axis.work_items.oldest_due_age` | gauge | s | `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
 | `axis.work_items.duration` | histogram | s | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced` |
 | `axis.process.instances.ended` | counter | `{instance}` | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
 | `axis.calls.attempts` | counter | `{attempt}` | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
-| `axis.computed.pending_fields` | gauge | fields | *(planned for M7)* `axis.tenant`, `axis.application`. See [Recomputing computed fields](storage.md#recomputing-computed-fields) |
+| `axis.computed.pending_fields` | gauge | fields | `axis.tenant`, `axis.application`. See [Recomputing computed fields](storage.md#recomputing-computed-fields) |
+
+The gauges are read every `Worker:MetricsInterval` by a loop that is separate
+from the work loop, so a hung item does not stop it and it does not slow the
+work. A metrics scrape never queries a tenant database. An item counts as due
+once its `due_at` has passed, claimed or not, so a hung item keeps aging. The
+age and the due time use the clock of the claim. Every kind the worker handles
+reports 0 when nothing is due, and so does every application with an active
+release when nothing is pending. A kind with due items that the worker has no
+handler for reports its real count. `axis.computed.pending_fields` adds up the
+pending field names of all pending entities of the application. A tenant whose
+database cannot be read logs a warning and reports no data until a later read
+succeeds.
 
 ## Tables
 
