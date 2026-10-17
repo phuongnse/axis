@@ -11,12 +11,14 @@
     "nav.requestsByDepartment": "By department",
     "nav.departments": "Departments",
     "nav.suppliers": "Suppliers",
+    "nav.approvals": "Approvals",
     "pages.purchaseRequests.title": "Purchase requests",
     "pages.purchaseRequestForm.title": "Purchase request",
     "pages.requestsByDepartment.title": "Purchase request totals by department",
     "pages.departments.title": "Departments",
     "pages.suppliers.title": "Suppliers",
     "pages.myTasks.title": "My tasks",
+    "pages.approvals.title": "Purchase request approvals",
     "department.label": "Department",
     "department.code": "Code",
     "department.name": "Name",
@@ -58,6 +60,7 @@
     "role.employee": "Employee",
     "role.departmentManager": "Department manager",
     "role.financeReviewer": "Finance reviewer",
+    "role.operator": "Operator",
     "role.purchasingSystem": "Purchasing system"
   }
 }

@@ -1,0 +1,13 @@
+{
+  "id": "ad149043-1f24-4e7d-a9b8-1ba518f8e010",
+  "kind": "policy",
+  "name": "OperatorAccess",
+  "formatVersion": 1,
+  "roles": ["operator"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "process": "PurchaseRequestApproval", "actions": ["inspect"] }
+  ]
+}

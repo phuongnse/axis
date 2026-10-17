@@ -17,6 +17,10 @@
           "clientRole": true
         },
         {
+          "name": "operator",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         }
@@ -212,6 +216,28 @@
       "clientRoles": {
         "axis": [
           "finance-reviewer"
+        ]
+      }
+    },
+    {
+      "id": "giang",
+      "username": "giang",
+      "enabled": true,
+      "email": "giang@axis.local",
+      "emailVerified": true,
+      "firstName": "Giang",
+      "lastName": "Operator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "operator"
         ]
       }
     },

@@ -1867,10 +1867,10 @@ A `policy` resource gives roles grants. The record API and the data source
 endpoint enforce entity and data source grants. Both enforce the filter and
 fields rules below: the data source endpoint adds the root entity's read
 filters to its query and refuses a data source that shows a field the user
-may not read. The purchase request sample uses the three policies below.
+may not read. The purchase request sample uses the four policies below.
 Employees reach their own requests, department managers the requests of
 their department, and finance reviewers the submitted requests and their
-outcomes:
+outcomes. Operators inspect the approvals and change nothing:
 
 ```json
 {
@@ -1926,6 +1926,22 @@ outcomes:
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "dataSource": "RequestsByDepartment", "actions": ["read"] },
     { "process": "PurchaseRequestApproval", "actions": ["cancel", "retry", "resolve"] }
+  ]
+}
+```
+
+```json
+{
+  "id": "ad149043-1f24-4e7d-a9b8-1ba518f8e010",
+  "kind": "policy",
+  "name": "OperatorAccess",
+  "formatVersion": 1,
+  "roles": ["operator"],
+  "grants": [
+    { "entity": "PurchaseRequest", "actions": ["read"] },
+    { "entity": "Department", "actions": ["read"] },
+    { "entity": "Supplier", "actions": ["read"] },
+    { "process": "PurchaseRequestApproval", "actions": ["inspect"] }
   ]
 }
 ```

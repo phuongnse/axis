@@ -1,0 +1,8 @@
+{
+  "id": "5ffa28da-f66a-46d6-b996-9c8f00dc3643",
+  "kind": "page",
+  "name": "Approvals",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.approvals.title" },
+  "widgets": [{ "type": "processInspector", "process": "PurchaseRequestApproval" }]
+}

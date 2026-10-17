@@ -17,7 +17,7 @@ public sealed class SampleApplicationTests
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
         Assert.Equal("PurchaseRequestApproval", Assert.Single(result.Model.Processes).Name);
         Assert.Equal("PurchaseRequestReview", Assert.Single(result.Model.Forms).Name);
-        Assert.Equal(["department-manager", "employee", "finance-reviewer", "purchasing-system"], result.Model.Roles.Select(role => role.Name));
+        Assert.Equal(["department-manager", "employee", "finance-reviewer", "operator", "purchasing-system"], result.Model.Roles.Select(role => role.Name));
         Assert.Equal("SubmitPurchaseRequest", Assert.Single(result.Model.Endpoints).Name);
 
         Assert.True(result.Model.TryGetEntity("PurchaseRequest", out var purchaseRequest));
