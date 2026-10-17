@@ -118,6 +118,7 @@ const noteEntity: EntityMetadata = {
 }
 
 const tasksPath = '/api/apps/E2eApp/tasks'
+const instancesPath = '/api/apps/E2eApp/processes/NoteReview/instances'
 
 const noteFields = noteEntity.fields.map((field) => field.name)
 const noteAccess: WidgetAccess = {
@@ -138,6 +139,8 @@ const pages: Record<string, PageMetadata> = {
         dataSource: null,
         form: null,
         tasksPath: null,
+        process: null,
+        instancesPath: null,
         actions: [],
         access: noteAccess,
       },
@@ -154,6 +157,8 @@ const pages: Record<string, PageMetadata> = {
         dataSource: null,
         form: null,
         tasksPath: null,
+        process: null,
+        instancesPath: null,
         actions: [],
         access: noteAccess,
       },
@@ -170,6 +175,26 @@ const pages: Record<string, PageMetadata> = {
         dataSource: null,
         form: null,
         tasksPath,
+        process: null,
+        instancesPath: null,
+        actions: [],
+        access: null,
+      },
+    ],
+  },
+  inspector: {
+    name: 'Inspector',
+    titleKey: 'pages.inspector.title',
+    widgets: [
+      {
+        type: 'processInspector',
+        formPage: null,
+        entity: null,
+        dataSource: null,
+        form: null,
+        tasksPath: null,
+        process: 'NoteReview',
+        instancesPath,
         actions: [],
         access: null,
       },
@@ -520,6 +545,20 @@ describe('App', () => {
     }
     const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
     expect(requested.filter((url) => url.startsWith(tasksPath))).toEqual([])
+  })
+
+  it('shows the not-found page for new or a malformed id under a process inspector page, and requests no instance', async () => {
+    stubServer()
+
+    for (const path of ['/e2e/inspector/new', '/e2e/inspector/not-an-id']) {
+      const { unmount } = renderApp(path)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
+      unmount()
+    }
+    const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(requested.filter((url) => url.startsWith(instancesPath))).toEqual([])
   })
 
   it('shows the not-found page in the platform shell for an unknown site', async () => {

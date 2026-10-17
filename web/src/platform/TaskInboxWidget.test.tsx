@@ -19,6 +19,8 @@ const inboxWidget: WidgetMetadata = {
   dataSource: null,
   form: null,
   tasksPath,
+  process: null,
+  instancesPath: null,
   actions: [],
   access: null,
 }

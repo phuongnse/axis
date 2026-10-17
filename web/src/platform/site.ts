@@ -163,19 +163,24 @@ export interface WidgetAccess {
  * widget shows all records of an entity, or the rows of a data source. `formPage` is set only on a
  * table that names the page holding its form. `form` is set only on a form widget that names a form,
  * and `entity` is then the form's entity with every field. A task inbox has neither an entity nor a
- * data source, and lists the signed-in user's tasks from `tasksPath`.
+ * data source, and lists the signed-in user's tasks from `tasksPath`. A process inspector has neither,
+ * and lists the instances of its `process` from `instancesPath`.
  */
 export interface WidgetMetadata {
-  type: 'table' | 'form' | 'taskInbox'
+  type: 'table' | 'form' | 'taskInbox' | 'processInspector'
   formPage: string | null
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null
   /** The task API path on a task inbox, and `null` on every other widget. */
   tasksPath: string | null
+  /** The process a process inspector inspects, and `null` on every other widget. */
+  process: string | null
+  /** The inspection API's instance list path on a process inspector, and `null` on every other widget. */
+  instancesPath: string | null
   /** The actions of a form widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
-  /** What the user may do with a table or form widget's entity, and `null` on a task inbox. */
+  /** What the user may do with a table or form widget's entity, and `null` on a task inbox and a process inspector. */
   access: WidgetAccess | null
 }
 

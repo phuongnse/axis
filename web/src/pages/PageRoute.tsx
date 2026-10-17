@@ -2,6 +2,8 @@ import { PageContainer } from '@ant-design/pro-components'
 import { useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
+import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
+import { ProcessInstancePage } from '../platform/ProcessInstancePage'
 import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
@@ -103,6 +105,23 @@ function SitePage({ sitePath, name, locale, fallbackLocale, form, recordId, retu
       </PageContainer>
     )
   }
+  // An instance's address is under its inspector page. `new` and an id in the wrong form are no instance.
+  if (widget?.type === 'processInspector' && form !== undefined) {
+    if (recordId === null || !recordIdPattern.test(recordId)) {
+      return <NotFoundPage />
+    }
+    return (
+      <PageContainer title={t(page.titleKey)}>
+        <ProcessInstancePage
+          sitePath={sitePath}
+          widget={widget}
+          instanceId={recordId}
+          locale={locale}
+          fallbackLocale={fallbackLocale}
+        />
+      </PageContainer>
+    )
+  }
   // A table page has no record segment, and a form page always has one.
   const isForm = widget?.type === 'form'
   if (isForm !== (form !== undefined) || (recordId !== null && !recordIdPattern.test(recordId))) {
@@ -122,6 +141,9 @@ function SitePage({ sitePath, name, locale, fallbackLocale, form, recordId, retu
           locale={locale}
           fallbackLocale={fallbackLocale}
         />
+      )}
+      {widget?.type === 'processInspector' && (
+        <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
       )}
     </PageContainer>
   )

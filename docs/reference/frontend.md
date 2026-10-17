@@ -248,7 +248,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
-  | `/{site}/{inspectorpage}/{instanceId}` *(planned for M7)* | the instance page of the process instance with that id, under the page of a process inspector |
+  | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector |
 
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
@@ -731,30 +731,40 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `process` and an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
     the list endpoint. The SPA never builds the path itself. *(Planned for
-    M7.)* It uses `process` to link the record history to the page, see
+    M7.)* It will use `process` to link the record history to the page, see
     **History** under the form widget. The widget has `"access": null` and
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.
-  - *(planned for M7)* **List.** The page lists the instances with their state, step, subject id,
-    release and times. `state` and `page` and `pageSize` live in the URL, as
-    for a table. Rows keep the API's order, newest first.
-  - *(planned for M7)* **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
-    page name in lower case. The page reads the instance detail and shows the
-    graph with the path drawn on it: steps the instance has run are marked,
-    and the step it is at is marked as current. Below it are the tasks and the
-    calls with their attempts. A call whose `inputHidden` is `true` shows
-    "hidden" in place of its input.
-  - *(planned for M7)* **Labels.** Step labels come from the texts of the instance's `releaseId`,
+  - **List.** The page lists the instances with their state, step, subject id,
+    release and times. Rows keep the API's order, newest first. A clearable
+    select above the list filters by state, and offers the five states with
+    platform texts. `state`, `page` and `pageSize` live in the URL, as for a
+    table. Changing the state goes back to page 1. A `state` in the URL that is
+    not one of the five is dropped. The step column shows the step's name,
+    because a list row carries no label key. Each row has an Open link.
+  - **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
+    page name in lower case. `new` and an id in the wrong form show the
+    not-found page, and the instance is not requested. The page reads the
+    instance detail and shows the steps as a list in graph order, each with
+    its type and its transitions, with no diagram. Steps the instance has run
+    are marked as taken, and the step it is at is marked as current, whatever
+    the instance state. Below it are the history rows with the step, the
+    times, the decision and the error, then the tasks, then the calls with
+    their attempts. A call whose `inputHidden` is `true` shows "hidden" in
+    place of its input. A shown input is a list of its top-level properties,
+    where a number keeps its source digits.
+  - **Labels.** Step labels come from the texts of the instance's `releaseId`,
     loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
     the inbox does. A step without a label shows its name.
-  - *(planned for M7)* **Errors.** With nobody signed in, the API answers `401` and the widget
+  - **Errors.** With nobody signed in, the API answers `401` and the widget
     starts sign-in like any other call. A `403` shows a message that the user
     may not inspect the process. A `404` on the instance page shows a message
-    that the instance does not exist. Any other failure shows a generic load
-    error. The server checks every request, so the page never decides who may
-    inspect.
-  - *(planned for M7)* The platform texts `shell.inspector.*` hold the column headers, the
-    "hidden" text, the empty text and the messages.
+    that the instance does not exist, inside the page. Any other failure shows
+    a generic load error. The server checks every request, so the page never
+    decides who may inspect.
+  - The platform texts `shell.inspector.*` hold the column headers, the
+    section titles, the instance states, the "hidden" text, the empty texts
+    and the messages.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

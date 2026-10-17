@@ -33,10 +33,11 @@ step's retry policy are built too. The capability limits of package operations a
 triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers). Process inspection, where
-authorized users see an instance's graph, path, tasks and calls, is partly
-built. The `inspect` grant, the instance list and the instance detail with its
-`calls` and the `sensitive` flag are built. The inspector widget is planned
-for M7, see [Process inspection](#process-inspection). Operator cancel
+authorized users see an instance's graph, path, tasks and calls, is built, except
+that the record history link to an instance is planned for M7. The `inspect`
+grant, the instance list, the instance detail with its `calls`, the
+`sensitive` flag and the inspector widget are built, see
+[Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
 resolve is built for connector and package calls,
 see [Operator commands](#operator-commands).
@@ -769,7 +770,8 @@ where an instance is, what it did and why it failed or waits. Two routes list
 the instances of a process and read one of them. The `inspect` grant and the
 [instance list](#instance-list) and the [instance detail](#instance-detail)
 are built, with the detail's `calls`. The `sensitive` flag, which hides more
-values, is built too. The widget is *(planned for M7)*.
+values, is built too. The widget is built. Only the record history link to an
+instance is *(planned for M7)*.
 The user is the user of the
 [session](../architecture.md#sign-in-and-the-session). The
 [process inspector widget](frontend.md) shows the same data.

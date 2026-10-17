@@ -47,6 +47,8 @@ const noteWidget: EntityWidgetMetadata = {
   dataSource: null,
   form: null,
   tasksPath: null,
+  process: null,
+  instancesPath: null,
   actions: [],
   access: everyAction,
   entity: {
@@ -79,6 +81,8 @@ const noteListWidget: WidgetMetadata = {
   entity: null,
   form: null,
   tasksPath: null,
+  process: null,
+  instancesPath: null,
   actions: [],
   access: everyAction,
   dataSource: {
@@ -320,6 +324,8 @@ describe('TableWidget', () => {
       entity: null,
       form: null,
       tasksPath: null,
+      process: null,
+      instancesPath: null,
       actions: [],
       access: everyAction,
       dataSource: {
@@ -462,6 +468,8 @@ describe('TableWidget', () => {
       dataSource: null,
       form: null,
       tasksPath: null,
+      process: null,
+      instancesPath: null,
       actions: [],
       access: everyAction,
     })

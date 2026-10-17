@@ -40,6 +40,8 @@ const noteWidget: EntityWidgetMetadata = {
   dataSource: null,
   form: null,
   tasksPath: null,
+  process: null,
+  instancesPath: null,
   actions: [],
   access: null,
   entity: {
