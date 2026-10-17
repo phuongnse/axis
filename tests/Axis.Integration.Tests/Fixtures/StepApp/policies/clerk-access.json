@@ -1,0 +1,12 @@
+{
+  "id": "0d22c6ef-08ee-45a3-a9d5-81e3b7580b91",
+  "kind": "policy",
+  "name": "ClerkAccess",
+  "formatVersion": 1,
+  "roles": ["clerk"],
+  "grants": [
+    { "entity": "Request", "actions": ["read"], "fields": ["title", "amount", "department"] },
+    { "entity": "Department", "actions": ["read"], "fields": ["name"] },
+    { "process": "DepartmentOrder", "actions": ["inspect"] }
+  ]
+}
