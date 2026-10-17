@@ -26,7 +26,7 @@ namespace Axis.Integration.Tests;
 /// migrations applied and the StepApp fixture activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. The test authentication scheme signs in
 /// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, <c>rita</c>, who holds
-/// <c>reviewer</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
+/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
 /// a test runs the work items that create tasks itself.
 /// </summary>
@@ -90,6 +90,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 new TestIdentity("maria", "Maria Manager", "finance"),
                 new TestIdentity("fiona", "Fiona Finance", "finance"),
                 new TestIdentity("rita", "Rita Reviewer", "reviewer"),
+                new TestIdentity("ines", "Ines Inspector", "inspector"),
                 new TestIdentity("otto", "Otto Other", "employee"));
         });
 

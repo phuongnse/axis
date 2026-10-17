@@ -1,0 +1,13 @@
+{
+  "id": "c4a8e2d6-1f3b-4975-8e0c-6b9d7a5f3e21",
+  "kind": "policy",
+  "name": "InspectorAccess",
+  "formatVersion": 1,
+  "roles": ["inspector"],
+  "grants": [
+    { "entity": "Request", "actions": ["read"], "filter": "department is null" },
+    { "process": "RoleApprove", "actions": ["inspect"] },
+    { "process": "Break", "actions": ["inspect"] },
+    { "process": "Divide", "actions": ["inspect"] }
+  ]
+}
