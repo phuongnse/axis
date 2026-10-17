@@ -182,31 +182,7 @@ public static class ReleaseActivator
                 continue;
             }
 
-            var fields = new Dictionary<Guid, IReadOnlySet<string>>();
-            foreach (var resource in stored.Resources)
-            {
-                using var document = JsonDocument.Parse(resource.Content);
-                var root = document.RootElement;
-                if (root.TryGetProperty("kind", out var kind) && kind.GetString() == "entity"
-                    && root.TryGetProperty("id", out var entityId) && Guid.TryParse(entityId.GetString(), out var parsedId))
-                {
-                    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    if (root.TryGetProperty("fields", out var entityFields) && entityFields.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var field in entityFields.EnumerateArray())
-                        {
-                            if (field.ValueKind == JsonValueKind.Object
-                                && field.TryGetProperty("name", out var name) && name.GetString() is { } fieldName)
-                            {
-                                names.Add(fieldName);
-                            }
-                        }
-                    }
-
-                    fields[parsedId] = names;
-                }
-            }
-
+            var fields = ReleaseColumns.FieldsByEntityId(stored);
             work.Add(new OldReleaseWork(id, count, fields));
         }
 

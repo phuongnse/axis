@@ -1,10 +1,14 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
+using Axis.Data;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -30,6 +34,12 @@ public enum ProcessRetryOutcome
     /// checked against it. Nothing was written.
     /// </summary>
     PendingFilter,
+
+    /// <summary>
+    /// An applied <c>renameField</c>, <c>dropField</c>, <c>dropEntity</c> or <c>convert</c> changed a column that the
+    /// instance's pinned release uses, so old steps could run against a changed table. Nothing was written.
+    /// </summary>
+    MigrationChanged,
 }
 
 /// <summary>
@@ -46,7 +56,9 @@ public sealed record ProcessRetryResult(ProcessRetryOutcome Outcome, Guid? Relea
 /// retry is refused first, before the instance is found. The instance keeps its pinned release and its step. It gets the next revision and no end
 /// time, and a <c>process.step</c> work item runs the step again with the record as it is then.
 /// Another <c>running</c> or <c>waiting</c> instance for the same record refuses the retry, which
-/// the explicit check and the unique index on active instances both catch. A history row with
+/// the explicit check and the unique index on active instances both catch. A migration applied since the
+/// pinned release that changed a column the release uses refuses it too, before anything is written.
+/// A pinned release whose stored content is missing counts as using every column. A history row with
 /// output <c>{ "command": "retry" }</c> and the audit record <c>process.retried</c> are written.
 /// The command never commits or rolls back. A result other than <see cref="ProcessRetryOutcome.Retried"/>
 /// may have locked rows, and an <see cref="ProcessRetryOutcome.AlreadyRunning"/> from the unique index
@@ -113,6 +125,15 @@ public static class ProcessRetryCommand
             return new ProcessRetryResult(ProcessRetryOutcome.AlreadyRunning);
         }
 
+        // A failed instance never blocks a destructive migration, so the migrations applied since its release
+        // are checked before old steps run again. The start lock of the caller keeps an activation from committing in between.
+        if (RetryMigrationCheck.Blocks(
+            await AppliedMigrationColumns.ReadAsync(transaction, instance.ApplicationId, cancellationToken),
+            await ReadPinnedReleaseAsync(connection, transaction, instance.ReleaseId, cancellationToken)))
+        {
+            return new ProcessRetryResult(ProcessRetryOutcome.MigrationChanged);
+        }
+
         long revision;
         try
         {
@@ -167,6 +188,20 @@ public static class ProcessRetryCommand
             cancellationToken);
 
         return new ProcessRetryResult(ProcessRetryOutcome.Retried, ReleaseId: instance.ReleaseId, SubjectId: instance.SubjectId);
+    }
+
+    // Null when the stored release is gone.
+    private static async Task<Release?> ReadPinnedReleaseAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid releaseId,
+        CancellationToken cancellationToken)
+    {
+        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>()
+            .UseNpgsql(connection)
+            .Options);
+        await configuration.Database.UseTransactionAsync(transaction, cancellationToken);
+        return await new ActiveReleaseStore(configuration).GetReleaseAsync(releaseId, cancellationToken);
     }
 
     private static async Task<LockedInstance?> LockInstanceAsync(NpgsqlTransaction transaction, Guid instanceId, CancellationToken cancellationToken)

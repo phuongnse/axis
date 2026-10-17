@@ -842,6 +842,7 @@ records a migration only when activation commits. The table has an index on
 | `release_id` | `uuid` | The release that applied the migration |
 | `content_hash` | `varchar(64)` | SHA-256 of the file's canonical JSON as lower-case hex, without its path |
 | `applied_at` | `timestamptz` | When the migration was applied |
+| `changed_columns` | `jsonb`, null | The columns the migration changed, as `[{ entityId, field }]`; null for rows applied before it was recorded |
 
 ### Example: renaming a field while a task waits
 
@@ -885,7 +886,7 @@ These limits apply to migrations.
   `sending` or `unknown` must settle or be
   [resolved](processes.md#resolve) *(planned for M7)* first. A `failed`
   instance does not block the migration, and a [retry](processes.md#retry)
-  *(planned for M7)* of one is refused when the migration changed a column it
+  of one is refused when the migration changed a column it
   uses. There is no way to pause starts yet.
 - A record API create or update takes the start lock and runs again on the new
   release when the active release changed. A list, a read, a history or a

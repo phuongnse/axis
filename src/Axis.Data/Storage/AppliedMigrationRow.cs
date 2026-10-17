@@ -16,4 +16,10 @@ public sealed class AppliedMigrationRow
     public required string ContentHash { get; init; }
 
     public required DateTimeOffset AppliedAt { get; init; }
+
+    /// <summary>
+    /// The columns the migration changed, as a JSON array of <see cref="ChangedColumn"/>. It is <see langword="null"/>
+    /// for a row applied before the columns were recorded.
+    /// </summary>
+    public string? ChangedColumns { get; init; }
 }

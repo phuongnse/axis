@@ -72,6 +72,7 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             migration.Property(m => m.ReleaseId).HasColumnName("release_id");
             migration.Property(m => m.ContentHash).HasColumnName("content_hash").HasMaxLength(64);
             migration.Property(m => m.AppliedAt).HasColumnName("applied_at");
+            migration.Property(m => m.ChangedColumns).HasColumnName("changed_columns").HasColumnType("jsonb");
             migration.HasIndex(m => m.ApplicationId).HasDatabaseName("ix_applied_migrations_application_id");
         });
 

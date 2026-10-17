@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
@@ -219,6 +220,7 @@ public static class EntityProvisioner
                 ReleaseId = migrations.ReleaseId,
                 ContentHash = migration.ContentHash,
                 AppliedAt = appliedAt,
+                ChangedColumns = ChangedColumnsJson(plan.DestructiveChanges, migration),
             }));
             await context.SaveChangesAsync(cancellationToken);
 
@@ -412,7 +414,7 @@ public static class EntityProvisioner
         {
             foreach (var release in oldReleases)
             {
-                var blocks = changes.Any(change => change.Migration.Id == migration.Id && Blocks(change, release));
+                var blocks = changes.Any(change => change.Migration.Id == migration.Id && ReleaseColumns.Uses(release.FieldsByEntityId, change.EntityId, change.Field));
                 if (blocks)
                 {
                     diagnostics.Add(new Diagnostic(
@@ -428,9 +430,11 @@ public static class EntityProvisioner
         return DiagnosticOrder.Sort(diagnostics);
     }
 
-    private static bool Blocks(DestructiveChange change, OldReleaseWork release) =>
-        release.FieldsByEntityId is not { } entities
-        || (entities.TryGetValue(change.EntityId, out var fields) && (change.Field is null || fields.Contains(change.Field)));
+    // The columns the migration changed, which a retry of an older process instance reads back.
+    private static string ChangedColumnsJson(IReadOnlyList<DestructiveChange> changes, MigrationModel migration) =>
+        JsonSerializer.Serialize(
+            changes.Where(change => change.Migration.Id == migration.Id).Select(change => new ChangedColumn(change.EntityId, change.Field)),
+            ChangedColumn.JsonOptions);
 
     private static ProvisioningResult ConvertFailed(ConvertTarget convert, string message) =>
         new(

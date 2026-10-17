@@ -145,22 +145,23 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
     /// <summary>
     /// Inserts a request of <paramref name="tenant"/> titled <see cref="RequestTitle"/> with an
-    /// optional <paramref name="department"/> and <paramref name="divisor"/>, and returns its id. The id is
+    /// optional <paramref name="department"/>, <paramref name="divisor"/> and <paramref name="amount"/>, and returns its id. The id is
     /// <paramref name="id"/>, or a new one.
     /// </summary>
-    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null)
+    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null, decimal? amount = null)
     {
         Assert.True(Model.TryGetEntity("Request", out var request));
         var requestId = id ?? Guid.NewGuid();
         await using var command = DataSource(tenant).CreateCommand(
             $"""
-            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("department")}, {Column("divisor")})
-            VALUES (@id, @title, @department, @divisor)
+            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("department")}, {Column("divisor")}, {Column("amount")})
+            VALUES (@id, @title, @department, @divisor, @amount)
             """);
         command.Parameters.AddWithValue("id", requestId);
         command.Parameters.AddWithValue("title", RequestTitle(requestId));
         command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("divisor", NpgsqlDbType.Bigint) { Value = (object?)divisor ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("amount", NpgsqlDbType.Numeric) { Value = (object?)amount ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
         return requestId;
     }
@@ -422,12 +423,13 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// release, with <paramref name="edit"/> applied to each file. It gets the file's path relative
     /// to the folder and its content, and returns the new content, or null to leave the file out.
     /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
-    /// more to the backfill. Returns the new release's id.
+    /// more to the backfill. The files in <paramref name="added"/>, by relative path, are added to the folder. Returns the new release's id.
     /// </summary>
     public async Task<Guid> ActivateEditedAsync(
         string tenant,
         Func<string, string, string?> edit,
-        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
+        IReadOnlyDictionary<string, string>? added = null)
     {
         using var folder = new TemporaryFolder();
         foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
@@ -437,6 +439,11 @@ public sealed class TaskApiFixture : IAsyncLifetime
             {
                 folder.With(path, content);
             }
+        }
+
+        foreach (var (path, content) in added ?? new Dictionary<string, string>())
+        {
+            folder.With(path, content);
         }
 
         await using var connection = new NpgsqlConnection(_tenants[tenant].ConnectionString);
