@@ -46,4 +46,7 @@ public sealed class WorkItemRow
 
     /// <summary>The last record id a <c>trigger.fanOut</c> item handled, or <see langword="null"/> before its first batch.</summary>
     public Guid? Cursor { get; init; }
+
+    /// <summary>The entity a <c>computed.backfill</c> item recomputes, or <see langword="null"/> for other work.</summary>
+    public Guid? EntityId { get; init; }
 }

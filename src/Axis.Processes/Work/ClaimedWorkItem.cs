@@ -11,6 +11,7 @@ namespace Axis.Processes.Work;
 /// <param name="OccurrenceAt">The occurrence a <c>trigger.fanOut</c> item runs, or <see langword="null"/> for other work.</param>
 /// <param name="Cursor">The last record id a <c>trigger.fanOut</c> item handled, or <see langword="null"/> before its first batch and for other work.</param>
 /// <param name="Lease">The length the item was claimed for.</param>
+/// <param name="EntityId">The entity a <c>computed.backfill</c> item recomputes, or <see langword="null"/> for other work.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
     string TenantId,
@@ -25,4 +26,5 @@ public sealed record ClaimedWorkItem(
     Guid? ReleaseId,
     DateTimeOffset? OccurrenceAt,
     Guid? Cursor,
-    TimeSpan Lease);
+    TimeSpan Lease,
+    Guid? EntityId);

@@ -31,11 +31,30 @@ namespace Axis.Data;
 /// </summary>
 public static class ReleaseActivator
 {
+    /// <summary>The default most rows of one entity that activation recomputes inline.</summary>
+    public const int DefaultInlineRecomputeLimit = 10_000;
+
+    /// <summary>
+    /// Activates the release in <paramref name="compiled"/> with the default inline recompute limit,
+    /// <see cref="DefaultInlineRecomputeLimit"/> rows. See the overload with a limit.
+    /// </summary>
+    public static Task<ActivationResult> ActivateAsync(
+        ReleaseCompilationResult compiled,
+        IActiveReleaseStore store,
+        DataDbContext data,
+        ActivationBindings bindings,
+        IOpenInstanceCounter openInstances,
+        CancellationToken cancellationToken = default) =>
+        ActivateAsync(compiled, store, data, bindings, openInstances, DefaultInlineRecomputeLimit, cancellationToken);
+
     /// <summary>
     /// Activates the release in <paramref name="compiled"/>, which must have a release and a model
     /// with the same application id, for the tenant whose deployment bindings are
     /// <paramref name="bindings"/>. <paramref name="openInstances"/> counts the process instances that are
-    /// still open on the other releases of the application. Call it outside an explicit transaction.
+    /// still open on the other releases of the application. When a changed computed definition, or a migration
+    /// <c>fill</c> or <c>convert</c>, affects more than <paramref name="inlineRecomputeLimit"/> rows of an entity,
+    /// activation marks the entity pending and queues a <c>computed.backfill</c> work item instead of recomputing
+    /// the rows. Call it outside an explicit transaction.
     /// </summary>
     public static async Task<ActivationResult> ActivateAsync(
         ReleaseCompilationResult compiled,
@@ -43,6 +62,7 @@ public static class ReleaseActivator
         DataDbContext data,
         ActivationBindings bindings,
         IOpenInstanceCounter openInstances,
+        int inlineRecomputeLimit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(compiled);
@@ -100,6 +120,8 @@ public static class ReleaseActivator
                 await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)))
         {
             ReadActiveComputedFingerprintsAsync = token => ReadActiveComputedFingerprintsAsync(store, manifest.Id, token),
+            InlineRecomputeLimit = inlineRecomputeLimit,
+            TenantId = bindings.TenantId,
         };
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
         return new ActivationResult(provisioned.Diagnostics);

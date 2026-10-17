@@ -42,6 +42,15 @@ public sealed record MigrationContext(
     /// </summary>
     public Func<CancellationToken, Task<ActiveComputedFingerprints>>? ReadActiveComputedFingerprintsAsync { get; init; }
 
+    /// <summary>
+    /// The most rows of one entity that provisioning recomputes inside the activation transaction. An entity with
+    /// more affected rows is marked pending and queued for the worker to backfill in batches.
+    /// </summary>
+    public int InlineRecomputeLimit { get; init; } = ReleaseActivator.DefaultInlineRecomputeLimit;
+
+    /// <summary>The tenant whose database is activated. A pending recompute queues its work item for it.</summary>
+    public string? TenantId { get; init; }
+
     /// <summary>No release, no stored entities and no active release write.</summary>
     public static MigrationContext None { get; } = new(
         Guid.Empty,

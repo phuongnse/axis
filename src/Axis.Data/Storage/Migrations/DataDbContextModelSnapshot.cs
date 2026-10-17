@@ -144,6 +144,40 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("computed_field_errors", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.PendingComputedFieldRow", b =>
+                {
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.PrimitiveCollection<Guid[]>("CurrentReleaseIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("current_release_ids");
+
+                    b.PrimitiveCollection<string[]>("Fields")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("fields");
+
+                    b.Property<Guid>("TargetReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_release_id");
+
+                    b.HasKey("EntityId")
+                        .HasName("pk_pending_computed_fields");
+
+                    b.ToTable("pending_computed_fields", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.ProvisionedEntityRow", b =>
                 {
                     b.Property<Guid>("EntityId")

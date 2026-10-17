@@ -2464,9 +2464,9 @@ database, with history in `axis.__processes_migrations` (see
     Its item also has the `trigger_id`, the `release_id` that was active at
     the occurrence and the `occurrence_at` time. Its `cursor` is the last
     record id it handled, and is null before its first batch.
-  - `computed.backfill` *(planned for M7)* recomputes the out-of-date rows of
+  - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
-    batch. See
+    batch of up to 500 rows. See
     [Recomputing computed fields](storage.md#recomputing-computed-fields).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key.

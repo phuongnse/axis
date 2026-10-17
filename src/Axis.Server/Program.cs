@@ -1,4 +1,5 @@
 using Axis.Configuration.Packages;
+using Axis.Data;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
 using Axis.Server.Applications;
@@ -60,7 +61,8 @@ builder.Services.AddSingleton(new StartupActivationStatus(finished: startupFolde
 if (startupFolders.Length > 0)
 {
     builder.Services.AddSingleton(new StartupActivationOptions(
-        [.. startupFolders.Select(folder => Path.GetFullPath(folder, builder.Environment.ContentRootPath))]));
+        [.. startupFolders.Select(folder => Path.GetFullPath(folder, builder.Environment.ContentRootPath))],
+        builder.Configuration.GetValue("Activation:InlineRecomputeLimit", ReleaseActivator.DefaultInlineRecomputeLimit)));
     builder.Services.AddHostedService<StartupActivation>();
 }
 

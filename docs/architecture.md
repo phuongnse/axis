@@ -32,7 +32,7 @@ flowchart LR
   events. Wait for event, timer and sub-process steps come later. It
   delivers raised events to async event triggers, see
   [events and triggers](reference/processes.md#events-and-triggers). It also
-  runs the backfill of pending computed fields *(planned for M7)*, see
+  runs the backfill of pending computed fields, see
   [recomputing computed fields](reference/storage.md#recomputing-computed-fields).
   It runs the occurrences of schedule triggers and their fan-out over the records
   of the trigger's data source, see [schedules](reference/processes.md#schedules).

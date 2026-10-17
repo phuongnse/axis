@@ -191,7 +191,7 @@ public static class EntityProvisioner
 
             if (migrations.ReadActiveComputedFingerprintsAsync is { } readActiveFingerprints)
             {
-                await RecomputeChangedEntitiesAsync(model, migrations.ReleaseId, plan.RecomputedEntityIds, await readActiveFingerprints(cancellationToken), connection, npgsqlTransaction, cancellationToken);
+                await RecomputeChangedEntitiesAsync(model, migrations, plan.RecomputedEntityIds, await readActiveFingerprints(cancellationToken), connection, npgsqlTransaction, cancellationToken);
             }
 
             foreach (var change in plan.RecordChanges)
@@ -250,19 +250,25 @@ public static class EntityProvisioner
     // every entity, which costs nothing on tables that are new. Activating the active release again recomputes nothing,
     // even when it stored no fingerprints, so a restart does not recompute every table. Then it recomputes the rows
     // with a cleared stamp in each entity that a fill or convert touched, except an entity it just recomputed whole.
+    // An entity with more affected rows than the inline limit is not recomputed here. It is marked pending, and the
+    // worker backfills it. The affected rows of a changed entity are all its rows, and those of a fill or convert
+    // are the rows left with no stamp.
     private static async Task RecomputeChangedEntitiesAsync(
         ApplicationModel model,
-        Guid releaseId,
+        MigrationContext migrations,
         IReadOnlyList<Guid> migratedEntityIds,
         ActiveComputedFingerprints active,
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         CancellationToken cancellationToken)
     {
+        var releaseId = migrations.ReleaseId;
+        var limit = migrations.InlineRecomputeLimit;
+        var fingerprints = ComputedFingerprints.Compute(model);
         var recomputed = new HashSet<Guid>();
         if (active.ActiveReleaseId != releaseId)
         {
-            foreach (var (entityId, fingerprint) in ComputedFingerprints.Compute(model))
+            foreach (var (entityId, fingerprint) in fingerprints)
             {
                 if (active.Fingerprints.TryGetValue(entityId, out var current) && current == fingerprint)
                 {
@@ -270,19 +276,66 @@ public static class EntityProvisioner
                 }
 
                 var entity = model.FindEntity(entityId) ?? throw new InvalidOperationException("The model has no entity for its fingerprint.");
-                await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
+                if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: false, cancellationToken) <= limit)
+                {
+                    await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
+                }
+                else
+                {
+                    await MarkPendingAsync(connection, transaction, model, migrations, entity, fingerprint, cancellationToken);
+                }
+
                 recomputed.Add(entityId);
             }
         }
 
         foreach (var entityId in migratedEntityIds)
         {
-            if (!recomputed.Contains(entityId) && model.FindEntity(entityId) is { } entity)
+            if (recomputed.Contains(entityId) || model.FindEntity(entityId) is not { } entity)
+            {
+                continue;
+            }
+
+            if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: true, cancellationToken) <= limit)
             {
                 await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken, unstampedOnly: true);
             }
+            else
+            {
+                await MarkPendingAsync(connection, transaction, model, migrations, entity, fingerprints[entityId], cancellationToken);
+            }
         }
     }
+
+    private static async Task<long> CountRowsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        EntityModel entity,
+        bool unstampedOnly,
+        CancellationToken cancellationToken)
+    {
+        var unstamped = unstampedOnly ? $" WHERE {EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} IS NULL" : "";
+        await using var count = new NpgsqlCommand($"SELECT count(*) FROM {RecordQueries.Table(entity)}{unstamped}", connection, transaction);
+        return (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    private static Task MarkPendingAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ApplicationModel model,
+        MigrationContext migrations,
+        EntityModel entity,
+        string fingerprint,
+        CancellationToken cancellationToken) =>
+        ComputedBackfill.MarkPendingAsync(
+            connection,
+            transaction,
+            migrations.TenantId ?? throw new InvalidOperationException("The migration context names no tenant, so a pending recompute cannot queue its work."),
+            model,
+            entity,
+            migrations.ReleaseId,
+            fingerprint,
+            cancellationToken);
 
     // One diagnostic per migration and release. A release blocks a change when its stored model has the changed
     // column, or when its stored model is gone, since nothing then shows that it does not use the column.
