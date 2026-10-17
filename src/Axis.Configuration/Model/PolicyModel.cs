@@ -43,7 +43,7 @@ public sealed record GrantModel(
 /// <summary>
 /// What a grant allows. An entity grant takes <see cref="Read"/>, <see cref="Create"/>,
 /// <see cref="Update"/> and <see cref="Delete"/>, a data source grant <see cref="Read"/>, a
-/// process grant <see cref="Start"/> and <see cref="Inspect"/>, and an endpoint grant
+/// process grant <see cref="Start"/>, <see cref="Inspect"/> and <see cref="Cancel"/>, and an endpoint grant
 /// <see cref="Invoke"/>.
 /// </summary>
 public enum PolicyAction
@@ -55,4 +55,5 @@ public enum PolicyAction
     Start,
     Invoke,
     Inspect,
+    Cancel,
 }

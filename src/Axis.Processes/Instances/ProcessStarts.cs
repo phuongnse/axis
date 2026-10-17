@@ -41,6 +41,9 @@ public static class ProcessStarts
     /// <summary>The state of an instance whose step failed. The error is in its history.</summary>
     public const string Failed = "failed";
 
+    /// <summary>The state of an instance that an operator cancelled. It does not block a new start.</summary>
+    public const string Cancelled = "cancelled";
+
     /// <summary>The partial unique index that allows one running or waiting instance per process and record.</summary>
     internal const string ActiveSubjectIndex = "ux_process_instances_active_subject";
 

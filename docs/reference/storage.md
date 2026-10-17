@@ -869,13 +869,14 @@ These limits apply to migrations.
   batches.
 - Process starts for the application wait while activation holds the
   exclusive start lock. A long fill delays them.
-- Old work must finish before a destructive migration can run. *(Planned for
-  M7.)* An operator can drain it by cancelling the `running` and `waiting`
-  old-release instances, see [Cancel](processes.md#cancel). A call that is
+- Old work must finish before a destructive migration can run. An operator
+  can drain it by cancelling the `running` and `waiting` old-release
+  instances, see [Cancel](processes.md#cancel). A call that is
   `sending` or `unknown` must settle or be
-  [resolved](processes.md#resolve) first. A `failed` instance does not block
-  the migration, and a [retry](processes.md#retry) of one is refused when the
-  migration changed a column it uses. There is no way to pause starts yet.
+  [resolved](processes.md#resolve) *(planned for M7)* first. A `failed`
+  instance does not block the migration, and a [retry](processes.md#retry)
+  *(planned for M7)* of one is refused when the migration changed a column it
+  uses. There is no way to pause starts yet.
 - A record API create or update takes the start lock and runs again on the new
   release when the active release changed. A list, a read, a history or a
   delete that resolved the previous release just before the commit can still

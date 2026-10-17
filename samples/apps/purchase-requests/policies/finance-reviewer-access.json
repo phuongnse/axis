@@ -9,6 +9,7 @@
     { "entity": "Department", "actions": ["read"] },
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+    { "dataSource": "RequestsByDepartment", "actions": ["read"] },
+    { "process": "PurchaseRequestApproval", "actions": ["cancel"] }
   ]
 }

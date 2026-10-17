@@ -4,6 +4,7 @@ using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
+using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.PurchasingStub;
 using Axis.Server.Tests;
@@ -151,6 +152,25 @@ public sealed class SampleAppFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Claims and runs the tenant's due <c>process.step</c> work items until none is left or <paramref name="limit"/>
+    /// have run, and returns how many it ran. A staged connector call is not sent, because its work item is of another kind.
+    /// </summary>
+    public async Task<int> RunStepsUntilIdleAsync(CancellationToken cancellationToken, int limit = int.MaxValue)
+    {
+        var runner = (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        await using var connection = await OpenConnectionAsync();
+        var ran = 0;
+        while (ran < limit
+            && await WorkItemQueue.ClaimAsync(connection, Tenant, [ProcessStarts.StepWorkItemKind], _lease, cancellationToken) is { } item)
+        {
+            await runner.ExecuteAsync(item, cancellationToken);
+            ran++;
+        }
+
+        return ran;
+    }
+
+    /// <summary>
     /// Starts a worker host for the tenant, with a two second lease, that logs to <paramref name="logs"/>.
     /// The caller stops and disposes it.
     /// </summary>
@@ -228,6 +248,10 @@ public sealed class SampleAppFixture : IAsyncLifetime
     /// <summary>Completes the task <paramref name="taskId"/> with the JSON <paramref name="body"/>. The caller disposes the response.</summary>
     public static Task<HttpResponseMessage> CompleteAsync(HttpClient client, Guid taskId, string body) =>
         SendAsync(client, HttpMethod.Post, $"{App}/tasks/{taskId:D}/complete", body);
+
+    /// <summary>Cancels the approval instance <paramref name="instanceId"/> with the JSON <paramref name="body"/>. The caller disposes the response.</summary>
+    public static Task<HttpResponseMessage> CancelAsync(HttpClient client, Guid instanceId, string body) =>
+        SendAsync(client, HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instanceId:D}/cancel", body);
 
     /// <summary>The request's number and purchase order number, read through the record API.</summary>
     public static async Task<(string Number, string? PurchaseOrderNumber)> NumbersAsync(HttpClient client, Guid subject)
