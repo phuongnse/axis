@@ -47,7 +47,7 @@ public static class ProcessStarts
     /// <summary>The partial unique index that allows one running or waiting instance per process and record.</summary>
     internal const string ActiveSubjectIndex = "ux_process_instances_active_subject";
 
-    private const string UniqueViolation = "23505";
+    internal const string UniqueViolation = "23505";
 
     /// <summary>
     /// Stores a <c>201</c> receipt for <paramref name="key"/> unless one exists. Returns

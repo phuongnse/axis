@@ -24,7 +24,7 @@ internal static class PolicyChecker
 {
     private static readonly PolicyAction[] _entityActions = [PolicyAction.Read, PolicyAction.Create, PolicyAction.Update, PolicyAction.Delete];
     private static readonly PolicyAction[] _dataSourceActions = [PolicyAction.Read];
-    private static readonly PolicyAction[] _processActions = [PolicyAction.Start, PolicyAction.Inspect, PolicyAction.Cancel];
+    private static readonly PolicyAction[] _processActions = [PolicyAction.Start, PolicyAction.Inspect, PolicyAction.Cancel, PolicyAction.Retry];
     private static readonly PolicyAction[] _endpointActions = [PolicyAction.Invoke];
 
     /// <summary>
@@ -284,7 +284,8 @@ internal static class PolicyChecker
             "invoke" => PolicyAction.Invoke,
             "inspect" => PolicyAction.Inspect,
             "cancel" => PolicyAction.Cancel,
-            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, start, invoke, inspect and cancel."),
+            "retry" => PolicyAction.Retry,
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, start, invoke, inspect, cancel and retry."),
         };
 
     private static string Name(PolicyAction action) => action.ToString().ToLowerInvariant();
