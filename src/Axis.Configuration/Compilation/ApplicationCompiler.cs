@@ -1277,12 +1277,14 @@ public static class ApplicationCompiler
                     var entityName = widget.Entity ?? form?.Entity;
                     var entity = entityName is null ? null : entitiesByName[entityName];
                     var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
+                    var inspected = widget.Process is null ? null : processesByName[widget.Process];
                     return new WidgetModel(
                         WidgetTypes.Parse(widget.Type),
                         entity is null ? null : new EntityReference(entity.Id, entity.Name),
                         widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
                         dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
-                        form is null ? null : new FormReference(form.Id, form.Name))
+                        form is null ? null : new FormReference(form.Id, form.Name),
+                        inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
                     {
                         // Each action is named as its process declares it. A widget without
                         // actions keeps the shared empty list, so equal widgets stay equal.

@@ -1,0 +1,13 @@
+{
+  "id": "2f6b9d41-7a3c-4e58-8b10-9c4e5a7d1f01",
+  "kind": "site",
+  "name": "Processes",
+  "formatVersion": 1,
+  "path": "processes",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [
+    { "page": "Requests", "label": { "textKey": "nav.requests" } },
+    { "page": "Submissions", "label": { "textKey": "nav.submissions" } }
+  ]
+}

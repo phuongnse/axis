@@ -65,6 +65,8 @@ public static class ApplicationSites
             widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
             widget.Form is { } form ? DescribeForm(application, form.Name) : null,
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
+            widget.Process?.Name,
+            widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
             [.. widget.Actions.Select(action => new ActionMetadata(
                 "startProcess",
                 action.Process.Name,
@@ -74,7 +76,7 @@ public static class ApplicationSites
 
     /// <summary>
     /// The entity a table or form widget is about: its own entity, or the root entity of its data
-    /// source. Null on a task inbox.
+    /// source. Null on a task inbox and a process inspector.
     /// </summary>
     public static EntityModel? WidgetEntity(ApplicationModel application, WidgetModel widget)
     {

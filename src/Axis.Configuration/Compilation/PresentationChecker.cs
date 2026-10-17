@@ -145,6 +145,40 @@ internal static class PresentationChecker
                 continue;
             }
 
+            if (type == WidgetType.ProcessInspector)
+            {
+                // An inspector lists the instances of one process, so it binds no records and opens no form page.
+                foreach (var (property, value) in new[] { ("entity", widget.Entity), ("dataSource", widget.DataSource), ("form", widget.Form) })
+                {
+                    if (value is not null)
+                    {
+                        Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to process inspector widgets.", $"{path}/{property}");
+                    }
+                }
+
+                if (widget.FormPage is not null)
+                {
+                    Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
+                }
+
+                if (widget.Actions is not null)
+                {
+                    Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+                }
+
+                // The page schema requires the process on an inspector.
+                var processName = widget.Process!;
+                if (findProcess(processName) is null && !loaded.UnloadedProcessNames.Contains(processName))
+                {
+                    Report(
+                        DiagnosticCodes.UnknownWidgetProcess,
+                        $"The process '{processName}' was not found. No loaded process has that name.",
+                        $"{path}/process");
+                }
+
+                continue;
+            }
+
             if (!isForm && widget.Actions is not null)
             {
                 // An action starts a process for one record, which only a form shows.

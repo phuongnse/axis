@@ -24,10 +24,13 @@ public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<Wi
 /// for its records. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
 /// is then the form's entity, with every field the user may read, so a client knows the type of each
 /// field the form shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
+/// <see cref="Process"/> and <see cref="InstancesPath"/> are set only on a process inspector, which has no entity or data source either.
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
-/// <see cref="Access"/> is set on a table or form widget and null on a task inbox.
+/// <see cref="Access"/> is set on a table or form widget and null on a task inbox and a process inspector.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
+/// <param name="Process">The process an inspector inspects, by its declared name.</param>
+/// <param name="InstancesPath">The path of the process's instance list endpoint, so a client never builds it.</param>
 /// <param name="Actions">The buttons a form widget shows on a saved record, in page file order.</param>
 /// <param name="Access">
 /// What the user may do with the widget's entity, or with the root entity of its data source.
@@ -39,6 +42,8 @@ public sealed record WidgetMetadata(
     DataSourceMetadata? DataSource,
     FormMetadata? Form,
     string? TasksPath,
+    string? Process,
+    string? InstancesPath,
     IReadOnlyList<ActionMetadata> Actions,
     WidgetAccess? Access);
 

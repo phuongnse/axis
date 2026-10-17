@@ -5,8 +5,13 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "nav.requests": "Requests",
+    "nav.submissions": "Submissions",
+    "pages.requests.title": "Requests",
+    "pages.submissions.title": "Submissions",
     "request.cannotSubmit": "This request cannot be submitted.",
     "role.reader": "Reader",
-    "role.requester": "Requester"
+    "role.requester": "Requester",
+    "site.title": "Processes"
   }
 }

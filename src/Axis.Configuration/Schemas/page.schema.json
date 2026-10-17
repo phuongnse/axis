@@ -41,16 +41,24 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["table", "form", "taskInbox"] },
+        "type": { "enum": ["table", "form", "taskInbox", "processInspector"] },
         "entity": { "$ref": "#/$defs/name" },
         "dataSource": { "$ref": "#/$defs/name" },
         "form": { "$ref": "#/$defs/name" },
         "formPage": { "$ref": "#/$defs/name" },
+        "process": { "$ref": "#/$defs/name" },
         "actions": {
           "type": "array",
           "items": { "$ref": "#/$defs/action" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "processInspector" } } },
+          "then": { "required": ["process"] },
+          "else": { "properties": { "process": false } }
+        }
+      ]
     },
     "action": {
       "type": "object",
