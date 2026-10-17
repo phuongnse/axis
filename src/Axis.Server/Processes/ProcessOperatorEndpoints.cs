@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Unicode;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Policy;
@@ -38,11 +39,11 @@ namespace Axis.Server.Processes;
 /// When the active release is no longer the one resolved, the retry runs again from resolution on
 /// the new release, and answers 503 after three attempts. A retry that is refused writes nothing.
 /// A resolve at <c>POST /api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve</c>
-/// settles an <c>unknown</c> connector call of an instance that is <c>waiting</c> on the call's step, as
+/// settles an <c>unknown</c> connector or package call of an instance that is <c>waiting</c> on the call's step, as
 /// <c>succeeded</c> with its <c>output</c> or as <c>failed</c>. It is checked in the same order with the user's
 /// <c>resolve</c> grant, and its body is a <c>reason</c>, an <c>outcome</c> and, for <c>succeeded</c>, an
 /// <c>output</c> object. Then one transaction takes the start lock shared, as a retry does, and runs
-/// <see cref="ConnectorCallResolveCommand"/>. It answers 404 for a <c>callId</c> that is not a connector call of the
+/// <see cref="CallResolveCommand"/>. It answers 404 for a <c>callId</c> that is not a connector or package call of the
 /// instance, 409 for a call that is not unknown, 409 for an instance that is not waiting on the call's step, the same
 /// 409 for a <c>read</c> filter on a field that is being recomputed, and 400 for an output that does not fit the
 /// operation's declared outputs or a write the record refuses. A resolve that is refused writes nothing.
@@ -300,6 +301,7 @@ internal static class ProcessOperatorEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        PackageCatalog packages,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -311,7 +313,7 @@ internal static class ProcessOperatorEndpoints
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            if (await ResolveOnceAsync(app, process, id, callId, request, user, resolver, database, tenants, loggerFactory, cancellationToken) is { } result)
+            if (await ResolveOnceAsync(app, process, id, callId, request, user, resolver, database, tenants, packages, loggerFactory, cancellationToken) is { } result)
             {
                 return result;
             }
@@ -331,6 +333,7 @@ internal static class ProcessOperatorEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        PackageCatalog packages,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -389,7 +392,7 @@ internal static class ProcessOperatorEndpoints
             return null;
         }
 
-        var result = await ConnectorCallResolveCommand.ResolveAsync(
+        var result = await CallResolveCommand.ResolveAsync(
             connection,
             transaction,
             tenantId,
@@ -406,20 +409,21 @@ internal static class ProcessOperatorEndpoints
             body.Succeeded,
             body.Output,
             resolver.GetReleaseModelAsync,
+            packages,
             loggerFactory,
             cancellationToken);
-        if (result.Outcome != ConnectorCallResolveOutcome.Resolved)
+        if (result.Outcome != CallResolveOutcome.Resolved)
         {
             await transaction.RollbackAsync(cancellationToken);
             return result.Outcome switch
             {
-                ConnectorCallResolveOutcome.NotFound => InstanceNotFound(),
-                ConnectorCallResolveOutcome.CallNotFound => CallNotFound(),
-                ConnectorCallResolveOutcome.PendingFilter => Grants.PendingFilter(),
-                ConnectorCallResolveOutcome.NotUnknown => Results.Problem(
+                CallResolveOutcome.NotFound => InstanceNotFound(),
+                CallResolveOutcome.CallNotFound => CallNotFound(),
+                CallResolveOutcome.PendingFilter => Grants.PendingFilter(),
+                CallResolveOutcome.NotUnknown => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "The call's outcome is not unknown."),
-                ConnectorCallResolveOutcome.NotWaiting => Results.Problem(
+                CallResolveOutcome.NotWaiting => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "The instance is not waiting on the call's step."),
                 _ => Results.ValidationProblem(result.Errors!),

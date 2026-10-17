@@ -245,6 +245,27 @@ internal static class PackageCalls
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Settles the <c>unknown</c> call <paramref name="id"/> as <paramref name="state"/>, <c>succeeded</c>
+    /// or <c>failed</c>, by an operator's hand, at the transaction's time. Its stored input is cleared. Its
+    /// last error is kept, so inspection still shows what the last attempt ended with. Throws when the call
+    /// is not unknown.
+    /// </summary>
+    public static async Task ResolveAsync(NpgsqlTransaction transaction, Guid id, string state, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.package_calls SET state = @state, input = NULL, settled_at = now() WHERE id = @id AND state = @unknown",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        command.Parameters.AddWithValue("unknown", Unknown);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+        {
+            throw new InvalidOperationException($"The package call {id} is not unknown, so it cannot be resolved.");
+        }
+    }
+
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }

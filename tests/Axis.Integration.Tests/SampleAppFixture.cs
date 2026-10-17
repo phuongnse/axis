@@ -171,6 +171,24 @@ public sealed class SampleAppFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Claims and runs the tenant's due work items of the given <paramref name="kinds"/> until none is left, and
+    /// returns how many it ran. Work items of other kinds, such as a staged package call, are left due.
+    /// </summary>
+    public async Task<int> RunKindsUntilIdleAsync(CancellationToken cancellationToken, params string[] kinds)
+    {
+        var runner = (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        await using var connection = await OpenConnectionAsync();
+        var ran = 0;
+        while (await WorkItemQueue.ClaimAsync(connection, Tenant, kinds, _lease, cancellationToken) is { } item)
+        {
+            await runner.ExecuteAsync(item, cancellationToken);
+            ran++;
+        }
+
+        return ran;
+    }
+
+    /// <summary>
     /// Starts a worker host for the tenant, with a two second lease, that logs to <paramref name="logs"/>.
     /// The caller stops and disposes it.
     /// </summary>
@@ -257,7 +275,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public static Task<HttpResponseMessage> RetryAsync(HttpClient client, Guid instanceId, string body) =>
         SendAsync(client, HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instanceId:D}/retry", body);
 
-    /// <summary>Resolves the connector call <paramref name="callId"/> of the approval instance <paramref name="instanceId"/> with the JSON <paramref name="body"/>. The caller disposes the response.</summary>
+    /// <summary>Resolves the connector or package call <paramref name="callId"/> of the approval instance <paramref name="instanceId"/> with the JSON <paramref name="body"/>. The caller disposes the response.</summary>
     public static Task<HttpResponseMessage> ResolveAsync(HttpClient client, Guid instanceId, Guid callId, string body) =>
         SendAsync(client, HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instanceId:D}/calls/{callId:D}/resolve", body);
 
