@@ -802,7 +802,7 @@ sorted by file and then path.
 | `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
 | `AXC0173` | A `fill`'s or `convert`'s `field` is not a field of the entity in the release. A child-collection field does not count. Reported at `/changes/{i}/field`. |
 | `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. |
-| `AXC0175` | A pending migration holds a `fill` or `convert` on a child entity, or a `fill` or `convert` of a field that a computed field reads, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until activation can recompute computed fields. |
+| `AXC0175` | A pending migration holds a `fill` or `convert` on a child entity, or a `fill` or `convert` of a field that a computed field reads, which activation does not apply yet. Reported at `/changes/{i}/type` of the migration file. Nothing is applied. Temporary, until [activation can recompute computed fields](../decisions.md#d33-recomputing-stored-computed-fields--agreed). |
 | `AXC0176` | A pending `fill` leaves a `null` in some row, because its value is `null` for that row. Reported at `/changes/{i}/value` of the migration file, with the number of rows in the message. Nothing is applied. |
 | `AXC0177` | A pending `convert` fails for a stored row, such as text that does not parse as the new type, a value that is too long, a required field left empty or a duplicate in a unique field. Also reported when an enum `convert` leaves a value that the field does not list. Reported at `/changes/{i}/value` of the migration file, with a fixed message and, for a database error, its PostgreSQL error code. Nothing is applied. |
 | `AXC0178` | A pending `renameField`, `dropField`, `dropEntity` or `convert` changes a column that another release of the application uses, and `running` or `waiting` process instances are pinned to that release. One per migration and release, with the release id and the number of open instances in the message. Reported at the migration file with an empty path and the migration `id` as `resourceId`. Nothing is applied. Activate the release again once those instances end. |
@@ -848,6 +848,12 @@ development or E2E server serves a real application without a separate step.
   committed is logged with the folder and tenant too. The previously active
   release stays active, and the first failing tenant stops the whole start,
   so no server runs with some tenants on old releases and others on new ones.
+- **Recompute limit** *(planned for M7)*. `Activation:InlineRecomputeLimit`
+  is the most affected rows that activation recomputes in its own transaction
+  when a release changes stored computed fields. It defaults to 10,000. The
+  environment variable is `Activation__InlineRecomputeLimit`. Above the limit,
+  the field becomes pending and the worker recomputes the rows in batches. See
+  [Recomputing computed fields](storage.md#recomputing-computed-fields).
 - **Seeding.** After a folder is activated in a tenant, the step inserts
   every seed record whose id the entity table does not hold yet, so
   restarts never duplicate seeds. Only the id decides: a seed record that was

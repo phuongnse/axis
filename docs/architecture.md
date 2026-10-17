@@ -29,7 +29,9 @@ flowchart LR
   retries and reconciliation, and package operations. `raiseEvent` steps raise
   events. Wait for event, timer and sub-process steps come later. It
   delivers raised events to async event triggers, see
-  [events and triggers](reference/processes.md#events-and-triggers).
+  [events and triggers](reference/processes.md#events-and-triggers). It also
+  runs the backfill of pending computed fields *(planned for M7)*, see
+  [recomputing computed fields](reference/storage.md#recomputing-computed-fields).
   It runs the occurrences of schedule triggers and their fan-out over the records
   of the trigger's data source, see [schedules](reference/processes.md#schedules).
   It loads the installed extension packages at startup, as the server does.
@@ -520,7 +522,8 @@ The `role` and `policy` resource files are described in
   to their SQL. A single record is checked in SQL too, with one statement
   per filtered grant, so reads and writes give the same answer and a filter
   that fails denies through its own grant only. The user id is a parameter,
-  never part of the SQL text.
+  never part of the SQL text. A read filter that reads a pending computed
+  field fails closed with a `409` *(planned for M7)*.
 - **Writes.**
   - A create needs the new record to match the filter of a `create` grant.
   - An update needs the stored record to be readable, otherwise `404`. It
