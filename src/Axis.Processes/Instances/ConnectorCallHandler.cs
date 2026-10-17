@@ -93,6 +93,7 @@ internal sealed partial class ConnectorCallHandler(
             try
             {
                 target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, cancellationToken);
+                attempt = attempt with { Application = target.Model.Manifest.Name };
             }
             catch (InvalidOperationException exception)
             {
@@ -712,7 +713,7 @@ internal sealed partial class ConnectorCallHandler(
         }
 
         await ConnectorCalls.SettleAsync(transaction, call.Id, ConnectorCalls.Succeeded, status, null, cancellationToken);
-        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, cancellationToken);
+        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
@@ -826,7 +827,7 @@ internal sealed partial class ConnectorCallHandler(
         }
 
         await ConnectorCalls.RetryAsync(transaction, call.Id, status, error, cancellationToken);
-        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, cancellationToken);
+        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -880,7 +881,7 @@ internal sealed partial class ConnectorCallHandler(
         }
 
         await ConnectorCalls.MarkUnknownAsync(transaction, call.Id, status, error, cancellationToken);
-        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, cancellationToken);
+        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         if (lookup)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -940,7 +941,7 @@ internal sealed partial class ConnectorCallHandler(
 
         var lookups = await ConnectorCalls.FailLookupAsync(transaction, call.Id, status, error, cancellationToken)
             ?? throw new InvalidOperationException($"The connector call '{call.Id}' is no longer unknown.");
-        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, cancellationToken);
+        await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         var delay = Backoff(target.Step.Retry, lookups);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
@@ -986,10 +987,11 @@ internal sealed partial class ConnectorCallHandler(
             return WorkItemOutcome.Completed;
         }
 
+        await InstanceMetrics.RecordEndedAsync(models, new WorkItemContext(item, connection, transaction), instance, ProcessStarts.Failed, cancellationToken);
         await ConnectorCalls.SettleAsync(transaction, call.Id, ConnectorCalls.Failed, status, error, cancellationToken);
         if (row is not null)
         {
-            await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, cancellationToken);
+            await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         }
 
         await ProcessSteps.InsertHistoryAsync(
@@ -1020,6 +1022,9 @@ internal sealed partial class ConnectorCallHandler(
         LogFailed(call.Id, instance.Id, status, error);
         return WorkItemOutcome.Failed;
     }
+
+    private static CallTags Tags(ClaimedWorkItem item, Attempt attempt) =>
+        new(item.TenantId, attempt.Application, AxisTelemetry.ConnectorTag, attempt.Call.Connector, attempt.Call.Operation);
 
     /// <summary>The row of the attempt the worker makes, numbered as the call counts it.</summary>
     private static CallAttempt AttemptRow(Attempt attempt, string outcome, int? status, string? error) =>
@@ -1081,7 +1086,7 @@ internal sealed partial class ConnectorCallHandler(
     /// The attempt a worker makes: the call, the instance revision it waits at, the attempts made
     /// with this one, and the time of the mark transaction, which starts the step's history row.
     /// </summary>
-    private sealed record Attempt(LoadedConnectorCall Call, long Revision, int Attempts, DateTimeOffset StartedAt);
+    private sealed record Attempt(LoadedConnectorCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null);
 
     /// <summary>What the call's release declares for it.</summary>
     private sealed record Target(

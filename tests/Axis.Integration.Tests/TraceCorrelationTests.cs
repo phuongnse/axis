@@ -10,7 +10,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The server and the worker trace a purchase request from its start request to its work. A work item
 /// links to the span that queued it, history rows keep the trace id of their run, and no span holds a
-/// field value, a secret, a body, a user id or a bound address.
+/// field value, a secret, a body, a user id or a bound address. The same journey records the work item,
+/// process instance and call attempt metrics.
 /// </summary>
 public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
 {
@@ -113,6 +114,27 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
                 Assert.NotEqual("Axis", span.Source.Name);
             }
         }
+    }
+
+    [Fact]
+    public async Task The_purchase_request_journey_records_the_work_item_instance_and_call_attempt_metrics()
+    {
+        using var collector = new MetricCollector();
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var dung = fixture.CreateClient().SignedInAs("dung");
+        var subject = await CreateAsync(anna, $"Request {Guid.NewGuid():N}", 10000, traceparent: null);
+        var instance = await StartAsync(anna, subject);
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        await ApproveAsync(chau, instance, "managerApproval");
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        await ApproveAsync(dung, instance, "financeApproval");
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal("completed", await fixture.ScalarAsync("SELECT state FROM axis.process_instances WHERE id = @instance", ("instance", instance)));
+        Assert.True(collector.HasPoint("axis.process.instances.ended", ("axis.process", "PurchaseRequestApproval"), ("axis.outcome", "completed")));
+        Assert.True(collector.HasPoint("axis.calls.attempts", ("axis.connector", "PurchasingSystem"), ("axis.outcome", "succeeded")));
+        Assert.True(collector.HasPoint("axis.work_items.duration", ("axis.outcome", "completed")));
     }
 
     [Fact]

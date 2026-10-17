@@ -120,6 +120,7 @@ internal sealed partial class PackageCallHandler(
                 try
                 {
                     target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, package, cancellationToken);
+                    attempt = attempt with { Application = target.Model.Manifest.Name };
                 }
                 catch (InvalidOperationException exception)
                 {
@@ -545,7 +546,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, cancellationToken);
-        await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), cancellationToken);
+        await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), Tags(item, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
@@ -657,7 +658,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.RetryAsync(transaction, call.Id, error, cancellationToken);
-        await InsertAttemptAsync(transaction, call, row, cancellationToken);
+        await InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -703,7 +704,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.MarkUnknownAsync(transaction, call.Id, error, cancellationToken);
-        await InsertAttemptAsync(transaction, call, row, cancellationToken);
+        await InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(
@@ -752,8 +753,9 @@ internal sealed partial class PackageCallHandler(
             return WorkItemOutcome.Completed;
         }
 
+        await InstanceMetrics.RecordEndedAsync(models, new WorkItemContext(item, connection, transaction), instance, ProcessStarts.Failed, cancellationToken);
         await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, cancellationToken);
-        await InsertAttemptAsync(transaction, call, row, cancellationToken);
+        await InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(
@@ -787,8 +789,11 @@ internal sealed partial class PackageCallHandler(
     private static CallAttempt AttemptRow(Attempt attempt, string outcome, string? error) =>
         new(CallAttempts.Attempt, attempt.Attempts, attempt.StartedAt, outcome, null, error);
 
-    private static Task InsertAttemptAsync(NpgsqlTransaction transaction, LoadedPackageCall call, CallAttempt? row, CancellationToken cancellationToken) =>
-        row is null ? Task.CompletedTask : CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, row, cancellationToken);
+    private static CallTags Tags(ClaimedWorkItem item, Attempt attempt) =>
+        new(item.TenantId, attempt.Application, AxisTelemetry.PackageTag, attempt.Call.Package, attempt.Call.Operation);
+
+    private static Task InsertAttemptAsync(NpgsqlTransaction transaction, CallTags tags, LoadedPackageCall call, CallAttempt? row, CancellationToken cancellationToken) =>
+        row is null ? Task.CompletedTask : CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, row, tags, cancellationToken);
 
     private static bool IsWaitingAt(LoadedInstance? instance, LoadedPackageCall call, Attempt attempt) =>
         instance is { State: ProcessStarts.Waiting } && instance.Step == call.Step && instance.Revision == attempt.Revision;
@@ -836,7 +841,7 @@ internal sealed partial class PackageCallHandler(
     /// The attempt a worker makes: the call, the instance revision it waits at, the attempts made
     /// with this one, and the time of the mark transaction, which starts the step's history row.
     /// </summary>
-    private sealed record Attempt(LoadedPackageCall Call, long Revision, int Attempts, DateTimeOffset StartedAt);
+    private sealed record Attempt(LoadedPackageCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null);
 
     /// <summary>What the call's release and the host declare for it.</summary>
     private sealed record Target(
