@@ -1229,8 +1229,9 @@ schema changes. Runtime code can then read and write data, but it cannot
 change the schema, a stored release, the active release or the provisioning
 records. The server reads both connection strings, startup activation uses
 `SchemaConnectionString`, and the server grants the runtime database role its
-rights at every start. The start checks for a superuser, a schema owner or a
-role that may create objects are *(planned for M7)*.
+rights at every start. The server and the worker refuse to start when the
+runtime database role is a superuser, owns a schema or may create objects in
+one.
 See [storage](reference/storage.md#database-roles) for the grants and the
 connection string of each step.
 The owner confirmed these points for issue #414 on 2026-10-16.
@@ -1295,6 +1296,7 @@ given users and asserts the outcomes, including denied actions. See
 [configuration](reference/configuration.md#test-scenarios) for the resource
 shape and a purchase request example.
 The owner confirmed these points for issue #415 on 2026-10-16.
+The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
 
 - **Scenario resource:**
   - A new `scenario` resource kind has one file per scenario, under
@@ -1339,6 +1341,20 @@ The owner confirmed these points for issue #415 on 2026-10-16.
   - `stubs` give the output of each connector operation and package
     operation that the scenario calls. A call without a stub fails the
     scenario.
+- **Advancing time** *(planned for M7)*:
+  - A new step, `advanceTime`, has `by`, a positive ISO 8601 duration such as
+    `P1D` or `PT2H`.
+  - It needs the scenario's `now`. A scenario without `now` that uses it
+    fails to compile.
+  - It moves `now` forward by `by`. Every later step reads the new time.
+  - The runner then runs every work item that is due at the new time, until
+    none is due. Schedule triggers and their fan-outs are included. The limit
+    of 1,000 work items applies per step.
+  - Schedules catch up as on a worker after an outage. Only the latest
+    occurrence at or before the new time runs, once. The rules of
+    [schedules](reference/processes.md#schedules) apply unchanged. To fire a
+    daily schedule three times, a scenario advances one day three times.
+  - Time never goes back. No step sets an earlier time.
 - **Where it runs:**
   - A new console project, `Axis.Scenarios`, runs every scenario of an
     application folder against a PostgreSQL server:
@@ -1356,8 +1372,8 @@ The owner confirmed these points for issue #415 on 2026-10-16.
   - **Stubs only.** Scenarios never call a real external system, and never
     run real package code. Package operations get unit tests in their own
     project.
-  - **Fixed time.** One `now` per scenario. Advancing time to fire schedules
-    comes later.
+  - **Time moves forward only.** A scenario starts at its `now`, and only
+    `advanceTime` moves it, forward. *(planned for M7)*
   - **New project.** `Axis.Scenarios` is a new host next to the server and
     the worker.
 
@@ -1367,7 +1383,8 @@ CI can run them. A scenario sets users and roles itself, so it checks
 [D24](#d24-roles-and-policies--agreed) denials without an identity provider.
 A unique database that the runner always drops keeps a failed run from
 leaving data behind or touching a real tenant. The work item limit stops a
-looping process from hanging CI. See
+looping process from hanging CI. Advancing time lets CI test schedule
+triggers. See
 [testing applications](domain/knowledge.md#testing-applications).
 
 ## D33. Recomputing stored computed fields — Agreed
@@ -1428,6 +1445,101 @@ transaction, which does not scale to large tables and stopped activation on one
 row error. [Execution](domain/knowledge.md#execution) asks that stored state
 and the active release not disagree silently. A list that filters on old values
 without warning is that failure, so Axis refuses it.
+
+## D35. Operator retry, cancel and resolve — Agreed
+
+Authorized users can retry a failed process instance, cancel running or
+waiting work, and resolve a call whose outcome is unknown. Each is an audited
+command that needs its own grant. The design is *(planned for M7)*. See
+[processes](reference/processes.md#operator-commands) for the routes, the
+states each command accepts, the errors and a walkthrough.
+The owner confirmed these points on issue #478 on 2026-10-17. The owner made
+two changes to the proposal, which are marked below.
+
+- **Who may act:**
+  - A `process` grant takes three new actions, `retry`, `cancel` and
+    `resolve`, next to `start`. Each is checked on its own. None implies
+    another, and none implies a right to inspect the instance (#477).
+  - The subject record must be readable by the user, as for a start.
+    Otherwise the instance is `404`.
+  - Each command takes a required `reason` of at most 500 characters.
+  - Each command writes a history row and an audit record with the user, the
+    reason and the instance: `process.retried`, `process.cancelled`,
+    `connector.callResolved` or `operation.callResolved`. A call resolved as
+    failed also writes `process.failed`. The actor is the user, not `system`.
+  - The reason is stored only in the audit record's details, not in step
+    history.
+- **Retry:**
+  - It takes only a `failed` instance. Any other state is `409`.
+  - The instance stays on its pinned release.
+  - The step that failed runs again, reading the subject record as it is now.
+  - A call that failed is staged again under the **same operation identity**,
+    with its attempts counted from zero. The system's idempotency key then
+    stops a second effect.
+  - The instance goes back to `running`, and a call step makes it `waiting`
+    again. When another instance of the same process now runs for the record,
+    the retry is `409`.
+  - **Start lock (changed by the owner):** retry takes the application's start
+    lock as the first statement of its transaction, as a start does. So it
+    cannot race the old-release check of a destructive migration. A change of
+    active release under the lock runs the command again, and three changes
+    are a `503`.
+  - A retry is also `409` when an applied migration has renamed, dropped or
+    converted a column that the instance's pinned release uses. The
+    old-release check counts only `running` and `waiting` instances, so a
+    failed instance never blocks a destructive migration, and the retry would
+    run old steps against a changed table.
+- **Cancel:**
+  - It takes a `running` or `waiting` instance. It becomes `cancelled`, a new
+    end state that does not block a new start.
+  - Its open tasks become `cancelled`, a new task state. They leave every
+    inbox.
+  - A `pending` call becomes `cancelled`, and its work item is removed.
+  - A call that is `sending` or `unknown` makes the cancel `409`. The system
+    may have acted, so the call must settle or be resolved first. Cancel never
+    forgets an external effect.
+  - A step that a worker is running when the cancel commits cannot commit
+    after it. The instance revision fences it.
+  - Cancel does not undo steps that already ran. There is no compensation, as
+    D25 says. It comes later.
+  - Cancel is the way to drain old-release work before a destructive
+    migration.
+- **Resolve:**
+  - It takes only an `unknown` call, on an instance that is `waiting` on the
+    call's step.
+  - `"outcome": "succeeded"` with `output` values settles the call as
+    succeeded. The output is checked against the operation's declared output,
+    as a response would be. The instance moves on.
+  - `"outcome": "failed"` settles the call as failed, and the instance
+    becomes `failed`. A later retry stages the call again under the same
+    identity.
+  - **Start lock:** resolve takes the start lock too, because its output
+    fields can set off update triggers, as a task completion does.
+  - An `output` that does not fit, or an output write that the record refuses,
+    is a `400`. Nothing changes and the call stays `unknown`. An operator's
+    typing mistake does not fail the instance. The operator can still resolve
+    the call as `failed` on purpose.
+- **Where users see it:**
+  - The process inspector widget (#477) shows Retry, Cancel and Resolve when
+    the user's grants allow them. The server checks every request.
+  - **Retry warning (changed by the owner):** the widget warns before a retry
+    only when the failed call is a package call whose operation is not
+    `idempotent: true`. A failed connector call is safe to resend, because
+    every unknown outcome was resent under the idempotency key or reconciled.
+
+*Why:* [D11](#d11-durable-process-engine--agreed) makes the engine durable,
+and a failed instance, a stuck call and old work that cannot be drained are
+the places where durability needs a human decision.
+[D24](#d24-roles-and-policies--agreed) makes every action a grant, so each
+command gets its own. [D25](#d25-connectors-deployment-bindings-and-secrets--agreed)
+and [D28](#d28-extension-packages--agreed) leave an unknown call for an
+operator, and promise no second effect, so retry reuses the operation identity
+and cancel refuses a call that may have acted.
+[D30](#d30-schema-migrations--agreed) waits for old-release work before a
+destructive migration, which needs a way to drain it, and the start lock keeps
+a retry from racing that check.
+[Operations](domain/knowledge.md#operations) says retry, cancellation and
+resolution are authorized, audited commands.
 
 ## D36. Correlated logs, metrics and traces — Agreed
 

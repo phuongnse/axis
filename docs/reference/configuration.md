@@ -461,6 +461,10 @@ flowchart LR
        step property, `save` together with `expect`, `expect` on an
        expectation step, or a `now` that is not a real date and time, such as
        `2026-02-30T09:00:00Z`, is `AXC0004`.
+     - *(planned for M7)* An `advanceTime` step whose `by` is not a positive
+       duration in the form of a task's `dueIn` is `AXC0193` at
+       `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is
+       `AXC0194` at `/steps/{i}`.
      - A scenario error is an error like any other, so a folder with one does
        not compile or activate.
 
@@ -731,7 +735,7 @@ sorted by file and then path.
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 | `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
-| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and *(planned for M7)* `retry`, `cancel` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
 | `AXC0092` | A policy grant's `entity`, `dataSource`, `process` or `endpoint` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint`. Not reported when the name is a file that was not loaded because of its own errors. |
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
@@ -818,6 +822,13 @@ sorted by file and then path.
 | `AXC0189` | A value in a step's `values` does not fit its field's type: not a valid text, number, boolean, date, reference or listed enum value, or a child collection that is not an array of objects. Reported at `/steps/{i}/values/{key}`. |
 | `AXC0190` | A stub names no loaded connector, no operation of the connector, no package of the application, or no operation of the pinned package. Reported at `/stubs/{i}/connector/name`, `/stubs/{i}/connector/operation` or `/stubs/{i}/operation`. |
 | `AXC0191` | A key in a stub's `output` names no output field of the operation. Reported at `/stubs/{i}/output/{key}`. |
+
+*(planned for M7)* Two more codes come with `advanceTime`. They join the table
+when the step is built, because the table lists only codes that the compiler
+declares. `AXC0193` is an `advanceTime` step whose `by` is not a positive
+duration in the form of a task's `dueIn`, reported at `/steps/{i}/by`.
+`AXC0194` is an `advanceTime` step in a scenario without `now`, reported at
+`/steps/{i}`. Issue #477 takes `AXC0192`.
 
 ## Startup activation
 
@@ -1919,7 +1930,8 @@ outcomes:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`;
+  - a `process` takes `start`, and *(planned for M7)* `retry`, `cancel` and
+    `resolve`;
   - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
@@ -1939,6 +1951,16 @@ outcomes:
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](../architecture.md#combining-grants).
+
+*(Planned for M7.)* The `retry`, `cancel` and `resolve` actions of a `process`
+grant let a user run the [operator commands](processes.md#operator-commands)
+on that process's instances. Each is checked on its own, and none implies
+another. `start` implies none of them. A grant takes no `filter` or `fields`,
+as for `start`. For example, an operator role could hold:
+
+```json
+{ "process": "PurchaseRequestApproval", "actions": ["retry", "cancel", "resolve"] }
+```
 
 A policy also grants inbound [endpoints](#endpoint-resource). The target is
 `endpoint`, and its only action is `invoke`. An `endpoint` grant takes no
@@ -2002,7 +2024,8 @@ Compile checks, each a compile error:
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
 `start` and `invoke`, and a grant has no other properties. A problem there is
-`AXC0004`.
+`AXC0004`. *(Planned for M7.)* The list also holds `retry`, `cancel` and
+`resolve`.
 
 ### Record creator
 
@@ -2322,6 +2345,7 @@ Every step has a `type`. These are the step kinds:
 | `expectRecord` | `record`, `values` | Asserts that the saved record holds these values. |
 | `expectInstance` | `process`, `record`, `state`, optional `step` | Asserts the state of the process instance on the record, and the step it waits at. |
 | `expectTask` | `record`, `step`, `assignee` or `state` | Asserts who the task is assigned to, or its state. |
+| `advanceTime` | `by` | *(planned for M7)* Moves the scenario's `now` forward by `by`, then runs the work items that are due. |
 
 - `createRecord`, `updateRecord`, `deleteRecord`, `startProcess` and
   `completeTask` are the actions. The record actions go through the record
@@ -2354,6 +2378,82 @@ Every step has a `type`. These are the step kinds:
 - Every reference to an entity, field, process, step, outcome, role, user or
   alias is checked at compile. See the **Scenarios** bullet of the
   [Resolve step](#configuration-pipeline) for the checks and their codes.
+
+*(planned for M7)* `advanceTime`:
+
+- `by` has the form of a task's `dueIn`: weeks, such as `P2W`, or days with an
+  optional time part, such as `P1D`, `PT2H` or `P1DT12H`. It must be positive.
+  Years and months are refused, because they have no fixed length.
+- It needs `now`. The runner sets the new time on every connection of the
+  scenario, including the work item runner's. Every later step reads it.
+- The runner then runs every due work item (`process.step`, `connector.call`,
+  `package.call`, `trigger.schedule` and `trigger.fanOut`) until none is due.
+  If more than 1,000 items run in one step, the scenario fails at that step.
+- A schedule that missed several occurrences runs only the latest one, once, as
+  a worker does after an outage. See [schedules](processes.md#schedules). To
+  fire a daily schedule three times, advance one day three times.
+- Scenario activation writes the schedule state of each schedule trigger, so
+  the first occurrence is computed from the scenario's `now`, not the real
+  clock.
+- Schedule triggers run only in an `advanceTime` step. A scenario stays
+  repeatable, because no schedule fires on the real clock.
+- `advanceTime` is not an action. It takes no `as` and no `expect`.
+- Time never goes back. No step sets an earlier time.
+
+This example uses a daily schedule trigger. The purchase request sample does
+not hold this trigger. The trigger submits the drafts at 18:00 in Ho Chi Minh
+City:
+
+```json
+{
+  "id": "5c0f6b0e-3a7d-4f0e-9a52-6d2b8f3e7c41",
+  "kind": "trigger",
+  "name": "SubmitDraftsDaily",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 18 * * *",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "dataSource": "PurchaseRequestList",
+  "parameters": { "statusFilter": "draft" },
+  "process": "PurchaseRequestApproval"
+}
+```
+
+The scenario starts at 16:00 local time. Nothing has started yet. After it
+advances three hours, the schedule has fired and the manager has a task:
+
+```json
+{
+  "id": "0b7d9a52-1c64-4e8f-8d3a-92f1c5a6e7b3",
+  "kind": "scenario",
+  "name": "DailySubmitStartsApproval",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["employee"],
+    "binh": ["department-manager"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "PurchaseRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "title": "Laptops",
+        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
+        "currency": "USD",
+        "status": "draft",
+        "lineItems": [{ "description": "Laptop", "quantity": 3, "unitPrice": 5000 }]
+      }
+    },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "notFound" },
+    { "type": "advanceTime", "by": "PT3H" },
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } }
+  ]
+}
+```
 
 To run the scenarios of an application folder, see
 [D32](../decisions.md#d32-test-scenarios--agreed):
@@ -2420,9 +2520,11 @@ What runs now:
   number all use it. Timestamps that PostgreSQL writes itself, such as
   `created_at`, keep the real clock.
 
-*(planned for M7)*: event deliveries and schedule triggers. Only the
-`process.step`, `connector.call` and `package.call` items run, so event deliveries
-and schedule triggers stay queued and do not fail the scenario.
+*(planned for M7)*: event deliveries. Only the `process.step`, `connector.call`
+and `package.call` items run after an action, so event deliveries and schedule
+triggers stay queued and do not fail the scenario. Schedule triggers run through
+[`advanceTime`](#test-scenarios), as described above. Event deliveries stay
+planned as their own item.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

@@ -129,8 +129,8 @@ database roles, `axis_schema` and `axis_runtime`, own each test database with
 `axis_schema`, run the server and worker as `axis_runtime`, and run activation
 as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
 same: `samples/postgres/init-roles.sql` creates the roles and grants them
-nothing. *(planned for M7)* The start checks for a superuser, a schema owner or
-a role that may create objects are still to come.
+nothing. The server and the worker run the start checks for a superuser, a
+schema owner or a role that may create objects.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
   and `entities` schemas. The runtime database role reads and writes data, and
@@ -181,13 +181,23 @@ What each database role may do:
 - **Start checks.** A missing or blank setting stops the start, naming the
   tenant and the setting. The server does this today. So does a
   `ConnectionString` that names no user, and two settings that name the same
-  user. *(planned for M7)* So does a
-  runtime database role that is a superuser, owns the `axis` or `entities`
-  schema, or may create objects in either. The server runs all of these
-  checks. The worker validates `ConnectionString` and the runtime database
-  role. The server also validates `SchemaConnectionString` and that the two
-  settings name different users, because the worker holds no
-  `SchemaConnectionString`.
+  user. So does a runtime database role that is a superuser, owns the `axis` or
+  `entities` schema, or may create objects in either. A role that is a member
+  of the role that owns a schema counts as its owner, because it can `SET ROLE`
+  to the owner. The message names the tenant, the role and the first failed
+  check, in the order superuser, owner, `CREATE`, with `axis` before
+  `entities`. It never holds the connection string or the password. The
+  server runs the role check after its grant step, so a fresh database with the
+  right roles starts, and again in its start-time release check, which runs for
+  every tenant even when no folder is activated. The worker runs it once for
+  each tenant, when the tenant's database counts as migrated and before it
+  claims any work of that tenant. The server skips the check for a tenant
+  whose database it cannot reach, as the release check does. The checks do not
+  cover `CREATE` on the database itself, ownership of single tables or
+  `CREATEROLE`. The server runs all the other checks. The worker validates
+  `ConnectionString` and the runtime database role. The server also validates
+  `SchemaConnectionString` and that the two settings name different users,
+  because the worker holds no `SchemaConnectionString`.
 
 Which connection string each step uses. The server does this today:
 
@@ -593,7 +603,9 @@ Migrations run forward only.
   a start wait longer. This covers the process start endpoint, the inbound
   endpoint, record API creates and updates, task completion, event delivery,
   `sync` event triggers, update triggers from worker steps and schedule
-  fan-out. A record API create or update always takes it, because the new
+  fan-out. *(Planned for M7.)* Operator
+  [retry](processes.md#retry) and [resolve](processes.md#resolve) take it
+  too. A record API create or update always takes it, because the new
   release may add triggers. A delete never starts a process and does not. An
   activation with a pending migration takes the same lock exclusively, using
   `pg_advisory_xact_lock`, and holds it to commit. It waits for open starts
@@ -715,8 +727,13 @@ fields by a `fill` or `convert` are *(planned for M7)*.
   *(planned for M7)*.
 - Process starts for the application wait while activation holds the
   exclusive start lock. A long fill delays them.
-- Operator cancel comes in M7. Until then, old work must finish before a
-  destructive migration can run. There is no way to drain starts yet.
+- Old work must finish before a destructive migration can run. *(Planned for
+  M7.)* An operator can drain it by cancelling the `running` and `waiting`
+  old-release instances, see [Cancel](processes.md#cancel). A call that is
+  `sending` or `unknown` must settle or be
+  [resolved](processes.md#resolve) first. A `failed` instance does not block
+  the migration, and a [retry](processes.md#retry) of one is refused when the
+  migration changed a column it uses. There is no way to pause starts yet.
 - A record API create or update takes the start lock and runs again on the new
   release when the active release changed. A list, a read, a history or a
   delete that resolved the previous release just before the commit can still
@@ -732,7 +749,9 @@ schema of the tenant database.
   written in the same transaction as the action it records. The record API
   and the process [start endpoint](processes.md#start-endpoint) write them,
   and so do [process steps](processes.md#running-a-step) and
-  [task completions](processes.md#completing-a-task).
+  [task completions](processes.md#completing-a-task). *(Planned for M7.)* So
+  do the [operator commands](processes.md#operator-commands), with the user as
+  actor.
 
   | Column | Type | Meaning |
   | --- | --- | --- |

@@ -32,7 +32,8 @@ worker runs the operation and records its result, see
 step's retry policy are built too. The capability limits of package operations are built too. So are
 triggers, which start
 processes when something happens, see
-[Events and triggers](#events-and-triggers).
+[Events and triggers](#events-and-triggers). Operator retry, cancel and
+resolve are *(planned for M7)*, see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -433,10 +434,12 @@ caller, and its details add the endpoint's name.
 | `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](#connector-calls). It also waits for a package operation call, see [Package operations](#package-operations). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
+| `cancelled` *(planned for M7)* | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](#cancel). |
 
 Only `running` and `waiting` block a new start for the same process and
-record. A `failed` instance does not, so it never locks its record. Cancel
-comes in M7.
+record. A `failed` or `cancelled` instance does not, so it never locks its
+record. An operator can retry a `failed` instance and cancel a `running` or
+`waiting` one, *(planned for M7)*, see [Operator commands](#operator-commands).
 
 ## Task states
 
@@ -444,9 +447,10 @@ comes in M7.
 | --- | --- |
 | `open` | The task waits for a decision. |
 | `completed` | The decision is recorded, and the instance moves on. |
+| `cancelled` *(planned for M7)* | An operator cancelled the task's instance. The task has no decision and leaves every inbox. See [Cancel](#cancel). |
 
 A task has no other state. Its due date is only shown, so there is no overdue
-state. Cancel comes in M7.
+state.
 
 ## Task API
 
@@ -646,7 +650,8 @@ of these checks.
 
 - **`409` for a decided task.** The task is not `open`, because another
   completion came first. This covers a later completion and the loser of two
-  concurrent ones.
+  concurrent ones. *(Planned for M7.)* It covers a `cancelled` task too. A
+  cancelled task is not listed, as no task is that is not `open`.
 
   ```json
   {
@@ -765,6 +770,8 @@ for texts. **Both** means different parts use different releases.
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
+| Operator retry *(planned for M7)* | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
+| Operator resolve *(planned for M7)* | Both | The output check and the record write use the pinned release. The `resolve` grant and data change triggers come from the active release. |
 | `raiseEvent` | Both | The occurrence holds the pinned release. Its `sync` triggers come from the active release. |
 | `event.deliver` | Active | Reads `async` event triggers from the release active at delivery. |
 | Data change triggers | Active | Fire from the active release, even when old-release work writes the record. |
@@ -788,7 +795,9 @@ for texts. **Both** means different parts use different releases.
   different active release under the lock runs again on the new release. The
   process start endpoint, the [inbound endpoint](record-api.md#responses),
   task completion and record creates and updates answer `503` after three
-  release changes. Event delivery reads the active release again in each
+  release changes. *(Planned for M7.)* Operator [retry](#retry) and
+  [resolve](#resolve) take it too, as the first statement of their
+  transaction, and answer `503` after three release changes. Event delivery reads the active release again in each
   trigger's transaction, and skips a trigger that the new release no longer
   has. See [Migrations](storage.md#migrations).
 - **Authorization.** Roles and policies always come from the active release,
@@ -844,7 +853,8 @@ its form and texts, and raises `FinanceThreshold()` to 15000.
   error in the history and sets the instance to `failed`. No step is retried.
   A `callConnector` step retries its call under its retry policy, see
   [Connector calls](#connector-calls). So does a package operation step, see
-  [Package operations](#package-operations). Operator retry comes in M7.
+  [Package operations](#package-operations). *(Planned for M7.)* An operator
+  can retry a `failed` instance, see [Operator commands](#operator-commands).
 - **Revision.** An instance's revision is a counter that starts at 1 and goes
   up each time the instance changes. A step changes the instance only at the
   revision it loaded.
@@ -1088,6 +1098,15 @@ and `next`.
 While its call is pending, retrying or unknown, the instance stays `waiting`.
 So a second start for the same record is blocked, as with an open task.
 
+*(Planned for M7.)* **A step that runs again after a retry** finds its call row
+`failed`, because a unique index lets a step stage only one call. It reuses the
+row instead of inserting one, in the same transaction. The row keeps its id, so
+the operation identity and the idempotency key do not change. The step
+evaluates the input again from the subject record as it is now, because a
+failed call's stored input is cleared when it settles. It sets the call to
+`pending` with that input, 0 attempts and 0 lookups, and clears the last status
+and the last error. Everything else is as above. See [Retry](#retry).
+
 **Each attempt.** A worker that claims the `connector.call` item does this:
 
 1. **Mark.** A short transaction marks the call `sending` and counts the
@@ -1201,7 +1220,7 @@ operation's `lookup` with the operation identity as `{idempotencyKey}`.
 - **No lookup.** The operation declares none. The call stays `unknown`, and
   the instance stays `waiting`. A history row with output
   `{ "operationId", "outcome": "unknown" }` makes it visible. An operator
-  resolves it in M7.
+  resolves it *(planned for M7)*, see [Resolve](#resolve).
 
 The first lookup runs at once after the unknown outcome. Only a failed lookup
 waits. The same `connector.call` item runs each lookup, under the same claim
@@ -1342,6 +1361,10 @@ the operation in place of the HTTP request:
   step. The call also stores the step's retry policy and the operation's
   `idempotent` flag, because a worker that lacks the pinned version cannot
   read them from the release.
+  *(Planned for M7.)* A step that runs again after an operator
+  [retry](#retry) reuses its `failed` row, as a connector call does, under the
+  same operation identity. It stores fresh input, the step's current retry
+  policy and 0 attempts.
 - **Mark.** Before each attempt, a short transaction marks the call
   `sending`, counts the attempt and extends the item's lease past the
   operation's `timeout`.
@@ -1400,7 +1423,8 @@ again with the stored input under the same operation identity.
   fixed sentence, one for a timeout and one for a call found `sending`. The
   call keeps its stored input, and it writes no `operation.called` audit record
   and no `process.failed`, because it has not settled. Packages have no
-  lookup, so an operator resolves it in M7.
+  lookup, so an operator resolves it *(planned for M7)*, see
+  [Resolve](#resolve).
 - **Audit.** Each settled call writes one audit record `operation.called`,
   with actor `system` and details
   `{ "package", "version", "operation", "operationId", "attempts", "outcome" }`.
@@ -1410,6 +1434,302 @@ again with the stored input under the same operation identity.
   as `System.FormatException`, never its message. A message can hold input
   values or secrets. An output that does not fit gets a fixed sentence that
   names the package and the operation, and holds no value.
+
+## Operator commands
+
+*(Planned for M7.)* This section follows
+[D35](../decisions.md#d35-operator-retry-cancel-and-resolve--agreed). Three
+commands let an authorized user act on process work that the engine cannot
+finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
+`running` or `waiting` instance. **Resolve** settles a connector or package
+call whose outcome is `unknown`. Each is an audited command with its own
+grant, a required reason and one transaction. None is built yet. The process
+inspector widget (#477) will show them.
+
+```http
+POST /api/apps/{app}/processes/{process}/instances/{id}/retry
+POST /api/apps/{app}/processes/{process}/instances/{id}/cancel
+Content-Type: application/json
+
+{ "reason": "The supplier code is fixed." }
+```
+
+```http
+POST /api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve
+Content-Type: application/json
+
+{
+  "reason": "Order PO-2026-0001 exists in the purchasing system.",
+  "outcome": "succeeded",
+  "output": { "orderNumber": "PO-2026-0001" }
+}
+```
+
+The content type follows the same rules as the record API, see
+[Create, update and delete](record-api.md#create-update-and-delete). `{id}` is
+the instance id and `{callId}` is the call's operation identity. A success is
+`200` with the instance, in the shape of a start's body:
+`{ "id", "process", "subjectId", "releaseId", "state" }`.
+
+- `reason` is required. It must not be blank and has at most 500 characters.
+- `outcome` is required for a resolve, and is `succeeded` or `failed`.
+- `output` is for a resolve. It is allowed only with `succeeded`.
+
+### Who may act
+
+A `process` grant takes the actions `retry`, `cancel` and `resolve`, as well as
+`start`, see [Authorization](../architecture.md#authorization). Each is checked
+on its own, and none implies another. The subject record must also be readable
+by the user, by the same rule as a start. A subject record the user may not
+read makes the instance an unknown instance, `404`, so the user cannot tell the
+two apart. Every request is also checked on the server, whatever the widget
+shows.
+
+### Retry
+
+Retry takes an instance that is `failed`. The instance stays on its pinned
+release.
+
+One transaction does this:
+
+1. It takes the [start lock](#releases-and-running-work) as its first
+   statement, as a start does. So it cannot race the old-release check of a
+   destructive migration. When the active release changed under the lock, the
+   command runs again on the new release. After three changes it answers `503`.
+2. It locks the instance and requires it to be `failed`, otherwise `409`.
+3. It requires that no other `running` or `waiting` instance exists for the
+   process and the subject record, otherwise `409`.
+4. It requires that no applied `renameField`, `dropField`, `dropEntity` or
+   `convert` migration changed a column that the pinned release uses,
+   otherwise `409`. It uses the same has-the-column test as `AXC0178`, see
+   [Migrations](storage.md#migrations). That check counts only `running` and
+   `waiting` instances, so a `failed` instance never blocks a destructive
+   migration. Without this check, the retry would run old steps against a
+   changed table.
+5. It sets the instance to `running` on the same step, with the next revision,
+   and clears `ended_at`.
+6. It inserts a `process.step` work item for the step.
+7. It writes a history row for the step, at the revision the instance had when
+   it failed. Its output is `{ "command": "retry" }`.
+8. It writes the audit record `process.retried` for the subject record, with
+   details `{ "step", "reason" }`. The actor is the user with their display
+   name.
+
+The worker then runs the step as usual, see [Running a step](#running-a-step).
+It reads the subject record as it is now. A step that failed because of the
+record's data can succeed after the record is fixed.
+
+A `callConnector` step or a package operation step whose call row is `failed`
+stages the call again under the **same operation identity**, see
+[Staging and the call](#staging-and-the-call). The input is evaluated again,
+because a failed call's stored input is cleared when it settles. The attempts
+count from zero.
+
+**Risks.** A retry of a connector call sends it again under the same
+idempotency key. Some systems replay their stored failure for a key they have
+seen, so the retry can fail the same way. The widget warns before a retry only
+when the failed call is a package call whose operation is not
+`idempotent: true`. Such an operation may have acted before it failed, and a
+retry runs it again. A connector call needs no warning, because every unknown
+outcome of one was sent again under the idempotency key or
+[reconciled](#reconciliation), or was [resolved](#resolve) by an operator.
+
+### Cancel
+
+Cancel takes an instance that is `running` or `waiting`. It does not undo
+steps that already ran, because there is no compensation yet
+([D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed)).
+
+One transaction does this:
+
+1. It locks the instance, then its call rows.
+2. It requires the instance to be `running` or `waiting`, otherwise `409`.
+3. It requires that no call of the instance is `sending` or `unknown`,
+   otherwise `409`. The problem names the call. The system may have acted, so
+   the call must settle or be [resolved](#resolve) first. Cancel never forgets
+   an external effect.
+4. It sets the instance to `cancelled`, with the next revision and `ended_at`.
+5. It sets the instance's `open` tasks to `cancelled`, and its `pending` calls
+   to `cancelled` with their stored input cleared.
+6. It deletes the instance's work items.
+7. It writes a history row for the step, at the revision the instance had. Its
+   output is `{ "command": "cancel" }`.
+8. It writes the audit record `process.cancelled` for the subject record, with
+   details `{ "step", "reason", "taskIds", "operationIds" }`. The two lists
+   name the tasks and calls it cancelled. The actor is the user.
+
+A `cancelled` instance does not block a new start for the same record. Its
+cancelled tasks leave every inbox, and a completion of one is `409`, see
+[Task API errors](#task-api-errors).
+
+**Races.** A worker that runs a step when the cancel commits cannot commit
+after it, because the step changes the instance only at the revision it loaded,
+see [Running a step](#running-a-step). A worker that marks a call `sending`
+either commits before the cancel, so the cancel finds the call `sending` and
+answers `409`, or finds its work item deleted and sends nothing.
+
+Cancel is also the way to drain old-release work before a destructive
+migration, see [Migrations](storage.md#limits). An `unknown` call must be
+resolved first.
+
+### Resolve
+
+Resolve takes a call that is `unknown`, on an instance that is `waiting` on the
+call's step. The operator has checked what the other system did, and says so.
+It works for a connector call with no lookup and for a package call, which has
+none. It also works for a connector call that waits for its lookup, in place of
+the lookup.
+
+One transaction does this:
+
+1. It takes the [start lock](#releases-and-running-work) as its first
+   statement, with the same rerun and `503` as a retry. Output fields can set
+   off update triggers, so resolve follows the rule of a task completion.
+2. It locks the instance and the call. It requires the call to be `unknown` and
+   the instance to be `waiting` on its step, otherwise `409`. A lookup or a
+   worker that settled the call first makes this a `409`.
+3. For `succeeded`, it checks `output` against the operation's declared
+   outputs, as a response body would be checked, see
+   [Call outcomes](#call-outcomes). That is the connector operation's outputs,
+   or the manifest's for a package call. Then it writes the step's output
+   fields to the subject record with the record update rules, as a successful
+   outcome does. An `output` that does not fit, or a write that the record
+   refuses, is a `400`. Nothing changes and the call stays `unknown`.
+   - It sets the call to `succeeded` and clears its stored input.
+   - It sets the instance to `running` on `next`, with the next revision.
+   - It writes the history row of the step, at the revision the instance
+     waited at. Its output is
+     `{ "operationId", "outcome", "next", "resolved": true }`, plus
+     `subjectVersion` when it wrote output fields.
+   - It writes `record.updated` when it wrote output fields, and inserts the
+     work item of the next step.
+4. For `failed`, it sets the call to `failed` and clears its stored input. It
+   sets the instance to `failed` with `ended_at`, and writes a history row
+   with output `{ "operationId", "outcome": "failed", "resolved": true }` and
+   a fixed error sentence. It writes `process.failed` with details
+   `{ "step" }`. The actor is the user.
+5. For both outcomes, it deletes the call's `connector.call` or `package.call`
+   work item, because a lookup may still be due.
+6. For both outcomes, it writes `connector.callResolved` or
+   `operation.callResolved` instead of `connector.called` or `operation.called`.
+   Its details are `{ "step", "connector", "operation", "operationId", "outcome", "reason" }`
+   for a connector call, and
+   `{ "step", "package", "operation", "operationId", "outcome", "reason" }` for
+   a package call. The actor is the user. So each settled call has one audit
+   record, and it shows who settled it by hand.
+
+A resolve with a mistake in `output` is a `400` and does not fail the
+instance. The operator can still resolve the call as `failed` on purpose. A
+later [retry](#retry) of that instance stages the call again under the same
+operation identity.
+
+When the operator resolves a call as `failed` and the other system had in fact
+acted, a retry can create a second effect. Axis trusts the operator's judgement
+there.
+
+### Operator command errors
+
+Errors are problem details, as in the [record API](record-api.md#errors). The
+titles are fixed and never contain text from the request. The shape of the
+answers matches the [start endpoint](#start-endpoint).
+
+A request is checked in this order, and the first failure is the response:
+
+1. The CSRF header, `403`.
+2. The session, `401`.
+3. The application and the process, `404`.
+4. The matching grant on the process, `403`: `retry`, `cancel` or `resolve`.
+5. The content type, `415`.
+6. The body, `400`.
+
+One transaction then checks the instance, and for a resolve the call. It
+answers `404` for the instance, the subject record and the call, and then the
+`409` checks.
+
+- **`401`.** Nobody is signed in. The title is the record API's "Sign in to
+  read or write this data.".
+- **`403`.** The user has no grant for the command on the process. The title
+  is the record API's "You have no grant for this action.". The CSRF header
+  failure is a `403` too.
+- **`404`.** An unknown application, an application with no active release, or
+  an unknown process. In the transaction, also:
+  - an unknown instance, an `{id}` that is not a UUID in the hyphenated form,
+    or an instance of another process;
+  - an instance whose subject record the user may not read;
+  - for a resolve, an unknown `{callId}`, or a call of another instance.
+- **`400`.** The body is a validation problem keyed by JSON Pointer. Every
+  invalid part is reported in the same response.
+  - A missing, blank or too long `reason` is keyed `/reason`.
+  - A missing `outcome`, or one that is not `succeeded` or `failed`, is keyed
+    `/outcome`.
+  - An `output` with `failed`, or an `output` that is not an object, is keyed
+    `/output`.
+  - An output that is not declared, or has a value of the wrong type, is keyed
+    `/output/{name}`. So is a required output that is missing, and an output
+    whose field write the record refuses, with the record API's message.
+  - Any other property, a repeated property and a body that is not a JSON
+    object get the record API's keys and messages, such as "Unknown
+    property.".
+- **`409`.** The state does not allow the command. Nothing is written.
+
+  | Command | Cause |
+  | --- | --- |
+  | Retry | The instance is not `failed`. |
+  | Retry | Another instance of the process is `running` or `waiting` for the record. |
+  | Retry | An applied migration renamed, dropped or converted a column that the pinned release uses. |
+  | Cancel | The instance is not `running` or `waiting`. |
+  | Cancel | A call of the instance is `sending` or `unknown`. The problem names the call in a `callId` member. |
+  | Resolve | The call is not `unknown`. |
+  | Resolve | The instance is not `waiting` on the call's step. |
+
+- **`503`.** Retry and resolve only. The application's active release changed
+  on each of three attempts, found under the
+  [start lock](#releases-and-running-work). The server already ran the command
+  again on the new release each time. Nothing was written, and the client may
+  send the request again. The title is the start endpoint's: "The
+  application's active release changed while the request ran. Try again.".
+
+### Walkthrough: an unknown purchase order
+
+Suppose the `PurchasingSystem` connector declares neither `idempotency` nor a
+`lookup`. The request still ends with exactly one purchase order.
+
+1. The finance reviewer approves request `PR-2026-00042`. `markApproved` runs
+   and queues `createPurchaseOrder`.
+2. The step stages call C as `pending` and sets the instance `waiting`. Worker
+   A marks C `sending` and sends `POST /purchase-orders`.
+3. The purchasing system creates `PO-2026-0001`. Its response is lost, and the
+   request times out.
+4. A timeout is an unknown outcome. The connector declares no `idempotency`, so
+   C is not sent again. It declares no `lookup`, so nothing can ask the system.
+   C becomes `unknown`, its work item is deleted, and the instance stays
+   `waiting`. A history row with output `{ "operationId", "outcome": "unknown" }`
+   makes it visible. A second start for the request is blocked.
+5. An operator who holds a `resolve` grant on the process checks the purchasing
+   system. It holds `PO-2026-0001` for `PR-2026-00042`.
+6. The operator posts a resolve for C with a reason, `outcome` `succeeded` and
+   `output` `{ "orderNumber": "PO-2026-0001" }`.
+7. One transaction takes the start lock and checks that C is `unknown` and the
+   instance is `waiting` on `createPurchaseOrder`. It checks the output
+   against the operation's declared output. It writes
+   `purchaseOrderNumber = PO-2026-0001` and `record.updated`, and sets C to
+   `succeeded`. The instance becomes `running` on `assignPaymentReference`. It
+   writes the history row, and one `connector.callResolved` with the operator
+   as its actor and their reason. It queues the next step.
+8. The worker runs `assignPaymentReference` and then `done`, which completes
+   the instance.
+
+The purchasing system holds one order, and the request records its number. No
+`connector.called` was written, because C settled by hand, and the audit trail
+shows who did it.
+
+- **Resolved as failed, then retried.** Had the operator found no order, they
+  would resolve C with `outcome` `failed`. C becomes `failed` and the instance
+  becomes `failed` on `createPurchaseOrder`, with `process.failed` written. The
+  operator can then post a retry. The instance goes back to `running` on the
+  same step, which stages C again under the same operation identity with fresh
+  input and 0 attempts. Without `idempotency`, a wrong "no order" finding means
+  a second order, so the operator must check first.
 
 ## Events and triggers
 
@@ -1748,7 +2068,8 @@ database, with history in `axis.__processes_migrations` (see
 
 - `axis.process_instances`: one row per instance, with its process, subject
   record, release, state, revision and `step`, the step it runs next. Its
-  `ended_at` is the time it became `completed` or `failed`, and is null before.
+  `ended_at` is the time it became `completed`, `failed` or `cancelled`
+  *(planned for M7)*, and is null before. A retry clears it.
   A partial unique index on
   application, process and subject record, where the state is `running` or
   `waiting`, enforces one start per submission.
@@ -1762,7 +2083,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. *(Planned for M7.)* `{ "command": "retry" }` or `{ "command": "cancel" }` for an operator command. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1821,10 +2142,10 @@ database, with history in `axis.__processes_migrations` (see
   | `assignee` | `text` | The user id that the `user` expression gave, or the role name |
   | `form_id` | `uuid` | The id of the step's form |
   | `due_at` | `timestamptz`, null | `created_at` plus `dueIn`, or null when the step has no `dueIn` |
-  | `state` | `text` | `open` or `completed` |
-  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open` |
-  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open` |
-  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open` |
+  | `state` | `text` | `open` or `completed`. `cancelled` *(planned for M7)* |
+  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open`, and for a `cancelled` task *(planned for M7)* |
+  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open`, and for a `cancelled` task *(planned for M7)* |
+  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open`, and for a `cancelled` task *(planned for M7)* |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 - `axis.connector_calls`: one row per staged connector
   call, see [Connector calls](#connector-calls). A unique index on
@@ -1841,10 +2162,10 @@ database, with history in `axis.__processes_migrations` (see
   | `release_id` | `uuid` | The release the instance is pinned to |
   | `connector` | `text` | The connector's name |
   | `operation` | `text` | The operation's name |
-  | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed` |
+  | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed`. `cancelled` *(planned for M7)* |
   | `attempts` | `integer` | The attempts made so far, the first one included |
   | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
-  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles. Never copied to history, audit records or logs |
+  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles or is cancelled. Never copied to history, audit records or logs |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -1865,12 +2186,12 @@ database, with history in `axis.__processes_migrations` (see
   | `package` | `text` | The package id |
   | `version` | `text` | The package version the release pins |
   | `operation` | `text` | The operation's name |
-  | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed` |
+  | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed`. `cancelled` *(planned for M7)* |
   | `attempts` | `integer` | The attempts made so far, the first one included |
   | `retry_attempts` | `integer` | The attempts the step's retry policy allows, stored when the call is staged |
   | `retry_backoff` | `interval` | The step's backoff, stored when the call is staged |
   | `idempotent` | `boolean` | Whether the operation is `idempotent`, stored when the call is staged |
-  | `input` | `jsonb`, null | The evaluated input. Kept while the call is `unknown`, and cleared when it settles. Never copied to history, audit records or logs |
+  | `input` | `jsonb`, null | The evaluated input. Kept while the call is `unknown`, and cleared when it settles or is cancelled. Never copied to history, audit records or logs |
   | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
