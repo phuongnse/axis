@@ -1230,8 +1230,8 @@ change the schema, a stored release, the active release or the provisioning
 records. The server reads both connection strings, startup activation uses
 `SchemaConnectionString`, and the server grants the runtime database role its
 rights at every start. The server and the worker refuse to start when the
-runtime database role is a superuser, owns a schema or may create objects in
-one.
+runtime database role is, or is a member of a role that is, a superuser, owns
+a schema or may create objects in one.
 See [storage](reference/storage.md#database-roles) for the grants and the
 connection string of each step.
 The owner confirmed these points for issue #414 on 2026-10-16.
@@ -1267,7 +1267,8 @@ The owner confirmed these points for issue #414 on 2026-10-16.
     step that runs with the migrations. The runtime database role name comes
     from the user of `ConnectionString`.
   - The start stops when the runtime database role is a superuser, owns the
-    `axis` or `entities` schema, or may create objects in either.
+    `axis` or `entities` schema, or may create objects in either, or is a member
+    of a role that is or may. Membership counts whatever its `INHERIT` option.
 - **Stored releases:** a trigger refuses every `UPDATE`, `DELETE` and
   `TRUNCATE` on the three release tables, for every database role. It replaces
   the guard that only EF Core change tracking gives today. A stored release can

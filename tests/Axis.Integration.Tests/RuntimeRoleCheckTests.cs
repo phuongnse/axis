@@ -36,6 +36,40 @@ public sealed class RuntimeRoleCheckTests(PostgreSqlFixture database) : IClassFi
     }
 
     [Fact]
+    public async Task Start_stops_when_the_runtime_database_role_is_a_member_of_a_superuser_role()
+    {
+        using var folder = ApplicationFolder();
+        var (schemaConnection, role) = await PrepareAsync(folder, "CREATE ROLE {0}_su SUPERUSER NOLOGIN; GRANT {0}_su TO {0}");
+
+        var serverLogs = new LogCollector();
+        await using var server = CreateServer(schemaConnection, role, folder.Path, serverLogs);
+        var exception = Assert.ThrowsAny<Exception>(() => server.CreateClient());
+        var workerLogs = await RunWorkerUntilItStopsAsync(schemaConnection, role);
+
+        AssertNames(exception.ToString(), "tenant 'a'", "superuser");
+        Assert.Contains(workerLogs.Entries, entry => entry.Contains("tenant 'a'", StringComparison.Ordinal) && entry.Contains("superuser", StringComparison.Ordinal));
+        AssertNoSecrets(role, exception.ToString(), serverLogs, workerLogs);
+    }
+
+    [Fact]
+    public async Task Start_stops_when_the_runtime_database_role_may_create_objects_in_the_entities_schema_through_a_membership_without_inherit()
+    {
+        using var folder = ApplicationFolder();
+        var (schemaConnection, role) = await PrepareAsync(
+            folder,
+            "CREATE ROLE {0}_cr NOLOGIN; GRANT CREATE ON SCHEMA entities TO {0}_cr; GRANT {0}_cr TO {0} WITH INHERIT FALSE");
+
+        var serverLogs = new LogCollector();
+        await using var server = CreateServer(schemaConnection, role, folder.Path, serverLogs);
+        var exception = Assert.ThrowsAny<Exception>(() => server.CreateClient());
+        var workerLogs = await RunWorkerUntilItStopsAsync(schemaConnection, role);
+
+        AssertNames(exception.ToString(), "tenant 'a'", "create objects in the 'entities' schema");
+        Assert.Contains(workerLogs.Entries, entry => entry.Contains("create objects in the 'entities' schema", StringComparison.Ordinal));
+        AssertNoSecrets(role, exception.ToString(), serverLogs, workerLogs);
+    }
+
+    [Fact]
     public async Task Start_stops_when_the_runtime_database_role_owns_the_entities_schema()
     {
         using var folder = ApplicationFolder();
