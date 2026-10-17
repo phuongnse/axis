@@ -14,6 +14,9 @@ public sealed class AxisMetricsTests
     {
         ["axis.work_items.duration"] = ["axis.tenant", "axis.work_item.kind", "axis.outcome"],
         ["axis.process.instances.ended"] = ["axis.tenant", "axis.application", "axis.process", "axis.outcome"],
+        ["axis.work_items.due"] = ["axis.tenant", "axis.work_item.kind"],
+        ["axis.work_items.oldest_due_age"] = ["axis.tenant", "axis.work_item.kind"],
+        ["axis.computed.pending_fields"] = ["axis.tenant", "axis.application"],
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
     };
 
@@ -34,6 +37,7 @@ public sealed class AxisMetricsTests
         listener.SetMeasurementEventCallback<long>(Record);
         listener.SetMeasurementEventCallback<double>(Record);
         listener.Start();
+        using var gauges = new AxisGauges();
 
         void Record<T>(Instrument instrument, T measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
             where T : struct
@@ -57,6 +61,9 @@ public sealed class AxisMetricsTests
         AxisMetrics.RecordInstanceEnded("default", null, null, "failed");
         AxisMetrics.RecordCallAttempt("default", "PurchaseRequests", AxisTelemetry.ConnectorTag, "PurchasingSystem", "createOrder", "succeeded");
         AxisMetrics.RecordCallAttempt("default", null, AxisTelemetry.PackageTag, "PaymentReferences", "reserve", "retryable");
+
+        gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
+        listener.RecordObservableInstruments();
 
         Assert.Equal([.. _allowed.Keys.Order(StringComparer.Ordinal)], [.. published.Order(StringComparer.Ordinal)]);
         Assert.Equal([.. _allowed.Keys.Order(StringComparer.Ordinal)], [.. keys.Keys.Order(StringComparer.Ordinal)]);

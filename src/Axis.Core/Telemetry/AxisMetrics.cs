@@ -16,6 +16,15 @@ public static class AxisMetrics
     /// <summary>The duration of one work item run, in seconds, by tenant, kind and outcome.</summary>
     public const string WorkItemDuration = "axis.work_items.duration";
 
+    /// <summary>The work items whose due time has passed, by tenant and kind. A claimed item counts until it is done.</summary>
+    public const string WorkItemsDue = "axis.work_items.due";
+
+    /// <summary>The age in seconds of the oldest work item whose due time has passed, by tenant and kind.</summary>
+    public const string WorkItemsOldestDueAge = "axis.work_items.oldest_due_age";
+
+    /// <summary>The pending computed field names, by tenant and application.</summary>
+    public const string ComputedPendingFields = "axis.computed.pending_fields";
+
     /// <summary>The process instances that ended <c>completed</c> or <c>failed</c>.</summary>
     public const string InstancesEnded = "axis.process.instances.ended";
 

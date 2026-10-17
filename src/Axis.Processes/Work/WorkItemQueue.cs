@@ -121,6 +121,36 @@ public static class WorkItemQueue
                 await reader.IsDBNullAsync(15, cancellationToken) ? null : reader.GetString(15)));
     }
 
+    /// <summary>
+    /// Reads, for each kind that has an item whose due time has passed, how many items there are and how many
+    /// seconds the oldest has been due. A claimed item counts until it is done, so a hung item keeps aging.
+    /// Time is the transaction time, which a test scenario's <c>axis.now</c> fixes, as it is for a claim.
+    /// </summary>
+    public static async Task<IReadOnlyList<WorkItemGauge>> ReadDueAsync(
+        NpgsqlConnection connection,
+        string tenantId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await using var command = new NpgsqlCommand(
+            $"""
+            SELECT kind, count(*), extract(epoch FROM {SqlTranslator.NowSql} - min(due_at))::double precision
+            FROM axis.process_work_items
+            WHERE tenant_id = @tenant AND due_at <= {SqlTranslator.NowSql}
+            GROUP BY kind
+            """,
+            connection);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        var rows = new List<WorkItemGauge>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new WorkItemGauge(reader.GetString(0), reader.GetInt64(1), reader.GetDouble(2)));
+        }
+
+        return rows;
+    }
+
     /// <summary>The span that queued an item, or <see langword="null"/> when the item stores none or an id that is not hex of the right length.</summary>
     private static ActivityContext? QueuedBy(string? traceId, string? spanId) =>
         traceId is { Length: 32 } && spanId is { Length: 16 } && IsHex(traceId) && IsHex(spanId)
