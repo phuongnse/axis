@@ -144,6 +144,30 @@ public sealed class PurchasingStubTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
     }
 
+    [Fact]
+    public async Task An_unavailable_request_answers_503_and_stores_no_order_until_it_is_available_again()
+    {
+        using var on = await _client.PostAsync("/test/unavailable-request/PR-2026-00042", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, on.StatusCode);
+
+        using var other = await CreateAsync("key-other", "PR-2026-00041");
+        Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+
+        // The switch stays on, so every create for the number answers 503.
+        using var first = await CreateAsync("key-1", "PR-2026-00042");
+        using var second = await CreateAsync("key-1", "PR-2026-00042");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, first.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, second.StatusCode);
+        Assert.Equal(["PR-2026-00041"], (await ListAsync()).Select(o => o.GetProperty("requestNumber").GetString()));
+
+        using var off = await _client.PostAsync("/test/available-request/PR-2026-00042", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, off.StatusCode);
+
+        using var created = await CreateAsync("key-1", "PR-2026-00042");
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(["PR-2026-00041", "PR-2026-00042"], (await ListAsync()).Select(o => o.GetProperty("requestNumber").GetString()));
+    }
+
     [Theory]
     [InlineData(null, """{ "requestNumber": "PR-2026-00042", "amount": 120.5 }""")]
     [InlineData("key-1", """{ "amount": 120.5 }""")]
