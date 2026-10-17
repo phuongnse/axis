@@ -130,7 +130,8 @@ database roles, `axis_schema` and `axis_runtime`, own each test database with
 as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
 same: `samples/postgres/init-roles.sql` creates the roles and grants them
 nothing. The server and the worker run the start checks for a superuser, a
-schema owner or a role that may create objects.
+schema owner or a role that may create objects, also when the right comes
+through role membership.
 
 - **Two database roles per tenant.** The schema database role owns the `axis`
   and `entities` schemas. The runtime database role reads and writes data, and
@@ -184,9 +185,12 @@ What each database role may do:
   user. So does a runtime database role that is a superuser, owns the `axis` or
   `entities` schema, or may create objects in either. A role that is a member
   of the role that owns a schema counts as its owner, because it can `SET ROLE`
-  to the owner. The message names the tenant, the role and the first failed
-  check, in the order superuser, owner, `CREATE`, with `axis` before
-  `entities`. It never holds the connection string or the password. The
+  to the owner. The same goes for a member of a superuser role and for a
+  member of any role with `CREATE` on either schema, whatever the `INHERIT`
+  option of the membership. The message names the tenant, the role and the
+  first failed check, in the order superuser, owner, `CREATE`, with `axis`
+  before `entities`. When the right comes through another role, it also names
+  that role. It never holds the connection string or the password. The
   server runs the role check after its grant step, so a fresh database with the
   right roles starts, and again in its start-time release check, which runs for
   every tenant even when no folder is activated. The worker runs it once for
