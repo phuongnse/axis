@@ -2549,6 +2549,9 @@ database, with history in `axis.__processes_migrations` (see
   A partial unique index on
   application, process and subject record, where the state is `running` or
   `waiting`, enforces one start per submission.
+  Three more indexes serve the inspector's instance list: one by application,
+  process and start time, newest first, one by application, process, state and
+  start time, and one by subject record.
 - `axis.process_step_history`: one row per step occurrence. Times use the
   database clock.
 

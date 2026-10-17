@@ -27,6 +27,13 @@ public static class WorkItemQueue
         RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id
         """;
 
+    internal const string ReadDueSql = $"""
+        SELECT kind, count(*), extract(epoch FROM {SqlTranslator.NowSql} - min(due_at))::double precision
+        FROM axis.process_work_items
+        WHERE tenant_id = @tenant AND due_at <= {SqlTranslator.NowSql}
+        GROUP BY kind
+        """;
+
     /// <summary>
     /// Adds a ready work item and returns its id. <paramref name="processInstanceId"/> names the
     /// process instance the item runs a step or a connector call of, when it does,
@@ -132,14 +139,7 @@ public static class WorkItemQueue
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        await using var command = new NpgsqlCommand(
-            $"""
-            SELECT kind, count(*), extract(epoch FROM {SqlTranslator.NowSql} - min(due_at))::double precision
-            FROM axis.process_work_items
-            WHERE tenant_id = @tenant AND due_at <= {SqlTranslator.NowSql}
-            GROUP BY kind
-            """,
-            connection);
+        await using var command = new NpgsqlCommand(ReadDueSql, connection);
         command.Parameters.AddWithValue("tenant", tenantId);
         var rows = new List<WorkItemGauge>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);

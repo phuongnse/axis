@@ -394,10 +394,21 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_process_instances");
 
+                    b.HasIndex("SubjectId")
+                        .HasDatabaseName("ix_process_instances_subject_id");
+
                     b.HasIndex("ApplicationId", "ProcessId", "SubjectId")
                         .IsUnique()
                         .HasDatabaseName("ux_process_instances_active_subject")
                         .HasFilter("state IN ('running', 'waiting')");
+
+                    b.HasIndex("ApplicationId", "ProcessId", "CreatedAt", "Id")
+                        .IsDescending(false, false, true, true)
+                        .HasDatabaseName("ix_process_instances_application_id_process_id_created_at_id");
+
+                    b.HasIndex("ApplicationId", "ProcessId", "State", "CreatedAt", "Id")
+                        .IsDescending(false, false, false, true, true)
+                        .HasDatabaseName("ix_process_instances_application_id_process_id_state_created_at");
 
                     b.ToTable("process_instances", "axis");
                 });

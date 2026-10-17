@@ -70,6 +70,15 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .IsUnique()
                 .HasFilter("state IN ('running', 'waiting')")
                 .HasDatabaseName(ProcessStarts.ActiveSubjectIndex);
+
+            // The inspector lists a process's instances newest first, by state and by subject record.
+            instance.HasIndex(i => new { i.ApplicationId, i.ProcessId, i.CreatedAt, i.Id })
+                .IsDescending(false, false, true, true)
+                .HasDatabaseName("ix_process_instances_application_id_process_id_created_at_id");
+            instance.HasIndex(i => new { i.ApplicationId, i.ProcessId, i.State, i.CreatedAt, i.Id })
+                .IsDescending(false, false, false, true, true)
+                .HasDatabaseName("ix_process_instances_application_id_process_id_state_created_at");
+            instance.HasIndex(i => i.SubjectId).HasDatabaseName("ix_process_instances_subject_id");
         });
 
         modelBuilder.Entity<ProcessStepHistoryRow>(history =>

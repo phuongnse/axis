@@ -369,6 +369,13 @@ internal static class ComputedBackfill
     }
 
     /// <summary>
+    /// The query that reads the ids of the next batch of out-of-date rows of <paramref name="owner"/>. It binds
+    /// <c>@current</c>, the releases whose rows are up to date, as a <c>uuid[]</c>.
+    /// </summary>
+    internal static string OutOfDateBatchSql(EntityModel owner) =>
+        $"SELECT {IdColumn} FROM {RecordQueries.Table(owner)} WHERE {OutOfDate} ORDER BY {IdColumn} LIMIT {BatchSize}";
+
+    /// <summary>
     /// Recomputes one batch of the out-of-date rows of <paramref name="owner"/> with
     /// <paramref name="targetReleaseId"/>, from <paramref name="target"/>, on <paramref name="connection"/>
     /// inside <paramref name="transaction"/>. Returns the number of out-of-date rows it found, which is
@@ -386,7 +393,7 @@ internal static class ComputedBackfill
         var ids = await ComputedRecompute.ReadIdsAsync(
             connection,
             transaction,
-            $"SELECT {IdColumn} FROM {RecordQueries.Table(owner)} WHERE {OutOfDate} ORDER BY {IdColumn} LIMIT {BatchSize}",
+            OutOfDateBatchSql(owner),
             parameters => parameters.AddWithValue("current", currentReleaseIds.ToArray()),
             cancellationToken);
         await ComputedRecompute.RecomputeIdsAsync(connection, transaction, target, owner, targetReleaseId, ids, cancellationToken);

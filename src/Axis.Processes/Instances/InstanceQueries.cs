@@ -52,14 +52,12 @@ public static class InstanceQueries
             long totalCount;
             await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.process_instances AS {InstanceAlias} {where}", connection))
             {
-                AddParameters(count, applicationId, processId, subjectEntity.Id, state, subjectId, condition);
+                AddListParameters(count, applicationId, processId, subjectEntity.Id, state, subjectId, condition);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
             }
 
-            await using var command = new NpgsqlCommand(
-                $"SELECT {Columns} FROM axis.process_instances AS {InstanceAlias} {where} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset",
-                connection);
-            AddParameters(command, applicationId, processId, subjectEntity.Id, state, subjectId, condition);
+            await using var command = new NpgsqlCommand(ListPageSql(subjectEntity, condition), connection);
+            AddListParameters(command, applicationId, processId, subjectEntity.Id, state, subjectId, condition);
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -162,7 +160,14 @@ public static class InstanceQueries
             """;
     }
 
-    private static void AddParameters(
+    /// <summary>
+    /// The query that reads one page of the list. <c>@limit</c> and <c>@offset</c> are bound by the caller,
+    /// next to the parameters of <see cref="AddListParameters"/>.
+    /// </summary>
+    internal static string ListPageSql(EntityModel subjectEntity, RecordCondition? condition) =>
+        $"SELECT {Columns} FROM axis.process_instances AS {InstanceAlias} {Where(subjectEntity, condition)} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset";
+
+    internal static void AddListParameters(
         NpgsqlCommand command,
         Guid applicationId,
         Guid processId,
