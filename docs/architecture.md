@@ -23,7 +23,9 @@ flowchart LR
   It is the BFF: the OIDC client and the cookie session. The record API, the
   data source endpoint, the process start endpoint, the task API and the site
   endpoints require a session.
-- **Axis.Worker** executes durable work. It runs work items, and through them
+- **Axis.Worker** executes durable work. It serves health endpoints on its own
+  address *(planned for M7)*, see [health checks](#health-checks-planned-for-m7).
+  It runs work items, and through them
   the `decision`, `task`, `operation` and `end` steps of process instances.
   Operation steps include `updateRecord`, `callConnector` calls with their
   retries and reconciliation, and package operations. `raiseEvent` steps raise
@@ -668,6 +670,61 @@ starts, and for package operation steps, see
 The process resource, the start endpoint, the instance and task states, the
 task API, the worker settings and the tables are in
 [reference/processes.md](reference/processes.md).
+
+## Health checks *(planned for M7)*
+
+This section is *(planned for M7)*, as [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed)
+says. Today the server answers `/health/live` and `/health/ready`, and the
+ready answer lists its checks. The worker has no health endpoint.
+
+**The answer.** Each endpoint answers JSON of the form
+`{ "status": "Healthy" | "Degraded" | "Unhealthy" }` and nothing else.
+`/health` needs no session, so the answer names no tenant, database or error.
+M7 removes the `checks` map that today's answer holds. Healthy and Degraded
+answer `200`, so a degraded host still passes a readiness probe. Unhealthy
+answers `503`.
+
+**Server `/health/live`.** It runs no checks. It is Healthy while the process
+answers requests, with status `200`. It is never Degraded or Unhealthy.
+
+**Server `/health/ready`.**
+
+| Status | HTTP | When |
+| --- | --- | --- |
+| Healthy | `200` | The platform database answers, startup activation has finished for every tenant, and every tenant database answers. |
+| Degraded | `200` | The platform database answers and activation has finished, but at least one tenant database does not answer. |
+| Unhealthy | `503` | The platform database does not answer, or startup activation has not finished for every tenant. |
+
+- One tenant database that is down makes the server Degraded and not
+  Unhealthy, so one tenant cannot take the others offline, see
+  [tenancy](#tenancy-d10). Requests for that tenant fail and the others work.
+- The tenant is named in the logs and in a metric labelled with the tenant id,
+  never in the answer.
+- Today the server does not listen until startup activation has finished, see
+  [startup activation](reference/configuration.md#startup-activation). So a
+  probe gets no answer in that time. The activation rule matters once the
+  server listens earlier.
+
+**Worker.** The worker serves only `/health/live` and `/health/ready`, on the
+address `Health:Urls`. The default is `http://127.0.0.1:5208`, so nothing
+outside the host reaches it until someone changes the setting. See
+[worker settings](reference/processes.md#worker-settings). The worker is never
+Degraded. A tenant database that stops answering after the worker saw it
+migrated is only logged.
+
+The loop counts as stalled when it has not polled within twice
+`Worker:LeaseDuration`, one minute by default. A poll interval would be too
+short, because one work item can run for up to a lease.
+
+| Endpoint | Status | HTTP | When |
+| --- | --- | --- | --- |
+| `/health/live` | Healthy | `200` | The loop has polled within twice `Worker:LeaseDuration`. |
+| `/health/live` | Unhealthy | `503` | The loop has not polled within that time, so an orchestrator restarts the worker. |
+| `/health/ready` | Healthy | `200` | Every tenant database has its processes migrations, and the loop has polled within twice `Worker:LeaseDuration`. |
+| `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, or the loop has not polled within that time. |
+
+**Docker Compose.** The worker gets a health check on `/health/ready`. It runs
+inside the container, and Compose does not publish the worker's health port.
 
 ## Frontend
 
