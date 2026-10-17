@@ -81,7 +81,7 @@ public static class InstanceQueries
 
     private static string Where(EntityModel subjectEntity, RecordCondition? condition)
     {
-        var row = EntityNaming.Quote("r");
+        var row = EntityNaming.Quote(RecordQueries.RowAlias);
         var visible = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {InstanceAlias}.subject_id"
             + (condition is null ? "" : $" AND {condition.Sql}");
         return $"""
