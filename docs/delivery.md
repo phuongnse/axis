@@ -45,9 +45,7 @@ models, are not copied here. Look them up where they live.
 - **NexKit pauses at the Claude usage limit and resumes after it resets.** A
   Claude stage first moves to the second Claude subscription. NexKit pauses
   only when both are at their limit. The
-  run's comment shows the reset time. No person repeats the command. A stage
-  that runs on an OpenAI model on Azure does not pause: a rate or quota error
-  ends the run as an error, and the local agent repeats the command.
+  run's comment shows the reset time. No person repeats the command.
 - **A parent issue closes when its last part does.** With
   `close_parent_issues` on, NexKit closes a parent issue once every sub-issue
   is closed and at least one was completed.

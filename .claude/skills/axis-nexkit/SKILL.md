@@ -221,9 +221,8 @@ returns 404, upgrade `gh` and try again.
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that profile is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | A run is paused at the Claude usage limit (⏸️) | Nothing: NexKit runs the same command again after the reset. If it stops a second time with an unknown reset time, repeat the command. |
-| A stage on an Azure OpenAI agent errors at a rate or quota limit | Repeat the same command once. If it errors again, tell the owner. |
 | The *Restore caches* step reports a missed cache | Nothing for one run: setup installs from scratch, and the next successful CI run on `main` saves the cache. An older cache restored after a lock file changed is normal too. If every run misses, compare the `cache` entries with the CI cache steps and check that CI on `main` succeeds, because `actions/cache` saves only after a successful job. |
-| The review job errored | Comment `/nexkit review` to retry. |
+| The review job errored | The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
 | NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
 | CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the `bug` label, the failure and the run link, in the current milestone, and plan it before other issues. |
