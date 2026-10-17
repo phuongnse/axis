@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using Axis.Core.Telemetry;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -11,10 +13,12 @@ namespace Axis.Worker;
 internal static class WorkerTelemetry
 {
     /// <summary>
-    /// Traces the worker's outgoing HTTP calls, PostgreSQL commands and Axis spans, and publishes the
-    /// standard and Axis metrics. Traces are exported over OTLP only when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c>
-    /// or <c>OTEL_EXPORTER_OTLP_TRACES_ENDPOINT</c> is set, and metrics only when
-    /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> or <c>OTEL_EXPORTER_OTLP_METRICS_ENDPOINT</c> is set.
+    /// Traces the worker's outgoing HTTP calls, PostgreSQL commands and Axis spans, sends logs through the
+    /// OpenTelemetry logging provider, and publishes the standard and Axis metrics. Traces are exported over
+    /// OTLP only when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> or <c>OTEL_EXPORTER_OTLP_TRACES_ENDPOINT</c> is
+    /// set, logs only when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> or <c>OTEL_EXPORTER_OTLP_LOGS_ENDPOINT</c> is
+    /// set, and metrics only when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> or
+    /// <c>OTEL_EXPORTER_OTLP_METRICS_ENDPOINT</c> is set.
     /// <c>OTEL_SERVICE_NAME</c> overrides the service name.
     /// </summary>
     public static IServiceCollection AddWorkerTelemetry(this IServiceCollection services, IConfiguration configuration)
@@ -24,6 +28,12 @@ internal static class WorkerTelemetry
             || !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"]);
         var exportMetrics = !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"])
             || !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"]);
+        var exportLogs = !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"])
+            || !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"]);
+
+        // Each log entry carries the trace and span ids of the current activity in its scope.
+        services.Configure<LoggerFactoryOptions>(options =>
+            options.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId);
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(configuration["OTEL_SERVICE_NAME"] ?? "axis-worker"))
             .WithTracing(tracing =>
@@ -38,6 +48,15 @@ internal static class WorkerTelemetry
                     tracing.AddOtlpExporter();
                 }
             })
+            .WithLogging(
+                logging =>
+                {
+                    if (exportLogs)
+                    {
+                        logging.AddOtlpExporter();
+                    }
+                },
+                options => options.IncludeScopes = true)
             .WithMetrics(metrics =>
             {
                 metrics.AddStandardMetrics();

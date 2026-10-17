@@ -166,7 +166,8 @@ public sealed partial class WorkItemRunner
                 await transaction.RollbackAsync(cancellationToken);
             }
 
-            LogFailed(error, item.Id, item.Kind, item.TenantId);
+            // The exception type only: its message and inner exceptions can quote record values.
+            LogFailed(item.Id, item.Kind, item.TenantId, error.GetType().FullName ?? error.GetType().Name);
 
             // An exception from here on rolls back as the transaction is disposed, so the item stays
             // claimed until its lease expires.
@@ -229,6 +230,6 @@ public sealed partial class WorkItemRunner
     [LoggerMessage(LogLevel.Warning, "Work item {ItemId} of kind {Kind} for tenant {TenantId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, string kind, string tenantId);
 
-    [LoggerMessage(LogLevel.Error, "Work item {ItemId} of kind {Kind} for tenant {TenantId} failed. Its writes were rolled back.")]
-    private partial void LogFailed(Exception exception, Guid itemId, string kind, string tenantId);
+    [LoggerMessage(LogLevel.Error, "Work item {ItemId} of kind {Kind} for tenant {TenantId} failed with {ErrorType}. Its writes were rolled back.")]
+    private partial void LogFailed(Guid itemId, string kind, string tenantId, string errorType);
 }

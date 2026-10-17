@@ -377,7 +377,7 @@ otherwise the answer is the stale-version `409`. See
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
-- **`traceId`** *(planned for M7)*. Every problem details answer has a
+- **`traceId`**. Every problem details answer has a
   `traceId` member, the request's 32-hex W3C trace id. It names no tenant,
   record or user. An operator uses it to find the request and its run, see
   [Telemetry](../architecture.md#telemetry).

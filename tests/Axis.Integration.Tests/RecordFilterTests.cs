@@ -234,7 +234,7 @@ public sealed class RecordFilterTests(RecordApiFixture fixture) : IClassFixture<
             fixture.Logs.Entries,
             entry => entry.Contains("A record list of entity Item failed", StringComparison.Ordinal)
                 && entry.Contains("grant 1 of policy FailingAccess", StringComparison.Ordinal));
-        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("FailingAccess", StringComparison.Ordinal) && entry.Contains("Desk", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("Desk", StringComparison.Ordinal) || entry.Contains("Chair", StringComparison.Ordinal));
     }
 
     private Task<Guid> InsertItemAsync(string name, string? status) =>

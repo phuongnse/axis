@@ -96,6 +96,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             context.Transaction,
             new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now),
             cancellationToken);
+
+        // The same fixed text the history row stores. It holds names and the error kind, never a value.
+        LogStepFailed(instanceId, step, failure?.Message ?? TypeName(exception));
         await AuditRecords.AppendAsync(
             context.Transaction,
             new AuditEntry(
@@ -766,6 +769,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     [LoggerMessage(LogLevel.Warning, "Process instance {InstanceId} is missing or not running (state {State}), so its step work item was discarded.")]
     private partial void LogNotRunning(Guid instanceId, string? state);
+
+    [LoggerMessage(LogLevel.Warning, "Step {Step} of process instance {InstanceId} failed: {Error}")]
+    private partial void LogStepFailed(Guid instanceId, string step, string error);
 
     [LoggerMessage(LogLevel.Warning, "Step {Step} of process instance {InstanceId} ran at revision {Revision}, but the instance changed since, so the step wrote nothing.")]
     private partial void LogStaleRevision(Guid instanceId, string step, long revision);

@@ -32,7 +32,8 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
     .AddCheck<StartupActivationHealthCheck>("activation", tags: [HealthEndpoints.ReadyTag])
     .AddCheck<TenantDatabasesHealthCheck>("tenant-databases", failureStatus: HealthStatus.Degraded, tags: [HealthEndpoints.ReadyTag]);
-builder.Services.AddProblemDetails();
+// Every problem details answer carries the request's trace id.
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemTraceId.Apply);
 builder.Services.AddServerTelemetry(builder.Configuration);
 builder.Services.AddTenancy(builder.Configuration, builder.Environment);
 

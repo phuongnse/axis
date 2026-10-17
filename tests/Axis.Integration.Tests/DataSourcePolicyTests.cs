@@ -171,7 +171,7 @@ public sealed class DataSourcePolicyTests(RecordApiFixture fixture) : IClassFixt
             fixture.Logs.Entries,
             entry => entry.Contains("A data source ActiveItems failed", StringComparison.Ordinal)
                 && entry.Contains("grant 0 of policy FailingAccess", StringComparison.Ordinal));
-        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("FailingAccess", StringComparison.Ordinal) && entry.Contains("Desk", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("Desk", StringComparison.Ordinal));
     }
 
     /// <summary>The condition of the <c>read</c> filters of the <c>filtered</c> role on <paramref name="entity"/>.</summary>

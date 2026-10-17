@@ -171,7 +171,7 @@ public static partial class DataChangeTriggerStarts
                         trigger.Name,
                         trigger.Process.Name,
                         written.Id,
-                        evaluated.Error is { } error ? $"the when failed: {Clause(error.Message)}" : "the when is not true");
+                        evaluated.Error is { } error ? $"the when failed: {error.Kind}" : "the when is not true");
                     continue;
                 }
             }
@@ -204,8 +204,8 @@ public static partial class DataChangeTriggerStarts
                     written.Id,
                     started.Outcome == ProcessStartOutcome.AlreadyRunning
                         ? "the process already runs for the record"
-                        : started.Error is { } error
-                            ? $"the start condition failed: {Clause(error)}"
+                        : started.ErrorKind is { } errorKind
+                            ? $"the start condition failed: {errorKind}"
                             : "the start condition is not true");
             }
         }
@@ -213,7 +213,4 @@ public static partial class DataChangeTriggerStarts
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId}: {Reason}.")]
     private static partial void LogSkipped(ILogger logger, string trigger, string process, Guid subjectId, string reason);
-
-    /// <summary>An error message without its closing period, to fit inside the log line.</summary>
-    private static string Clause(string message) => message.TrimEnd('.');
 }

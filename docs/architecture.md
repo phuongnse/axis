@@ -687,15 +687,15 @@ task API, the worker settings and the tables are in
 
 The server and the worker emit correlated logs, metrics and traces with
 OpenTelemetry and W3C trace context. Traces and their stored correlation are
-built. So are the standard metrics and the work item duration, process instance
-and call attempt metrics. The gauges, OTLP logs, the log scope and the problem
-details `traceId` stay *(planned for M7)*. See
+built. So are the OTLP logs, the log scope, the problem details `traceId`,
+the standard metrics and the work item duration, process instance and call
+attempt metrics. The gauges stay *(planned for M7)*. See
 [D36](decisions.md#d36-correlated-logs-metrics-and-traces--agreed).
 
 ### Signals and export
 
-Both hosts export traces and metrics over OTLP. Logs follow *(planned for
-M7)*. The standard `OTEL_*` variables set the export, see
+Both hosts export traces, logs and metrics over OTLP. The standard `OTEL_*`
+variables set the export, see
 [Telemetry export](reference/configuration.md#telemetry-export). With no
 endpoint, nothing is exported and logs still go to the console. Docker Compose
 and `scripts/dev.sh` start no collector. The scenario runner, `Axis.Scenarios`,
@@ -747,15 +747,26 @@ is not part of this design.
 - **Errors.** An Axis span that fails records the exception type only, with no
   message.
 
-### Logs *(planned for M7)*
+### Logs
 
 The console always gets logs. OTLP gets them too when an endpoint is set. Each
 record carries `TraceId` and `SpanId` in its scope, next to the `TenantId` of
-the [log scope](#request-resolution).
+the [log scope](#request-resolution). The console shows scopes, so an operator
+can go from a reported `traceId` to its logs with no collector.
+
+- **Failed steps.** A step failure logs the step name, the instance id and the
+  same fixed text the step history row stores. It names the error kind, such
+  as `DivisionByZero`, and never a value.
+- **Failed work items.** A failed work item logs its kind, its id and the
+  exception type only. The exception message and its inner exceptions can quote
+  a record value, so the log leaves them out.
+- **Skipped trigger starts.** A trigger that skips a start because its `when`
+  or start condition hit a run-time error logs the error kind, never the
+  error message.
 
 ### Correlation
 
-- **Problem details.** *(planned for M7)* Every problem details answer carries
+- **Problem details.** Every problem details answer carries
   a `traceId`, see [Errors](reference/record-api.md#errors).
 - **Stored history.** Step history rows and call attempt rows store the
   `trace_id` of their run, see [Tables](reference/processes.md#tables). A

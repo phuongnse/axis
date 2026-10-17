@@ -2,7 +2,10 @@ using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Data.Naming;
 using Axis.Processes.Instances;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
+using OpenTelemetry.Logs;
 
 namespace Axis.Integration.Tests;
 
@@ -113,6 +116,27 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
         Assert.Empty(await fixture.HistoryAsync(instanceId));
         Assert.Empty(await fixture.SystemAuditActionsAsync(instanceId));
         Assert.Equal(0L, await CountWorkItemsAsync(instanceId));
+    }
+
+    [Fact]
+    public async Task Step_that_fails_at_run_time_logs_the_step_and_the_error_kind_and_no_record_value()
+    {
+        var subjectId = await fixture.InsertRequestAsync(7341.29m, 0);
+        var instanceId = await fixture.StartAsync("Divide", subjectId, fixture.FirstReleaseId);
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Contains(
+            fixture.Logs.Entries,
+            entry => entry.Contains($"Step check of process instance {instanceId} failed", StringComparison.Ordinal)
+                && entry.Contains("DivisionByZero", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("7341", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_worker_registers_the_OpenTelemetry_logger_provider()
+    {
+        Assert.Contains(fixture.Services.GetServices<ILoggerProvider>(), provider => provider is OpenTelemetryLoggerProvider);
     }
 
     [Fact]

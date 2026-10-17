@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Audit;
 using Axis.Data.Records;
+using Axis.Expressions.Evaluation;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Npgsql;
@@ -53,7 +54,7 @@ public static class ProcessStarter
             var result = await RecordExpressions.EvaluateAsync(connection, application, entity, record, condition.Expression, now, cancellationToken);
             if (result.Value is not true)
             {
-                return new ProcessStartResult(ProcessStartOutcome.ConditionFailed, condition.Message.TextKey, result.Error?.Message);
+                return new ProcessStartResult(ProcessStartOutcome.ConditionFailed, condition.Message.TextKey, result.Error?.Kind);
             }
         }
 
@@ -122,6 +123,7 @@ public enum ProcessStartOutcome
 
 /// <summary>
 /// The outcome of a start, with the start condition's message text key when it failed, and the
-/// run-time error's message when the condition failed with one.
+/// run-time error's kind when the condition failed with one. The kind, never the error message, is
+/// what a log may name, because the message can quote a value.
 /// </summary>
-public sealed record ProcessStartResult(ProcessStartOutcome Outcome, string? TextKey = null, string? Error = null);
+public sealed record ProcessStartResult(ProcessStartOutcome Outcome, string? TextKey = null, ExpressionRuntimeErrorKind? ErrorKind = null);
