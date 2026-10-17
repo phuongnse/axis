@@ -295,6 +295,48 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task A_retried_package_call_runs_again_under_the_same_operation_id_and_its_attempts_carry_on()
+    {
+        var tenant = fixture.Tenant;
+        var (subjectId, instanceId) = await fixture.StageAsync("PackageFlakyShort", CancellationToken, divisor: 3);
+        var callId = await CallIdAsync(instanceId);
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync(CancellationToken));
+        await fixture.MakeDueAsync(callId);
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync(CancellationToken));
+        var failed = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Failed, 2), (failed.State, failed.Attempts));
+        Assert.Equal(ProcessStarts.Failed, (await tenant.InstanceAsync(instanceId)).State);
+
+        // The retry writes the step's retry policy and the operation's idempotent flag (true for flaky) again, so stale values must not survive it.
+        await tenant.ScalarAsync("UPDATE axis.package_calls SET retry_attempts = 1, idempotent = false WHERE id = @id", ("id", callId));
+
+        await fixture.RetryAsync("PackageFlakyShort", instanceId, CancellationToken);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync(CancellationToken));
+
+        Assert.Equal(callId, await CallIdAsync(instanceId));
+        var restaged = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Pending, 0, (string?)null, "{\"failures\": 3}"), (restaged.State, restaged.Attempts, restaged.LastError, restaged.Input));
+        Assert.Equal(2, await tenant.ScalarAsync("SELECT retry_attempts FROM axis.package_calls WHERE id = @id", ("id", callId)));
+        Assert.Equal(true, await tenant.ScalarAsync("SELECT idempotent FROM axis.package_calls WHERE id = @id", ("id", callId)));
+        Assert.Null(await tenant.ScalarAsync("SELECT settled_at FROM axis.package_calls WHERE id = @id", ("id", callId)));
+        Assert.Equal(ProcessStarts.Waiting, (await tenant.InstanceAsync(instanceId)).State);
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync(CancellationToken));
+        await fixture.MakeDueAsync(callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+
+        var settled = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Succeeded, 2), (settled.State, settled.Attempts));
+
+        // The operation counts per operation id, so the fourth run succeeding shows it saw the same identity.
+        Assert.Equal(
+            [("attempt", 1, "retryable"), ("attempt", 2, "retryable"), ("attempt", 3, "retryable"), ("attempt", 4, "succeeded")],
+            (await AttemptsAsync(callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
+        Assert.Equal(4L, (await fixture.RequestAsync(subjectId)).Values["total"]!.GetValue<long>());
+    }
+
+    [Fact]
     public async Task A_worker_that_does_not_hold_the_pinned_version_counts_an_attempt_and_reschedules_the_call()
     {
         var tenant = fixture.Tenant;

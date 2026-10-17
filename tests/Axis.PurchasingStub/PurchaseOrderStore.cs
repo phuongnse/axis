@@ -10,7 +10,8 @@ internal sealed record PurchaseOrder(
 
 /// <summary>
 /// The stub's orders, by idempotency key and in creation order, and the drops and holds that tests
-/// ask for. Each drop and each hold happens once.
+/// ask for. Each drop and each hold happens once. A request made unavailable stays so until a test
+/// makes it available again.
 /// </summary>
 internal sealed class PurchaseOrderStore
 {
@@ -19,6 +20,7 @@ internal sealed class PurchaseOrderStore
     private readonly List<PurchaseOrder> _orders = [];
     private readonly HashSet<string> _dropKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _dropRequests = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _unavailableRequests = new(StringComparer.Ordinal);
 
     // The holds no create has met yet, and the holds not yet released, by request number.
     private readonly Dictionary<string, TaskCompletionSource> _holds = new(StringComparer.Ordinal);
@@ -92,6 +94,32 @@ internal sealed class PurchaseOrderStore
         lock (_lock)
         {
             _dropRequests.Add(requestNumber);
+        }
+    }
+
+    /// <summary>Makes every create for the request fail with <c>503</c> until <see cref="MakeAvailable"/>.</summary>
+    public void MakeUnavailable(string requestNumber)
+    {
+        lock (_lock)
+        {
+            _unavailableRequests.Add(requestNumber);
+        }
+    }
+
+    /// <summary>Lets creates for the request succeed again.</summary>
+    public void MakeAvailable(string requestNumber)
+    {
+        lock (_lock)
+        {
+            _unavailableRequests.Remove(requestNumber);
+        }
+    }
+
+    public bool IsUnavailable(string requestNumber)
+    {
+        lock (_lock)
+        {
+            return _unavailableRequests.Contains(requestNumber);
         }
     }
 
