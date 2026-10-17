@@ -3,7 +3,6 @@ using Axis.Configuration.Model;
 using Axis.Data.Naming;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
-using Axis.Expressions.Syntax;
 using Axis.Expressions.Typing;
 
 namespace Axis.Data.Schema;
@@ -15,8 +14,9 @@ namespace Axis.Data.Schema;
 /// a migration covers is not reported, and a field that a <c>fill</c> covers may become required. A
 /// change that does not fit the stored schema is skipped: the table or the <c>from</c> column is
 /// missing, or the <c>to</c> column exists. If something is left over, the planner still reports it.
-/// A <c>fill</c> or <c>convert</c> on a child entity, or of a field that a computed field reads, is
-/// refused, because activation cannot recompute computed fields yet.
+/// A <c>fill</c> or <c>convert</c> sets the release stamp of each row it changes to <c>NULL</c>. On a child
+/// entity it also increments the version of the owner of each changed row and clears the owner's stamp.
+/// <see cref="RecomputedEntityIds"/> names the entities whose rows activation then recomputes.
 /// </summary>
 internal sealed class MigrationPlanning
 {
@@ -61,6 +61,12 @@ internal sealed class MigrationPlanning
 
     public List<DestructiveChange> DestructiveChanges { get; } = [];
 
+    /// <summary>
+    /// The entities that own the rows a <c>fill</c> or <c>convert</c> changes: the entity itself, or for a child
+    /// entity the entity whose child collection it is. Activation recomputes their rows with a cleared stamp.
+    /// </summary>
+    public HashSet<Guid> RecomputedEntityIds { get; } = [];
+
     public CatalogSnapshot Catalog => new(_tables);
 
     public ProvisioningRecords Records => new(_entities, _enumValues);
@@ -100,9 +106,6 @@ internal sealed class MigrationPlanning
         }
     }
 
-    private void NotApplied(MigrationModel migration, int index, string message) =>
-        Diagnostics.Add(new Diagnostic(DiagnosticCodes.MigrationChangeNotApplied, message, migration.File, $"/changes/{index}/type", migration.Id));
-
     // The application's active release describes the tables that hold the data now, and only it has a dropped
     // entity. The release being activated covers entities the active release does not have.
     private Guid? FindEntityId(string name)
@@ -122,20 +125,7 @@ internal sealed class MigrationPlanning
         var table = _tables[tableIndex];
         var column = EntityNaming.Column(change.Field!);
 
-        if (table.Columns.Any(candidate => candidate.Name == EntityNaming.OwnerColumn))
-        {
-            NotApplied(migration, index, "A 'fill' on a child entity is not applied yet: it must also change the owner's version and recompute the owner's computed fields.");
-            return;
-        }
-
         var releaseEntity = _model.Entities.FirstOrDefault(entity => entity.Id == entityId);
-        var names = NamesAfter(migration, index, entityId, change.Field!);
-        var reader = releaseEntity?.Fields.FirstOrDefault(field => field.Computed is { } computed && Reads(computed.Syntax, names));
-        if (reader is not null)
-        {
-            NotApplied(migration, index, $"A 'fill' of '{change.Field}' is not applied yet: the computed field '{reader.Name}' reads it, and activation cannot recompute computed fields.");
-            return;
-        }
 
         var existing = table.Columns.FirstOrDefault(candidate => candidate.Name == column);
         var quotedTable = EntityNaming.QualifiedTable(table.Name);
@@ -197,18 +187,24 @@ internal sealed class MigrationPlanning
             return;
         }
 
-        var version = columns.Any(candidate => candidate.Name == EntityNaming.VersionColumn)
-            ? $", {EntityNaming.Quote(EntityNaming.VersionColumn)} = {EntityNaming.Quote(EntityNaming.VersionColumn)} + 1"
-            : "";
+        var owner = FindOwner(table);
+        if (owner is { Exists: false })
+        {
+            return;
+        }
+
         var quotedColumn = EntityNaming.Quote(column);
+        var returning = owner is null ? quotedColumn : $"{EntityNaming.Quote(EntityNaming.OwnerColumn)}, {quotedColumn}";
+        var ownerUpdate = owner is null ? "" : $", owners AS ({owner.Update("filled")})";
         Commands.AddRange(addColumn);
         Commands.Add(new SchemaCommand(
-            $"WITH filled AS (UPDATE {quotedTable} SET {quotedColumn} = {translated.Sql}{version} WHERE {quotedColumn} IS NULL RETURNING {quotedColumn}) "
+            $"WITH filled AS (UPDATE {quotedTable} SET {quotedColumn} = {translated.Sql}{Stale(columns)} WHERE {quotedColumn} IS NULL RETURNING {returning}){ownerUpdate} "
             + $"SELECT count(*) FROM filled WHERE {quotedColumn} IS NULL")
         {
             Parameters = translated.Parameters,
             Fill = new FillTarget(migration.Id, migration.File, index, change.Field!),
         });
+        RecomputedEntityIds.Add(RecomputedOwnerId(entityId, owner));
         _tables[tableIndex] = table with { Columns = columns };
     }
 
@@ -221,21 +217,8 @@ internal sealed class MigrationPlanning
         var table = _tables[tableIndex];
         var column = EntityNaming.Column(change.Field!);
 
-        if (table.Columns.Any(candidate => candidate.Name == EntityNaming.OwnerColumn))
-        {
-            NotApplied(migration, index, "A 'convert' on a child entity is not applied yet: it must also change the owner's version and recompute the owner's computed fields.");
-            return;
-        }
-
         var releaseEntity = _model.Entities.FirstOrDefault(entity => entity.Id == entityId);
         var names = NamesAfter(migration, index, entityId, change.Field!);
-        var reader = releaseEntity?.Fields.FirstOrDefault(field => field.Computed is { } computed && Reads(computed.Syntax, names));
-        if (reader is not null)
-        {
-            NotApplied(migration, index, $"A 'convert' of '{change.Field}' is not applied yet: the computed field '{reader.Name}' reads it, and activation cannot recompute computed fields.");
-            return;
-        }
-
         var existing = table.Columns.FirstOrDefault(candidate => candidate.Name == column);
         var field = releaseEntity?.Fields.FirstOrDefault(candidate => names.Contains(candidate.Name));
         if (existing is null || field is null)
@@ -301,9 +284,13 @@ internal sealed class MigrationPlanning
             return;
         }
 
-        var version = table.Columns.Any(candidate => candidate.Name == EntityNaming.VersionColumn)
-            ? $", {EntityNaming.Quote(EntityNaming.VersionColumn)} = {EntityNaming.Quote(EntityNaming.VersionColumn)} + 1"
-            : "";
+        var owner = FindOwner(table);
+        if (owner is { Exists: false })
+        {
+            return;
+        }
+
+        var stale = Stale(table.Columns);
         var quotedTable = EntityNaming.QualifiedTable(table.Name);
         var quotedColumn = EntityNaming.Quote(column);
 
@@ -316,8 +303,10 @@ internal sealed class MigrationPlanning
             parameters.AddRange(kept.Select((value, position) => new SqlValue($"k{position}", ExpressionTypeKind.Text, value)));
             var removedList = string.Join(", ", removed.Select((_, position) => $"@r{position}"));
             var keptList = kept.Count == 0 ? "" : $" AND {quotedColumn} NOT IN ({string.Join(", ", kept.Select((_, position) => $"@k{position}"))})";
+            var returning = owner is null ? quotedColumn : $"{EntityNaming.Quote(EntityNaming.OwnerColumn)}, {quotedColumn}";
+            var ownerUpdate = owner is null ? "" : $", owners AS ({owner.Update("converted")})";
             Commands.Add(new SchemaCommand(
-                $"WITH converted AS (UPDATE {quotedTable} SET {quotedColumn} = {translated.Sql}{version} WHERE {quotedColumn} IN ({removedList}) RETURNING {quotedColumn}) "
+                $"WITH converted AS (UPDATE {quotedTable} SET {quotedColumn} = {translated.Sql}{stale} WHERE {quotedColumn} IN ({removedList}) RETURNING {returning}){ownerUpdate} "
                 + $"SELECT count(*) FROM converted WHERE {quotedColumn} IS NOT NULL{keptList}")
             {
                 Parameters = parameters,
@@ -328,6 +317,7 @@ internal sealed class MigrationPlanning
                 && removed.Contains(value.Value, StringComparer.Ordinal));
             RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.Convert, entityId, change.Field, null) { Values = removed });
             DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.Field));
+            RecomputedEntityIds.Add(RecomputedOwnerId(entityId, owner));
             return;
         }
 
@@ -337,7 +327,10 @@ internal sealed class MigrationPlanning
         var alterTable = $"ALTER TABLE {quotedTable}";
         var target = new ConvertTarget(migration.Id, migration.File, index, change.Field!, CountsDisallowed: false);
         Commands.Add(new SchemaCommand($"{alterTable} ADD COLUMN {staging} {expected}") { Convert = target });
-        Commands.Add(new SchemaCommand($"UPDATE {quotedTable} SET {staging} = ({translated.Sql})::{cast}{version}")
+        var stagingUpdate = owner is null
+            ? $"UPDATE {quotedTable} SET {staging} = ({translated.Sql})::{cast}{stale}"
+            : $"WITH converted AS (UPDATE {quotedTable} SET {staging} = ({translated.Sql})::{cast} RETURNING {EntityNaming.Quote(EntityNaming.OwnerColumn)}) {owner.Update("converted")}";
+        Commands.Add(new SchemaCommand(stagingUpdate)
         {
             Parameters = translated.Parameters,
             Convert = target,
@@ -349,6 +342,66 @@ internal sealed class MigrationPlanning
             Columns = [.. table.Columns.Select(candidate => candidate == existing ? existing with { Type = expected } : candidate)],
         };
         DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.Field));
+        RecomputedEntityIds.Add(RecomputedOwnerId(entityId, owner));
+    }
+
+    // The row assignments that mark a changed row for a recompute, for the columns the table has: a version bump,
+    // so an edit begun before the migration gets a conflict, and a cleared release stamp. A child table has neither.
+    private static string Stale(IEnumerable<CatalogColumn> columns) => string.Concat(StaleAssignments(columns).Select(assignment => ", " + assignment));
+
+    private static List<string> StaleAssignments(IEnumerable<CatalogColumn> columns)
+    {
+        var present = columns.Select(column => column.Name).ToHashSet();
+        var assignments = new List<string>();
+        if (present.Contains(EntityNaming.VersionColumn))
+        {
+            assignments.Add($"{EntityNaming.Quote(EntityNaming.VersionColumn)} = {EntityNaming.Quote(EntityNaming.VersionColumn)} + 1");
+        }
+
+        if (present.Contains(EntityNaming.ComputedReleaseColumn))
+        {
+            assignments.Add($"{EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} = NULL");
+        }
+
+        return assignments;
+    }
+
+    // The owner of a child table's rows, null for a table that is not a child table. A child table whose owner
+    // table the catalog lacks, or that has no version or stamp column, gives an owner that does not exist, and the change is not planned.
+    private OwnerUpdate? FindOwner(CatalogTable table)
+    {
+        var ownerColumn = table.Columns.FirstOrDefault(candidate => candidate.Name == EntityNaming.OwnerColumn);
+        if (ownerColumn is null)
+        {
+            return null;
+        }
+
+        var owner = _tables.FirstOrDefault(candidate => candidate.Name == ownerColumn.ReferencedTable);
+        var assignments = owner is null ? [] : StaleAssignments(owner.Columns);
+        return owner is null || assignments.Count == 0
+            ? new OwnerUpdate(false, "", [])
+            : new OwnerUpdate(true, EntityNaming.QualifiedTable(owner.Name), assignments);
+    }
+
+    // The entity whose rows activation recomputes: the entity itself, or for a child entity the entity whose
+    // child collection it is. Nesting is one level only.
+    private Guid RecomputedOwnerId(Guid entityId, OwnerUpdate? owner)
+    {
+        if (owner is null)
+        {
+            return entityId;
+        }
+
+        var parent = _model.Entities.FirstOrDefault(entity =>
+            entity.Fields.Any(field => field.Type == FieldType.ChildCollection && field.Target?.Id == entityId));
+        return parent?.Id ?? entityId;
+    }
+
+    private sealed record OwnerUpdate(bool Exists, string QuotedTable, IReadOnlyList<string> Assignments)
+    {
+        // Marks the owner of every row that the CTE named by source returned.
+        public string Update(string source) =>
+            $"UPDATE {QuotedTable} SET {string.Join(", ", Assignments)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} IN (SELECT {EntityNaming.Quote(EntityNaming.OwnerColumn)} FROM {source})";
     }
 
     // The release names the field by its last name, so a rename after the fill gives the names to look for.
@@ -378,18 +431,6 @@ internal sealed class MigrationPlanning
 
         return names;
     }
-
-    private static bool Reads(ExpressionNode node, HashSet<string> fields) => node switch
-    {
-        NameNode name => fields.Contains(name.Name),
-        MemberNode member => Reads(member.Target, fields),
-        CallNode call => call.Arguments.Any(argument => Reads(argument, fields)),
-        UnaryNode unary => Reads(unary.Operand, fields),
-        BinaryNode binary => Reads(binary.Left, fields) || Reads(binary.Right, fields),
-        IsNullNode isNull => Reads(isNull.Operand, fields),
-        InNode inNode => Reads(inNode.Operand, fields) || inNode.Items.Any(item => Reads(item, fields)),
-        _ => false,
-    };
 
     private void Rename(MigrationModel migration, int tableIndex, Guid entityId, MigrationChangeModel change)
     {

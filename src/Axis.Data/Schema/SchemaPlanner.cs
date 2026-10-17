@@ -131,6 +131,7 @@ public static class SchemaPlanner
                 {
                     RecordChanges = [.. migrations.RecordChanges],
                     DestructiveChanges = [.. migrations.DestructiveChanges],
+                    RecomputedEntityIds = [.. migrations.RecomputedEntityIds],
                 };
 
         private void PlanNewTable(EntityModel entity, string table, ChildOwner? childOwner)

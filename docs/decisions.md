@@ -1111,9 +1111,8 @@ work without the code its release pins.
 Activation applies the `renameField`, `dropField`, `dropEntity`, `fill` and
 `convert` migrations once per tenant. The start lock and the old-release work
 check are built too. The recompute of computed fields at activation is built,
-but its use by a `fill` or `convert` is not yet *(planned for M7)*. Until
-then, a `fill` or `convert` on a child entity and a `fill` or
-`convert` of a field that a computed field reads are refused. Migrations
+and so is its use by a `fill` or `convert`, including one on a child entity.
+Migrations
 change entity storage in ways that are not additive, before provisioning.
 See [configuration](reference/configuration.md#resource-file-shape) for the
 resource shape and [storage](reference/storage.md#migrations) for planning,
@@ -1394,8 +1393,9 @@ A stored computed field stays correct when its expression or its inputs
 change. One recompute covers a changed expression, a computed field added to a
 table with rows and a migration `fill` or `convert`. Small tables recompute at
 activation. Large tables recompute in the worker, in batches. The recompute at
-activation of a changed or added computed field is built, with no limit yet. The
-rest is *(planned for M7)*. See
+activation of a changed or added computed field, and of the rows a migration
+`fill` or `convert` changed, is built, with no limit yet. The rest is
+*(planned for M7)*. See
 [storage](reference/storage.md#recomputing-computed-fields) for the steps and
 a walkthrough.
 The owner confirmed these points on issue #473 on 2026-10-17.

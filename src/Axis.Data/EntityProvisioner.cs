@@ -49,7 +49,9 @@ namespace Axis.Data;
 /// transaction recomputes the stored computed values of each entity whose computed definitions differ from the
 /// active release's, with the release being activated. A computed field that fails for a record gets <c>NULL</c>
 /// and a row in <c>axis.computed_field_errors</c>, and the activation goes on. Activating the active release again
-/// recomputes nothing.
+/// recomputes nothing. A <c>fill</c> or <c>convert</c> clears the release stamp of the rows it changes, and of the
+/// owner of each changed child row. The transaction then recomputes the rows of the touched entities that have no
+/// stamp, unless it already recomputed the whole entity.
 /// </para>
 /// </summary>
 public static class EntityProvisioner
@@ -189,7 +191,7 @@ public static class EntityProvisioner
 
             if (migrations.ReadActiveComputedFingerprintsAsync is { } readActiveFingerprints)
             {
-                await RecomputeChangedEntitiesAsync(model, migrations.ReleaseId, await readActiveFingerprints(cancellationToken), connection, npgsqlTransaction, cancellationToken);
+                await RecomputeChangedEntitiesAsync(model, migrations.ReleaseId, plan.RecomputedEntityIds, await readActiveFingerprints(cancellationToken), connection, npgsqlTransaction, cancellationToken);
             }
 
             foreach (var change in plan.RecordChanges)
@@ -246,29 +248,39 @@ public static class EntityProvisioner
     // Step 7: recomputes the stored computed values of each entity whose computed definitions differ from the active
     // release's. A missing fingerprint counts as different, so the first activation of an application recomputes
     // every entity, which costs nothing on tables that are new. Activating the active release again recomputes nothing,
-    // even when it stored no fingerprints, so a restart does not recompute every table.
+    // even when it stored no fingerprints, so a restart does not recompute every table. Then it recomputes the rows
+    // with a cleared stamp in each entity that a fill or convert touched, except an entity it just recomputed whole.
     private static async Task RecomputeChangedEntitiesAsync(
         ApplicationModel model,
         Guid releaseId,
+        IReadOnlyList<Guid> migratedEntityIds,
         ActiveComputedFingerprints active,
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         CancellationToken cancellationToken)
     {
-        if (active.ActiveReleaseId == releaseId)
+        var recomputed = new HashSet<Guid>();
+        if (active.ActiveReleaseId != releaseId)
         {
-            return;
+            foreach (var (entityId, fingerprint) in ComputedFingerprints.Compute(model))
+            {
+                if (active.Fingerprints.TryGetValue(entityId, out var current) && current == fingerprint)
+                {
+                    continue;
+                }
+
+                var entity = model.FindEntity(entityId) ?? throw new InvalidOperationException("The model has no entity for its fingerprint.");
+                await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
+                recomputed.Add(entityId);
+            }
         }
 
-        foreach (var (entityId, fingerprint) in ComputedFingerprints.Compute(model))
+        foreach (var entityId in migratedEntityIds)
         {
-            if (active.Fingerprints.TryGetValue(entityId, out var current) && current == fingerprint)
+            if (!recomputed.Contains(entityId) && model.FindEntity(entityId) is { } entity)
             {
-                continue;
+                await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken, unstampedOnly: true);
             }
-
-            var entity = model.FindEntity(entityId) ?? throw new InvalidOperationException("The model has no entity for its fingerprint.");
-            await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
         }
     }
 

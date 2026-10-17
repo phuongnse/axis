@@ -651,7 +651,7 @@ public sealed class SchemaPlannerTests
         Assert.Equal(
             [
                 $"ALTER TABLE {table} ADD COLUMN {Quote("axis_convert")} bigint",
-                $"UPDATE {table} SET {Quote("axis_convert")} = ({Quote("f_note")})::bigint, {Quote("version")} = {Quote("version")} + 1",
+                $"UPDATE {table} SET {Quote("axis_convert")} = ({Quote("f_note")})::bigint, {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL",
                 $"ALTER TABLE {table} ALTER COLUMN {Quote("f_note")} TYPE bigint USING {Quote("axis_convert")}",
                 $"ALTER TABLE {table} DROP COLUMN {Quote("axis_convert")}",
             ],
@@ -689,7 +689,7 @@ public sealed class SchemaPlannerTests
         var table = EntityNaming.QualifiedTable(OrderTable);
         var statement = Assert.Single(plan.Statements);
         Assert.Equal(
-            $"WITH converted AS (UPDATE {table} SET {Quote("f_status")} = @f0, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_status")} IN (@r0) RETURNING {Quote("f_status")}) "
+            $"WITH converted AS (UPDATE {table} SET {Quote("f_status")} = @f0, {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("f_status")} IN (@r0) RETURNING {Quote("f_status")}) "
             + $"SELECT count(*) FROM converted WHERE {Quote("f_status")} IS NOT NULL AND {Quote("f_status")} NOT IN (@k0)",
             statement);
         var command = plan.Commands[0];
@@ -720,35 +720,44 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
-    public void Pending_convert_on_a_child_entity_is_reported_as_not_applied_and_plans_nothing()
+    public void Pending_convert_on_a_child_entity_changes_the_owners_version_and_stamp()
     {
         var stored = ChildModel();
         var migration = Migration("Line", new MigrationChangeModel(MigrationChangeType.Convert, "description", null, null, "description"));
+        var release = ChangeLineField(stored, "description", field => field with { Type = FieldType.Integer });
+        var catalog = ChangeColumns(Catalog(stored, hasRows: true), LineTable, columns => columns.Select(column => column.Name == "f_description" ? column with { Type = "text" } : column));
 
-        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+        var plan = SchemaPlanner.Plan(release, catalog, Models.Records(stored), [migration], StoredIds(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics);
-        Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/0/type", migration.Id),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        AssertNothingPlanned(plan);
+        Assert.DoesNotContain(plan.Diagnostics, diagnostic => diagnostic.Code == "AXC0175");
+        var line = EntityNaming.QualifiedTable(LineTable);
+        var order = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Contains(
+            $"WITH converted AS (UPDATE {line} SET {Quote("axis_convert")} = ({Quote("f_description")})::bigint RETURNING {Quote("owner_id")}) "
+            + $"UPDATE {order} SET {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("id")} IN (SELECT {Quote("owner_id")} FROM converted)",
+            plan.Statements);
+        Assert.Equal([_orderId], plan.RecomputedEntityIds);
     }
 
     [Fact]
-    public void Pending_convert_of_a_field_a_computed_field_reads_is_reported_as_not_applied_and_plans_nothing()
+    public void Pending_convert_of_a_field_a_computed_field_reads_is_planned_and_clears_the_stamp()
     {
         var amount = Field("amount", FieldType.Integer);
         var stored = ChangeOrder(
             BaseModel(),
             fields => [.. fields.Where(field => field.Name != "amount"), amount, Computed(Field("doubled", FieldType.Integer), "amount * 2", [amount])]);
+        var release = ChangeOrder(stored, fields => [.. fields.Select(field => field.Name == "amount" ? field with { Type = FieldType.Decimal, Precision = 10, Scale = 2 } : field)]);
+        var catalog = ChangeOrderColumns(Catalog(stored, hasRows: true), columns => columns.Select(column => column.Name == "f_amount" ? column with { Type = "bigint" } : column));
         var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Convert, "amount", null, null, "amount"));
 
-        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+        var plan = SchemaPlanner.Plan(release, catalog, Models.Records(stored), [migration], StoredIds(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics);
-        Assert.Equal(DiagnosticCodes.MigrationChangeNotApplied, diagnostic.Code);
-        Assert.Contains("doubled", diagnostic.Message, StringComparison.Ordinal);
-        AssertNothingPlanned(plan);
+        Assert.DoesNotContain(plan.Diagnostics, diagnostic => diagnostic.Code == "AXC0175");
+        Assert.Contains(
+            plan.Statements,
+            statement => statement.StartsWith("UPDATE", StringComparison.Ordinal)
+                && statement.Contains($"{Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL", StringComparison.Ordinal));
+        Assert.Equal([_orderId], plan.RecomputedEntityIds);
     }
 
     [Fact]
@@ -764,7 +773,7 @@ public sealed class SchemaPlannerTests
         var table = EntityNaming.QualifiedTable(OrderTable);
         Assert.Equal(
             [
-                $"WITH filled AS (UPDATE {table} SET {Quote("f_amount")} = @f0, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_amount")} IS NULL RETURNING {Quote("f_amount")}) SELECT count(*) FROM filled WHERE {Quote("f_amount")} IS NULL",
+                $"WITH filled AS (UPDATE {table} SET {Quote("f_amount")} = @f0, {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("f_amount")} IS NULL RETURNING {Quote("f_amount")}) SELECT count(*) FROM filled WHERE {Quote("f_amount")} IS NULL",
                 $"ALTER TABLE {table} ALTER COLUMN {Quote("f_amount")} SET NOT NULL",
             ],
             plan.Statements);
@@ -789,7 +798,7 @@ public sealed class SchemaPlannerTests
         Assert.Equal(
             [
                 $"ALTER TABLE {table} ADD COLUMN {Quote("f_level")} text",
-                $"WITH filled AS (UPDATE {table} SET {Quote("f_level")} = @f0, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_level")} IS NULL RETURNING {Quote("f_level")}) SELECT count(*) FROM filled WHERE {Quote("f_level")} IS NULL",
+                $"WITH filled AS (UPDATE {table} SET {Quote("f_level")} = @f0, {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("f_level")} IS NULL RETURNING {Quote("f_level")}) SELECT count(*) FROM filled WHERE {Quote("f_level")} IS NULL",
                 $"ALTER TABLE {table} ALTER COLUMN {Quote("f_level")} SET NOT NULL",
             ],
             plan.Statements);
@@ -812,7 +821,7 @@ public sealed class SchemaPlannerTests
         Assert.Equal(
             [
                 $"ALTER TABLE {table} ADD COLUMN {Quote("f_tag")} character varying(10)",
-                $"WITH filled AS (UPDATE {table} SET {Quote("f_tag")} = {Quote("f_code")}, {Quote("version")} = {Quote("version")} + 1 WHERE {Quote("f_tag")} IS NULL RETURNING {Quote("f_tag")}) SELECT count(*) FROM filled WHERE {Quote("f_tag")} IS NULL",
+                $"WITH filled AS (UPDATE {table} SET {Quote("f_tag")} = {Quote("f_code")}, {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("f_tag")} IS NULL RETURNING {Quote("f_tag")}) SELECT count(*) FROM filled WHERE {Quote("f_tag")} IS NULL",
                 $"ALTER TABLE {table} ADD CONSTRAINT {Quote(EntityNaming.Unique(OrderTable, "f_tag"))} UNIQUE ({Quote("f_tag")})",
             ],
             plan.Statements);
@@ -858,22 +867,29 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
-    public void Pending_fill_on_a_child_entity_is_reported_as_not_applied_and_plans_nothing()
+    public void Pending_fill_on_a_child_entity_plans_the_fill_and_changes_the_owners_version_and_stamp()
     {
         var stored = ChildModel();
         var migration = Migration("Line", new MigrationChangeModel(MigrationChangeType.Fill, "description", null, null, "'x'"));
 
         var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.DoesNotContain(plan.Diagnostics, diagnostic => diagnostic.Code == "AXC0175");
+        Assert.Empty(plan.Diagnostics);
+        var line = EntityNaming.QualifiedTable(LineTable);
+        var order = EntityNaming.QualifiedTable(OrderTable);
+        var statement = Assert.Single(plan.Statements);
         Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/0/type", migration.Id),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        AssertNothingPlanned(plan);
+            $"WITH filled AS (UPDATE {line} SET {Quote("f_description")} = @f0 WHERE {Quote("f_description")} IS NULL RETURNING {Quote("owner_id")}, {Quote("f_description")}), "
+            + $"owners AS (UPDATE {order} SET {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("id")} IN (SELECT {Quote("owner_id")} FROM filled)) "
+            + $"SELECT count(*) FROM filled WHERE {Quote("f_description")} IS NULL",
+            statement);
+        Assert.Equal(new FillTarget(migration.Id, "migrations/0001-order.json", 0, "description"), plan.Commands[0].Fill);
+        Assert.Equal([_orderId], plan.RecomputedEntityIds);
     }
 
     [Fact]
-    public void Pending_fill_of_a_field_a_computed_field_reads_is_reported_as_not_applied_and_plans_nothing()
+    public void Pending_fill_of_a_field_a_computed_field_reads_is_planned_and_clears_the_stamp()
     {
         var amount = Field("amount", FieldType.Integer);
         var stored = ChangeOrder(
@@ -883,16 +899,16 @@ public sealed class SchemaPlannerTests
 
         var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
         Assert.Equal(
-            (DiagnosticCodes.MigrationChangeNotApplied, "migrations/0001-order.json", "/changes/0/type"),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("doubled", diagnostic.Message, StringComparison.Ordinal);
-        AssertNothingPlanned(plan);
+            $"WITH filled AS (UPDATE {table} SET {Quote("f_amount")} = @f0, {Quote("version")} = {Quote("version")} + 1, {Quote("computed_release_id")} = NULL WHERE {Quote("f_amount")} IS NULL RETURNING {Quote("f_amount")}) SELECT count(*) FROM filled WHERE {Quote("f_amount")} IS NULL",
+            Assert.Single(plan.Statements));
+        Assert.Equal([_orderId], plan.RecomputedEntityIds);
     }
 
     [Fact]
-    public void Pending_fill_followed_by_a_rename_of_a_field_a_computed_field_reads_is_reported_as_not_applied_and_plans_nothing()
+    public void Pending_fill_followed_by_a_rename_of_a_field_a_computed_field_reads_is_planned()
     {
         var stored = BaseModel();
         var gross = Field("gross", FieldType.Integer);
@@ -904,10 +920,11 @@ public sealed class SchemaPlannerTests
 
         var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.MigrationChangeNotApplied);
-        Assert.Equal("/changes/0/type", diagnostic.Path);
-        Assert.Contains("doubled", diagnostic.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain(plan.Statements, statement => statement.Contains("UPDATE", StringComparison.Ordinal));
+        Assert.DoesNotContain(plan.Diagnostics, diagnostic => diagnostic.Code == "AXC0175");
+        Assert.Contains(
+            plan.Statements,
+            statement => statement.StartsWith("WITH filled", StringComparison.Ordinal) && statement.Contains($"{Quote("computed_release_id")} = NULL", StringComparison.Ordinal));
+        Assert.Equal([_orderId], plan.RecomputedEntityIds);
     }
 
     private static string Quote(string identifier) => EntityNaming.Quote(identifier);
@@ -970,6 +987,14 @@ public sealed class SchemaPlannerTests
 
     private static ApplicationModel ChangeOrderField(ApplicationModel model, int index, Func<FieldModel, FieldModel> change) =>
         ChangeOrder(model, fields => [.. fields.Select((field, i) => i == index ? change(field) : field)]);
+
+    private static ApplicationModel ChangeLineField(ApplicationModel model, string name, Func<FieldModel, FieldModel> change) =>
+        model with
+        {
+            Entities = [.. model.Entities.Select(entity => entity.Id == _lineId
+                ? entity with { Fields = [.. entity.Fields.Select(field => field.Name == name ? change(field) : field)] }
+                : entity)],
+        };
 
     private static CatalogSnapshot ChangeOrderColumns(CatalogSnapshot catalog, Func<IEnumerable<CatalogColumn>, IEnumerable<CatalogColumn>> change) =>
         ChangeColumns(catalog, OrderTable, change);
