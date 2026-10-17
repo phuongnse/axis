@@ -26,7 +26,7 @@ namespace Axis.Integration.Tests;
 /// migrations applied and the StepApp fixture activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. The test authentication scheme signs in
 /// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, <c>rita</c>, who holds
-/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
+/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
 /// a test runs the work items that create tasks itself.
 /// </summary>
@@ -91,6 +91,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 new TestIdentity("fiona", "Fiona Finance", "finance"),
                 new TestIdentity("rita", "Rita Reviewer", "reviewer"),
                 new TestIdentity("ines", "Ines Inspector", "inspector"),
+                new TestIdentity("ada", "Ada Auditor", "auditor"),
+                new TestIdentity("carl", "Carl Clerk", "clerk"),
                 new TestIdentity("otto", "Otto Other", "employee"));
         });
 
@@ -248,6 +250,54 @@ public sealed class TaskApiFixture : IAsyncLifetime
         while (await runner.RunNextAsync(tenant, _lease, cancellationToken))
         {
         }
+    }
+
+    /// <summary>
+    /// Inserts a <c>pending</c> connector call of the step <paramref name="step"/> of the instance
+    /// <paramref name="instanceId"/> in <paramref name="tenant"/>, to <c>Purchasing</c>
+    /// <c>createOrder</c> on the tenant's first release, with the stored input
+    /// <paramref name="inputJson"/>. Returns the call's id.
+    /// </summary>
+    public async Task<Guid> InsertConnectorCallAsync(string tenant, Guid instanceId, string step, string inputJson)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = DataSource(tenant).CreateCommand(
+            """
+            INSERT INTO axis.connector_calls (id, process_instance_id, step, release_id, connector, operation, state, attempts, input)
+            VALUES (@id, @instance, @step, @release, 'Purchasing', 'createOrder', 'pending', 0, @input::jsonb)
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("step", step);
+        command.Parameters.AddWithValue("release", _tenants[tenant].ReleaseId);
+        command.Parameters.AddWithValue("input", inputJson);
+        await command.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    /// <summary>
+    /// Inserts an attempt or lookup, by <paramref name="kind"/>, of the connector call
+    /// <paramref name="callId"/> in <paramref name="tenant"/>, started at <paramref name="startedAt"/>
+    /// and finished a second later.
+    /// </summary>
+    public async Task InsertCallAttemptAsync(
+        string tenant, Guid callId, string kind, int number, DateTimeOffset startedAt, string outcome, int? httpStatus, string? error = null)
+    {
+        await using var command = DataSource(tenant).CreateCommand(
+            """
+            INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error)
+            VALUES (@id, 'connector', @call, @kind, @number, @startedAt, @finishedAt, @outcome, @status, @error)
+            """);
+        command.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("call", callId);
+        command.Parameters.AddWithValue("kind", kind);
+        command.Parameters.AddWithValue("number", number);
+        command.Parameters.AddWithValue("startedAt", startedAt);
+        command.Parameters.AddWithValue("finishedAt", startedAt.AddSeconds(1));
+        command.Parameters.AddWithValue("outcome", outcome);
+        command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)httpStatus ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)error ?? DBNull.Value });
+        await command.ExecuteNonQueryAsync();
     }
 
     /// <summary>The id of the one task of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>.</summary>

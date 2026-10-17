@@ -20,7 +20,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "graph", "path", "tasks"],
+            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "graph", "path", "tasks", "calls"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
@@ -35,6 +35,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(JsonValueKind.Null, path.GetProperty("output").ValueKind);
         Assert.Equal(JsonValueKind.Null, path.GetProperty("decision").ValueKind);
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
+        Assert.Empty(root.GetProperty("calls").EnumerateArray());
     }
 
     [Fact]
@@ -166,6 +167,90 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task A_connector_call_lists_its_attempts_and_lookups_in_start_order()
+    {
+        var (instance, call) = await StartWithCallAsync(TenantA, """{"reference":"Sales","amount":500}""");
+        var start = DateTimeOffset.UtcNow.AddMinutes(-5);
+        await fixture.InsertCallAttemptAsync(TenantA, call, "attempt", 2, start.AddSeconds(4), "succeeded", 200);
+        await fixture.InsertCallAttemptAsync(TenantA, call, "attempt", 1, start, "retryable", 503);
+        await fixture.InsertCallAttemptAsync(TenantA, call, "lookup", 1, start.AddSeconds(2), "notFound", 404);
+
+        using var body = await GetOkAsync(TenantA, "DepartmentOrder", instance);
+
+        var calls = body.RootElement.GetProperty("calls").EnumerateArray().ToList();
+        var item = Assert.Single(calls);
+        Assert.Equal(
+            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden"],
+            item.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(call, item.GetProperty("id").GetGuid());
+        Assert.Equal("connector", item.GetProperty("kind").GetString());
+        Assert.Equal("createOrder", item.GetProperty("step").GetString());
+        Assert.Equal("Purchasing", item.GetProperty("connector").GetString());
+        Assert.Equal("createOrder", item.GetProperty("operation").GetString());
+        Assert.Equal("pending", item.GetProperty("state").GetString());
+        var attempts = item.GetProperty("attempts").EnumerateArray().ToList();
+        Assert.Equal(
+            [("attempt", 1, "retryable", 503), ("lookup", 1, "notFound", 404), ("attempt", 2, "succeeded", 200)],
+            attempts.Select(attempt => (
+                attempt.GetProperty("kind").GetString()!,
+                attempt.GetProperty("number").GetInt32(),
+                attempt.GetProperty("outcome").GetString()!,
+                attempt.GetProperty("httpStatus").GetInt32())));
+        Assert.Equal(
+            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error"],
+            attempts[0].EnumerateObject().Select(property => property.Name));
+        Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("error").ValueKind);
+        Assert.Equal(DateTimeKind.Utc, attempts[0].GetProperty("startedAt").GetDateTime().Kind);
+        Assert.True(attempts[0].GetProperty("startedAt").GetDateTime() < attempts[1].GetProperty("startedAt").GetDateTime());
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_a_field_on_a_reference_path_gets_the_input_hidden()
+    {
+        var (instance, _) = await StartWithCallAsync(TenantA, """{"reference":"Sales","amount":500}""");
+
+        using var body = await GetOkAsync(TenantA, "DepartmentOrder", instance);
+
+        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
+        Assert.True(call.GetProperty("inputHidden").GetBoolean());
+        Assert.DoesNotContain("Sales", call.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_user_who_may_read_every_mapped_field_including_the_output_target_sees_the_input()
+    {
+        var (instance, _) = await StartWithCallAsync(TenantA, """{"reference":"Sales","amount":500}""");
+
+        using var body = await GetOkAsync(TenantA, "DepartmentOrder", instance, "ada");
+
+        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
+        Assert.Equal("Sales", call.GetProperty("input").GetProperty("reference").GetString());
+        Assert.Equal(500, call.GetProperty("input").GetProperty("amount").GetDecimal());
+        Assert.False(call.GetProperty("inputHidden").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_the_output_target_field_gets_the_input_hidden()
+    {
+        var (instance, _) = await StartWithCallAsync(TenantA, """{"reference":"Sales","amount":500}""");
+
+        using var body = await GetOkAsync(TenantA, "DepartmentOrder", instance, "carl");
+
+        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
+        Assert.True(call.GetProperty("inputHidden").GetBoolean());
+    }
+
+    private async Task<(Guid Instance, Guid Call)> StartWithCallAsync(string tenant, string inputJson)
+    {
+        var subject = await fixture.InsertRequestAsync(tenant, null);
+        var instance = await fixture.StartAsync(tenant, "DepartmentOrder", subject);
+        var call = await fixture.InsertConnectorCallAsync(tenant, instance, "createOrder", inputJson);
+        return (instance, call);
+    }
+
     private static List<(string? Next, string? On)> Transitions(JsonElement step) =>
         step.GetProperty("transitions").EnumerateArray()
             .Select(transition => (transition.GetProperty("next").GetString(), transition.GetProperty("on").GetString()))
@@ -179,9 +264,9 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         return instance;
     }
 
-    private async Task<JsonDocument> GetOkAsync(string tenant, string process, Guid instance)
+    private async Task<JsonDocument> GetOkAsync(string tenant, string process, Guid instance, string user = "ines")
     {
-        using var response = await GetAsync("ines", tenant, process, instance.ToString("D"));
+        using var response = await GetAsync(user, tenant, process, instance.ToString("D"));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }

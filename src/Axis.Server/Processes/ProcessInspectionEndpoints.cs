@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -26,8 +27,11 @@ namespace Axis.Server.Processes;
 /// record. The problem titles never contain text from the request.
 /// <para>
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
-/// its properties, the graph of the release it is pinned to, its path (the history rows in order)
-/// and its tasks. It has no <c>calls</c> yet. The checks run in the order of the list, then the id
+/// its properties, the graph of the release it is pinned to, its path (the history rows in order),
+/// its tasks and its calls. A call lists its attempts and lookups, and its stored input only when
+/// the user may read every field that the step's input and output mapping reads or writes, on any
+/// entity. Otherwise the input is null and marked hidden. The pinned release gives the fields the
+/// mapping uses and the active release gives the fields the user may read. The checks run in the order of the list, then the id
 /// is parsed. A malformed id, an unknown id, an instance of another process, and an instance whose
 /// subject record the user may not read or that no longer exists are one 404. A read filter that
 /// fails at run time for the subject record does not match, so it is a 404 too. The detail writes
@@ -218,6 +222,10 @@ internal static class ProcessInspectionEndpoints
         var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == model.Id));
         var history = await InstanceQueries.HistoryAsync(connection, row.Id, cancellationToken);
         var tasks = await TaskQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
+        var calls = await CallQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
+        var mappings = new Dictionary<string, IReadOnlySet<MappedField>?>(StringComparer.Ordinal);
+        var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == model.Id);
+        var pinnedSubject = pinned.FindEntity(entity.Id);
         return Results.Ok(new ProcessInstanceDetailResponse(
             row.Id,
             model.Name,
@@ -248,7 +256,82 @@ internal static class ProcessInspectionEndpoints
                     task.CompletedBy,
                     task.CreatedAt.UtcDateTime,
                     task.CompletedAt?.UtcDateTime))
+                .ToList(),
+            calls
+                .Select(call =>
+                {
+                    if (!mappings.TryGetValue(call.Step, out var fields))
+                    {
+                        mappings[call.Step] = fields = MappedFields(pinned, pinnedProcess, pinnedSubject, call.Step);
+                    }
+
+                    var hidden = call.Input is not null && !Readable(application, user.Roles, fields);
+                    return new ProcessInstanceCall(
+                        call.Id,
+                        call.Kind,
+                        call.Step,
+                        call.Connector,
+                        call.Package,
+                        call.Version,
+                        call.Operation,
+                        call.State,
+                        call.Attempts
+                            .Select(attempt => new ProcessCallAttemptEntry(
+                                attempt.Kind,
+                                attempt.Number,
+                                attempt.StartedAt.UtcDateTime,
+                                attempt.FinishedAt.UtcDateTime,
+                                attempt.Outcome,
+                                attempt.HttpStatus,
+                                attempt.Error))
+                            .ToList(),
+                        call.Input is null || hidden ? null : JsonNode.Parse(call.Input),
+                        hidden);
+                })
                 .ToList()));
+    }
+
+    // The fields the step's mapping reads or writes in the pinned release, or null, which hides the
+    // input, when the release lacks the step or the step is no call.
+    private static IReadOnlySet<MappedField>? MappedFields(
+        ApplicationModel pinned, ProcessModel process, EntityModel? subject, string step)
+    {
+        if (subject is null || !process.TryGetStep(step, out var found))
+        {
+            return null;
+        }
+
+        return found switch
+        {
+            CallConnectorStepModel call => MappingFields.Collect(pinned, subject, call.Input, call.Output),
+            PackageOperationStepModel package => MappingFields.Collect(pinned, subject, package.Input, package.Output),
+            _ => null,
+        };
+    }
+
+    // Readable comes from the fields of the user's read grants in the active release. A field or
+    // entity that the active release no longer has is not readable.
+    private static bool Readable(ApplicationModel active, IReadOnlyList<string> roles, IReadOnlySet<MappedField>? fields)
+    {
+        if (fields is null)
+        {
+            return false;
+        }
+
+        foreach (var mapped in fields)
+        {
+            if (active.FindEntity(mapped.EntityId) is not { } entity || !entity.TryGetField(mapped.Field, out var field))
+            {
+                return false;
+            }
+
+            if (PolicyEvaluator.Fields(active, roles, entity, PolicyAction.Read) is { } readable && !readable.Contains(field.Name))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static ProcessGraph Graph(ProcessModel model) =>
@@ -302,7 +385,7 @@ internal sealed record ProcessInstanceListItem(
     DateTime CreatedAt,
     DateTime? EndedAt);
 
-/// <summary>One instance of a process, the graph of the release it is pinned to, its path and its tasks.</summary>
+/// <summary>One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.</summary>
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
     string Process,
@@ -314,7 +397,8 @@ internal sealed record ProcessInstanceDetailResponse(
     DateTime? EndedAt,
     ProcessGraph Graph,
     IReadOnlyList<ProcessPathEntry> Path,
-    IReadOnlyList<ProcessInstanceTask> Tasks);
+    IReadOnlyList<ProcessInstanceTask> Tasks,
+    IReadOnlyList<ProcessInstanceCall> Calls);
 
 /// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
 internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);
@@ -339,3 +423,32 @@ internal sealed record ProcessInstanceTask(
     string? CompletedBy,
     DateTime CreatedAt,
     DateTime? CompletedAt);
+
+/// <summary>
+/// A connector call or package call of the instance, with its attempts and lookups. A connector
+/// call has <paramref name="Connector"/> and a package call has <paramref name="Package"/> and
+/// <paramref name="Version"/>. <paramref name="Input"/> is null, and <paramref name="InputHidden"/> true,
+/// when the user may not read every field the step's mapping uses.
+/// </summary>
+internal sealed record ProcessInstanceCall(
+    Guid Id,
+    string Kind,
+    string Step,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Connector,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Package,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Version,
+    string Operation,
+    string State,
+    IReadOnlyList<ProcessCallAttemptEntry> Attempts,
+    JsonNode? Input,
+    bool InputHidden);
+
+/// <summary>An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.</summary>
+internal sealed record ProcessCallAttemptEntry(
+    string Kind,
+    int Number,
+    DateTime StartedAt,
+    DateTime FinishedAt,
+    string Outcome,
+    int? HttpStatus,
+    string? Error);

@@ -1,0 +1,20 @@
+{
+  "id": "3430efbb-85ed-450d-9779-ee484b8a866a",
+  "kind": "process",
+  "name": "DepartmentOrder",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "createOrder",
+  "steps": [
+    {
+      "name": "createOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Purchasing", "operation": "createOrder" },
+      "input": { "reference": "department.name", "amount": "amount" },
+      "output": { "orderNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "c27766a6-b09b-4db7-99c6-e22bc5be3f64",
+  "kind": "role",
+  "name": "clerk",
+  "formatVersion": 1,
+  "label": { "textKey": "role.clerk" }
+}
