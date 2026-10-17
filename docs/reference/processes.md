@@ -1426,8 +1426,10 @@ So a second start for the same record is blocked, as with an open task.
 `failed`, because a unique index lets a step stage only one call. It reuses the
 row instead of inserting one, in the same transaction. The row keeps its id, so
 the operation identity and the idempotency key do not change. The step
-evaluates the input again from the subject record as it is now, because a
-failed call's stored input is cleared when it settles. It sets the call to
+evaluates the input again from the subject record as it is now, on purpose, so
+the retry sends the current data. *(Planned for M7: a failed connector call
+keeps its stored input, but the step still evaluates it again.)* A failed
+package call's stored input is cleared when it settles. It sets the call to
 `pending` with that input, 0 attempts and 0 lookups, and clears the last status
 and the last error. Everything else is as above. See [Retry](#retry).
 
@@ -1851,9 +1853,11 @@ record's data can succeed after the record is fixed.
 
 A `callConnector` step or a package operation step whose call row is `failed`
 stages the call again under the **same operation identity**, see
-[Staging and the call](#staging-and-the-call). The input is evaluated again,
-because a failed call's stored input is cleared when it settles. The attempts
-count from zero.
+[Staging and the call](#staging-and-the-call). The input is evaluated again
+on purpose, so the retry sends the current data. *(Planned for M7: a failed
+connector call keeps its stored input, but the retry still evaluates it
+again.)* A failed package call's stored input is cleared when it settles. The
+attempts count from zero.
 
 **Risks.** A retry of a connector call sends it again under the same
 idempotency key. Some systems replay their stored failure for a key they have
@@ -1925,7 +1929,9 @@ One transaction does this:
    fields to the subject record with the record update rules, as a successful
    outcome does. An `output` that does not fit, or a write that the record
    refuses, is a `400`. Nothing changes and the call stays `unknown`.
-   - It sets the call to `succeeded` and clears its stored input.
+   - It sets the call to `succeeded` and clears its stored input. *(planned
+     for M7)* A connector call keeps the stored input instead, see
+     [Call input kept](#call-input-kept).
    - It sets the instance to `running` on `next`, with the next revision.
    - It writes the history row of the step, at the revision the instance
      waited at. Its output is
@@ -1933,7 +1939,9 @@ One transaction does this:
      `subjectVersion` when it wrote output fields.
    - It writes `record.updated` when it wrote output fields, and inserts the
      work item of the next step.
-4. For `failed`, it sets the call to `failed` and clears its stored input. It
+4. For `failed`, it sets the call to `failed` and clears its stored input.
+   *(planned for M7)* A connector call keeps the stored input instead, see
+   [Call input kept](#call-input-kept). It
    sets the instance to `failed` with `ended_at`, and writes a history row
    with output `{ "operationId", "outcome": "failed", "resolved": true }` and
    a fixed error sentence. It writes `process.failed` with details
