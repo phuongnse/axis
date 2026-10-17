@@ -42,6 +42,7 @@ internal static class ProcessInspectionEndpoints
         ProcessStarts.Waiting,
         ProcessStarts.Completed,
         ProcessStarts.Failed,
+        ProcessStarts.Cancelled,
     ];
 
     public static void MapProcessInspectionEndpoints(this IEndpointRouteBuilder endpoints)
