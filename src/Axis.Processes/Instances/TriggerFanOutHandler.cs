@@ -182,6 +182,12 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
             return "the record no longer exists";
         }
 
+        // The start condition reads the record with its pending computed fields computed by the active release.
+        if (process.StartCondition is not null)
+        {
+            record = await PendingComputedReads.ApplyAsync(connection, transaction, active, entity, record, cancellationToken);
+        }
+
         var instanceId = Guid.CreateVersion7();
         var started = await ProcessStarter.StartAsync(
             connection,

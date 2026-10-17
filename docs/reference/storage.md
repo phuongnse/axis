@@ -381,8 +381,10 @@ backfill are built, and so are the restart by a newer activation and the writes
 of older releases. Activation recomputes every row of an entity whose computed
 definitions changed, and the rows a `fill` or `convert` changed, in its own
 transaction, up to the inline limit. Above the limit it leaves the entity
-pending and the worker recomputes it. What reads answer while a field is
-pending is planned for M7.
+pending and the worker recomputes it. A single read, the response of an update,
+the engine's reads of a subject record and process start conditions answer
+while a field is pending as the "While pending" list below says. The rest of
+what reads answer is planned for M7.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -569,10 +571,15 @@ in batches.
   pending. When the active release no longer has the entity, the batch deletes
   the pending row and the item without a batch.
 - **While pending.**
-  - A single read, and the engine's reads of one subject record, compute a
-    pending field with the active release and do not store the result. A
-    read must not write. The backfill or the next write stores the value. A
-    run-time error reads as `null`.
+  - *(Built.)* A single read, the response of an update, and the engine's
+    reads of one subject record compute a pending field with the active
+    release and do not store the result. Process start conditions and the
+    `when` of a data change trigger read the same way. A read must not write.
+    The backfill or the next write stores the value. A run-time error reads as
+    `null`. A row is computed only when its stamp is out of date. An instance
+    pinned to an older release takes a computed value only for a field with
+    the same name and type in both releases. The inbound endpoint's output and
+    the test scenario runner show the stored values.
   - A list, a data source and a projection show the stored value.
   - A sort, search, filter or grouping that reads a pending field is refused
     with `409`. A policy read filter that reads one is refused too.
@@ -620,8 +627,7 @@ UUIDs of the same application, as in the
 [migrations example](#example-renaming-a-field-while-a-task-waits). The table
 holds about 50,000 purchase requests. R2 changes the `amount` expression of the
 line item, so `amount` and the aggregate `total` of the request become
-pending. Steps 1 and 4 to 9 are built. What reads answer while pending
-(steps 2 and 3) is planned for M7.
+pending. Steps 1 and 3 to 9 are built. The `409` of step 2 is planned for M7.
 
 1. R2 is activated. Activation counts 50,000 affected rows, which is more than
    10,000. It inserts the pending row for the purchase request, with R2 as the

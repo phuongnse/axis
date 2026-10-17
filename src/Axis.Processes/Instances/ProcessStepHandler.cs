@@ -158,9 +158,16 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             await RecordCommands.LockAsync(context.Connection, entity, instance.SubjectId, cancellationToken);
         }
 
-        var record = await RecordQueries.GetAsync(context.Connection, model, entity, instance.SubjectId, cancellationToken)
+        var stored = await RecordQueries.GetAsync(context.Connection, model, entity, instance.SubjectId, cancellationToken)
             ?? throw Failure($"No record of '{entity.Name}' has the id '{instance.SubjectId}'.", instance, input);
-        input["subjectVersion"] = record.Version;
+        input["subjectVersion"] = stored.Version;
+
+        // The step's expressions read the record with its pending computed fields computed by the active release,
+        // whatever release the instance is pinned to. The write of an updateRecord step starts from the stored record.
+        var active = await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken);
+        var record = active is { } release
+            ? await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, release.Model, entity, stored, cancellationToken, model)
+            : stored;
 
         string state;
         string nextStep;
@@ -359,7 +366,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         Record? updated = null;
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity, instance.ReleaseId, record, assignments, instance.Now, cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity, instance.ReleaseId, stored, assignments, instance.Now, cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
@@ -423,17 +430,16 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             await AuditRecords.AppendAsync(context.Transaction, recordAudit, cancellationToken);
         }
 
-        if (updated is not null
-            && await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken) is { } active)
+        if (updated is not null && active is { } activeNow)
         {
             await DataChangeTriggerStarts.StartAfterUpdateAsync(
                 context.Transaction,
                 context.Item.TenantId,
-                active.Model,
-                active.ReleaseId,
+                activeNow.Model,
+                activeNow.ReleaseId,
                 instance.ReleaseId,
                 entity,
-                record,
+                stored,
                 updated,
                 [],
                 logger,

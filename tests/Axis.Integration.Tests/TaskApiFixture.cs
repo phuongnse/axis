@@ -144,21 +144,22 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
     /// <summary>
     /// Inserts a request of <paramref name="tenant"/> titled <see cref="RequestTitle"/> with an
-    /// optional <paramref name="department"/>, and returns its id. The id is <paramref name="id"/>,
-    /// or a new one.
+    /// optional <paramref name="department"/> and <paramref name="divisor"/>, and returns its id. The id is
+    /// <paramref name="id"/>, or a new one.
     /// </summary>
-    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null)
+    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null)
     {
         Assert.True(Model.TryGetEntity("Request", out var request));
         var requestId = id ?? Guid.NewGuid();
         await using var command = DataSource(tenant).CreateCommand(
             $"""
-            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("department")})
-            VALUES (@id, @title, @department)
+            INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} ({Column("id")}, {Column("title")}, {Column("department")}, {Column("divisor")})
+            VALUES (@id, @title, @department, @divisor)
             """);
         command.Parameters.AddWithValue("id", requestId);
         command.Parameters.AddWithValue("title", RequestTitle(requestId));
         command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("divisor", NpgsqlDbType.Bigint) { Value = (object?)divisor ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
         return requestId;
     }
@@ -285,6 +286,35 @@ public sealed class TaskApiFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Deletes the <c>computed.backfill</c> work items of <paramref name="tenant"/>, so
+    /// <see cref="RunUntilIdleAsync"/> cannot run the backfill of a pending entity.
+    /// </summary>
+    public async Task DeleteBackfillItemsAsync(string tenant)
+    {
+        await using var command = DataSource(tenant).CreateCommand("DELETE FROM axis.process_work_items WHERE kind = 'computed.backfill'");
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// The stored value of the <c>doubled</c> column of the Request <paramref name="requestId"/> in
+    /// <paramref name="tenant"/>, or null when it is NULL, and the number of rows of
+    /// <c>axis.computed_field_errors</c> that name the record. A release adds the field to the Request.
+    /// </summary>
+    public async Task<(long? Doubled, long ErrorRows)> DoubledAsync(string tenant, Guid requestId)
+    {
+        Assert.True(Model.TryGetEntity("Request", out var request));
+        await using var command = DataSource(tenant).CreateCommand(
+            $"""
+            SELECT r.{Column("doubled")}, (SELECT count(*) FROM axis.computed_field_errors e WHERE e.record_id = r.{Column("id")})
+            FROM {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} r WHERE r.{Column("id")} = @id
+            """);
+        command.Parameters.AddWithValue("id", requestId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync(), "The request does not exist.");
+        return (reader.IsDBNull(0) ? null : reader.GetInt64(0), reader.GetInt64(1));
+    }
+
+    /// <summary>
     /// The state of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>, its
     /// task and its subject record, and the number of its audit records, history rows and work items.
     /// The audit records count those of the instance and of its subject record.
@@ -383,9 +413,13 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// Compiles and activates a copy of the StepApp fixture on <paramref name="tenant"/> as a new
     /// release, with <paramref name="edit"/> applied to each file. It gets the file's path relative
     /// to the folder and its content, and returns the new content, or null to leave the file out.
-    /// Returns the new release's id.
+    /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
+    /// more to the backfill. Returns the new release's id.
     /// </summary>
-    public async Task<Guid> ActivateEditedAsync(string tenant, Func<string, string, string?> edit)
+    public async Task<Guid> ActivateEditedAsync(
+        string tenant,
+        Func<string, string, string?> edit,
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
     {
         using var folder = new TemporaryFolder();
         foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
@@ -403,7 +437,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder.Path, configuration);
         Assert.Empty(compiled.Diagnostics);
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"), OpenInstanceCounter.Instance);
+        var activated = await ReleaseActivator.ActivateAsync(
+            compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings("default"), OpenInstanceCounter.Instance, inlineRecomputeLimit);
         Assert.Empty(activated.Diagnostics);
         return compiled.Release!.Id;
     }

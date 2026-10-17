@@ -400,8 +400,8 @@ One transaction then does the rest:
    it. A missing one, or one the user may not read, is the `400`. The lock
    makes the start condition see the latest version, and an edit of the
    record waits until the start commits or rolls back.
-3. It evaluates the `startCondition` on the record, and a failure is the
-   `400`.
+3. It evaluates the `startCondition` on the record, with any pending computed
+   field computed by the active release, and a failure is the `400`.
 4. It inserts the instance as `running` at revision 1, pinned to the release
    that was active when the request was checked. Its next step is the
    process's `start` step. An instance already running or waiting is the
@@ -1244,13 +1244,17 @@ one transaction:
    stored version, and a user's write of the same record waits until the
    step's transaction ends. A `callConnector` or `raiseEvent` step only
    reads the record, so it takes no lock.
-   *(planned for M7)* Every read of the subject record computes a
+   Every read of the subject record computes a
    [pending field](storage.md#recomputing-computed-fields) with the active
    release and does not store the result. That covers decisions, `set`
    expressions, connector and package inputs, `raiseEvent` fields and task
    assignees. A run-time error reads `null`. An instance pinned to an older
-   release reads the same way. An `updateRecord` write under a release that is
-   out of date for the entity marks the field pending again, as described in
+   release reads the same way, but a computed value replaces the stored one
+   only when the field has the same name and type in both releases. An
+   `updateRecord` step evaluates its `set` expressions on the computed values
+   and writes from the stored record. An `updateRecord` write under a release
+   that is out of date for the entity marks the field pending again, as
+   described in
    [Recomputing computed fields](storage.md#recomputing-computed-fields).
    - A **decision** evaluates its branches in order and takes the first `when`
      that is true. A `when` that gives `null` counts as false. When no branch
@@ -2247,7 +2251,11 @@ its triggers from the active release at the time of the write, while the write
 itself uses the release the task or instance is pinned to. When the two
 differ, the record is read again with the active release's model before the
 triggers run, so a `when` and a start condition see the field types they were
-compiled against.
+compiled against. A start condition, and the `when` of a data change trigger,
+read the record with any [pending computed
+field](storage.md#recomputing-computed-fields) computed by that release, and
+store nothing. An event trigger's `when` reads the event's payload, not the
+record.
 
 | Trigger | Start commits in | Skipped when |
 | --- | --- | --- |
@@ -2262,6 +2270,8 @@ or hits a run-time error.
 A data change trigger sees the record as the write left it. A create always
 passes `fields`, because every field is new. An update passes `fields` when
 the stored value of a listed field differs from the value before the update.
+A value that is only computed on the spot for a pending field is not a change
+by the write.
 A child collection in `fields` counts as changed whenever the update body
 sets it, because an update replaces all its rows. The triggers run in the
 order of the release, after the record and its `record.created` or
