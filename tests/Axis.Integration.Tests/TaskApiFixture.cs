@@ -423,7 +423,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// release, with <paramref name="edit"/> applied to each file. It gets the file's path relative
     /// to the folder and its content, and returns the new content, or null to leave the file out.
     /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
-    /// more to the backfill. The files in <paramref name="added"/>, by relative path, are added to the folder. Returns the new release's id.
+    /// more to the backfill. Each file of <paramref name="added"/>, keyed by its path relative to the folder, is
+    /// written as well. Returns the new release's id.
     /// </summary>
     public async Task<Guid> ActivateEditedAsync(
         string tenant,

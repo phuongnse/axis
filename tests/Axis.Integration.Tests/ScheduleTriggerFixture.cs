@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Eight tenants, <c>a</c> to <c>h</c>, each with its own database holding StepApp plus a
+/// Nine tenants, <c>a</c> to <c>i</c>, each with its own database holding StepApp plus a
 /// schedule trigger. Tenants <c>e</c> and <c>g</c> start with <see cref="HourlyFolder"/>, a copy of
 /// the application whose trigger runs every hour, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
 /// <c>RoleApprove</c> for each request of the data source <c>LargeRequests</c>, those with an
@@ -31,6 +31,9 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
 
     /// <summary>Every log entry of the workers.</summary>
     internal LogCollector Logs { get; } = new();
+
+    /// <summary>The application whose trigger runs every day at 06:00 Berlin time, which tenants other than <c>e</c> and <c>g</c> start with.</summary>
+    internal string Folder => (_folder ?? throw new InvalidOperationException("The fixture is not initialized.")).Path;
 
     /// <summary>A copy of the application whose trigger runs at the start of every hour, with the same ids.</summary>
     internal string HourlyFolder => (_hourlyFolder ?? throw new InvalidOperationException("The fixture is not initialized.")).Path;
@@ -79,7 +82,7 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
             _hourlyFolder.With(relativePath, relativePath == "triggers/review-large-requests.json" ? content.Replace("\"0 6 * * *\"", "\"0 * * * *\"", StringComparison.Ordinal) : content);
         }
 
-        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h" })
+        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i" })
         {
             var tenant = new ProcessStepFixture(id, id is "e" or "g" ? _hourlyFolder.Path : _folder.Path);
             _tenantList.Add(tenant);
@@ -116,7 +119,7 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
     /// <summary>The database of <paramref name="tenantId"/>.</summary>
     public ProcessStepFixture Tenant(string tenantId) => _tenants[tenantId];
 
-    /// <summary>Builds a worker for the eight tenants. The fixture disposes it.</summary>
+    /// <summary>Builds a worker for the nine tenants. The fixture disposes it.</summary>
     public WorkItemRunner NewWorker()
     {
         var worker = new ServiceCollection()

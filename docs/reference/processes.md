@@ -2441,11 +2441,14 @@ runs again after the lease expires, as event delivery does, and the receipts
 make each record start at most once per occurrence. A data error in the data
 source's filter, an SQLSTATE of class 22, is different. It is logged as a
 warning and the item is deleted, because trying again would fail the same way.
-*(planned for M7)* A fan-out whose data source reads a
-[pending field](storage.md#recomputing-computed-fields) is different again. It
-is refused with a `409`, and the item is not deleted. It runs again after the
-lease, because deleting it would drop the schedule run, and starting from old
-values is the failure the pending state removes.
+A fan-out whose data source reads a
+[pending field](storage.md#recomputing-computed-fields) in its `filter` or its
+grouping is different again. The worker starts nothing and writes no receipt.
+It logs a warning, keeps the item and its cursor, and makes the item due again
+one lease later. There is no HTTP `409`, because no request is waiting. The
+item is not deleted, because deleting it would drop the schedule run, and
+starting from old values is the failure the pending state removes. The fan-out
+ignores the data source's `sort`, so a pending sort field does not stop it.
 
 A worker that stops in the middle of the occurrence loses only its open batch.
 The next worker claims the item and continues after the stored cursor. Each

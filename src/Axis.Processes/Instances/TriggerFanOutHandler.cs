@@ -24,7 +24,10 @@ namespace Axis.Processes.Instances;
 /// starts nothing. Each record gets a receipt in <c>axis.trigger_starts</c> keyed by the trigger,
 /// the occurrence and the record, so a run again after a crash starts nothing twice. A start marks
 /// the receipt <c>started</c>, and a skip leaves it <c>skipped</c> and is logged with its reason after the commit.
-/// A data error in the data source's filter ends the occurrence with a warning.
+/// A data error in the data source's filter ends the occurrence with a warning. When the data
+/// source's filter or a group field reads a computed field that is being recomputed, the batch starts
+/// nothing, writes no receipt and keeps the cursor. It logs a warning and makes the item due again one
+/// lease later. The sort is not checked, because the batch reads by record id.
 /// </summary>
 internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILogger<TriggerFanOutHandler> logger) : IExternalWorkItemHandler
 {
@@ -75,8 +78,22 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
                 var parameters = dataSource.Parameters
                     .Select(parameter => new DataSourceParameterValue(parameter, trigger.Parameters!.GetValueOrDefault(parameter.Name)))
                     .ToList();
-                var ids = await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, cancellationToken);
-                if (ids is null)
+
+                // The filter or a group field on a field that is being recomputed would select records by a stale stored value.
+                var pending = await DataSourcePendingFields.ReadAsync(connection, transaction, stored, dataSource, sort: null, cancellationToken);
+                if (pending.Count > 0)
+                {
+                    LogPending(trigger.Name, occurrence);
+                    if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, item.Lease, cancellationToken))
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        LogLostClaim(item.Id, triggerId, occurrence);
+                        return WorkItemOutcome.LostClaim;
+                    }
+
+                    outcome = WorkItemOutcome.Rescheduled;
+                }
+                else if (await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, cancellationToken) is not { } ids)
                 {
                     LogDataError(trigger.Name, occurrence);
                 }
@@ -223,6 +240,9 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
 
     [LoggerMessage(LogLevel.Warning, "Trigger {Trigger} started nothing for occurrence {OccurrenceAt}: the database rejected the data source's filter with a data exception.")]
     private partial void LogDataError(string trigger, string occurrenceAt);
+
+    [LoggerMessage(LogLevel.Warning, "Trigger {Trigger} started nothing for occurrence {OccurrenceAt}: the data source reads a field that is being recomputed, so the occurrence runs again after the lease.")]
+    private partial void LogPending(string trigger, string occurrenceAt);
 
     [LoggerMessage(LogLevel.Warning, "Fan-out work item {ItemId} for trigger {TriggerId} and occurrence {OccurrenceAt} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, Guid triggerId, string occurrenceAt);
