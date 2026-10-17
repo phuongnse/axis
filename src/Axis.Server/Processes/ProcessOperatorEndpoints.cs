@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Unicode;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
@@ -36,11 +37,24 @@ namespace Axis.Server.Processes;
 /// 409 when an applied migration changed a column that the instance's pinned release uses.
 /// When the active release is no longer the one resolved, the retry runs again from resolution on
 /// the new release, and answers 503 after three attempts. A retry that is refused writes nothing.
+/// A resolve at <c>POST /api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve</c>
+/// settles an <c>unknown</c> connector call of an instance that is <c>waiting</c> on the call's step, as
+/// <c>succeeded</c> with its <c>output</c> or as <c>failed</c>. It is checked in the same order with the user's
+/// <c>resolve</c> grant, and its body is a <c>reason</c>, an <c>outcome</c> and, for <c>succeeded</c>, an
+/// <c>output</c> object. Then one transaction takes the start lock shared, as a retry does, and runs
+/// <see cref="ConnectorCallResolveCommand"/>. It answers 404 for a <c>callId</c> that is not a connector call of the
+/// instance, 409 for a call that is not unknown, 409 for an instance that is not waiting on the call's step, the same
+/// 409 for a <c>read</c> filter on a field that is being recomputed, and 400 for an output that does not fit the
+/// operation's declared outputs or a write the record refuses. A resolve that is refused writes nothing.
 /// The problem titles never contain text from the request.
 /// </summary>
 internal static class ProcessOperatorEndpoints
 {
     private const string ReasonProperty = "reason";
+
+    private const string OutcomeProperty = "outcome";
+
+    private const string OutputProperty = "output";
 
     private const int MaxReasonLength = 500;
 
@@ -51,10 +65,13 @@ internal static class ProcessOperatorEndpoints
 
     private const string DuplicateProperty = "Duplicate property.";
 
+    private const string MustBeObject = "Must be an object.";
+
     public static void MapProcessOperatorEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/cancel", CancelAsync);
         endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/retry", RetryAsync);
+        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve", ResolveAsync);
     }
 
     private static async Task<IResult> CancelAsync(
@@ -274,16 +291,286 @@ internal static class ProcessOperatorEndpoints
             new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, ProcessStarts.Running));
     }
 
+    private static async Task<IResult> ResolveAsync(
+        string app,
+        string process,
+        string id,
+        string callId,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
+        {
+            if (await ResolveOnceAsync(app, process, id, callId, request, user, resolver, database, tenants, loggerFactory, cancellationToken) is { } result)
+            {
+                return result;
+            }
+        }
+
+        return ReleaseRetry.Changed();
+    }
+
+    // Null when the active release changed while the resolve waited for the start lock. Nothing was written.
+    private static async Task<IResult?> ResolveOnceAsync(
+        string app,
+        string process,
+        string id,
+        string callId,
+        HttpRequest request,
+        CurrentUserResponse user,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return NotFound("No application is active under this name.");
+        }
+
+        var application = active.Model;
+        if (!application.TryGetProcess(process, out var model))
+        {
+            return NotFound("The application has no process with this name.");
+        }
+
+        if (!PolicyEvaluator.AllowsResolve(application, user.Roles, model))
+        {
+            return Grants.Forbidden();
+        }
+
+        if (!JsonRequest.IsJson(request))
+        {
+            return JsonRequest.UnsupportedMediaType();
+        }
+
+        var (body, errors) = ReadResolve(await ReadBodyAsync(request, cancellationToken));
+        if (errors is not null)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        if (id is not { Length: 36 } || !Guid.TryParseExact(id, "D", out var instanceId))
+        {
+            return InstanceNotFound();
+        }
+
+        if (callId is not { Length: 36 } || !Guid.TryParseExact(callId, "D", out var operationId))
+        {
+            return CallNotFound();
+        }
+
+        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+        }
+
+        var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
+        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The start lock comes first, before any entity table is touched, because a succeeded resolve writes the
+        // record and can start instances. The release is read again under it.
+        if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != active.ReleaseId)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var result = await ConnectorCallResolveCommand.ResolveAsync(
+            connection,
+            transaction,
+            tenantId,
+            application,
+            active.ReleaseId,
+            model,
+            entity,
+            instanceId,
+            operationId,
+            read,
+            user.Id,
+            user.DisplayName,
+            body!.Reason,
+            body.Succeeded,
+            body.Output,
+            resolver.GetReleaseModelAsync,
+            loggerFactory,
+            cancellationToken);
+        if (result.Outcome != ConnectorCallResolveOutcome.Resolved)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return result.Outcome switch
+            {
+                ConnectorCallResolveOutcome.NotFound => InstanceNotFound(),
+                ConnectorCallResolveOutcome.CallNotFound => CallNotFound(),
+                ConnectorCallResolveOutcome.PendingFilter => Grants.PendingFilter(),
+                ConnectorCallResolveOutcome.NotUnknown => Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "The call's outcome is not unknown."),
+                ConnectorCallResolveOutcome.NotWaiting => Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "The instance is not waiting on the call's step."),
+                _ => Results.ValidationProblem(result.Errors!),
+            };
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return Results.Json(
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, result.State!));
+    }
+
     /// <summary>
     /// Reads a body that is exactly <c>{ "reason": "&lt;text&gt;" }</c>. Every problem is reported
     /// in one pass, keyed by JSON Pointer into the body. A body that is not a JSON object is one
     /// problem on the whole body.
     /// </summary>
-    private static (string? Reason, SortedDictionary<string, string[]>? Errors) ReadReason(byte[] utf8Body)
+    private static (string? Reason, SortedDictionary<string, string[]>? Errors) ReadReason(byte[] utf8Body) =>
+        ReadObject(utf8Body, [ReasonProperty], (properties, errors) => ReadReasonText(properties, errors));
+
+    /// <summary>
+    /// Reads a resolve body: a <c>reason</c>, an <c>outcome</c> of <c>succeeded</c> or <c>failed</c> and,
+    /// with <c>succeeded</c>, an optional <c>output</c> object. Every problem is reported in one pass, keyed
+    /// by JSON Pointer into the body. Whether the output fits the operation is checked later.
+    /// </summary>
+    private static (ResolveBody? Body, SortedDictionary<string, string[]>? Errors) ReadResolve(byte[] utf8Body) =>
+        ReadObject(
+            utf8Body,
+            [ReasonProperty, OutcomeProperty, OutputProperty],
+            (properties, errors) =>
+            {
+                var reason = ReadReasonText(properties, errors);
+                bool? succeeded = null;
+                if (!errors.ContainsKey("/" + OutcomeProperty))
+                {
+                    if (!properties.TryGetValue(OutcomeProperty, out var outcome) || outcome.ValueKind == JsonValueKind.Null)
+                    {
+                        errors["/" + OutcomeProperty] = ["Required."];
+                    }
+                    else
+                    {
+                        succeeded = outcome.ValueKind == JsonValueKind.String ? outcome.GetString() switch
+                        {
+                            "succeeded" => true,
+                            "failed" => false,
+                            _ => null,
+                        }
+                        : null;
+                        if (succeeded is null)
+                        {
+                            errors["/" + OutcomeProperty] = ["Must be succeeded or failed."];
+                        }
+                    }
+                }
+
+                JsonObject? output = null;
+                if (!errors.ContainsKey("/" + OutputProperty) && properties.TryGetValue(OutputProperty, out var element))
+                {
+                    if (element.ValueKind != JsonValueKind.Object)
+                    {
+                        errors["/" + OutputProperty] = [MustBeObject];
+                    }
+                    else if (succeeded == false)
+                    {
+                        errors["/" + OutputProperty] = ["Not allowed when the outcome is failed."];
+                    }
+                    else
+                    {
+                        output = ReadOutput(element, errors);
+                    }
+                }
+
+                return reason is not null && succeeded is { } settled ? new ResolveBody(reason, settled, output) : null;
+            });
+
+    // The names are checked for duplicates here, and each value is kept as parsed. The type of each is checked later.
+    private static JsonObject? ReadOutput(JsonElement element, SortedDictionary<string, string[]> errors)
+    {
+        var output = new JsonObject();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            string name;
+            try
+            {
+                name = property.Name;
+            }
+            catch (InvalidOperationException)
+            {
+                // A name with an unpaired surrogate escape cannot be read as text.
+                errors["/" + OutputProperty] = [MalformedBody];
+                return null;
+            }
+
+            var pointer = Pointer(OutputProperty, name);
+            if (!names.Add(name))
+            {
+                errors.TryAdd(pointer, [DuplicateProperty]);
+                continue;
+            }
+
+            try
+            {
+                output[name] = JsonNode.Parse(property.Value.GetRawText());
+            }
+            catch (ArgumentException)
+            {
+                // A nested object repeats a name.
+                errors[pointer] = [MalformedBody];
+            }
+        }
+
+        return output;
+    }
+
+    private static string? ReadReasonText(Dictionary<string, JsonElement> properties, SortedDictionary<string, string[]> errors)
+    {
+        if (errors.ContainsKey("/" + ReasonProperty))
+        {
+            return null;
+        }
+
+        var reason = properties.TryGetValue(ReasonProperty, out var element) && element.ValueKind == JsonValueKind.String ? element.GetString() : null;
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            errors["/" + ReasonProperty] = ["Required."];
+            return null;
+        }
+
+        if (reason.Length > MaxReasonLength)
+        {
+            errors["/" + ReasonProperty] = [$"Must be at most {MaxReasonLength} characters."];
+            return null;
+        }
+
+        return reason;
+    }
+
+    /// <summary>
+    /// Parses <paramref name="utf8Body"/> as a JSON object whose properties are among <paramref name="allowed"/>,
+    /// and reports an unknown or a repeated property. <paramref name="read"/> reads the properties that were
+    /// accepted and adds its own errors. A body that is not a JSON object is one problem on the whole body.
+    /// </summary>
+    private static (T? Value, SortedDictionary<string, string[]>? Errors) ReadObject<T>(
+        byte[] utf8Body,
+        string[] allowed,
+        Func<Dictionary<string, JsonElement>, SortedDictionary<string, string[]>, T?> read)
+        where T : class
     {
         if (!Utf8.IsValid(utf8Body))
         {
-            return Malformed();
+            return Malformed<T>();
         }
 
         JsonDocument document;
@@ -293,71 +580,59 @@ internal static class ProcessOperatorEndpoints
         }
         catch (JsonException)
         {
-            return Malformed();
+            return Malformed<T>();
         }
 
         using (document)
         {
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return Malformed();
+                return Malformed<T>();
             }
 
             var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
             var names = new HashSet<string>(StringComparer.Ordinal);
-            string? reason = null;
+            var properties = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             foreach (var property in document.RootElement.EnumerateObject())
             {
                 string name;
                 try
                 {
                     name = property.Name;
+                    if (property.Value.ValueKind == JsonValueKind.String && allowed.Contains(name))
+                    {
+                        _ = property.Value.GetString();
+                    }
                 }
                 catch (InvalidOperationException)
                 {
-                    // A name with an unpaired surrogate escape cannot be read as text.
-                    return Malformed();
+                    // A name or a text with an unpaired surrogate escape cannot be read as text.
+                    return Malformed<T>();
                 }
 
-                var pointer = $"/{name.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal)}";
                 if (!names.Add(name))
                 {
-                    errors.TryAdd(pointer, [DuplicateProperty]);
+                    errors.TryAdd(Pointer(name), [DuplicateProperty]);
                 }
-                else if (name != ReasonProperty)
+                else if (!allowed.Contains(name))
                 {
-                    errors.TryAdd(pointer, [UnknownProperty]);
+                    errors.TryAdd(Pointer(name), [UnknownProperty]);
                 }
-                else if (property.Value.ValueKind == JsonValueKind.String)
+                else
                 {
-                    try
-                    {
-                        reason = property.Value.GetString();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        return Malformed();
-                    }
+                    properties[name] = property.Value;
                 }
             }
 
-            if (!errors.ContainsKey("/" + ReasonProperty))
-            {
-                if (string.IsNullOrWhiteSpace(reason))
-                {
-                    errors["/" + ReasonProperty] = ["Required."];
-                }
-                else if (reason.Length > MaxReasonLength)
-                {
-                    errors["/" + ReasonProperty] = [$"Must be at most {MaxReasonLength} characters."];
-                }
-            }
-
-            return errors.Count > 0 ? (null, errors) : (reason, null);
+            var value = read(properties, errors);
+            return errors.Count > 0 ? (null, errors) : (value, null);
         }
     }
 
-    private static (string?, SortedDictionary<string, string[]>?) Malformed() =>
+    private static string Pointer(params string[] names) =>
+        string.Concat(names.Select(name => $"/{name.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal)}"));
+
+    private static (T?, SortedDictionary<string, string[]>?) Malformed<T>() where T : class =>
         (null, new SortedDictionary<string, string[]>(StringComparer.Ordinal) { [""] = [MalformedBody] });
 
     // Buffered, so a retry that runs again on a new release can read the body again.
@@ -373,6 +648,11 @@ internal static class ProcessOperatorEndpoints
 
     private static IResult InstanceNotFound() => NotFound("No instance of this process exists with this id.");
 
+    private static IResult CallNotFound() => NotFound("No call of this instance exists with this id.");
+
     private static IResult NotFound(string title) =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
 }
+
+/// <summary>The body of a resolve: the reason, whether the call succeeded, and the output of a succeeded call.</summary>
+internal sealed record ResolveBody(string Reason, bool Succeeded, JsonObject? Output);

@@ -38,7 +38,8 @@ built. The `inspect` grant, the instance list and the instance detail with its
 `calls` and the `sensitive` flag are built. The inspector widget is planned
 for M7, see [Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
-resolve is *(planned for M7)*, see [Operator commands](#operator-commands).
+resolve is built for connector calls, and *(planned for M7)* for package calls,
+see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -1145,7 +1146,7 @@ for texts. **Both** means different parts use different releases.
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
-| Operator resolve *(planned for M7)* | Both | The output check and the record write use the pinned release. The `resolve` grant and data change triggers come from the active release. |
+| Operator resolve | Both | The output check and the record write use the pinned release. The `resolve` grant and data change triggers come from the active release. |
 | `raiseEvent` | Both | The occurrence holds the pinned release. Its `sync` triggers come from the active release. |
 | `event.deliver` | Active | Reads `async` event triggers from the release active at delivery. |
 | Data change triggers | Active | Fire from the active release, even when old-release work writes the record. |
@@ -1171,7 +1172,7 @@ for texts. **Both** means different parts use different releases.
   task completion and record creates and updates answer `503` after three
   release changes. Operator [retry](#retry) takes it too, as the first
   statement of its transaction, and answers `503` after three release changes.
-  *(Planned for M7.)* [Resolve](#resolve) takes it the same way. Event delivery reads the active release again in each
+  [Resolve](#resolve) takes it the same way. Event delivery reads the active release again in each
   trigger's transaction, and skips a trigger that the new release no longer
   has. See [Migrations](storage.md#migrations).
 - **Authorization.** Roles and policies always come from the active release,
@@ -1619,7 +1620,7 @@ operation's `lookup` with the operation identity as `{idempotencyKey}`.
 - **No lookup.** The operation declares none. The call stays `unknown`, and
   the instance stays `waiting`. A history row with output
   `{ "operationId", "outcome": "unknown" }` makes it visible. An operator
-  resolves it *(planned for M7)*, see [Resolve](#resolve).
+  resolves it, see [Resolve](#resolve).
 
 The first lookup runs at once after the unknown outcome. Only a failed lookup
 waits. The same `connector.call` item runs each lookup, under the same claim
@@ -1823,8 +1824,8 @@ again with the stored input under the same operation identity.
   fixed sentence, one for a timeout and one for a call found `sending`. The
   call keeps its stored input, and it writes no `operation.called` audit record
   and no `process.failed`, because it has not settled. Packages have no
-  lookup, so an operator resolves it *(planned for M7)*, see
-  [Resolve](#resolve).
+  lookup, so an operator resolves it, see [Resolve](#resolve). *(Resolving a
+  package call is planned for M7.)*
 - **Audit.** Each settled call writes one audit record `operation.called`,
   with actor `system` and details
   `{ "package", "version", "operation", "operationId", "attempts", "outcome" }`.
@@ -1839,7 +1840,8 @@ again with the stored input under the same operation identity.
 
 This section follows
 [D35](../decisions.md#d35-operator-retry-cancel-and-resolve--agreed). Cancel and
-retry are built. Resolve is *(planned for M7)*. Three
+retry are built. Resolve is built for connector calls, and package calls are
+*(planned for M7)*. Three
 commands let an authorized user act on process work that the engine cannot
 finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
 `running` or `waiting` instance. **Resolve** settles a connector or package
@@ -1880,8 +1882,7 @@ the instance id and `{callId}` is the call's operation identity. A success is
 
 A `process` grant takes the actions `retry`, `cancel` and `resolve`, as well as
 `start` and `inspect`, see [Authorization](../architecture.md#authorization).
-Only `cancel` and `retry` are accepted so far. `resolve` is refused when the
-application compiles, until it is built. Each is checked
+Each is checked
 on its own, and none implies another. The subject record must also be readable
 by the user, by the same rule as a start. A subject record the user may not
 read makes the instance an unknown instance, `404`, so the user cannot tell the
@@ -2003,7 +2004,9 @@ Resolve takes a call that is `unknown`, on an instance that is `waiting` on the
 call's step. The operator has checked what the other system did, and says so.
 It works for a connector call with no lookup and for a package call, which has
 none. It also works for a connector call that waits for its lookup, in place of
-the lookup.
+the lookup. Connector calls are built. Package calls are *(planned for M7)*,
+and until then a package call's id on the route is a `404`, like any id that is
+not a connector call of the instance.
 
 One transaction does this:
 
@@ -2046,6 +2049,10 @@ One transaction does this:
    a package call. The actor is the user. So each settled call has one audit
    record, and it shows who settled it by hand.
 
+A resolved call keeps its last HTTP status and last error from its final
+attempt. Only its state and its settled time change. A resolve records no
+instance-ended metric, as a cancel does not.
+
 A resolve with a mistake in `output` is a `400` and does not fail the
 instance. The operator can still resolve the call as `failed` on purpose. A
 later [retry](#retry) of that instance stages the call again under the same
@@ -2068,7 +2075,11 @@ A request is checked in this order, and the first failure is the response:
 3. The application and the process, `404`.
 4. The matching grant on the process, `403`: `retry`, `cancel` or `resolve`.
 5. The content type, `415`.
-6. The body, `400`.
+6. The body, `400`. For a resolve this is the body's shape: `reason`, `outcome` and
+   `output` as an object. Each output value is checked later, in the
+   transaction, because the declared outputs come from the call's pinned
+   release. A bad `reason` and a bad output value are reported one after the
+   other, not together.
 
 One transaction then checks the instance, and for a resolve the call. A cancel
 or a retry first answers the policy `409` below, before it looks for the
@@ -2086,7 +2097,10 @@ and then the `409` checks.
     or an instance of another process. The cancel's title is "No instance of
     this process exists with this id.";
   - an instance whose subject record the user may not read;
-  - for a resolve, an unknown `{callId}`, or a call of another instance.
+  - for a resolve, an unknown `{callId}`, a `{callId}` that is not a UUID in the
+    hyphenated form, or a call of another instance. A package call's id is
+    also a `404` until package resolve is built. The title is "No call of this
+    instance exists with this id.".
 - **`400`.** The body is a validation problem keyed by JSON Pointer. Every
   invalid part is reported in the same response.
   - A missing, blank or too long `reason` is keyed `/reason`.
@@ -2100,7 +2114,7 @@ and then the `409` checks.
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".
-- **`409` for a policy that reads a pending field.** Cancel and retry only. A
+- **`409` for a policy that reads a pending field.** Cancel, retry and resolve. A
   `read` filter of the user's grants on the subject entity reads a
   [pending field](storage.md#recomputing-computed-fields). The title is the
   record API's "Your access to this entity cannot be checked while a field is
@@ -2114,8 +2128,8 @@ and then the `409` checks.
   | Retry | An applied migration renamed, dropped or converted a column that the pinned release uses. The title is "A migration changed a column that the instance's release uses.". |
   | Cancel | The instance is not `running` or `waiting`. The title is "The instance is not running or waiting.". |
   | Cancel | A call of the instance is `sending` or `unknown`. The problem names the call in a `callId` member. The title is "A call of this instance may have reached the other system. It must settle or be resolved first.". |
-  | Resolve | The call is not `unknown`. |
-  | Resolve | The instance is not `waiting` on the call's step. |
+  | Resolve | The call is not `unknown`. The title is "The call's outcome is not unknown.". |
+  | Resolve | The instance is not `waiting` on the call's step. The title is "The instance is not waiting on the call's step.". |
 
 - **`503`.** Retry and resolve only. The application's active release changed
   on each of three attempts, found under the
