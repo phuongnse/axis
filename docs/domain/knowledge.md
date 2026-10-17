@@ -254,6 +254,7 @@ See [D32](../decisions.md#d32-test-scenarios--agreed).
 - **Correlation.** Every request, process instance, step attempt and connector
   call carries correlation identifiers. Operators can go from a user-visible
   error to the exact attempt and its logs.
+  See [D36](../decisions.md#d36-correlated-logs-metrics-and-traces--agreed).
 - **Durable history.** Execution history is stored with the process. Sampled
   telemetry is not the source of truth.
 - **Log protection.** Sensitive fields are masked in logs and inspection

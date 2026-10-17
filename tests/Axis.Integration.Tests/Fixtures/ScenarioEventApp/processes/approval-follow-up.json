@@ -1,0 +1,20 @@
+{
+  "id": "d1f24d30-88b2-4254-9611-053a46cd3d3f",
+  "kind": "process",
+  "name": "ApprovalFollowUp",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "start": "followUp",
+  "steps": [
+    {
+      "name": "followUp",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "decisionComments": "'followed up'"
+      },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

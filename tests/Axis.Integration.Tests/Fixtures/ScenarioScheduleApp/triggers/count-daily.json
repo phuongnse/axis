@@ -1,0 +1,11 @@
+{
+  "id": "2825656c-d7f7-4808-ba4a-8129d4e3b905",
+  "kind": "trigger",
+  "name": "CountDaily",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 18 * * *",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "dataSource": "AllPurchaseRequests",
+  "process": "CountScheduleRuns"
+}

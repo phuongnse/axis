@@ -1,0 +1,8 @@
+{
+  "id": "f42ec710-9250-42a0-94b5-7db552eb5ce9",
+  "kind": "dataSource",
+  "name": "AllPurchaseRequests",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "fields": [{ "name": "title", "path": "title" }]
+}

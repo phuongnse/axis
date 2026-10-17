@@ -103,6 +103,28 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("releases", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ReleaseComputedFingerprint", b =>
+                {
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.HasKey("ReleaseId", "EntityId")
+                        .HasName("pk_release_computed_fingerprints");
+
+                    b.ToTable("release_computed_fingerprints", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.ReleasePackage", b =>
                 {
                     b.Property<Guid>("ReleaseId")
@@ -167,6 +189,16 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasConstraintName("fk_active_sites_active_releases_application_id");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ReleaseComputedFingerprint", b =>
+                {
+                    b.HasOne("Axis.Configuration.Storage.Release", null)
+                        .WithMany("ComputedFingerprints")
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_release_computed_fingerprints_releases_release_id");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.ReleasePackage", b =>
                 {
                     b.HasOne("Axis.Configuration.Storage.Release", null)
@@ -189,6 +221,8 @@ namespace Axis.Configuration.Storage.Migrations
 
             modelBuilder.Entity("Axis.Configuration.Storage.Release", b =>
                 {
+                    b.Navigation("ComputedFingerprints");
+
                     b.Navigation("Packages");
 
                     b.Navigation("Resources");

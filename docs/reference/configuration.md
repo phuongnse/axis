@@ -465,7 +465,7 @@ flowchart LR
        step property, `save` together with `expect`, `expect` on an
        expectation step, or a `now` that is not a real date and time, such as
        `2026-02-30T09:00:00Z`, is `AXC0004`.
-     - *(planned for M7)* An `advanceTime` step whose `by` is not a positive
+     - An `advanceTime` step whose `by` is not a positive
        duration in the form of a task's `dueIn` is `AXC0193` at
        `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is
        `AXC0194` at `/steps/{i}`.
@@ -826,16 +826,13 @@ sorted by file and then path.
 | `AXC0189` | A value in a step's `values` does not fit its field's type: not a valid text, number, boolean, date, reference or listed enum value, or a child collection that is not an array of objects. Reported at `/steps/{i}/values/{key}`. |
 | `AXC0190` | A stub names no loaded connector, no operation of the connector, no package of the application, or no operation of the pinned package. Reported at `/stubs/{i}/connector/name`, `/stubs/{i}/connector/operation` or `/stubs/{i}/operation`. |
 | `AXC0191` | A key in a stub's `output` names no output field of the operation. Reported at `/stubs/{i}/output/{key}`. |
+| `AXC0193` | An `advanceTime` step's `by` is not a positive duration in the form of a task's `dueIn`. Reported at `/steps/{i}/by`. |
+| `AXC0194` | An `advanceTime` step in a scenario without `now`. Reported at `/steps/{i}`. |
 
 *(planned for M7)* `AXC0192` is not in the table yet, because the table lists the codes in
 `DiagnosticCodes`. A `processInspector` widget's `process` that names no loaded process,
 ignoring letter case, is `AXC0192`, reported at `/widgets/{i}/process`. The code joins the table
-when the widget is built. Two more codes come with `advanceTime`. They join the table
-when the step is built, because the table lists only codes that the compiler
-declares. `AXC0193` is an `advanceTime` step whose `by` is not a positive
-duration in the form of a task's `dueIn`, reported at `/steps/{i}/by`.
-`AXC0194` is an `advanceTime` step in a scenario without `now`, reported at
-`/steps/{i}`.
+when the widget is built.
 
 ## Startup activation
 
@@ -916,6 +913,28 @@ development or E2E server serves a real application without a separate step.
   activates again safely because provisioning is additive. A failed activation
   with a pending migration leaves nothing applied, so the next start runs the
   migrations again.
+
+## Telemetry export
+
+*(planned for M7)* The server and the worker export traces, metrics and logs
+with OpenTelemetry, see [Telemetry](../architecture.md#telemetry). They read
+the standard variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | The OTLP endpoint for all signals. With no endpoint, nothing is exported |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | The endpoint for traces only |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | The endpoint for metrics only |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | The endpoint for logs only |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | The OTLP protocol |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Headers sent with every export |
+| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker` |
+| `OTEL_RESOURCE_ATTRIBUTES` | More resource attributes |
+
+With no endpoint, nothing is exported and logs still go to the console. The
+headers may carry a collector token, so they come from the environment and
+never from a committed file. Docker Compose and `scripts/dev.sh` set no
+endpoint and start no collector.
 
 ## Resource file shape
 
@@ -2371,7 +2390,7 @@ Every step has a `type`. These are the step kinds:
 | `expectRecord` | `record`, `values` | Asserts that the saved record holds these values. |
 | `expectInstance` | `process`, `record`, `state`, optional `step` | Asserts the state of the process instance on the record, and the step it waits at. |
 | `expectTask` | `record`, `step`, `assignee` or `state` | Asserts who the task is assigned to, or its state. |
-| `advanceTime` | `by` | *(planned for M7)* Moves the scenario's `now` forward by `by`, then runs the work items that are due. |
+| `advanceTime` | `by` | Moves the scenario's `now` forward by `by`, then runs the work items that are due. |
 
 - `createRecord`, `updateRecord`, `deleteRecord`, `startProcess` and
   `completeTask` are the actions. The record actions go through the record
@@ -2405,7 +2424,7 @@ Every step has a `type`. These are the step kinds:
   alias is checked at compile. See the **Scenarios** bullet of the
   [Resolve step](#configuration-pipeline) for the checks and their codes.
 
-*(planned for M7)* `advanceTime`:
+`advanceTime`:
 
 - `by` has the form of a task's `dueIn`: weeks, such as `P2W`, or days with an
   optional time part, such as `P1D`, `PT2H` or `P1DT12H`. It must be positive.
@@ -2413,7 +2432,8 @@ Every step has a `type`. These are the step kinds:
 - It needs `now`. The runner sets the new time on every connection of the
   scenario, including the work item runner's. Every later step reads it.
 - The runner then runs every due work item (`process.step`, `connector.call`,
-  `package.call`, `trigger.schedule` and `trigger.fanOut`) until none is due.
+  `package.call`, `event.deliver`, `trigger.schedule` and `trigger.fanOut`) until
+  none is due.
   If more than 1,000 items run in one step, the scenario fails at that step.
 - A schedule that missed several occurrences runs only the latest one, once, as
   a worker does after an outage. See [schedules](processes.md#schedules). To
@@ -2533,24 +2553,25 @@ What runs now:
 - **Process steps.** After each action, the runner runs the `process.step` work
   items of the scenario's tenant in-process, until none is due. So the process
   reaches its next wait: an open task, or its end. If one action makes more than
-  1,000 items run, the scenario fails at that step.
+  1,000 items run, of any kind, the scenario fails at that step.
 - **Connector and package calls.** The same loop runs the `connector.call` and
   `package.call` items. They are the real handlers, so output mapping, resume,
   history, audit records and data change triggers behave as they do on a worker.
   Only the HTTP request of a connector call and the package operation are replaced
   by the scenario's `stubs`. See `stubs` above.
+- **Event deliveries.** The same loop runs the `event.deliver` items with the real
+  handler. So an `async` event trigger starts its process, and that process runs
+  to its next wait before the next step. See
+  [event delivery](processes.md#event-delivery).
 - **The current time.** With `now` set, the runner gives every connection of the
   scenario the PostgreSQL setting `axis.now`. The transaction time reads it
   instead of PostgreSQL `now()`. So `now()` in expressions, in policy and data
   source filters, task due dates, step history times and the year of a sequence
   number all use it. Timestamps that PostgreSQL writes itself, such as
   `created_at`, keep the real clock.
-
-*(planned for M7)*: event deliveries. Only the `process.step`, `connector.call`
-and `package.call` items run after an action, so event deliveries and schedule
-triggers stay queued and do not fail the scenario. Schedule triggers run through
-[`advanceTime`](#test-scenarios), as described above. Event deliveries stay
-planned as their own item.
+- **Schedule triggers.** They run only through [`advanceTime`](#test-scenarios),
+  as described above. After an action the `trigger.schedule` and `trigger.fanOut`
+  items stay queued and do not fail the scenario.
 
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops

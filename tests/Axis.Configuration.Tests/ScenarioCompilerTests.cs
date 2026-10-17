@@ -102,6 +102,10 @@ public sealed class ScenarioCompilerTests
     [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "expect": "denied" }""")]
     [InlineData("""{ "type": "deleteRecord", "record": "request" }""")]
     [InlineData("""{ "type": "expectTask", "record": "request", "step": "managerApproval" }""")]
+    [InlineData("""{ "type": "advanceTime" }""")]
+    [InlineData("""{ "type": "advanceTime", "by": "P1D", "as": "anna" }""")]
+    [InlineData("""{ "type": "advanceTime", "by": "P1D", "expect": "denied" }""")]
+    [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "by": "P1D" }""")]
     public void A_malformed_step_is_a_schema_violation(string step)
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
@@ -113,6 +117,77 @@ public sealed class ScenarioCompilerTests
 
         Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File) == (DiagnosticCodes.SchemaViolation, ScenarioFile));
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("P0D")]
+    [InlineData("PT0S")]
+    [InlineData("P1M")]
+    [InlineData("P1Y")]
+    [InlineData("-P1D")]
+    [InlineData("tomorrow")]
+    public void An_advance_time_step_whose_by_is_not_a_positive_fixed_duration_is_AXC0193_at_by(string by)
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
+            "now": "2026-10-01T09:00:00Z",
+            "users": { "anna": ["employee"] },
+            "steps": [{ "type": "advanceTime", "by": "{{by}}" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Null(result.Model);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidAdvanceTimeBy, "/steps/0/by", ScenarioFile), (diagnostic.Code, diagnostic.Path, diagnostic.File));
+    }
+
+    [Fact]
+    public void An_advance_time_step_in_a_scenario_without_now_is_AXC0194_at_the_step()
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario("""
+            "users": { "anna": ["employee"] },
+            "steps": [{ "type": "advanceTime", "by": "P1D" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Null(result.Model);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.AdvanceTimeWithoutNow, "/steps/0"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_advance_time_step_that_breaks_both_rules_reports_both_codes()
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario("""
+            "users": { "anna": ["employee"] },
+            "steps": [{ "type": "advanceTime", "by": "P1M" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Equal(
+            new[] { ("AXC0193", "/steps/0/by"), ("AXC0194", "/steps/0") },
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)).Order().ToArray());
+    }
+
+    [Theory]
+    [InlineData("P1D")]
+    [InlineData("PT1H")]
+    [InlineData("P1W")]
+    [InlineData("P1DT12H")]
+    public void An_advance_time_step_with_now_and_a_positive_by_compiles(string by)
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
+            "now": "2026-10-01T09:00:00Z",
+            "users": { "anna": ["employee"] },
+            "steps": [{ "type": "advanceTime", "by": "{{by}}" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
     }
 
     [Fact]

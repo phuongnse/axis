@@ -1,0 +1,20 @@
+{
+  "id": "c0d9b42a-36fc-48a3-b982-4a4328ec5c63",
+  "kind": "process",
+  "name": "CountScheduleRuns",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "start": "count",
+  "steps": [
+    {
+      "name": "count",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "amount": "amount + 1"
+      },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

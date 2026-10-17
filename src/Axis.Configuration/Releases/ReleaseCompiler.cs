@@ -64,6 +64,9 @@ public static class ReleaseCompiler
             Packages = compiled.Model.Packages
                 .Select(package => new ReleasePackage { ReleaseId = releaseId, PackageId = package.Id, Version = package.Version })
                 .ToList(),
+            ComputedFingerprints = ComputedFingerprints.Compute(compiled.Model)
+                .Select(pair => new ReleaseComputedFingerprint { ReleaseId = releaseId, EntityId = pair.Key, Fingerprint = pair.Value })
+                .ToList(),
         };
         context.Releases.Add(release);
 

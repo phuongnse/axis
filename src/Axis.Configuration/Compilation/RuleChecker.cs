@@ -62,7 +62,10 @@ internal static class RuleChecker
             built[rule.Name] = new ExpressionRule(
                 rule.Name,
                 [.. rule.Parameters.Select(parameter => new ExpressionRuleParameter(parameter.Name, ExpressionScopes.TypeOf(parameter.Type)))],
-                ExpressionScopes.TypeOf(rule.ResultType));
+                ExpressionScopes.TypeOf(rule.ResultType))
+            {
+                Expression = rule.Expression,
+            };
 
             var parsed = ExpressionParser.Parse(rule.Expression);
             if (parsed.Succeeded)

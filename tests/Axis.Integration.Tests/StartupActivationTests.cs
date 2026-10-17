@@ -534,7 +534,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
         await StartAsync(a, b, folder);
         var runtime = PostgreSqlServer.RuntimeConnectionString(a);
 
-        foreach (var (table, column) in new[] { ("active_releases", "application_id"), ("provisioned_entities", "entity_id") })
+        foreach (var (table, column) in new[] { ("active_releases", "application_id"), ("provisioned_entities", "entity_id"), ("release_computed_fingerprints", "entity_id") })
         {
             Assert.True((long)(await ScalarAsync(runtime, $"SELECT count(*) FROM axis.{table}"))! > 0);
             foreach (var sql in new[] { $"INSERT INTO axis.{table} DEFAULT VALUES", $"UPDATE axis.{table} SET {column} = {column}", $"DELETE FROM axis.{table}" })
@@ -542,6 +542,9 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
                 await AssertSqlStateAsync(runtime, sql, PostgresErrorCodes.InsufficientPrivilege);
             }
         }
+
+        // The application has one entity and it is not a child entity, so its release has one fingerprint.
+        Assert.Equal(1L, await ScalarAsync(runtime, "SELECT count(*) FROM axis.release_computed_fingerprints"));
     }
 
     [Fact]

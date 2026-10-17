@@ -111,7 +111,8 @@
             "completeTask",
             "expectRecord",
             "expectInstance",
-            "expectTask"
+            "expectTask",
+            "advanceTime"
           ]
         },
         "entity": { "$ref": "#/$defs/name" },
@@ -124,9 +125,30 @@
         "state": { "enum": ["running", "waiting", "completed", "failed", "open"] },
         "assignee": { "$ref": "#/$defs/assignee" },
         "values": { "type": "object" },
-        "expect": { "$ref": "#/$defs/expect" }
+        "expect": { "$ref": "#/$defs/expect" },
+        "by": { "type": "string", "minLength": 1 }
       },
       "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "advanceTime" } } },
+          "then": {
+            "required": ["by"],
+            "properties": {
+              "entity": false,
+              "record": false,
+              "save": false,
+              "as": false,
+              "process": false,
+              "step": false,
+              "outcome": false,
+              "state": false,
+              "assignee": false,
+              "values": false,
+              "expect": false
+            }
+          },
+          "else": { "properties": { "by": false } }
+        },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "createRecord" } } },
           "then": {

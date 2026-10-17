@@ -42,7 +42,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
 
         Assert.Empty(first.Diagnostics);
         var table = Assert.Single(await ReadTablesAsync(_orderId));
-        Assert.Equal(["id", "version", "f_number"], table.Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number"], table.Columns.Select(column => column.Name));
         var active = await FindActiveAsync(_applicationId);
         Assert.NotNull(active);
         Assert.Equal((_applicationId, _name, compiled.Release.Id), (active.ApplicationId, active.Name, active.ReleaseId));
@@ -82,7 +82,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Empty(result.Diagnostics);
         Assert.Equal(second.Release.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
         var table = Assert.Single(await ReadTablesAsync(_orderId));
-        Assert.Equal(["id", "version", "f_number", "f_note"], table.Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_note"], table.Columns.Select(column => column.Name));
         Assert.Equal([rowId], await ReadIdsAsync(_orderId));
     }
 
@@ -138,7 +138,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
             (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", path, _connectorId, message),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId, diagnostic.Message));
         Assert.Equal(before, await FindActiveAsync(_applicationId));
-        Assert.Equal(["id", "version", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
     }
 
     [Fact]

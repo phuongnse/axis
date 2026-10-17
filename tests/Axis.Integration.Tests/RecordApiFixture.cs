@@ -209,6 +209,14 @@ public sealed class RecordApiFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>Runs one SQL query on the database of <paramref name="tenant"/> and returns its first value.</summary>
+    public async Task<object?> ScalarAsync(string tenant, string sql)
+    {
+        await using var command = _dataSources[tenant].CreateCommand(sql);
+        var value = await command.ExecuteScalarAsync();
+        return value is DBNull ? null : value;
+    }
+
     /// <summary>Runs one SQL statement on the database of <paramref name="tenant"/>.</summary>
     public async Task ExecuteAsync(string tenant, string sql)
     {

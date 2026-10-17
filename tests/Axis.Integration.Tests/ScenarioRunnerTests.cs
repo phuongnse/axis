@@ -1,7 +1,11 @@
 using System.Xml.Linq;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
+using Axis.Data.Storage;
+using Axis.Processes.Storage;
 using Axis.Scenarios;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
@@ -418,6 +422,67 @@ public sealed class ScenarioRunnerTests
         Assert.True(result.Passed, result.Failure);
     }
 
+    private const string ScheduleNow = "2026-10-01T09:00:00Z";
+
+    [Fact]
+    public async Task A_daily_schedule_fires_once_after_advance_time_and_expect_instance_sees_it()
+    {
+        using var folder = ScheduleApplication(Scenario("DailySchedule", Purchasing, CreateRequest + """
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5000 } },
+            { "type": "advanceTime", "by": "PT1H" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5000 } },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5001 } }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "DailySchedule");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task No_schedule_instance_exists_before_advance_time()
+    {
+        using var folder = ScheduleApplication(Scenario("NoInstanceYet", Purchasing, CreateRequest + """
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" }
+            """, now: ScheduleNow));
+        using var shortAdvance = ScheduleApplication(Scenario("ShortAdvance", Purchasing, CreateRequest + """
+            { "type": "advanceTime", "by": "PT1H" },
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" }
+            """, now: ScheduleNow));
+
+        var before = await RunAsync(folder, "NoInstanceYet");
+        var after = await RunAsync(shortAdvance, "ShortAdvance");
+
+        Assert.False(before.Passed);
+        Assert.Contains("Step 2 (expectInstance)", before.Failure);
+        Assert.False(after.Passed);
+        Assert.Contains("Step 3 (expectInstance)", after.Failure);
+    }
+
+    [Fact]
+    public async Task Three_days_in_one_step_fire_the_schedule_once_but_three_daily_steps_fire_it_three_times()
+    {
+        using var catchUp = ScheduleApplication(Scenario("CatchUp", Purchasing, CreateRequest + """
+            { "type": "advanceTime", "by": "P3D" },
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5001 } }
+            """, now: ScheduleNow));
+        using var daily = ScheduleApplication(Scenario("ThreeDays", Purchasing, CreateRequest + """
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5003 } }
+            """, now: ScheduleNow));
+
+        var caught = await RunAsync(catchUp, "CatchUp");
+        var days = await RunAsync(daily, "ThreeDays");
+
+        Assert.True(caught.Passed, caught.Failure);
+        Assert.True(days.Passed, days.Failure);
+    }
+
     [Fact]
     public async Task An_action_that_runs_more_work_items_than_the_limit_fails_at_that_step()
     {
@@ -439,6 +504,137 @@ public sealed class ScenarioRunnerTests
     private const string OrderStub = """{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "output": { "orderNumber": "PO-1001" } }""";
 
     private const string ReferenceStub = """{ "operation": "payment-references/creditorReference", "output": { "creditorReference": "RF00STUB" } }""";
+
+    [Fact]
+    public async Task An_async_event_trigger_starts_its_process_inside_the_scenario_and_expect_instance_sees_it()
+    {
+        using var folder = EventApplication(Scenario("EventDelivery", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectInstance", "process": "ApprovalFollowUp", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "approved", "decisionComments": "followed up" } }
+            """));
+
+        var result = await RunAsync(folder, "EventDelivery");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task Async_event_triggers_that_start_each_other_in_a_loop_fail_the_action_at_the_work_item_limit()
+    {
+        using var folder = EventApplication(Scenario("DeliveryLoop", Purchasing, ApproveBelowThreshold.TrimEnd().TrimEnd(',')));
+        folder.With("events/follow-up-done.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "event",
+              "name": "FollowUpDone",
+              "formatVersion": 1,
+              "entity": "PurchaseRequest",
+              "fields": [{ "name": "title", "type": "text" }]
+            }
+            """);
+        folder.With("processes/approval-follow-up.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "process",
+              "name": "ApprovalFollowUp",
+              "formatVersion": 1,
+              "entity": "PurchaseRequest",
+              "start": "announce",
+              "steps": [
+                { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "FollowUpDone", "fields": { "title": "title" }, "next": "done" },
+                { "name": "done", "type": "end" }
+              ]
+            }
+            """);
+        folder.With("processes/follow-up-echo.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "process",
+              "name": "FollowUpEcho",
+              "formatVersion": 1,
+              "entity": "PurchaseRequest",
+              "start": "announce",
+              "steps": [
+                { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "PurchaseRequestApproved", "fields": { "title": "title" }, "next": "done" },
+                { "name": "done", "type": "end" }
+              ]
+            }
+            """);
+        folder.With("triggers/follow-up-done.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "trigger",
+              "name": "EchoFollowUp",
+              "formatVersion": 1,
+              "type": "event",
+              "event": "FollowUpDone",
+              "mode": "async",
+              "process": "FollowUpEcho"
+            }
+            """);
+
+        var result = await RunAsync(folder, "DeliveryLoop", workItemLimit: 20);
+
+        Assert.False(result.Passed);
+        Assert.StartsWith("Step 3 (completeTask): ", result.Failure);
+        Assert.Contains("more than 20 work items", result.Failure);
+    }
+
+    [Fact]
+    public async Task A_due_schedule_trigger_item_stays_queued_and_unclaimed_and_does_not_fail_the_work_loop()
+    {
+        var server = await PostgreSqlServer.AdminConnectionStringAsync();
+        var database = $"axis_scenario_{Guid.NewGuid():N}";
+        await ExecuteAsync(server, $"""CREATE DATABASE "{database}" """);
+        try
+        {
+            var connectionString = new NpgsqlConnectionStringBuilder(server) { Database = database, Pooling = false }.ConnectionString;
+            await using (var connection = new NpgsqlConnection(connectionString))
+            {
+                await connection.OpenAsync(CancellationToken);
+                await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
+                await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connection).Options);
+                await using var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connection).Options);
+                await configuration.Database.MigrateAsync(CancellationToken);
+                await data.Database.MigrateAsync(CancellationToken);
+                await processes.Database.MigrateAsync(CancellationToken);
+
+                await using var insert = new NpgsqlCommand(
+                    """
+                    INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, trigger_id)
+                    VALUES (@id, @tenant, 'trigger.schedule', now() - interval '1 hour', @trigger)
+                    """,
+                    connection);
+                insert.Parameters.AddWithValue("id", Guid.NewGuid());
+                insert.Parameters.AddWithValue("tenant", ScenarioRunner.TenantId);
+                insert.Parameters.AddWithValue("trigger", Guid.NewGuid());
+                await insert.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            using (var work = new ScenarioWork(connectionString, NullLoggerFactory.Instance, 10, PackageCatalog.Empty, new ScenarioStubs([])))
+            {
+                await work.RunDueAsync(CancellationToken);
+            }
+
+            await using var check = new NpgsqlConnection(connectionString);
+            await check.OpenAsync(CancellationToken);
+            await using var query = new NpgsqlCommand("SELECT count(*) FROM axis.process_work_items WHERE kind = 'trigger.schedule' AND claim_token IS NULL", check);
+            Assert.Equal(1L, await query.ExecuteScalarAsync(CancellationToken));
+        }
+        finally
+        {
+            await ExecuteAsync(server, $"""DROP DATABASE IF EXISTS "{database}" WITH (FORCE)""");
+        }
+    }
+
+    private static async Task ExecuteAsync(string connectionString, string sql)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+    }
 
     [Fact]
     public async Task A_connector_stub_answers_the_purchase_order_call_and_the_process_completes_with_its_order_number()
@@ -653,6 +849,20 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder CallApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioCallApp");
+
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioEventApp files over it: after approval the process raises
+    /// an event, and an <c>async</c> trigger starts a follow-up process that writes the decision comments.
+    /// </summary>
+    private static TemporaryFolder EventApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioEventApp");
+
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioScheduleApp files over it: a daily schedule trigger at 18:00
+    /// local time (11:00Z) starts a process on every purchase request that adds 1 to its amount.
+    /// </summary>
+    private static TemporaryFolder ScheduleApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioScheduleApp");
 
     private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios, string? overlay = null)
     {

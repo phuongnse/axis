@@ -2383,6 +2383,21 @@ applied to the tenant database. Until they are, it skips the tenant and logs
 once that it is waiting. Once they are, it logs that the tenant is ready for
 work and starts claiming. So the worker can start before the server.
 
+### Worker metrics
+
+*(planned for M7)* The worker emits these metrics, next to the standard
+ASP.NET Core, HttpClient and .NET runtime metrics. Attributes name things and
+never hold values, see [Telemetry](../architecture.md#telemetry).
+
+| Metric | Instrument | Unit | Attributes |
+| --- | --- | --- | --- |
+| `axis.work_items.due` | gauge | items | `axis.tenant`, `axis.work_item.kind` |
+| `axis.work_items.oldest_due_age` | gauge | s | `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
+| `axis.work_items.duration` | histogram | s | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced` |
+| `axis.process.instances.ended` | counter | instances | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
+| `axis.calls.attempts` | counter | attempts | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
+| `axis.computed.pending_fields` | gauge | fields | `axis.tenant`, `axis.application`. See [Recomputing computed fields](storage.md#recomputing-computed-fields) |
+
 ## Tables
 
 `Axis.Processes` owns these tables in the `axis` schema of each tenant
@@ -2412,12 +2427,14 @@ database, with history in `axis.__processes_migrations` (see
   | `error` | `text`, null | The error of a failed step. *(planned for M7)* The exception type, or a fixed text that names the step, property, field pointer or message key. Never the exception message or a value, see [Step errors](#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
+  | `trace_id` | `text` | *(planned for M7)* The 32-hex trace id of the run that wrote the row. For a task completion or a start through the server, it is the request's trace |
 - `axis.process_work_items`: the ready work. Each item has an `id`, its
   `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
   `claim_token` of its current claim. A step's item also has the
   `process_instance_id` of its instance. A worker claims only items of the
-  tenant it polls and only kinds it has a handler for. Lease times use the
-  database clock. Completed and failed items are deleted. A `connector.call`
+  tenant it polls and only kinds it has a handler for. The claim compares
+  `due_at` with the transaction time, which a test scenario's `axis.now` fixes.
+  Lease times use the database clock. Completed and failed items are deleted. A `connector.call`
   item sends or reconciles one connector call. It has the
   `process_instance_id` of the call's instance and the `connector_call_id` of
   the call. See [Connector calls](#connector-calls). The item's `due_at`
@@ -2425,7 +2442,10 @@ database, with history in `axis.__processes_migrations` (see
   `process_instance_id` of the call's instance and the `package_call_id` of
   the call. See [Package operations](#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](#event-delivery). It has
-  the `event_id` of the occurrence.
+  the `event_id` of the occurrence. Every item also has the `trace_id` and
+  `span_id` of the span whose transaction queued it *(planned for M7)*. A run
+  starts a new trace with a link to that span, see
+  [Telemetry](../architecture.md#telemetry).
   Two more kinds come with [schedules](#schedules), and a third with
   [computed fields](storage.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
@@ -2471,6 +2491,8 @@ database, with history in `axis.__processes_migrations` (see
   call, see [Connector calls](#connector-calls). A unique index on
   (`process_instance_id`, `step`) lets a step stage only one call. Times use
   the database clock. There is no column for a request or response body.
+  *(planned for M7)* Each call attempt row stores the `trace_id` of its
+  attempt, see [Telemetry](../architecture.md#telemetry).
 
   | Column | Type | Meaning |
   | --- | --- | --- |
@@ -2512,6 +2534,8 @@ database, with history in `axis.__processes_migrations` (see
   [Package operations](#package-operations). A unique index on
   (`process_instance_id`, `step`) lets a step stage only one call. Times use
   the database clock. There is no column for an output.
+  *(planned for M7)* Each call attempt row stores the `trace_id` of its
+  attempt, see [Telemetry](../architecture.md#telemetry).
 
   | Column | Type | Meaning |
   | --- | --- | --- |

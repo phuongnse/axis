@@ -97,11 +97,11 @@ test('an unknown page is not found inside the site shell', async ({ page }) => {
   await expect(page.getByRole('menuitem', { name: 'Notes' })).toBeVisible()
 })
 
-test('the readiness endpoint reports the database check', async ({ request }) => {
+test('the readiness endpoint reports healthy', async ({ request }) => {
   const response = await request.get('/health/ready')
 
   expect(response.status()).toBe(200)
-  expect(await response.json()).toEqual({ status: 'Healthy', checks: { database: 'Healthy' } })
+  expect(await response.json()).toEqual({ status: 'Healthy' })
 })
 
 test('the texts of an unknown locale are not found', async ({ request }) => {

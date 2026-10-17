@@ -1,4 +1,5 @@
 using Axis.Configuration.Packages;
+using Axis.Expressions.Sql;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Tenancy;
@@ -8,21 +9,25 @@ using Npgsql;
 namespace Axis.Scenarios;
 
 /// <summary>
-/// Runs the due process step, connector call and package call work items of the scenario's tenant
-/// in-process, as the worker would, until none is due. The call handlers are the real ones, with the
-/// scenario's placeholder bindings. The scenario's stubs take the place of the HTTP request of a
-/// connector call and of the package operation. A call that no stub answers fails the scenario
-/// before it runs. Event deliveries and schedule triggers stay queued. The items run over the
-/// scenario's connection string, so they read the scenario's <c>now</c> too.
+/// Runs the due process step, connector call, package call and event delivery work items of the
+/// scenario's tenant in-process, as the worker would, until none is due. The handlers are the real
+/// ones, with the scenario's placeholder bindings, so an <c>async</c> event trigger starts its process
+/// here. The scenario's stubs take the place of the HTTP request of a connector call and of the
+/// package operation. A call that no stub answers fails the scenario before it runs. After an action,
+/// schedule triggers and fan-outs stay queued, so a schedule never fires on the real clock.
+/// <see cref="AdvanceAsync"/> runs them too, after the scenario's <c>now</c> moved. The items run over
+/// the scenario's connection string, so they read the scenario's <c>now</c> too, and a due time is
+/// compared with it. Leases keep the database clock.
 /// </summary>
 internal sealed class ScenarioWork : IDisposable
 {
     private static readonly TimeSpan _lease = TimeSpan.FromMinutes(5);
 
-    private readonly string _connectionString;
+    private string _connectionString;
     private readonly int _limit;
     private readonly ScenarioStubs _stubs;
     private readonly WorkItemRunner _runner;
+    private readonly WorkItemRunner _timeRunner;
     private readonly ConnectorClient _client;
     private readonly PackageHttpTransport _transport;
 
@@ -41,14 +46,26 @@ internal sealed class ScenarioWork : IDisposable
         [
             new ConnectorCallHandler(models, bindings, _client, settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
             new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
+            new EventDeliveryHandler(models, loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
-        _runner = new WorkItemRunner(
-            new ScenarioConnections(connectionString),
+        _runner = CreateRunner(handler, externalHandlers, loggerFactory);
+        _timeRunner = CreateRunner(
+            handler,
+            [
+                .. externalHandlers,
+                new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
+                new TriggerFanOutHandler(models, loggerFactory.CreateLogger<TriggerFanOutHandler>()),
+            ],
+            loggerFactory);
+    }
+
+    private WorkItemRunner CreateRunner(ProcessStepHandler handler, IExternalWorkItemHandler[] externalHandlers, ILoggerFactory loggerFactory) =>
+        new(
+            new ScenarioConnections(() => _connectionString),
             new TenantContextAccessor(),
             [handler],
             loggerFactory.CreateLogger<WorkItemRunner>(),
             externalHandlers);
-    }
 
     public void Dispose()
     {
@@ -61,13 +78,27 @@ internal sealed class ScenarioWork : IDisposable
     /// loop ends when the process waits or ends.
     /// </summary>
     /// <exception cref="StepFailedException">More items than the limit ran, or a due call has no stub.</exception>
-    public async Task RunDueAsync(CancellationToken cancellationToken)
+    public Task RunDueAsync(CancellationToken cancellationToken) => RunAsync(_runner, cancellationToken);
+
+    /// <summary>
+    /// Moves the work to <paramref name="connectionString"/>, whose <c>axis.now</c> is the new time of
+    /// the scenario. Then runs the due items until none is due, <c>trigger.schedule</c> and
+    /// <c>trigger.fanOut</c> included. The limit counts the whole step.
+    /// </summary>
+    /// <exception cref="StepFailedException">More items than the limit ran, or a due call has no stub.</exception>
+    public Task AdvanceAsync(string connectionString, CancellationToken cancellationToken)
+    {
+        _connectionString = connectionString;
+        return RunAsync(_timeRunner, cancellationToken);
+    }
+
+    private async Task RunAsync(WorkItemRunner runner, CancellationToken cancellationToken)
     {
         var ran = 0;
         while (true)
         {
             await CheckStubsAsync(cancellationToken);
-            if (await _runner.RunNextAsync(ScenarioRunner.TenantId, _lease, cancellationToken))
+            if (await runner.RunNextAsync(ScenarioRunner.TenantId, _lease, cancellationToken))
             {
                 if (++ran > _limit)
                 {
@@ -91,11 +122,11 @@ internal sealed class ScenarioWork : IDisposable
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using (var command = new NpgsqlCommand(
-            """
+            $"""
             SELECT c.step, c.connector, c.operation
             FROM axis.process_work_items w
             JOIN axis.connector_calls c ON c.id = w.connector_call_id
-            WHERE w.tenant_id = @tenant AND w.due_at <= now() AND c.state = 'pending'
+            WHERE w.tenant_id = @tenant AND w.due_at <= {SqlTranslator.NowSql} AND c.state = 'pending'
             """,
             connection))
         {
@@ -112,11 +143,11 @@ internal sealed class ScenarioWork : IDisposable
         }
 
         await using (var command = new NpgsqlCommand(
-            """
+            $"""
             SELECT p.step, p.package, p.operation
             FROM axis.process_work_items w
             JOIN axis.package_calls p ON p.id = w.package_call_id
-            WHERE w.tenant_id = @tenant AND w.due_at <= now() AND p.state = 'pending'
+            WHERE w.tenant_id = @tenant AND w.due_at <= {SqlTranslator.NowSql} AND p.state = 'pending'
             """,
             connection))
         {
@@ -133,27 +164,34 @@ internal sealed class ScenarioWork : IDisposable
         }
     }
 
-    // The application clock queued an item, and the database clock decides when it is due. When the
-    // two differ slightly, a waiting item is made due at once, so a step is never skipped.
+    // The application clock queued an item, and the scenario's time decides when it is due. When the
+    // two differ slightly, a waiting item is made due at once, so a step is never skipped. A schedule
+    // item is not among the kinds, so it waits for its occurrence.
     private async Task<bool> MakeDueAsync(CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            "UPDATE axis.process_work_items SET due_at = now() WHERE tenant_id = @tenant AND kind = ANY(@kinds) AND due_at > now()",
+            $"UPDATE axis.process_work_items SET due_at = {SqlTranslator.NowSql} WHERE tenant_id = @tenant AND kind = ANY(@kinds) AND due_at > {SqlTranslator.NowSql}",
             connection);
         command.Parameters.AddWithValue("tenant", ScenarioRunner.TenantId);
         command.Parameters.AddWithValue(
             "kinds",
-            new[] { ProcessStarts.StepWorkItemKind, ProcessStarts.ConnectorCallWorkItemKind, ProcessStarts.PackageCallWorkItemKind });
+            new[]
+            {
+                ProcessStarts.StepWorkItemKind,
+                ProcessStarts.ConnectorCallWorkItemKind,
+                ProcessStarts.PackageCallWorkItemKind,
+                ProcessStarts.EventDeliverWorkItemKind,
+            });
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
-    private sealed class ScenarioConnections(string connectionString) : ITenantConnectionFactory
+    private sealed class ScenarioConnections(Func<string> connectionString) : ITenantConnectionFactory
     {
         public async ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
         {
-            var connection = new NpgsqlConnection(connectionString);
+            var connection = new NpgsqlConnection(connectionString());
             await connection.OpenAsync(cancellationToken);
             return connection;
         }

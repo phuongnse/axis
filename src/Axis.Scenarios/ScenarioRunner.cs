@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
@@ -24,11 +25,13 @@ namespace Axis.Scenarios;
 /// placeholder deployment bindings, never a real URL or secret. It reads the manifests of the
 /// installed extension packages it is given, and runs none of their code. Each step runs as its user,
 /// with the roles the scenario gives that user. The first failing step ends the scenario. After each
-/// action the runner runs the due process steps and the connector and package calls in-process, so
-/// the process reaches its next wait. The scenario's stubs answer the calls. The scenario's
+/// action the runner runs the due process steps, the connector and package calls and the event
+/// deliveries in-process, so the process reaches its next wait. Schedule triggers stay queued after an
+/// action. An <c>advanceTime</c> step moves the scenario's <c>now</c> forward and runs every due work
+/// item, schedule triggers and fan-outs included. The scenario's stubs answer the calls. The scenario's
 /// <c>now</c> reaches every connection as the PostgreSQL setting <c>axis.now</c>, which the
-/// transaction time and the SQL of <c>now()</c> read. Times that PostgreSQL writes itself, such as
-/// <c>created_at</c>, keep the real clock.
+/// transaction time and the SQL of <c>now()</c> read. The work queue compares due times with it too.
+/// Times that PostgreSQL writes itself, such as <c>created_at</c>, and lease times keep the real clock.
 /// </summary>
 public static class ScenarioRunner
 {
@@ -75,15 +78,11 @@ public static class ScenarioRunner
         {
             // The connection does not pool, so no idle session keeps the database from being dropped.
             var builder = new NpgsqlConnectionStringBuilder(serverConnectionString) { Database = database, Pooling = false };
-            if (scenario.Now is { } now)
-            {
-                // The setting reaches every connection of the scenario, including the work item runner's.
-                var time = DateTimeOffset.Parse(now, CultureInfo.InvariantCulture).ToUniversalTime();
-                var option = "-c axis.now=" + time.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
-                builder.Options = string.IsNullOrEmpty(builder.Options) ? option : builder.Options + " " + option;
-            }
+            DateTimeOffset? now = scenario.Now is { } text ? DateTimeOffset.Parse(text, CultureInfo.InvariantCulture).ToUniversalTime() : null;
 
-            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, loggerFactory, workItemLimit, packages, cancellationToken);
+            // The setting reaches every connection of the scenario, including the work item runner's.
+            var connectionString = now is { } time ? WithNow(builder.ConnectionString, time) : builder.ConnectionString;
+            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, connectionString, now, loggerFactory, workItemLimit, packages, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -104,6 +103,17 @@ public static class ScenarioRunner
         return Result(failure ?? dropFailure);
     }
 
+    private static string WithNow(string connectionString, DateTimeOffset now)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        var option = "-c axis.now=" + FormatNow(now);
+        builder.Options = string.IsNullOrEmpty(builder.Options) ? option : builder.Options + " " + option;
+        return builder.ConnectionString;
+    }
+
+    private static string FormatNow(DateTimeOffset now) =>
+        now.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
+
     // CREATE DATABASE and DROP DATABASE cannot run in a transaction block, so each is its own command.
     private static async Task ExecuteAsync(string connectionString, string sql, CancellationToken cancellationToken)
     {
@@ -116,7 +126,9 @@ public static class ScenarioRunner
     private static async Task<string?> RunInDatabaseAsync(
         string folder,
         ScenarioResource scenario,
+        string baseConnectionString,
         string connectionString,
+        DateTimeOffset? now,
         ILoggerFactory loggerFactory,
         int workItemLimit,
         PackageCatalog packages,
@@ -144,9 +156,10 @@ public static class ScenarioRunner
         }
 
         var model = compiled.Model;
+        await TriggerSchedules.ActivateAsync(connection, TenantId, model, compiled.Release.Id, cancellationToken);
         if (model.Seeds.Count > 0)
         {
-            var seeded = await SeedApplier.ApplyAsync(model, connection, cancellationToken);
+            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, connection, cancellationToken);
             if (seeded.Diagnostics.Count > 0)
             {
                 return Setup("could not be seeded", seeded.Diagnostics);
@@ -160,6 +173,24 @@ public static class ScenarioRunner
             var step = scenario.Steps[index];
             try
             {
+                if (step.Type == ScenarioStepDefinition.AdvanceTime)
+                {
+                    if (now is not { } current || step.By is null || !IsoDuration.TryParse(step.By, out var by))
+                    {
+                        throw new StepFailedException("the step needs the scenario's 'now' and a positive 'by'");
+                    }
+
+                    now = current + by;
+                    await using (var command = new NpgsqlCommand("SELECT set_config('axis.now', @now, false)", connection))
+                    {
+                        command.Parameters.AddWithValue("now", FormatNow(now.Value));
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    await work.AdvanceAsync(WithNow(baseConnectionString, now.Value), cancellationToken);
+                    continue;
+                }
+
                 await steps.RunAsync(step, cancellationToken);
                 if (IsAction(step))
                 {

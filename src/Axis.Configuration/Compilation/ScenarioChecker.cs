@@ -17,7 +17,8 @@ namespace Axis.Configuration.Compilation;
 /// computed and read-only fields are not refused, because a scenario may test that the record API
 /// refuses a value. A connector stub names a loaded connector and one of its operations, a package
 /// stub names a pinned package operation and each output names an output field of the operation.
-/// Every problem of a scenario is reported in one pass. Names are matched ignoring letter case,
+/// An <c>advanceTime</c> step needs the scenario's <c>now</c>, and its <c>by</c> is a positive fixed
+/// duration, as a task's <c>dueIn</c> is. Every problem of a scenario is reported in one pass. Names are matched ignoring letter case,
 /// except roles, users and aliases, which are matched exactly. A name whose file was not loaded
 /// because of its own errors is not reported again, and a step that depends on an unknown alias or
 /// entity is not checked further.
@@ -108,6 +109,25 @@ internal static class ScenarioChecker
                         DiagnosticCodes.UnknownScenarioRole,
                         $"The role '{assigneeRole}' was not found. No loaded role has that name.",
                         $"{path}/assignee/role");
+                }
+
+                if (step.Type == ScenarioStepDefinition.AdvanceTime)
+                {
+                    if (scenario.Now is null)
+                    {
+                        Report(
+                            DiagnosticCodes.AdvanceTimeWithoutNow,
+                            "The 'advanceTime' step needs the scenario's 'now'. Set 'now' in the scenario, so time moves from a known point.",
+                            path);
+                    }
+
+                    if (!IsoDuration.TryParse(step.By!, out _))
+                    {
+                        Report(
+                            DiagnosticCodes.InvalidAdvanceTimeBy,
+                            $"The duration '{step.By}' is not valid. 'by' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                            $"{path}/by");
+                    }
                 }
 
                 // The record's entity, or null when it is not known. A null entity stops the checks that need it.

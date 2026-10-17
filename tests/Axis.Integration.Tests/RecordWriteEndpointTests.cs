@@ -87,6 +87,30 @@ public sealed class RecordWriteEndpointTests(RecordApiFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task Create_and_update_stamp_the_row_with_the_active_release()
+    {
+        await fixture.ResetAsync();
+        Assert.True(fixture.Model.TryGetEntity("Item", out var item));
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(item.Id));
+        var active = await fixture.ScalarAsync(TenantA, "SELECT release_id FROM axis.active_releases");
+        Assert.NotNull(active);
+
+        var id = await CreateItemAsync(HostA, """{ "name": "Desk" }""");
+
+        var stampSql = $"""SELECT computed_release_id FROM {table} WHERE id = '{id}'""";
+        Assert.Equal(active, await fixture.ScalarAsync(TenantA, stampSql));
+
+        // Clearing the stamp shows that the update writes it again.
+        await fixture.ExecuteAsync(TenantA, $"""UPDATE {table} SET computed_release_id = NULL WHERE id = '{id}'""");
+        Assert.Null(await fixture.ScalarAsync(TenantA, stampSql));
+
+        using var updated = await PatchJsonAsync(id, """{ "version": 1, "values": { "quantity": 5 } }""", HttpStatusCode.OK);
+
+        Assert.Equal(2, updated.RootElement.GetProperty("version").GetInt64());
+        Assert.Equal(active, await fixture.ScalarAsync(TenantA, stampSql));
+    }
+
+    [Fact]
     public async Task Update_returns_the_label_of_a_reference_it_sets_and_drops_it_when_cleared()
     {
         await fixture.ResetAsync();

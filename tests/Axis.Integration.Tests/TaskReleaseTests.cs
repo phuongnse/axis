@@ -62,6 +62,22 @@ public sealed class TaskReleaseTests(TaskApiFixture fixture) : IClassFixture<Tas
     }
 
     [Fact]
+    public async Task Completing_a_task_started_on_release_A_stamps_the_subject_with_release_A_while_release_B_is_active()
+    {
+        var (task, subject, instance) = await CreateTaskAsync("Decide");
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        var releaseB = await ActivateRewordedAsync();
+        Assert.NotEqual(fixture.ReleaseId(TenantA), releaseB);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var response = await CompleteAsync(
+            maria, task, $$"""{ "outcome": "approve", "values": { "comment": "ok" }, "version": {{waiting.SubjectVersion}} }""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(fixture.ReleaseId(TenantA), await fixture.ComputedReleaseAsync(TenantA, subject));
+    }
+
+    [Fact]
     public async Task The_texts_of_release_A_are_served_by_its_id_while_release_B_is_active()
     {
         await ActivateRewordedAsync();

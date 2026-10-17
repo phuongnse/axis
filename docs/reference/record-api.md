@@ -372,10 +372,15 @@ otherwise the answer is the stale-version `409`. See
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
+- **`traceId`** *(planned for M7)*. Every problem details answer has a
+  `traceId` member, the request's 32-hex W3C trace id. It names no tenant,
+  record or user. An operator uses it to find the request and its run, see
+  [Telemetry](../architecture.md#telemetry).
 
 **No leaks.** No response body, including `title`, `detail` and the `errors`
 messages, ever contains SQL, the `entities` schema, a table, column or
-constraint name, an exception type or a stack trace. The `errors` keys repeat
+constraint name, an exception type or a stack trace. The `traceId` member is
+allowed. The `errors` keys repeat
 the request's property names by design, so they can hold any text the request
 sent. A row of a child collection has a key such as
 `/values/lineItems/1/quantity`. The integration tests check every error
