@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Tenancy;
@@ -11,9 +12,10 @@ namespace Axis.Worker;
 /// Polls every configured tenant in ordinal order of its id and runs its due work items until none
 /// is left, then waits for the poll interval when no tenant had work. A tenant whose database the
 /// server has not migrated yet is skipped until it has. When a tenant's database counts as migrated,
-/// the releases the tenant still uses are checked against the installed extension packages. A
-/// pinned version that is not installed, or a release that no longer compiles, records the failure
-/// in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
+/// its runtime database role is checked, so that it can only read and write rows. Then the releases
+/// the tenant still uses are checked against the installed extension packages. A role that can change
+/// the schema, a pinned version that is not installed, or a release that no longer compiles records
+/// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// </summary>
 internal sealed partial class WorkerService(
     TenantOptions tenants,
@@ -69,6 +71,7 @@ internal sealed partial class WorkerService(
                     return false;
                 }
 
+                await CheckRuntimeRoleAsync(tenantId, stoppingToken);
                 await CheckReleasesAsync(tenantId, stoppingToken);
                 _ready.Add(tenantId);
                 LogReady(tenantId);
@@ -89,6 +92,28 @@ internal sealed partial class WorkerService(
         }
 
         return ran;
+    }
+
+    /// <exception cref="StartupCheckException">The runtime database role is a superuser, owns a schema or may create objects.</exception>
+    private async Task CheckRuntimeRoleAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            await RuntimeRoleCheck.CheckAsync(connection, tenantId, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            checkState.Failed = true;
+            LogRoleCheckFailed(exception, tenantId);
+            throw new StartupCheckException(exception);
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
     }
 
     /// <exception cref="StartupCheckException">A release in use pins a package version that is not installed, or no longer compiles.</exception>
@@ -138,6 +163,9 @@ internal sealed partial class WorkerService(
     [LoggerMessage(LogLevel.Error, "Checking the releases in use for tenant {TenantId} failed.")]
     private partial void LogCheckFailed(Exception exception, string tenantId);
 
+    [LoggerMessage(LogLevel.Error, "The runtime database role check for tenant {TenantId} failed.")]
+    private partial void LogRoleCheckFailed(Exception exception, string tenantId);
+
     [LoggerMessage(LogLevel.Error, "Running work items for tenant {TenantId} failed.")]
     private partial void LogRunFailed(Exception exception, string tenantId);
 
@@ -146,6 +174,11 @@ internal sealed partial class WorkerService(
     {
         public StartupCheckException(string tenantId, Diagnostic first)
             : base($"The releases in use for tenant '{tenantId}' do not match the installed extension packages, first {first.Code}: {first.Message}")
+        {
+        }
+
+        public StartupCheckException(Exception inner)
+            : base(inner.Message, inner)
         {
         }
 

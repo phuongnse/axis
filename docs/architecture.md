@@ -170,7 +170,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   whitespace. This applies even when no application folder is activated at
   startup;
 - in the server, both connection strings name the same user;
-- *(planned for M7)* in the server and the worker, the runtime database role
+- in the server and the worker, the runtime database role
   is a superuser, owns the `axis` or `entities` schema, or may create objects
   in either;
 - a binding has a missing `Kind` or one other than `url` or `secret`, a blank
@@ -508,9 +508,10 @@ The `role` and `policy` resource files are described in
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
   `read`, `create`, `update` and `delete` on an entity, `read` on a data
-  source, or `start` on a process. *(planned for M7)* A process also takes
-  `inspect`, see [process inspection](reference/processes.md#process-inspection).
-  An entity grant may also have a record
+  source, or `start` on a process. *(Planned for M7.)* A process also takes
+  `inspect`, see [process inspection](reference/processes.md#process-inspection),
+  and `retry`, `cancel` and `resolve`, each checked on its own, for the
+  [operator commands](reference/processes.md#operator-commands). An entity grant may also have a record
   `filter` and a `fields` list. A user's grants are the grants of every
   policy they match.
 - **Default-deny.**
@@ -564,7 +565,9 @@ The `role` and `policy` resource files are described in
   `reference` fields, every field along the path must be readable. See
   [data sources](reference/data-sources.md#authorization).
 - **Processes and tasks.** A process start needs a `start` grant on the
-  process and read access to the subject record. The task assignee check
+  process and read access to the subject record. *(Planned for M7.)* An
+  operator retry, cancel or resolve needs the matching grant and the same
+  read access. The task assignee check
   stays, and it is enough to list, read and complete a task. A role assignee
   counts only when the active release declares the role. The task form
   leaves out fields the user may not read, and the subject label uses the

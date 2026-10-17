@@ -15,7 +15,8 @@ namespace Axis.Server.Applications;
 
 /// <summary>
 /// Migrates every configured tenant database and grants its runtime database role its rights (before
-/// and after the migrations), then compiles the configured application folders
+/// and after the migrations) and checks over its own connection that the role can only read and write rows,
+/// then compiles the configured application folders
 /// against the installed extension packages, activates them in it, writes the state of their schedule triggers and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. The migrations, release storage, entity
 /// provisioning and the active release use a connection from the tenant's
@@ -90,6 +91,7 @@ internal sealed partial class StartupActivation(
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
         await GrantRuntimeRoleAsync(schemaConnection, runtimeRole, tenantId, cancellationToken);
+        await RuntimeRoleCheck.CheckAsync(await runtime.GetConnectionAsync(cancellationToken), tenantId, cancellationToken);
         var bindings = Bindings(tenantId);
 
         foreach (var folder in options.Folders)
