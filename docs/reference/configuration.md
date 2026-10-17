@@ -739,7 +739,7 @@ sorted by file and then path.
 | `AXC0088` | A `form` widget action's `process` is over another entity than the form's records. Reported at `/widgets/{i}/actions/{j}/process`, naming both entities. Not checked when the form's entity is unknown. |
 | `AXC0089` | A process task step's `assignee.role` names no declared role, compared exactly. Reported at `/steps/{i}/assignee/role`. Not reported when the name is a role file that was not loaded because of its own errors. |
 | `AXC0090` | A policy's `roles` entry names no declared role, compared exactly. Reported at `/roles/{i}`. Not reported when the name is a role file that was not loaded because of its own errors. |
-| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start`, and *(planned for M7)* `inspect`, `retry`, `cancel` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
+| `AXC0091` | A policy grant is badly shaped. It has no target or more than one of `entity`, `dataSource`, `process` and `endpoint`, reported at `/grants/{i}`. It has an action its target's kind does not take, reported at `/grants/{i}/actions/{j}`: an entity takes `read`, `create`, `update` and `delete`, a data source `read`, a process `start` and `inspect`, and *(planned for M7)* `retry`, `cancel` and `resolve`, and an endpoint `invoke`. Or a `dataSource`, `process` or `endpoint` grant has a `filter` or `fields`, reported at `/grants/{i}/filter` or `/grants/{i}/fields`. The message names the target and the allowed actions. |
 | `AXC0092` | A policy grant's `entity`, `dataSource`, `process` or `endpoint` names no loaded resource of that kind, ignoring letter case. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint`. Not reported when the name is a file that was not loaded because of its own errors. |
 | `AXC0093` | A policy grant's `entity` is a child entity. Reported at `/grants/{i}/entity`, naming the owner. Child rows are read and written through their owner's grants. |
 | `AXC0094` | A policy grant's `fields` entry names no field of the grant's entity, ignoring letter case. Reported at `/grants/{i}/fields/{j}`. |
@@ -1815,9 +1815,9 @@ and the policy checks are built. So are matching the roles claim and
 enforcing every grant. That covers entity grants with filters and fields on
 the record API, data source grants with root read filters and field checks,
 and process `start` grants. The `endpoint` grant with its `invoke` action and
-its compile checks are built too, and the endpoint call enforces it. The
-`inspect` action on a `process` grant is planned for M7, see
-[Process inspection](processes.md#process-inspection). Each
+its compile checks are built too, and the endpoint call enforces it. So is the
+`inspect` action on a `process` grant, which the process instance list
+enforces, see [Process inspection](processes.md#process-inspection). Each
 compile check below is a compile error.
 
 A `role` resource declares a role that users can hold:
@@ -1936,7 +1936,7 @@ outcomes:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`, and *(planned for M7)* `inspect`, `retry`,
+  - a `process` takes `start` and `inspect`, and *(planned for M7)* `retry`,
     `cancel` and `resolve`;
   - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
@@ -2014,8 +2014,8 @@ Compile checks, each a compile error:
 - A target that names no loaded entity, data source, process or endpoint,
   ignoring letter case, is `AXC0092`.
 - An action that the target's kind does not take, such as `start` on an
-  entity or `read` on an endpoint, is `AXC0091`. *(planned for M7)* `inspect`
-  on anything but a process is `AXC0091` too.
+  entity or `read` on an endpoint, is `AXC0091`. So is `inspect` on anything
+  but a process.
 - A grant on a child entity is `AXC0093`. Child rows are read and written
   through their owner's grants.
 - A `filter` or `fields` on a `dataSource`, `process` or `endpoint` grant is
@@ -2030,7 +2030,7 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`start`, `invoke` and, *(planned for M7)*, `inspect`, and a grant has no other properties. A problem there is
+`start`, `invoke` and `inspect`, and a grant has no other properties. A problem there is
 `AXC0004`. *(Planned for M7.)* The list also holds `retry`, `cancel` and
 `resolve`.
 

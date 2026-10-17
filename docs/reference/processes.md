@@ -33,8 +33,9 @@ step's retry policy are built too. The capability limits of package operations a
 triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers). Process inspection, where
-authorized users see an instance's graph, path, tasks and calls, is planned
-for M7, see [Process inspection](#process-inspection). Operator retry, cancel and
+authorized users see an instance's graph, path, tasks and calls, is partly
+built. The `inspect` grant and the instance list are built. The instance
+detail is planned for M7, see [Process inspection](#process-inspection). Operator retry, cancel and
 resolve are *(planned for M7)*, see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -365,7 +366,7 @@ are problem details, as in the [record API](record-api.md#errors).
 
 The `201` has no `Location` header, because there is no endpoint to read an
 instance yet. *(planned for M7)* It stays without one after the
-[inspection endpoints](#process-inspection) exist, because reading an
+[instance detail](#process-inspection) exists, because reading an
 instance needs an `inspect` grant, which the user who started it may not hold.
 
 A start needs a session, a `start` grant on the process and read access to
@@ -751,15 +752,17 @@ the next step as usual.
 
 ## Process inspection
 
-*(planned for M7)* This section follows
+This section follows
 [D34](../decisions.md#d34-process-inspection--agreed). Authorized users see
 where an instance is, what it did and why it failed or waits. Two routes list
-the instances of a process and read one of them. Nothing here is built yet.
+the instances of a process and read one of them. The `inspect` grant and the
+[instance list](#instance-list) are built. The instance detail and the rest of
+this section are *(planned for M7)*.
 The user is the user of the
 [session](../architecture.md#sign-in-and-the-session). The
 [process inspector widget](frontend.md) shows the same data.
 
-**Grant.** A `process` grant takes a new action, `inspect`, next to `start`.
+**Grant.** A `process` grant takes the action `inspect`, next to `start`.
 See [Roles and policies](configuration.md#roles-and-policies). The grant
 decides who may inspect, and the signed-in user needs nothing else. A user who
 holds only `start` cannot inspect, and a user who holds only `inspect` cannot
@@ -1061,6 +1064,10 @@ titles are fixed and never contain text from the request.
 - **`403`.** The user has no `inspect` grant on the process.
 - **`400`.** A list parameter is invalid: `page`, `pageSize`, `state` or
   `subject`, keyed by its name. The detail has none.
+- **`400`.** A read filter of the user fails at run time with a database data
+  error for some record. The title is the record list's "A record filter could
+  not be evaluated for these records.". The server logs each filter by policy
+  name and grant index.
 
 ## Releases and running work
 
@@ -1085,7 +1092,8 @@ for texts. **Both** means different parts use different releases.
 | Task list | Both | Step and subject labels use the task's release. Their texts load from it too. Policies and roles come from the active release. |
 | Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
-| Instance list and detail *(planned for M7)* | Both | The graph and the step names use the instance's release. Roles, policies and the `sensitive` flag come from the active release, and the pinned release's flag counts too. See [Values and masking](#values-and-masking). |
+| Instance list | Active | Roles and policies come from the active release. |
+| Instance detail *(planned for M7)* | Both | The graph and the step names use the instance's release. Roles, policies and the `sensitive` flag come from the active release, and the pinned release's flag counts too. See [Values and masking](#values-and-masking). |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry *(planned for M7)* | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |

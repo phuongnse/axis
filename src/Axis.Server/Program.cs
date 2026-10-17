@@ -93,6 +93,7 @@ app.MapPresentationEndpoints();
 app.MapSiteEndpoints();
 app.MapRecordEndpoints();
 app.MapProcessEndpoints();
+app.MapProcessInspectionEndpoints();
 app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
 app.MapInboundEndpoints();

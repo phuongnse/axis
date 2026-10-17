@@ -124,6 +124,42 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
+    /// <summary>
+    /// Inserts a running instance of the <c>Submit</c> process for <paramref name="subject"/>, with
+    /// no start through the API, and returns its id. The subject need not be a record the user may
+    /// read, or a record at all.
+    /// </summary>
+    public async Task<Guid> InsertInstanceAsync(Guid subject)
+    {
+        Assert.True(Model.TryGetProcess("Submit", out var process));
+        Assert.True(Model.TryGetEntity(process.Entity.Name, out var entity));
+        var id = Guid.CreateVersion7();
+        await using var command = DataSource.CreateCommand(
+            """
+            INSERT INTO axis.process_instances (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step)
+            VALUES (@id, @application, @process, @entity, @subject, @release, 'running', 1, @step)
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", Model.Manifest.Id);
+        command.Parameters.AddWithValue("process", process.Id);
+        command.Parameters.AddWithValue("entity", entity.Id);
+        command.Parameters.AddWithValue("subject", subject);
+        command.Parameters.AddWithValue("release", FirstReleaseId);
+        command.Parameters.AddWithValue("step", process.Start);
+        await command.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    /// <summary>Moves the instance <paramref name="id"/> to <paramref name="state"/>, which ends it unless it is <c>running</c> or <c>waiting</c>.</summary>
+    public async Task SetInstanceStateAsync(Guid id, string state)
+    {
+        await using var command = DataSource.CreateCommand(
+            "UPDATE axis.process_instances SET state = @state, ended_at = CASE WHEN @state IN ('running', 'waiting') THEN NULL ELSE now() END WHERE id = @id");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     /// <summary>Runs <paramref name="sql"/>, a <c>SELECT count(*)</c>, with the named parameters.</summary>
     public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters)
     {
