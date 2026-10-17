@@ -1295,6 +1295,7 @@ given users and asserts the outcomes, including denied actions. See
 [configuration](reference/configuration.md#test-scenarios) for the resource
 shape and a purchase request example.
 The owner confirmed these points for issue #415 on 2026-10-16.
+The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
 
 - **Scenario resource:**
   - A new `scenario` resource kind has one file per scenario, under
@@ -1339,6 +1340,20 @@ The owner confirmed these points for issue #415 on 2026-10-16.
   - `stubs` give the output of each connector operation and package
     operation that the scenario calls. A call without a stub fails the
     scenario.
+- **Advancing time** *(planned for M7)*:
+  - A new step, `advanceTime`, has `by`, a positive ISO 8601 duration such as
+    `P1D` or `PT2H`.
+  - It needs the scenario's `now`. A scenario without `now` that uses it
+    fails to compile.
+  - It moves `now` forward by `by`. Every later step reads the new time.
+  - The runner then runs every work item that is due at the new time, until
+    none is due. Schedule triggers and their fan-outs are included. The limit
+    of 1,000 work items applies per step.
+  - Schedules catch up as on a worker after an outage. Only the latest
+    occurrence at or before the new time runs, once. The rules of
+    [schedules](reference/processes.md#schedules) apply unchanged. To fire a
+    daily schedule three times, a scenario advances one day three times.
+  - Time never goes back. No step sets an earlier time.
 - **Where it runs:**
   - A new console project, `Axis.Scenarios`, runs every scenario of an
     application folder against a PostgreSQL server:
@@ -1356,8 +1371,8 @@ The owner confirmed these points for issue #415 on 2026-10-16.
   - **Stubs only.** Scenarios never call a real external system, and never
     run real package code. Package operations get unit tests in their own
     project.
-  - **Fixed time.** One `now` per scenario. Advancing time to fire schedules
-    comes later.
+  - **Time moves forward only.** A scenario starts at its `now`, and only
+    `advanceTime` moves it, forward. *(planned for M7)*
   - **New project.** `Axis.Scenarios` is a new host next to the server and
     the worker.
 
@@ -1367,7 +1382,8 @@ CI can run them. A scenario sets users and roles itself, so it checks
 [D24](#d24-roles-and-policies--agreed) denials without an identity provider.
 A unique database that the runner always drops keeps a failed run from
 leaving data behind or touching a real tenant. The work item limit stops a
-looping process from hanging CI. See
+looping process from hanging CI. Advancing time lets CI test schedule
+triggers. See
 [testing applications](domain/knowledge.md#testing-applications).
 
 ## D33. Recomputing stored computed fields — Agreed
@@ -1428,3 +1444,42 @@ transaction, which does not scale to large tables and stopped activation on one
 row error. [Execution](domain/knowledge.md#execution) asks that stored state
 and the active release not disagree silently. A list that filters on old values
 without warning is that failure, so Axis refuses it.
+
+## D37. Health checks for the server and the worker — Agreed
+
+The server's readiness covers the platform database and startup activation, and
+one tenant database that is down makes the server degraded, not unhealthy. The
+worker gets its own health endpoints. The design is *(planned for M7)*. See
+[health checks](architecture.md#health-checks-planned-for-m7) for the answers
+of each endpoint.
+The owner confirmed these points on issue #480 on 2026-10-17.
+
+- **Server:**
+  - `/health/live` stays as it is: the process answers.
+  - `/health/ready` is healthy when the platform database answers and startup
+    activation has finished for every tenant.
+  - A tenant database that does not answer makes the server **degraded**, not
+    unhealthy. Readiness still passes, so one tenant cannot take the others
+    offline. The tenant is named in the logs and in a metric, not in the
+    answer.
+  - The answer holds only the overall status. It names no tenant, database or
+    error, because `/health` needs no session.
+- **Worker:**
+  - The worker serves `/health/live` and `/health/ready` on its own address,
+    the setting `Health:Urls`. The default is `http://127.0.0.1:5208`. It
+    serves nothing else.
+  - Ready means every tenant database is migrated and the worker's loop has
+    polled within twice `Worker:LeaseDuration`, one minute by default. A poll
+    interval would be too short, because one work item can run for up to a
+    lease.
+  - A worker loop that stops polling makes `/health/live` fail, so an
+    orchestrator restarts it.
+  - Docker Compose gives the worker a health check on `/health/ready`.
+
+*Why:* [Operations](domain/knowledge.md#operations) asks that failed and stuck
+work is visible. Today the worker has no health endpoint, so a stuck worker
+shows only when work piles up, and Compose cannot wait for it. The server's
+readiness ignores tenant databases and activation. Degraded, not unhealthy,
+follows [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed): one
+tenant must not take the others offline. `/health` needs no session, so the
+answer names nothing that an open endpoint should not show.
