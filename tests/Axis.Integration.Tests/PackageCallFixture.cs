@@ -246,14 +246,14 @@ public sealed class PackageCallFixture : IAsyncLifetime
         (DateTime)(await _tenant.ScalarAsync("SELECT now()"))!;
 
     /// <summary>
-    /// Starts <paramref name="process"/> for a new request with the divisor 2 and runs its step,
+    /// Starts <paramref name="process"/> for a new request with the divisor <paramref name="divisor"/> and runs its step,
     /// which stages the package call. Work items that earlier tests left queued are deleted first,
     /// so the test runs only its own. The tests of a class run one after the other.
     /// </summary>
-    public async Task<(Guid SubjectId, Guid InstanceId)> StageAsync(string process, CancellationToken cancellationToken)
+    public async Task<(Guid SubjectId, Guid InstanceId)> StageAsync(string process, CancellationToken cancellationToken, int divisor = 2)
     {
         await _tenant.ScalarAsync("DELETE FROM axis.process_work_items");
-        var subjectId = await _tenant.InsertRequestAsync(500m, 2);
+        var subjectId = await _tenant.InsertRequestAsync(500m, divisor);
         var instanceId = await _tenant.StartAsync(process, subjectId, ReleaseId, _model);
         Assert.Equal(WorkItemOutcome.Completed, await RunStepAsync(cancellationToken));
         Assert.Equal(ProcessStarts.Waiting, (await _tenant.InstanceAsync(instanceId)).State);

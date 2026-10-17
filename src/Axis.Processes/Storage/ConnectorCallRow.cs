@@ -37,8 +37,8 @@ public sealed class ConnectorCallRow
     public int Lookups { get; init; }
 
     /// <summary>
-    /// The evaluated input as JSON text, sent again by every retry, or <see langword="null"/> once
-    /// the call settled. It is never copied to history, audit records or logs.
+    /// The evaluated input as JSON text, sent again by every retry. It is kept after the call
+    /// settles. It is never copied to history, audit records or logs.
     /// </summary>
     public string? Input { get; init; }
 

@@ -155,7 +155,7 @@ public static class ConnectorCalls
     /// <summary>
     /// Settles the call <paramref name="id"/> as <paramref name="state"/>, <c>succeeded</c> or
     /// <c>failed</c>, at the transaction's time, with the last attempt's status and error. Its
-    /// stored input is cleared.
+    /// stored input is kept, so inspection shows what was sent.
     /// </summary>
     internal static async Task SettleAsync(
         NpgsqlTransaction transaction,
@@ -168,7 +168,7 @@ public static class ConnectorCalls
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.connector_calls
-            SET state = @state, last_status = @status, last_error = @error, input = NULL, settled_at = now()
+            SET state = @state, last_status = @status, last_error = @error, settled_at = now()
             WHERE id = @id
             """,
             Connection(transaction),
@@ -226,7 +226,7 @@ internal sealed record NewConnectorCall(
 /// <param name="Connector">The connector's declared name.</param>
 /// <param name="Operation">The operation's declared name.</param>
 /// <param name="Attempts">The attempts made so far.</param>
-/// <param name="Input">The stored input as JSON text, or <see langword="null"/> once the call settled.</param>
+/// <param name="Input">The stored input as JSON text.</param>
 /// <param name="Lookups">The failed lookups since the call became <c>unknown</c>.</param>
 internal sealed record LoadedConnectorCall(
     Guid Id,

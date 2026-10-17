@@ -27,9 +27,14 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         var record = await tenant.RequestAsync(subjectId);
         Assert.Equal("PO-1", record.Values["comment"]!.GetValue<string>());
         Assert.Equal(2L, record.Version);
-        Assert.Equal(
-            (ConnectorCalls.Succeeded, 1, (int?)200, (string?)null, (string?)null),
-            await CallAsync(tenant, callId));
+        var settled = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Succeeded, 1, (int?)200, (string?)null), (settled.State, settled.Attempts, settled.LastStatus, settled.LastError));
+
+        // The call keeps the input it sent after it settles.
+        Assert.True(JsonNode.DeepEquals(body, JsonNode.Parse(settled.Input!)));
+        var attempt = Assert.Single(await AttemptsAsync(tenant, callId));
+        Assert.Equal(("attempt", 1, "succeeded", (int?)200, (string?)null), (attempt.Kind, attempt.Number, attempt.Outcome, attempt.HttpStatus, attempt.Error));
+        Assert.True(attempt.StartedAt <= attempt.FinishedAt);
 
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, (string?)null), (row.Step, row.Revision, row.Error));
@@ -104,8 +109,15 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Null(await fixture.DueAtAsync("a", callId));
         Assert.Equal((ProcessStarts.Failed, 3L, "createOrder", true), await tenant.InstanceAsync(instanceId));
         var call = await CallAsync(tenant, callId);
-        Assert.Equal((ConnectorCalls.Failed, 1, (int?)400, (string?)null), (call.State, call.Attempts, call.LastStatus, call.Input));
+        Assert.Equal((ConnectorCalls.Failed, 1, (int?)400), (call.State, call.Attempts, call.LastStatus));
         Assert.Contains("400", call.LastError, StringComparison.Ordinal);
+
+        // A failed call keeps its input too. Its attempt row holds the status and a fixed error, not the body.
+        var stored = Assert.IsType<JsonObject>(JsonNode.Parse(call.Input!));
+        Assert.Equal($"Request {subjectId:N}", stored["reference"]!.GetValue<string>());
+        var failedAttempt = Assert.Single(await AttemptsAsync(tenant, callId));
+        Assert.Equal(("attempt", 1, "failed", (int?)400, call.LastError), (failedAttempt.Kind, failedAttempt.Number, failedAttempt.Outcome, failedAttempt.HttpStatus, failedAttempt.Error));
+        Assert.DoesNotContain(marker, await AttemptTextAsync(tenant, callId), StringComparison.Ordinal);
 
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
@@ -239,9 +251,12 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         var requests = fixture.Stub.RequestsWithKey(callId);
         Assert.Equal(3, requests.Count);
         Assert.Single(requests.Select(request => request.Body).Distinct());
+        var settled = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Succeeded, 3, (int?)200, (string?)null), (settled.State, settled.Attempts, settled.LastStatus, settled.LastError));
+        Assert.NotNull(settled.Input);
         Assert.Equal(
-            (ConnectorCalls.Succeeded, 3, (int?)200, (string?)null, (string?)null),
-            await CallAsync(tenant, callId));
+            [("attempt", 1, "retryable"), ("attempt", 2, "retryable"), ("attempt", 3, "succeeded")],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
         Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
 
         // Only the settled call writes a history row and a connector.called record.
@@ -267,7 +282,13 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(3, fixture.Stub.RequestsWithKey(callId).Count);
         Assert.Null(await fixture.DueAtAsync("a", callId));
         var call = await CallAsync(tenant, callId);
-        Assert.Equal((ConnectorCalls.Failed, 3, (int?)503, (string?)null), (call.State, call.Attempts, call.LastStatus, call.Input));
+        Assert.Equal((ConnectorCalls.Failed, 3, (int?)503), (call.State, call.Attempts, call.LastStatus));
+        Assert.NotNull(call.Input);
+
+        // Each attempt has its row. The last is a retryable class, although the call failed: no attempts were left.
+        Assert.Equal(
+            [("attempt", 1, "retryable", (int?)503), ("attempt", 2, "retryable", (int?)503), ("attempt", 3, "retryable", (int?)503)],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome, row.HttpStatus)));
         Assert.Equal("The operation 'createOrder' of the connector 'Purchasing' answered with the status 503.", call.LastError);
         Assert.Equal((ProcessStarts.Failed, 3L, "createOrder", true), await tenant.InstanceAsync(instanceId));
 
@@ -317,6 +338,13 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.All(requests, request => Assert.Equal("/tenant-a/quick-orders", request.Path));
         Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
         Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
+
+        // The timeout is the first attempt's row, as unknown, and the retry is the second.
+        var attempts = await AttemptsAsync(tenant, callId);
+        Assert.Equal(
+            [("attempt", 1, "unknown", (int?)null, call.LastError), ("attempt", 2, "succeeded", (int?)200, (string?)null)],
+            attempts.Select(row => (row.Kind, row.Number, row.Outcome, row.HttpStatus, row.Error)));
+        Assert.All(attempts, row => Assert.True(row.StartedAt <= row.FinishedAt));
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
     }
 
@@ -351,6 +379,8 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.NotNull(call.Input);
         Assert.Null(await fixture.DueAtAsync("a", callId));
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
+        var unknownAttempt = Assert.Single(await AttemptsAsync(tenant, callId));
+        Assert.Equal(("attempt", 1, "unknown", call.LastError), (unknownAttempt.Kind, unknownAttempt.Number, unknownAttempt.Outcome, unknownAttempt.Error));
 
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
@@ -429,10 +459,17 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(ConnectorCallHandler.UnknownOutcome, call.LastError);
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
 
+        // The lost attempt gets its row, with the outcome unknown and the fixed text.
+        var lost = Assert.Single(await AttemptsAsync(tenant, callId));
+        Assert.Equal(("attempt", 1, "unknown", (int?)null, ConnectorCallHandler.UnknownOutcome), (lost.Kind, lost.Number, lost.Outcome, lost.HttpStatus, lost.Error));
+
         await fixture.MakeDueAsync("a", callId);
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
         Assert.Single(fixture.Stub.RequestsWithKey(callId));
         Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
+        Assert.Equal(
+            [("attempt", 1, "unknown"), ("attempt", 2, "succeeded")],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
     }
 
@@ -462,9 +499,14 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(
             ($"/tenant-a/tracked-orders/by-key/{callId:D}", $"Bearer {fixture.Token("a")}", ""),
             (lookup.Path, lookup.Authorization, lookup.Body));
+        var reconciled = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Succeeded, 1, (int?)200, (string?)null), (reconciled.State, reconciled.Attempts, reconciled.LastStatus, reconciled.LastError));
+        Assert.NotNull(reconciled.Input);
+
+        // The dropped attempt is unknown, and the lookup that found the call is numbered apart.
         Assert.Equal(
-            (ConnectorCalls.Succeeded, 1, (int?)200, (string?)null, (string?)null),
-            await CallAsync(tenant, callId));
+            [("attempt", 1, "unknown", (int?)null), ("lookup", 1, "found", (int?)200)],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome, row.HttpStatus)));
         Assert.Equal("PO-1", (await tenant.RequestAsync(subjectId)).Values["comment"]!.GetValue<string>());
         Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
 
@@ -505,6 +547,9 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal((ConnectorCalls.Pending, 1, (int?)404), (call.State, call.Attempts, call.LastStatus));
         Assert.Equal("The lookup 'findOrder' of the connector 'TrackedPurchasing' found no call.", call.LastError);
         Assert.Single(fixture.Stub.CreateRequestsFor(callId));
+        Assert.Equal(
+            [("attempt", 1, "unknown", (int?)500), ("lookup", 1, "notFound", (int?)404)],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome, row.HttpStatus)));
 
         await fixture.MakeDueAsync("a", callId);
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
@@ -514,6 +559,11 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.All(creates, request => Assert.Equal($"/tenant-a/tracked-orders/{callId:D}", request.Path));
         Assert.Single(creates.Select(request => request.Body).Distinct());
         Assert.Equal((ConnectorCalls.Succeeded, 2), await StateAsync(tenant, callId));
+
+        // The resend is the next attempt. The lookup keeps its own numbering.
+        Assert.Equal(
+            [("attempt", 1, "unknown"), ("attempt", 2, "succeeded"), ("lookup", 1, "notFound")],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
         Assert.Equal(2, JsonNode.Parse(await CalledDetailsAsync(tenant, instanceId))!["attempts"]!.GetValue<int>());
         Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
@@ -555,6 +605,11 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Single(fixture.Stub.CreateRequestsFor(callId));
         Assert.Equal(3, fixture.Stub.RequestsFor(callId).Count(request => request.Method == "GET"));
         Assert.Equal((ConnectorCalls.Succeeded, 1), await StateAsync(tenant, callId));
+
+        // Every lookup has its row: two failed ones, then the one that found the call.
+        Assert.Equal(
+            [("attempt", 1, "unknown", (int?)null), ("lookup", 1, "failed", (int?)500), ("lookup", 2, "failed", (int?)500), ("lookup", 3, "found", (int?)200)],
+            (await AttemptsAsync(tenant, callId)).Select(row => (row.Kind, row.Number, row.Outcome, row.HttpStatus)));
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
     }
 
@@ -623,6 +678,40 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
             reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetString(4));
     }
+
+    /// <summary>The rows of <c>axis.process_call_attempts</c> for the call: attempts first, then lookups, each in order.</summary>
+    private static async Task<List<(string Kind, int Number, string Outcome, int? HttpStatus, string? Error, DateTimeOffset StartedAt, DateTimeOffset FinishedAt)>> AttemptsAsync(
+        ProcessStepFixture tenant,
+        Guid callId)
+    {
+        await using var command = tenant.DataSource.CreateCommand(
+            """
+            SELECT kind, number, outcome, http_status, error, started_at, finished_at
+            FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'connector' ORDER BY kind, number
+            """);
+        command.Parameters.AddWithValue("id", callId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<(string, int, string, int?, string?, DateTimeOffset, DateTimeOffset)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add((
+                reader.GetString(0),
+                reader.GetInt32(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                reader.GetFieldValue<DateTimeOffset>(6)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>All text in the call's attempt rows, to check that no body is in it.</summary>
+    private static async Task<string> AttemptTextAsync(ProcessStepFixture tenant, Guid callId) =>
+        (string)(await tenant.ScalarAsync(
+            "SELECT string_agg(row_to_json(a)::text, ' ') FROM axis.process_call_attempts a WHERE call_id = @id",
+            ("id", callId)))!;
 
     /// <summary>The failed lookups of the call since it became <c>unknown</c>.</summary>
     private static async Task<int> LookupsAsync(ProcessStepFixture tenant, Guid callId) =>

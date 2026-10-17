@@ -106,6 +106,10 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
 
         Assert.Equal((ProcessStarts.Failed, 3L, "fail", true), await tenant.InstanceAsync(instanceId));
         Assert.Equal((PackageCalls.Failed, 1, (string?)"System.FormatException", (string?)null), await CallAsync(callId));
+
+        // The attempt row holds the exception type, the same fixed text as the call.
+        var failed = Assert.Single(await AttemptsAsync(callId));
+        Assert.Equal(("attempt", 1, "failed", (int?)null, (string?)"System.FormatException"), (failed.Kind, failed.Number, failed.Outcome, failed.HttpStatus, failed.Error));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("fail", 2L, "System.FormatException"), (row.Step, row.Revision, row.Error));
         Assert.True(JsonNode.DeepEquals(
@@ -139,6 +143,11 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         var call = await CallAsync(callId);
         Assert.Null(call.Input);
         var texts = new List<string> { call.LastError!, await AuditDetailsAsync(instanceId) };
+        foreach (var attempt in await AttemptsAsync(callId))
+        {
+            texts.Add(attempt.Error ?? "");
+        }
+
         foreach (var row in await tenant.HistoryAsync(instanceId))
         {
             texts.AddRange([row.Input, row.Output!, row.Error ?? ""]);
@@ -177,6 +186,10 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
             JsonNode.Parse(row.Output!)));
         Assert.Equal(AuditActions.OperationStaged, Assert.Single(await tenant.SystemAuditActionsAsync(instanceId)));
 
+        // The lost attempt gets its row, with the outcome unknown and the fixed text.
+        var lost = Assert.Single(await AttemptsAsync(callId));
+        Assert.Equal(("attempt", 1, "unknown", (int?)null, (string?)PackageCallHandler.UnknownOutcome), (lost.Kind, lost.Number, lost.Outcome, lost.HttpStatus, lost.Error));
+
         // The item is gone, so the operation is never run again.
         Assert.Null(await fixture.RunCallAsync(CancellationToken));
     }
@@ -195,6 +208,9 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
 
         Assert.Equal((PackageCalls.Succeeded, 3, (string?)null, (string?)null), await CallAsync(callId));
+        Assert.Equal(
+            [("attempt", 1, "retryable"), ("attempt", 2, "retryable"), ("attempt", 3, "succeeded")],
+            (await AttemptsAsync(callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
         Assert.Equal((ProcessStarts.Running, 3L, "done", false), await tenant.InstanceAsync(instanceId));
         Assert.Equal(3L, (await fixture.RequestAsync(subjectId)).Values["total"]!.GetValue<long>());
         Assert.Equal(2, (await tenant.HistoryAsync(instanceId)).Count);
@@ -204,6 +220,28 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         var called = JsonNode.Parse(await AuditDetailsAsync(instanceId, AuditActions.OperationCalled))!;
         Assert.Equal((3, "succeeded"), (called["attempts"]!.GetValue<int>(), called["outcome"]!.GetValue<string>()));
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_call_that_throws_a_retryable_error_once_and_then_succeeds_has_two_attempt_rows_with_their_times_and_no_status()
+    {
+        var (_, instanceId) = await fixture.StageAsync("PackageFlaky", CancellationToken, divisor: 1);
+        var callId = await CallIdAsync(instanceId);
+
+        await RunAndAssertRescheduledAsync(callId, TimeSpan.FromSeconds(10));
+        await fixture.MakeDueAsync(callId);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+
+        var attempts = await AttemptsAsync(callId);
+        Assert.Equal(
+            [("attempt", 1, "retryable", (int?)null, (string?)"Axis.Extensions.RetryableException"), ("attempt", 2, "succeeded", (int?)null, (string?)null)],
+            attempts.Select(row => (row.Kind, row.Number, row.Outcome, row.HttpStatus, row.Error)));
+        Assert.All(attempts, row => Assert.True(row.StartedAt <= row.FinishedAt));
+
+        // A settled package call still clears its input.
+        var call = await CallAsync(callId);
+        Assert.Equal((PackageCalls.Succeeded, 2), (call.State, call.Attempts));
+        Assert.Null(call.Input);
     }
 
     [Fact]
@@ -241,6 +279,11 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync(CancellationToken));
 
         Assert.Equal((PackageCalls.Failed, 2, (string?)"Axis.Extensions.RetryableException", (string?)null), await CallAsync(callId));
+
+        // The last attempt is a retryable class, although the call failed: no attempts were left.
+        Assert.Equal(
+            [("attempt", 1, "retryable"), ("attempt", 2, "retryable")],
+            (await AttemptsAsync(callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
         Assert.Equal((ProcessStarts.Failed, 3L, "flaky", true), await tenant.InstanceAsync(instanceId));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("flaky", 2L, "Axis.Extensions.RetryableException"), (row.Step, row.Revision, row.Error));
@@ -270,6 +313,8 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal((PackageCalls.Pending, 1), (call.State, call.Attempts));
         Assert.Equal("The package 'test-package' 1.0.0 is not installed on this worker.", call.LastError);
         Assert.Equal("{\"a\": 2, \"b\": 3}", call.Input);
+        var missing = Assert.Single(await AttemptsAsync(callId));
+        Assert.Equal(("attempt", 1, "retryable", (int?)null, (string?)call.LastError), (missing.Kind, missing.Number, missing.Outcome, missing.HttpStatus, missing.Error));
         Assert.Equal((ProcessStarts.Waiting, 2L, "sum", false), await tenant.InstanceAsync(instanceId));
         Assert.Single(await tenant.HistoryAsync(instanceId));
 
@@ -278,6 +323,9 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
         var settled = await CallAsync(callId);
         Assert.Equal((PackageCalls.Succeeded, 2), (settled.State, settled.Attempts));
+        Assert.Equal(
+            [("attempt", 1, "retryable"), ("attempt", 2, "succeeded")],
+            (await AttemptsAsync(callId)).Select(row => (row.Kind, row.Number, row.Outcome)));
     }
 
     [Fact]
@@ -293,6 +341,8 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         var call = await CallAsync(callId);
         Assert.Equal((PackageCalls.Unknown, 1, (string?)PackageCallHandler.TimedOut), (call.State, call.Attempts, call.LastError));
         Assert.NotNull(call.Input);
+        var timedOut = Assert.Single(await AttemptsAsync(callId));
+        Assert.Equal(("attempt", 1, "unknown", (int?)null, (string?)PackageCallHandler.TimedOut), (timedOut.Kind, timedOut.Number, timedOut.Outcome, timedOut.HttpStatus, timedOut.Error));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("slow", 2L, (string?)PackageCallHandler.TimedOut), (row.Step, row.Revision, row.Error));
         Assert.True(JsonNode.DeepEquals(
@@ -351,6 +401,32 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
             reader.GetInt32(1),
             reader.IsDBNull(2) ? null : reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3));
+    }
+
+    /// <summary>The rows of <c>axis.process_call_attempts</c> for the call: attempts first, then lookups, each in order.</summary>
+    private async Task<List<(string Kind, int Number, string Outcome, int? HttpStatus, string? Error, DateTimeOffset StartedAt, DateTimeOffset FinishedAt)>> AttemptsAsync(Guid callId)
+    {
+        await using var command = fixture.Tenant.DataSource.CreateCommand(
+            """
+            SELECT kind, number, outcome, http_status, error, started_at, finished_at
+            FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'package' ORDER BY kind, number
+            """);
+        command.Parameters.AddWithValue("id", callId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<(string, int, string, int?, string?, DateTimeOffset, DateTimeOffset)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add((
+                reader.GetString(0),
+                reader.GetInt32(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                reader.GetFieldValue<DateTimeOffset>(6)));
+        }
+
+        return rows;
     }
 
     /// <summary>The details of the instance's system audit record with <paramref name="action"/>.</summary>

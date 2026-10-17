@@ -1008,8 +1008,8 @@ evaluated input that the call sent, so it holds field values.
 ### Call input kept
 
 A connector call keeps its input after it settles, whether it succeeded or
-failed. Today it clears it. The kept input lets inspection show what was sent.
-It is still never copied to history, audit records or logs, and inspection
+failed. The kept input lets inspection show what was sent. It is never copied
+to history, audit records or logs, and inspection
 shows it only under the [masking rule](#values-and-masking). Package calls
 keep today's rule: their input is cleared when the call settles, see
 [Staging a package call](#staging-a-package-call).
@@ -1017,8 +1017,9 @@ keep today's rule: their input is cleared when the call settles, see
 ### Attempts
 
 `axis.process_call_attempts` holds one row per attempt and per lookup of a
-connector or package call, see [Tables](#tables). Today a call row counts its
-attempts and keeps only the last status and error, so earlier ones are lost.
+connector or package call, see [Tables](#tables). The call row counts its
+attempts and keeps only the last status and error, so the attempt rows hold the
+earlier ones.
 
 - **Attempt.** One send of a connector call, or one run of a package
   operation. Its outcome is `succeeded`, `retryable`, `unknown` or `failed`,
@@ -1026,12 +1027,23 @@ attempts and keeps only the last status and error, so earlier ones are lost.
   [Package call outcomes](#package-call-outcomes).
 - **Lookup.** One lookup of [reconciliation](#reconciliation). Its outcome is
   `found`, `notFound` or `failed`. Package calls have none.
-- **Numbers.** `number` counts attempts and lookups apart, each from 1.
+- **Numbers.** `number` counts attempts and lookups apart, each from 1. An
+  attempt's number is the call's `attempts` count when the attempt ran, the
+  same number as in `connector.called` or `operation.called`. A lookup's
+  number is the highest lookup number of the call plus one.
+- **Outcome.** A row's outcome is the class of that attempt, not what became
+  of the call. A retryable error with no attempts left is recorded as
+  `retryable`, and the call becomes `failed`. The one exception is a `2xx`
+  answer or an output whose record write is refused: the attempt did not
+  succeed, so its row is `failed`. A lookup that found the call stays `found`.
 - **Writing.** The outcome transaction of the attempt or lookup writes its
   row, in the same transaction that updates the call. A rolled back outcome
   leaves no row. A worker that crashes after it sends leaves no row either. The
   next worker finds the call still `sending` and writes that attempt's row
-  with the outcome `unknown`.
+  with the outcome `unknown`. Its `started_at` is when that worker found the
+  call, because the start of the lost attempt is not stored. An outcome that is
+  stale, because the instance moved on, writes no row, and neither does a
+  call whose release lacks the step before any attempt was counted.
 - **Content.** A row holds the times, the outcome, the HTTP status and a fixed
   error text. It never holds a request or response body, an exception message
   or a secret.
@@ -1427,9 +1439,9 @@ So a second start for the same record is blocked, as with an open task.
 row instead of inserting one, in the same transaction. The row keeps its id, so
 the operation identity and the idempotency key do not change. The step
 evaluates the input again from the subject record as it is now, on purpose, so
-the retry sends the current data. *(Planned for M7: a failed connector call
-keeps its stored input, but the step still evaluates it again.)* A failed
-package call's stored input is cleared when it settles. It sets the call to
+the retry sends the current data. A failed connector call keeps its stored
+input, but the step still evaluates it again. A failed package call's stored
+input is cleared when it settles. It sets the call to
 `pending` with that input, 0 attempts and 0 lookups, and clears the last status
 and the last error. Everything else is as above. See [Retry](#retry).
 
@@ -1467,9 +1479,9 @@ never resends blind.
    rules, as `updateRecord` does. An optional output that the body leaves
    out leaves its field unchanged, and an explicit `null` writes `null`. A
    refused write, such as a failed validation, fails the call instead.
-2. It sets the call to `succeeded` and clears its stored input. *(planned
-   for M7)* It keeps the stored input instead, see
-   [Call input kept](#call-input-kept).
+2. It sets the call to `succeeded` and keeps its stored input, see
+   [Call input kept](#call-input-kept). It writes the attempt's row, see
+   [Attempts](#attempts).
 3. It sets the instance to `running` on `next`, with a new revision.
 4. It writes the history row of the step, at the revision the instance
    waited at. Its output is `{ "operationId", "outcome", "next" }`, plus
@@ -1495,20 +1507,19 @@ the item is deleted, and a history row with output
 `{ "operationId", "outcome": "unknown" }` and the error makes the call visible.
 No `connector.called` is written, because the call has not settled.
 
-**A failed call settles** too. The call becomes `failed` and its stored input
-is cleared, with the last status and the error on the call row. *(planned for
-M7)* The stored input is kept instead, see
-[Call input kept](#call-input-kept). The instance
+**A failed call settles** too. The call becomes `failed` and keeps its stored
+input, see [Call input kept](#call-input-kept), with the last status and the
+error on the call row. It writes the attempt's row too. The instance
 becomes `failed`, with the error in a history row whose output is
 `{ "operationId", "outcome": "failed" }`. The transaction writes
 `connector.called`, with the same details as a successful call, and
 `process.failed`, both with the actor `system`.
 
 No request or response body is ever stored. The stored input lives only on
-the call row until the call settles. It never appears in history, audit
-records or logs. *(planned for M7)* A connector call keeps its input after it
-settles. It is still never copied to history, audit records or logs, and
-inspection shows it only under the [masking rule](#values-and-masking).
+the call row. A connector call keeps it after the call settles, see
+[Call input kept](#call-input-kept). It never appears in history, audit
+records or logs, and inspection shows it only under the
+[masking rule](#values-and-masking).
 
 ### Call outcomes
 
@@ -1854,10 +1865,9 @@ record's data can succeed after the record is fixed.
 A `callConnector` step or a package operation step whose call row is `failed`
 stages the call again under the **same operation identity**, see
 [Staging and the call](#staging-and-the-call). The input is evaluated again
-on purpose, so the retry sends the current data. *(Planned for M7: a failed
-connector call keeps its stored input, but the retry still evaluates it
-again.)* A failed package call's stored input is cleared when it settles. The
-attempts count from zero.
+on purpose, so the retry sends the current data. A failed connector call keeps
+its stored input, but the retry still evaluates it again. A failed package
+call's stored input is cleared when it settles. The attempts count from zero.
 
 **Risks.** A retry of a connector call sends it again under the same
 idempotency key. Some systems replay their stored failure for a key they have
@@ -1929,9 +1939,8 @@ One transaction does this:
    fields to the subject record with the record update rules, as a successful
    outcome does. An `output` that does not fit, or a write that the record
    refuses, is a `400`. Nothing changes and the call stays `unknown`.
-   - It sets the call to `succeeded` and clears its stored input. *(planned
-     for M7)* A connector call keeps the stored input instead, see
-     [Call input kept](#call-input-kept).
+   - It sets the call to `succeeded`. A package call clears its stored input,
+     and a connector call keeps it, see [Call input kept](#call-input-kept).
    - It sets the instance to `running` on `next`, with the next revision.
    - It writes the history row of the step, at the revision the instance
      waited at. Its output is
@@ -1939,8 +1948,8 @@ One transaction does this:
      `subjectVersion` when it wrote output fields.
    - It writes `record.updated` when it wrote output fields, and inserts the
      work item of the next step.
-4. For `failed`, it sets the call to `failed` and clears its stored input.
-   *(planned for M7)* A connector call keeps the stored input instead, see
+4. For `failed`, it sets the call to `failed`. A package call clears its
+   stored input, and a connector call keeps it, see
    [Call input kept](#call-input-kept). It
    sets the instance to `failed` with `ended_at`, and writes a history row
    with output `{ "operationId", "outcome": "failed", "resolved": true }` and
@@ -2505,17 +2514,19 @@ database, with history in `axis.__processes_migrations` (see
   | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded` or `failed`. `cancelled` *(planned for M7)* |
   | `attempts` | `integer` | The attempts made so far, the first one included |
   | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
-  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Cleared when the call settles or is cancelled. *(planned for M7)* Kept after the call settles, but still cleared when the call is cancelled. Never copied to history, audit records or logs, and shown only through [inspection](#values-and-masking) |
+  | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Kept after the call settles, but cleared when the call is cancelled *(planned for M7)*. Never copied to history, audit records or logs, and shown only through [inspection](#values-and-masking) |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
   | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
-- `axis.process_call_attempts` *(planned for M7)*: one row per attempt and per
+- `axis.process_call_attempts`: one row per attempt and per
   lookup of a connector or package call, see
   [Attempts](#attempts). Times use the database clock. The outcome transaction
   of an attempt or a lookup writes its row. A call found still `sending` has
   no row for its lost attempt, so the next worker that finds it writes that
-  row, with the outcome `unknown`. There is no column for a request or
+  row, with the outcome `unknown`. A unique index on (`call_id`, `kind`,
+  `number`) keeps each number once. The call is in one of two tables, so
+  `call_id` has no foreign key. There is no column for a request or
   response body.
 
   | Column | Type | Meaning |
