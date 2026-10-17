@@ -10,4 +10,8 @@
     <ProjectReference Include="..\Axis.Processes\Axis.Processes.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Integration.Tests" />
+  </ItemGroup>
+
 </Project>

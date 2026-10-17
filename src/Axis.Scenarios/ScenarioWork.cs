@@ -8,12 +8,13 @@ using Npgsql;
 namespace Axis.Scenarios;
 
 /// <summary>
-/// Runs the due process step, connector call and package call work items of the scenario's tenant
-/// in-process, as the worker would, until none is due. The call handlers are the real ones, with the
-/// scenario's placeholder bindings. The scenario's stubs take the place of the HTTP request of a
-/// connector call and of the package operation. A call that no stub answers fails the scenario
-/// before it runs. Event deliveries and schedule triggers stay queued. The items run over the
-/// scenario's connection string, so they read the scenario's <c>now</c> too.
+/// Runs the due process step, connector call, package call and event delivery work items of the
+/// scenario's tenant in-process, as the worker would, until none is due. The handlers are the real
+/// ones, with the scenario's placeholder bindings, so an <c>async</c> event trigger starts its process
+/// here. The scenario's stubs take the place of the HTTP request of a connector call and of the
+/// package operation. A call that no stub answers fails the scenario before it runs. Schedule triggers
+/// and fan-outs stay queued. The items run over the scenario's connection string, so they read the
+/// scenario's <c>now</c> too.
 /// </summary>
 internal sealed class ScenarioWork : IDisposable
 {
@@ -41,6 +42,7 @@ internal sealed class ScenarioWork : IDisposable
         [
             new ConnectorCallHandler(models, bindings, _client, settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
             new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
+            new EventDeliveryHandler(models, loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
         _runner = new WorkItemRunner(
             new ScenarioConnections(connectionString),
@@ -145,7 +147,13 @@ internal sealed class ScenarioWork : IDisposable
         command.Parameters.AddWithValue("tenant", ScenarioRunner.TenantId);
         command.Parameters.AddWithValue(
             "kinds",
-            new[] { ProcessStarts.StepWorkItemKind, ProcessStarts.ConnectorCallWorkItemKind, ProcessStarts.PackageCallWorkItemKind });
+            new[]
+            {
+                ProcessStarts.StepWorkItemKind,
+                ProcessStarts.ConnectorCallWorkItemKind,
+                ProcessStarts.PackageCallWorkItemKind,
+                ProcessStarts.EventDeliverWorkItemKind,
+            });
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
