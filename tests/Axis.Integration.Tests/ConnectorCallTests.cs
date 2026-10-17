@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
+using Axis.Data.Naming;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 
@@ -615,6 +616,50 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
     }
 
     [Fact]
+    public async Task Database_error_while_recording_a_success_stores_the_exception_type_and_no_record_value()
+    {
+        var tenant = fixture.Tenant("a");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken);
+        var callId = await CallIdAsync(tenant, instanceId);
+        Assert.True(tenant.Model.TryGetEntity("Request", out var request));
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(request.Id));
+
+        // The error fires only for this test's record and carries its amount in the message.
+        await tenant.ScalarAsync(
+            $$"""
+            CREATE FUNCTION axis.test_success_write_leak() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+                IF OLD.{{EntityNaming.IdColumn}} = '{{subjectId:D}}'::uuid THEN
+                    RAISE EXCEPTION 'amount %', OLD.{{EntityNaming.Column("amount")}};
+                END IF;
+                RETURN NEW;
+            END
+            $body$;
+            CREATE TRIGGER test_success_write_leak BEFORE UPDATE ON {{table}}
+                FOR EACH ROW EXECUTE FUNCTION axis.test_success_write_leak();
+            """);
+        try
+        {
+            Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync("a", CancellationToken));
+        }
+        finally
+        {
+            await tenant.ScalarAsync(
+                $"""
+                DROP TRIGGER test_success_write_leak ON {table};
+                DROP FUNCTION axis.test_success_write_leak();
+                """);
+        }
+
+        const string recordFailure = "The outcome of the call could not be recorded: Npgsql.PostgresException.";
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal(recordFailure, call.LastError);
+        Assert.Equal(recordFailure, (await tenant.HistoryAsync(instanceId))[1].Error);
+        Assert.Equal(recordFailure, Assert.Single(await AttemptsAsync(tenant, callId)).Error);
+        Assert.DoesNotContain("500", call.LastError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Dropped_connection_on_a_connector_without_lookup_leaves_the_call_unknown_and_never_sends_it_again()
     {
         var tenant = fixture.Tenant("a");
@@ -626,7 +671,9 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
 
         var call = await CallAsync(tenant, callId);
         Assert.Equal((ConnectorCalls.Unknown, 1, (int?)null), (call.State, call.Attempts, call.LastStatus));
-        Assert.NotNull(call.LastError);
+        const string sendFailure = "The operation 'createOrder' of the connector 'Ledger' could not be called: System.Net.Http.HttpRequestException.";
+        Assert.Equal(sendFailure, call.LastError);
+        Assert.Equal(sendFailure, (await AttemptsAsync(tenant, callId)).Single(attempt => attempt.Outcome == "unknown").Error);
         Assert.Null(await fixture.DueAtAsync("a", callId));
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
         var row = (await tenant.HistoryAsync(instanceId))[1];

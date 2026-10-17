@@ -7,6 +7,7 @@ using Axis.Configuration.Releases;
 using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Data.Records;
+using Axis.Expressions.Evaluation;
 using Axis.Processes.Work;
 using Microsoft.Extensions.Logging;
 
@@ -67,7 +68,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         catch (Exception exception) when (exception is not ProcessStepException and not OperationCanceledException)
         {
             // Any failure after the load fails the instance at the revision the step loaded.
-            throw Failure(exception.Message, instance, input, exception);
+            throw Failure(TypeName(exception), instance, input, exception);
         }
     }
 
@@ -92,7 +93,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, exception.Message, failure?.StartedAt ?? instance.Now),
+            new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now),
             cancellationToken);
         await AuditRecords.AppendAsync(
             context.Transaction,
@@ -527,7 +528,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, branch.When, instance.Now, cancellationToken);
             if (result.Error is { } error)
             {
-                throw Failure(error.Message, instance, input);
+                throw ExpressionFailure($"when of branch {index}", step, error, instance, input);
             }
 
             if (result.Value is true)
@@ -564,7 +565,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, assignment.Value, instance.Now, cancellationToken);
             if (result.Error is { } error)
             {
-                throw Failure(error.Message, instance, input);
+                throw ExpressionFailure($"value of the field '{field.Name}'", step, error, instance, input);
             }
 
             values.Add(KeyValuePair.Create(field, result.Value));
@@ -595,7 +596,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, user, instance.Now, cancellationToken);
         if (result.Error is { } error)
         {
-            throw Failure(error.Message, instance, input);
+            throw ExpressionFailure("assignee of the task step", step, error, instance, input);
         }
 
         if (result.Value is not string id || string.IsNullOrWhiteSpace(id))
@@ -645,7 +646,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, mapping.Value, instance.Now, cancellationToken);
             if (result.Error is { } error)
             {
-                throw Failure(error.Message, instance, input);
+                throw ExpressionFailure($"input '{mapping.Input}'", step, error, instance, input);
             }
 
             if (result.Value is null && isRequired(mapping.Input))
@@ -681,7 +682,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, field.Value, instance.Now, cancellationToken);
             if (result.Error is { } error)
             {
-                throw Failure(error.Message, instance, input);
+                throw ExpressionFailure($"payload field '{field.Field}'", step, error, instance, input);
             }
 
             payload[field.Field] = ToJson(result.Value, $"field '{field.Field}'", step, instance, input);
@@ -713,6 +714,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         result.Errors is { Count: > 0 } errors
             ? string.Join(", ", errors.Select(error => $"{error.Key}: {string.Join(" ", error.Value)}"))
             : result.Outcome.ToString();
+
+    private static ProcessStepException ExpressionFailure(string part, ProcessStepModel step, ExpressionRuntimeError error, LoadedInstance instance, JsonObject input) =>
+        Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input);
+
+    private static string TypeName(Exception exception) => exception.GetType().FullName ?? exception.GetType().Name;
 
     private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, Exception? innerException = null) =>
         new(message, instance.Step, instance.Revision, instance.Now, input, innerException);

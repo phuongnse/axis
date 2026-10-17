@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
+using Axis.Data.Naming;
 using Axis.Processes.Instances;
 using Npgsql;
 
@@ -126,7 +127,7 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
         Assert.Equal("check", row.Step);
         Assert.Equal(1L, row.Revision);
-        Assert.Contains("Division by zero", row.Error, StringComparison.Ordinal);
+        Assert.Equal("The when of branch 0 of the step 'check' failed: DivisionByZero.", row.Error);
         Assert.Null(row.Output);
         Assert.Null(row.Decision);
         Assert.True(row.FinishedAfterStart);
@@ -158,6 +159,62 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
         // The new release's own instances take its renamed steps.
         Assert.Equal((ProcessStarts.Completed, 3L, "reviewedV2", true), await fixture.InstanceAsync(later));
         Assert.Equal(["check", "reviewedV2"], (await fixture.HistoryAsync(later)).Select(row => row.Step));
+    }
+
+    [Fact]
+    public async Task Expression_error_that_would_quote_a_record_value_stores_a_fixed_text_without_it()
+    {
+        var subjectId = await fixture.InsertRequestAsync(12345.67m, 41);
+        var instanceId = await fixture.StartAsync("Divide", subjectId, fixture.FirstReleaseId);
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(ProcessStarts.Failed, (await fixture.InstanceAsync(instanceId)).State);
+        var row = Assert.Single(await fixture.HistoryAsync(instanceId));
+        Assert.Equal("The when of branch 0 of the step 'check' failed: ArgumentOutOfRange.", row.Error);
+        Assert.DoesNotContain("41", row.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345", row.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unexpected_exception_during_a_step_stores_only_its_type_name()
+    {
+        var subjectId = await fixture.InsertRequestAsync(4321.5m, 1);
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(RequestEntityId));
+
+        // The error fires only for this test's record and carries its amount in the message.
+        await fixture.ScalarAsync(
+            $$"""
+            CREATE FUNCTION axis.test_step_leak() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+                IF OLD.{{EntityNaming.IdColumn}} = '{{subjectId:D}}'::uuid THEN
+                    RAISE EXCEPTION 'amount %', OLD.{{EntityNaming.Column("amount")}};
+                END IF;
+                RETURN NEW;
+            END
+            $body$;
+            CREATE TRIGGER test_step_leak BEFORE UPDATE ON {{table}}
+                FOR EACH ROW EXECUTE FUNCTION axis.test_step_leak();
+            """);
+        Guid instanceId;
+        try
+        {
+            instanceId = await fixture.StartAsync("Submit", subjectId, fixture.FirstReleaseId);
+            await fixture.RunUntilIdleAsync(CancellationToken);
+        }
+        finally
+        {
+            await fixture.ScalarAsync(
+                $"""
+                DROP TRIGGER test_step_leak ON {table};
+                DROP FUNCTION axis.test_step_leak();
+                """);
+        }
+
+        Assert.Equal(ProcessStarts.Failed, (await fixture.InstanceAsync(instanceId)).State);
+        var row = Assert.Single(await fixture.HistoryAsync(instanceId));
+        Assert.Equal("Npgsql.PostgresException", row.Error);
+        Assert.DoesNotContain("4321", row.Error, StringComparison.Ordinal);
     }
 
     private Guid RequestEntityId
