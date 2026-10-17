@@ -89,6 +89,28 @@ public static class TaskQueries
         return await reader.ReadAsync(cancellationToken) ? ReadTask(reader) : null;
     }
 
+    /// <summary>Reads the tasks of the instance <paramref name="instanceId"/> in any state, oldest first.</summary>
+    public static async Task<IReadOnlyList<ProcessTaskRow>> ListByInstanceAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT {Columns} FROM axis.process_tasks WHERE process_instance_id = @id ORDER BY created_at, id",
+            connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        var items = new List<ProcessTaskRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadTask(reader));
+        }
+
+        return items;
+    }
+
     /// <summary>
     /// Reads and locks the task with <paramref name="id"/> in any state until the transaction ends,
     /// or returns <see langword="null"/> when there is none. A concurrent lock waits for this

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -22,6 +24,15 @@ namespace Axis.Server.Processes;
 /// entity is needed for it, so without one the list is empty. A hidden instance is in neither the
 /// page nor the total. A read filter that fails at run time is a 400. The list writes no audit
 /// record. The problem titles never contain text from the request.
+/// <para>
+/// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
+/// its properties, the graph of the release it is pinned to, its path (the history rows in order)
+/// and its tasks. It has no <c>calls</c> yet. The checks run in the order of the list, then the id
+/// is parsed. A malformed id, an unknown id, an instance of another process, and an instance whose
+/// subject record the user may not read or that no longer exists are one 404. A read filter that
+/// fails at run time for the subject record does not match, so it is a 404 too. The detail writes
+/// no audit record.
+/// </para>
 /// </summary>
 internal static class ProcessInspectionEndpoints
 {
@@ -33,8 +44,11 @@ internal static class ProcessInspectionEndpoints
         ProcessStarts.Failed,
     ];
 
-    public static void MapProcessInspectionEndpoints(this IEndpointRouteBuilder endpoints) =>
+    public static void MapProcessInspectionEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapGet("/api/apps/{app}/processes/{process}/instances", ListAsync);
+        endpoints.MapGet("/api/apps/{app}/processes/{process}/instances/{id}", GetAsync);
+    }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
     private static async Task<IResult> ListAsync(
@@ -138,6 +152,138 @@ internal static class ProcessInspectionEndpoints
         return Results.Ok(new ProcessInstanceListResponse(items, pageNumber, size, result.TotalCount));
     }
 
+    private static async Task<IResult> GetAsync(
+        string app,
+        string process,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return NotFound("No application is active under this name.");
+        }
+
+        var application = active.Model;
+        if (!application.TryGetProcess(process, out var model))
+        {
+            return NotFound("The application has no process with this name.");
+        }
+
+        if (!PolicyEvaluator.AllowsInspect(application, user.Roles, model))
+        {
+            return Grants.Forbidden();
+        }
+
+        if (id is not { Length: 36 } || !Guid.TryParseExact(id, "D", out var instanceId))
+        {
+            return InstanceNotFound();
+        }
+
+        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+        }
+
+        // An instance whose record the user may not read does not exist for them.
+        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        if (!read.Granted)
+        {
+            return InstanceNotFound();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (await InstanceQueries.FindAsync(connection, application.Manifest.Id, model.Id, entity, instanceId, cancellationToken) is not { } row)
+        {
+            return InstanceNotFound();
+        }
+
+        if (read.Filters is { } filters
+            && await RecordCommand.MatchAsync(connection, null, application, entity, row.SubjectId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+        {
+            return InstanceNotFound();
+        }
+
+        // The graph is the pinned release's, so a newer release does not change a running instance.
+        var pinned = await resolver.GetReleaseModelAsync(row.ReleaseId, cancellationToken);
+        var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == model.Id));
+        var history = await InstanceQueries.HistoryAsync(connection, row.Id, cancellationToken);
+        var tasks = await TaskQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
+        return Results.Ok(new ProcessInstanceDetailResponse(
+            row.Id,
+            model.Name,
+            row.SubjectId,
+            row.ReleaseId,
+            row.State,
+            row.Step,
+            row.CreatedAt.UtcDateTime,
+            row.EndedAt?.UtcDateTime,
+            graph,
+            history
+                .Select(entry => new ProcessPathEntry(
+                    entry.Step,
+                    entry.StartedAt.UtcDateTime,
+                    entry.FinishedAt.UtcDateTime,
+                    entry.Decision,
+                    entry.Output is null ? null : JsonNode.Parse(entry.Output),
+                    entry.Error))
+                .ToList(),
+            tasks
+                .Select(task => new ProcessInstanceTask(
+                    task.Id,
+                    task.Step,
+                    task.AssigneeKind,
+                    task.Assignee,
+                    task.State,
+                    task.Outcome,
+                    task.CompletedBy,
+                    task.CreatedAt.UtcDateTime,
+                    task.CompletedAt?.UtcDateTime))
+                .ToList()));
+    }
+
+    private static ProcessGraph Graph(ProcessModel model) =>
+        new(model.Start, model.Steps.Select(GraphStep).ToList());
+
+    // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise".
+    private static ProcessGraphStep GraphStep(ProcessStepModel step) =>
+        step switch
+        {
+            DecisionStepModel decision => new(
+                decision.Name,
+                "decision",
+                null,
+                decision.Branches
+                    .Select((branch, index) => new ProcessGraphTransition(branch.Next, index.ToString(CultureInfo.InvariantCulture)))
+                    .Append(new ProcessGraphTransition(decision.Otherwise, "otherwise"))
+                    .ToList()),
+            TaskStepModel task => new(
+                task.Name,
+                "task",
+                task.Label.TextKey,
+                task.Outcomes.Select(outcome => new ProcessGraphTransition(outcome.Next, outcome.Name)).ToList()),
+            OperationStepModel operation => Operation(operation.Name, operation.Next),
+            CallConnectorStepModel call => Operation(call.Name, call.Next),
+            PackageOperationStepModel package => Operation(package.Name, package.Next),
+            RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
+            EndStepModel end => new(end.Name, "end", null, []),
+            _ => throw new InvalidOperationException($"Unexpected step type {step.GetType().Name}."),
+        };
+
+    private static ProcessGraphStep Operation(string name, string next) =>
+        new(name, "operation", null, [new ProcessGraphTransition(next, null)]);
+
+    private static IResult InstanceNotFound() =>
+        NotFound("No instance of this process exists with this id.");
+
     private static IResult NotFound(string title) =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
 }
@@ -154,3 +300,41 @@ internal sealed record ProcessInstanceListItem(
     Guid ReleaseId,
     DateTime CreatedAt,
     DateTime? EndedAt);
+
+/// <summary>One instance of a process, the graph of the release it is pinned to, its path and its tasks.</summary>
+internal sealed record ProcessInstanceDetailResponse(
+    Guid Id,
+    string Process,
+    Guid SubjectId,
+    Guid ReleaseId,
+    string State,
+    string Step,
+    DateTime CreatedAt,
+    DateTime? EndedAt,
+    ProcessGraph Graph,
+    IReadOnlyList<ProcessPathEntry> Path,
+    IReadOnlyList<ProcessInstanceTask> Tasks);
+
+/// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
+internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);
+
+/// <summary>A step of the graph: its type (<c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>), its label for a task, and where it leads.</summary>
+internal sealed record ProcessGraphStep(string Name, string Type, string? LabelKey, IReadOnlyList<ProcessGraphTransition> Transitions);
+
+/// <summary>A transition to the step <paramref name="Next"/>, taken on a decision branch or a task outcome, or null for an operation.</summary>
+internal sealed record ProcessGraphTransition(string Next, string? On);
+
+/// <summary>One occurrence of a step in the instance's history. A failed step has an error and no output.</summary>
+internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error);
+
+/// <summary>A task of the instance, with who it is assigned to and how it ended.</summary>
+internal sealed record ProcessInstanceTask(
+    Guid Id,
+    string Step,
+    string AssigneeKind,
+    string Assignee,
+    string State,
+    string? Outcome,
+    string? CompletedBy,
+    DateTime CreatedAt,
+    DateTime? CompletedAt);

@@ -79,6 +79,77 @@ public static class InstanceQueries
         }
     }
 
+    /// <summary>
+    /// Reads the instance <paramref name="id"/> of the process, or returns <see langword="null"/> when
+    /// there is none, it belongs to another process or application, or its subject record in
+    /// <paramref name="subjectEntity"/> no longer exists. It applies no read filter: the caller
+    /// checks the subject record against the reader's filters.
+    /// </summary>
+    public static async Task<ProcessInstanceRow?> FindAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid processId,
+        EntityModel subjectEntity,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(subjectEntity);
+
+        var row = EntityNaming.Quote(RecordQueries.RowAlias);
+        await using var command = new NpgsqlCommand(
+            $"""
+            SELECT {Columns} FROM axis.process_instances AS {InstanceAlias}
+            WHERE i.id = @id AND i.application_id = @application AND i.process_id = @process AND i.subject_entity_id = @entity
+              AND EXISTS (SELECT 1 FROM {RecordQueries.Table(subjectEntity)} AS {row} WHERE {row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {InstanceAlias}.subject_id)
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("process", processId);
+        command.Parameters.AddWithValue("entity", subjectEntity.Id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadInstance(reader) : null;
+    }
+
+    /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
+    public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id
+            FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY finished_at, id
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        var rows = new List<ProcessStepHistoryRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new ProcessStepHistoryRow
+            {
+                Id = reader.GetGuid(0),
+                ProcessInstanceId = reader.GetGuid(1),
+                Step = reader.GetString(2),
+                Revision = reader.GetInt64(3),
+                Input = reader.GetString(4),
+                Output = reader.IsDBNull(5) ? null : reader.GetString(5),
+                Decision = reader.IsDBNull(6) ? null : reader.GetString(6),
+                Error = reader.IsDBNull(7) ? null : reader.GetString(7),
+                StartedAt = reader.GetFieldValue<DateTimeOffset>(8),
+                FinishedAt = reader.GetFieldValue<DateTimeOffset>(9),
+                TraceId = reader.IsDBNull(10) ? null : reader.GetString(10),
+            });
+        }
+
+        return rows;
+    }
+
     private static string Where(EntityModel subjectEntity, RecordCondition? condition)
     {
         var row = EntityNaming.Quote(RecordQueries.RowAlias);

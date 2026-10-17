@@ -34,8 +34,9 @@ triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers). Process inspection, where
 authorized users see an instance's graph, path, tasks and calls, is partly
-built. The `inspect` grant and the instance list are built. The instance
-detail is planned for M7, see [Process inspection](#process-inspection). Operator retry, cancel and
+built. The `inspect` grant, the instance list and the instance detail without
+`calls` are built. The detail's `calls` and the rest of the section are
+planned for M7, see [Process inspection](#process-inspection). Operator retry, cancel and
 resolve are *(planned for M7)*, see [Operator commands](#operator-commands).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -365,9 +366,9 @@ are problem details, as in the [record API](record-api.md#errors).
   "The application's active release changed while the request ran. Try again."
 
 The `201` has no `Location` header, because there is no endpoint to read an
-instance yet. *(planned for M7)* It stays without one after the
-[instance detail](#process-inspection) exists, because reading an
-instance needs an `inspect` grant, which the user who started it may not hold.
+instance yet. The [instance detail](#instance-detail) exists, but the `201`
+still has no `Location`, because reading an instance needs an `inspect`
+grant, which the user who started it may not hold.
 
 A start needs a session, a `start` grant on the process and read access to
 the subject record, as [Authorization](../architecture.md#authorization)
@@ -756,8 +757,9 @@ This section follows
 [D34](../decisions.md#d34-process-inspection--agreed). Authorized users see
 where an instance is, what it did and why it failed or waits. Two routes list
 the instances of a process and read one of them. The `inspect` grant and the
-[instance list](#instance-list) are built. The instance detail and the rest of
-this section are *(planned for M7)*.
+[instance list](#instance-list) and the [instance detail](#instance-detail)
+are built, without the detail's `calls`. The `calls` and the rest of this
+section are *(planned for M7)*.
 The user is the user of the
 [session](../architecture.md#sign-in-and-the-session). The
 [process inspector widget](frontend.md) shows the same data.
@@ -844,9 +846,12 @@ in any state. The body has these parts:
   - `type` is the step type: `decision`, `task`, `operation` or `end`.
   - `labelKey` is the step's label text key, or `null` when it has none.
   - `transitions` is a list of `{ "next", "on" }`, one for each step the step
-    can lead to. `on` is the zero-based index of a decision branch, as in the
-    history's `decision`, `otherwise`, the name of a task outcome, or `null`
-    for an operation's `next`. An `end` step has none.
+    can lead to. `on` is always text or `null`. It is the zero-based index of
+    a decision branch as text, such as `"0"`, as in the history's `decision`,
+    then `"otherwise"` for the fallback branch, the name of a task outcome, or
+    `null` for an operation's `next`. An `end` step has none.
+  - A `callConnector`, package and `raiseEvent` step have type `operation`.
+  - `labelKey` is set only for a `task` step.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is
   `{ "step", "startedAt", "finishedAt", "decision", "output", "error" }`.
@@ -862,7 +867,7 @@ in any state. The body has these parts:
   `assigneeKind` is `user` or `role`. `outcome`, `completedBy` and
   `completedAt` are `null` while the task is `open`. A task row holds no field
   values.
-- `calls` are the connector and package calls of the instance, ordered by
+- `calls` *(planned for M7)* are the connector and package calls of the instance, ordered by
   `createdAt`, then by `id`. Each is
   `{ "id", "kind", "step", "connector" or "package" with "version", "operation", "state", "attempts", "input", "inputHidden" }`.
   - `kind` is `connector` or `package`. A connector call has `connector`. A
@@ -876,6 +881,7 @@ in any state. The body has these parts:
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
   - A call has no output. The engine writes the outputs of a call straight to
     the subject record and stores no response body.
+  - Until then the response has no `calls` key.
 
 ```json
 {
@@ -1084,9 +1090,10 @@ titles are fixed and never contain text from the request.
 - **`400`.** A list parameter is invalid: `page`, `pageSize`, `state` or
   `subject`, keyed by its name. The detail has none.
 - **`400`.** A read filter of the user fails at run time with a database data
-  error for some record. The title is the record list's "A record filter could
-  not be evaluated for these records.". The server logs each filter by policy
-  name and grant index.
+  error for some record, in the list only. The title is the record list's "A
+  record filter could not be evaluated for these records.". The server logs
+  each filter by policy name and grant index. The detail checks one record, so
+  a filter that fails for it does not match, and the detail answers `404`.
 
 ## Releases and running work
 
@@ -1112,7 +1119,7 @@ for texts. **Both** means different parts use different releases.
 | Task read | Both | Form, outcomes and field definitions use the task's release. Texts use it too. Policies come from the active release. |
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Instance list | Active | Roles and policies come from the active release. |
-| Instance detail *(planned for M7)* | Both | The graph and the step names use the instance's release. Roles, policies and the `sensitive` flag come from the active release, and the pinned release's flag counts too. See [Values and masking](#values-and-masking). |
+| Instance detail | Both | The graph and the step names use the instance's release. Roles and policies come from the active release. The `sensitive` flag, which comes from the active release and counts from the pinned release too, applies with `calls` *(planned for M7)*. See [Values and masking](#values-and-masking). |
 | Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry *(planned for M7)* | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |

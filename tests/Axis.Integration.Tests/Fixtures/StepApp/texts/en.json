@@ -13,6 +13,7 @@
     "requestDecision.main": "Decision",
     "requestReview.main": "Request",
     "role.finance": "Finance",
+    "role.inspector": "Inspector",
     "role.reviewer": "Reviewer",
     "site.title": "Steps",
     "task.approve": "Approve",
