@@ -23,6 +23,8 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
 
     private const string AlreadyRunningTitle = "A running or waiting instance of this process already exists for this record.";
 
+    private static readonly Guid _globex = Guid.Parse("d97fc520-bc90-442b-8e4d-8d2b94b77c65");
+
     private static readonly string _requests = EntityNaming.QualifiedTable(EntityNaming.Table(Guid.Parse("d9ccbf89-5004-4d52-8885-2ee377b7caa5")));
 
     private static readonly string _departments = EntityNaming.QualifiedTable(EntityNaming.Table(Guid.Parse("ebe6bc20-4772-4d6c-839b-65d426ebeeca")));
@@ -268,6 +270,148 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
 
         Assert.Equal("failed", await StateAsync(instance));
         Assert.Equal(0L, await RetriedAsync(instance));
+    }
+
+    [Fact]
+    public async Task A_retried_purchase_order_call_is_sent_again_with_the_same_key_and_ends_with_one_order()
+    {
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var dung = fixture.CreateClient().SignedInAs("dung");
+        var (_, number, instance) = await FailAtPurchaseOrderAsync(anna);
+        var call = (Guid)(await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance))!;
+        await StubAsync($"/test/available-request/{number}");
+
+        using (var response = await RetryAsync(dung, instance, Reason))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await RunToEndAsync(instance);
+
+        Assert.Equal("completed", await StateAsync(instance));
+        Assert.Equal(call, await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance));
+        Assert.Equal("succeeded:1", await CallAsync(call));
+        Assert.Null(await fixture.ScalarAsync("SELECT last_error FROM axis.connector_calls WHERE id = @id", ("id", call)));
+        var order = Assert.Single(await OrdersAsync(number));
+        Assert.Equal(call.ToString("D"), order.Key);
+        Assert.NotNull((await NumbersAsync(anna, await SubjectAsync(instance))).PurchaseOrderNumber);
+
+        // The first run made five attempts that answered 503. The retry's attempt carries on with number 6.
+        Assert.Equal(
+            "1:retryable:503,2:retryable:503,3:retryable:503,4:retryable:503,5:retryable:503,6:succeeded:201",
+            await fixture.ScalarAsync(
+                """
+                SELECT string_agg(number || ':' || outcome || ':' || http_status, ',' ORDER BY number)
+                FROM axis.process_call_attempts WHERE call_id = @id AND kind = 'attempt'
+                """,
+                ("id", call)));
+
+        // The step staged the call twice under the same operation id.
+        Assert.Equal(
+            2L,
+            await fixture.CountAsync(
+                """
+                SELECT count(*) FROM axis.process_step_history
+                WHERE process_instance_id = @id AND step = 'createPurchaseOrder' AND output->>'state' = 'waiting' AND output->>'operationId' = @call
+                """,
+                ("id", instance),
+                ("call", call.ToString("D"))));
+        Assert.Equal(2L, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'connector.callStaged'", ("id", instance)));
+    }
+
+    [Fact]
+    public async Task A_retried_purchase_order_call_sends_the_input_evaluated_from_the_record_as_it_is_now()
+    {
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var dung = fixture.CreateClient().SignedInAs("dung");
+        var (subject, number, instance) = await FailAtPurchaseOrderAsync(anna);
+        var call = (Guid)(await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance))!;
+        Assert.NotEqual("GLOBEX", await fixture.ScalarAsync("SELECT input->>'supplierCode' FROM axis.connector_calls WHERE id = @id", ("id", call)));
+        await UpdateRequestAsync(subject, "supplier", _globex);
+        await StubAsync($"/test/available-request/{number}");
+
+        using (var response = await RetryAsync(dung, instance, Reason))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await RunToEndAsync(instance);
+
+        Assert.Equal("completed", await StateAsync(instance));
+        Assert.Equal("GLOBEX", await fixture.ScalarAsync("SELECT input->>'supplierCode' FROM axis.connector_calls WHERE id = @id", ("id", call)));
+        Assert.Equal("GLOBEX", Assert.Single(await OrdersAsync(number)).SupplierCode);
+    }
+
+    // Starts an approval for a request of 500 whose purchasing system is unavailable, approves it as chau,
+    // and runs it until the createPurchaseOrder call has used up its five attempts and the instance failed.
+    private async Task<(Guid Subject, string Number, Guid Instance)> FailAtPurchaseOrderAsync(HttpClient anna)
+    {
+        using var chau = fixture.CreateClient().SignedInAs("chau");
+        var subject = await CreateRequestAsync(anna, 500);
+        var (number, _) = await NumbersAsync(anna, subject);
+        await StubAsync($"/test/unavailable-request/{number}");
+        var instance = await StartAsync(anna, subject);
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.Equal("waiting", await StateAsync(instance));
+        using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
+        {
+            Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+        }
+
+        await RunToEndAsync(instance);
+        Assert.Equal("failed", await StateAsync(instance));
+        Assert.Equal("createPurchaseOrder", await ScalarAsync("SELECT step FROM axis.process_instances WHERE id = @id", instance));
+        var call = (Guid)(await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance))!;
+        Assert.Equal("failed:5", await CallAsync(call));
+        Assert.Empty(await OrdersAsync(number));
+        return (subject, number, instance);
+    }
+
+    // Runs the due work items, making a call that waits out its backoff due, until the instance is completed or failed.
+    private async Task RunToEndAsync(Guid instance)
+    {
+        for (var round = 0; round < 20; round++)
+        {
+            await fixture.RunUntilIdleAsync(CancellationToken);
+            if (await StateAsync(instance) is "completed" or "failed")
+            {
+                return;
+            }
+
+            await fixture.ScalarAsync(
+                "UPDATE axis.process_work_items SET due_at = now() WHERE process_instance_id = @id AND connector_call_id IS NOT NULL", ("id", instance));
+        }
+
+        Assert.Fail("The instance did not complete or fail within 20 rounds.");
+    }
+
+    private async Task StubAsync(string path)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(fixture.PurchasingUrl) };
+        using var response = await client.PostAsync(path, null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    /// <summary>The state and attempts of the connector call, such as <c>failed:5</c>.</summary>
+    private async Task<string?> CallAsync(Guid call) =>
+        (string?)await fixture.ScalarAsync("SELECT state || ':' || attempts FROM axis.connector_calls WHERE id = @id", ("id", call));
+
+    private async Task<Guid> SubjectAsync(Guid instance) =>
+        (Guid)(await ScalarAsync("SELECT subject_id FROM axis.process_instances WHERE id = @id", instance))!;
+
+    private sealed record StubOrder(string Key, string? SupplierCode);
+
+    // The stub's orders for the request number, with the idempotency key and supplier code each was created with.
+    private async Task<IReadOnlyList<StubOrder>> OrdersAsync(string requestNumber)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(fixture.PurchasingUrl) };
+        using var body = JsonDocument.Parse(await client.GetStringAsync("/purchase-orders", CancellationToken));
+        return [.. body.RootElement.EnumerateArray()
+            .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
+            .Select(order => new StubOrder(
+                order.GetProperty("idempotencyKey").GetString()!,
+                order.TryGetProperty("supplierCode", out var code) ? code.GetString() : null))];
     }
 
     // Starts an approval for a request whose department has no manager, and runs it until managerApproval fails.

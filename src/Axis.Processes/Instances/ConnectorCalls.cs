@@ -34,7 +34,8 @@ public static class ConnectorCalls
 
     /// <summary>
     /// Inserts <paramref name="call"/> as <c>pending</c> with no attempts. It is created at the
-    /// transaction's time. A second call for the same instance and step violates the unique index.
+    /// transaction's time. A second call for the same instance and step violates the unique index, unless
+    /// the first one failed, which <see cref="RestageAsync"/> stages again.
     /// </summary>
     internal static async Task InsertAsync(NpgsqlTransaction transaction, NewConnectorCall call, CancellationToken cancellationToken)
     {
@@ -55,6 +56,49 @@ public static class ConnectorCalls
         command.Parameters.AddWithValue("state", Pending);
         command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = call.Input.ToJsonString() });
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Finds the <c>failed</c> call of <paramref name="step"/> for the instance and locks it until the
+    /// transaction ends, or returns <see langword="null"/> when the step has no failed call. An
+    /// operator retry leaves such a call.
+    /// </summary>
+    internal static async Task<Guid?> FindFailedAsync(NpgsqlTransaction transaction, Guid instanceId, string step, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT id FROM axis.connector_calls WHERE process_instance_id = @instance AND step = @step AND state = @failed FOR UPDATE",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("step", step);
+        command.Parameters.AddWithValue("failed", Failed);
+        return await command.ExecuteScalarAsync(cancellationToken) is Guid id ? id : null;
+    }
+
+    /// <summary>
+    /// Sets the <c>failed</c> call <paramref name="call"/> back to <c>pending</c> under its id, so its
+    /// operation identity stays. It stores the new input, counts attempts and lookups from 0 again,
+    /// and clears the last status, the last error and the settled time. Throws when the call is not failed.
+    /// </summary>
+    internal static async Task RestageAsync(NpgsqlTransaction transaction, NewConnectorCall call, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.connector_calls
+            SET state = @pending, attempts = 0, lookups = 0, input = @input,
+                last_status = NULL, last_error = NULL, settled_at = NULL
+            WHERE id = @id AND state = @failed
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", call.Id);
+        command.Parameters.AddWithValue("pending", Pending);
+        command.Parameters.AddWithValue("failed", Failed);
+        command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = call.Input.ToJsonString() });
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+        {
+            throw new InvalidOperationException($"The connector call {call.Id} is not failed, so it cannot be staged again.");
+        }
     }
 
     /// <summary>

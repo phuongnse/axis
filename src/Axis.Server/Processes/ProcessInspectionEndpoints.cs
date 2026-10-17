@@ -23,8 +23,9 @@ namespace Axis.Server.Processes;
 /// An instance is listed only when its subject record exists and matches one of the user's read
 /// filters on the subject entity in the active release. The user's <c>read</c> grant on that
 /// entity is needed for it, so without one the list is empty. A hidden instance is in neither the
-/// page nor the total. A read filter that fails at run time is a 400. The list writes no audit
-/// record. The problem titles never contain text from the request.
+/// page nor the total. A read filter that fails at run time is a 400. A <c>read</c> filter that
+/// reads a computed field that is being recomputed is a 409 that names no field or policy, after the
+/// parameters and before the instances are read. The list writes no audit record. The problem titles never contain text from the request.
 /// <para>
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
@@ -32,7 +33,8 @@ namespace Axis.Server.Processes;
 /// the user may read every field that the step's input and output mapping reads or writes, on any
 /// entity. Otherwise the input is null and marked hidden. The pinned release gives the fields the
 /// mapping uses and the active release gives the fields the user may read. The checks run in the order of the list, then the id
-/// is parsed. A malformed id, an unknown id, an instance of another process, and an instance whose
+/// is parsed. A <c>read</c> filter that reads a computed field that is being recomputed is a 409,
+/// as in the list, before any instance is looked up. A malformed id, an unknown id, an instance of another process, and an instance whose
 /// subject record the user may not read or that no longer exists are one 404. A read filter that
 /// fails at run time for the subject record does not match, so it is a 404 too. The detail writes
 /// no audit record.
@@ -128,6 +130,12 @@ internal static class ProcessInspectionEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, null, application, entity, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
         var condition = read.Filters is { } filters
             ? RecordFilters.Condition(application, entity, RecordCommand.Expressions(filters), user.Id)
             : null;
@@ -206,6 +214,12 @@ internal static class ProcessInspectionEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, null, application, entity, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
         if (await InstanceQueries.FindAsync(connection, application.Manifest.Id, model.Id, entity, instanceId, cancellationToken) is not { } row)
         {
             return InstanceNotFound();

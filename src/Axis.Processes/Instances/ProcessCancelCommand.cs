@@ -23,6 +23,12 @@ public enum ProcessCancelOutcome
 
     /// <summary>A call of the instance is <c>sending</c> or <c>unknown</c>, see <see cref="ProcessCancelResult.CallId"/>.</summary>
     CallInFlight,
+
+    /// <summary>
+    /// A <c>read</c> filter of the user reads a computed field that is being recomputed, so no instance can be
+    /// checked against it. Nothing was written.
+    /// </summary>
+    PendingFilter,
 }
 
 /// <summary>
@@ -38,7 +44,9 @@ public sealed record ProcessCancelResult(
 /// <summary>
 /// Cancels a <c>running</c> or <c>waiting</c> instance in the caller's transaction. The user's
 /// <c>cancel</c> grant is the caller's check. The instance's subject record must be readable by
-/// the user, or the instance does not exist for them. The statements run in one order: the
+/// the user, or the instance does not exist for them. When a <c>read</c> filter of the user reads a
+/// computed field that is being recomputed, the cancel is refused first, before the instance is found.
+/// The statements run in one order: the
 /// instance's open tasks, then the instance, then its connector and package calls. A task
 /// completion locks its task before the instance, so locking the instance first would deadlock
 /// with it. A call that is <c>sending</c> or <c>unknown</c> may have reached the other system, and
@@ -76,6 +84,14 @@ public static class ProcessCancelCommand
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        // A read filter on a field that is being recomputed decides nothing. It is checked before any row is
+        // locked, and before the instance is looked up, so it tells nothing about the instance.
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, transaction, active, entity, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return new ProcessCancelResult(ProcessCancelOutcome.PendingFilter);
+        }
 
         // The open tasks come first, because a task completion locks its task and then the instance.
         await LockOpenTasksAsync(transaction, instanceId, cancellationToken);

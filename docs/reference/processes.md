@@ -39,8 +39,7 @@ built. The `inspect` grant, the instance list and the instance detail with its
 for M7, see [Process inspection](#process-inspection). Operator cancel
 and retry are built, see [Cancel](#cancel) and [Retry](#retry). Operator
 resolve is *(planned for M7)*, see [Operator commands](#operator-commands). The
-retry of a failed call step and the retry's migration check are *(planned for
-M7)* too.
+retry's migration check is *(planned for M7)* too.
 
 Dn refers to [decisions.md](../decisions.md). The design follows
 [D11](../decisions.md#d11-durable-process-engine--agreed) and
@@ -360,6 +359,13 @@ are problem details, as in the [record API](record-api.md#errors).
   message text key.
 - **`409`.** A `running` or `waiting` instance already exists for this
   process and subject record.
+- **`409` for a policy that reads a pending field.** A `read` filter of the
+  user's grants on the subject entity reads a
+  [pending field](storage.md#recomputing-computed-fields). The title is the
+  record API's "Your access to this entity cannot be checked while a field is
+  being recomputed.", with no `errors`, see
+  [the record API](record-api.md#errors). It comes before the subject record
+  is looked up, so it is the same for a record that does not exist.
 - **`422`.** The `Idempotency-Key` was used before with a different subject
   record.
 - **`503`.** The application's active release changed on each of three
@@ -399,8 +405,10 @@ One transaction then does the rest:
 
 1. With a key, it stores the receipt first. When the key is taken, it rolls
    back and answers from the stored receipt, or with the `422`.
-2. It locks the subject record, checks that the user may read it, and reads
-   it. A missing one, or one the user may not read, is the `400`. The lock
+2. It answers the policy `409` when a `read` filter of the user reads a
+   pending field, whatever the record. A repeat with a used key has already
+   been answered by step 1. Then it locks the subject record, checks that the
+   user may read it, and reads it. A missing one, or one the user may not read, is the `400`. The lock
    makes the start condition see the latest version, and an edit of the
    record waits until the start commits or rolls back.
 3. It evaluates the `startCondition` on the record, with any pending computed
@@ -785,7 +793,9 @@ failure is the response:
    "You have no grant for this action.". The grant comes from the policies of
    the active release.
 4. The query parameters of the list, `400`.
-5. For the detail, the instance, `404`. An `{id}` that is not a UUID in the
+5. A `read` filter of the user on the subject entity that reads a pending
+   field, `409`. For the detail, a malformed `{id}` is a `404` first.
+6. For the detail, the instance, `404`. An `{id}` that is not a UUID in the
    hyphenated form, an unknown id, an instance of another process or
    application, and an instance whose subject record the user may not read all
    give one answer, with the title "No instance of this process exists with
@@ -1040,9 +1050,12 @@ earlier ones.
 - **Lookup.** One lookup of [reconciliation](#reconciliation). Its outcome is
   `found`, `notFound` or `failed`. Package calls have none.
 - **Numbers.** `number` counts attempts and lookups apart, each from 1. An
-  attempt's number is the call's `attempts` count when the attempt ran, the
-  same number as in `connector.called` or `operation.called`. A lookup's
-  number is the highest lookup number of the call plus one.
+  attempt's number is the highest attempt number of the call plus one, as a
+  lookup's number is the highest lookup number plus one. In the call's first
+  run it equals the call's `attempts` count when the attempt ran, the number
+  in `connector.called` or `operation.called`. After an operator
+  [retry](#retry) the call's `attempts` count from 0 again, while the numbers
+  carry on, so history is kept.
 - **Outcome.** A row's outcome is the class of that attempt, not what became
   of the call. A retryable error with no attempts left is recorded as
   `retryable`, and the call becomes `failed`. The one exception is a `2xx`
@@ -1092,6 +1105,11 @@ titles are fixed and never contain text from the request.
 - **`403`.** The user has no `inspect` grant on the process.
 - **`400`.** A list parameter is invalid: `page`, `pageSize`, `state` or
   `subject`, keyed by its name. The detail has none.
+- **`409`.** A `read` filter of the user's grants on the subject entity reads a
+  [pending field](storage.md#recomputing-computed-fields). The title is the
+  record API's "Your access to this entity cannot be checked while a field is
+  being recomputed.", with no `errors`. It comes before any instance is looked
+  up, so it holds for an unknown instance too.
 - **`400`.** A read filter of the user fails at run time with a database data
   error for some record, in the list only. The title is the record list's "A
   record filter could not be evaluated for these records.". The server logs
@@ -1465,16 +1483,18 @@ and `next`.
 While its call is pending, retrying or unknown, the instance stays `waiting`.
 So a second start for the same record is blocked, as with an open task.
 
-*(Planned for M7.)* **A step that runs again after a retry** finds its call row
-`failed`, because a unique index lets a step stage only one call. It reuses the
-row instead of inserting one, in the same transaction. The row keeps its id, so
+**A step that runs again after a retry** finds its call row `failed`, because
+a unique index lets a step stage only one call. It reuses the row instead of
+inserting one, in the same transaction. The row keeps its id, so
 the operation identity and the idempotency key do not change. The step
 evaluates the input again from the subject record as it is now, on purpose, so
 the retry sends the current data. A failed connector call keeps its stored
 input, but the step still evaluates it again. A failed package call's stored
 input is cleared when it settles. It sets the call to
-`pending` with that input, 0 attempts and 0 lookups, and clears the last status
-and the last error. Everything else is as above. See [Retry](#retry).
+`pending` with that input, 0 attempts and 0 lookups, and clears the last status,
+the last error and the settled time. Only a `failed` row is reused. The history
+row, the audit record and the work item are written again as above, with the
+same `operationId`. See [Retry](#retry).
 
 **Each attempt.** A worker that claims the `connector.call` item does this:
 
@@ -1735,10 +1755,11 @@ the operation in place of the HTTP request:
   step. The call also stores the step's retry policy and the operation's
   `idempotent` flag, because a worker that lacks the pinned version cannot
   read them from the release.
-  *(Planned for M7.)* A step that runs again after an operator
-  [retry](#retry) reuses its `failed` row, as a connector call does, under the
-  same operation identity. It stores fresh input, the step's current retry
-  policy and 0 attempts.
+  A step that runs again after an operator [retry](#retry) reuses its
+  `failed` row, as a connector call does, under the same operation identity.
+  It stores fresh input, the step's current retry policy, the operation's
+  `idempotent` flag and 0 attempts, and clears the last error and the settled
+  time.
 - **Mark.** Before each attempt, a short transaction marks the call
   `sending`, counts the attempt and extends the item's lease past the
   operation's `timeout`.
@@ -1865,7 +1886,9 @@ shows.
 ### Retry
 
 Retry takes an instance that is `failed`. The instance stays on its pinned
-release.
+release. Before it looks for the instance, it answers the policy `409` when a
+`read` filter of the user reads a pending field, see
+[Operator command errors](#operator-command-errors).
 
 One transaction does this:
 
@@ -1897,14 +1920,14 @@ The worker then runs the step as usual, see [Running a step](#running-a-step).
 It reads the subject record as it is now. A step that failed because of the
 record's data can succeed after the record is fixed.
 
-*(Planned for M7.)* A `callConnector` step or a package operation step whose
+A `callConnector` step or a package operation step whose
 call row is `failed` stages the call again under the **same operation identity**, see
 [Staging and the call](#staging-and-the-call). The input is evaluated again
 on purpose, so the retry sends the current data. A failed connector call keeps
 its stored input, but the retry still evaluates it again. A failed package
-call's stored input is cleared when it settles. The attempts count from zero.
-Until then, a retried call step runs again but fails again, because a step may
-stage only one call. Nothing is sent and nothing is written but the new failure.
+call's stored input is cleared when it settles. The attempts count from zero,
+so the step's full retry policy applies again. The attempt rows carry on
+numbering after the earlier run, see [Attempts](#attempts).
 
 **Risks.** A retry of a connector call sends it again under the same
 idempotency key. Some systems replay their stored failure for a key they have
@@ -1920,6 +1943,9 @@ outcome of one was sent again under the idempotency key or
 Cancel takes an instance that is `running` or `waiting`. It does not undo
 steps that already ran, because there is no compensation yet
 ([D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed)).
+Before it locks anything, it answers the policy `409` when a `read` filter of
+the user reads a pending field, see
+[Operator command errors](#operator-command-errors).
 
 One transaction does this:
 
@@ -2030,9 +2056,10 @@ A request is checked in this order, and the first failure is the response:
 5. The content type, `415`.
 6. The body, `400`.
 
-One transaction then checks the instance, and for a resolve the call. It
-answers `404` for the instance, the subject record and the call, and then the
-`409` checks.
+One transaction then checks the instance, and for a resolve the call. A cancel
+or a retry first answers the policy `409` below, before it looks for the
+instance. It answers `404` for the instance, the subject record and the call,
+and then the `409` checks.
 
 - **`401`.** Nobody is signed in. The title is the record API's "Sign in to
   read or write this data.".
@@ -2059,6 +2086,11 @@ answers `404` for the instance, the subject record and the call, and then the
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".
+- **`409` for a policy that reads a pending field.** Cancel and retry only. A
+  `read` filter of the user's grants on the subject entity reads a
+  [pending field](storage.md#recomputing-computed-fields). The title is the
+  record API's "Your access to this entity cannot be checked while a field is
+  being recomputed.", with no `errors`. Nothing is written.
 - **`409`.** The state does not allow the command. Nothing is written.
 
   | Command | Cause |
@@ -2561,7 +2593,7 @@ database, with history in `axis.__processes_migrations` (see
   | `connector` | `text` | The connector's name |
   | `operation` | `text` | The operation's name |
   | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded`, `failed` or `cancelled` |
-  | `attempts` | `integer` | The attempts made so far, the first one included |
+  | `attempts` | `integer` | The attempts made so far, the first one included. An operator retry resets it to 0 |
   | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
   | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Kept after the call settles, but cleared when the call is cancelled. Never copied to history, audit records or logs, and shown only through [inspection](#values-and-masking) |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
@@ -2584,7 +2616,7 @@ database, with history in `axis.__processes_migrations` (see
   | `call_kind` | `text` | `connector` or `package` |
   | `call_id` | `uuid` | The call, in `axis.connector_calls` or `axis.package_calls` |
   | `kind` | `text` | `attempt` or `lookup` |
-  | `number` | `integer` | The number of the attempt or lookup, counted per `kind`, starting at 1 |
+  | `number` | `integer` | The number of the attempt or lookup, counted per `kind`, starting at 1. It carries on across an operator retry |
   | `started_at` | `timestamptz` | When the attempt or lookup started |
   | `finished_at` | `timestamptz` | When its outcome was recorded |
   | `outcome` | `text` | For an attempt: `succeeded`, `retryable`, `unknown` or `failed`. For a lookup: `found`, `notFound` or `failed` |
@@ -2608,7 +2640,7 @@ database, with history in `axis.__processes_migrations` (see
   | `version` | `text` | The package version the release pins |
   | `operation` | `text` | The operation's name |
   | `state` | `text` | `pending`, `sending`, `unknown`, `succeeded`, `failed` or `cancelled` |
-  | `attempts` | `integer` | The attempts made so far, the first one included |
+  | `attempts` | `integer` | The attempts made so far, the first one included. An operator retry resets it to 0 |
   | `retry_attempts` | `integer` | The attempts the step's retry policy allows, stored when the call is staged |
   | `retry_backoff` | `interval` | The step's backoff, stored when the call is staged |
   | `idempotent` | `boolean` | Whether the operation is `idempotent`, stored when the call is staged |
