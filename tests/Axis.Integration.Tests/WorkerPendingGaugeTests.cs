@@ -30,10 +30,14 @@ public sealed class WorkerPendingGaugeTests(TaskApiFixture fixture) : IClassFixt
         Assert.Equal(expected, collector.GaugeValue("axis.computed.pending_fields", tags));
 
         await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        Assert.Equal(0, await fixture.SumPendingComputedFieldNamesAsync(TenantA));
+
+        // A new collector holds only the exports after the refresh, so it never shows a value from the first one.
+        using var afterBackfill = new MetricCollector();
         await gauges.RefreshAsync(CancellationToken);
 
-        Assert.Equal(0, await fixture.SumPendingComputedFieldNamesAsync(TenantA));
-        Assert.Equal(0, collector.GaugeValue("axis.computed.pending_fields", tags));
+        Assert.True(afterBackfill.HasPoint("axis.computed.pending_fields", tags), "The refresh after the backfill published no point for the application.");
+        Assert.Equal(0, afterBackfill.GaugeValue("axis.computed.pending_fields", tags));
     }
 
     private static Func<string, string, string?> Edit(string expression) =>
