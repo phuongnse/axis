@@ -422,6 +422,67 @@ public sealed class ScenarioRunnerTests
         Assert.True(result.Passed, result.Failure);
     }
 
+    private const string ScheduleNow = "2026-10-01T09:00:00Z";
+
+    [Fact]
+    public async Task A_daily_schedule_fires_once_after_advance_time_and_expect_instance_sees_it()
+    {
+        using var folder = ScheduleApplication(Scenario("DailySchedule", Purchasing, CreateRequest + """
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5000 } },
+            { "type": "advanceTime", "by": "PT1H" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5000 } },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5001 } }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "DailySchedule");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task No_schedule_instance_exists_before_advance_time()
+    {
+        using var folder = ScheduleApplication(Scenario("NoInstanceYet", Purchasing, CreateRequest + """
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" }
+            """, now: ScheduleNow));
+        using var shortAdvance = ScheduleApplication(Scenario("ShortAdvance", Purchasing, CreateRequest + """
+            { "type": "advanceTime", "by": "PT1H" },
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" }
+            """, now: ScheduleNow));
+
+        var before = await RunAsync(folder, "NoInstanceYet");
+        var after = await RunAsync(shortAdvance, "ShortAdvance");
+
+        Assert.False(before.Passed);
+        Assert.Contains("Step 2 (expectInstance)", before.Failure);
+        Assert.False(after.Passed);
+        Assert.Contains("Step 3 (expectInstance)", after.Failure);
+    }
+
+    [Fact]
+    public async Task Three_days_in_one_step_fire_the_schedule_once_but_three_daily_steps_fire_it_three_times()
+    {
+        using var catchUp = ScheduleApplication(Scenario("CatchUp", Purchasing, CreateRequest + """
+            { "type": "advanceTime", "by": "P3D" },
+            { "type": "expectInstance", "process": "CountScheduleRuns", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5001 } }
+            """, now: ScheduleNow));
+        using var daily = ScheduleApplication(Scenario("ThreeDays", Purchasing, CreateRequest + """
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5003 } }
+            """, now: ScheduleNow));
+
+        var caught = await RunAsync(catchUp, "CatchUp");
+        var days = await RunAsync(daily, "ThreeDays");
+
+        Assert.True(caught.Passed, caught.Failure);
+        Assert.True(days.Passed, days.Failure);
+    }
+
     [Fact]
     public async Task An_action_that_runs_more_work_items_than_the_limit_fails_at_that_step()
     {
@@ -795,6 +856,13 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder EventApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioEventApp");
+
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioScheduleApp files over it: a daily schedule trigger at 18:00
+    /// local time (11:00Z) starts a process on every purchase request that adds 1 to its amount.
+    /// </summary>
+    private static TemporaryFolder ScheduleApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioScheduleApp");
 
     private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios, string? overlay = null)
     {

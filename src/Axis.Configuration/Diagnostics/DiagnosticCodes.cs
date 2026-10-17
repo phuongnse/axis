@@ -185,4 +185,6 @@ public static class DiagnosticCodes
     public const string InvalidScenarioValue = "AXC0189";
     public const string UnknownStubOperation = "AXC0190";
     public const string UnknownStubOutput = "AXC0191";
+    public const string InvalidAdvanceTimeBy = "AXC0193";
+    public const string AdvanceTimeWithoutNow = "AXC0194";
 }

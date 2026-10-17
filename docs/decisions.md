@@ -1341,7 +1341,7 @@ The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
   - `stubs` give the output of each connector operation and package
     operation that the scenario calls. A call without a stub fails the
     scenario.
-- **Advancing time** *(planned for M7)*:
+- **Advancing time**:
   - A new step, `advanceTime`, has `by`, a positive ISO 8601 duration such as
     `P1D` or `PT2H`.
   - It needs the scenario's `now`. A scenario without `now` that uses it
@@ -1373,7 +1373,7 @@ The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
     run real package code. Package operations get unit tests in their own
     project.
   - **Time moves forward only.** A scenario starts at its `now`, and only
-    `advanceTime` moves it, forward. *(planned for M7)*
+    `advanceTime` moves it, forward.
   - **New project.** `Axis.Scenarios` is a new host next to the server and
     the worker.
 
