@@ -6,6 +6,7 @@ using Axis.Data;
 using Axis.Data.Seeding;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Server.Health;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ namespace Axis.Server.Applications;
 /// user of the tenant's <c>ConnectionString</c>. The schedule trigger state
 /// and the seed records use the tenant's <c>ConnectionString</c>. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
+/// Readiness reports Unhealthy until the last tenant is done, and stays so when a tenant fails.
 /// Restarting with unchanged folders and installed packages stores no new release and only
 /// refreshes the activation time.
 /// </summary>
@@ -35,6 +37,7 @@ internal sealed partial class StartupActivation(
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
     IHostEnvironment environment,
+    StartupActivationStatus status,
     ILogger<StartupActivation> logger) : IHostedLifecycleService
 {
     public async Task StartingAsync(CancellationToken cancellationToken)
@@ -54,6 +57,8 @@ internal sealed partial class StartupActivation(
                 accessor.Current = null;
             }
         }
+
+        status.MarkFinished();
     }
 
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;

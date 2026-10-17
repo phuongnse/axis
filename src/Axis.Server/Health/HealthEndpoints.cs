@@ -24,11 +24,9 @@ internal static class HealthEndpoints
         });
     }
 
-    // Exception details stay in logs; the response only names each check and its status.
+    // The answer names no check, tenant or error. Those stay in the logs.
     private static Task WriteResponseAsync(HttpContext context, HealthReport report) =>
-        context.Response.WriteAsJsonAsync(new HealthResponse(
-            report.Status.ToString(),
-            report.Entries.ToDictionary(entry => entry.Key, entry => entry.Value.Status.ToString())));
+        context.Response.WriteAsJsonAsync(new HealthResponse(report.Status.ToString()));
 
-    private sealed record HealthResponse(string Status, IReadOnlyDictionary<string, string> Checks);
+    private sealed record HealthResponse(string Status);
 }

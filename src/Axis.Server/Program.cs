@@ -14,6 +14,7 @@ using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,7 +27,9 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
+    .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
+    .AddCheck<StartupActivationHealthCheck>("activation", tags: [HealthEndpoints.ReadyTag])
+    .AddCheck<TenantDatabasesHealthCheck>("tenant-databases", failureStatus: HealthStatus.Degraded, tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
 builder.Services.AddTenancy(builder.Configuration, builder.Environment);
 
@@ -53,6 +56,7 @@ builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
 
 // Off unless folders are listed, which is the Production default.
 var startupFolders = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
+builder.Services.AddSingleton(new StartupActivationStatus(finished: startupFolders.Length == 0));
 if (startupFolders.Length > 0)
 {
     builder.Services.AddSingleton(new StartupActivationOptions(

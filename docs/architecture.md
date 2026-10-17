@@ -673,16 +673,16 @@ task API, the worker settings and the tables are in
 
 ## Health checks *(planned for M7)*
 
-This section is *(planned for M7)*, as [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed)
-says. Today the server answers `/health/live` and `/health/ready`, and the
-ready answer lists its checks. The worker has no health endpoint.
+The server's `/health/live` and `/health/ready` work as described below, as
+[D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed)
+says. The worker's health endpoints and the tenant metric are *(planned for
+M7)*. The worker has no health endpoint yet.
 
 **The answer.** Each endpoint answers JSON of the form
 `{ "status": "Healthy" | "Degraded" | "Unhealthy" }` and nothing else.
 `/health` needs no session, so the answer names no tenant, database or error.
-M7 removes the `checks` map that today's answer holds. Healthy and Degraded
-answer `200`, so a degraded host still passes a readiness probe. Unhealthy
-answers `503`.
+Healthy and Degraded answer `200`, so a degraded host still passes a readiness
+probe. Unhealthy answers `503`.
 
 **Server `/health/live`.** It runs no checks. It is Healthy while the process
 answers requests, with status `200`. It is never Degraded or Unhealthy.
@@ -698,8 +698,11 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
 - One tenant database that is down makes the server Degraded and not
   Unhealthy, so one tenant cannot take the others offline, see
   [tenancy](#tenancy-d10). Requests for that tenant fail and the others work.
-- The tenant is named in the logs and in a metric labelled with the tenant id,
-  never in the answer.
+- The tenant database checks run in parallel, and each gives up after 2
+  seconds. A database that has not answered by then counts as not answering,
+  so a hung database makes the server Degraded and does not stall the probe.
+- The tenant is named in a warning in the logs on every probe, and in a metric
+  labelled with the tenant id *(planned for M7)*, never in the answer.
 - Today the server does not listen until startup activation has finished, see
   [startup activation](reference/configuration.md#startup-activation). So a
   probe gets no answer in that time. The activation rule matters once the
