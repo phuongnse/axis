@@ -282,6 +282,61 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("package_calls", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.ProcessCallAttemptRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("call_id");
+
+                    b.Property<string>("CallKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("call_kind");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int?>("HttpStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("http_status");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_process_call_attempts");
+
+                    b.HasIndex("CallId", "Kind", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ux_process_call_attempts_call_id_kind_number");
+
+                    b.ToTable("process_call_attempts", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.ProcessInstanceRow", b =>
                 {
                     b.Property<Guid>("Id")

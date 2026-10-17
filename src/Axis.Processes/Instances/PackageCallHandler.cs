@@ -39,8 +39,10 @@ namespace Axis.Processes.Instances;
 /// exception. The error names the operation, the package and the binding, never a value.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
-/// instance still waiting on the step at the revision the attempt saw. No input value and no
-/// exception message is stored or logged.
+/// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
+/// also writes one row to <c>axis.process_call_attempts</c>: the attempt with its times, its outcome
+/// class and a fixed error text, and no HTTP status. A call found <c>sending</c> gets an attempt row
+/// with the outcome <c>unknown</c>. No input value and no exception message is stored or logged.
 /// </summary>
 internal sealed partial class PackageCallHandler(
     ReleaseModelCache models,
@@ -68,6 +70,7 @@ internal sealed partial class PackageCallHandler(
         Target? target = null;
         string? error = null;
         var errorClass = ErrorClass.Failed;
+        var counted = true;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             var call = item.PackageCallId is { } callId ? await PackageCalls.LoadAsync(transaction, callId, cancellationToken) : null;
@@ -118,7 +121,9 @@ internal sealed partial class PackageCallHandler(
                 }
                 catch (InvalidOperationException exception)
                 {
+                    // The operation never ran, and the attempt is not counted.
                     error = exception.Message;
+                    counted = false;
                 }
 
                 if (target is not null)
@@ -148,18 +153,19 @@ internal sealed partial class PackageCallHandler(
         {
             // A release or a manifest that does not match cannot be fixed by a retry. A call that is
             // found sending or lacks its version is settled by the retry policy.
-            return await SettleAttemptAsync(item, connection, attempt, errorClass, error!, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, errorClass, error!, counted, cancellationToken);
         }
 
         if (ReadInput(attempt.Call.Input, target.Operation) is not { } input)
         {
-            return await FailAsync(item, connection, attempt, $"The stored input of the call did not fit the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}'.", cancellationToken);
+            var misfit = $"The stored input of the call did not fit the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}'.";
+            return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
         // The bindings are resolved before the operation runs, so a missing one leaves nothing run.
         if (!TryCreateContext(item, target, attempt.Call, out var context, out var bindingError))
         {
-            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, true, cancellationToken);
         }
 
         var run = await RunAsync(target, attempt.Call, input, context, cancellationToken);
@@ -167,28 +173,24 @@ internal sealed partial class PackageCallHandler(
         {
             // The operation asked for more than it declares. A retry cannot fix that, and the
             // operation may have swallowed the exception, so this holds whatever it returned.
-            return await FailAsync(item, connection, attempt, violation, cancellationToken);
+            return await FailAsync(item, connection, attempt, violation, AttemptRow(attempt, CallAttempts.Failed, violation), cancellationToken);
         }
 
         if (run.Timeout)
         {
             // The operation may have acted.
-            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, TimedOut, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, TimedOut, true, cancellationToken);
         }
 
         if (run.Error is { } runError)
         {
-            return await SettleAttemptAsync(item, connection, attempt, run.Retryable ? ErrorClass.Retryable : ErrorClass.Failed, runError, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, run.Retryable ? ErrorClass.Retryable : ErrorClass.Failed, runError, true, cancellationToken);
         }
 
         if (Fit(run.Output, target) is not { } values)
         {
-            return await FailAsync(
-                item,
-                connection,
-                attempt,
-                $"The output of the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}' {target.Package.Manifest.Version} did not fit its manifest.",
-                cancellationToken);
+            var misfit = $"The output of the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}' {target.Package.Manifest.Version} did not fit its manifest.";
+            return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
         return await SucceedAsync(item, connection, attempt, target, values, cancellationToken);
@@ -392,8 +394,8 @@ internal sealed partial class PackageCallHandler(
     /// <summary>
     /// Records a fitting output in one transaction: the output fields with the record update rules,
     /// the call <c>succeeded</c>, the instance <c>running</c> on <c>next</c>, the history row, the
-    /// audit records and the next step's work item. A refused write or any other error rolls it
-    /// back and fails the call instead.
+    /// audit records, the next step's work item and the attempt row. A refused write or any other
+    /// error rolls it back and fails the call instead, and the attempt row then says it failed.
     /// </summary>
     private async Task<WorkItemOutcome> SucceedAsync(
         ClaimedWorkItem item,
@@ -442,7 +444,7 @@ internal sealed partial class PackageCallHandler(
             await transaction.RollbackAsync(cancellationToken);
         }
 
-        return await FailAsync(item, connection, attempt, failure, cancellationToken);
+        return await FailAsync(item, connection, attempt, failure, AttemptRow(attempt, CallAttempts.Failed, failure), cancellationToken);
     }
 
     /// <summary>Writes the success in the transaction. Returns the error when the record write is refused, or <see langword="null"/>.</summary>
@@ -510,6 +512,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, cancellationToken);
+        await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
@@ -552,7 +555,9 @@ internal sealed partial class PackageCallHandler(
     /// Records an attempt that ended with <paramref name="error"/> of <paramref name="errorClass"/>.
     /// A retryable error is retried while attempts are left, and an unknown outcome only when the
     /// operation is also <c>idempotent</c>. An unknown outcome that is not retried leaves the call
-    /// <c>unknown</c>. Anything else fails the call.
+    /// <c>unknown</c>. Anything else fails the call. The attempt row records the class of the attempt,
+    /// whatever happens to the call. It is left out when <paramref name="counted"/> is
+    /// <see langword="false"/>, because no attempt was made.
     /// </summary>
     private Task<WorkItemOutcome> SettleAttemptAsync(
         ClaimedWorkItem item,
@@ -560,25 +565,37 @@ internal sealed partial class PackageCallHandler(
         Attempt attempt,
         ErrorClass errorClass,
         string error,
+        bool counted,
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
         var attemptsLeft = attempt.Attempts < call.Retry.Attempts;
+        var row = counted
+            ? AttemptRow(
+                attempt,
+                errorClass switch
+                {
+                    ErrorClass.Retryable => CallAttempts.Retryable,
+                    ErrorClass.Unknown => CallAttempts.Unknown,
+                    _ => CallAttempts.Failed,
+                },
+                error)
+            : null;
         return errorClass switch
         {
             ErrorClass.Retryable when attemptsLeft =>
-                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), cancellationToken),
+                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), row, cancellationToken),
             ErrorClass.Unknown when attemptsLeft && call.Idempotent =>
-                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), cancellationToken),
-            ErrorClass.Unknown => LeaveUnknownAsync(item, connection, attempt, error, cancellationToken),
-            _ => FailAsync(item, connection, attempt, error, cancellationToken),
+                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), row, cancellationToken),
+            ErrorClass.Unknown => LeaveUnknownAsync(item, connection, attempt, error, row, cancellationToken),
+            _ => FailAsync(item, connection, attempt, error, row, cancellationToken),
         };
     }
 
     /// <summary>
     /// Sets the call back to <c>pending</c> with the attempt's error, and keeps the item, due again
     /// after <paramref name="delay"/>. The next attempt runs the stored input under the same
-    /// operation identity. It writes no history row and no audit record.
+    /// operation identity. It writes <paramref name="row"/>, and no history row and no audit record.
     /// </summary>
     private async Task<WorkItemOutcome> RetryAsync(
         ClaimedWorkItem item,
@@ -586,6 +603,7 @@ internal sealed partial class PackageCallHandler(
         Attempt attempt,
         string error,
         TimeSpan delay,
+        CallAttempt? row,
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
@@ -606,6 +624,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.RetryAsync(transaction, call.Id, error, cancellationToken);
+        await InsertAttemptAsync(transaction, call, row, cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -622,13 +641,14 @@ internal sealed partial class PackageCallHandler(
     /// Leaves the call <c>unknown</c> with the attempt's error, and keeps its stored input. The
     /// item is deleted and the instance stays waiting. A history row with the outcome
     /// <c>unknown</c> makes the call visible. It writes no audit record, because the call has not
-    /// settled.
+    /// settled. It writes <paramref name="row"/>.
     /// </summary>
     private async Task<WorkItemOutcome> LeaveUnknownAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
         Attempt attempt,
         string error,
+        CallAttempt? row,
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
@@ -650,6 +670,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.MarkUnknownAsync(transaction, call.Id, error, cancellationToken);
+        await InsertAttemptAsync(transaction, call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(
@@ -669,13 +690,15 @@ internal sealed partial class PackageCallHandler(
 
     /// <summary>
     /// Settles the call <c>failed</c> with <paramref name="error"/> and fails its instance, with a
-    /// history row and the audit records <c>operation.called</c> and <c>process.failed</c>.
+    /// history row and the audit records <c>operation.called</c> and <c>process.failed</c>. It writes
+    /// <paramref name="row"/> unless it is <see langword="null"/>, which means that no attempt was made.
     /// </summary>
     private async Task<WorkItemOutcome> FailAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
         Attempt attempt,
         string error,
+        CallAttempt? row,
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
@@ -697,6 +720,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, cancellationToken);
+        await InsertAttemptAsync(transaction, call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(
@@ -725,6 +749,13 @@ internal sealed partial class PackageCallHandler(
         LogFailed(call.Id, instance.Id, error);
         return WorkItemOutcome.Failed;
     }
+
+    /// <summary>The row of the attempt the worker makes, numbered as the call counts it. A package call has no HTTP status.</summary>
+    private static CallAttempt AttemptRow(Attempt attempt, string outcome, string? error) =>
+        new(CallAttempts.Attempt, attempt.Attempts, attempt.StartedAt, outcome, null, error);
+
+    private static Task InsertAttemptAsync(NpgsqlTransaction transaction, LoadedPackageCall call, CallAttempt? row, CancellationToken cancellationToken) =>
+        row is null ? Task.CompletedTask : CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, row, cancellationToken);
 
     private static bool IsWaitingAt(LoadedInstance? instance, LoadedPackageCall call, Attempt attempt) =>
         instance is { State: ProcessStarts.Waiting } && instance.Step == call.Step && instance.Revision == attempt.Revision;

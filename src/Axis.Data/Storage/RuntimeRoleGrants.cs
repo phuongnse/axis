@@ -26,6 +26,7 @@ public static class RuntimeRoleGrants
         "process_work_items",
         "connector_calls",
         "package_calls",
+        "process_call_attempts",
         "events",
         "endpoint_receipts",
         "process_start_receipts",

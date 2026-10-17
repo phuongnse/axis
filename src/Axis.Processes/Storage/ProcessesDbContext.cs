@@ -5,7 +5,7 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, their human tasks, their staged connector calls, the events they raised, the receipts of starts and of
+/// their steps, their human tasks, their staged connector calls, the attempts and lookups of those calls and of package calls, the events they raised, the receipts of starts and of
 /// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, the state of schedule triggers, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
@@ -27,6 +27,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ConnectorCallRow> ConnectorCalls => Set<ConnectorCallRow>();
 
     public DbSet<PackageCallRow> PackageCalls => Set<PackageCallRow>();
+
+    public DbSet<ProcessCallAttemptRow> CallAttempts => Set<ProcessCallAttemptRow>();
 
     public DbSet<EventRow> Events => Set<EventRow>();
 
@@ -187,6 +189,27 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .HasForeignKey(c => c.ProcessInstanceId)
                 .HasConstraintName("fk_package_calls_process_instances_process_instance_id")
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProcessCallAttemptRow>(attempt =>
+        {
+            attempt.ToTable("process_call_attempts");
+            attempt.HasKey(a => a.Id).HasName("pk_process_call_attempts");
+            attempt.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            attempt.Property(a => a.CallKind).HasColumnName("call_kind");
+            attempt.Property(a => a.CallId).HasColumnName("call_id");
+            attempt.Property(a => a.Kind).HasColumnName("kind");
+            attempt.Property(a => a.Number).HasColumnName("number");
+            attempt.Property(a => a.StartedAt).HasColumnName("started_at");
+            attempt.Property(a => a.FinishedAt).HasColumnName("finished_at");
+            attempt.Property(a => a.Outcome).HasColumnName("outcome");
+            attempt.Property(a => a.HttpStatus).HasColumnName("http_status");
+            attempt.Property(a => a.Error).HasColumnName("error");
+
+            // The call is in one of two tables, so there is no foreign key. Each attempt and lookup has its own number.
+            attempt.HasIndex(a => new { a.CallId, a.Kind, a.Number })
+                .IsUnique()
+                .HasDatabaseName("ux_process_call_attempts_call_id_kind_number");
         });
 
         modelBuilder.Entity<EventRow>(@event =>

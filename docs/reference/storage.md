@@ -39,6 +39,8 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `axis.process_tasks` (one row per human task),
     `axis.connector_calls` (one row per staged connector call),
     `axis.package_calls` (one row per staged package call),
+    `axis.process_call_attempts` (one row per attempt and per lookup of a
+    connector or package call),
     `axis.events` (one row per event occurrence that a step raised),
     `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start), `axis.endpoint_receipts` (the record and
