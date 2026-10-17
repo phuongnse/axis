@@ -6,4 +6,5 @@ public enum WidgetType
     Table,
     Form,
     TaskInbox,
+    ProcessInspector,
 }

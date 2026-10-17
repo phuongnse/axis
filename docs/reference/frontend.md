@@ -98,6 +98,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "dataSource": null,
         "form": null,
         "tasksPath": null,
+        "process": null,
+        "instancesPath": null,
         "actions": [],
         "access": {
           "actions": ["read", "create", "update", "delete"],
@@ -112,8 +114,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `titles` in the site list has one entry per available locale of the site,
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
-  - `type` of a widget is `table`, `form` or `taskInbox`, or
-    *(planned for M7)* `processInspector`. `formPage` is the
+  - `type` of a widget is `table`, `form` or `taskInbox` or
+    `processInspector`. `formPage` is the
     page holding the form for a table's records, and `null` otherwise. On a
     `table` or `form`, exactly one of `entity` and `dataSource` is set, and
     the other is `null`. A `taskInbox` has both `null`, and so does a
@@ -124,7 +126,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     described under **Form metadata** of the form widget.
   - Every widget also has `tasksPath`, never left out. It is described under
     the task inbox widget, and is `null` on every other widget.
-  - *(planned for M7)* Every widget also has `process` and `instancesPath`,
+  - Every widget also has `process` and `instancesPath`,
     never left out. They are described under the process inspector widget, and
     are `null` on every other widget.
   - Every widget also has `actions`, never left out. It
@@ -192,7 +194,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       over an entity, or over a form of an entity, needs a `read` grant on
       that entity. A widget over a data source needs what the
       [data source endpoint](data-sources.md#authorization) needs. A
-      `taskInbox` is always readable. *(planned for M7)* A
+      `taskInbox` is always readable. A
       `processInspector` is readable when the user holds an `inspect` grant on
       its process.
     - **Unreadable pages.** The page endpoint answers `403` for a page the
@@ -712,7 +714,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - The task page has no history panel.
   - The platform texts `shell.task.*` hold the assigned elsewhere and
     already completed messages, and the load and complete errors.
-- **Process inspector widget** *(planned for M7)*. A page whose widget is a
+- **Process inspector widget**. A page whose widget is a
   `processInspector` names one process. It lists the process's instances and
   opens one, through the [inspection API](processes.md#process-inspection).
 
@@ -728,28 +730,30 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `"form": null`, `"formPage": null` and `"tasksPath": null`. It adds
     `process` and an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
-    the list endpoint. The SPA never builds the path itself. It uses
-    `process` to link the record history to the page, see **History** under the
-    form widget.
-  - **List.** The page lists the instances with their state, step, subject id,
+    the list endpoint. The SPA never builds the path itself. *(Planned for
+    M7.)* It uses `process` to link the record history to the page, see
+    **History** under the form widget. The widget has `"access": null` and
+    `"actions": []`. The page endpoint answers `403` to a user without an
+    `inspect` grant on the process, and site navigation leaves the page out.
+  - *(planned for M7)* **List.** The page lists the instances with their state, step, subject id,
     release and times. `state` and `page` and `pageSize` live in the URL, as
     for a table. Rows keep the API's order, newest first.
-  - **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
+  - *(planned for M7)* **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
     page name in lower case. The page reads the instance detail and shows the
     graph with the path drawn on it: steps the instance has run are marked,
     and the step it is at is marked as current. Below it are the tasks and the
     calls with their attempts. A call whose `inputHidden` is `true` shows
     "hidden" in place of its input.
-  - **Labels.** Step labels come from the texts of the instance's `releaseId`,
+  - *(planned for M7)* **Labels.** Step labels come from the texts of the instance's `releaseId`,
     loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
     the inbox does. A step without a label shows its name.
-  - **Errors.** With nobody signed in, the API answers `401` and the widget
+  - *(planned for M7)* **Errors.** With nobody signed in, the API answers `401` and the widget
     starts sign-in like any other call. A `403` shows a message that the user
     may not inspect the process. A `404` on the instance page shows a message
     that the instance does not exist. Any other failure shows a generic load
     error. The server checks every request, so the page never decides who may
     inspect.
-  - The platform texts `shell.inspector.*` hold the column headers, the
+  - *(planned for M7)* The platform texts `shell.inspector.*` hold the column headers, the
     "hidden" text, the empty text and the messages.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,

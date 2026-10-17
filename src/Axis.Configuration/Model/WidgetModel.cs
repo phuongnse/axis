@@ -7,14 +7,15 @@ namespace Axis.Configuration.Model;
 /// only on a form widget that names a form, and <see cref="Entity"/> is then the form's entity.
 /// <see cref="FormPage"/> is set only on a table widget that names the page holding the form for
 /// its records. <see cref="Actions"/> is empty on every widget but a form widget that declares
-/// actions.
+/// actions. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// </summary>
 public sealed record WidgetModel(
     WidgetType Type,
     EntityReference? Entity,
     PageReference? FormPage,
     DataSourceReference? DataSource = null,
-    FormReference? Form = null)
+    FormReference? Form = null,
+    ProcessReference? Process = null)
 {
     /// <summary>The processes a form widget can start for its record, in page file order.</summary>
     public IReadOnlyList<StartProcessActionModel> Actions { get; init; } = [];

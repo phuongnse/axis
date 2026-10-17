@@ -89,10 +89,12 @@ flowchart LR
      allowed when the table's data source has an `aggregate`, because a group
      is not a record (`AXC0022`). A `taskInbox` widget names none of
      `entity`, `dataSource` and `form` (`AXC0060` at that property), and no
-     `formPage` (`AXC0022`). A `processInspector` widget *(planned for M7)*
+     `formPage` (`AXC0022`). A `processInspector` widget
      needs a `process` that names a loaded process, otherwise it is `AXC0192`
      at `/widgets/{i}/process`. It names none of `entity`, `dataSource` and
      `form` (`AXC0060` at that property), and no `formPage` (`AXC0022`).
+     The page schema requires `process` on a `processInspector` and does not
+     allow it on any other widget (`AXC0004`).
      `actions` are allowed only on a `form` widget
      (`AXC0060` at `/widgets/{i}/actions`). An action's `process` must name a
      loaded process (`AXC0087`) over the entity of the form's records
@@ -670,7 +672,7 @@ sorted by file and then path.
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 | `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
-| `AXC0022` | A widget's `formPage` is set on a `form`, `taskInbox` or `processInspector` *(planned for M7)* widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`. |
+| `AXC0022` | A widget's `formPage` is set on a `form`, `taskInbox` or `processInspector` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`. |
 | `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
 | `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
 | `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |
@@ -708,7 +710,7 @@ sorted by file and then path.
 | `AXC0057` | A rule's `name` is the name of a built-in function, ignoring letter case, such as `round`. Reported at `/name`. |
 | `AXC0058` | A path in a data source filter or a process condition takes more than 3 hops, such as `a.b.c.d.name`. Reported at the JSON Pointer of the expression string, such as `/filter` or `/steps/0/branches/0/when`, with the character position of the `.` that goes past the limit in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0059` | A widget's `dataSource` names no loaded data source. Reported at `/widgets/{i}/dataSource`. Not reported when the name is a data source file that was not loaded because of its own errors. |
-| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. Or a `taskInbox` or `processInspector` *(planned for M7)* widget names an `entity`, `dataSource` or `form`, reported at that property. Or a `table` or `taskInbox` widget has `actions`, reported at `/widgets/{i}/actions`. |
+| `AXC0060` | A `table` widget names both `entity` and `dataSource`, or neither, or a `form` widget names both `form` and `entity`, or neither. Reported at `/widgets/{i}`. Or a `form` widget names a `dataSource`, or a table's data source has a required parameter, which the table has no input for. Those are reported at `/widgets/{i}/dataSource`, and the message names the parameter. Or a `table` widget names a `form`, reported at `/widgets/{i}/form`. Or a `taskInbox` or `processInspector` widget names an `entity`, `dataSource` or `form`, reported at that property. Or a `table`, `taskInbox` or `processInspector` widget has `actions`, reported at `/widgets/{i}/actions`. |
 | `AXC0061` | A data source's `aggregate.groupBy` entry names no projected field, compared exactly. Reported at `/aggregate/groupBy/{i}`. |
 | `AXC0062` | A data source measure's `name` is also a group field, or is already used by an earlier measure, compared exactly. Reported at `/aggregate/measures/{i}/name` of the later measure. |
 | `AXC0063` | A data source measure is invalid. A `count` with a `field`, or a `sum`, `min` or `max` without one, is reported at `/aggregate/measures/{i}`. A `field` that names no projected field, or whose type the function does not take, is reported at `/aggregate/measures/{i}/field`. `sum` takes an integer or a decimal. `min` and `max` take an integer, a decimal, a date or a date-time. |
@@ -825,13 +827,9 @@ sorted by file and then path.
 | `AXC0189` | A value in a step's `values` does not fit its field's type: not a valid text, number, boolean, date, reference or listed enum value, or a child collection that is not an array of objects. Reported at `/steps/{i}/values/{key}`. |
 | `AXC0190` | A stub names no loaded connector, no operation of the connector, no package of the application, or no operation of the pinned package. Reported at `/stubs/{i}/connector/name`, `/stubs/{i}/connector/operation` or `/stubs/{i}/operation`. |
 | `AXC0191` | A key in a stub's `output` names no output field of the operation. Reported at `/stubs/{i}/output/{key}`. |
+| `AXC0192` | A `processInspector` widget's `process` names no loaded process, ignoring letter case. Not reported when the process's file failed to load. Reported at `/widgets/{i}/process`. |
 | `AXC0193` | An `advanceTime` step's `by` is not a positive duration in the form of a task's `dueIn`. Reported at `/steps/{i}/by`. |
 | `AXC0194` | An `advanceTime` step in a scenario without `now`. Reported at `/steps/{i}`. |
-
-*(planned for M7)* `AXC0192` is not in the table yet, because the table lists the codes in
-`DiagnosticCodes`. A `processInspector` widget's `process` that names no loaded process,
-ignoring letter case, is `AXC0192`, reported at `/widgets/{i}/process`. The code joins the table
-when the widget is built.
 
 ## Startup activation
 

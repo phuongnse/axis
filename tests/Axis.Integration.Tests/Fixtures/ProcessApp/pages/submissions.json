@@ -1,0 +1,8 @@
+{
+  "id": "2f6b9d41-7a3c-4e58-8b10-9c4e5a7d1f03",
+  "kind": "page",
+  "name": "Submissions",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.submissions.title" },
+  "widgets": [{ "type": "processInspector", "process": "Submit" }]
+}

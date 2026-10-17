@@ -18,8 +18,9 @@ internal static class PageAccess
 
     /// <summary>
     /// Whether <paramref name="roles"/> may read every widget of <paramref name="page"/>. A task
-    /// inbox is always readable. A widget over an entity or a form needs a <c>read</c> grant on the
-    /// entity, and one over a data source needs what the data source endpoint needs.
+    /// inbox is always readable. A process inspector needs an <c>inspect</c> grant on its process.
+    /// A widget over an entity or a form needs a <c>read</c> grant on the entity, and one over a
+    /// data source needs what the data source endpoint needs.
     /// </summary>
     public static bool CanRead(ApplicationModel application, IReadOnlyList<string> roles, PageModel page) =>
         page.Widgets.All(widget => CanRead(application, roles, widget));
@@ -70,6 +71,12 @@ internal static class PageAccess
 
     private static bool CanRead(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget)
     {
+        if (widget.Process is { } inspected)
+        {
+            // The compiler resolves every inspected process, so the lookup always succeeds.
+            return application.TryGetProcess(inspected.Name, out var process) && PolicyEvaluator.AllowsInspect(application, roles, process);
+        }
+
         if (widget.DataSource is { } reference)
         {
             // The compiler resolves every widget data source, so the lookup always succeeds.

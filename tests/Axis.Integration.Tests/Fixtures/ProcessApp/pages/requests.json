@@ -1,0 +1,8 @@
+{
+  "id": "2f6b9d41-7a3c-4e58-8b10-9c4e5a7d1f02",
+  "kind": "page",
+  "name": "Requests",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.requests.title" },
+  "widgets": [{ "type": "table", "entity": "Request" }]
+}

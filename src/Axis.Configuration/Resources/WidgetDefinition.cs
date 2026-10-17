@@ -25,6 +25,9 @@ public sealed record WidgetDefinition
     /// </summary>
     public string? FormPage { get; init; }
 
+    /// <summary>The process a <c>processInspector</c> widget inspects.</summary>
+    public string? Process { get; init; }
+
     /// <summary>The buttons a <c>form</c> widget shows on a saved record, or null when it has none.</summary>
     public IReadOnlyList<WidgetActionDefinition>? Actions { get; init; }
 }
