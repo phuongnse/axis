@@ -214,7 +214,7 @@ internal sealed partial class ConnectorCallHandler(
         var answer = await SendAsync(target, attempt.Call, baseUrl, secret, cancellationToken);
         if (answer.Error is { } sendError)
         {
-            return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, answer.AttemptError!, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, answer.Error!, cancellationToken);
         }
 
         if (Fit(answer.Body!, target) is not { } values)
@@ -319,7 +319,7 @@ internal sealed partial class ConnectorCallHandler(
             target,
             answer.Status,
             error,
-            LookupRow(attempt, CallAttempts.Failed, answer.Status, answer.AttemptError ?? error),
+            LookupRow(attempt, CallAttempts.Failed, answer.Status, answer.Error ?? error),
             cancellationToken);
     }
 
@@ -456,12 +456,6 @@ internal sealed partial class ConnectorCallHandler(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            var message = exception.Message;
-            if (secret?.Reveal() is { Length: > 0 } value)
-            {
-                message = message.Replace(value, SecretValue.Placeholder, StringComparison.Ordinal);
-            }
-
             // Only a failed name lookup, connection or TLS handshake proves the request never left.
             var errorClass = exception is HttpRequestException
             {
@@ -469,13 +463,12 @@ internal sealed partial class ConnectorCallHandler(
             }
                 ? ErrorClass.Retryable
                 : ErrorClass.Unknown;
-            // The exception message can hold a value, so an attempt row names only the exception type.
+            // The exception message can hold a value, so the error names only the exception type.
             return new Answer(
                 null,
                 null,
-                $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {message}",
-                errorClass,
-                $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {exception.GetType().FullName}.");
+                $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {exception.GetType().FullName}.",
+                errorClass);
         }
     }
 
@@ -630,9 +623,9 @@ internal sealed partial class ConnectorCallHandler(
             }
             catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
-                // The message can hold record values, so the row names only the type.
-                failure = exception.Message;
-                rowFailure = $"The outcome of the call could not be recorded: {exception.GetType().FullName}.";
+                // The message can hold record values, so the error names only the type.
+                failure = $"The outcome of the call could not be recorded: {exception.GetType().FullName}.";
+                rowFailure = failure;
             }
 
             if (failure is null)
@@ -1100,14 +1093,9 @@ internal sealed partial class ConnectorCallHandler(
 
     /// <summary>
     /// The status of an answered request, the body of a <c>2xx</c>, or the error of any other result
-    /// with its class. <paramref name="RowError"/> replaces the error in an attempt row when the error
-    /// holds an exception message.
+    /// with its class. An error holds no exception message, because a message can hold a value.
     /// </summary>
-    private sealed record Answer(int? Status, string? Body, string? Error, ErrorClass Class, string? RowError = null)
-    {
-        /// <summary>The error as an attempt row holds it, or <see langword="null"/> when there is none.</summary>
-        public string? AttemptError => RowError ?? Error;
-    }
+    private sealed record Answer(int? Status, string? Body, string? Error, ErrorClass Class);
 
     /// <summary>How an attempt that did not succeed is handled.</summary>
     private enum ErrorClass

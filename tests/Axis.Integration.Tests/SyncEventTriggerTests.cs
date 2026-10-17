@@ -90,7 +90,7 @@ public sealed class SyncEventTriggerTests(EventDeliveryFixture fixture) : IClass
         Assert.Equal(ProcessStarts.Failed, (await tenant.InstanceAsync(flagId)).State);
         var failure = Assert.Single(await tenant.HistoryAsync(flagId));
         Assert.Equal("flag", failure.Step);
-        Assert.Contains("injected start failure", failure.Error, StringComparison.Ordinal);
+        Assert.Equal("Npgsql.PostgresException", failure.Error);
         Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.events WHERE process_instance_id = @id", ("id", flagId)));
         Assert.Empty(await InstancesAsync(tenant, "RoleApprove", subjectId));
         Assert.Empty(await InstancesAsync(tenant, "Review", subjectId));

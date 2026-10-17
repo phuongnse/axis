@@ -1053,14 +1053,21 @@ earlier ones.
 
 ### Step errors in inspection
 
-The `error` of a path entry is the history's stored error. In M7 the engine
+The `error` of a path entry is the history's stored error. The engine
 stores it as one of these, and never as the exception message, because a
 message can hold a value:
 
 - The exception type, such as `System.DivideByZeroException`.
-- A fixed text that names the step, the property, the field pointer or the
-  message key, such as the refused-write text of
-  [Running a step](#running-a-step). It holds no value.
+- A fixed text that names the step, the part (branch, field, input, payload
+  field or assignee) and the kind of expression error, such as
+  `The when of branch 0 of the step 'check' failed: DivisionByZero.`
+- A fixed text that holds the field pointer and the message key, such as the
+  refused-write text of [Running a step](#running-a-step).
+- For a connector call that cannot be sent or whose success cannot be
+  recorded, a fixed text that ends with the exception type. The same text is
+  the call's `last_error`.
+
+None of them holds a value.
 
 History rows written before this change may still hold exception messages.
 Inspection shows them as stored.
@@ -1325,11 +1332,13 @@ the audit record `process.failed` with
 details `{ "step" }` and the actor `system`. It does nothing when the instance
 has changed since the step loaded it. No step is retried.
 
-*(planned for M7)* The error in the history row is never the exception
-message, because a message can hold a value. It is the exception type, such as
-`System.DivideByZeroException`, or a fixed text that names the step, the
-property, the field pointer or the message key. The refused-write text above
-already fits. See [Step errors](#step-errors-in-inspection).
+The error in the history row is never the exception message, because a
+message can hold a value. It is the exception type, such as
+`System.DivideByZeroException`, or a fixed text that names the step, the part
+and the kind of expression error, such as
+`The when of branch 0 of the step 'check' failed: DivisionByZero.` A refused
+write stores its field pointers and message keys, as above. See
+[Step errors](#step-errors-in-inspection).
 
 ## Connector calls
 
@@ -2441,7 +2450,7 @@ database, with history in `axis.__processes_migrations` (see
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
   | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. *(Planned for M7.)* `{ "command": "retry" }` or `{ "command": "cancel" }` for an operator command. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
-  | `error` | `text`, null | The error of a failed step. *(planned for M7)* The exception type, or a fixed text that names the step, property, field pointer or message key. Never the exception message or a value, see [Step errors](#step-errors-in-inspection) |
+  | `error` | `text`, null | The error of a failed step. The exception type, or a fixed text that names the step, part, field pointer or message key. Never the exception message or a value, see [Step errors](#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
   | `trace_id` | `text`, null | The 32-hex trace id of the run that wrote the row. For a task completion through the server, it is the request's trace. Null when no span was current, such as a row written by the scenario runner, and for rows that existed before the column |
@@ -2525,7 +2534,7 @@ database, with history in `axis.__processes_migrations` (see
   | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
   | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Kept after the call settles, but cleared when the call is cancelled *(planned for M7)*. Never copied to history, audit records or logs, and shown only through [inspection](#values-and-masking) |
   | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
-  | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body or secret |
+  | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body, secret, exception message or value |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
 - `axis.process_call_attempts`: one row per attempt and per

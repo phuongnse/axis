@@ -117,7 +117,7 @@ public sealed class ProcessRaiseEventStepTests(ProcessStepFixture fixture) : ICl
         Assert.Equal((ProcessStarts.Failed, 2L, "announce", true), await fixture.InstanceAsync(instanceId));
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
         Assert.Equal(("announce", (string?)null), (row.Step, row.Output));
-        Assert.NotNull(row.Error);
+        Assert.Equal("The payload field 'ratio' of the step 'announce' failed: DivisionByZero.", row.Error);
         Assert.Empty(await EventsAsync(instanceId));
         Assert.Equal([AuditActions.ProcessFailed], await fixture.SystemAuditActionsAsync(instanceId));
     }
