@@ -146,7 +146,7 @@ public static class TaskCompletionCommand
             }
 
             var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
+                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return result.Outcome == RecordWriteOutcome.StaleVersion

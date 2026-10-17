@@ -56,7 +56,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
 
         Assert.Empty(result.Diagnostics);
         var table = Assert.Single(await ReadTablesAsync(_orderId));
-        Assert.Equal(["id", "version", "f_number", "f_remark", "f_state"], table.Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_remark", "f_state"], table.Columns.Select(column => column.Name));
         Assert.True(compiled.Model.TryGetEntity("Order", out var entity));
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync(CancellationToken);
@@ -93,7 +93,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
 
         Assert.Empty(result.Diagnostics);
         var order = Assert.Single(await ReadTablesAsync(_orderId));
-        Assert.Equal(["id", "version", "f_number"], order.Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number"], order.Columns.Select(column => column.Name));
         Assert.Empty(await ReadTablesAsync(_invoiceId));
         Assert.Empty(await ReadTablesAsync(_lineId));
         Assert.Equal(0, await CountProvisionedEntitiesAsync(_invoiceId, _lineId));
@@ -187,7 +187,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.SitePathActiveForOtherApplication, "sites/main.json", "/path"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Equal(before, await ReadStateAsync(_orderId));
-        Assert.Equal(["id", "version", "f_number", "f_note"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_note"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
         Assert.Empty(await ReadAppliedMigrationsAsync());
         Assert.Equal(first.Release?.Id, await ReadActiveReleaseIdAsync());
     }
@@ -208,7 +208,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(
             (DiagnosticCodes.ChangedMigrationHistory, "migrations/0001-rename-note.json", "", _migrationId),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
         Assert.Equal(applied, Assert.Single(await ReadAppliedMigrationsAsync()));
         Assert.NotEqual(changed.Release?.Id, await ReadActiveReleaseIdAsync());
     }
@@ -229,7 +229,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Equal(
             (DiagnosticCodes.ChangedMigrationHistory, "application.json", "", _migrationId),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
         Assert.Equal(applied, Assert.Single(await ReadAppliedMigrationsAsync()));
         Assert.NotEqual(deleted.Release?.Id, await ReadActiveReleaseIdAsync());
     }
@@ -569,7 +569,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         Assert.Empty((await older).Diagnostics);
         Assert.Empty((await newer).Diagnostics);
         Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
-        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
         Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
     }
 
@@ -652,7 +652,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
 
         Assert.Empty(result.Diagnostics);
         Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
-        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
     }
 
     [Fact]
@@ -683,7 +683,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         var applied = await ActivateAsync(second);
 
         Assert.Empty(applied.Diagnostics);
-        Assert.Equal(["id", "version", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
         Assert.Equal(_migrationId, Assert.Single(await ReadAppliedMigrationsAsync()).MigrationId);
         Assert.Equal(second.Release?.Id, await ReadActiveReleaseIdAsync());
     }
@@ -705,7 +705,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         var result = await ActivateAsync(third);
 
         Assert.Empty(result.Diagnostics);
-        Assert.Equal(["id", "version", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
+        Assert.Equal(["id", "version", "computed_release_id", "f_number", "f_remark"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
         Assert.Equal(third.Release?.Id, await ReadActiveReleaseIdAsync());
     }
 

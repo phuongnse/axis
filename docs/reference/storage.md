@@ -18,8 +18,8 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     package), `axis.active_releases` (the active release of each application `id`,
     with its name, unique ignoring letter case) and `axis.active_sites` (the
     site paths of each active release, as application `id` and path, unique
-    on path), with history in `axis.__configuration_migrations`. *(planned for
-    M7)* It also owns `axis.release_computed_fingerprints`, the hash of the
+    on path), with history in `axis.__configuration_migrations`. It also owns
+    `axis.release_computed_fingerprints`, the hash of the
     computed definitions of each entity in each release. The caller
     supplies the tenant database connection. Other modules read and set the
     active release and its site paths only through `IActiveReleaseStore`;
@@ -85,7 +85,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | Table | `e_` + entity `id` as 32 lowercase hex characters | 34 |
   | Primary key column | `id` (`uuid`) | 2 |
   | Version column | `version` (`bigint`) | 7 |
-  | Computed release column *(planned for M7)* | `computed_release_id` (`uuid`, null), on tables that are not child tables | 19 |
+  | Computed release column | `computed_release_id` (`uuid`, null), on tables that are not child tables | 19 |
   | Field column | `f_` + field name in lowercase | at most 62 |
   | Primary key | `pk_` + table | 37 |
   | Unique constraint | `uq_` + table + `_` + hash of the column name | 54 |
@@ -148,7 +148,7 @@ What each database role may do:
 | --- | --- | --- |
 | `entities` tables | Owns them | Read and write rows |
 | `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, and *(planned for M7)* `pending_computed_fields`, `computed_field_errors` | Owns them | Read and write rows |
-| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, *(planned for M7)* `release_computed_fingerprints`, the `__*_migrations` tables | Owns them | Read only |
+| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables | Owns them | Read only |
 | Release tables: `releases`, `release_resources`, `release_packages` | Insert and read. The trigger refuses update, delete and truncate | Read only |
 | Sequences in `axis` and `entities` | Owns them | `USAGE`, `SELECT` |
 | Create, alter, drop | Yes | No |
@@ -245,12 +245,15 @@ access. It returns diagnostics, SQL statements and the new records to write.
   dropped entity. It is then looked up in the release being activated. A
   rename also renames the field in the recorded enum values, and a drop
   deletes them.
-- **System columns.** `id` and `version` are created with the table, or
-  `id`, `owner_id` and `position` for a child table (see **Child table**
-  below). `version` is added to an existing table other than a child table
-  that lacks it as
+- **System columns.** `id`, `version` and `computed_release_id` are created
+  with the table, or `id`, `owner_id` and `position` for a child table (see
+  **Child table** below). `version` is added to an existing table other than a
+  child table that lacks it as
   `bigint NOT NULL DEFAULT 1`, even when the table has rows, because the
-  default fills them. System columns are never compared or changed otherwise:
+  default fills them. `computed_release_id` is added to such a table as
+  `uuid`, nullable and with no default, so the rows are kept and stay
+  unstamped. See [Recomputing computed fields](#recomputing-computed-fields).
+  System columns are never compared or changed otherwise:
   only Axis DDL creates them, and an author cannot fix them through
   configuration.
 - **Missing table.** It is created with the system columns and every field
@@ -350,10 +353,12 @@ child tables are in [Schema planning](#schema-planning).
 
 ## Recomputing computed fields
 
-*(planned for M7)* This section records
-[D33](../decisions.md#d33-recomputing-stored-computed-fields--agreed). Nothing
-in it is built. Today a changed computed expression leaves every row on its
-old value until its next write.
+This section records
+[D33](../decisions.md#d33-recomputing-stored-computed-fields--agreed). Only the
+stamp and the fingerprint are built, with the exception that a `fill` or
+`convert` does not clear the stamp yet. The rest is planned for M7. Today a
+changed computed expression leaves every row on its old value until its next
+write.
 
 One recompute covers three cases: a changed computed expression, a computed
 field added to a table that has rows, and a migration `fill` or `convert` of a
@@ -382,16 +387,31 @@ in batches.
   row. Adding it is cheap on a large table, because it is nullable and has no
   default.
   - Every write stamps the release it ran with. That includes a record API
-    write, a step of a process pinned to an older release, and a task
-    completion.
+    write, an inbound endpoint create, a step of a process pinned to an older
+    release, a connector or package result write, a task completion and seed
+    data. Work pinned to an older release stamps that release, not the active
+    one. A row written before the column existed has no stamp.
   - Child rows recompute with their owner and carry no stamp.
-  - A `fill` or `convert` sets the stamp to `NULL` on every row it changes and
-    on the owner row of every changed child row. Their computed inputs changed,
-    so the old stamp no longer proves the row is up to date.
-- **Fingerprint.** Each release stores, for each entity, one hash of the
-  computed definitions of the entity and its child entities, and of every rule
-  their expressions call. It is written with the release in
-  `axis.release_computed_fingerprints`.
+  - *(planned for M7)* A `fill` or `convert` sets the stamp to `NULL` on every
+    row it changes and on the owner row of every changed child row. Their
+    computed inputs changed, so the old stamp no longer proves the row is up to
+    date.
+- **Fingerprint.** Each release stores, for each entity that is not a child
+  entity, one hash of the computed definitions of the entity and its child
+  entities, and of every rule their expressions call. It is written with the
+  release in `axis.release_computed_fingerprints`.
+  - The hash covers each computed field's name, type, length or precision
+    settings and expression text, for the entity and for each child
+    collection. It also covers each rule the expressions call, directly or
+    through other rules, with its parameters, result type and expression text.
+    Two releases with the same computed definitions have the same fingerprint,
+    even when other parts of the entity differ. A change to whitespace only in
+    an expression changes it.
+  - A child entity has no row, because its rows carry no stamp and recompute
+    with their owner. An entity with no computed field still has a row, so
+    adding one later shows as a changed fingerprint.
+  - A release stored before fingerprints existed has no rows, and nothing fills
+    them in. A missing fingerprint counts as different.
 - **Up to date.** A row is up to date when its stamp names a release whose
   fingerprint for the entity equals the target release's. The pending row
   keeps the ids of those releases as `current_release_ids`. A row with no stamp

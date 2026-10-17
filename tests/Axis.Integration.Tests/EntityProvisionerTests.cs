@@ -152,6 +152,41 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
     }
 
     [Fact]
+    public async Task Missing_computed_release_column_is_added_without_a_default_and_keeps_existing_rows_unstamped()
+    {
+        var model = ChildModel(BaseModel());
+        await ProvisionAsync(model);
+        var customerTable = EntityNaming.QualifiedTable(EntityNaming.Table(_customerId));
+        var lineTable = EntityNaming.Table(_lineId);
+        await using (var dataSource = NpgsqlDataSource.Create(database.ConnectionString))
+        {
+            await using var command = dataSource.CreateCommand($"""ALTER TABLE {customerTable} DROP COLUMN "computed_release_id" """);
+            await command.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        var rowId = await InsertCustomerAsync();
+
+        var result = await ProvisionAsync(model);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal([$"""ALTER TABLE {customerTable} ADD COLUMN "computed_release_id" uuid"""], result.Statements);
+        var tables = await ReadTablesAsync(model);
+        var table = Assert.Single(tables, table => table.Name == EntityNaming.Table(_customerId));
+        Assert.True(table.HasRows);
+        Assert.Equal(
+            new CatalogColumn("computed_release_id", "uuid", NotNull: false, Unique: false, ReferencedTable: null),
+            Assert.Single(table.Columns, column => column.Name == "computed_release_id"));
+        Assert.DoesNotContain(Assert.Single(tables, candidate => candidate.Name == lineTable).Columns, column => column.Name == "computed_release_id");
+        Assert.Equal([rowId], await ReadIdsAsync(_customerId));
+        await using (var dataSource = NpgsqlDataSource.Create(database.ConnectionString))
+        {
+            await using var command = dataSource.CreateCommand($"""SELECT "computed_release_id" IS NULL FROM {customerTable} WHERE "id" = @id""");
+            command.Parameters.AddWithValue("id", rowId);
+            Assert.Equal(true, await command.ExecuteScalarAsync(CancellationToken));
+        }
+    }
+
+    [Fact]
     public async Task Label_only_change_applies_nothing()
     {
         var model = BaseModel();
@@ -323,6 +358,7 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
             [
                 new CatalogColumn("id", "uuid", NotNull: true, Unique: false, ReferencedTable: null),
                 new CatalogColumn("version", "bigint", NotNull: true, Unique: false, ReferencedTable: null),
+                new CatalogColumn("computed_release_id", "uuid", NotNull: false, Unique: false, ReferencedTable: null),
                 new CatalogColumn("f_number", "character varying(20)", NotNull: true, Unique: false, ReferencedTable: null),
                 new CatalogColumn("f_note", "text", NotNull: false, Unique: false, ReferencedTable: null),
             ],

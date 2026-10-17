@@ -593,7 +593,7 @@ internal sealed partial class ConnectorCallHandler(
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity, record!, values, now, cancellationToken);
+            var result = await RecordCommands.SetAsync(connection, target.Model, entity, call.ReleaseId, record!, values, now, cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";

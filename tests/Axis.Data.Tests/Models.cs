@@ -89,7 +89,7 @@ internal static class Models
     public static EntityModel? Owner(ApplicationModel model, EntityModel entity) =>
         model.Entities.FirstOrDefault(owner => owner.Fields.Any(field => field.Type == FieldType.ChildCollection && field.Target?.Id == entity.Id));
 
-    // The version column, or the owner and position columns of a child table.
+    // The version and computed release columns, or the owner and position columns of a child table.
     private static CatalogColumn[] SystemColumns(ApplicationModel model, EntityModel entity) =>
         Owner(model, entity) is { } owner
             ?
@@ -97,7 +97,11 @@ internal static class Models
                 new CatalogColumn(EntityNaming.OwnerColumn, "uuid", NotNull: true, Unique: false, ReferencedTable: EntityNaming.Table(owner.Id)),
                 new CatalogColumn(EntityNaming.PositionColumn, "integer", NotNull: true, Unique: false, ReferencedTable: null),
             ]
-            : [new CatalogColumn(EntityNaming.VersionColumn, "bigint", NotNull: true, Unique: false, ReferencedTable: null)];
+            :
+            [
+                new CatalogColumn(EntityNaming.VersionColumn, "bigint", NotNull: true, Unique: false, ReferencedTable: null),
+                new CatalogColumn(EntityNaming.ComputedReleaseColumn, "uuid", NotNull: false, Unique: false, ReferencedTable: null),
+            ];
 
     /// <summary>The records written when the model was first provisioned.</summary>
     public static ProvisioningRecords Records(ApplicationModel model)

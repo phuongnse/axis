@@ -115,7 +115,7 @@ internal sealed partial class StartupActivation(
                 LogActivated(compiled.Model.Manifest.Name, compiled.Release.Id, folder, tenantId);
                 if (compiled.Model.Seeds.Count > 0)
                 {
-                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, await runtime.GetConnectionAsync(cancellationToken), cancellationToken);
+                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, compiled.Release.Id, await runtime.GetConnectionAsync(cancellationToken), cancellationToken);
                     if (seeded.Diagnostics.Count > 0)
                     {
                         LogDiagnostics(seeded.Diagnostics, folder, tenantId);

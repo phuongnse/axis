@@ -19,6 +19,12 @@ public static class EntityNaming
     /// <summary>The row version column of every entity table except a child table, starting at 1 for each row.</summary>
     public const string VersionColumn = "version";
 
+    /// <summary>
+    /// The nullable column of every entity table except a child table that holds the id of the release
+    /// that computed the row's stored computed values. A row written before the column existed is null.
+    /// </summary>
+    public const string ComputedReleaseColumn = "computed_release_id";
+
     /// <summary>The owner record's id in a child table, with a foreign key that deletes the row with its owner.</summary>
     public const string OwnerColumn = "owner_id";
 

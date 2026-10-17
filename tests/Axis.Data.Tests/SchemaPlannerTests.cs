@@ -61,8 +61,8 @@ public sealed class SchemaPlannerTests
         Assert.False(plan.HasErrors);
         Assert.Equal(
             [
-                $"""CREATE TABLE "entities"."{CustomerTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "f_name" character varying(200) NOT NULL, "f_lastorder" uuid, CONSTRAINT "pk_{CustomerTable}" PRIMARY KEY ("id"))""",
-                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "f_code" character varying(20) NOT NULL, "f_customer" uuid NOT NULL, "f_parent" uuid, "f_total" numeric(18,2), "f_quantity" bigint, "f_paid" boolean, "f_due" date, "f_placedat" timestamp with time zone, "f_notes" text, "f_status" text NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"), CONSTRAINT "{EntityNaming.Unique(OrderTable, "f_code")}" UNIQUE ("f_code"))""",
+                $"""CREATE TABLE "entities"."{CustomerTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, "f_name" character varying(200) NOT NULL, "f_lastorder" uuid, CONSTRAINT "pk_{CustomerTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, "f_code" character varying(20) NOT NULL, "f_customer" uuid NOT NULL, "f_parent" uuid, "f_total" numeric(18,2), "f_quantity" bigint, "f_paid" boolean, "f_due" date, "f_placedat" timestamp with time zone, "f_notes" text, "f_status" text NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"), CONSTRAINT "{EntityNaming.Unique(OrderTable, "f_code")}" UNIQUE ("f_code"))""",
                 ForeignKey(CustomerTable, "f_lastorder", OrderTable),
                 ForeignKey(OrderTable, "f_customer", CustomerTable),
                 ForeignKey(OrderTable, "f_parent", OrderTable),
@@ -110,6 +110,18 @@ public sealed class SchemaPlannerTests
                 $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_priority" bigint""",
             ],
             plan.Statements);
+    }
+
+    [Fact]
+    public void Missing_computed_release_column_on_a_table_with_rows_is_added_without_a_default()
+    {
+        var model = BaseModel();
+        var catalog = ChangeOrderColumns(Catalog(model, hasRows: true), columns => columns.Where(column => column.Name != EntityNaming.ComputedReleaseColumn));
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([$"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "computed_release_id" uuid"""], plan.Statements);
     }
 
     [Theory]
@@ -379,7 +391,7 @@ public sealed class SchemaPlannerTests
         Assert.Empty(plan.Diagnostics);
         Assert.Equal(
             [
-                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "f_title" character varying(100) NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, "f_title" character varying(100) NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
                 $"""CREATE TABLE "entities"."{LineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" text, "f_quantity" bigint NOT NULL, CONSTRAINT "pk_{LineTable}" PRIMARY KEY ("id"))""",
                 OwnerForeignKey(LineTable, OrderTable),
             ],

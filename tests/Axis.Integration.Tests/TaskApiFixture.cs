@@ -260,6 +260,16 @@ public sealed class TaskApiFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>The <c>computed_release_id</c> of the Request <paramref name="requestId"/> in <paramref name="tenant"/>, or null when it has no stamp.</summary>
+    public async Task<Guid?> ComputedReleaseAsync(string tenant, Guid requestId)
+    {
+        Assert.True(Model.TryGetEntity("Request", out var request));
+        await using var command = DataSource(tenant).CreateCommand(
+            $"SELECT {EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} FROM {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} WHERE {Column("id")} = @id");
+        command.Parameters.AddWithValue("id", requestId);
+        return await command.ExecuteScalarAsync() is Guid stamp ? stamp : null;
+    }
+
     /// <summary>
     /// The state of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>, its
     /// task and its subject record, and the number of its audit records, history rows and work items.
