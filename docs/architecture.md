@@ -687,13 +687,14 @@ task API, the worker settings and the tables are in
 
 The server and the worker emit correlated logs, metrics and traces with
 OpenTelemetry and W3C trace context. Traces and their stored correlation are
-built. Metrics, OTLP logs, the log scope and the problem details `traceId`
-stay *(planned for M7)*. See
+built. So are the standard metrics and the work item duration, process instance
+and call attempt metrics. The gauges, OTLP logs, the log scope and the problem
+details `traceId` stay *(planned for M7)*. See
 [D36](decisions.md#d36-correlated-logs-metrics-and-traces--agreed).
 
 ### Signals and export
 
-Both hosts export traces over OTLP. Metrics and logs follow *(planned for
+Both hosts export traces and metrics over OTLP. Logs follow *(planned for
 M7)*. The standard `OTEL_*` variables set the export, see
 [Telemetry export](reference/configuration.md#telemetry-export). With no
 endpoint, nothing is exported and logs still go to the console. Docker Compose
@@ -716,8 +717,12 @@ is not part of this design.
 - **Npgsql.** Each command is a span. It keeps the statement text without
   parameter values. Axis never calls `EnableParameterLogging`, and no
   connection string sets `Include Error Detail`.
-- **Metrics.** *(planned for M7)* The standard ASP.NET Core, HttpClient and
-  .NET runtime metric sets. The Axis metrics are in
+- **Metrics.** The standard ASP.NET Core, HttpClient, DNS and .NET runtime
+  metric sets. The HttpClient and DNS metrics keep only `error.type`,
+  `http.connection.state`, `http.request.method`, `http.response.status_code`,
+  `network.protocol.version` and `url.scheme`. So `server.address`,
+  `server.port`, `network.peer.address` and `dns.question.name` never reach an
+  exporter. The Axis metrics are in
   [worker metrics](reference/processes.md#worker-metrics).
 
 ### Axis spans

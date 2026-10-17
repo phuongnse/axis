@@ -44,13 +44,15 @@ internal static class CallAttempts
 
     /// <summary>
     /// Inserts the row for <paramref name="attempt"/> of the call <paramref name="callId"/>, finished at
-    /// the transaction's time. A row with a number that exists already violates the unique index.
+    /// the transaction's time. A row with a number that exists already violates the unique index. An
+    /// attempt, unlike a lookup, adds one to <c>axis.calls.attempts</c>.
     /// </summary>
     internal static async Task InsertAsync(
         NpgsqlTransaction transaction,
         string callKind,
         Guid callId,
         CallAttempt attempt,
+        CallTags tags,
         CancellationToken cancellationToken)
     {
         var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
@@ -77,6 +79,10 @@ internal static class CallAttempts
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)attempt.Error ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         TagOutcome(attempt);
+        if (attempt.Kind == Attempt)
+        {
+            AxisMetrics.RecordCallAttempt(tags.TenantId, tags.Application, tags.TargetTag, tags.Target, tags.Operation, attempt.Outcome);
+        }
     }
 
     /// <summary>
@@ -114,3 +120,11 @@ internal static class CallAttempts
 /// <param name="HttpStatus">The HTTP status, or <see langword="null"/> when none answered.</param>
 /// <param name="Error">A fixed text. It holds no body, no exception message and no secret.</param>
 internal sealed record CallAttempt(string Kind, int? Number, DateTimeOffset StartedAt, string Outcome, int? HttpStatus, string? Error);
+
+/// <summary>The names that label the call metric of an attempt. They hold no value.</summary>
+/// <param name="TenantId">The tenant of the call.</param>
+/// <param name="Application">The application name, or <see langword="null"/> when the release could not be loaded.</param>
+/// <param name="TargetTag">The attribute that names the target: <see cref="AxisTelemetry.ConnectorTag"/> or <see cref="AxisTelemetry.PackageTag"/>.</param>
+/// <param name="Target">The connector or package name.</param>
+/// <param name="Operation">The operation name.</param>
+internal sealed record CallTags(string TenantId, string? Application, string TargetTag, string Target, string Operation);

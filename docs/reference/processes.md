@@ -2485,18 +2485,23 @@ work and starts claiming. So the worker can start before the server.
 
 ### Worker metrics
 
-*(planned for M7)* The worker emits these metrics, next to the standard
-ASP.NET Core, HttpClient and .NET runtime metrics. Attributes name things and
-never hold values, see [Telemetry](../architecture.md#telemetry).
+The worker emits these metrics, next to the standard ASP.NET Core, HttpClient
+and .NET runtime metrics. Attributes name things and never hold values, see
+[Telemetry](../architecture.md#telemetry). The gauges are *(planned for M7)*.
+A metric is recorded in the transaction that writes the end or the attempt. So
+a transaction that rolls back after its write, such as a `fenced` run, can count
+the same end or attempt again when the item is retried. An ended instance whose
+release cannot be loaded is counted without `axis.application` and
+`axis.process`. A cancelled instance is not counted.
 
 | Metric | Instrument | Unit | Attributes |
 | --- | --- | --- | --- |
-| `axis.work_items.due` | gauge | items | `axis.tenant`, `axis.work_item.kind` |
-| `axis.work_items.oldest_due_age` | gauge | s | `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
+| `axis.work_items.due` | gauge | items | *(planned for M7)* `axis.tenant`, `axis.work_item.kind` |
+| `axis.work_items.oldest_due_age` | gauge | s | *(planned for M7)* `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
 | `axis.work_items.duration` | histogram | s | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced` |
-| `axis.process.instances.ended` | counter | instances | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
-| `axis.calls.attempts` | counter | attempts | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
-| `axis.computed.pending_fields` | gauge | fields | `axis.tenant`, `axis.application`. See [Recomputing computed fields](storage.md#recomputing-computed-fields) |
+| `axis.process.instances.ended` | counter | `{instance}` | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
+| `axis.calls.attempts` | counter | `{attempt}` | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
+| `axis.computed.pending_fields` | gauge | fields | *(planned for M7)* `axis.tenant`, `axis.application`. See [Recomputing computed fields](storage.md#recomputing-computed-fields) |
 
 ## Tables
 

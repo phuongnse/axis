@@ -33,7 +33,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<StartupActivationHealthCheck>("activation", tags: [HealthEndpoints.ReadyTag])
     .AddCheck<TenantDatabasesHealthCheck>("tenant-databases", failureStatus: HealthStatus.Degraded, tags: [HealthEndpoints.ReadyTag]);
 builder.Services.AddProblemDetails();
-builder.Services.AddServerTracing(builder.Configuration);
+builder.Services.AddServerTelemetry(builder.Configuration);
 builder.Services.AddTenancy(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no schema connection string. Only startup activation uses it,

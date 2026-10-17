@@ -91,6 +91,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             return;
         }
 
+        await InstanceMetrics.RecordEndedAsync(models, context, instance, ProcessStarts.Failed, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
             new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now),
@@ -366,6 +367,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             // The newer revision owns the instance now, so this item is discarded with no other write.
             LogStaleRevision(instance.Id, step.Name, instance.Revision);
             return;
+        }
+
+        if (state == ProcessStarts.Completed)
+        {
+            AxisMetrics.RecordInstanceEnded(context.Item.TenantId, model.Manifest.Name, process.Name, ProcessStarts.Completed);
         }
 
         // The record is written only once the instance is known to be current, so a stale step
