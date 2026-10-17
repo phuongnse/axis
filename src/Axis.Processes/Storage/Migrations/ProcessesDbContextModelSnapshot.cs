@@ -327,6 +327,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at");
 
+                    b.Property<string>("TraceId")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_id");
+
                     b.HasKey("Id")
                         .HasName("pk_process_call_attempts");
 
@@ -484,6 +488,10 @@ namespace Axis.Processes.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("step");
+
+                    b.Property<string>("TraceId")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_id");
 
                     b.HasKey("Id")
                         .HasName("pk_process_step_history");
@@ -711,10 +719,18 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("SpanId")
+                        .HasColumnType("text")
+                        .HasColumnName("span_id");
+
                     b.Property<string>("TenantId")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("tenant_id");
+
+                    b.Property<string>("TraceId")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_id");
 
                     b.Property<Guid?>("TriggerId")
                         .HasColumnType("uuid")

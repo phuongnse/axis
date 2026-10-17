@@ -1,6 +1,8 @@
 using Axis.Configuration.Model;
+using Axis.Core.Telemetry;
 using Axis.Data.Naming;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Data.Records;
 
@@ -85,13 +87,15 @@ internal static class ComputedBackfill
         }
 
         await using var enqueue = new NpgsqlCommand(
-            "INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, entity_id) VALUES (@id, @tenant, @kind, now(), @entity)",
+            "INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, entity_id, trace_id, span_id) VALUES (@id, @tenant, @kind, now(), @entity, @trace, @span)",
             connection,
             transaction);
         enqueue.Parameters.AddWithValue("id", Guid.CreateVersion7());
         enqueue.Parameters.AddWithValue("tenant", tenantId);
         enqueue.Parameters.AddWithValue("kind", WorkItemKind);
         enqueue.Parameters.AddWithValue("entity", owner.Id);
+        enqueue.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
+        enqueue.Parameters.Add(new NpgsqlParameter("span", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentSpanId() ?? DBNull.Value });
         await enqueue.ExecuteNonQueryAsync(cancellationToken);
     }
 

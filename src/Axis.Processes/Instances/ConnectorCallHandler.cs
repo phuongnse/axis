@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -5,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
+using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Work;
@@ -164,7 +166,16 @@ internal sealed partial class ConnectorCallHandler(
 
         if (lookup is not null)
         {
-            return await ReconcileAsync(item, connection, attempt, target, lookup, cancellationToken);
+            using var lookupSpan = StartCallSpan(AxisTelemetry.ConnectorLookup, item, target, lookup);
+            try
+            {
+                return await ReconcileAsync(item, connection, attempt, target, lookup, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                AxisTelemetry.RecordFailure(lookupSpan, exception);
+                throw;
+            }
         }
 
         if (sending)
@@ -173,6 +184,26 @@ internal sealed partial class ConnectorCallHandler(
             return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Unknown, null, UnknownOutcome, UnknownOutcome, cancellationToken);
         }
 
+        using var attemptSpan = StartCallSpan(AxisTelemetry.ConnectorAttempt, item, target, target.Operation);
+        try
+        {
+            return await SendAttemptAsync(item, connection, attempt, target, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            AxisTelemetry.RecordFailure(attemptSpan, exception);
+            throw;
+        }
+    }
+
+    /// <summary>Resolves the endpoint, sends the request and settles the call by the answer.</summary>
+    private async Task<WorkItemOutcome> SendAttemptAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Attempt attempt,
+        Target target,
+        CancellationToken cancellationToken)
+    {
         var connector = target.Connector;
         if (ResolveEndpoint(item, connector, out var baseUrl, out var secret) is { } bindingError)
         {
@@ -325,6 +356,18 @@ internal sealed partial class ConnectorCallHandler(
             ? target.Connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase))
             : null;
 
+    private static Activity? StartCallSpan(string name, ClaimedWorkItem item, Target target, ConnectorOperationModel operation) =>
+        AxisTelemetry.Source.StartActivity(
+            name,
+            ActivityKind.Internal,
+            default(ActivityContext),
+            [
+                new(AxisTelemetry.TenantTag, item.TenantId),
+                new(AxisTelemetry.ApplicationTag, target.Model.Manifest.Name),
+                new(AxisTelemetry.ConnectorTag, target.Connector.Name),
+                new(AxisTelemetry.OperationTag, operation.Name),
+            ]);
+
     /// <summary>Finds the step, the subject entity, the connector and the operation of the call on its release.</summary>
     /// <exception cref="InvalidOperationException">The release lacks one of them.</exception>
     private async Task<Target> FindTargetAsync(WorkItemContext context, LoadedConnectorCall call, LoadedInstance instance, CancellationToken cancellationToken)
@@ -384,6 +427,12 @@ internal sealed partial class ConnectorCallHandler(
             if (connector.Idempotency is { } idempotency)
             {
                 request.Headers.TryAddWithoutValidation(idempotency, call.Id.ToString("D"));
+            }
+
+            // The HTTP span shows the path template, never the address or the identity in the URL.
+            if (Activity.Current is { } span && span.Source == AxisTelemetry.Source)
+            {
+                span.SetCustomProperty(AxisTelemetry.UrlTemplateProperty, operation.Path);
             }
 
             using var response = await client.SendAsync(request, timeout.Token);

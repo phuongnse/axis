@@ -1634,9 +1634,11 @@ resolution are authorized, audited commands.
 
 ## D36. Correlated logs, metrics and traces — Agreed
 
-The server and the worker emit correlated logs, metrics and traces. The design
-is *(planned for M7)*. See [telemetry](architecture.md#telemetry) for the
-spans and what telemetry never holds.
+The server and the worker emit correlated logs, metrics and traces. Traces and
+the stored `trace_id` are built. Metrics, OTLP logs, the log scope and the
+problem details `traceId` are *(planned for M7)*. See
+[telemetry](architecture.md#telemetry) for the spans and what telemetry never
+holds.
 The owner confirmed these points on issue #479 on 2026-10-17.
 
 - **Standard:**
@@ -1655,6 +1657,9 @@ The owner confirmed these points on issue #479 on 2026-10-17.
     Its run starts a new trace with a **link** to that one, not a child span.
     Instances wait for days, so one trace per run stays readable.
   - Connector calls send `traceparent` to the external system.
+  - Outgoing HTTP spans drop `server.address`, `server.port` and `url.query`.
+    A connector call's `url.full` is the operation's path template. Other
+    outgoing spans have no `url.full`.
 - **Npgsql:** spans keep the statement text without parameter values.
   Npgsql parameter logging stays off.
 - **Stored correlation:**

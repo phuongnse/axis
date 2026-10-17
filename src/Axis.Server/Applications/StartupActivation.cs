@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
 using Axis.Data;
 using Axis.Data.Seeding;
@@ -101,9 +103,12 @@ internal sealed partial class StartupActivation(
 
         foreach (var folder in options.Folders)
         {
+            using var activity = AxisTelemetry.Source.StartActivity(AxisTelemetry.Activation, ActivityKind.Internal);
+            activity?.SetTag(AxisTelemetry.TenantTag, tenantId);
             try
             {
                 var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, cancellationToken);
+                activity?.SetTag(AxisTelemetry.ApplicationTag, compiled.Model?.Manifest.Name);
                 LogDiagnostics(compiled.Diagnostics, folder, tenantId);
                 if (compiled.Release is null || compiled.Model is null)
                 {
@@ -134,6 +139,7 @@ internal sealed partial class StartupActivation(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                AxisTelemetry.RecordFailure(activity, exception);
                 LogFailed(exception, folder, tenantId);
                 throw;
             }

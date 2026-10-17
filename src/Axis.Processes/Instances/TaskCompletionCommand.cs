@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Core.Telemetry;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Records;
@@ -106,7 +108,19 @@ public static class TaskCompletionCommand
         }
 
         var release = await releaseOf(task, cancellationToken);
-        var (_, step) = StepOf(release, task);
+        var (process, step) = StepOf(release, task);
+
+        // Open through the task's resume, so the next work item stores this span as the one that queued it.
+        using var activity = AxisTelemetry.Source.StartActivity(
+            AxisTelemetry.ProcessStep,
+            ActivityKind.Internal,
+            default(ActivityContext),
+            [
+                new(AxisTelemetry.TenantTag, tenantId),
+                new(AxisTelemetry.ApplicationTag, release.Manifest.Name),
+                new(AxisTelemetry.ProcessTag, process.Name),
+                new(AxisTelemetry.StepTag, task.Step),
+            ]);
         var form = FormOf(release, task, step);
         var entity = release.FindEntity(task.SubjectEntityId)
             ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");

@@ -2444,7 +2444,7 @@ database, with history in `axis.__processes_migrations` (see
   | `error` | `text`, null | The error of a failed step. *(planned for M7)* The exception type, or a fixed text that names the step, property, field pointer or message key. Never the exception message or a value, see [Step errors](#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
-  | `trace_id` | `text` | *(planned for M7)* The 32-hex trace id of the run that wrote the row. For a task completion or a start through the server, it is the request's trace |
+  | `trace_id` | `text`, null | The 32-hex trace id of the run that wrote the row. For a task completion through the server, it is the request's trace. Null when no span was current, such as a row written by the scenario runner, and for rows that existed before the column |
 - `axis.process_work_items`: the ready work. Each item has an `id`, its
   `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
   `claim_token` of its current claim. A step's item also has the
@@ -2460,9 +2460,10 @@ database, with history in `axis.__processes_migrations` (see
   the call. See [Package operations](#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](#event-delivery). It has
   the `event_id` of the occurrence. Every item also has the `trace_id` and
-  `span_id` of the span whose transaction queued it *(planned for M7)*. A run
-  starts a new trace with a link to that span, see
-  [Telemetry](../architecture.md#telemetry).
+  `span_id` of the span whose transaction queued it, or null when no span was
+  current. A run starts a new trace with a link to that span, see
+  [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
+  Activation that queues a `trigger.schedule` item again replaces them.
   Two more kinds come with [schedules](#schedules), and a third with
   [computed fields](storage.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
@@ -2508,8 +2509,8 @@ database, with history in `axis.__processes_migrations` (see
   call, see [Connector calls](#connector-calls). A unique index on
   (`process_instance_id`, `step`) lets a step stage only one call. Times use
   the database clock. There is no column for a request or response body.
-  *(planned for M7)* Each call attempt row stores the `trace_id` of its
-  attempt, see [Telemetry](../architecture.md#telemetry).
+  Each call attempt row stores the `trace_id` of its attempt, see
+  [Telemetry](../architecture.md#telemetry).
 
   | Column | Type | Meaning |
   | --- | --- | --- |
@@ -2549,12 +2550,13 @@ database, with history in `axis.__processes_migrations` (see
   | `outcome` | `text` | For an attempt: `succeeded`, `retryable`, `unknown` or `failed`. For a lookup: `found`, `notFound` or `failed` |
   | `http_status` | `integer`, null | The HTTP status, when one answered. Null for a package call and when none answered |
   | `error` | `text`, null | A fixed text, such as a timeout. It holds no body, no exception message and no secret |
+  | `trace_id` | `text`, null | The 32-hex trace id of the run that made the attempt or lookup. Null when no span was current, and for rows that existed before the column |
 - `axis.package_calls`: one row per staged package call, see
   [Package operations](#package-operations). A unique index on
   (`process_instance_id`, `step`) lets a step stage only one call. Times use
   the database clock. There is no column for an output.
-  *(planned for M7)* Each call attempt row stores the `trace_id` of its
-  attempt, see [Telemetry](../architecture.md#telemetry).
+  Each call attempt row stores the `trace_id` of its attempt, see
+  [Telemetry](../architecture.md#telemetry).
 
   | Column | Type | Meaning |
   | --- | --- | --- |

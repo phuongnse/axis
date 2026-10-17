@@ -127,7 +127,8 @@ public sealed class ConnectorStub : IAsyncDisposable
             context.Request.Path.Value ?? "",
             context.Request.Headers.Authorization.ToString(),
             context.Request.Headers["Idempotency-Key"].ToString(),
-            body));
+            body,
+            context.Request.Headers["traceparent"].ToString()));
 
         var get = HttpMethods.IsGet(context.Request.Method);
         var key = Guid.TryParse(context.Request.Headers["Idempotency-Key"].ToString(), out var headerKey) ? headerKey : PathKey(context.Request.Path.Value);
@@ -187,8 +188,8 @@ public sealed class ConnectorStub : IAsyncDisposable
         Guid.TryParse(path?[(path.LastIndexOf('/') + 1)..], out var key) ? key : null;
 }
 
-/// <summary>A request the stub got. <see cref="Authorization"/> and <see cref="IdempotencyKey"/> are empty when the header was missing.</summary>
-public sealed record StubRequest(string Method, string Path, string Authorization, string IdempotencyKey, string Body);
+/// <summary>A request the stub got. <see cref="Authorization"/>, <see cref="IdempotencyKey"/> and <see cref="Traceparent"/> are empty when the header was missing.</summary>
+public sealed record StubRequest(string Method, string Path, string Authorization, string IdempotencyKey, string Body, string Traceparent = "");
 
 /// <summary>A response the stub holds until <see cref="Release"/>.</summary>
 public sealed class HeldResponse

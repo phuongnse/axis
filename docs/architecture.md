@@ -682,13 +682,15 @@ task API, the worker settings and the tables are in
 ## Telemetry
 
 The server and the worker emit correlated logs, metrics and traces with
-OpenTelemetry and W3C trace context. This section is *(planned for M7)*. See
+OpenTelemetry and W3C trace context. Traces and their stored correlation are
+built. Metrics, OTLP logs, the log scope and the problem details `traceId`
+stay *(planned for M7)*. See
 [D36](decisions.md#d36-correlated-logs-metrics-and-traces--agreed).
 
 ### Signals and export
 
-Both hosts export traces, metrics and logs over OTLP. The standard
-`OTEL_*` variables set the export, see
+Both hosts export traces over OTLP. Metrics and logs follow *(planned for
+M7)*. The standard `OTEL_*` variables set the export, see
 [Telemetry export](reference/configuration.md#telemetry-export). With no
 endpoint, nothing is exported and logs still go to the console. Docker Compose
 and `scripts/dev.sh` start no collector. The scenario runner, `Axis.Scenarios`,
@@ -700,12 +702,18 @@ is not part of this design.
   incoming `traceparent`, as the standard says, so a caller can choose the
   trace id stored with its request.
 - **HttpClient.** Each outgoing call is a span, and carries `traceparent`.
-  The purchasing system receives it, so both sides can find a call.
+  The purchasing system receives it, so both sides can find a call. An
+  outgoing span never names a bound address: it drops `server.address`,
+  `server.port` and `url.query`. A connector call's `url.full` is the
+  operation's path template with `{idempotencyKey}` left unexpanded. Other
+  outgoing spans, such as a package operation's calls and the sign-in calls to
+  Keycloak, have no `url.full`. A trace processor in each host removes these
+  attributes when the span ends, before any exporter sees it.
 - **Npgsql.** Each command is a span. It keeps the statement text without
   parameter values. Axis never calls `EnableParameterLogging`, and no
   connection string sets `Include Error Detail`.
-- **Metrics.** The standard ASP.NET Core, HttpClient and .NET runtime metric
-  sets. The Axis metrics are in
+- **Metrics.** *(planned for M7)* The standard ASP.NET Core, HttpClient and
+  .NET runtime metric sets. The Axis metrics are in
   [worker metrics](reference/processes.md#worker-metrics).
 
 ### Axis spans
@@ -730,7 +738,7 @@ is not part of this design.
 - **Errors.** An Axis span that fails records the exception type only, with no
   message.
 
-### Logs
+### Logs *(planned for M7)*
 
 The console always gets logs. OTLP gets them too when an endpoint is set. Each
 record carries `TraceId` and `SpanId` in its scope, next to the `TenantId` of
@@ -738,11 +746,12 @@ the [log scope](#request-resolution).
 
 ### Correlation
 
-- **Problem details.** Every problem details answer carries a `traceId`, see
-  [Errors](reference/record-api.md#errors).
+- **Problem details.** *(planned for M7)* Every problem details answer carries
+  a `traceId`, see [Errors](reference/record-api.md#errors).
 - **Stored history.** Step history rows and call attempt rows store the
-  `trace_id` of their run, see [Tables](reference/processes.md#tables).
-  `traceId` and `trace_id` hold the same value, the 32-hex W3C trace id.
+  `trace_id` of their run, see [Tables](reference/processes.md#tables). A
+  row written with no current span stores null. `traceId` and `trace_id` hold
+  the same value, the 32-hex W3C trace id.
 
 So a user reports a `traceId`, and an operator searches the history for it.
 Finding one user's failed request goes through the stored history, not the

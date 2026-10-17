@@ -39,6 +39,7 @@ public static class WorkerServiceCollectionExtensions
             throw new InvalidOperationException($"'{HealthOptions.SectionName}:{nameof(HealthOptions.Urls)}' must not be empty.");
         }
 
+        services.AddWorkerTracing(configuration);
         services.AddTenancy(configuration, environment);
         services.AddExtensionPackages(configuration, environment);
         services.AddProcesses(environment.IsDevelopment());

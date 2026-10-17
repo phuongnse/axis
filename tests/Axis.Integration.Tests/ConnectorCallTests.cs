@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
@@ -658,6 +659,38 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         var dueAt = await fixture.DueAtAsync("a", callId);
         Assert.NotNull(dueAt);
         Assert.InRange(dueAt.Value, before + delay, after + delay);
+    }
+
+    [Fact]
+    public async Task Attempt_has_an_http_client_span_under_it_that_names_the_path_template_and_no_address_and_the_call_carries_the_trace()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, "TrackedOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+        using var collector = new SpanCollector();
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        // The stub got the trace context of the HTTP span, so its trace id names the attempt's trace.
+        var request = Assert.Single(fixture.Stub.CreateRequestsFor(callId));
+        var traceId = request.Traceparent.Split('-')[1];
+        var spans = collector.Spans.Where(span => span.TraceId.ToHexString() == traceId).ToList();
+        var attempt = Assert.Single(spans, span => span.OperationName == "axis.connector.attempt");
+        Assert.Equal("succeeded", attempt.GetTagItem("axis.outcome"));
+        var http = Assert.Single(spans, span => span.Kind == ActivityKind.Client && span.GetTagItem("http.request.method") is not null && span.ParentSpanId == attempt.SpanId);
+        Assert.Equal("/tracked-orders/{idempotencyKey}", http.GetTagItem("url.full"));
+        Assert.All(["server.address", "server.port", "url.query"], key => Assert.Null(http.GetTagItem(key)));
+        Assert.DoesNotContain(http.TagObjects, tag => tag.Value?.ToString()?.Contains(fixture.Stub.BaseUrl, StringComparison.Ordinal) == true);
+        Assert.Equal(http.SpanId.ToHexString(), request.Traceparent.Split('-')[2]);
+
+        var row = Assert.Single(await AttemptsAsync(tenant, callId));
+        Assert.Equal("attempt", row.Kind);
+        Assert.Equal(
+            traceId,
+            await tenant.ScalarAsync("SELECT trace_id FROM axis.process_call_attempts WHERE call_id = @id", ("id", callId)));
+
+        // The next step's item was queued. Running it leaves nothing due for the next test.
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
     }
 
     private static async Task<Guid> CallIdAsync(ProcessStepFixture tenant, Guid instanceId) =>

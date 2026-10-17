@@ -34,4 +34,7 @@ public sealed class ProcessStepHistoryRow
     public required DateTimeOffset StartedAt { get; init; }
 
     public required DateTimeOffset FinishedAt { get; init; }
+
+    /// <summary>The trace id of the run that executed the step, or <see langword="null"/> when no span was current.</summary>
+    public string? TraceId { get; init; }
 }

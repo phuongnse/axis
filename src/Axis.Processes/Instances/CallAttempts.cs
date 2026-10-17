@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Axis.Core.Telemetry;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -55,16 +57,17 @@ internal static class CallAttempts
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_call_attempts
-                (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error)
+                (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id)
             VALUES (
                 @id, @callKind, @callId, @kind,
                 COALESCE(@number, (SELECT COALESCE(max(number), 0) + 1 FROM axis.process_call_attempts WHERE call_id = @callId AND kind = @kind)),
-                @startedAt, now(), @outcome, @status, @error)
+                @startedAt, now(), @outcome, @status, @error, @trace)
             """,
             connection,
             transaction);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("callKind", callKind);
+        command.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
         command.Parameters.AddWithValue("callId", callId);
         command.Parameters.AddWithValue("kind", attempt.Kind);
         command.Parameters.Add(new NpgsqlParameter("number", NpgsqlDbType.Integer) { Value = (object?)attempt.Number ?? DBNull.Value });
@@ -73,6 +76,33 @@ internal static class CallAttempts
         command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)attempt.HttpStatus ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)attempt.Error ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
+        TagOutcome(attempt);
+    }
+
+    /// <summary>
+    /// Sets the outcome of the current call span, when the current span is one. A lookup's outcome is
+    /// the outcome class of the call after it: found is <c>succeeded</c>, not found <c>retryable</c>
+    /// and a failed lookup <c>unknown</c>.
+    /// </summary>
+    private static void TagOutcome(CallAttempt attempt)
+    {
+        if (Activity.Current is not { } span
+            || span.Source != AxisTelemetry.Source
+            || span.OperationName is not (AxisTelemetry.ConnectorAttempt or AxisTelemetry.ConnectorLookup or AxisTelemetry.PackageCall))
+        {
+            return;
+        }
+
+        span.SetTag(
+            AxisTelemetry.OutcomeTag,
+            attempt.Kind == Lookup
+                ? attempt.Outcome switch
+                {
+                    Found => Succeeded,
+                    NotFound => Retryable,
+                    _ => Unknown,
+                }
+                : attempt.Outcome);
     }
 }
 
