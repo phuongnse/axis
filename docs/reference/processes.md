@@ -743,11 +743,11 @@ the next step as usual.
 ## Releases and running work
 
 New work starts on the active release. Running work stays on its pinned
-release until it ends, including its tasks, forms, texts and package versions
-*(planned for M6)*. Roles and policies come from the active release. This
+release until it ends, including its tasks, forms, texts and package versions.
+Roles and policies come from the active release. This
 section records [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
 
-The table includes the rules already built. Notes mark the M6 additions.
+The table lists the release each endpoint and command uses.
 **Pinned** means the instance's or task's release, or the release id requested
 for texts. **Both** means different parts use different releases.
 
@@ -805,7 +805,7 @@ for texts. **Both** means different parts use different releases.
 
 ### Walkthrough: a waiting purchase request
 
-This walkthrough shows full release pinning *(planned for M6)* in the
+This walkthrough shows full release pinning in the
 [purchase request sample](../../samples/apps/purchase-requests/sites/purchasing.json).
 R1 and R2 stand for stored release UUIDs of the same application.
 

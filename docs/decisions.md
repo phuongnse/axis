@@ -1055,9 +1055,8 @@ plainly that a package is trusted code.
 
 ## D29. Release pinning and text resources — Agreed
 
-M6 keeps running work on its release, including its tasks, forms, texts and
-package versions *(planned for M6)*. Roles and policies still come from the
-active release. See [releases and running work](reference/processes.md#releases-and-running-work)
+Running work stays on its release, including its tasks, forms, texts and
+package versions. Roles and policies still come from the active release. See [releases and running work](reference/processes.md#releases-and-running-work)
 for the endpoint and command rules and a purchase request walkthrough.
 The owner confirmed these points on issue #412 on 2026-10-15.
 
@@ -1112,7 +1111,7 @@ work without the code its release pins.
 Activation applies the `renameField`, `dropField`, `dropEntity`, `fill` and
 `convert` migrations once per tenant. The start lock and the old-release work
 check are built too. The recompute of computed fields is not built yet
-*(planned for M6)*. Until
+*(planned for M7)*. Until
 the recompute is built, a `fill` or `convert` on a child entity and a `fill` or
 `convert` of a field that a computed field reads are refused. Migrations
 change entity storage in ways that are not additive, before provisioning.
@@ -1235,7 +1234,7 @@ change the schema, a stored release, the active release or the provisioning
 records. The server reads both connection strings, startup activation uses
 `SchemaConnectionString`, and the server grants the runtime database role its
 rights at every start. The start checks for a superuser, a schema owner or a
-role that may create objects are *(planned for M6)*.
+role that may create objects are *(planned for M7)*.
 See [storage](reference/storage.md#database-roles) for the grants and the
 connection string of each step.
 The owner confirmed these points for issue #414 on 2026-10-16.
@@ -1295,7 +1294,7 @@ database role makes that a property of the database, not of the code.
 ## D32. Test scenarios — Agreed
 
 A `scenario` resource is a configuration-level test that runs against its own
-temporary tenant database *(planned for M6)*. It seeds data, runs actions as
+temporary tenant database. It seeds data, runs actions as
 given users and asserts the outcomes, including denied actions. See
 [configuration](reference/configuration.md#test-scenarios) for the resource
 shape and a purchase request example.
