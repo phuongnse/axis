@@ -883,7 +883,7 @@ in any state. The body has these parts:
   values.
 - `calls` are the connector and package calls of the instance, ordered by
   `createdAt`, then by `id`. Each is
-  `{ "id", "kind", "step", "connector" or "package" with "version", "operation", "state", "attempts", "input", "inputHidden" }`.
+  `{ "id", "kind", "step", "connector" or "package" with "version" and "idempotent", "operation", "state", "attempts", "input", "inputHidden", "resolvable", "outputs" }`.
   - `kind` is `connector` or `package`. A connector call has `connector`. A
     package call has `package` and `version`, the version its release pins.
   - `state` is the call's state: `pending`, `sending`, `unknown`,
@@ -895,8 +895,30 @@ in any state. The body has these parts:
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
   - A call has no output. The engine writes the outputs of a call straight to
     the subject record and stores no response body.
-  - A connector call has no `package` or `version` key, and a package call
-    has no `connector` key.
+  - `idempotent` is only on a package call. It is the value stored when the
+    engine staged the call, for the inspector's retry warning.
+  - `resolvable` is `true` when the user holds the `resolve` grant, the call
+    is `unknown`, the instance is `waiting` on the call's step, and the
+    operation is declared. A call that does not meet all four has `false`.
+  - `outputs` is only on a resolvable call. It lists the operation's declared
+    outputs as `{ "name", "type", "required" }`, from the connector operation
+    of the pinned release or the manifest of the pinned package version. When
+    the pinned release lacks the connector operation, or the package version is
+    not installed, the call is not resolvable.
+  - A connector call has no `package`, `version` or `idempotent` key, and a
+    package call has no `connector` key.
+- `commands` lists the [operator commands](#operator-commands) the user may
+  take on the instance. It is an array and may be empty.
+  - It holds `retry` when the instance is `failed` and the user holds the
+    `retry` grant.
+  - It holds `cancel` when the instance is `running` or `waiting`, none of
+    its calls is `sending` or `unknown`, and the user holds the `cancel`
+    grant.
+  - The grants are read from the policies of the active release, as the
+    commands themselves do.
+  - It does not run the other checks of a retry: another active instance for
+    the record, or a destructive migration since the pinned release. A command
+    in the list can still be refused with `409`.
 
 ```json
 {
@@ -972,15 +994,17 @@ in any state. The body has these parts:
         }
       ],
       "input": null,
-      "inputHidden": true
+      "inputHidden": true,
+      "resolvable": false
     }
-  ]
+  ],
+  "commands": []
 }
 ```
 
 The example shortens the lists. The graph, the path and the tasks are the
-same for every user who may inspect the instance. Only a call's `input`
-differs between users.
+same for every user who may inspect the instance. Only a call's `input`,
+`commands`, and each call's `resolvable` and `outputs` differ between users.
 
 ### Values and masking
 
@@ -1846,8 +1870,9 @@ commands let an authorized user act on process work that the engine cannot
 finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
 `running` or `waiting` instance. **Resolve** settles a connector or package
 call whose outcome is `unknown`. Each is an audited command with its own
-grant, a required reason and one transaction. The process inspector widget
-(#477) will show them.
+grant, a required reason and one transaction. The
+[instance detail](#instance-detail) lists the commands the user may take. The
+process inspector widget (#477) will show them.
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry

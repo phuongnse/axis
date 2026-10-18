@@ -20,7 +20,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "graph", "path", "tasks", "calls"],
+            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "graph", "path", "tasks", "calls", "commands"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
@@ -181,7 +181,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var calls = body.RootElement.GetProperty("calls").EnumerateArray().ToList();
         var item = Assert.Single(calls);
         Assert.Equal(
-            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden"],
+            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "resolvable"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal(call, item.GetProperty("id").GetGuid());
         Assert.Equal("connector", item.GetProperty("kind").GetString());

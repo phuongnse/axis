@@ -22,10 +22,10 @@ public static class CallQueries
         var calls = new List<ProcessCallDetail>();
         await using (var command = new NpgsqlCommand(
             """
-            SELECT id, 'connector' AS kind, step, connector AS name, NULL::text AS version, operation, state, input::text, created_at
+            SELECT id, 'connector' AS kind, step, connector AS name, NULL::text AS version, operation, state, input::text, NULL::boolean AS idempotent, created_at
             FROM axis.connector_calls WHERE process_instance_id = @id
             UNION ALL
-            SELECT id, 'package' AS kind, step, package AS name, version, operation, state, input::text, created_at
+            SELECT id, 'package' AS kind, step, package AS name, version, operation, state, input::text, idempotent, created_at
             FROM axis.package_calls WHERE process_instance_id = @id
             ORDER BY created_at, id
             """,
@@ -45,7 +45,8 @@ public static class CallQueries
                     Operation = reader.GetString(5),
                     State = reader.GetString(6),
                     Input = reader.IsDBNull(7) ? null : reader.GetString(7),
-                    CreatedAt = reader.GetFieldValue<DateTimeOffset>(8),
+                    Idempotent = reader.IsDBNull(8) ? null : reader.GetBoolean(8),
+                    CreatedAt = reader.GetFieldValue<DateTimeOffset>(9),
                 });
             }
         }
@@ -125,6 +126,9 @@ public sealed class ProcessCallDetail
     public required string State { get; init; }
 
     public string? Input { get; init; }
+
+    /// <summary>Whether a package call's operation is idempotent, as stored when the call was staged, or null for a connector call.</summary>
+    public bool? Idempotent { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
 
