@@ -852,7 +852,7 @@ Studio is where authors edit an application's resources. It uses the
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, the resource list with its
 search, the editor, the Uses and Used by lists, the delete button and its warning,
-and the diagnostics panel are built. *(Planned for M9: the reconnect message.)*
+the diagnostics panel, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -921,8 +921,18 @@ and the diagnostics panel are built. *(Planned for M9: the reconnect message.)*
   diagnostic's `path`.)* A diagnostic that names no resource cannot be
   selected. A diagnostic never blocks a save.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
-  Studio shows a short reconnect message and retries until the server
-  answers. *(Planned for M9.)*
+  Studio shows a reconnect message at the top of the page when a request gets
+  no answer, or answers `502`, `503` or `504`. The Vite dev proxy answers `502`
+  while the server is down.
+  - Studio then calls `GET /api/me` with a back-off of 0.5, 1, 2 and then 4
+    seconds, with no limit, until the server answers with any other status.
+  - Then the resource list, the diagnostics, the open resource and its Uses
+    and Used by lists load again, and the message goes away.
+  - An unsaved draft stays on screen, with the version it was based on. If the
+    file changed in the meantime, the next save gets a `409`. Studio does not
+    resend a save that got no answer, so the author clicks Save again.
+  - Save and Delete are off while the message shows.
+  - A `401` from a reload starts sign-in, as elsewhere.
 - **Out of scope.** Visual process and page designers stay out of scope, see
   [out of scope for now](../product-brief.md#out-of-scope-for-now).
 - **Texts.** Its texts, including those of the lists above, are the platform

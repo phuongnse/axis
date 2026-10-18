@@ -1,5 +1,5 @@
 import { Alert, Button, Descriptions, Flex, Input, Result, Select, Tag, Typography } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { forbidden } from '../platform/inspection'
 import {
@@ -9,10 +9,13 @@ import {
   filterResources,
   groupByKind,
   resourceTitle,
+  ServerUnreachableError,
   type StudioApplication,
   type StudioDiagnostic,
   type StudioResourceItem,
+  waitForServer,
 } from '../platform/studio'
+import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioReferences } from './StudioReferences'
@@ -33,10 +36,43 @@ type FolderState =
  * picked. A diagnostic that names a resource selects it, and clears the search so the resource is listed.
  * A selected resource opens in an editor below its details, with its Uses and Used by lists under the editor. A
  * Used by entry opens its resource at the path of the reference, as `&path=`. After a save, the diagnostics panel
- * shows the diagnostics that the save answered. After a delete, the resource leaves the list.
+ * shows the diagnostics that the save answered. After a delete, the resource leaves the list. When the server does
+ * not answer, a reconnect message shows at the top. Studio checks the server with a back-off, then loads its data
+ * again, and an unsaved draft stays on screen.
  */
 export function StudioPage() {
   const t = useText()
+  const [reconnecting, setReconnecting] = useState(false)
+  const [generation, setGeneration] = useState(0)
+  const lost = useCallback(() => setReconnecting(true), [])
+  const connection = useMemo(() => ({ generation, reconnecting, lost }), [generation, reconnecting, lost])
+
+  useEffect(() => {
+    if (!reconnecting) {
+      return
+    }
+    const controller = new AbortController()
+    waitForServer(controller.signal).then(
+      () => {
+        setReconnecting(false)
+        setGeneration((value) => value + 1)
+      },
+      () => {},
+    )
+    return () => controller.abort()
+  }, [reconnecting])
+
+  return (
+    <StudioConnectionContext.Provider value={connection}>
+      {reconnecting && <Alert data-testid="studio-reconnecting" type="info" message={t('shell.studio.reconnecting')} />}
+      <StudioWorkspace />
+    </StudioConnectionContext.Provider>
+  )
+}
+
+function StudioWorkspace() {
+  const t = useText()
+  const { generation, lost } = useStudioConnection()
   const [params, setParams] = useSearchParams()
   const application = params.get('app')
   const resourceId = params.get('resource')
@@ -48,13 +84,18 @@ export function StudioPage() {
   useEffect(() => {
     const controller = new AbortController()
     fetchStudioApps(controller.signal).then(setApps, (error: unknown) => {
-      if (!controller.signal.aborted) {
-        console.warn('Loading the Studio applications failed', error)
-        setApps('failed')
+      if (controller.signal.aborted) {
+        return
       }
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return
+      }
+      console.warn('Loading the Studio applications failed', error)
+      setApps('failed')
     })
     return () => controller.abort()
-  }, [])
+  }, [generation, lost])
 
   const onlyApplication = Array.isArray(apps) && apps.length === 1 ? apps[0].name : null
   useEffect(() => {
@@ -74,14 +115,19 @@ export function StudioPage() {
     ]).then(
       ([resources, diagnostics]) => setFolder({ application, resources, diagnostics }),
       (error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn(`Loading the Studio folder of '${application}' failed`, error)
-          setFolder({ application, failed: true })
+        if (controller.signal.aborted) {
+          return
         }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the Studio folder of '${application}' failed`, error)
+        setFolder({ application, failed: true })
       },
     )
     return () => controller.abort()
-  }, [application])
+  }, [application, generation, lost])
 
   const loaded = folder?.application === application ? folder : undefined
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])

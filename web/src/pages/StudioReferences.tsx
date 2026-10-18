@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   fetchResourceReferences,
   fetchTextReferences,
+  ServerUnreachableError,
   type StudioReference,
   type StudioReferenceNode,
   type StudioResourceReferences,
 } from '../platform/studio'
+import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 
 type Direction = 'uses' | 'usedBy'
@@ -28,19 +30,25 @@ export function StudioReferences({
   onOpen: OpenResource
 }) {
   const t = useText()
+  const { generation, lost } = useStudioConnection()
   const [references, setReferences] = useState<StudioResourceReferences>()
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
     fetchResourceReferences(application, resourceId, controller.signal).then(setReferences, (error: unknown) => {
-      if (!controller.signal.aborted) {
-        console.warn(`Loading the references of '${resourceId}' failed`, error)
-        setFailed(true)
+      if (controller.signal.aborted) {
+        return
       }
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return
+      }
+      console.warn(`Loading the references of '${resourceId}' failed`, error)
+      setFailed(true)
     })
     return () => controller.abort()
-  }, [application, resourceId])
+  }, [application, resourceId, generation, lost])
 
   if (failed) {
     return <Alert type="error" message={t('shell.studio.referencesFailed')} />
@@ -98,6 +106,7 @@ function ReferenceEntry({
   onOpen: OpenResource
 }) {
   const t = useText()
+  const { lost } = useStudioConnection()
   const { node } = entry
   const expandable = node.type === 'resource' || node.type === 'text'
   const [expanded, setExpanded] = useState(false)
@@ -111,8 +120,12 @@ function ReferenceEntry({
     if (next && !requested.current) {
       requested.current = true
       loadDetails(application, node)?.then(setDetails, (error: unknown) => {
-        console.warn('Loading the references of an entry failed', error)
         requested.current = false
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn('Loading the references of an entry failed', error)
         setFailed(true)
       })
     }

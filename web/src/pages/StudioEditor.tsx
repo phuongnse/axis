@@ -5,10 +5,12 @@ import {
   deleteStudioResource,
   fetchStudioResource,
   patchStudioResource,
+  ServerUnreachableError,
   type StudioDiagnostic,
   type StudioResource,
   type StudioResourceItem,
 } from '../platform/studio'
+import { useStudioConnection } from '../platform/studioConnection'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { SchemaForm } from './SchemaForm'
@@ -47,7 +49,8 @@ function fieldElement(root: HTMLElement, path: string): HTMLElement | undefined 
  * only the difference from what was loaded, as a JSON Patch with the loaded version. A `409` keeps the draft and
  * offers Reload, which reads the file again and drops the draft. Delete asks first and warns with the number of
  * references to the resource, and it is off for the application manifest. When `path` is set, the editor scrolls
- * to the field that holds it once the resource has loaded.
+ * to the field that holds it once the resource has loaded. When the server does not answer, the draft stays, and
+ * the resource loads again after the reconnect unless the draft has changes.
  */
 export function StudioEditor({
   application,
@@ -63,7 +66,9 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
+  const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
+  const dirtyRef = useRef(false)
   const [loaded, setLoaded] = useState<Loaded>()
   const [schema, setSchema] = useState<JsonSchema>()
   const [loadFailed, setLoadFailed] = useState(false)
@@ -94,20 +99,32 @@ export function StudioEditor({
     Promise.all([fetchStudioResource(application, item.id, controller.signal), loadKindSchema(item.kind)]).then(
       ([resource, kindSchema]) => {
         setSchema(kindSchema)
-        adopt(resource)
+        setLoadFailed(false)
+        if (!dirtyRef.current) {
+          adopt(resource)
+        }
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn(`Loading the resource '${item.id}' failed`, error)
-          setLoadFailed(true)
+        if (controller.signal.aborted) {
+          return
         }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the resource '${item.id}' failed`, error)
+        setLoadFailed(true)
       },
     )
     return () => controller.abort()
-  }, [application, item.id, item.kind])
+  }, [application, item.id, item.kind, generation, lost])
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   const isLoaded = loaded !== undefined
+
+  useEffect(() => {
+    dirtyRef.current = patch.length > 0 || jsonInvalid
+  }, [patch, jsonInvalid])
 
   useEffect(() => {
     if (!isLoaded || path === null || !rootRef.current) {
@@ -170,8 +187,12 @@ export function StudioEditor({
       setSaved(true)
       onSaved(result.diagnostics)
     } catch (error) {
-      console.warn(`Saving the resource '${item.id}' failed`, error)
-      setSaveFailed(true)
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else {
+        console.warn(`Saving the resource '${item.id}' failed`, error)
+        setSaveFailed(true)
+      }
     } finally {
       setSaving(false)
     }
@@ -181,6 +202,10 @@ export function StudioEditor({
     try {
       adopt(await fetchStudioResource(application, item.id))
     } catch (error) {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return
+      }
       console.warn(`Loading the resource '${item.id}' failed`, error)
       setLoadFailed(true)
     }
@@ -198,9 +223,13 @@ export function StudioEditor({
       }
       onDeleted(result.diagnostics)
     } catch (error) {
-      console.warn(`Deleting the resource '${item.id}' failed`, error)
       setDeleteOpen(false)
-      setDeleteFailed(true)
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else {
+        console.warn(`Deleting the resource '${item.id}' failed`, error)
+        setDeleteFailed(true)
+      }
     } finally {
       setDeleting(false)
     }
@@ -253,11 +282,15 @@ export function StudioEditor({
         <Alert data-testid="studio-delete-error" type="error" message={t('shell.studio.deleteFailed')} />
       )}
       <Flex gap="small" align="center">
-        <Button type="primary" disabled={patch.length === 0 || jsonInvalid || conflict || saving} onClick={save}>
+        <Button
+          type="primary"
+          disabled={patch.length === 0 || jsonInvalid || conflict || saving || reconnecting}
+          onClick={save}
+        >
           {t('shell.studio.save')}
         </Button>
         {item.kind !== 'application' && (
-          <Button danger onClick={() => setDeleteOpen(true)}>
+          <Button danger disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
             {t('shell.studio.delete')}
           </Button>
         )}

@@ -2,6 +2,65 @@ import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
 
+/** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
+export class ServerUnreachableError extends Error {}
+
+const unavailableStatuses = new Set([502, 503, 504])
+
+/** The waits before each `GET /api/me` while the server is unreachable. The last wait repeats. */
+export const reconnectDelays = [500, 1000, 2000, 4000]
+
+/** `apiFetch` for Studio. A request that gets no answer, or an unavailable status, throws {@link ServerUnreachableError}. */
+async function studioFetch(path: string, init?: RequestInit): Promise<Response> {
+  let response: Response
+  try {
+    response = await apiFetch(path, init)
+  } catch (error) {
+    if (init?.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      throw error
+    }
+    throw new ServerUnreachableError(`The server did not answer '${path}'.`)
+  }
+  if (unavailableStatuses.has(response.status)) {
+    throw new ServerUnreachableError(`'${path}' answered with status ${response.status}.`)
+  }
+  return response
+}
+
+/**
+ * Resolves once `GET /api/me` answers with anything but no answer or 502, 503 or 504. It does not start sign-in on
+ * a 401, because the reloads after the reconnect do. It rejects when `signal` aborts.
+ */
+export async function waitForServer(signal: AbortSignal, delays: readonly number[] = reconnectDelays): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    await pause(delays[Math.min(attempt, delays.length - 1)], signal)
+    try {
+      const response = await apiFetch('/api/me', { signal }, { signInOnUnauthorized: false })
+      if (!unavailableStatuses.has(response.status)) {
+        return
+      }
+    } catch (error) {
+      if (signal.aborted) {
+        throw error
+      }
+    }
+  }
+}
+
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(signal.reason)
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
 /** An application in the list of `GET /api/studio/apps`. */
 export interface StudioApplication {
   name: string
@@ -80,7 +139,7 @@ export interface ResourceGroup {
  * throws, as any other failure does.
  */
 export async function fetchStudioApps(signal?: AbortSignal): Promise<StudioApplication[] | typeof forbidden> {
-  const response = await apiFetch('/api/studio/apps', { signal })
+  const response = await studioFetch('/api/studio/apps', { signal })
   if (response.status === 403) {
     return forbidden
   }
@@ -93,7 +152,7 @@ export async function fetchStudioApps(signal?: AbortSignal): Promise<StudioAppli
 /** Loads the resources of an application's folder, sorted by file. A 401 starts sign-in and throws, as any other failure does. */
 export async function fetchStudioResources(application: string, signal?: AbortSignal): Promise<StudioResourceItem[]> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources`
-  const response = await apiFetch(path, { signal })
+  const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
@@ -103,7 +162,7 @@ export async function fetchStudioResources(application: string, signal?: AbortSi
 /** Loads the compile diagnostics of an application's folder. A 401 starts sign-in and throws, as any other failure does. */
 export async function fetchStudioDiagnostics(application: string, signal?: AbortSignal): Promise<StudioDiagnostic[]> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/diagnostics`
-  const response = await apiFetch(path, { signal })
+  const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
@@ -117,7 +176,7 @@ export async function fetchStudioResource(
   signal?: AbortSignal,
 ): Promise<StudioResource> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}`
-  const response = await apiFetch(path, { signal })
+  const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
@@ -135,7 +194,7 @@ export async function patchStudioResource(
   operations: JsonPatchOperation[],
 ): Promise<PatchResult> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}`
-  const response = await apiFetch(path, {
+  const response = await studioFetch(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json-patch+json', 'If-Match': `"${version}"` },
     body: JSON.stringify(operations),
@@ -157,7 +216,7 @@ export async function fetchResourceReferences(
   signal?: AbortSignal,
 ): Promise<StudioResourceReferences> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}/references`
-  const response = await apiFetch(path, { signal })
+  const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
@@ -171,7 +230,7 @@ export async function fetchTextReferences(
   signal?: AbortSignal,
 ): Promise<StudioTextReferences> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/texts/${encodeURIComponent(key)}/references`
-  const response = await apiFetch(path, { signal })
+  const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
@@ -184,7 +243,7 @@ export async function fetchTextReferences(
  */
 export async function deleteStudioResource(application: string, id: string, version: string): Promise<DeleteResult> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}`
-  const response = await apiFetch(path, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
+  const response = await studioFetch(path, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
   if (response.status === 409) {
     return { status: 'conflict' }
   }
