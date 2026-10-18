@@ -58,6 +58,9 @@ namespace Axis.Server.Records;
 /// <c>update</c> or <c>delete</c> filter. Nothing is written. A list whose valid <c>sort</c> or
 /// <c>search</c> names such a field is a 409 with the problem at <c>sort</c> or <c>search</c>. The
 /// problem titles never contain text from the request.
+/// An entity of a module is written <c>{module id}/{entity name}</c>, as two path segments, for
+/// example <c>entities/departments/Department/records</c>. It has the same routes and checks as
+/// any other entity, and only that form reaches it.
 /// </summary>
 internal static class RecordEndpoints
 {
@@ -65,13 +68,18 @@ internal static class RecordEndpoints
 
     public static void MapRecordEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var records = endpoints.MapGroup("/api/apps/{app}/entities/{entity}/records");
-        records.MapGet("", ListAsync);
-        records.MapGet("/{id}", GetAsync);
-        records.MapGet("/{id}/history", HistoryAsync);
-        records.MapPost("", CreateAsync);
-        records.MapPatch("/{id}", UpdateAsync);
-        records.MapDelete("/{id}", DeleteAsync);
+        // An entity of the application has one segment, and an entity of a module has the module id
+        // and the entity name as two, so no entity has two URLs.
+        foreach (var pattern in new[] { "/api/apps/{app}/entities/{entity}/records", "/api/apps/{app}/entities/{module}/{entity}/records" })
+        {
+            var records = endpoints.MapGroup(pattern);
+            records.MapGet("", ListAsync);
+            records.MapGet("/{id}", GetAsync);
+            records.MapGet("/{id}/history", HistoryAsync);
+            records.MapPost("", CreateAsync);
+            records.MapPatch("/{id}", UpdateAsync);
+            records.MapDelete("/{id}", DeleteAsync);
+        }
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -95,7 +103,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(request.HttpContext, entity), resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -204,7 +212,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -266,7 +274,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -366,7 +374,7 @@ internal static class RecordEndpoints
         // A release change under the start lock sends the create back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, EntityName(request.HttpContext, entity), resolver, cancellationToken);
             if (model is null)
             {
                 return notFound!;
@@ -418,7 +426,7 @@ internal static class RecordEndpoints
         // A release change under the start lock sends the update back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, EntityName(request.HttpContext, entity), resolver, cancellationToken);
             if (model is null)
             {
                 return notFound!;
@@ -471,7 +479,7 @@ internal static class RecordEndpoints
             return Grants.SignInRequired();
         }
 
-        var (application, model, notFound, _) = await ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
         if (model is null)
         {
             return notFound!;
@@ -488,6 +496,10 @@ internal static class RecordEndpoints
     }
 
     private static RecordActor Actor(CurrentUserResponse user) => new(user.Id, user.DisplayName, user.Roles);
+
+    // The route of a module entity has a module segment before the entity name.
+    private static string EntityName(HttpContext context, string entity) =>
+        context.GetRouteValue("module") is string module ? $"{module}/{entity}" : entity;
 
     private static RecordBodyReader BodyReader(HttpRequest request) =>
         async cancellationToken => JsonRequest.IsJson(request) ? await ReadBodyAsync(request, cancellationToken) : null;

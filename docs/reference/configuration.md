@@ -1948,9 +1948,11 @@ checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences and seeds join the application model, each
 with an id derived from the application `id` and the name
 `<module id>/<name>`. A field's `target` and `sequence` can name them, which
-also covers data source parameters and endpoint inputs. Module data sources,
-rules, forms, events and texts, seeding and activating module entities, the API
-naming of module entities and the codes marked planned are *(planned for M8)*.
+also covers data source parameters and endpoint inputs. Activation provisions
+the module's entities as the application's own tables, startup seeding applies
+the module's seeds, and the record API serves module entities. Module data
+sources, rules, forms, events and texts, and the codes marked planned are
+*(planned for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -2012,8 +2014,12 @@ The module's manifest is `module.json` at the root of its folder:
   policy grant `entity` that names an undeclared module keeps the policy's
   unknown-entity code. A module entity sees no rules yet, so it cannot call an
   application rule. Module entities come before the application's own entities
-  in the model, in the order of `modules` and then by path. How a module entity
-  or data source is named in API URLs is left to the issue that builds modules.
+  in the model, in the order of `modules` and then by path. The record API
+  writes a module entity's name as two path segments, `{module id}/{entity
+  name}`, for example
+  `/api/apps/{app}/entities/departments/Department/records`. See the
+  [record API routes](record-api.md#routes). How a module data source is named
+  in API URLs is still open, because module data sources are not built yet.
 - **A copy per application.** Entities, sequences and seeds of a module belong
   to the application that uses it. The id of each module resource inside an
   application is a UUID v5 of the application `id` and the id written in the
@@ -2031,7 +2037,9 @@ The module's manifest is `module.json` at the root of its folder:
   and `AXC0028`. An application text key may not start with the `<id>.` prefix
   of a declared module.
 - **Seeds.** The startup seeding step applies a module's seeds for each
-  application that uses the module, into that application's table.
+  application that uses the module, into that application's table. Each
+  application keeps the record ids written in the module file, so its own
+  seeds can reference a module seed record by that id.
 - **Diagnostics.** A diagnostic in a module file has `file` set to
   `modules/<id>/<relative path>` and `resourceId` set to the id declared in the
   file.
