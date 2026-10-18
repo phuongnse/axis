@@ -1898,3 +1898,52 @@ applications in one tenant would share one table. Deriving the id per
 application removes that risk and keeps a module's id stable across its
 versions. The cost is that each application holds its own data, and a module
 can only grow additively until modules can ship migrations.
+
+## D41. Leave requests as the second sample application — Agreed
+
+M8 adds a second, smaller sample application: leave requests. Nothing of it is
+built, and every point below is *(planned for M8)*. See the
+[Second application section](product-brief.md#second-application-leave-requests)
+of the product brief for the data, flow, security, pages and scenarios. The
+owner confirmed these points on issue #572 on 2026-10-18.
+
+- **Application:** leave requests, in `samples/apps/leave-requests`. An
+  employee asks for days off, and the department manager decides. It needs no
+  platform code change.
+- **Data:**
+  - A leave request has a number from the sequence `LR-{yyyy}-{n:5}`, an
+    employee, a department, a leave type (`annual`, `sick` or `unpaid`), a
+    first day, a last day, days, a reason, a status and a decision comment.
+  - Departments come from the `departments` module of
+    [D40](#d40-reusable-modules--agreed), with its seed departments.
+  - Days are computed as `daysBetween(firstDay, lastDay) + 1`. They count
+    calendar days, including both ends. Weekends and holidays are not left out.
+- **Flow:**
+  - An employee creates a draft and submits it. Submitting checks that the
+    last day is not before the first day. It starts the approval process only
+    once.
+  - The department manager gets a task and approves, returns or rejects.
+  - A returned request can be edited and submitted again.
+  - There is no finance step, connector or extension package.
+- **Security:**
+  - The roles are `employee` and `department-manager`. They are the Keycloak
+    realm roles that the purchase request sample already uses, so the realm
+    needs no change.
+  - The sample reuses the development users: `anna` and `lan` are employees,
+    `binh` and `chau` are managers.
+  - An employee sees only their own requests. A manager sees the requests of
+    their departments. Everything else is denied by default.
+- **Pages:** My leave requests, the request form and My tasks, in a site at
+  path `leave`.
+- **Tests:**
+  - Test scenarios cover approve, return then resubmit, reject and denied
+    access.
+  - One Playwright journey: `anna` submits, `chau` approves, and `anna` sees
+    the request approved.
+  - The server activates the sample next to purchase requests under
+    `scripts/dev.sh`, Compose and E2E.
+
+*Why:* The sample is small. It uses tasks and policies as purchase requests
+do, and it uses the departments module of [D40](#d40-reusable-modules--agreed).
+It needs no package or connector. So it shows reuse without platform code. Any
+platform change it needs is a gap to raise, not to hide in the sample.
