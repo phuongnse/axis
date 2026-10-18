@@ -106,6 +106,51 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 - A new release is published while an older request is still waiting; that
   request finishes on its original version.
 
-A second, smaller application is added after purchase requests to show that
-the platform is reused without platform code changes. It will be chosen when
-that milestone starts.
+## Second application: leave requests
+
+*(Planned for M8)* A second, smaller application shows that the platform is
+reused with no platform code change. It lives as configuration in
+`samples/apps/leave-requests/`. It is not platform code. See
+[D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed).
+
+### Data
+
+- **Leave request**: number (sequence `LR-{yyyy}-{n:5}`), employee, department,
+  leave type (`annual`, `sick` or `unpaid`), first day, last day, days
+  (computed), reason, status and decision comment.
+- Days are calendar days, counting both ends:
+  `daysBetween(firstDay, lastDay) + 1`. Weekends and holidays are not left out.
+- **Department**: comes from the `departments` module, with its seed
+  departments (see [D40](decisions.md#d40-reusable-modules--agreed)).
+
+### Flow
+
+1. An employee creates a draft and submits it. Submitting checks that the last
+   day is not before the first day. It starts the approval process only once.
+2. The department manager gets a task. They approve, return or reject the
+   request.
+3. A returned request can be edited and submitted again.
+4. There is no finance step, connector or extension package.
+
+### Security
+
+- The roles are `employee` and `department-manager`. The sample uses the same
+  development users as purchase requests: `anna` and `lan` are employees, and
+  `binh` and `chau` are managers.
+- An employee sees only their own requests. A manager sees the requests of
+  their departments. Everything else is denied by default.
+
+### Pages
+
+My leave requests, the request form and My tasks, in a site at path `leave`.
+
+### Scenarios the application must pass
+
+- Approve, return then resubmit, and reject.
+- Denied access: an employee cannot see another employee's request, and a
+  user cannot act on a task that is not theirs.
+- One Playwright journey: `anna` submits, `chau` approves, and `anna` sees the
+  request approved.
+
+The server activates this sample next to purchase requests under
+`scripts/dev.sh`, Compose and E2E.
