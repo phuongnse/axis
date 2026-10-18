@@ -1756,7 +1756,8 @@ answer names nothing that an open endpoint should not show.
 In M8, Studio edits an application's resource files through an authoring API
 on the server. The routes that list applications, list, read, patch, create and
 delete resources and give diagnostics are built, and so are the Studio page's
-list, search, editor and diagnostics panel. The rest is *(planned for M8)*. See the
+list, search, editor, diagnostics panel, Uses and Used by lists, and the delete
+button with its warning. The rest is *(planned for M8)*. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1829,8 +1830,8 @@ installation-level setting.
 In M8, every compile collects each reference it resolves into a reference
 index. Studio reads it through two authoring API routes and shows a **Uses**
 list and a **Used by** list for each resource. The compile already builds the
-index with every relation of the design. Only Studio is *(planned for M8)*.
-See the [reference index](reference/configuration.md#reference-index),
+index with every relation of the design. Studio's lists and delete warning are
+built. See the [reference index](reference/configuration.md#reference-index),
 the [authoring API](reference/authoring.md#references) and the
 [Studio section of the frontend](reference/frontend.md#studio).
 The owner confirmed these points on issue #570 on 2026-10-18.
@@ -1861,8 +1862,9 @@ The owner confirmed these points on issue #570 on 2026-10-18.
     before a delete. The warning does not block the delete. The next compile
     reports what broke.
 - **Studio:**
-  - Each resource shows a **Uses** list and a **Used by** list. An entry opens
-    the other resource at its path. An entry expands one more step on request.
+  - Each resource shows a **Uses** list and a **Used by** list. A Used by entry
+    opens the other resource at the path of the reference. A Uses entry opens
+    it at its top. An entry expands one more step on request.
   - There is no graph drawing library in M8. A drawn graph can come later
     without changing the index.
 - **Cost:**

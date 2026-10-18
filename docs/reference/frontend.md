@@ -851,8 +851,8 @@ Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, the resource list with its
-search, the editor and the diagnostics panel are built. *(Planned for M8: the
-Uses and Used by lists, the delete warning and the reconnect message.)*
+search, the editor, the Uses and Used by lists, the delete button and its warning,
+and the diagnostics panel are built. *(Planned for M8: the reconnect message.)*
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -860,7 +860,7 @@ Uses and Used by lists, the delete warning and the reconnect message.)*
   sees a forbidden page. A signed-out person is sent to sign in.
 - **Address.** The picked application and the selected resource are in the
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
-  them.
+  them. A Used by entry that opens a resource at a path adds `&path=<path>`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
   once.
@@ -889,15 +889,29 @@ Uses and Used by lists, the delete warning and the reconnect message.)*
     Selecting another resource also drops an unsaved draft, without a warning.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
-  its relation and the other resource.
-  - Selecting an entry opens that resource at the entry's path.
-  - An expand control on an entry loads one more step, the entry's own lists.
+  its relation, the other resource, and the file and path of the reference.
+  - Selecting a **Uses** entry opens the other resource at its top.
+  - Selecting a **Used by** entry opens the other resource at the path of the
+    reference. The path is in the address and the details, and the editor
+    scrolls to the form field for that path. Nothing is highlighted.
+  - An expand control on a resource or text key entry loads one more step, the
+    entry's own lists. It loads them once. Collapsing and expanding again shows
+    the same lists.
+  - A package or a module entry is plain text. It cannot be opened or expanded.
   - There is no drawn graph and no graph drawing library in M8.
-- **Text keys.** A text key opens its **Used by** list, which shows the labels
-  that use it and the locales that define it.
-- **Delete warning.** When a resource's `usedBy` count is above 0, Studio warns
-  before a delete and names the count. The warning does not block the delete.
-  The next diagnostics report what broke.
+- **Text keys.** A text resource's **Uses** list holds its keys, each as an
+  entry. Expanding a key lists the labels that use it and the locales that
+  define it, as its **Used by** list.
+- **Delete.** The editor has a **Delete** button, which is hidden for the
+  application manifest. It always opens a confirm dialog first. When a
+  resource's `usedBy` count is above 0, the dialog warns and names the count. The
+  author can still confirm. The delete sends the loaded version in `If-Match`. A
+  stale version shows the conflict message, and nothing is deleted. After a
+  delete, the resource leaves the list and the diagnostics panel shows the
+  diagnostics that the delete answered, which report what broke.
+- **Stale counts.** The `usedBy` counts and the lists load with the selected
+  resource. A save does not reload them, so a count can be out of date until the
+  page is reloaded.
 - **Diagnostics panel.** The panel lists the diagnostics of the folder, with
   each one's code, severity, message, file and `path`. It loads them from
   `GET /api/studio/apps/{application}/diagnostics` when an application is

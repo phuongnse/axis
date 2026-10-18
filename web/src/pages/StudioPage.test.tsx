@@ -4,18 +4,86 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
+import type { StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { StudioPage } from './StudioPage'
 
 const entityId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const formId = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
 const departmentId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
+const manifestId = 'f0e1d2c3-b4a5-4968-8776-655443322110'
 
 const resources: StudioResourceItem[] = [
-  { id: departmentId, kind: 'entity', name: 'Department', file: 'entities/department.json', version: 'a' },
-  { id: entityId, kind: 'entity', name: 'PurchaseRequest', file: 'entities/purchase-request.json', version: 'b' },
-  { id: formId, kind: 'form', name: 'PurchaseRequestForm', file: 'forms/purchase-request.json', version: 'c' },
+  { id: departmentId, kind: 'entity', name: 'Department', file: 'entities/department.json', version: 'a', usedBy: 1 },
+  {
+    id: entityId,
+    kind: 'entity',
+    name: 'PurchaseRequest',
+    file: 'entities/purchase-request.json',
+    version: 'b',
+    usedBy: 3,
+  },
+  {
+    id: formId,
+    kind: 'form',
+    name: 'PurchaseRequestForm',
+    file: 'forms/purchase-request.json',
+    version: 'c',
+    usedBy: 0,
+  },
+  { id: manifestId, kind: 'application', name: null, file: 'application.json', version: 'd', usedBy: 0 },
 ]
+
+const departmentEntry: StudioReference = {
+  relation: 'field target',
+  file: 'entities/purchase-request.json',
+  path: '/fields/3/target',
+  node: { type: 'resource', id: departmentId, kind: 'entity', name: 'Department', file: 'entities/department.json' },
+}
+
+const purchaseRequestEntry: StudioReference = {
+  relation: 'field target',
+  file: 'entities/purchase-request.json',
+  path: '/fields/3/target',
+  node: {
+    type: 'resource',
+    id: entityId,
+    kind: 'entity',
+    name: 'PurchaseRequest',
+    file: 'entities/purchase-request.json',
+  },
+}
+
+const labelEntry: StudioReference = {
+  relation: 'label text',
+  file: 'entities/purchase-request.json',
+  path: '/label/textKey',
+  node: { type: 'text', key: 'purchaseRequest.label' },
+}
+
+/** What each resource uses and what uses it, as its references route answers. */
+const referenceAnswers: Record<string, { uses: StudioReference[]; usedBy: StudioReference[] }> = {
+  [departmentId]: { uses: [], usedBy: [purchaseRequestEntry] },
+  [entityId]: { uses: [departmentEntry, labelEntry], usedBy: [] },
+  [formId]: { uses: [], usedBy: [] },
+}
+
+/** What the text key `purchaseRequest.label` is used by, as its text key route answers. */
+const labelUsers: { usedBy: StudioReference[] } = {
+  usedBy: [
+    {
+      relation: 'label text',
+      file: 'entities/purchase-request.json',
+      path: '/label/textKey',
+      node: {
+        type: 'resource',
+        id: entityId,
+        kind: 'entity',
+        name: 'PurchaseRequest',
+        file: 'entities/purchase-request.json',
+      },
+    },
+  ],
+}
 
 const diagnostics: StudioDiagnostic[] = [
   {
@@ -67,27 +135,42 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Stubs `fetch` with the Studio list routes and the read and patch of the purchase request entity. `apps` is the status or list of `/api/studio/apps`. */
+/** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
 function stubServer(
   apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }],
   patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
 ) {
-  const entityPath = `/api/studio/apps/PurchaseRequests/resources/${entityId}`
+  const folder = '/api/studio/apps/PurchaseRequests'
+  const entityPath = `${folder}/resources/${entityId}`
+  const manifestPath = `${folder}/resources/${manifestId}`
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     if (input === entityPath && init?.method === 'PATCH') {
       return json(patch.body, patch.status)
     }
+    if (input === entityPath && init?.method === 'DELETE') {
+      return json({ diagnostics: [] })
+    }
     if (input === entityPath) {
       return json({ ...resources[1], content: entityContent() })
+    }
+    if (input === manifestPath) {
+      return json({ ...resources[3], content: { id: manifestId, kind: 'application', name: 'PurchaseRequests' } })
     }
     if (input === '/api/studio/apps') {
       return typeof apps === 'number' ? json({ title: 'No.' }, apps) : json({ items: apps })
     }
-    if (input === '/api/studio/apps/PurchaseRequests/resources') {
+    if (input === `${folder}/resources`) {
       return json({ items: resources })
     }
-    if (input === '/api/studio/apps/PurchaseRequests/diagnostics') {
+    if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
+    }
+    if (input === `${folder}/texts/purchaseRequest.label/references`) {
+      return json(labelUsers)
+    }
+    const answer = Object.entries(referenceAnswers).find(([id]) => input === `${folder}/resources/${id}/references`)
+    if (answer) {
+      return json(answer[1])
     }
     return new Response(null, { status: 404 })
   })
@@ -361,5 +444,104 @@ describe('StudioPage', () => {
 
     expect(await screen.findByTestId('studio-load-error')).toBeInTheDocument()
     warn.mockRestore()
+  })
+
+  it('lists what a resource uses and what uses it, with the relation, resource, file and path of each entry', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    const uses = await screen.findByTestId('studio-uses')
+    const [department, label] = within(uses).getAllByTestId('studio-reference')
+    expect(department).toHaveTextContent('field target')
+    expect(department).toHaveTextContent('Department')
+    expect(department).toHaveTextContent('entities/purchase-request.json · Path: /fields/3/target')
+    expect(label).toHaveTextContent('label text')
+    expect(label).toHaveTextContent('purchaseRequest.label')
+    expect(within(screen.getByTestId('studio-used-by')).getByText('None.')).toBeInTheDocument()
+  })
+
+  it('opens a Uses entry at its top and a Used by entry at the path of its reference', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await userEvent.click(within(await screen.findByTestId('studio-uses')).getByRole('button', { name: 'Department' }))
+
+    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/department.json')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests&resource=[^&]+$/)
+
+    const usedBy = await screen.findByTestId('studio-used-by')
+    await userEvent.click(await within(usedBy).findByRole('button', { name: 'PurchaseRequest' }))
+
+    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
+    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('/fields/3/target')
+    expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F3%2Ftarget`)
+  })
+
+  it('scrolls the form field of the path in the address into view', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubServer()
+      renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Ffields%2F1%2FmaxLength`)
+
+      const field = await screen.findByTestId('studio-field-/fields/1/maxLength')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([field])
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
+  it('loads an entry once when it is first expanded, and a text key entry loads its text key route', async () => {
+    const fetchMock = stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const uses = await screen.findByTestId('studio-uses')
+    const departmentRequests = () =>
+      fetchMock.mock.calls.filter(
+        ([input]) => input === `/api/studio/apps/PurchaseRequests/resources/${departmentId}/references`,
+      )
+    const department = within(uses).getByRole('button', { name: 'Department' }).closest('li')!
+
+    await userEvent.click(within(department).getByRole('button', { name: 'Expand' }))
+    expect(await within(department).findByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    await userEvent.click(within(department).getByRole('button', { name: 'Collapse' }))
+    await userEvent.click(within(department).getByRole('button', { name: 'Expand' }))
+
+    expect(within(department).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(departmentRequests()).toHaveLength(1)
+
+    const label = within(uses).getByText('purchaseRequest.label').closest('li')!
+    await userEvent.click(within(label).getByRole('button', { name: 'Expand' }))
+
+    expect(await within(label).findByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(within(label).queryByText('Uses')).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/studio/apps/PurchaseRequests/texts/purchaseRequest.label/references',
+      expect.anything(),
+    )
+  })
+
+  it('warns with the number of references before a delete, and deletes after confirming', async () => {
+    const fetchMock = stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(within(dialog).getByTestId('studio-delete-warning')).getByText('3')).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument())
+    const deletes = fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE')
+    expect(deletes).toHaveLength(1)
+    const [, init] = deletes[0]
+    expect(new Headers(init!.headers).get('If-Match')).toBe('"b"')
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/))
+  })
+
+  it('does not offer a delete for the application manifest', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${manifestId}`)
+
+    await screen.findByRole('button', { name: 'Save' })
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 })

@@ -7,13 +7,17 @@ export interface StudioApplication {
   name: string
 }
 
-/** A resource in the list of `GET /api/studio/apps/{application}/resources`. `name` is `null` when the file has none. */
+/**
+ * A resource in the list of `GET /api/studio/apps/{application}/resources`. `name` is `null` when the file has none.
+ * `usedBy` counts the references that point at the resource, so one resource that refers twice counts twice.
+ */
 export interface StudioResourceItem {
   id: string
   kind: string
   name: string | null
   file: string
   version: string
+  usedBy: number
 }
 
 /** A resource with its content, as `GET /api/studio/apps/{application}/resources/{id}` answers. */
@@ -33,6 +37,37 @@ export interface StudioDiagnostic {
   path: string
   resourceId: string | null
 }
+
+/** The other end of a reference. Each type writes only its own fields. */
+export type StudioReferenceNode =
+  | { type: 'resource'; id: string; kind: string; name: string | null; file: string }
+  | { type: 'text'; key: string }
+  | { type: 'package'; id: string }
+  | { type: 'module'; id: string }
+
+/**
+ * One reference. `file` and `path` are always in the resource that holds the reference, and `node` is the other end.
+ */
+export interface StudioReference {
+  relation: string
+  file: string
+  path: string
+  node: StudioReferenceNode
+}
+
+/** What a resource refers to (`uses`) and what refers to it (`usedBy`). */
+export interface StudioResourceReferences {
+  uses: StudioReference[]
+  usedBy: StudioReference[]
+}
+
+/** The `usedBy` entries of a text key: the labels and text resources that use it. */
+export interface StudioTextReferences {
+  usedBy: StudioReference[]
+}
+
+/** The answer to a delete: the folder's diagnostics after it, or `conflict` when the file changed since it was read. */
+export type DeleteResult = { status: 'deleted'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' }
 
 /** The resources of one kind, sorted by name, or by file when a resource has no name. */
 export interface ResourceGroup {
@@ -113,6 +148,51 @@ export async function patchStudioResource(
   }
   const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
   return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
+}
+
+/** Loads what a resource uses and what uses it. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchResourceReferences(
+  application: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StudioResourceReferences> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}/references`
+  const response = await apiFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioResourceReferences
+}
+
+/** Loads what uses a text key. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchTextReferences(
+  application: string,
+  key: string,
+  signal?: AbortSignal,
+): Promise<StudioTextReferences> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/texts/${encodeURIComponent(key)}/references`
+  const response = await apiFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioTextReferences
+}
+
+/**
+ * Deletes a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
+ * and nothing was deleted. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function deleteStudioResource(application: string, id: string, version: string): Promise<DeleteResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}`
+  const response = await apiFetch(path, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (!response.ok) {
+    throw new Error(`Deleting '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { diagnostics: StudioDiagnostic[] }
+  return { status: 'deleted', diagnostics: body.diagnostics }
 }
 
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */

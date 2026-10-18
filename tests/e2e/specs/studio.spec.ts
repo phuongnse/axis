@@ -44,6 +44,25 @@ test('an author changes the maxLength of an entity field and the file holds only
   expect(JSON.stringify(after)).toBe(JSON.stringify(before))
 })
 
+test('an author follows a Used by entry from a department to the entity that uses it', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const department = items.find((item) => item.file === 'entities/department.json')!
+  const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
+
+  await page.goto(`/studio?app=PurchaseRequests&resource=${department.id}`)
+  await page
+    .getByTestId('studio-used-by')
+    .getByTestId('studio-reference')
+    .filter({ hasText: 'entities/purchase-request.json · Path: /fields/3/target' })
+    .getByRole('button', { name: 'PurchaseRequest' })
+    .click()
+
+  await expect(page).toHaveURL(new RegExp(`resource=${entity.id}`))
+  await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
+})
+
 test('someone without the author role sees no Studio link and a forbidden page', async ({ page }) => {
   await useSession(page, 'anna')
 
