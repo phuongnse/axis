@@ -9,6 +9,15 @@ export function stateText(t: (key: string) => string, state: string): string {
   return (instanceStates as readonly string[]).includes(state) ? t(`shell.inspector.states.${state}`) : state
 }
 
+/**
+ * The process and the instance an instance detail path names, such as
+ * `/api/apps/StepApp/processes/Submit/instances/{id}`, or `null` when the path is not one.
+ */
+export function inspectTarget(inspectPath: string): { process: string; instanceId: string } | null {
+  const match = /\/processes\/([^/]+)\/instances\/([^/]+)$/.exec(inspectPath)
+  return match ? { process: decodeURIComponent(match[1]), instanceId: decodeURIComponent(match[2]) } : null
+}
+
 /** What the inspection API answers when the signed-in user may not inspect the process. */
 export const forbidden = 'forbidden'
 

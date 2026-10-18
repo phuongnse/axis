@@ -301,7 +301,14 @@ function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata
       {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
       <ConfigProvider theme={{ token: { motion: false } }}>
         <TextProvider catalogs={catalogs} development={false}>
-          <FormWidget widget={widget} recordId={recordId} returnTo="/e2e/notes?pageSize=10" locale="en" />
+          <FormWidget
+            widget={widget}
+            sitePath="e2e"
+            pages={['Notes', 'NoteForm']}
+            recordId={recordId}
+            returnTo="/e2e/notes?pageSize=10"
+            locale="en"
+          />
         </TextProvider>
       </ConfigProvider>
       <CurrentLocation />

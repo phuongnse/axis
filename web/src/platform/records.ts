@@ -142,7 +142,9 @@ export async function saveRecord(
 /**
  * One audit record of a record's history. `actorName` is the display name stored with the audit
  * record, or `null` for `system`, `anonymous` and audit records written before names were stored.
- * `details` depends on the action and never holds a field value.
+ * `details` depends on the action and never holds a field value. `inspectPath` is the detail path of
+ * the process instance that wrote the entry, or `null` when the signed-in user may not inspect its
+ * process or it has no instance. The server decides.
  */
 export interface HistoryItem {
   id: string
@@ -152,6 +154,7 @@ export interface HistoryItem {
   action: string
   processInstanceId: string | null
   details: Record<string, unknown>
+  inspectPath: string | null
 }
 
 /** One page of a record's history, newest first. */

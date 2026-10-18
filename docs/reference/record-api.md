@@ -906,12 +906,13 @@ can be read as its history (D21).
     `processInstanceId` and `details`, as stored. `actorName` is the display
     name stored with the audit record. It is `null` for `system`,
     `anonymous` and audit records written before names were stored.
-  - *(planned for M8)* Each item also has `inspectPath`. It is the
+  - Each item also has `inspectPath`, the last property of the item. It is the
     [instance detail](processes.md#instance-detail) path of the entry's
     process instance, such as
     `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances/0192f4a9-…`,
     when the user holds an `inspect` grant on the entry's process. It is `null`
-    when the user holds none, and when the entry has no instance. The server
+    when the user holds none, when the entry has no instance, and when the
+    process is no longer in the active release. The server
     decides, so a client never guesses it from roles. The path leads to a
     `404` when the user may not read the instance's subject record.
   - The history needs a session and a `read` grant on the entity. Without a
@@ -932,7 +933,8 @@ For example:
       "actorName": "Anna Employee",
       "action": "record.updated",
       "processInstanceId": null,
-      "details": { "version": 2, "fields": ["title"] }
+      "details": { "version": 2, "fields": ["title"] },
+      "inspectPath": null
     },
     {
       "id": "01926b3a-1c20-7b4d-8e6f-7a8b9c0d1e2f",
@@ -941,7 +943,8 @@ For example:
       "actorName": "Anna Employee",
       "action": "record.created",
       "processInstanceId": null,
-      "details": { "version": 1 }
+      "details": { "version": 1 },
+      "inspectPath": null
     }
   ],
   "page": 1,
