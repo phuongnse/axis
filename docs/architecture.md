@@ -24,7 +24,7 @@ flowchart LR
   data source endpoint, the process start endpoint, the task API and the site
   endpoints require a session.
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
-  address, see [health checks](#health-checks-planned-for-m7).
+  address, see [health checks](#health-checks).
   It runs work items, and through them
   the `decision`, `task`, `operation` and `end` steps of process instances.
   Operation steps include `updateRecord`, `callConnector` calls with their
@@ -791,11 +791,11 @@ connector, package, operation and work item kind. Expression and step log
 texts are fixed and hold names, not values. Statement text in Npgsql spans
 holds table and column names.
 
-## Health checks *(planned for M7)*
+## Health checks
 
 The server's `/health/live` and `/health/ready` work as described below, as
 [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed)
-says. The tenant metric is *(planned for M7)*.
+says. The tenant metric is *(planned for M8)*.
 
 **The answer.** Each endpoint answers JSON of the form
 `{ "status": "Healthy" | "Degraded" | "Unhealthy" }` and nothing else.
@@ -821,7 +821,7 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
   seconds. A database that has not answered by then counts as not answering,
   so a hung database makes the server Degraded and does not stall the probe.
 - The tenant is named in a warning in the logs on every probe, and in a metric
-  labelled with the tenant id *(planned for M7)*, never in the answer.
+  labelled with the tenant id *(planned for M8)*, never in the answer.
 - Today the server does not listen until startup activation has finished, see
   [startup activation](reference/configuration.md#startup-activation). So a
   probe gets no answer in that time. The activation rule matters once the

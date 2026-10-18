@@ -320,7 +320,7 @@ Processes and the worker host arrive in M3. See
   worker can claim the item.
 - **Failure:** a failing step rolls back. A following transaction records the
   error in the history and marks the instance `failed`. Connector and package
-  operation steps have retry policies (D25, D28). Operator retry comes in M7.
+  operation steps have retry policies (D25, D28). Operator [retry](reference/processes.md#retry) is built.
 - **History:** every step occurrence records its input, output, decision and
   error.
 
@@ -708,7 +708,7 @@ retries and reconciliation.
   `idempotency`.
 - **Attempts run out:** the instance becomes `failed` with the error in its
   history. After an unknown outcome, the call goes to reconciliation
-  instead. Operator retry comes in M7. Alerts and compensation come later.
+  instead. Operator [retry](reference/processes.md#retry) is built. Alerts and compensation come later.
 - **Reconciliation:** the worker calls `lookup` with the operation
   identity.
   - Found settles the call as succeeded, with its output.
@@ -718,7 +718,7 @@ retries and reconciliation.
     backoff, capped at 1 hour, with no limit.
 - **Never blind:** an unknown outcome is never retried without the
   idempotency key or a lookup. Without a `lookup`, it stays `unknown` and
-  visible in the history until an operator resolves it in M7.
+  visible in the history until an operator [resolves](reference/processes.md#resolve) it.
 - **A late original request:** if a lookup answers not found and the
   original request arrives later, only the system's idempotency key
   prevents a second order. Without `idempotency`, a connector depends on its
@@ -1015,8 +1015,7 @@ operation step. The owner confirmed these points on issue #313 on
     is a pinned version that is missing on the worker.
   - A timeout, or a call found still `sending` after a crash, is an unknown
     outcome. It is retried only when the operation declares
-    `idempotent: true`. Otherwise it stays unknown until an operator resolves
-    it in M7.
+    `idempotent: true`. Otherwise it stays unknown until an operator [resolves](reference/processes.md#resolve) it.
 - **Timeout:** each operation declares its own `timeout`. It defaults to
   `PT30S` and is at most `PT2M`, as for connectors.
 - **Capabilities:** the operation context gives the operation an HTTP client
@@ -1462,8 +1461,8 @@ without warning is that failure, so Axis refuses it.
 ## D34. Process inspection — Agreed
 
 Authorized users inspect process instances: where an instance is, what it did,
-with which inputs, and why it failed or waits. The design is *(planned for
-M7)*. See [processes](reference/processes.md#process-inspection) for the
+with which inputs, and why it failed or waits. The design is built, except the
+record history link to an instance *(planned for M8)*. See [processes](reference/processes.md#process-inspection) for the
 endpoints, the order of checks and the rules that hide values.
 The owner confirmed these points on issue #477 on 2026-10-17, with two
 changes. The changes are the masking bullet, which covers every entity, and
@@ -1643,7 +1642,7 @@ The server and the worker emit correlated logs, metrics and traces. Traces,
 the stored `trace_id`, OTLP logs, the log scope and the problem details
 `traceId` are built. So are the standard metrics and the work item duration,
 process instance and call attempt metrics, and the work item gauges and the
-computed fields gauge. The tenant health metric of D37 stays *(planned for M7)*. See
+computed fields gauge. The tenant health metric of D37 stays *(planned for M8)*. See
 [telemetry](architecture.md#telemetry) for the spans and what telemetry never
 holds.
 The owner confirmed these points on issue #479 on 2026-10-17.
@@ -1714,8 +1713,8 @@ content.
 The server's readiness covers the platform database and startup activation, and
 one tenant database that is down makes the server degraded, not unhealthy. The
 worker gets its own health endpoints. The server's readiness and the worker's
-health endpoints are built. The tenant metric is *(planned for M7)*. See
-[health checks](architecture.md#health-checks-planned-for-m7) for the answers
+health endpoints are built. The tenant metric is *(planned for M8)*. See
+[health checks](architecture.md#health-checks) for the answers
 of each endpoint.
 The owner confirmed these points on issue #480 on 2026-10-17.
 
