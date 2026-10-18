@@ -25,6 +25,9 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     active release and its site paths only through `IActiveReleaseStore`;
     they never use `axis.active_releases`, `axis.active_sites` or the
     configuration context directly.
+    Files of a module *(planned for M8)* are stored in
+    `axis.release_resources` with their `modules/<id>/` path, see
+    [Modules](configuration.md#modules).
   - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity
     with its application and table), `axis.provisioned_enum_values` (each
     recorded enum value) and `axis.sequence_counters` (the last number of
@@ -99,6 +102,15 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   column name. Because names are ASCII and at most 60 characters, every
   identifier fits PostgreSQL's 63-byte limit by construction and is never
   truncated. Identifiers are always double-quoted in SQL.
+- **Module resource ids** *(planned for M8)*. The id of a module resource
+  inside an application is a UUID v5 (RFC 9562). The namespace is the
+  application `id`. The name is the resource's own declared id, as lower-case
+  hyphenated UTF-8 text. A module entity's table is `e_` + the derived id, and
+  `axis.provisioned_entities` records the application that uses it. So two
+  applications in one tenant that use one module get different `e_` tables,
+  and `AXC0018` never fires between them. The derived id stays the same across
+  module versions, so an upgrade maps onto the same table. See
+  [Modules](configuration.md#modules).
 - **Column types.** Each field type maps to one PostgreSQL type, spelled as
   `format_type` renders it, so a catalog column matches by string equality.
 
@@ -942,6 +954,10 @@ schema of the tenant database.
   | `last_value` | `bigint` | The last number handed out |
 
   - The primary key is `(sequence_id, period)`.
+  - For a module sequence *(planned for M8)*, `sequence_id` is the id derived
+    for the application, see the module resource ids under physical names. So two
+    applications that use one module get separate `axis.sequence_counters`
+    rows and count on their own.
   - Taking a number is one
     `INSERT ... ON CONFLICT DO UPDATE SET last_value = last_value + 1 RETURNING last_value`
     in the caller's transaction.

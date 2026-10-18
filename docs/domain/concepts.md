@@ -12,7 +12,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | --- | --- | --- |
 | **Application** | A deployable business application. It is a folder of resources with a manifest, and owns a set of sites. | M1 |
 | **Resource** | One typed configuration item with a stable `id`, a `kind`, a `name`, a format version and typed references to other resources. | M1 |
-| **Module** | A reusable bundle of resources and extension operations, such as notifications, document generation or audit export. Applications declare the modules they depend on, with version ranges. | M8 |
+| **Module** | A reusable, versioned folder of resources with a `module.json` manifest. Applications declare the modules they use with version ranges. Each application gets its own copy of a module's entities, sequences and seeds. See [configuration](../reference/configuration.md#modules). | M8 |
 | **Release** | The immutable compiled form of an application at one point in time. It pins every resource version it uses. New work starts on the active release. Running work, with its tasks, forms, texts and package versions, stays on its release until it ends, while roles and policies come from the active release. | M1 (basic), M6 (full) |
 | **Diagnostic** | A validation or compile error or warning. It points at the resource, field and path that caused it. | M1 |
 | **Studio** | The visual editor of an application's resources. It edits the JSON files of the application folders that `Studio:Folders` lists, through an authoring API, and never activates a release. Visual process and page designers stay out of scope. See [authoring API](../reference/authoring.md). | M8 |
