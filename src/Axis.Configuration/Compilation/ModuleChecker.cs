@@ -189,17 +189,18 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences and seeds of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds and texts of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
         private readonly List<SequenceResource> _sequences = [];
         private readonly List<SeedResource> _seeds = [];
+        private readonly List<ModuleText> _texts = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
 
         public ModuleResources ToResources() =>
-            new(_entities, _sequences, _seeds, _unloadedEntityNames, _unloadedSequenceNames);
+            new(_entities, _sequences, _seeds, _texts, _unloadedEntityNames, _unloadedSequenceNames);
 
         /// <summary>Notes the name of an entity or sequence file that failed its schema, so a reference to it is not reported again.</summary>
         public void AddUnloaded(string moduleId, JsonElement root)
@@ -241,6 +242,10 @@ internal static class ModuleChecker
                 case ResourceKinds.Seed:
                     var seed = root.Deserialize<SeedResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _seeds.Add(seed with { Name = $"{moduleId}/{seed.Name}", Entity = $"{moduleId}/{seed.Entity}" });
+                    break;
+                case ResourceKinds.Text:
+                    var text = root.Deserialize<TextResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    _texts.Add(new ModuleText(moduleId, text));
                     break;
             }
         }
@@ -287,7 +292,7 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences and seeds of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The unloaded names are those of module files that
 /// failed their schema or whose reference was reported, so no second diagnostic names them. Both name
 /// sets ignore letter case.
@@ -296,5 +301,9 @@ internal sealed record ModuleResources(
     IReadOnlyList<EntityResource> Entities,
     IReadOnlyList<SequenceResource> Sequences,
     IReadOnlyList<SeedResource> Seeds,
+    IReadOnlyList<ModuleText> Texts,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedSequenceNames);
+
+/// <summary>A text resource of a pinned module, with the id of that module.</summary>
+internal sealed record ModuleText(string ModuleId, TextResource Text);

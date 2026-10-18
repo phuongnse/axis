@@ -26,8 +26,8 @@ namespace Axis.Configuration.Compilation;
 /// processes, events and conditions, checks migrations, their entities, fields and values, checks
 /// scenarios, their users, steps, values and stubs, checks
 /// the extension packages of the manifest and pins each to the highest installed version in its
-/// range, does the same for its modules and takes the files of each pinned module into the
-/// resources, and resolves references
+/// range, does the same for its modules, takes the files of each pinned module into the
+/// resources and merges their texts into the application's, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
@@ -159,7 +159,7 @@ public static class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
-        var moduleResources = new ModuleResources([], [], [], new HashSet<string>(), new HashSet<string>());
+        var moduleResources = new ModuleResources([], [], [], [], new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics);
@@ -268,8 +268,11 @@ public static class ApplicationCompiler
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
+        var texts = loaded.Texts;
         if (loaded.Application is { } application)
         {
+            texts = ModuleTextChecker.Check(application, modules, loaded.Texts, moduleResources.Texts, diagnostics);
+            textKeys.UnionWith(texts.SelectMany(text => text.Texts.Keys));
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
         }
 
@@ -415,7 +418,7 @@ public static class ApplicationCompiler
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
-            Texts = loaded.Texts,
+            Texts = texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules)).ToList(),
@@ -449,7 +452,7 @@ public static class ApplicationCompiler
     /// left out of the key check, so its drift is not reported on top. Returns every key that
     /// some locale has.
     /// </summary>
-    private static HashSet<string> CheckTexts(IReadOnlyList<TextResource> texts, List<Diagnostic> diagnostics)
+    internal static HashSet<string> CheckTexts(IReadOnlyList<TextResource> texts, List<Diagnostic> diagnostics)
     {
         var firstFileByLocale = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var checkedTexts = new List<TextResource>();

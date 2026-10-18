@@ -41,7 +41,9 @@ flowchart LR
      same keys: a key that one locale has and another lacks is `AXC0027` at
      `/texts` of the file that lacks it, once per key, naming the first
      locale in path order that has it. A file already reported as a duplicate
-     locale is left out of this check. Keys are compared ordinally.
+     locale is left out of this check. Keys are compared ordinally. The texts
+     of a pinned module are checked the same way, within that module; see
+     [Modules](#modules).
      Each release carries its own texts, so a newer release can remove a key
      that older running work still shows.
    - **Labels.** The text key of the application label, an entity label or a
@@ -844,6 +846,9 @@ sorted by file and then path.
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
 | `AXC0207` | A field's `target` or `sequence` names a module that `modules` does not declare. Reported at `/fields/{i}/target` or `/fields/{i}/sequence`. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity contains `/`. Reported at that property in `modules/<id>/…`. |
+| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
+| `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
+| `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 
 ## Startup activation
@@ -1942,15 +1947,17 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
 
 This section follows
 [D40](../decisions.md#d40-reusable-modules--agreed). The manifest,
-installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0208`
-and `AXC0212` are built. A pinned module's files are stored in the release and
+installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0212`
+are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences and seeds join the application model, each
 with an id derived from the application `id` and the name
 `<module id>/<name>`. A field's `target` and `sequence` can name them, which
-also covers data source parameters and endpoint inputs. Module data sources,
-rules, forms, events and texts, seeding and activating module entities, the API
-naming of module entities and the codes marked planned are *(planned for M8)*.
+also covers data source parameters and endpoint inputs. A pinned module's texts
+join the application's texts of the same locale, so its labels resolve. Module
+data sources, rules, forms and events, seeding and activating module entities,
+the API naming of module entities and the codes marked planned are *(planned
+for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -2025,11 +2032,16 @@ The module's manifest is `module.json` at the root of its folder:
   additive for its entities: `AXC0213`. Modules ship no migrations in M8, and a
   `migration` cannot name a module entity: `AXC0214`. So an application cannot
   stop using a module once its tables exist.
-- **Texts.** A module's text keys start with `<module id>.`. A module ships one
-  `text` resource per locale. Each locale of the application needs the module's
-  text for that locale. Module texts join the checks of `AXC0026`, `AXC0027`
-  and `AXC0028`. An application text key may not start with the `<id>.` prefix
-  of a declared module.
+- **Texts.** A module's text keys start with `<module id>.`, or `AXC0209` is
+  reported. A module ships one `text` resource per locale. Its texts join the
+  application's texts of the same locale, ignoring letter case, so labels in
+  module resources resolve. Each locale of the application needs the module's
+  text for that locale, or `AXC0210` is reported. A module text in a locale the
+  application does not have is ignored, without a diagnostic. `AXC0026` and
+  `AXC0027` check each module's texts against each other, apart from the
+  application's texts. A module key joins the `AXC0028` check only in the
+  locales the application has. An application text key may not start with the
+  `<id>.` prefix of a declared module, or `AXC0211` is reported.
 - **Seeds.** The startup seeding step applies a module's seeds for each
   application that uses the module, into that application's table.
 - **Diagnostics.** A diagnostic in a module file has `file` set to
@@ -2047,13 +2059,13 @@ The module's manifest is `module.json` at the root of its folder:
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
 | `AXC0207` | A field's `target` or `sequence` names a module that `modules` does not declare. Reported at `/fields/{i}/target` or `/fields/{i}/sequence`. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity contains `/`. Reported at that property in `modules/<id>/…`. |
+| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
+| `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
+| `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 
 | Planned code | Meaning |
 | --- | --- |
-| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
-| `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
-| `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
 | `AXC0213` | The pinned version changes a module entity in a way that is not additive. The message names the module and both versions. Reported at activation, at the module entity file in the release. |
 | `AXC0214` | A `migration`'s `entity` names a module entity. Reported at `/entity`. |
 
