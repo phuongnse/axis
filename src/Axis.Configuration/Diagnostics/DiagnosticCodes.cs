@@ -195,5 +195,7 @@ public static class DiagnosticCodes
     public const string InvalidModuleRange = "AXC0204";
     public const string NoModuleVersionInRange = "AXC0205";
     public const string DuplicateApplicationModule = "AXC0206";
+    public const string UndeclaredModuleReference = "AXC0207";
+    public const string QualifiedModuleReference = "AXC0208";
     public const string ReservedModulesFolder = "AXC0212";
 }

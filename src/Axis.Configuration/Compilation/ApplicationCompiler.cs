@@ -145,6 +145,9 @@ public static class ApplicationCompiler
         return modules;
     }
 
+    private static bool IsModuleResource(Resource resource) =>
+        resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
+
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
         IReadOnlyCollection<PackageVersion> installedPackages,
@@ -152,17 +155,42 @@ public static class ApplicationCompiler
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
+        IReadOnlyList<PinnedPackageModel> packages = [];
+        IReadOnlyList<PinnedModuleModel> modules = [];
+        IReadOnlyList<ResourceContent> moduleFiles = [];
+        IReadOnlySet<string>? declaredPackageIds = null;
+        var moduleResources = new ModuleResources([], [], [], new HashSet<string>(), new HashSet<string>());
+        if (loaded.Application is { } manifest)
+        {
+            packages = PackageChecker.Check(manifest, installedPackages, diagnostics);
+            (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics);
+            declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
+        }
+
+        // A pinned module's entities, sequences and seeds come before the application's own, so a
+        // step that depends on order sees each module target first. Application resources can name
+        // them as '<module id>/<name>', but a module never names an application resource.
+        var allEntities = new List<EntityResource>([.. moduleResources.Entities, .. loaded.Entities]);
+        var allSequences = new List<SequenceResource>([.. moduleResources.Sequences, .. loaded.Sequences]);
+        var allSeeds = new List<SeedResource>([.. moduleResources.Seeds, .. loaded.Seeds]);
+        var unloadedEntityNames = new HashSet<string>(loaded.UnloadedEntityNames.Concat(moduleResources.UnloadedEntityNames), StringComparer.OrdinalIgnoreCase);
+        var unloadedSequenceNames = new HashSet<string>(loaded.UnloadedSequenceNames.Concat(moduleResources.UnloadedSequenceNames), StringComparer.OrdinalIgnoreCase);
+        loaded = loaded with { UnloadedEntityNames = unloadedEntityNames, UnloadedSequenceNames = unloadedSequenceNames };
+        var moduleReferences = new ModuleReferences(
+            new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal),
+            new HashSet<string>(modules.Select(pin => pin.Id), StringComparer.Ordinal));
+
         // Entity names are unique ignoring letter case; a second entity with the same name is
         // already reported by the loader, so references resolve to the first one.
         var entitiesByName = new Dictionary<string, EntityResource>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entity in loaded.Entities)
+        foreach (var entity in allEntities)
         {
             entitiesByName.TryAdd(entity.Name, entity);
         }
 
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
 
-        var ownersByChildName = FindChildOwners(loaded.Entities, FindEntity, diagnostics);
+        var ownersByChildName = FindChildOwners(allEntities, FindEntity, diagnostics);
 
         // Page names follow the same rule as entity names.
         var pagesByName = new Dictionary<string, PageResource>(StringComparer.OrdinalIgnoreCase);
@@ -184,7 +212,7 @@ public static class ApplicationCompiler
 
         // Sequence names follow the same rule too.
         var sequencesByName = new Dictionary<string, SequenceResource>(StringComparer.OrdinalIgnoreCase);
-        foreach (var sequence in loaded.Sequences)
+        foreach (var sequence in allSequences)
         {
             sequencesByName.TryAdd(sequence.Name, sequence);
         }
@@ -240,16 +268,9 @@ public static class ApplicationCompiler
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
-        IReadOnlyList<PinnedPackageModel> packages = [];
-        IReadOnlyList<PinnedModuleModel> modules = [];
-        IReadOnlyList<ResourceContent> moduleFiles = [];
-        IReadOnlySet<string>? declaredPackageIds = null;
         if (loaded.Application is { } application)
         {
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
-            packages = PackageChecker.Check(application, installedPackages, diagnostics);
-            (modules, moduleFiles) = ModuleChecker.Check(application, installedModules, diagnostics);
-            declaredPackageIds = new HashSet<string>(application.Packages.Select(package => package.Id), StringComparer.Ordinal);
         }
 
         // Package ids are matched exactly. Each pin is an installed version, so it has its manifest's operations.
@@ -271,8 +292,9 @@ public static class ApplicationCompiler
         // Validations, at their top level, data source filters and process conditions call rules.
         // Computed fields and aggregate item expressions see no rules.
         var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
-        foreach (var entity in loaded.Entities)
+        foreach (var entity in allEntities)
         {
+            // Module rules are a separate step, so a module entity sees none and cannot call an application rule.
             CheckEntity(
                 entity,
                 FindEntity,
@@ -280,14 +302,15 @@ public static class ApplicationCompiler
                 loaded.UnloadedEntityNames,
                 FindSequence,
                 loaded.UnloadedSequenceNames,
+                moduleReferences,
                 textKeys,
-                rules,
+                IsModuleResource(entity) ? [] : rules,
                 diagnostics);
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, textKeys, diagnostics);
-        CheckSeeds(loaded, FindEntity, diagnostics);
-        CheckDataSources(loaded, FindEntity, ownersByChildName, textKeys, rules, diagnostics);
+        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, diagnostics);
+        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, textKeys, rules, diagnostics);
         ProcessChecker.Check(
             loaded.Processes,
             FindEntity,
@@ -335,7 +358,7 @@ public static class ApplicationCompiler
             loaded.UnloadedEntityNames,
             FindProcess,
             loaded.UnloadedProcessNames,
-            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, report),
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
             diagnostics);
         TriggerChecker.Check(
             loaded.Triggers,
@@ -371,7 +394,21 @@ public static class ApplicationCompiler
             return result;
         }
 
-        var entities = loaded.Entities.Select(entity => BuildEntity(entity, entitiesByName, sequencesByName, rules)).ToList();
+        // The derived ids apply only now, so a diagnostic in a module file keeps the id written in that file.
+        var applicationId = loaded.Application.Id;
+        foreach (var entity in moduleResources.Entities)
+        {
+            entitiesByName[entity.Name] = entity with { Id = ModuleResourceIds.Derive(applicationId, entity.Id) };
+        }
+
+        foreach (var sequence in moduleResources.Sequences)
+        {
+            sequencesByName[sequence.Name] = sequence with { Id = ModuleResourceIds.Derive(applicationId, sequence.Id) };
+        }
+
+        var entities = allEntities
+            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, IsModuleResource(entity) ? [] : rules))
+            .ToList();
         var model = new ApplicationModel
         {
             Manifest = loaded.Application,
@@ -379,7 +416,7 @@ public static class ApplicationCompiler
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = loaded.Texts,
-            Seeds = loaded.Seeds.Select(seed => BuildSeed(seed, entitiesByName)).ToList(),
+            Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
@@ -526,6 +563,7 @@ public static class ApplicationCompiler
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, SequenceResource?> findSequence,
         IReadOnlySet<string> unloadedSequenceNames,
+        ModuleReferences moduleReferences,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -552,8 +590,8 @@ public static class ApplicationCompiler
             }
 
             CheckTextKey(field.Label, entity.File, entity.Id, $"{path}/label", textKeys, diagnostics);
-            CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, Report);
-            CheckSequence(field, path, childOwner, findSequence, unloadedSequenceNames, Report);
+            CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, Report);
+            CheckSequence(field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, Report);
             CheckCreator(field, path, childOwner, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
@@ -692,6 +730,7 @@ public static class ApplicationCompiler
         ChildOwner? childOwner,
         Func<string, SequenceResource?> findSequence,
         IReadOnlySet<string> unloadedSequenceNames,
+        ModuleReferences moduleReferences,
         Action<string, string, string> report)
     {
         if (field.Sequence is not { } sequence)
@@ -712,7 +751,10 @@ public static class ApplicationCompiler
 
         // A sequence file that is in the folder but was not loaded is not reported again; that
         // file's own diagnostics already are.
-        if (isText && findSequence(sequence) is null && !unloadedSequenceNames.Contains(sequence))
+        if (isText
+            && findSequence(sequence) is null
+            && !unloadedSequenceNames.Contains(sequence)
+            && !moduleReferences.ReportUndeclared(sequence, $"{path}/sequence", report))
         {
             report(
                 DiagnosticCodes.UnknownSequence,
@@ -757,6 +799,7 @@ public static class ApplicationCompiler
         Func<string, EntityResource?> findEntity,
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> unloadedEntityNames,
+        ModuleReferences moduleReferences,
         Action<string, string, string> report)
     {
         var type = FieldTypes.Parse(field.Type);
@@ -863,7 +906,8 @@ public static class ApplicationCompiler
                         }
                     }
                 }
-                else if (!unloadedEntityNames.Contains(target))
+                else if (!unloadedEntityNames.Contains(target)
+                    && !moduleReferences.ReportUndeclared(target, $"{path}/target", report))
                 {
                     // A target naming an entity file that is in the folder but was not loaded is not
                     // reported again; that file's own diagnostics already are.
@@ -918,13 +962,17 @@ public static class ApplicationCompiler
     /// id is used once across all seeds, compared as a UUID. The values are not checked here; the
     /// startup step checks them with the record API's rules before it inserts any record.
     /// </summary>
-    private static void CheckSeeds(ApplicationLoadResult loaded, Func<string, EntityResource?> findEntity, List<Diagnostic> diagnostics)
+    private static void CheckSeeds(
+        IReadOnlyList<SeedResource> seeds,
+        IReadOnlySet<string> unloadedEntityNames,
+        Func<string, EntityResource?> findEntity,
+        List<Diagnostic> diagnostics)
     {
         var firstFileById = new Dictionary<Guid, string>();
-        foreach (var seed in loaded.Seeds)
+        foreach (var seed in seeds)
         {
             // An entity file that was not loaded because of its own errors is not reported again.
-            if (findEntity(seed.Entity) is null && !loaded.UnloadedEntityNames.Contains(seed.Entity))
+            if (findEntity(seed.Entity) is null && !unloadedEntityNames.Contains(seed.Entity))
             {
                 diagnostics.Add(new Diagnostic(
                     DiagnosticCodes.UnknownSeedEntity,
@@ -972,6 +1020,7 @@ public static class ApplicationCompiler
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
+        ModuleReferences moduleReferences,
         IReadOnlySet<string> textKeys,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
@@ -1132,6 +1181,7 @@ public static class ApplicationCompiler
                     findEntity,
                     ownersByChildName,
                     loaded.UnloadedEntityNames,
+                    moduleReferences,
                     Report);
             }
 
@@ -1424,12 +1474,12 @@ public static class ApplicationCompiler
         };
     }
 
-    private static SeedModel BuildSeed(SeedResource seed, Dictionary<string, EntityResource> entitiesByName)
+    private static SeedModel BuildSeed(SeedResource seed, Dictionary<string, EntityResource> entitiesByName, Guid applicationId)
     {
         var entity = entitiesByName[seed.Entity];
         return new SeedModel
         {
-            Id = seed.Id,
+            Id = IsModuleResource(seed) ? ModuleResourceIds.Derive(applicationId, seed.Id) : seed.Id,
             Name = seed.Name,
             File = seed.File,
             Entity = new EntityReference(entity.Id, entity.Name),
