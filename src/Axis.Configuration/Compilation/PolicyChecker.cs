@@ -29,13 +29,13 @@ internal static class PolicyChecker
     private static readonly PolicyAction[] _endpointActions = [PolicyAction.Invoke];
 
     /// <summary>
-    /// Checks <paramref name="policies"/>, which come in path order. <paramref name="roleNames"/>
-    /// holds the declared role names, compared exactly. <paramref name="ownerOf"/> names the owner of
+    /// Checks <paramref name="policies"/>, which come in path order. <paramref name="findRole"/>
+    /// finds a declared role by name, compared exactly. <paramref name="ownerOf"/> names the owner of
     /// a child entity, or gives null for a root entity.
     /// </summary>
     public static void Check(
         IReadOnlyList<PolicyResource> policies,
-        IReadOnlySet<string> roleNames,
+        Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         Func<string, EntityResource?> findEntity,
         Func<string, string?> ownerOf,
@@ -46,6 +46,7 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedProcessNames,
         Func<string, EndpointResource?> findEndpoint,
         IReadOnlySet<string> unloadedEndpointNames,
+        ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         ModuleReferences moduleReferences,
         IReadOnlySet<string> modules,
@@ -59,7 +60,11 @@ internal static class PolicyChecker
             for (var index = 0; index < policy.Roles.Count; index++)
             {
                 var role = policy.Roles[index];
-                if (!roleNames.Contains(role) && !unloadedRoleNames.Contains(role))
+                if (findRole(role) is { } roleResource)
+                {
+                    references.Add(policy, $"/roles/{index}", ReferenceRelations.PolicyRole, ResourceNode.Of(roleResource));
+                }
+                else if (!unloadedRoleNames.Contains(role))
                 {
                     Report(DiagnosticCodes.UnknownPolicyRole, $"The role '{role}' was not found. No declared role has that name.", $"/roles/{index}");
                 }
@@ -68,6 +73,7 @@ internal static class PolicyChecker
             for (var index = 0; index < policy.Grants.Count; index++)
             {
                 CheckGrant(
+                    policy,
                     policy.Grants[index],
                     $"/grants/{index}",
                     findEntity,
@@ -79,6 +85,7 @@ internal static class PolicyChecker
                     unloadedProcessNames,
                     findEndpoint,
                     unloadedEndpointNames,
+                    references,
                     rules,
                     moduleReferences,
                     modules,
@@ -151,6 +158,7 @@ internal static class PolicyChecker
     }
 
     private static void CheckGrant(
+        PolicyResource policy,
         GrantDefinition grant,
         string path,
         Func<string, EntityResource?> findEntity,
@@ -162,6 +170,7 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedProcessNames,
         Func<string, EndpointResource?> findEndpoint,
         IReadOnlySet<string> unloadedEndpointNames,
+        ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         ModuleReferences moduleReferences,
         IReadOnlySet<string> modules,
@@ -217,8 +226,11 @@ internal static class PolicyChecker
         switch (kind)
         {
             case "dataSource":
-                if (findDataSource(name) is null
-                    && !unloadedDataSourceNames.Contains(name)
+                if (findDataSource(name) is { } dataSource)
+                {
+                    references.Add(policy, $"{path}/dataSource", ReferenceRelations.Grant, ResourceNode.Of(dataSource));
+                }
+                else if (!unloadedDataSourceNames.Contains(name)
                     && !moduleReferences.ReportUndeclared(name, $"{path}/dataSource", report))
                 {
                     report(DiagnosticCodes.UnknownGrantTarget, $"The data source '{name}' was not found. No loaded data source has that name.", $"{path}/dataSource");
@@ -227,7 +239,11 @@ internal static class PolicyChecker
                 return;
 
             case "process":
-                if (findProcess(name) is null && !unloadedProcessNames.Contains(name))
+                if (findProcess(name) is { } process)
+                {
+                    references.Add(policy, $"{path}/process", ReferenceRelations.Grant, ResourceNode.Of(process));
+                }
+                else if (!unloadedProcessNames.Contains(name))
                 {
                     report(DiagnosticCodes.UnknownGrantTarget, $"The process '{name}' was not found. No loaded process has that name.", $"{path}/process");
                 }
@@ -235,7 +251,11 @@ internal static class PolicyChecker
                 return;
 
             case "endpoint":
-                if (findEndpoint(name) is null && !unloadedEndpointNames.Contains(name))
+                if (findEndpoint(name) is { } endpoint)
+                {
+                    references.Add(policy, $"{path}/endpoint", ReferenceRelations.Grant, ResourceNode.Of(endpoint));
+                }
+                else if (!unloadedEndpointNames.Contains(name))
                 {
                     report(DiagnosticCodes.UnknownGrantTarget, $"The endpoint '{name}' was not found. No loaded endpoint has that name.", $"{path}/endpoint");
                 }
@@ -253,6 +273,8 @@ internal static class PolicyChecker
 
             return;
         }
+
+        references.Add(policy, $"{path}/entity", ReferenceRelations.Grant, ResourceNode.Of(entityResource));
 
         if (ownerOf(entityResource.Name) is { } owner)
         {
@@ -276,10 +298,19 @@ internal static class PolicyChecker
             }
         }
 
-        if (grant.Filter is { } filter
-            && ApplicationCompiler.CheckFilter(filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules), policyFilter: true, out _) is { } problem)
+        if (grant.Filter is { } filter)
         {
-            report(problem.Code, problem.Message, $"{path}/filter");
+            var problem = ApplicationCompiler.CheckFilter(
+                filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules), policyFilter: true, out var check);
+            if (check is not null)
+            {
+                references.AddRuleCalls(policy, $"{path}/filter", check);
+            }
+
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, $"{path}/filter");
+            }
         }
     }
 
