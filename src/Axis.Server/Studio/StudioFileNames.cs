@@ -7,8 +7,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// Forms the relative path of a new resource file from its content. Only letters and digits reach the file
-/// name, so no request can name a path outside the application folder.
+/// Forms the relative path of a new resource file from its content. Only letters, digits and, for a role,
+/// hyphens reach the file name, so no request can name a path outside the application folder.
 /// </summary>
 internal static partial class StudioFileNames
 {
@@ -69,9 +69,13 @@ internal static partial class StudioFileNames
             return null;
         }
 
-        if (String(content, "name") is not { } name || !Name().IsMatch(name))
+        // The role schema allows lower-case letters, digits and hyphens. Every other kind allows letters and digits.
+        var isRole = kind == ResourceKinds.Role;
+        if (String(content, "name") is not { } name || !(isRole ? RoleName() : Name()).IsMatch(name))
         {
-            problem = "The name must be letters and digits, start with a letter and have at most 60 characters.";
+            problem = isRole
+                ? "A role name must be lower-case letters, digits and hyphens, start with a letter and have at most 60 characters."
+                : "The name must be letters and digits, start with a letter and have at most 60 characters.";
             return null;
         }
 
@@ -88,7 +92,7 @@ internal static partial class StudioFileNames
         }
 
         problem = null;
-        return $"{folder}/{Kebab(name)}.json";
+        return $"{folder}/{(isRole ? name : Kebab(name))}.json";
     }
 
     // A hyphen goes before a capital that follows a lower-case letter or a digit, or before the last capital
@@ -117,6 +121,9 @@ internal static partial class StudioFileNames
 
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9]{0,59}\\z", RegexOptions.CultureInvariant)]
     private static partial Regex Name();
+
+    [GeneratedRegex("^[a-z][a-z0-9-]{0,59}\\z", RegexOptions.CultureInvariant)]
+    private static partial Regex RoleName();
 
     [GeneratedRegex("^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*\\z", RegexOptions.CultureInvariant)]
     private static partial Regex Locale();

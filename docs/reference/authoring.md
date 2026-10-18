@@ -185,15 +185,18 @@ Writes are built for patches, creates and deletes.
     `endpoints`, `trigger` in `triggers`, `migration` in `migrations` and
     `scenario` in `scenarios`. The `kind` is matched with its letter case.
   - **Name pattern.** A create's `name` must be `^[A-Za-z][A-Za-z0-9]*$`
-    with at most 60 characters, which is the pattern of every kind's schema.
-    Letters and digits alone cannot form a path, so `../x` is `400`. A text's
+    with at most 60 characters, which is the pattern of every kind's schema
+    except `role`. A role's `name` must be `^[a-z][a-z0-9-]*$` with at most 60
+    characters, as its schema says. Letters, digits and hyphens cannot form a
+    path, so `../x` is `400`. A text's
     `locale` must match the text schema's pattern, `^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$`,
     with at most 60 characters.
   - **Kebab-case.** A hyphen goes before a capital that follows a lower-case
     letter or a digit, or before the last capital of an acronym that a
     lower-case letter follows. Then everything is lower-cased. So
     `PurchaseRequestList` is `purchase-request-list`, and `HTTPCall` is
-    `http-call`.
+    `http-call`. A role's file name is its name as it is, such as
+    `roles/department-manager.json`.
   - **Checked fields.** A create checks only `id`, `kind`, `name` and, for a
     text, `locale`. Any other schema problem is saved and shows up as a
     diagnostic.

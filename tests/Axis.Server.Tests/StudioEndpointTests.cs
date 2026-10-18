@@ -464,6 +464,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("process", "HTTPCall", null, "processes/http-call.json")]
     [InlineData("event", "Step2Approval", null, "events/step2-approval.json")]
     [InlineData("text", "German", "pt-BR", "texts/pt-br.json")]
+    [InlineData("role", "cost-centre-owner", null, "roles/cost-centre-owner.json")]
+    [InlineData("role", "auditor", null, "roles/auditor.json")]
     public async Task Create_puts_each_kind_in_its_plural_folder_and_names_a_text_after_its_locale(string kind, string name, string? locale, string expected)
     {
         await using var factory = CreateFactory();
@@ -532,6 +534,12 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("""{"id":"{0}","kind":"widget","name":"Fresh"}""")]
     [InlineData("""{"id":"{0}","kind":"Entity","name":"Fresh"}""")]
     [InlineData("""{"id":"{0}","kind":"application","name":"Fresh"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"../x"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"Manager"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"-manager"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"a.b"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"cost-centre"}""")]
     [InlineData("""{"id":"{0}","kind":"text","name":"Fresh","locale":"../x"}""")]
     [InlineData("""{"id":"{0}","kind":"text","name":"Fresh"}""")]
     [InlineData("[]")]
