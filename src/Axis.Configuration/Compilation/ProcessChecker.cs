@@ -70,7 +70,7 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEventNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
@@ -118,18 +118,17 @@ internal static class ProcessChecker
 
             if (process.StartCondition is { } startCondition)
             {
-                ApplicationCompiler.CheckTextKey(startCondition.Message, process.File, process.Id, "/startCondition/message", textKeys, diagnostics);
+                ApplicationCompiler.CheckTextKey(startCondition.Message, process, "/startCondition/message", references, diagnostics);
             }
 
             for (var index = 0; index < process.Steps.Count; index++)
             {
                 var step = process.Steps[index];
-                ApplicationCompiler.CheckTextKey(step.Label, process.File, process.Id, $"/steps/{index}/label", textKeys, diagnostics);
+                ApplicationCompiler.CheckTextKey(step.Label, process, $"/steps/{index}/label", references, diagnostics);
                 var outcomes = step.Outcomes ?? [];
                 for (var outcome = 0; outcome < outcomes.Count; outcome++)
                 {
-                    ApplicationCompiler.CheckTextKey(
-                        outcomes[outcome].Label, process.File, process.Id, $"/steps/{index}/outcomes/{outcome}/label", textKeys, diagnostics);
+                    ApplicationCompiler.CheckTextKey(outcomes[outcome].Label, process, $"/steps/{index}/outcomes/{outcome}/label", references, diagnostics);
                 }
             }
         }
