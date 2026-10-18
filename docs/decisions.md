@@ -1754,8 +1754,8 @@ answer names nothing that an open endpoint should not show.
 ## D38. Studio edits application folders through an authoring API — Agreed
 
 In M8, Studio edits an application's resource files through an authoring API
-on the server. The routes that list applications, list and read resources,
-patch a resource and give diagnostics are built, and so are the Studio page's
+on the server. The routes that list applications, list, read, patch, create and
+delete resources and give diagnostics are built, and so are the Studio page's
 list, search and diagnostics panel. The rest is *(planned for M8)*. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the

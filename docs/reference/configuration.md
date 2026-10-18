@@ -939,8 +939,7 @@ Studio edits application folders through the
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Two server settings control it. They are built, and the authoring
 API reads them. The Studio page lists the resources with a search and shows
-the diagnostics. *(Planned for M8: the routes that create and delete, and the
-Studio editor.)*
+the diagnostics. *(Planned for M8: the Studio editor.)*
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
@@ -1955,7 +1954,9 @@ model, each with an id derived from the application `id` and the name
 form's `entity` and a policy grant's `entity` can name them. A field's
 `target` also covers data source parameters and endpoint inputs. A process
 `entity`, a raise event step's `event` and an event trigger's `event` can name
-a module entity or event. Module data sources, rules, forms and texts, seeding
+a module entity or event. A pinned module's rules are checked with the rule
+checks, inside their module, see [References](#modules). Module data sources,
+forms and texts, seeding
 and activating module entities, the API
 naming of module entities and the codes marked planned are *(planned for M8)*.
 A module is a
@@ -2023,8 +2024,14 @@ The module's manifest is `module.json` at the root of its folder:
   An unknown name inside a declared module keeps its existing code, such as
   `AXC0012`, `AXC0042`, `AXC0066` or `AXC0074`. A policy grant `entity` can
   name a module entity. One that names an undeclared module keeps the policy's
-  unknown-entity code, `AXC0092`. A module entity sees no rules yet, so it
-  cannot call an
+  unknown-entity code, `AXC0092`. A module rule calls only rules of its own
+  module, by plain name, such as `isActive(x)`. The rule checks, `AXC0055`,
+  `AXC0056`, `AXC0057` and `AXC0065`, and the type check of its expression
+  apply to it and are reported in the module file. A call to an application
+  rule, or to a rule of another module, is `AXC0050` at `/expression` of the
+  module file. The compiler keeps each module rule as `<module id>/<name>`.
+  Calling it from application expressions and from module validations is
+  *(planned for M8)*. A module entity sees no rules yet, so it cannot call an
   application rule. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. How a module entity
   or data source is named in API URLs is left to the issue that builds modules.

@@ -576,6 +576,281 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Assert.Equal(7, responses.Count(response => response.StatusCode == HttpStatusCode.Conflict));
     }
 
+    [Fact]
+    public async Task Create_writes_the_entity_in_its_kind_folder_in_the_canonical_format()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var id = Guid.NewGuid();
+        var body = $$"""{"id":"{{id}}","kind":"entity","name":"CostCentre","formatVersion":1,"fields":[{"name":"code","type":"string"}]}""";
+
+        var response = await Create(client, body);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var path = Path.Combine(Folder, "entities", "cost-centre.json");
+        Assert.True(File.Exists(path));
+        var version = Sha256(path);
+        Assert.Equal($"\"{version}\"", response.Headers.ETag?.Tag);
+        Assert.Equal($"/api/studio/apps/PurchaseRequests/resources/{id}", response.Headers.Location?.OriginalString);
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var root = answer.RootElement;
+        Assert.Equal(id.ToString(), root.GetProperty("id").GetString());
+        Assert.Equal("entity", root.GetProperty("kind").GetString());
+        Assert.Equal("CostCentre", root.GetProperty("name").GetString());
+        Assert.Equal("entities/cost-centre.json", root.GetProperty("file").GetString());
+        Assert.Equal(version, root.GetProperty("version").GetString());
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("diagnostics").ValueKind);
+        var text = File.ReadAllText(path);
+        Assert.Equal(["id", "kind", "name", "formatVersion", "fields"], JsonNode.Parse(text)!.AsObject().Select(pair => pair.Key));
+        Assert.DoesNotContain('\r', text);
+        Assert.EndsWith("}\n", text, StringComparison.Ordinal);
+        Assert.StartsWith("  \"id\"", text.Split('\n')[1], StringComparison.Ordinal);
+        Assert.Empty(Directory.EnumerateFiles(Folder, ".*.tmp", SearchOption.AllDirectories));
+
+        var read = await client.GetAsync(new Uri($"/api/studio/apps/PurchaseRequests/resources/{id}", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("dataSource", "RequestTotals", null, "data-sources/request-totals.json")]
+    [InlineData("policy", "PurchasePolicy", null, "policies/purchase-policy.json")]
+    [InlineData("process", "HTTPCall", null, "processes/http-call.json")]
+    [InlineData("event", "Step2Approval", null, "events/step2-approval.json")]
+    [InlineData("text", "German", "pt-BR", "texts/pt-br.json")]
+    [InlineData("role", "cost-centre-owner", null, "roles/cost-centre-owner.json")]
+    [InlineData("role", "auditor", null, "roles/auditor.json")]
+    public async Task Create_puts_each_kind_in_its_plural_folder_and_names_a_text_after_its_locale(string kind, string name, string? locale, string expected)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var content = new JsonObject { ["id"] = Guid.NewGuid().ToString(), ["kind"] = kind, ["name"] = name };
+        if (locale is not null)
+        {
+            content["locale"] = locale;
+        }
+
+        var body = content.ToJsonString();
+
+        var response = await Create(client, body);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.True(File.Exists(Path.Combine(Folder, expected)));
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(expected, answer.RootElement.GetProperty("file").GetString());
+    }
+
+    [Fact]
+    public async Task Create_creates_a_missing_kind_folder()
+    {
+        Directory.Delete(Path.Combine(Folder, "policies"), recursive: true);
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Create(client, $$"""{"id":"{{Guid.NewGuid()}}","kind":"policy","name":"Fresh"}""");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.True(File.Exists(Path.Combine(Folder, "policies", "fresh.json")));
+    }
+
+    [Theory]
+    [InlineData(EntityId, "Fresh")]
+    [InlineData("", "PurchaseRequest")]
+    public async Task Create_with_an_existing_id_or_target_file_gets_409_and_changes_no_file(string id, string name)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+        var body = $$"""{"id":"{{(id.Length == 0 ? Guid.NewGuid().ToString() : id)}}","kind":"entity","name":"{{name}}"}""";
+
+        var response = await Create(client, body);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Theory]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"../x"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"x/y"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"x\\y"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"a.b"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":".."}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":""}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"1abc"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"abc\n"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":5}""")]
+    [InlineData("""{"kind":"entity","name":"Fresh"}""")]
+    [InlineData("""{"id":"not-a-guid","kind":"entity","name":"Fresh"}""")]
+    [InlineData("""{"id":"{0}","name":"Fresh"}""")]
+    [InlineData("""{"id":"{0}","kind":"widget","name":"Fresh"}""")]
+    [InlineData("""{"id":"{0}","kind":"Entity","name":"Fresh"}""")]
+    [InlineData("""{"id":"{0}","kind":"application","name":"Fresh"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"../x"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"Manager"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"-manager"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"a.b"}""")]
+    [InlineData("""{"id":"{0}","kind":"role","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}""")]
+    [InlineData("""{"id":"{0}","kind":"entity","name":"cost-centre"}""")]
+    [InlineData("""{"id":"{0}","kind":"text","name":"Fresh","locale":"../x"}""")]
+    [InlineData("""{"id":"{0}","kind":"text","name":"Fresh"}""")]
+    [InlineData("[]")]
+    [InlineData("null")]
+    [InlineData("not json")]
+    public async Task Create_with_a_bad_body_or_an_unsafe_name_gets_400_and_writes_nothing(string template)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+
+        var response = await Create(client, template.Replace("{0}", Guid.NewGuid().ToString(), StringComparison.Ordinal));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Create_with_another_content_type_gets_415_and_writes_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+
+        var response = await Create(client, $$"""{"id":"{{Guid.NewGuid()}}","kind":"entity","name":"Fresh"}""", "application/json-patch+json");
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Create_does_not_write_through_a_linked_kind_folder()
+    {
+        Directory.Delete(Path.Combine(Folder, "policies"), recursive: true);
+        Directory.CreateSymbolicLink(Path.Combine(Folder, "policies"), Outside);
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Create(client, $$"""{"id":"{{Guid.NewGuid()}}","kind":"policy","name":"Fresh"}""");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Outside));
+    }
+
+    [Fact]
+    public async Task Create_and_delete_without_the_CSRF_header_or_the_author_role_or_a_session_are_refused_and_write_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var anonymous = factory.CreateClient();
+        var before = Snapshot();
+        var body = $$"""{"id":"{{Guid.NewGuid()}}","kind":"entity","name":"Fresh"}""";
+        var version = Sha256(Path.Combine(Folder, "entities", "supplier.json"));
+        var supplier = SupplierId();
+
+        var created = new[]
+        {
+            await Create(hoa, body, csrf: false),
+            await Create(anna, body),
+            await Create(anonymous, body),
+        };
+        var deleted = new[]
+        {
+            await Delete(hoa, supplier, version, csrf: false),
+            await Delete(anna, supplier, version),
+            await Delete(anonymous, supplier, version),
+        };
+
+        foreach (var responses in new[] { created, deleted })
+        {
+            Assert.Equal(
+                [HttpStatusCode.Forbidden, HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized],
+                responses.Select(response => response.StatusCode));
+        }
+
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Delete_with_the_current_version_removes_the_file_and_lists_the_references_it_broke()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, "entities", "supplier.json");
+
+        var response = await Delete(client, SupplierId(), $"\"{Sha256(path)}\"");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(File.Exists(path));
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var diagnostic = body.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .First(item => item.GetProperty("code").GetString() == "AXC0012" && item.GetProperty("file").GetString() == EntityFile);
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+    }
+
+    [Theory]
+    [InlineData("stale")]
+    [InlineData("*")]
+    public async Task Delete_with_a_stale_or_wildcard_version_gets_409_and_keeps_the_file(string kind)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, "entities", "supplier.json");
+        var old = Sha256(path);
+        var supplier = SupplierId();
+        var patch = await Patch(client, """[{"op":"replace","path":"/label","value":"Changed"}]""", old, supplier);
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        var before = File.ReadAllBytes(path);
+
+        var response = await Delete(client, supplier, kind == "*" ? "*" : old);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public async Task Delete_without_If_Match_gets_428_and_of_the_manifest_gets_400_and_of_an_unknown_id_gets_404()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var supplier = Path.Combine(Folder, "entities", "supplier.json");
+        var manifest = Path.Combine(Folder, "application.json");
+        var manifestId = JsonNode.Parse(File.ReadAllBytes(manifest))!["id"]!.GetValue<string>();
+
+        var missing = await Delete(client, SupplierId(), ifMatch: null);
+        var refused = await Delete(client, manifestId, Sha256(manifest));
+        var unknown = await Delete(client, Guid.NewGuid().ToString(), "x");
+        var unknownApplication = await Delete(client, SupplierId(), Sha256(supplier), "Unknown");
+
+        Assert.Equal(HttpStatusCode.PreconditionRequired, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
+        Assert.True(File.Exists(supplier));
+        Assert.True(File.Exists(manifest));
+    }
+
+    [Fact]
+    public async Task Delete_does_not_remove_a_file_through_a_link()
+    {
+        var path = Path.Combine(Folder, "entities", "supplier.json");
+        var outsideFile = Path.Combine(Outside, "supplier.json");
+        var supplier = SupplierId();
+        File.Move(path, outsideFile);
+        File.CreateSymbolicLink(path, outsideFile);
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Delete(client, supplier, Sha256(outsideFile));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.True(File.Exists(outsideFile));
+    }
+
     private static async Task<HttpResponseMessage> Patch(
         HttpClient client,
         string patch,
@@ -601,6 +876,56 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
         return await client.SendAsync(request, CancellationToken);
     }
+
+    private static async Task<HttpResponseMessage> Create(
+        HttpClient client,
+        string body,
+        string contentType = "application/json",
+        bool csrf = true,
+        string application = "PurchaseRequests")
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/api/studio/apps/{application}/resources", UriKind.Relative))
+        {
+            Content = new StringContent(body, Encoding.UTF8, contentType),
+        };
+        if (csrf)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static async Task<HttpResponseMessage> Delete(
+        HttpClient client,
+        string id,
+        string? ifMatch,
+        string application = "PurchaseRequests",
+        bool csrf = true)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri($"/api/studio/apps/{application}/resources/{id}", UriKind.Relative));
+        if (csrf)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private string SupplierId() =>
+        JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, "entities", "supplier.json")))!["id"]!.GetValue<string>();
+
+    // Every file and folder under the test root, which includes the folder outside the application, with its bytes.
+    private List<string> Snapshot() =>
+        Directory.EnumerateFileSystemEntries(_root, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(_root, path) + (File.Exists(path) ? ":" + Sha256(path) : "/"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
 
     private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
