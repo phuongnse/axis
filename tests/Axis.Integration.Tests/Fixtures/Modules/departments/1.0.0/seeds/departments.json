@@ -1,0 +1,12 @@
+{
+  "id": "3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f03",
+  "kind": "seed",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "sync": true,
+  "records": [
+    { "id": "8f1c3d52-6a4e-4b70-a1d9-2e5c7b9f0a11", "values": { "code": "FIN", "name": "Finance" } },
+    { "id": "8f1c3d52-6a4e-4b70-a1d9-2e5c7b9f0a12", "values": { "code": "ENG", "name": "Engineering" } }
+  ]
+}

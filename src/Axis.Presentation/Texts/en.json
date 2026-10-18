@@ -126,5 +126,22 @@
   "shell.history.action.process.completed": "Process completed",
   "shell.history.action.process.failed": "Process failed",
   "shell.history.action.task.created": "Task created",
-  "shell.history.action.task.completed": "Task decided"
+  "shell.history.action.task.completed": "Task decided",
+  "shell.studio.link": "Studio",
+  "shell.studio.title": "Studio",
+  "shell.studio.application": "Application",
+  "shell.studio.noApplications": "No application is available in Studio.",
+  "shell.studio.search": "Search by name or id",
+  "shell.studio.resources": "Resources",
+  "shell.studio.noResources": "No resource matches.",
+  "shell.studio.selectResource": "Select a resource.",
+  "shell.studio.kind": "Kind",
+  "shell.studio.id": "Id",
+  "shell.studio.file": "File",
+  "shell.studio.path": "Path",
+  "shell.studio.diagnostics": "Diagnostics",
+  "shell.studio.noDiagnostics": "No diagnostics.",
+  "shell.studio.loadFailed": "Studio could not be loaded.",
+  "shell.studio.forbidden.title": "Studio is not available",
+  "shell.studio.forbidden.message": "You need the author role to use Studio."
 }

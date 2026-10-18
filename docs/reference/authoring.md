@@ -8,8 +8,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The list, read, patch, create, delete and diagnostics routes are built.
-*(Planned for M8: the applications list and the references routes.)* It is
+in git. The application list, resource list, read, patch, create, delete and diagnostics
+routes are built. *(Planned for M8: the references routes.)* It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 It never activates a release and touches no database. Under `scripts/dev.sh`,
@@ -22,8 +22,8 @@ Two server settings decide who may use the API and which
 folders it may edit. See [Studio](configuration.md#studio) for their defaults.
 
 - `Studio:Folders` lists the application folders. With no folder, the API
-  has nothing to edit, and every route answers `403`. *(Planned for M8:
-  `studio: false` on `GET /api/me` says the same.)*
+  has nothing to edit, and every route answers `403`. `studio: false` on
+  `GET /api/me` says the same.
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
 
@@ -39,7 +39,7 @@ Routes marked *(planned for M8)* are not built yet.
 
 | Method and path | Response |
 | --- | --- |
-| *(planned for M8)* `GET /api/studio/apps` | `200` with the applications in `Studio:Folders`, each with its `name` |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file` and `version`. *(Planned for M8: `usedBy`.)* |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
@@ -107,7 +107,7 @@ exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List resources, Read, Create, Patch, Delete and Diagnostics
+from the request. The rows for List applications, List resources, Read, Create, Patch, Delete and Diagnostics
 are built, and the others are *(planned for M8)*.
 
 | Route | `401` | `403` | `404` | `409` |

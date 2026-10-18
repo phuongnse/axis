@@ -5,6 +5,8 @@ export interface CurrentUser {
   id: string
   displayName: string
   roles: string[]
+  /** Whether the user may use Studio: it is on and the user holds the author role. */
+  studio: boolean
 }
 
 /**

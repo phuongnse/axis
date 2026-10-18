@@ -68,7 +68,7 @@ flowchart LR
      [Entity logic](#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
-     reserved by the platform (`api`, `health`, `assets`), or one that an
+     reserved by the platform (`api`, `health`, `assets`, `studio`), or one that an
      earlier site of the application already uses in path order, is
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in
@@ -939,7 +939,8 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Two server settings control it. They are built, and the authoring
-API reads them. *(Planned for M8: the Studio page.)*
+API reads them. The Studio page lists the resources with a search and shows
+the diagnostics. *(Planned for M8: the Studio editor.)*
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
@@ -958,7 +959,7 @@ API reads them. *(Planned for M8: the Studio page.)*
   a saved file restarts the server, which activates the folder, see
   [Startup activation](#startup-activation). Elsewhere a folder is committed
   and deployed as today.
-- **Current user.** *(Planned for M8)* `GET /api/me` answers `studio: true` when `Studio:Folders`
+- **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
   is not empty and the user holds the author role.
 
 ## Reference index
@@ -1957,8 +1958,9 @@ process `entity`, a raise event step's `event` and an event trigger's `event`
 can name a module entity or event. A table widget's `dataSource` and a policy
 grant's `dataSource` can name a module data source. A pinned module's rules are
 checked with the rule checks, inside their module, see [References](#modules).
-Module texts, seeding and activating module entities, the API naming of module
-resources and the codes marked planned are *(planned for M8)*.
+Activation provisions the module's entities as the application's own tables,
+startup seeding applies the module's seeds, and the record API serves module
+entities. Module texts and the codes marked planned are *(planned for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -2037,9 +2039,12 @@ The module's manifest is `module.json` at the root of its folder:
   Calling it from application expressions and from module validations is
   *(planned for M8)*. A module entity or data source filter sees no rules yet,
   so it cannot call an application rule. Module entities come before the
-  application's own entities
-  in the model, in the order of `modules` and then by path. How a module entity
-  or data source is named in API URLs is left to the issue that builds modules.
+  application's own entities in the model, in the order of `modules` and then
+  by path. The record API writes a module entity's name as two path segments,
+  `{module id}/{entity name}`, for example
+  `/api/apps/{app}/entities/departments/Department/records`. See the
+  [record API routes](record-api.md#routes). How a module data source is named
+  in API URLs is left to the issue that builds modules.
 - **A copy per application.** Entities, sequences, seeds, events, data sources and forms of a module belong
   to the application that uses it. The id of each module resource inside an
   application is a UUID v5 of the application `id` and the id written in the
@@ -2057,7 +2062,9 @@ The module's manifest is `module.json` at the root of its folder:
   and `AXC0028`. An application text key may not start with the `<id>.` prefix
   of a declared module.
 - **Seeds.** The startup seeding step applies a module's seeds for each
-  application that uses the module, into that application's table.
+  application that uses the module, into that application's table. Each
+  application keeps the record ids written in the module file, so its own
+  seeds can reference a module seed record by that id.
 - **Diagnostics.** A diagnostic in a module file has `file` set to
   `modules/<id>/<relative path>` and `resourceId` set to the id declared in the
   file.

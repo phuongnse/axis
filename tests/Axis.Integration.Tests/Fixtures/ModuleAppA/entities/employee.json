@@ -1,0 +1,11 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3a05",
+  "kind": "entity",
+  "name": "Employee",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "department", "type": "reference", "target": "departments/Department" }
+  ]
+}

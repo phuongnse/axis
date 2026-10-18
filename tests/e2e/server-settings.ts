@@ -58,5 +58,8 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The sample extension package payment-references, which scripts/build.sh installs. The worker gets
     // the same folder from scripts/e2e.sh.
     Extensions__Path: extensionsPath,
+    // Studio edits the purchase request sample for the author role, as in appsettings.Development.json.
+    Studio__Folders__0: purchaseRequests,
+    Studio__AuthorRole: 'author',
   }
 }
