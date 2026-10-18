@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Storage;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,8 @@ namespace Axis.Configuration.Releases;
 /// Compiles an application folder into an immutable release in the tenant database. A folder with
 /// errors produces no release. An unchanged folder returns the release already stored for its
 /// application id and content hash. The release stores the extension package versions it pins, so
-/// installing a newer version never changes it. A stored release can be compiled back into its model.
+/// installing a newer version never changes it. It also stores the files of the module versions it
+/// pins, under <c>modules/&lt;id&gt;/</c>, so removing a module version never changes it. A stored release can be compiled back into its model.
 /// </summary>
 public static class ReleaseCompiler
 {
@@ -28,16 +30,30 @@ public static class ReleaseCompiler
     /// database. Call it outside an explicit transaction: when a concurrent compile stores the same
     /// release first, the context's change tracker is cleared and the stored release is returned.
     /// </summary>
+    public static Task<ReleaseCompilationResult> CompileAsync(
+        string folderPath,
+        ConfigurationDbContext context,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        CancellationToken cancellationToken = default) =>
+        CompileAsync(folderPath, context, installedPackages, [], cancellationToken);
+
+    /// <summary>
+    /// Compiles <paramref name="folderPath"/> against <paramref name="installedPackages"/> and
+    /// <paramref name="installedModules"/> and stores the release as the overload without modules
+    /// does. The files of each pinned module version are stored in the release.
+    /// </summary>
     public static async Task<ReleaseCompilationResult> CompileAsync(
         string folderPath,
         ConfigurationDbContext context,
         IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(installedPackages);
+        ArgumentNullException.ThrowIfNull(installedModules);
 
-        var compiled = ApplicationCompiler.Compile(folderPath, installedPackages);
+        var compiled = ApplicationCompiler.Compile(folderPath, installedPackages, installedModules);
         if (compiled.Model is null || compiled.ContentHash is null)
         {
             return new ReleaseCompilationResult(null, null, compiled.Diagnostics);
@@ -96,7 +112,9 @@ public static class ReleaseCompiler
     /// packages installed now, so the release always rebuilds to the same model. The operations of
     /// each pin come from the same version in <paramref name="installedPackages"/>, and a pin that
     /// is not installed has none, so a release with a package operation step cannot be rebuilt
-    /// without it. Null means no package is installed. A release is stored
+    /// without it. Null means no package is installed. The files of its pinned modules are among
+    /// its stored resources, so the model is rebuilt from those copies alone, never from the
+    /// modules installed now. A release is stored
     /// only when it compiles clean, so any diagnostic, another content hash or another application
     /// id means the stored rows are wrong.
     /// </summary>

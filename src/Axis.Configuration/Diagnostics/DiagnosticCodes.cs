@@ -187,4 +187,13 @@ public static class DiagnosticCodes
     public const string UnknownWidgetProcess = "AXC0192";
     public const string InvalidAdvanceTimeBy = "AXC0193";
     public const string AdvanceTimeWithoutNow = "AXC0194";
+
+    public const string ModuleManifestInvalid = "AXC0200";
+    public const string ModuleFolderMismatch = "AXC0201";
+    public const string ModuleKindNotAllowed = "AXC0202";
+    public const string UnknownModule = "AXC0203";
+    public const string InvalidModuleRange = "AXC0204";
+    public const string NoModuleVersionInRange = "AXC0205";
+    public const string DuplicateApplicationModule = "AXC0206";
+    public const string ReservedModulesFolder = "AXC0212";
 }
