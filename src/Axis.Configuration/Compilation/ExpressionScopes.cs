@@ -18,7 +18,8 @@ namespace Axis.Configuration.Compilation;
 /// data source scope adds the data source's parameters after the fields, has the named
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
 /// process scope resolves paths the same way, and a data change trigger's <c>when</c> uses the process
-/// scope. No other scope resolves paths.
+/// scope. No other scope resolves paths. A rule call qualified with a module id is allowed only
+/// where the scope is given the application's <c>modules</c>.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -26,7 +27,8 @@ public static class ExpressionScopes
         IEnumerable<FieldModel> fields,
         bool includeComputed = true,
         IEnumerable<ExpressionRule>? rules = null,
-        Func<FieldModel, EntityModel?>? childOf = null)
+        Func<FieldModel, EntityModel?>? childOf = null,
+        IEnumerable<string>? modules = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         var all = fields.ToList();
@@ -44,14 +46,16 @@ public static class ExpressionScopes
                         : null)
                     .OfType<ExpressionCollection>()
                     .ToList(),
-            referenceFields: null);
+            referenceFields: null,
+            modules);
     }
 
     internal static ExpressionScope ForEntity(
         IEnumerable<FieldDefinition> fields,
         bool includeComputed = true,
         IEnumerable<ExpressionRule>? rules = null,
-        Func<string, EntityResource?>? findEntity = null)
+        Func<string, EntityResource?>? findEntity = null,
+        IEnumerable<string>? modules = null)
     {
         var all = fields.ToList();
         return Build(
@@ -60,7 +64,8 @@ public static class ExpressionScopes
                 .Select(field => (field.Name, TypeOf(field))),
             rules,
             findEntity is null ? null : CollectionsOf(all, findEntity),
-            referenceFields: null);
+            referenceFields: null,
+            modules);
     }
 
     /// <summary>
@@ -72,7 +77,8 @@ public static class ExpressionScopes
         IEnumerable<FieldModel> fields,
         IEnumerable<DataSourceParameterModel> parameters,
         Func<string, EntityModel?> findEntity,
-        IEnumerable<ExpressionRule>? rules = null)
+        IEnumerable<ExpressionRule>? rules = null,
+        IEnumerable<string>? modules = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(parameters);
@@ -85,7 +91,8 @@ public static class ExpressionScopes
             ],
             rules,
             collections: null,
-            (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null);
+            (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null,
+            modules);
     }
 
     /// <summary>
@@ -99,7 +106,8 @@ public static class ExpressionScopes
         IEnumerable<FieldDefinition> fields,
         IEnumerable<DataSourceParameterDefinition> parameters,
         Func<string, EntityResource?> findEntity,
-        IEnumerable<ExpressionRule>? rules = null)
+        IEnumerable<ExpressionRule>? rules = null,
+        IEnumerable<string>? modules = null)
     {
         var all = fields.ToList();
         return Build(
@@ -110,7 +118,8 @@ public static class ExpressionScopes
             ],
             rules,
             CollectionsOf(all, findEntity),
-            ReferenceFieldsOf(findEntity));
+            ReferenceFieldsOf(findEntity),
+            modules);
     }
 
     /// <summary>
@@ -122,14 +131,16 @@ public static class ExpressionScopes
     internal static ExpressionScope ForProcess(
         IEnumerable<FieldDefinition> fields,
         IEnumerable<ExpressionRule> rules,
-        Func<string, EntityResource?> findEntity)
+        Func<string, EntityResource?> findEntity,
+        IEnumerable<string>? modules = null)
     {
         var all = fields.ToList();
         return Build(
             all.Select(field => (field.Name, TypeOf(field))),
             rules,
             CollectionsOf(all, findEntity),
-            ReferenceFieldsOf(findEntity));
+            ReferenceFieldsOf(findEntity),
+            modules);
     }
 
     /// <summary>
@@ -211,7 +222,8 @@ public static class ExpressionScopes
         IEnumerable<(string Name, ExpressionType? Type)> fields,
         IEnumerable<ExpressionRule>? rules,
         IEnumerable<ExpressionCollection>? collections,
-        ReferenceFieldResolver? referenceFields)
+        ReferenceFieldResolver? referenceFields,
+        IEnumerable<string>? modules = null)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -222,7 +234,7 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections, referenceFields);
+        return new ExpressionScope(types, rules, collections, referenceFields, modules);
     }
 
     /// <summary>

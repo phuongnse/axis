@@ -20,4 +20,5 @@ public static class ExpressionDiagnosticCodes
     public const string TooManyHops = "AXC0058";
     public const string CurrentTimeInStoredValue = "AXC0086";
     public const string CurrentUserOutsidePolicyFilter = "AXC0095";
+    public const string UndeclaredModuleReference = "AXC0207";
 }
