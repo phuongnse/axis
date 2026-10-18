@@ -34,6 +34,7 @@ internal static class TriggerChecker
         Func<string, DataSourceResource?> findDataSource,
         IReadOnlySet<string> unloadedDataSourceNames,
         IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics)
     {
         foreach (var trigger in triggers)
@@ -53,7 +54,7 @@ internal static class TriggerChecker
 
             if (trigger.Type == "dataChange")
             {
-                CheckDataChange(trigger, process, findEntity, unloadedEntityNames, rules, Report);
+                CheckDataChange(trigger, process, findEntity, unloadedEntityNames, rules, modules, Report);
                 continue;
             }
 
@@ -117,6 +118,7 @@ internal static class TriggerChecker
         Func<string, EntityResource?> findEntity,
         IReadOnlySet<string> unloadedEntityNames,
         IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules,
         Action<string, string, string> report)
     {
         var entityName = trigger.Entity!;
@@ -169,7 +171,7 @@ internal static class TriggerChecker
         {
             var parsed = ExpressionParser.Parse(when);
             var problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression!, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity), ExpressionType.Boolean).Diagnostic
+                ? ExpressionTypeChecker.Check(parsed.Expression!, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules), ExpressionType.Boolean).Diagnostic
                 : parsed.Diagnostic;
             if (problem is not null)
             {
@@ -333,11 +335,12 @@ internal static class TriggerChecker
         Func<string, EventResource?> findEvent,
         Func<string, ProcessResource?> findProcess,
         Func<string, DataSourceResource?> findDataSource,
-        IEnumerable<ExpressionRule> rules)
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules)
     {
         if (trigger.Type == "dataChange")
         {
-            return BuildDataChange(trigger, findEntity, findProcess, rules);
+            return BuildDataChange(trigger, findEntity, findProcess, rules, modules);
         }
 
         if (trigger.Type == "schedule")
@@ -414,7 +417,8 @@ internal static class TriggerChecker
         TriggerResource trigger,
         Func<string, EntityResource?> findEntity,
         Func<string, ProcessResource?> findProcess,
-        IEnumerable<ExpressionRule> rules)
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules)
     {
         var entity = findEntity(trigger.Entity!)
             ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
@@ -440,7 +444,7 @@ internal static class TriggerChecker
             Fields = trigger.Fields?.Select(name => FindField(entity, name)!.Name).ToList(),
             Process = new ProcessReference(process.Id, process.Name),
             When = trigger.When is { } when
-                ? ExpressionModel.Compile(when, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity), ExpressionType.Boolean)
+                ? ExpressionModel.Compile(when, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules), ExpressionType.Boolean)
                 : null,
         };
     }

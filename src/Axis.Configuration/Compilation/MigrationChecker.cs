@@ -25,7 +25,8 @@ namespace Axis.Configuration.Compilation;
 /// drops or converts the field, when the value comes after a <c>dropEntity</c>, or when it reads a
 /// field that this migration's own undo leaves without a type. The stored schema is known only at
 /// activation, which a later issue builds, so a name that never existed in the stored table is not
-/// caught here. An entity that is not loaded is not reported when its file failed to load or some
+/// caught here. A migration cannot name a module entity, so one whose <c>entity</c> contains <c>/</c>
+/// is reported with <see cref="DiagnosticCodes.MigrationOfModuleEntity"/> and checked no further. An entity that is not loaded is not reported when its file failed to load or some
 /// migration of that name drops it.
 /// </summary>
 internal static class MigrationChecker
@@ -53,6 +54,21 @@ internal static class MigrationChecker
 
         foreach (var (entityName, group) in groups)
         {
+            if (entityName.Contains('/', StringComparison.Ordinal))
+            {
+                foreach (var migration in group)
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.MigrationOfModuleEntity,
+                        $"The migration names the module entity '{migration.Entity}'. A migration cannot change a module entity.",
+                        migration.File,
+                        "/entity",
+                        migration.Id));
+                }
+
+                continue;
+            }
+
             var entity = findEntity(entityName);
             var dropped = group.Any(migration => migration.Changes.Any(change => change.Type == "dropEntity"));
             if (entity is null && !dropped)

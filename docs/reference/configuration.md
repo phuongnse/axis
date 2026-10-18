@@ -844,12 +844,14 @@ sorted by file and then path.
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
-| `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity` or the expression's pointer. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, or the `entity` of a module event, contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
 | `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
+| `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
+| `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
 
 ## Startup activation
 
@@ -943,8 +945,8 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Two server settings control it. They are built, and the authoring
-API reads them. The Studio page lists the resources with a search and shows
-the diagnostics. *(Planned for M8: the Studio editor.)*
+API reads them. The Studio page lists the resources with a search, edits them in a form
+and a JSON view, and shows the diagnostics.
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
@@ -1264,7 +1266,8 @@ The entity file in the same release renames `decisionComments` to
 ```
 
 - `id` is permanent. `kind` is `migration`, `name` names the migration and
-  `formatVersion` is `1`. `entity` names the entity it changes.
+  `formatVersion` is `1`. `entity` names the entity it changes. It cannot name a
+  module entity such as `departments/Department`, which is `AXC0214`.
 - `changes` is ordered. Each change has a `type` and the properties below.
 
   | Type | Properties | Effect |
@@ -1950,7 +1953,7 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
 
 This section follows
 [D40](../decisions.md#d40-reusable-modules--agreed). The manifest,
-installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0212`
+installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0214`
 are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds and events join the application
@@ -1961,10 +1964,10 @@ form's `entity` and a policy grant's `entity` can name them. A field's
 `entity`, a raise event step's `event` and an event trigger's `event` can name
 a module entity or event. A pinned module's texts join the application's texts
 of the same locale, so its labels resolve. A pinned module's rules are checked
-with the rule checks, inside their module, see [References](#modules). Activation
-provisions the module's entities as the application's own tables, startup seeding
-applies the module's seeds, and the record API serves module entities. Module
-data sources and forms, and the codes marked planned are *(planned for M8)*.
+with the rule checks, inside their module, and application expressions call them,
+see [References](#modules). Activation provisions the module's entities as the
+application's own tables, startup seeding applies the module's seeds, and the record
+API serves module entities. Module data sources and forms are *(planned for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -2036,9 +2039,18 @@ The module's manifest is `module.json` at the root of its folder:
   apply to it and are reported in the module file. A call to an application
   rule, or to a rule of another module, is `AXC0050` at `/expression` of the
   module file. The compiler keeps each module rule as `<module id>/<name>`.
-  Calling it from application expressions and from module validations is
-  *(planned for M8)*. A module entity sees no rules yet, so it cannot call an
-  application rule. Module entities come before the application's own entities
+  An application expression calls it as `<module id>:<name>(…)`, such as
+  `departments:IsManager(x)`, with no spaces around the `:`. A rule, a
+  validation, a data source filter, a process condition and a policy filter can
+  call it. The interpreter runs its body, and a filter's SQL inlines it with the
+  module rules it calls. The rule name ignores letter case and the module id
+  must match exactly. A module that `modules` does not declare is `AXC0207` at
+  the expression's pointer. A rule the declared module lacks is `AXC0050`. A
+  call chain that passes from an application rule into module rules counts
+  toward the 8-deep limit, `AXC0065`. See
+  [qualified rule calls](expressions.md#names-and-references). Calling a module
+  rule from module validations is *(planned for M8)*. A module entity sees no
+  rules yet, so it cannot call an application rule or a module rule. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
@@ -2053,9 +2065,16 @@ The module's manifest is `module.json` at the root of its folder:
   builds the derived id into the model. A diagnostic in a module file keeps the
   id written in that file. See
   [the physical names in storage](storage.md). A module upgrade must be
-  additive for its entities: `AXC0213`. Modules ship no migrations in M8, and a
-  `migration` cannot name a module entity: `AXC0214`. So an application cannot
-  stop using a module once its tables exist.
+  additive for its entities: `AXC0213`. Activation compares each module copy in
+  the release with the copy in the application's active release. It matches
+  entities by the id written in the module file and fields by name, ignoring
+  letter case. Dropping an entity, dropping a field and changing a field's
+  `type` are refused. Other field properties are not compared there. Removing a
+  declared module from an application whose active release uses it counts as
+  dropping each of its entities. Nothing is applied when activation is
+  refused. Modules ship no migrations in M8, and a `migration` cannot name a
+  module entity: `AXC0214`. So an application cannot stop using a module once
+  its tables exist.
 - **Texts.** A module's text keys start with `<module id>.`, or `AXC0209` is
   reported. A module ships one `text` resource per locale. Its texts join the
   application's texts of the same locale, ignoring letter case, so labels in
@@ -2083,17 +2102,14 @@ The module's manifest is `module.json` at the root of its folder:
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
-| `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity` or the expression's pointer. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, or the `entity` of a module event, contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
 | `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
-
-| Planned code | Meaning |
-| --- | --- |
-| `AXC0213` | The pinned version changes a module entity in a way that is not additive. The message names the module and both versions. Reported at activation, at the module entity file in the release. |
-| `AXC0214` | A `migration`'s `entity` names a module entity. Reported at `/entity`. |
+| `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
+| `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
 
 ## Roles and policies
 

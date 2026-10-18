@@ -471,6 +471,49 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Fact]
+    public void A_qualified_call_resolves_to_the_rule_of_a_declared_module_ignoring_the_rule_name_case()
+    {
+        var ok = Check("departments:isPositive(i)", ExpressionType.Boolean, ModuleScope());
+
+        Assert.True(ok.Succeeded, ok.Diagnostic?.Message);
+        Assert.Equal("departments", Assert.Single(ok.RuleCalls.Values).Module);
+    }
+
+    [Theory]
+    [InlineData("payroll:IsPositive(i)", ExpressionDiagnosticCodes.UndeclaredModuleReference,
+        "The rule call 'payroll:IsPositive' names the module 'payroll', which the application does not declare. Add 'payroll' to 'modules' in application.json at character 1.")]
+    [InlineData("Departments:IsPositive(i)", ExpressionDiagnosticCodes.UndeclaredModuleReference,
+        "The rule call 'Departments:IsPositive' names the module 'Departments', which the application does not declare. Add 'Departments' to 'modules' in application.json at character 1.")]
+    [InlineData("departments:Nope(i)", ExpressionDiagnosticCodes.UnknownFunction, "Unknown rule 'Nope' in module 'departments' at character 1.")]
+    [InlineData("departments:IsPositive()", ExpressionDiagnosticCodes.WrongArgumentCount,
+        "Rule 'departments:IsPositive' needs 1 argument, found 0 at character 1.")]
+    [InlineData("departments:IsPositive('a')", ExpressionDiagnosticCodes.TypeMismatch,
+        "Rule 'departments:IsPositive' needs integer for argument 1, found text at character 1.")]
+    // A module rule is never reached by its bare name, and a module call never reaches a function or an application rule.
+    [InlineData("Twice(1)", ExpressionDiagnosticCodes.UnknownFunction, "Unknown function or rule 'Twice' at character 1.")]
+    [InlineData("departments:abs(1)", ExpressionDiagnosticCodes.UnknownFunction, "Unknown rule 'abs' in module 'departments' at character 1.")]
+    [InlineData("departments:Own(1)", ExpressionDiagnosticCodes.UnknownFunction, "Unknown rule 'Own' in module 'departments' at character 1.")]
+    public void A_wrong_qualified_call_is_reported_at_the_call(string text, string code, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, ModuleScope());
+
+        Assert.Equal((code, message), (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_scope_built_without_modules_allows_no_qualified_call()
+    {
+        var scope = new ExpressionScope(
+            new Dictionary<string, ExpressionType> { ["i"] = ExpressionType.Integer },
+            [new ExpressionRule("IsPositive", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean) { Module = "departments" }]);
+
+        var diagnostic = CheckFails("departments:IsPositive(i)", ExpressionType.Boolean, scope);
+
+        Assert.Equal(ExpressionDiagnosticCodes.UnknownFunction, diagnostic.Code);
+        Assert.Null(scope.DeclaresModule("departments"));
+    }
+
+    [Fact]
     public void A_rule_is_unknown_outside_a_scope_that_has_it()
     {
         Assert.Equal(ExpressionDiagnosticCodes.UnknownFunction, CheckFails("IsPositive(i)", ExpressionType.Boolean).Code);
@@ -585,6 +628,15 @@ public sealed class ExpressionTypeCheckerTests
         });
 
     /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
+    private static ExpressionScope ModuleScope() => new(
+        new Dictionary<string, ExpressionType> { ["i"] = ExpressionType.Integer },
+        [
+            new ExpressionRule("IsPositive", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean) { Module = "departments" },
+            new ExpressionRule("Twice", [new ExpressionRuleParameter("value", ExpressionType.Decimal)], ExpressionType.Decimal) { Module = "departments" },
+            new ExpressionRule("Own", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean),
+        ],
+        modules: ["departments", "people"]);
+
     private static ExpressionScope RuleScope() => new(
         new Dictionary<string, ExpressionType>
         {

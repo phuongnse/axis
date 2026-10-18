@@ -398,6 +398,35 @@ public sealed class ExpressionInterpreterTests
         }
     }
 
+    [Theory]
+    [InlineData(3L, true)]
+    [InlineData(0L, false)]
+    public void A_qualified_call_gives_the_result_of_the_module_rule_body(long i, bool expected)
+    {
+        var isPositive = Rule("IsPositive", "value > 0", ExpressionType.Boolean, ("value", ExpressionType.Integer)) with { Module = "departments" };
+        var parsed = ExpressionParser.Parse("departments:IsPositive(i)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, new ExpressionScope(_fields, [isPositive], modules: ["departments"]), ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+
+        var result = ExpressionInterpreter.Evaluate(parsed.Expression, check, Values([("i", (object?)i)]));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public void A_qualified_call_without_a_resolved_rule_is_never_a_built_in_function()
+    {
+        // The check belongs to another expression, so it holds no rule for the call.
+        var parsed = ExpressionParser.Parse("departments:abs(i)");
+        var other = ExpressionParser.Parse("i");
+        Assert.True(parsed.Succeeded && other.Succeeded);
+        var check = ExpressionTypeChecker.Check(other.Expression, new ExpressionScope(_fields), ExpressionType.Null);
+
+        Assert.Throws<InvalidOperationException>(() => ExpressionInterpreter.Evaluate(parsed.Expression, check, Values([("i", (object?)-1L)])));
+    }
+
     [Fact]
     public void A_rule_known_only_by_its_signature_is_a_bug_to_evaluate()
     {

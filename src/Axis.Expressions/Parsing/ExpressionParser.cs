@@ -267,6 +267,18 @@ public static class ExpressionParser
                     return _current.Kind == TokenKind.OpenParen
                         ? ParseCall(token)
                         : Node(new NameNode(token.Offset, token.Text!), 1);
+                case TokenKind.ModuleQualifier:
+                    Advance();
+                    var rule = _current;
+                    Expect(TokenKind.Name, "a rule name");
+                    if (_current.Kind != TokenKind.OpenParen)
+                    {
+                        throw Failure(
+                            _current.Offset,
+                            $"A module rule must be called, as in '{token.Text}:{rule.Text}(…)', at character {_current.Offset + 1}.");
+                    }
+
+                    return ParseCall(rule, token);
                 case TokenKind.OpenParen:
                     Advance();
                     Enter(token);
@@ -281,7 +293,8 @@ public static class ExpressionParser
             }
         }
 
-        private Parsed ParseCall(Token name)
+        /// <summary>Parses a call's arguments. <paramref name="qualifier"/> is the module id token of a qualified call.</summary>
+        private Parsed ParseCall(Token name, Token? qualifier = null)
         {
             var open = Advance();
             var arguments = new List<ExpressionNode>();
@@ -306,7 +319,7 @@ public static class ExpressionParser
             }
 
             Expect(TokenKind.CloseParen, "',' or ')'");
-            return Node(new CallNode(name.Offset, name.Text!, arguments), height + 1);
+            return Node(new CallNode(qualifier?.Offset ?? name.Offset, name.Text!, arguments, qualifier?.Text), height + 1);
         }
 
         private static BinaryOperator? CompareOperator(TokenKind kind) => kind switch

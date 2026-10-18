@@ -64,17 +64,27 @@ multiplicative = unary , { ( "*" | "/" ) , unary } ;
 unary          = "-" , unary | path ;
 path           = primary , { "." , name } ;
 primary        = literal | call | name | "(" , expression , ")" ;
-call           = name , "(" , [ expression , { "," , expression } ] , ")" ;
+call           = [ qualifier ] , name , "(" , [ expression , { "," , expression } ] , ")" ;
+qualifier      = moduleId , ":" ;
 literal        = integer | decimal | text | "true" | "false" | "null" ;
 integer        = digit , { digit } ;
 decimal        = digit , { digit } , "." , digit , { digit } ;
 text           = "'" , { character - "'" | "''" } , "'" ;
 name           = letter , { letter | digit } ;
+moduleId       = letter , { letter | digit | "-" } ;
 ```
 
 - **Whitespace.** Space, tab and line break between tokens are ignored.
 - **Names.** A name is ASCII letters and digits that start with a letter, like
   a field name.
+- **Qualified call.** A call to a rule of a [module](configuration.md#modules)
+  is written `departments:IsManager(x)`, with the module id, a `:` and the rule
+  name. No space is allowed around the `:`. The reader takes the letters,
+  digits and `-` that run into the `:` as the module id, so `a-b:c(x)` calls
+  the rule `c` of the module `a-b`. To subtract the result of a call, write
+  spaces: `a - b:c(x)`. A `:` was never valid before, so no expression that
+  parsed before changes meaning, and `total/ratio(x)` is still a division. A
+  qualified name must be called: `departments:IsManager` alone is `AXC0035`.
 - **Keywords.** `and`, `or`, `not`, `is`, `in`, `null`, `true` and `false` are
   reserved in any letter case. Names ignore letter case, so a field named
   `Null` would otherwise be ambiguous.
@@ -285,6 +295,17 @@ Paths in validations and computed fields are not built. There a path is
   but not inside
   an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
+- **Qualified rule call.** A rule of a [module](configuration.md#modules) the
+  application declares is called as `departments:IsManager(x)`. It is allowed
+  wherever a rule call is: a rule body, a validation, a data source filter, a
+  process condition and a policy filter. The module id must match exactly. The
+  rule name ignores letter case. A bare name never reaches a module rule, and a
+  qualified name never reaches an application rule or a built-in function. The
+  interpreter runs the module rule's body, and a filter's SQL inlines it, with
+  the module rules it calls in turn. A module that `modules` in
+  `application.json` does not declare is `AXC0207`. A declared module without
+  that rule is `AXC0050`, so is a qualified call where no rules are callable,
+  such as a computed field or a module's own rule.
 - **Scope in a computed field.** The expression sees the entity's own fields
   that are not computed and its child collections through aggregates, and no
   reference path. Another computed field, itself included, is an unknown
@@ -462,7 +483,9 @@ evaluation of a rule call always ends.
   call given as an argument, such as `R(R(x))`, does not, because the inner
   call ends before the outer one starts. Every rule is measured, even one
   that nothing calls, so a validation is always within the limit. A chain
-  past 8 is reported once, at the lowest rule past the limit.
+  past 8 is reported once, at the lowest rule past the limit. A call to a
+  module rule counts the module rule and every rule it calls, so a chain that
+  passes from an application rule into module rules is measured as one.
 - **Nodes.** Each literal, name, operator, call, `.name` path step, `is null`
   and `in` is one node. So each `in` item counts, and a `date('…')` item is two
   nodes: the call and its text. Parentheses are not nodes.
@@ -671,6 +694,10 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   is needed, is not one of the field's `values`. Reported at the literal.
 - **`AXC0050`.** A call to a function or rule that does not exist, at the
   call. The message names it.
+- **`AXC0207`.** A qualified rule call, such as `payroll:IsManager(x)`, names a
+  module that `modules` in `application.json` does not declare, at the call.
+  The same code covers a module named in a `target`, `sequence` or `entity`, see
+  [Modules](configuration.md#modules).
 - **`AXC0051`.** A function or rule call with the wrong number of
   arguments, at the call. This includes an aggregate without its item
   expression, such as `sum(lineItems)`. The message names the expected count, such as "needs 2 arguments" or

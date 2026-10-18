@@ -20,6 +20,12 @@ function required(name: string, meaning: string): string {
   return value
 }
 
+// Studio edits a copy of the purchase request sample that scripts/e2e.sh makes for each run, so a saved
+// resource never changes a file under samples/.
+export const studioFolder = required(
+  'AXIS_E2E_STUDIO_FOLDER',
+  'the copy of the purchase request sample that Studio edits',
+)
 const connectionString = required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string of the runtime role')
 const schemaConnectionString = required(
   'AXIS_E2E_SCHEMA_DATABASE',
@@ -58,8 +64,9 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The sample extension package payment-references, which scripts/build.sh installs. The worker gets
     // the same folder from scripts/e2e.sh.
     Extensions__Path: extensionsPath,
-    // Studio edits the purchase request sample for the author role, as in appsettings.Development.json.
-    Studio__Folders__0: purchaseRequests,
+    // Studio edits the copy of the purchase request sample for the author role. appsettings.Development.json
+    // lists the sample itself.
+    Studio__Folders__0: studioFolder,
     Studio__AuthorRole: 'author',
   }
 }

@@ -15,12 +15,23 @@ namespace Axis.Configuration.Compilation;
 /// parameters alone. Rules that call each other in a cycle are reported once per cycle. A rule call
 /// chain deeper than the limit is reported once, at the lowest rule past the limit. A rule with a
 /// problem in its own expression, or in a cycle, is kept by its signature only, so that calls to it
-/// are still checked without further diagnostics.
+/// are still checked without further diagnostics. A body may call a module rule as
+/// <c>module:Name(…)</c> when it is given the module rules and the declared module ids. A chain that
+/// passes into module rules counts every rule in it toward the depth limit.
 /// </summary>
 internal static class RuleChecker
 {
-    /// <summary>Checks <paramref name="rules"/>, which come in path order, and returns the rules by name, ignoring letter case.</summary>
-    public static IReadOnlyDictionary<string, ExpressionRule> Check(IReadOnlyList<RuleResource> rules, List<Diagnostic> diagnostics)
+    /// <summary>
+    /// Checks <paramref name="rules"/>, which come in path order, and returns the rules by name, ignoring letter case.
+    /// <paramref name="moduleRules"/> are the checked rules of the declared modules and
+    /// <paramref name="modules"/> the declared module ids. Both are null for a module's own rules,
+    /// which call no module rule.
+    /// </summary>
+    public static IReadOnlyDictionary<string, ExpressionRule> Check(
+        IReadOnlyList<RuleResource> rules,
+        List<Diagnostic> diagnostics,
+        IReadOnlyCollection<ExpressionRule>? moduleRules = null,
+        IReadOnlySet<string>? modules = null)
     {
         // Rule names are unique ignoring letter case; a second rule with the same name is already
         // reported by the loader, so calls resolve to the first one.
@@ -78,7 +89,7 @@ internal static class RuleChecker
             }
         }
 
-        new Walk(resources, built, bodies, diagnostics).Run();
+        new Walk(resources, built, bodies, diagnostics, moduleRules ?? [], modules).Run();
         return built;
     }
 
@@ -94,7 +105,7 @@ internal static class RuleChecker
         {
             foreach (var (name, rule) in Check(moduleRules, diagnostics))
             {
-                rules[$"{moduleId}/{name}"] = rule;
+                rules[$"{moduleId}/{name}"] = rule with { Module = moduleId };
             }
         }
 
@@ -109,8 +120,11 @@ internal static class RuleChecker
         Dictionary<string, RuleResource> resources,
         Dictionary<string, ExpressionRule> built,
         Dictionary<string, ExpressionNode> bodies,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        IReadOnlyCollection<ExpressionRule> moduleRules,
+        IReadOnlySet<string>? modules)
     {
+        private readonly ExpressionScope _moduleScope = new([], moduleRules, modules: modules);
         private readonly Dictionary<string, bool> _doneByName = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _stack = [];
         private readonly HashSet<string> _inCycle = new(StringComparer.OrdinalIgnoreCase);
@@ -119,6 +133,7 @@ internal static class RuleChecker
         // so the rules that call it are not measured and get no further diagnostic.
         private readonly Dictionary<string, int> _depthByName = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _deepestCalleeByName = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, ExpressionRule> _deepestModuleRuleByName = new(StringComparer.OrdinalIgnoreCase);
 
         public void Run()
         {
@@ -152,7 +167,7 @@ internal static class RuleChecker
 
             _stack.RemoveAt(_stack.Count - 1);
             _doneByName[name] = true;
-            MeasureDepth(name, callees);
+            MeasureDepth(name, callees, body is null ? [] : ModuleCallees(body));
             CheckBody(name, body);
         }
 
@@ -174,8 +189,9 @@ internal static class RuleChecker
         /// <summary>
         /// Keeps the call depth of a rule whose callees are all measured: the rule itself plus its
         /// deepest callee. Every callee is done, or is on the stack and then the rule is in a cycle.
+        /// A module rule counts with the rules it calls in turn.
         /// </summary>
-        private void MeasureDepth(string name, List<string> callees)
+        private void MeasureDepth(string name, List<string> callees, List<ExpressionRule> moduleCallees)
         {
             if (_inCycle.Contains(name))
             {
@@ -198,9 +214,25 @@ internal static class RuleChecker
                 }
             }
 
+            ExpressionRule? deepestModuleRule = null;
+            foreach (var moduleRule in moduleCallees)
+            {
+                if (Depth(moduleRule) is not { } moduleDepth)
+                {
+                    return;
+                }
+
+                if (moduleDepth + 1 > depth)
+                {
+                    depth = moduleDepth + 1;
+                    deepest = null;
+                    deepestModuleRule = moduleRule;
+                }
+            }
+
             if (depth > ExpressionLimits.MaxRuleCallDepth)
             {
-                ReportTooDeep(name, deepest!, depth);
+                ReportTooDeep(name, deepest, deepestModuleRule, depth);
                 return;
             }
 
@@ -209,22 +241,64 @@ internal static class RuleChecker
             {
                 _deepestCalleeByName[name] = deepest;
             }
+            else if (deepestModuleRule is not null)
+            {
+                _deepestModuleRuleByName[name] = deepestModuleRule;
+            }
+        }
+
+        /// <summary>
+        /// The call depth of a checked module rule: itself plus its deepest callee. Null when the rule
+        /// or a rule it calls has no checked body.
+        /// </summary>
+        private static int? Depth(ExpressionRule rule)
+        {
+            if (rule.BodyCheck is null)
+            {
+                return null;
+            }
+
+            var deepest = 0;
+            foreach (var callee in rule.BodyCheck.RuleCalls.Values)
+            {
+                if (Depth(callee) is not { } calleeDepth)
+                {
+                    return null;
+                }
+
+                deepest = Math.Max(deepest, calleeDepth);
+            }
+
+            return deepest + 1;
         }
 
         /// <summary>Reports the chain from <paramref name="name"/> down its deepest callees, at the expression of <paramref name="name"/>.</summary>
-        private void ReportTooDeep(string name, string deepest, int depth)
+        private void ReportTooDeep(string name, string? deepest, ExpressionRule? deepestModuleRule, int depth)
         {
             var chain = new List<string> { name };
+            var last = name;
             for (string? next = deepest; next is not null; next = _deepestCalleeByName.GetValueOrDefault(next))
             {
                 chain.Add(next);
+                last = next;
+            }
+
+            var names = chain.Select(member => $"'{resources[member].Name}'").ToList();
+            if (deepestModuleRule is null && _deepestModuleRuleByName.TryGetValue(last, out var tail))
+            {
+                deepestModuleRule = tail;
+            }
+
+            if (deepestModuleRule is not null)
+            {
+                names.Add($"'{deepestModuleRule.Module}:{deepestModuleRule.Name}'");
             }
 
             var rule = resources[name];
-            var names = string.Join(" → ", chain.Select(member => $"'{resources[member].Name}'"));
+            var chainText = string.Join(" → ", names);
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.RuleCallTooDeep,
-                $"Rules {names} nest calls {depth} deep, past the limit of {ExpressionLimits.MaxRuleCallDepth}.",
+                $"Rules {chainText} nest calls {depth} deep, past the limit of {ExpressionLimits.MaxRuleCallDepth}.",
                 rule.File,
                 "/expression",
                 rule.Id));
@@ -249,7 +323,7 @@ internal static class RuleChecker
                 parameters.TryAdd(parameter.Name, parameter.Type);
             }
 
-            var check = ExpressionTypeChecker.Check(body, new ExpressionScope(parameters, built.Values), rule.ResultType);
+            var check = ExpressionTypeChecker.Check(body, new ExpressionScope(parameters, built.Values.Concat(moduleRules), modules: modules), rule.ResultType);
             if (!check.Succeeded)
             {
                 diagnostics.Add(new Diagnostic(check.Diagnostic.Code, check.Diagnostic.Message, resource.File, "/expression", resource.Id));
@@ -262,53 +336,70 @@ internal static class RuleChecker
 
         /// <summary>
         /// The known rules a body calls, each once, in tree order. A built-in function name is never
-        /// a rule call.
+        /// a rule call, and a qualified call never names an application rule.
         /// </summary>
         private List<string> Callees(ExpressionNode body)
         {
             var callees = new List<string>();
-            Collect(body);
-            return [.. callees.Distinct(StringComparer.OrdinalIgnoreCase)];
-
-            void Collect(ExpressionNode node)
+            ForEachCall(body, call =>
             {
-                switch (node)
+                if (call.Module is null && !ExpressionFunctions.IsFunction(call.Name) && resources.ContainsKey(call.Name))
                 {
-                    case CallNode call:
-                        if (!ExpressionFunctions.IsFunction(call.Name)
-                            && resources.ContainsKey(call.Name))
-                        {
-                            callees.Add(call.Name);
-                        }
-
-                        foreach (var argument in call.Arguments)
-                        {
-                            Collect(argument);
-                        }
-
-                        break;
-                    case MemberNode member:
-                        Collect(member.Target);
-                        break;
-                    case UnaryNode unary:
-                        Collect(unary.Operand);
-                        break;
-                    case BinaryNode binary:
-                        Collect(binary.Left);
-                        Collect(binary.Right);
-                        break;
-                    case IsNullNode isNull:
-                        Collect(isNull.Operand);
-                        break;
-                    case InNode inNode:
-                        Collect(inNode.Operand);
-                        foreach (var item in inNode.Items)
-                        {
-                            Collect(item);
-                        }
-
-                        break;
+                    callees.Add(call.Name);
                 }
+            });
+            return [.. callees.Distinct(StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <summary>The module rules a body calls with a qualified call, each once, in tree order.</summary>
+        private List<ExpressionRule> ModuleCallees(ExpressionNode body)
+        {
+            var callees = new List<ExpressionRule>();
+            ForEachCall(body, call =>
+            {
+                if (call.Module is { } module
+                    && _moduleScope.TryGetModuleRule(module, call.Name, out var rule)
+                    && !callees.Contains(rule))
+                {
+                    callees.Add(rule);
+                }
+            });
+            return callees;
+        }
+
+        private static void ForEachCall(ExpressionNode node, Action<CallNode> visit)
+        {
+            switch (node)
+            {
+                case CallNode call:
+                    visit(call);
+                    foreach (var argument in call.Arguments)
+                    {
+                        ForEachCall(argument, visit);
+                    }
+
+                    break;
+                case MemberNode member:
+                    ForEachCall(member.Target, visit);
+                    break;
+                case UnaryNode unary:
+                    ForEachCall(unary.Operand, visit);
+                    break;
+                case BinaryNode binary:
+                    ForEachCall(binary.Left, visit);
+                    ForEachCall(binary.Right, visit);
+                    break;
+                case IsNullNode isNull:
+                    ForEachCall(isNull.Operand, visit);
+                    break;
+                case InNode inNode:
+                    ForEachCall(inNode.Operand, visit);
+                    foreach (var item in inNode.Items)
+                    {
+                        ForEachCall(item, visit);
+                    }
+
+                    break;
             }
         }
     }

@@ -915,6 +915,11 @@ real metadata and records:
 - the purchase request sample in `samples/apps/purchase-requests`, for the
   purchase request skeleton journeys.
 
+The E2E server's `Studio:Folders` does not list that sample. It lists a copy
+that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
+exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. A spec that saves a resource in
+Studio therefore never changes a file under `samples/`.
+
 A spec can also activate another folder during the run, to test releases. The
 helper `tests/e2e/activate.ts` starts the built server once more on a spare
 port, with the same settings as the E2E server and that folder in
