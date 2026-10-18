@@ -1896,10 +1896,10 @@ the release, and the compile of a module's entities, sequences, seeds, events,
 data sources and forms with ids derived from the application are built. So are the
 `target`, `sequence` and `dataSource` references, the module texts that join the
 application's texts by locale, a module's rules and the calls to them from
-application expressions, and the codes `AXC0207` to `AXC0214`. So are activating
+application expressions, module validations that call rules of their own
+module, and the codes `AXC0207` to `AXC0214`. So are activating
 module entities, seeding and the record API for module entities. So is the
-sample module `departments`. Module validations that call rules are
-*(planned for M9)*. See the
+sample module `departments`. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner

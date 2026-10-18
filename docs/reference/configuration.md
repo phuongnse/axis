@@ -2006,7 +2006,9 @@ The module's manifest is `module.json` at the root of its folder:
 
 `departments` is the sample module, `samples/modules/departments`. It holds a
 `Department` entity with a code, a name and a manager, a `Departments` data source,
-an `IsManager(manager, user)` rule, three seed departments and `en` and `vi` texts.
+an `IsManager(manager, user)` rule and an `IsDepartmentCode(code)` rule, three seed
+departments and `en` and `vi` texts. The `Department` entity has a validation that
+calls `IsDepartmentCode`, so a department code must be in capital letters.
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install it under
 `artifacts/modules/departments/1.0.0/`, and the Compose images hold it in
 `/modules`. The server and the worker read it through `Modules:Path`.
@@ -2068,9 +2070,14 @@ an `IsManager(manager, user)` rule, three seed departments and `en` and `vi` tex
   the expression's pointer. A rule the declared module lacks is `AXC0050`. A
   call chain that passes from an application rule into module rules counts
   toward the 8-deep limit, `AXC0065`. See
-  [qualified rule calls](expressions.md#names-and-references). Calling a module
-  rule from module validations is *(planned for M9)*. A module entity or data source filter sees no
-  rules, so it cannot call an application rule or a module rule. Module entities come before the application's own entities
+  [qualified rule calls](expressions.md#names-and-references). A module
+  entity's validations call rules of their own module by plain name, as a
+  module rule does. A call to an application rule, or a qualified call, even
+  with the module's own id, is `AXC0050` at `/validations/{i}/expression` of the
+  module file. The record API runs the module rule's body in each application
+  that declares the module. These calls add no rule-call edge to the reference
+  index, and the 8-deep limit counts the rule chain only. A module data source
+  filter sees no rules. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
@@ -2503,7 +2510,8 @@ computed fields are built, including
 Expressions use the syntax of the [expression language](expressions.md), and
 diagnostic codes come with the issues that build each check. A validation
 can call a named [rule](#resource-file-shape), such as `IsPositive(quantity)`
-below. Both examples below compile, given that rule.
+below. Both examples below compile, given that rule. A module entity's
+validation calls the rules of its own module, see [modules](#modules).
 
 ```json
 {

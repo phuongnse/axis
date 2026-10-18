@@ -1,0 +1,9 @@
+{
+  "id": "6f2c8a41-9b3d-4e75-a0c6-1d8e4f7b2a93",
+  "kind": "rule",
+  "name": "IsDepartmentCode",
+  "formatVersion": 1,
+  "parameters": [{ "name": "code", "type": "text" }],
+  "resultType": "boolean",
+  "expression": "code == upper(code)"
+}

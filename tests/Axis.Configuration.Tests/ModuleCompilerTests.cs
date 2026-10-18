@@ -1084,6 +1084,103 @@ public sealed class ModuleCompilerTests
         Assert.NotNull(rules["departments/IsActive"].Body);
     }
 
+    /// <summary>
+    /// The module <c>departments</c> with the rule <c>IsPositive</c> and a <c>Department</c> entity with an integer
+    /// <c>value</c> and one validation, in an application that declares it, plus the given application files.
+    /// </summary>
+    private static (TemporaryFolder Modules, TemporaryFolder Folder) ModuleValidationApplication(
+        string expression, string ruleExpression = "value > 0", params (string Path, string Content)[] files)
+    {
+        var modules = Modules("1.0.0")
+            .With("departments/1.0.0/IsPositive.json", ModuleRule(ModuleRuleId, "IsPositive", ruleExpression))
+            .With("departments/1.0.0/Department.json", $$"""
+                { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1,
+                  "fields": [ { "name": "value", "type": "integer" } ],
+                  "validations": [ { "expression": "{{expression}}", "message": { "textKey": "departments.department.invalid" }, "field": "value" } ] }
+                """)
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department.invalid": "Not valid." }"""));
+        var folder = Folder(DepartmentsModule).With("texts/en.json", RequestTexts);
+        foreach (var (path, content) in files)
+        {
+            folder.With(path, content);
+        }
+
+        return (modules, folder);
+    }
+
+    private static object? EvaluateDepartment(Model.ValidationModel validation, long value)
+    {
+        var result = ExpressionInterpreter.Evaluate(
+            validation.Syntax, validation.Check, new ExpressionValues([KeyValuePair.Create("value", (object?)value)]));
+        Assert.True(result.Succeeded, result.Error?.Message);
+        return result.Value;
+    }
+
+    [Fact]
+    public void A_module_validation_calls_a_rule_of_its_module_by_plain_name()
+    {
+        var (modules, folder) = ModuleValidationApplication("IsPositive(value)");
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.DoesNotContain(result.References.Edges, edge => edge.Relation == ReferenceRelations.RuleCall);
+        Assert.True(result.Model!.TryGetEntity(DepartmentName, out var department));
+        var validation = Assert.Single(department.Validations);
+        Assert.Equal(true, EvaluateDepartment(validation, 1L));
+        Assert.Equal(false, EvaluateDepartment(validation, 0L));
+    }
+
+    [Fact]
+    public void A_module_validation_that_calls_an_application_rule_is_reported_in_the_module_file()
+    {
+        var (modules, folder) = ModuleValidationApplication(
+            "IsUrgent(value)", files: ("IsUrgent.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e03", "IsUrgent", "value > 0")));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownFunction, "modules/departments/Department.json", "/validations/0/expression", (Guid?)Guid.Parse(DepartmentId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_qualified_call_from_a_module_validation_is_an_unknown_rule()
+    {
+        var (modules, folder) = ModuleValidationApplication("departments:IsPositive(value)");
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownFunction, "modules/departments/Department.json", "/validations/0/expression", (Guid?)Guid.Parse(DepartmentId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_validation_calls_its_module_rule_when_an_application_rule_has_the_same_name()
+    {
+        var (modules, folder) = ModuleValidationApplication(
+            "IsPositive(value)", files: ("IsPositive.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e04", "IsPositive", "value > 100")));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.True(result.Model!.TryGetEntity(DepartmentName, out var department));
+        Assert.Equal(true, EvaluateDepartment(Assert.Single(department.Validations), 1L));
+    }
+
     private const string RequestTexts = """
         { "id": "55555555-5555-4555-8555-555555555599", "kind": "text", "name": "RequestTextsEn", "formatVersion": 1, "locale": "en",
           "texts": { "request.invalid": "The request is not valid.", "request.cannotStart": "This request cannot be started.", "role.employee": "Employee" } }
