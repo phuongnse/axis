@@ -193,7 +193,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules and events of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events and texts of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -201,6 +201,7 @@ internal static class ModuleChecker
         private readonly List<SeedResource> _seeds = [];
         private readonly List<(string ModuleId, List<RuleResource> Rules)> _rules = [];
         private readonly List<EventResource> _events = [];
+        private readonly List<ModuleText> _texts = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedEventNames = new(StringComparer.OrdinalIgnoreCase);
@@ -212,6 +213,7 @@ internal static class ModuleChecker
                 _seeds,
                 [.. _rules.Select(module => (module.ModuleId, (IReadOnlyList<RuleResource>)module.Rules))],
                 _events,
+                _texts,
                 _unloadedEntityNames,
                 _unloadedSequenceNames,
                 _unloadedEventNames);
@@ -243,7 +245,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule or an event.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event or a text.</summary>
         public void Add(string moduleId, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -278,6 +280,10 @@ internal static class ModuleChecker
                         Name = $"{moduleId}/{@event.Name}",
                         Entity = Rewrite(moduleId, @event.Entity, @event.File, @event.Id, "/entity", _unloadedEntityNames, diagnostics)!,
                     });
+                    break;
+                case ResourceKinds.Text:
+                    var text = root.Deserialize<TextResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    _texts.Add(new ModuleText(moduleId, text));
                     break;
             }
         }
@@ -336,7 +342,7 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences, seeds and events of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds, events and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The rules come by module, in pin order, each in path
 /// order and under its plain name. The unloaded names are those of module files that
 /// failed their schema or whose reference was reported, so no second diagnostic names them. Both name
@@ -348,6 +354,10 @@ internal sealed record ModuleResources(
     IReadOnlyList<SeedResource> Seeds,
     IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> Rules,
     IReadOnlyList<EventResource> Events,
+    IReadOnlyList<ModuleText> Texts,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedSequenceNames,
     IReadOnlySet<string> UnloadedEventNames);
+
+/// <summary>A text resource of a pinned module, with the id of that module.</summary>
+internal sealed record ModuleText(string ModuleId, TextResource Text);
