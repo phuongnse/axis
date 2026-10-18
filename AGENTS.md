@@ -46,7 +46,8 @@ Vietnamese.
   journeys. Test denied access as well as allowed access.
 - No application-specific code in the platform. Purchase requests and other
   sample applications live as configuration under `samples/`. Sample extension
-  packages, which hold custom C# code, live under `samples/packages/`.
+  packages, which hold custom C# code, live under `samples/packages/`. Sample modules
+  live under `samples/modules/`.
 - Never commit secrets, tokens, local logs or machine snapshots.
 
 ## Working through NexKit
@@ -72,7 +73,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | Script | What it does | Needs |
 | --- | --- | --- |
 | `scripts/setup.sh` | Restores .NET packages, installs npm packages and the Playwright browser | Network |
-| `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution, which installs the sample extension package in `artifacts/extensions` | |
+| `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution, which installs the sample extension package in `artifacts/extensions`, then installs the sample modules in `artifacts/modules` | |
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
@@ -92,14 +93,15 @@ annotation.
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
 A failure names the scenario and the step. To run them by hand, run
-`dotnet run --project src/Axis.Scenarios -- <folder> --server <cs> --extensions artifacts/extensions`.
+`dotnet run --project src/Axis.Scenarios -- <folder> --server <cs> --extensions artifacts/extensions --modules artifacts/modules`.
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
 with the purchase request sample at http://localhost:5206, the worker, and the purchasing
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
-Docker. `docker compose logs server` shows the activation diagnostics,
+Docker. The images hold the `departments` sample module in `/modules`.
+`docker compose logs server` shows the activation diagnostics,
 and `docker compose logs worker` shows the worker output. `docker compose ps` shows the worker
 healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The worker's
 health address `http://127.0.0.1:5208` stays inside its container. The Keycloak admin console login is
@@ -141,6 +143,10 @@ works on a fresh clone:
   point `Extensions:Path`. The purchase request sample declares the package, so it
   does not activate without it. A change to the package's C# code needs a restart of
   the script.
+- It installs the sample modules, `samples/modules/*`, into
+  `artifacts/modules/<id>/<version>/`, where the Development settings of the server and
+  the worker point `Modules:Path`. The server reads the module catalog only when it starts,
+  so a module edit needs a restart of the script.
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
@@ -184,6 +190,9 @@ works on a fresh clone:
   first, with `scripts/build.sh` or
   `dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj`.
   Until then `Extensions:Path` names a folder that does not exist, and they stop.
+  It also needs the sample modules installed, with `scripts/build.sh` or
+  `bash scripts/lib/install-sample-modules.sh`. Until then `Modules:Path` names a
+  folder that does not exist, and they stop too.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request
   sample, `../../samples/apps/purchase-requests`, in `ActivateOnStartup`. So
   `scripts/dev.sh` migrates every tenant database, then compiles and activates the

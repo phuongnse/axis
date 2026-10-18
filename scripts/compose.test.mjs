@@ -105,6 +105,13 @@ test('the stack runs from source', { timeout }, async () => {
     'axis=axis_schema,entities=axis_schema',
   )
 
+  // Both images hold the sample module departments, and the server loads it.
+  for (const service of ['server', 'worker']) {
+    const module = compose(['exec', '-T', service, 'test', '-f', '/modules/departments/1.0.0/module.json'])
+    assert.equal(module.status, 0, `${service}: ${module.stderr}`)
+  }
+  assert.doesNotMatch(compose(['logs', 'server']).stdout, /The module version is not loaded/)
+
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
   // The worker polls once a second, so it finds the migrated database soon after the server is up.

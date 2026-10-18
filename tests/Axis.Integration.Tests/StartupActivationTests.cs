@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
@@ -400,6 +401,41 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
             $"{TestPackages.Id} 1.0.0",
             await ScalarAsync(a, $"SELECT package_id || ' ' || version FROM axis.release_packages WHERE release_id = '{active.ReleaseId}'"));
         Assert.Equal(1L, await ScalarAsync(a, "SELECT count(*) FROM axis.release_packages"));
+    }
+
+    [Fact]
+    public async Task Start_activates_an_application_that_declares_the_sample_departments_module()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField)
+            .With("application.json", $$"""
+                { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
+                  "modules": [{ "id": "departments", "version": "^1.0.0" }] }
+                """)
+            .With("texts/vi.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a16", "kind": "text", "name": "TextsVi", "formatVersion": 1, "locale": "vi", "texts": { "role.employee": "Nhân viên" } }""")
+            .With(
+                "policies/manager-access.json",
+                """
+                { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a17", "kind": "policy", "name": "ManagerAccess", "formatVersion": 1, "roles": ["employee"],
+                  "grants": [
+                    { "entity": "departments/Department", "actions": ["read"], "filter": "departments:IsManager(manager, currentUser())" },
+                    { "dataSource": "departments/Departments", "actions": ["read"] }
+                  ] }
+                """);
+        var logs = new LogCollector();
+
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, new Dictionary<string, string>
+        {
+            ["Modules:Path"] = SampleModules.Path,
+        }))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.NotNull(await ActiveAsync(a));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("AXC", StringComparison.Ordinal));
+        var department = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, SampleModules.DepartmentEntityId)));
+        Assert.Equal(3L, await ScalarAsync(a, $"SELECT count(*) FROM {department}"));
     }
 
     [Fact]

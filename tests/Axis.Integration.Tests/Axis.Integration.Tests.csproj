@@ -45,6 +45,7 @@
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\apps\purchase-requests\**\*" Link="Samples\purchase-requests\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-realm.json" Link="Keycloak\axis-realm.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

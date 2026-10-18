@@ -1,0 +1,13 @@
+{
+  "id": "12fdd38d-6a48-4856-9ea8-8da52d0d2a22",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "departments.department.label": "Department",
+    "departments.department.code": "Code",
+    "departments.department.name": "Name",
+    "departments.department.manager": "Manager"
+  }
+}

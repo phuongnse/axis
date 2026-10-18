@@ -1893,9 +1893,9 @@ data sources and forms with ids derived from the application are built. So are t
 `target`, `sequence` and `dataSource` references, the module texts that join the
 application's texts by locale, a module's rules and the calls to them from
 application expressions, and the codes `AXC0207` to `AXC0214`. So are activating
-module entities, seeding and the record API for module entities. Module
-validations that call rules, the sample and the other checks are still
-*(planned for M8)*. See the
+module entities, seeding and the record API for module entities. So is the
+sample module `departments`. Module validations that call rules and the other
+checks are still *(planned for M8)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner

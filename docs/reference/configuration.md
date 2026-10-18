@@ -2003,7 +2003,12 @@ The module's manifest is `module.json` at the root of its folder:
 }
 ```
 
-`departments` is the planned sample module, `samples/modules/departments`.
+`departments` is the sample module, `samples/modules/departments`. It holds a
+`Department` entity with a code, a name and a manager, a `Departments` data source,
+an `IsManager(manager, user)` rule, three seed departments and `en` and `vi` texts.
+`scripts/build.sh`, `scripts/dev.sh` and the E2E run install it under
+`artifacts/modules/departments/1.0.0/`, and the Compose images hold it in
+`/modules`. The server and the worker read it through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an

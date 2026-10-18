@@ -7,6 +7,7 @@ const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 export const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 export const purchaseRequests = path.resolve(repoRoot, 'samples', 'apps', 'purchase-requests')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
+export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
 
 /** The built server, and the folder it runs from. scripts/build.sh builds it in Release. */
 export const serverProject = path.resolve(repoRoot, 'src', 'Axis.Server')
@@ -64,6 +65,9 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The sample extension package payment-references, which scripts/build.sh installs. The worker gets
     // the same folder from scripts/e2e.sh.
     Extensions__Path: extensionsPath,
+    // The sample module departments, which scripts/build.sh installs. The worker gets the same folder from
+    // scripts/e2e.sh.
+    Modules__Path: modulesPath,
     // Studio edits the copy of the purchase request sample for the author role. appsettings.Development.json
     // lists the sample itself.
     Studio__Folders__0: studioFolder,

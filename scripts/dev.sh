@@ -11,7 +11,9 @@
 # The server runs startup activation as the database role axis_schema and serves requests as
 # axis_runtime. The worker runs only as axis_runtime. Docker Compose creates both roles.
 # The sample extension package payment-references is built first, into artifacts/extensions,
-# which the server and the worker read through Extensions:Path.
+# which the server and the worker read through Extensions:Path. The sample modules under
+# samples/modules are installed into artifacts/modules, which they read through Modules:Path. A
+# change to a module needs a restart of this script.
 # AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_SERVER_PORT and
 # AXIS_WEB_PORT move the ports (5432, 8080, 5207, 5206, 5173).
 # Works with the bash 3.2 that ships with macOS.
@@ -180,6 +182,10 @@ trap cleanup EXIT
 # restart of this script.
 log "Building the sample extension package"
 dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj --nologo -v quiet
+
+# The server reads the module catalog only when it starts, so this runs once, before the server.
+log "Installing the sample modules"
+bash scripts/lib/install-sample-modules.sh
 
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.

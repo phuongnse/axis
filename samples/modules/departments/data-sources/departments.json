@@ -1,0 +1,12 @@
+{
+  "id": "794eb55e-55eb-45eb-8eb5-cf4bad248bc5",
+  "kind": "dataSource",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "fields": [
+    { "name": "code", "path": "code" },
+    { "name": "name", "path": "name" },
+    { "name": "manager", "path": "manager" }
+  ]
+}
