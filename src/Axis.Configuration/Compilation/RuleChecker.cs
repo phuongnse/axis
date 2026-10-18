@@ -83,6 +83,25 @@ internal static class RuleChecker
     }
 
     /// <summary>
+    /// Checks each module's rules on their own, so a module rule calls only rules of its module, and
+    /// returns them by <c>&lt;module id&gt;/&lt;name&gt;</c>, ignoring letter case.
+    /// </summary>
+    public static IReadOnlyDictionary<string, ExpressionRule> CheckModules(
+        IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> modules, List<Diagnostic> diagnostics)
+    {
+        var rules = new Dictionary<string, ExpressionRule>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (moduleId, moduleRules) in modules)
+        {
+            foreach (var (name, rule) in Check(moduleRules, diagnostics))
+            {
+                rules[$"{moduleId}/{name}"] = rule;
+            }
+        }
+
+        return rules;
+    }
+
+    /// <summary>
     /// A depth-first walk over the rule calls, in path order. A rule's body is checked once every
     /// rule it calls is done, so the rules it calls already carry their checked bodies.
     /// </summary>

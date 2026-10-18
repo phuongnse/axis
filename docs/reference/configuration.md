@@ -1948,8 +1948,9 @@ checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences and seeds join the application model, each
 with an id derived from the application `id` and the name
 `<module id>/<name>`. A field's `target` and `sequence` can name them, which
-also covers data source parameters and endpoint inputs. Module data sources,
-rules, forms, events and texts, seeding and activating module entities, the API
+also covers data source parameters and endpoint inputs. A pinned module's rules
+are checked with the rule checks, inside their module, see
+[References](#modules). Module data sources, forms, events and texts, seeding and activating module entities, the API
 naming of module entities and the codes marked planned are *(planned for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
@@ -2010,8 +2011,14 @@ The module's manifest is `module.json` at the root of its folder:
   `target` or `sequence` contains `/` is `AXC0208`. An unknown name inside a
   declared module keeps its existing code, such as `AXC0012` or `AXC0066`. A
   policy grant `entity` that names an undeclared module keeps the policy's
-  unknown-entity code. A module entity sees no rules yet, so it cannot call an
-  application rule. Module entities come before the application's own entities
+  unknown-entity code. A module rule calls only rules of its own module, by
+  plain name, such as `isActive(x)`. The rule checks, `AXC0055`, `AXC0056`,
+  `AXC0057` and `AXC0065`, and the type check of its expression apply to it and
+  are reported in the module file. A call to an application rule, or to a rule
+  of another module, is `AXC0050` at `/expression` of the module file. The
+  compiler keeps each module rule as `<module id>/<name>`. Calling it from
+  application expressions and from module validations is *(planned for M8)*. A
+  module entity sees no rules yet, so it cannot call an application rule. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. How a module entity
   or data source is named in API URLs is left to the issue that builds modules.
 - **A copy per application.** Entities, sequences and seeds of a module belong

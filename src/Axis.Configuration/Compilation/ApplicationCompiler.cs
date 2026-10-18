@@ -15,7 +15,7 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Compiles an application folder, or its resources held in memory: loads them, checks the texts
-/// of every locale, checks the named rules and their calls, checks every entity's fields against
+/// of every locale, checks the named rules and their calls, and the rules of each pinned module on their own, checks every entity's fields against
 /// the field type rules and type-checks its computed fields and validations, checks forms, sites,
 /// pages and seeds, checks data sources and their filters, checks role labels, checks processes,
 /// their step graphs, their conditions, the roles their tasks name and the connector operations
@@ -159,7 +159,7 @@ public static class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
-        var moduleResources = new ModuleResources([], [], [], new HashSet<string>(), new HashSet<string>());
+        var moduleResources = new ModuleResources([], [], [], [], new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics);
@@ -292,9 +292,13 @@ public static class ApplicationCompiler
         // Validations, at their top level, data source filters and process conditions call rules.
         // Computed fields and aggregate item expressions see no rules.
         var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
+
+        // A module rule sees only the rules of its own module. A later step lets application
+        // expressions call it by '<module id>/<name>'.
+        _ = RuleChecker.CheckModules(moduleResources.Rules, diagnostics);
         foreach (var entity in allEntities)
         {
-            // Module rules are a separate step, so a module entity sees none and cannot call an application rule.
+            // A module entity sees no rules yet, so it cannot call an application rule or a module rule.
             CheckEntity(
                 entity,
                 FindEntity,
