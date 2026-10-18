@@ -1,0 +1,7 @@
+{
+  "id": "3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f02",
+  "kind": "sequence",
+  "name": "DepartmentNumber",
+  "formatVersion": 1,
+  "format": "D-{n:3}"
+}

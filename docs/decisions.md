@@ -1891,8 +1891,9 @@ The manifest, installation, declaring, pinning, the module files stored in
 the release, and the compile of a module's entities, sequences, seeds and events
 with ids derived from the application are built. So are the `target` and `sequence`
 references and the codes `AXC0207` and `AXC0208`. Module data sources, rules,
-forms and texts, activating module entities, seeding, the sample and
-the other checks are still *(planned for M8)*. See the
+forms and texts, the sample and the other checks are still
+*(planned for M8)*. Activating module entities, seeding and the record API for
+module entities are built. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner
@@ -1926,8 +1927,11 @@ confirmed these points on issue #571 on 2026-10-18.
   - A module resource names only resources of its own module.
   - A reference to an undeclared module, or to a name the pinned version lacks,
     is a diagnostic.
-  - How a module entity or data source is named in API URLs is left to the
-    issue that builds modules.
+  - The record API writes a module entity's name as two path segments,
+    `{module id}/{entity name}`, for example
+    `/api/apps/{app}/entities/departments/Department/records`.
+  - How a module data source is named in API URLs is left to the issue that
+    builds module data sources.
 - **A copy per application:**
   - Module entities, sequences and seeds belong to the application that uses
     the module. Applications never share stored data. Shared master data would
