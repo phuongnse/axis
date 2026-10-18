@@ -25,7 +25,7 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
     active release and its site paths only through `IActiveReleaseStore`;
     they never use `axis.active_releases`, `axis.active_sites` or the
     configuration context directly.
-    Files of a module *(planned for M8)* are stored in
+    Files of a module are stored in
     `axis.release_resources` with their `modules/<id>/` path, see
     [Modules](configuration.md#modules).
   - `Axis.Data` owns `axis.provisioned_entities` (each provisioned entity

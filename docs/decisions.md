@@ -1826,7 +1826,9 @@ installation-level setting.
 ## D40. Reusable modules — Agreed
 
 M8 adds modules: versioned folders of resources that applications reuse.
-Nothing of it is built, and every point below is *(planned for M8)*. See the
+The manifest, installation, declaring, pinning and the module files stored in
+the release are built. References, the copy per application, texts, seeds, the
+sample and the other checks are still *(planned for M8)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner

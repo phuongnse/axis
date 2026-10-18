@@ -19,6 +19,9 @@ public static class ApplicationLoader
 {
     public const string ManifestFileName = "application.json";
 
+    /// <summary>The folder at the root of a release that holds the files of its pinned modules, as <c>modules/&lt;id&gt;/</c>.</summary>
+    public const string ModulesFolderPrefix = "modules/";
+
     private static readonly JsonDocumentOptions _documentOptions = new() { AllowDuplicateProperties = false };
 
     private static readonly JsonSerializerOptions _serializerOptions = new()
@@ -136,6 +139,18 @@ public static class ApplicationLoader
         foreach (var source in sources)
         {
             var file = source.Path;
+            if (file.StartsWith(ModulesFolderPrefix, StringComparison.Ordinal))
+            {
+                // Releases keep the files of pinned modules under this folder, so an application file there
+                // would be read back as a module copy. It is neither loaded nor added to the release.
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ReservedModulesFolder,
+                    $"Releases reserve the folder '{ModulesFolderPrefix}' for the files of pinned modules, so an application file cannot be placed in it.",
+                    file,
+                    ""));
+                continue;
+            }
+
             using var document = Parse(source, diagnostics);
             if (document is null)
             {
