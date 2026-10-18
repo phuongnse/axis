@@ -1925,7 +1925,7 @@ outcomes. Operators inspect the approvals and change nothing:
     { "entity": "Supplier", "actions": ["read"] },
     { "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "dataSource": "RequestsByDepartment", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["cancel", "retry", "resolve"] }
+    { "process": "PurchaseRequestApproval", "actions": ["inspect", "cancel", "retry", "resolve"] }
   ]
 }
 ```
@@ -1980,7 +1980,7 @@ action lets a user settle an unknown connector call, see
 [Resolve](processes.md#resolve). That covers a connector call and a package call.
 Each is checked on its own, and none implies another. `start` implies none of
 them. A grant takes no `filter` or `fields`, as for `start`. The finance
-reviewer policy above lets its reviewers cancel, retry and resolve an approval. An operator role
+reviewer policy above lets its reviewers inspect, cancel, retry and resolve an approval. An operator role
 that holds all three has:
 
 ```json

@@ -1872,7 +1872,7 @@ finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
 call whose outcome is `unknown`. Each is an audited command with its own
 grant, a required reason and one transaction. The
 [instance detail](#instance-detail) lists the commands the user may take. The
-process inspector widget (#477) will show them.
+[process inspector widget](frontend.md) shows Cancel and Retry.
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry

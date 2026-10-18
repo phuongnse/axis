@@ -1,5 +1,5 @@
 import { apiFetch } from './api'
-import { parseRecordJson } from './records'
+import { parseRecordJson, type RecordProblem } from './records'
 
 /** The states of a process instance, as the inspection API's `state` filter takes them. */
 export const instanceStates = ['running', 'waiting', 'completed', 'failed', 'cancelled'] as const
@@ -92,6 +92,8 @@ export interface InstanceCall {
   connector?: string
   package?: string
   version?: string
+  /** Whether the package operation is idempotent. Only a package call has it. */
+  idempotent?: boolean
   operation: string
   state: string
   attempts: CallAttempt[]
@@ -113,6 +115,29 @@ export interface InstanceDetail {
   path: PathEntry[]
   tasks: InstanceTask[]
   calls: InstanceCall[]
+  /** The operator commands the signed-in user may take on the instance now, such as `cancel` and `retry`. */
+  commands: string[]
+}
+
+/** The operator commands the instance page offers. */
+export const instanceCommands = ['cancel', 'retry'] as const
+
+/** An operator command the instance page offers. */
+export type InstanceCommand = (typeof instanceCommands)[number]
+
+/** The outcome of an operator command, or the problem the server reported. */
+export type CommandResult = { ok: true } | { ok: false; problem: RecordProblem }
+
+/**
+ * Whether retrying the instance needs a warning. It does when a call on the instance's current step
+ * has failed, and that call is a package call whose operation is not `idempotent: true`. Such an
+ * operation may have acted before it failed.
+ */
+export function retryWarns(instance: InstanceDetail): boolean {
+  return instance.calls.some(
+    (call) =>
+      call.step === instance.step && call.state === 'failed' && call.kind === 'package' && call.idempotent !== true,
+  )
 }
 
 /**
@@ -167,4 +192,34 @@ export async function fetchInstance(
       })),
     })),
   }
+}
+
+/**
+ * Sends an operator command to an instance with the reason the audit keeps. A 400, 403, 404 or 409
+ * comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function sendCommand(
+  instancesPath: string,
+  id: string,
+  command: InstanceCommand,
+  reason: string,
+): Promise<CommandResult> {
+  const response = await apiFetch(`${instancesPath}/${id}/${command}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (response.ok) {
+    return { ok: true }
+  }
+  if ([400, 403, 404, 409].includes(response.status)) {
+    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+    return {
+      ok: false,
+      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
+    }
+  }
+  throw new Error(
+    `Sending '${command}' to the instance '${id}' of '${instancesPath}' failed with status ${response.status}.`,
+  )
 }

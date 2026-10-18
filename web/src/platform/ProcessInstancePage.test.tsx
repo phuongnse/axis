@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -109,13 +110,15 @@ const detailText = `{
       "step": "registerPurchase",
       "package": "PaymentReferences",
       "version": "1.0.0",
+      "idempotent": false,
       "operation": "reference",
       "state": "succeeded",
       "attempts": [],
       "input": { "title": "Laptops", "amount": 1250.50, "lines": ["a", "b"] },
       "inputHidden": false
     }
-  ]
+  ],
+  "commands": []
 }`
 
 const texts = {
@@ -129,13 +132,38 @@ interface Answer {
   body?: string
 }
 
+/** The detail text with other `commands`, and with its package call and its connector call failed. */
+function detailWith(commands: string[], failed?: 'package' | 'connector') {
+  const detail = JSON.parse(detailText) as {
+    commands: string[]
+    state: string
+    calls: { kind: string; state: string }[]
+  }
+  detail.commands = commands
+  if (failed) {
+    detail.state = 'failed'
+    for (const call of detail.calls) {
+      call.state = call.kind === failed ? 'failed' : 'succeeded'
+    }
+  }
+  return JSON.stringify(detail)
+}
+
 function stubApi({
   detail = { status: 200, body: detailText },
+  command = { status: 200, body: '{}' },
+  reloaded,
   releaseTexts = { status: 200, body: JSON.stringify({ locale: 'en', texts: {} }) },
-}: { detail?: Answer; releaseTexts?: Answer } = {}) {
-  const fetchMock = vi.fn(async (url: string) => {
+}: { detail?: Answer; command?: Answer; reloaded?: Answer; releaseTexts?: Answer } = {}) {
+  let reads = 0
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === `${instancesPath}/${instanceId}`) {
-      return new Response(detail.body ?? '', { status: detail.status })
+      reads += 1
+      const answer = reads > 1 && reloaded ? reloaded : detail
+      return new Response(answer.body ?? '', { status: answer.status })
+    }
+    if (init?.method === 'POST' && (url.endsWith('/cancel') || url.endsWith('/retry'))) {
+      return new Response(command.body ?? '', { status: command.status })
     }
     if (url === `/api/sites/e2e/texts/en?release=${releaseId}`) {
       return new Response(releaseTexts.body ?? '', { status: releaseTexts.status })
@@ -288,5 +316,129 @@ describe('ProcessInstancePage', () => {
     renderPage()
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledOnce())
+  })
+
+  it('shows only the command buttons the detail allows', async () => {
+    stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
+    const { unmount } = renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.getByTestId('inspector-command-cancel')).toHaveTextContent('Cancel instance')
+    expect(screen.queryByTestId('inspector-command-retry')).not.toBeInTheDocument()
+    unmount()
+
+    stubApi({ detail: { status: 200, body: detailWith([]) } })
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.queryByTestId('inspector-command-cancel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('inspector-command-retry')).not.toBeInTheDocument()
+  })
+
+  it('leaves out a command this build does not know', async () => {
+    stubApi({ detail: { status: 200, body: detailWith(['resolve']) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.queryByTestId(/^inspector-command-/)).not.toBeInTheDocument()
+  })
+
+  it('warns before a retry of a failed non-idempotent package call', async () => {
+    stubApi({ detail: { status: 200, body: detailWith(['retry'], 'package') } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-retry'))
+
+    expect(await screen.findByTestId('inspector-retry-warning')).toBeInTheDocument()
+  })
+
+  it('shows no retry warning for a failed connector call, or for the cancel dialog', async () => {
+    stubApi({ detail: { status: 200, body: detailWith(['retry', 'cancel'], 'connector') } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-retry'))
+    await screen.findByRole('dialog')
+    expect(screen.queryByTestId('inspector-retry-warning')).not.toBeInTheDocument()
+  })
+
+  it('posts the reason of a cancel and shows the instance read again', async () => {
+    const cancelled = JSON.parse(detailWith([])) as { state: string }
+    cancelled.state = 'cancelled'
+    const fetchMock = stubApi({
+      detail: { status: 200, body: detailWith(['cancel']) },
+      reloaded: { status: 200, body: JSON.stringify(cancelled) },
+    })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-cancel'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Close')).toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Requested by finance' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByTestId('inspector-command-cancel')).not.toBeInTheDocument())
+    expect(within(screen.getByTestId('inspector-instance')).getByText('Cancelled')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
+    expect(post[0]).toBe(`${instancesPath}/${instanceId}/cancel`)
+    expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'Requested by finance' })
+  })
+
+  it('blocks a blank reason and sends nothing', async () => {
+    const fetchMock = stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-cancel'))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: '   ' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByText('Enter a reason.')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
+
+  it('shows the problem title of a refused command in the dialog', async () => {
+    stubApi({
+      detail: { status: 200, body: detailWith(['cancel']) },
+      command: { status: 409, body: JSON.stringify({ title: 'The instance already ended.' }) },
+    })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-cancel'))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Too late' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
+      'The instance already ended.',
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('shows a generic error when the command fails any other way', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubApi({ detail: { status: 200, body: detailWith(['cancel']) }, command: { status: 500 } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-cancel'))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Try' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
+      'The command could not be sent.',
+    )
   })
 })

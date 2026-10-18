@@ -1,12 +1,29 @@
-import { Alert, Descriptions, Flex, List, Table, Tag, Typography, type TableColumnsType } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Flex,
+  Form,
+  Input,
+  List,
+  Modal,
+  Table,
+  Tag,
+  Typography,
+  type TableColumnsType,
+} from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatValue } from './formatValue'
 import {
   fetchInstance,
   forbidden,
+  instanceCommands,
+  retryWarns,
+  sendCommand,
   stateText,
   type CallAttempt,
   type GraphStep,
+  type InstanceCommand,
   type InstanceCall,
   type InstanceDetail,
   type InstanceTask,
@@ -76,6 +93,16 @@ export function ProcessInstancePage({
     return () => controller.abort()
   }, [instancesPath, instanceId])
 
+  // After a command, the instance is read again. The page keeps showing the old one until it arrives.
+  const reload = useCallback(() => {
+    fetchInstance(instancesPath, instanceId)
+      .then(setInstance)
+      .catch((error: unknown) => {
+        console.warn(`Loading the instance '${instanceId}' failed`, error)
+        setInstance('failed')
+      })
+  }, [instancesPath, instanceId])
+
   if (instance === undefined) {
     return null
   }
@@ -95,7 +122,7 @@ export function ProcessInstancePage({
 
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
-      <InstanceBody instance={instance} locale={locale} />
+      <InstanceBody instance={instance} instancesPath={instancesPath} locale={locale} onChanged={reload} />
     </TextProvider>
   )
 }
@@ -117,11 +144,14 @@ function inputEntries(input: unknown): [string, string][] {
 
 interface InstanceBodyProps {
   instance: InstanceDetail
+  instancesPath: string
   locale: string
+  /** Called after a command was accepted, so the page reads the instance again. */
+  onChanged: () => void
 }
 
 /** The sections of an instance. It reads the release texts. */
-function InstanceBody({ instance, locale }: InstanceBodyProps) {
+function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBodyProps) {
   const t = useText()
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
@@ -194,6 +224,7 @@ function InstanceBody({ instance, locale }: InstanceBodyProps) {
   const taken = new Set(instance.path.map((entry) => entry.step))
   return (
     <Flex vertical gap="large" data-testid="inspector-instance">
+      <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       <Descriptions
         column={1}
         items={[
@@ -259,6 +290,118 @@ function InstanceBody({ instance, locale }: InstanceBodyProps) {
         />
       </section>
     </Flex>
+  )
+}
+
+interface InstanceCommandsProps {
+  instance: InstanceDetail
+  instancesPath: string
+  onChanged: () => void
+}
+
+/** One button for each command the instance detail allows. A command this build does not know is left out. */
+function InstanceCommands({ instance, instancesPath, onChanged }: InstanceCommandsProps) {
+  const t = useText()
+  const [open, setOpen] = useState<InstanceCommand>()
+  const allowed = instanceCommands.filter((command) => instance.commands.includes(command))
+  if (allowed.length === 0) {
+    return null
+  }
+  return (
+    <Flex gap="small">
+      {allowed.map((command) => (
+        <Button key={command} data-testid={`inspector-command-${command}`} onClick={() => setOpen(command)}>
+          {t(`shell.inspector.commands.${command}`)}
+        </Button>
+      ))}
+      {open && (
+        <CommandDialog
+          command={open}
+          instance={instance}
+          instancesPath={instancesPath}
+          onClose={() => setOpen(undefined)}
+          onChanged={onChanged}
+        />
+      )}
+    </Flex>
+  )
+}
+
+interface CommandDialogProps {
+  command: InstanceCommand
+  instance: InstanceDetail
+  instancesPath: string
+  onClose: () => void
+  onChanged: () => void
+}
+
+const reasonMaxLength = 500
+
+/**
+ * The dialog that asks for the reason of a command and sends it. A refusal shows the server's problem
+ * title, and any other failure shows a generic text. Retry warns first when the failed call may have
+ * acted before it failed.
+ */
+function CommandDialog({ command, instance, instancesPath, onClose, onChanged }: CommandDialogProps) {
+  const t = useText()
+  const [form] = Form.useForm<{ reason: string }>()
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string>()
+
+  const send = async () => {
+    const { reason } = await form.validateFields()
+    setSending(true)
+    setError(undefined)
+    try {
+      const result = await sendCommand(instancesPath, instance.id, command, reason)
+      if (result.ok) {
+        onClose()
+        onChanged()
+      } else {
+        setError(result.problem.title)
+      }
+    } catch (failure) {
+      console.warn(`Sending '${command}' to the instance '${instance.id}' failed`, failure)
+      setError(t('shell.inspector.commands.failed'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      title={t(`shell.inspector.commands.${command}`)}
+      okText={t('shell.inspector.commands.send')}
+      cancelText={t('shell.inspector.commands.close')}
+      confirmLoading={sending}
+      onOk={() => void send().catch(() => undefined)}
+      onCancel={onClose}
+      destroyOnHidden
+    >
+      <Flex vertical gap="middle">
+        {command === 'retry' && retryWarns(instance) && (
+          <Alert
+            data-testid="inspector-retry-warning"
+            type="warning"
+            message={t('shell.inspector.commands.retryWarning')}
+          />
+        )}
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="reason"
+            label={t('shell.inspector.commands.reason')}
+            rules={[
+              { required: true, whitespace: true, message: t('shell.inspector.commands.reasonRequired') },
+              { max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') },
+            ]}
+          >
+            <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
+          </Form.Item>
+        </Form>
+        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" message={error} />}
+      </Flex>
+    </Modal>
   )
 }
 
