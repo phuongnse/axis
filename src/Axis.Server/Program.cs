@@ -1,3 +1,4 @@
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Data;
 using Axis.Presentation.Sites;
@@ -43,6 +44,7 @@ builder.Services.AddTenancy(builder.Configuration, builder.Environment);
 // and the worker never reads it.
 builder.Services.AddSingleton(TenantSchemaConnections.Load(builder.Configuration));
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
+builder.Services.AddModules(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
 var oidcTenants = TenantOidcSettings.Load(builder.Configuration);

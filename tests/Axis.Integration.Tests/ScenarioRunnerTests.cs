@@ -271,6 +271,25 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task A_modules_folder_that_does_not_exist_exits_with_2_and_names_the_setting()
+    {
+        using var folder = Application(Scenario("Passing", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk" } }
+            """));
+        using var results = new TemporaryFolder();
+        var output = new StringWriter();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [folder.Path, "--server", await PostgreSqlServer.AdminConnectionStringAsync(), "--modules", Path.Combine(results.Path, "missing"), "--results", results.Path],
+            output,
+            CancellationToken);
+
+        Assert.Equal(ScenarioCommand.SetupError, exitCode);
+        Assert.Contains("Modules:Path", output.ToString(), StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFiles(results.Path));
+    }
+
+    [Fact]
     public async Task Wrong_arguments_exit_with_2_and_print_the_usage()
     {
         var output = new StringWriter();

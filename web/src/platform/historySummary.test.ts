@@ -42,6 +42,7 @@ function item(action: string, details: Record<string, unknown>): HistoryItem {
     action,
     processInstanceId: null,
     details,
+    inspectPath: null,
   }
 }
 

@@ -49,7 +49,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
         var items = root.GetProperty("items").EnumerateArray().ToList();
         Assert.Equal(items.Count, root.GetProperty("totalCount").GetInt64());
         Assert.Equal(
-            ["id", "occurredAt", "actor", "actorName", "action", "processInstanceId", "details"],
+            ["id", "occurredAt", "actor", "actorName", "action", "processInstanceId", "details", "inspectPath"],
             items[0].EnumerateObject().Select(property => property.Name));
         var times = items.Select(item => item.GetProperty("occurredAt")).ToList();
         Assert.All(times, time => Assert.EndsWith("Z", time.GetString(), StringComparison.Ordinal));
@@ -85,6 +85,38 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
             items[1].GetProperty("id").GetGuid(),
             Assert.Single(second.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
         Assert.Equal(items.Count, second.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task A_process_steps_entry_has_an_inspect_path_only_for_a_user_who_may_inspect_the_process()
+    {
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var ines = fixture.CreateClient().SignedInAs("ines");
+        var subject = await CreateAsync(maria, TenantA, """{ "values": { "title": "Stools" } }""");
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var forIness = await GetJsonAsync(ines, $"{Records}/{subject:D}/history", TenantA);
+        using var forMaria = await GetJsonAsync(maria, $"{Records}/{subject:D}/history", TenantA);
+
+        var path = $"/api/apps/StepApp/processes/Submit/instances/{instance:D}";
+        var step = Assert.Single(Entries(forIness, AuditActions.RecordUpdated), item => item.GetProperty("actor").GetString() == AuditActors.System);
+        Assert.Equal(instance, step.GetProperty("processInstanceId").GetGuid());
+        Assert.Equal(path, step.GetProperty("inspectPath").GetString());
+        using (var detail = await ines.SendAsync(RecordApiFixture.Request(path, Host(TenantA)), CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        }
+
+        var stepForMaria = Assert.Single(Entries(forMaria, AuditActions.RecordUpdated), item => item.GetProperty("actor").GetString() == AuditActors.System);
+        Assert.Equal(JsonValueKind.Null, stepForMaria.GetProperty("inspectPath").ValueKind);
+
+        // An entry with no process instance has no path, even for a user who may inspect every process.
+        Assert.All(
+            [forIness, forMaria],
+            history => Assert.Equal(
+                JsonValueKind.Null,
+                Assert.Single(Entries(history, AuditActions.RecordCreated)).GetProperty("inspectPath").ValueKind));
     }
 
     [Fact]
@@ -168,6 +200,9 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
         using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
     }
 
+
+    private static List<JsonElement> Entries(JsonDocument history, string action) =>
+        history.RootElement.GetProperty("items").EnumerateArray().Where(item => item.GetProperty("action").GetString() == action).ToList();
 
     private static async Task<Guid> CreateAsync(HttpClient client, string tenant, string body)
     {
