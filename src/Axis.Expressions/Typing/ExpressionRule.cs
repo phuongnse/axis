@@ -13,6 +13,9 @@ public sealed record ExpressionRuleParameter(string Name, ExpressionType Type);
 /// </summary>
 public sealed record ExpressionRule(string Name, IReadOnlyList<ExpressionRuleParameter> Parameters, ExpressionType ResultType)
 {
+    /// <summary>The id of the module that owns the rule, or null for an application rule.</summary>
+    public string? Module { get; init; }
+
     /// <summary>The body as written, or null for a rule built without source text.</summary>
     public string? Expression { get; init; }
 

@@ -40,7 +40,7 @@ internal sealed class Tokenizer(string text)
         var c = _text[start];
         if (char.IsAsciiLetter(c))
         {
-            return ReadName(start);
+            return ReadModuleQualifier(start) ?? ReadName(start);
         }
 
         if (char.IsAsciiDigit(c))
@@ -100,6 +100,28 @@ internal sealed class Tokenizer(string text)
     {
         _position = start + length;
         return new Token(kind, start, length);
+    }
+
+    /// <summary>
+    /// Reads a module id and its <c>:</c> when letters, digits and <c>-</c> run straight into a
+    /// <c>:</c> and a letter, as in <c>departments:IsManager</c>. Otherwise it reads nothing and
+    /// returns null. The run takes every <c>-</c>, so <c>a-b:c</c> names the module <c>a-b</c>.
+    /// </summary>
+    private Token? ReadModuleQualifier(int start)
+    {
+        var end = start;
+        while (end < _text.Length && (char.IsAsciiLetterOrDigit(_text[end]) || _text[end] == '-'))
+        {
+            end++;
+        }
+
+        if (end + 1 >= _text.Length || _text[end] != ':' || !char.IsAsciiLetter(_text[end + 1]))
+        {
+            return null;
+        }
+
+        _position = end + 1;
+        return new Token(TokenKind.ModuleQualifier, start, end + 1 - start, Text: _text[start..end]);
     }
 
     private Token ReadName(int start)

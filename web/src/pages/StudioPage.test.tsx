@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -36,13 +36,50 @@ const diagnostics: StudioDiagnostic[] = [
   },
 ]
 
+const entityContent = () => ({
+  id: entityId,
+  kind: 'entity',
+  name: 'PurchaseRequest',
+  formatVersion: 1,
+  label: { textKey: 'entity.purchaseRequest' },
+  fields: [
+    { name: 'number', type: 'text', label: { textKey: 'field.number' } },
+    { name: 'title', type: 'text', label: { textKey: 'field.title' }, maxLength: 200 },
+  ],
+})
+
+const savedDiagnostic: StudioDiagnostic = {
+  code: 'AXC0777',
+  severity: 'warning',
+  message: 'The title is long.',
+  file: 'entities/purchase-request.json',
+  path: '/fields/1/maxLength',
+  resourceId: entityId,
+}
+
+/** What the stubbed PATCH of the entity answers. */
+interface PatchAnswer {
+  status: number
+  body: unknown
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Stubs `fetch` with the three Studio list routes. `apps` is the status or list of `/api/studio/apps`. */
-function stubServer(apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }]) {
-  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+/** Stubs `fetch` with the Studio list routes and the read and patch of the purchase request entity. `apps` is the status or list of `/api/studio/apps`. */
+function stubServer(
+  apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }],
+  patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
+) {
+  const entityPath = `/api/studio/apps/PurchaseRequests/resources/${entityId}`
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input === entityPath && init?.method === 'PATCH') {
+      return json(patch.body, patch.status)
+    }
+    if (input === entityPath) {
+      return json({ ...resources[1], content: entityContent() })
+    }
     if (input === '/api/studio/apps') {
       return typeof apps === 'number' ? json({ title: 'No.' }, apps) : json({ items: apps })
     }
@@ -142,6 +179,100 @@ describe('StudioPage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('forms/purchase-request.json'),
     )
+  })
+
+  it('builds the form of an entity from its schema', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    const name = await screen.findByTestId('studio-field-/fields/0/name')
+    expect(within(name).getByRole('textbox')).toHaveValue('number')
+    expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
+    expect(within(screen.getByTestId('studio-field-/label/textKey')).getByRole('textbox')).toHaveValue(
+      'entity.purchaseRequest',
+    )
+    expect(screen.getByTestId('studio-field-/kind')).toHaveTextContent('entity')
+    expect(within(screen.getByTestId('studio-field-/kind')).queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('sends only the changed value, with the loaded version', async () => {
+    const fetchMock = stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const save = await screen.findByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+    expect(save).toBeEnabled()
+    await userEvent.click(save)
+
+    await screen.findByTestId('studio-saved')
+    const patches = fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+    expect(patches).toHaveLength(1)
+    const [, init] = patches[0]
+    expect(JSON.parse(init!.body as string)).toEqual([{ op: 'replace', path: '/fields/1/maxLength', value: 250 }])
+    const headers = new Headers(init!.headers)
+    expect(headers.get('If-Match')).toBe('"b"')
+    expect(headers.get('Content-Type')).toBe('application/json-patch+json')
+    expect(save).toBeDisabled()
+  })
+
+  it('shows the diagnostics of the save answer in place of the loaded ones', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const panel = await screen.findByTestId('studio-diagnostics')
+    expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
+
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await within(panel).findByText('AXC0777')).toBeInTheDocument()
+    expect(within(panel).queryByText('AXC0101')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('AXC0001')).not.toBeInTheDocument()
+  })
+
+  it('keeps the draft on a conflict until the author reloads', async () => {
+    const fetchMock = stubServer(undefined, { status: 409, body: { title: 'Conflict.' } })
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const conflict = await screen.findByTestId('studio-conflict')
+    expect(conflict).toHaveTextContent('Someone else changed this file.')
+    expect(maxLength).toHaveValue('250')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    const reads = () => fetchMock.mock.calls.filter(([input, init]) => input.endsWith(entityId) && !init?.method)
+
+    const before = reads().length
+    await userEvent.click(screen.getByRole('button', { name: 'Reload' }))
+
+    await waitFor(() => expect(screen.queryByTestId('studio-conflict')).not.toBeInTheDocument())
+    expect(reads()).toHaveLength(before + 1)
+    expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
+  })
+
+  it('shows an edit in the JSON view in the form, and turns Save off for invalid JSON', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await screen.findByTestId('studio-field-/fields/0/name')
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const editor = screen.getByRole('textbox', { name: 'JSON' })
+
+    fireEvent.change(editor, { target: { value: JSON.stringify({ ...entityContent(), name: 'Renamed' }) } })
+    await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
+    expect(within(screen.getByTestId('studio-field-/name')).getByRole('textbox')).toHaveValue('Renamed')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'JSON' }), { target: { value: '{ "name": ' } })
+
+    expect(screen.getByTestId('studio-json-error')).toHaveTextContent('The JSON is not valid.')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
   it('shows each diagnostic with its file and path', async () => {

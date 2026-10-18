@@ -7,6 +7,7 @@ internal enum TokenKind
     Decimal,
     Text,
     Name,
+    ModuleQualifier,
     And,
     Or,
     Not,

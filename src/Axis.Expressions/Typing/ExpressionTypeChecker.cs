@@ -151,6 +151,22 @@ public static class ExpressionTypeChecker
 
     private static ExpressionType InferCall(CallNode call, Context context)
     {
+        if (call.Module is { } module)
+        {
+            var declared = context.Scope.DeclaresModule(module);
+            if (declared == true && context.Scope.TryGetModuleRule(module, call.Name, out var moduleRule))
+            {
+                return InferRuleCall(call, moduleRule, context);
+            }
+
+            throw declared == false
+                ? Fail(
+                    ExpressionDiagnosticCodes.UndeclaredModuleReference,
+                    $"The rule call '{module}:{call.Name}' names the module '{module}', which the application does not declare. Add '{module}' to 'modules' in application.json",
+                    call.Offset)
+                : Fail(ExpressionDiagnosticCodes.UnknownFunction, $"Unknown rule '{call.Name}' in module '{module}'", call.Offset);
+        }
+
         if (!ExpressionFunctions.TryGet(call.Name, out var signature))
         {
             return context.Scope.TryGetRule(call.Name, out var rule)
@@ -343,7 +359,7 @@ public static class ExpressionTypeChecker
             var noun = parameters.Count == 1 ? "argument" : "arguments";
             throw Fail(
                 ExpressionDiagnosticCodes.WrongArgumentCount,
-                $"Rule '{rule.Name}' needs {parameters.Count} {noun}, found {count}",
+                $"Rule '{RuleLabel(rule)}' needs {parameters.Count} {noun}, found {count}",
                 call.Offset);
         }
 
@@ -355,7 +371,7 @@ public static class ExpressionTypeChecker
             {
                 throw Fail(
                     ExpressionDiagnosticCodes.TypeMismatch,
-                    $"Rule '{rule.Name}' needs {parameters[i].Type} for argument {i + 1}, found {type}",
+                    $"Rule '{RuleLabel(rule)}' needs {parameters[i].Type} for argument {i + 1}, found {type}",
                     call.Offset);
             }
         }
@@ -363,6 +379,9 @@ public static class ExpressionTypeChecker
         context.RuleCalls[call] = rule;
         return rule.ResultType;
     }
+
+    /// <summary>A rule's name in messages: <c>module:Name</c> for a module rule.</summary>
+    private static string RuleLabel(ExpressionRule rule) => rule.Module is null ? rule.Name : $"{rule.Module}:{rule.Name}";
 
     /// <summary>Argument <paramref name="index"/> must be <c>null</c> or a type <paramref name="accepts"/> allows.</summary>
     private static void Need(

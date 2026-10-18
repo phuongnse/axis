@@ -15,7 +15,7 @@ public static class TreePrinter
         NullLiteral => "null",
         NameNode name => name.Name,
         MemberNode member => $"(. {Print(member.Target)} {member.Name})",
-        CallNode call => List("call", [call.Name, .. call.Arguments.Select(Print)]),
+        CallNode call => List("call", [call.Module is null ? call.Name : $"{call.Module}:{call.Name}", .. call.Arguments.Select(Print)]),
         UnaryNode unary => List(unary.Operator == UnaryOperator.Not ? "not" : "neg", [Print(unary.Operand)]),
         BinaryNode binary => List(Symbol(binary.Operator), [Print(binary.Left), Print(binary.Right)]),
         IsNullNode isNull => List(isNull.Negated ? "is-not-null" : "is-null", [Print(isNull.Operand)]),

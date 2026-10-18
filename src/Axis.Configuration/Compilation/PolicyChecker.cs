@@ -48,6 +48,7 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedEndpointNames,
         IEnumerable<ExpressionRule> rules,
         ModuleReferences moduleReferences,
+        IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics)
     {
         foreach (var policy in policies)
@@ -80,6 +81,7 @@ internal static class PolicyChecker
                     unloadedEndpointNames,
                     rules,
                     moduleReferences,
+                    modules,
                     Report);
             }
         }
@@ -96,7 +98,8 @@ internal static class PolicyChecker
         Func<string, DataSourceResource?> findDataSource,
         Func<string, ProcessResource?> findProcess,
         Func<string, EndpointResource?> findEndpoint,
-        IEnumerable<ExpressionRule> rules)
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules)
     {
         EntityModel? Find(string name) =>
             entities.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -131,7 +134,7 @@ internal static class PolicyChecker
                 actions,
                 grant.Filter is { } filter
                     ? ExpressionModel.Compile(
-                        filter, ExpressionScopes.ForDataSource(entity.Fields, [], Find, rules), ExpressionType.Boolean, policyFilter: true)
+                        filter, ExpressionScopes.ForDataSource(entity.Fields, [], Find, rules, modules), ExpressionType.Boolean, policyFilter: true)
                     : null,
                 // A checked grant names only fields of the entity.
                 grant.Fields?.Select(name => entity.Fields.First(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)).Name).ToList());
@@ -161,6 +164,7 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedEndpointNames,
         IEnumerable<ExpressionRule> rules,
         ModuleReferences moduleReferences,
+        IReadOnlySet<string> modules,
         Action<string, string, string> report)
     {
         var targets = new[] { grant.Entity, grant.DataSource, grant.Process, grant.Endpoint }.Count(target => target is not null);
@@ -273,7 +277,7 @@ internal static class PolicyChecker
         }
 
         if (grant.Filter is { } filter
-            && ApplicationCompiler.CheckFilter(filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules), policyFilter: true) is { } problem)
+            && ApplicationCompiler.CheckFilter(filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules), policyFilter: true) is { } problem)
         {
             report(problem.Code, problem.Message, $"{path}/filter");
         }

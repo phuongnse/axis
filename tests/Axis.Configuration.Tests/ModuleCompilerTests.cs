@@ -7,6 +7,8 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Evaluation;
+using Axis.Expressions.Sql;
 
 namespace Axis.Configuration.Tests;
 
@@ -172,6 +174,25 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
+    public void A_migration_that_names_a_module_entity_is_reported_at_its_entity()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("migrations/0001.json", """
+                { "id": "2b4c6d8e-1f3a-4b5c-9d7e-0a1b2c3d4e5f", "kind": "migration", "name": "DropName", "formatVersion": 1,
+                  "entity": "departments/Department", "changes": [ { "type": "dropField", "field": "name" } ] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationOfModuleEntity, "migrations/0001.json", "/entity"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_data_source_and_a_form_over_an_undeclared_module_are_reported_at_the_entity()
     {
         using var folder = Folder("[]")
@@ -183,8 +204,8 @@ public sealed class ModuleCompilerTests
 
         Assert.Equal(
             [
-                (DiagnosticCodes.UndeclaredModuleReference, "data-sources/departments.json", "/entity"),
-                (DiagnosticCodes.UndeclaredModuleReference, "forms/department.json", "/entity"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "data-sources/departments.json", "/entity"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "forms/department.json", "/entity"),
             ],
             result.Diagnostics
                 .Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path))
@@ -228,7 +249,7 @@ public sealed class ModuleCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.UndeclaredModuleReference, "Request.json", "/fields/0/target"),
+            (ExpressionDiagnosticCodes.UndeclaredModuleReference, "Request.json", "/fields/0/target"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("'people'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
@@ -911,8 +932,8 @@ public sealed class ModuleCompilerTests
 
         Assert.Equal(
             [
-                (DiagnosticCodes.UndeclaredModuleReference, "pages/departments.json", "/widgets/0/dataSource"),
-                (DiagnosticCodes.UndeclaredModuleReference, "policies/departments.json", "/grants/0/dataSource"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "pages/departments.json", "/widgets/0/dataSource"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "policies/departments.json", "/grants/0/dataSource"),
             ],
             result.Diagnostics
                 .Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path))
@@ -1013,6 +1034,167 @@ public sealed class ModuleCompilerTests
         Assert.Empty(diagnostics);
         Assert.Equal(["departments/IsActive"], rules.Keys);
         Assert.NotNull(rules["departments/IsActive"].Body);
+    }
+
+    private const string RequestTexts = """
+        { "id": "55555555-5555-4555-8555-555555555599", "kind": "text", "name": "RequestTextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "request.invalid": "The request is not valid.", "request.cannotStart": "This request cannot be started.", "role.employee": "Employee" } }
+        """;
+
+    /// <summary>
+    /// An application over the module <c>departments</c> with the rules <c>IsPositive</c> and <c>A</c>, which calls <c>B</c>,
+    /// and a <c>Request</c> entity with an integer <c>quantity</c> and the given validations, plus the given extra files.
+    /// </summary>
+    private static (TemporaryFolder Modules, TemporaryFolder Folder) RuleApplication(
+        string declaredModules, string validations = "[]", params (string Path, string Content)[] files)
+    {
+        var modules = Modules("1.0.0")
+            .With("departments/1.0.0/IsPositive.json", ModuleRule(ModuleRuleId, "IsPositive", "value > 0"))
+            .With("departments/1.0.0/A.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e02", "A", "B(value)"))
+            .With("departments/1.0.0/B.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e03", "B", "value > 0 and value < 100"));
+        var folder = Folder(declaredModules)
+            .With("texts/en.json", RequestTexts)
+            .With("entities/request.json", $$"""
+                { "id": "a1b2c3d4-0000-4000-8000-000000000002", "kind": "entity", "name": "Request", "formatVersion": 1,
+                  "fields": [ { "name": "quantity", "type": "integer" } ], "validations": {{validations}} }
+                """);
+        foreach (var (path, content) in files)
+        {
+            folder.With(path, content);
+        }
+
+        return (modules, folder);
+    }
+
+    private const string DepartmentsModule = """[{ "id": "departments", "version": "1.0.0" }]""";
+
+    private static string RequestValidation(string expression) =>
+        $$"""[{ "expression": "{{expression}}", "message": { "textKey": "request.invalid" }, "field": "quantity" }]""";
+
+    private static object? EvaluateRequest(Model.ValidationModel validation, long quantity)
+    {
+        var result = ExpressionInterpreter.Evaluate(
+            validation.Syntax, validation.Check, new ExpressionValues([KeyValuePair.Create("quantity", (object?)quantity)]));
+        Assert.True(result.Succeeded, result.Error?.Message);
+        return result.Value;
+    }
+
+    [Fact]
+    public void An_application_validation_calls_a_module_rule_by_its_qualified_name()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, RequestValidation("departments:IsPositive(quantity)"));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.True(result.Model!.TryGetEntity("Request", out var request));
+        var validation = Assert.Single(request.Validations);
+        Assert.Equal(true, EvaluateRequest(validation, 1L));
+        Assert.Equal(false, EvaluateRequest(validation, 0L));
+    }
+
+    [Fact]
+    public void A_data_source_filter_inlines_a_module_rule_and_the_module_rule_it_calls()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, "[]", ("data-sources/requests.json", """
+            { "id": "99999999-9999-4999-8999-999999999902", "kind": "dataSource", "name": "Requests", "formatVersion": 1, "entity": "Request",
+              "fields": [{ "name": "quantity", "path": "quantity" }], "filter": "departments:A(quantity)" }
+            """));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var filter = Assert.Single(result.Model!.DataSources).Filter!;
+        var sql = SqlTranslator.Translate(filter.Syntax, path => string.Join('.', path), filter.Check);
+        Assert.True(sql.Succeeded, sql.Diagnostic?.Message);
+        Assert.Contains("quantity > @f0", sql.Sql, StringComparison.Ordinal);
+        Assert.Contains("quantity < @f1", sql.Sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("departments", sql.Sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_qualified_call_to_an_undeclared_module_is_reported_at_the_validation_expression()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, RequestValidation("payroll:IsPositive(quantity)"));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UndeclaredModuleReference, "entities/request.json", "/validations/0/expression"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'payroll'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_qualified_call_to_a_rule_the_declared_module_lacks_is_an_unknown_rule()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, RequestValidation("departments:Missing(quantity)"));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownFunction, "entities/request.json", "/validations/0/expression"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_process_start_condition_and_a_policy_filter_call_a_module_rule()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, "[]",
+            ("roles/employee.json", Role),
+            ("processes/review.json", """
+                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Request",
+                  "startCondition": { "expression": "departments:IsPositive(quantity)", "message": { "textKey": "request.cannotStart" } },
+                  "start": "done", "steps": [{ "name": "done", "type": "end" }] }
+                """),
+            ("policies/requests.json", """
+                { "id": "12121212-1212-4212-8212-121212121202", "kind": "policy", "name": "RequestAccess", "formatVersion": 1,
+                  "roles": ["employee"],
+                  "grants": [{ "entity": "Request", "actions": ["read"], "filter": "departments:A(quantity)" }] }
+                """));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var filter = Assert.Single(Assert.Single(result.Model!.Policies).Grants).Filter!;
+        var sql = SqlTranslator.Translate(filter.Syntax, path => string.Join('.', path), filter.Check);
+        Assert.True(sql.Succeeded, sql.Diagnostic?.Message);
+        Assert.Contains("quantity > @f0", sql.Sql, StringComparison.Ordinal);
+        Assert.Contains("quantity < @f1", sql.Sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("departments", sql.Sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_application_rule_chain_through_module_rules_counts_toward_the_call_depth_limit()
+    {
+        // R1 .. R7 are application rules, R7 calls departments:A, and A calls B: nine rules deep.
+        var (modules, folder) = RuleApplication(DepartmentsModule, RequestValidation("R1(quantity)"));
+        using var _ = modules;
+        using var __ = folder;
+        for (var k = 1; k <= 7; k++)
+        {
+            var expression = k < 7 ? $"R{k + 1}(value)" : "departments:A(value)";
+            folder.With($"rules/r{k}.json", ModuleRule($"66666666-6666-4666-8666-66666666670{k}", $"R{k}", expression));
+        }
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.RuleCallTooDeep, "rules/r1.json", "/expression"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'departments:A'", diagnostic.Message, StringComparison.Ordinal);
     }
 
     private const string Texts = """

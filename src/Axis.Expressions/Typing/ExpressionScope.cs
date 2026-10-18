@@ -20,12 +20,15 @@ public delegate ExpressionType? ReferenceFieldResolver(string targetEntity, stri
 /// collections its aggregates may name. Names match ignoring letter case. A repeated rule or
 /// collection name keeps its first one. A scope with a <see cref="ReferenceFieldResolver"/> also
 /// resolves paths through reference fields, such as <c>department.name</c>. A scope without one
-/// reports every path as an unknown name.
+/// reports every path as an unknown name. A rule with a <see cref="ExpressionRule.Module"/> is
+/// called as <c>module:Name(…)</c>, and only when the scope names the application's modules.
 /// </summary>
 public sealed class ExpressionScope
 {
     private readonly Dictionary<string, ExpressionType> _fields;
     private readonly Dictionary<string, ExpressionRule> _rules = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, ExpressionRule>> _moduleRules = new(StringComparer.Ordinal);
+    private readonly HashSet<string>? _modules;
     private readonly Dictionary<string, ExpressionCollection> _collections = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReferenceFieldResolver? _referenceFields;
 
@@ -33,13 +36,27 @@ public sealed class ExpressionScope
         IEnumerable<KeyValuePair<string, ExpressionType>> fields,
         IEnumerable<ExpressionRule>? rules = null,
         IEnumerable<ExpressionCollection>? collections = null,
-        ReferenceFieldResolver? referenceFields = null)
+        ReferenceFieldResolver? referenceFields = null,
+        IEnumerable<string>? modules = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         _fields = new Dictionary<string, ExpressionType>(fields, StringComparer.OrdinalIgnoreCase);
         foreach (var rule in rules ?? [])
         {
-            _rules.TryAdd(rule.Name, rule);
+            if (rule.Module is null)
+            {
+                _rules.TryAdd(rule.Name, rule);
+            }
+            else
+            {
+                if (!_moduleRules.TryGetValue(rule.Module, out var byName))
+                {
+                    byName = new Dictionary<string, ExpressionRule>(StringComparer.OrdinalIgnoreCase);
+                    _moduleRules[rule.Module] = byName;
+                }
+
+                byName.TryAdd(rule.Name, rule);
+            }
         }
 
         foreach (var collection in collections ?? [])
@@ -48,6 +65,7 @@ public sealed class ExpressionScope
         }
 
         _referenceFields = referenceFields;
+        _modules = modules is null ? null : new HashSet<string>(modules, StringComparer.Ordinal);
     }
 
     /// <summary>Whether paths through reference fields resolve in this scope.</summary>
@@ -58,6 +76,19 @@ public sealed class ExpressionScope
 
     public bool TryGetRule(string name, [NotNullWhen(true)] out ExpressionRule? rule) =>
         _rules.TryGetValue(name, out rule);
+
+    /// <summary>Finds a rule of a module. The module id matches exactly and the rule name ignores letter case.</summary>
+    public bool TryGetModuleRule(string module, string name, [NotNullWhen(true)] out ExpressionRule? rule)
+    {
+        rule = null;
+        return _moduleRules.TryGetValue(module, out var byName) && byName.TryGetValue(name, out rule);
+    }
+
+    /// <summary>
+    /// Whether the application declares the module. Null when the scope was built without its
+    /// modules, which means no qualified rule call is allowed here.
+    /// </summary>
+    public bool? DeclaresModule(string module) => _modules?.Contains(module);
 
     public bool TryGetCollection(string name, [NotNullWhen(true)] out ExpressionCollection? collection) =>
         _collections.TryGetValue(name, out collection);

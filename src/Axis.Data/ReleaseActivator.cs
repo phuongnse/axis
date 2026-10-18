@@ -3,6 +3,7 @@ using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
 using Axis.Data.Storage;
 
 namespace Axis.Data;
@@ -14,6 +15,10 @@ namespace Axis.Data;
 /// name with the right kind, provisions the
 /// entity tables and then sets the active release with its site paths. Between the two it recomputes the stored
 /// computed values of each entity whose computed definitions differ from the previously active release's.
+/// <para>
+/// It also refuses a module upgrade that drops a module entity or field, or changes a field's type, with
+/// <see cref="DiagnosticCodes.NonAdditiveModuleUpgrade"/>, comparing the module copies with those of the active release.
+/// </para>
 /// <para>
 /// Provisioning, the pending migrations and the active release write run in one transaction under
 /// the schema lock, so the migration history check and the write see the same history: no other
@@ -120,11 +125,26 @@ public static class ReleaseActivator
                 await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)))
         {
             ReadActiveComputedFingerprintsAsync = token => ReadActiveComputedFingerprintsAsync(store, manifest.Id, token),
+            CheckModuleUpgradeAsync = token => CheckModuleUpgradeAsync(store, manifest.Id, release, token),
             InlineRecomputeLimit = inlineRecomputeLimit,
             TenantId = bindings.TenantId,
         };
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
         return new ActivationResult(provisioned.Diagnostics);
+    }
+
+    // The module upgrade the release makes over the application's active release; none before the first activation.
+    private static async Task<IReadOnlyList<Diagnostic>> CheckModuleUpgradeAsync(
+        IActiveReleaseStore store, Guid applicationId, Release release, CancellationToken cancellationToken)
+    {
+        if (await store.FindByApplicationIdAsync(applicationId, cancellationToken) is not { } active
+            || active.ReleaseId == release.Id
+            || await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is not { } stored)
+        {
+            return [];
+        }
+
+        return ModuleUpgradeCheck.Check(stored.Resources, release.Resources);
     }
 
     // The entity ids of the application's active release by entity name: the tables that hold its data now.

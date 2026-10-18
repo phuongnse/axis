@@ -851,7 +851,7 @@ Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, the resource list with its
-search and the diagnostics panel are built. *(Planned for M8: the editor, the
+search, the editor and the diagnostics panel are built. *(Planned for M8: the
 Uses and Used by lists, the delete warning and the reconnect message.)*
 
 - **Route.** `/studio` is a platform route, outside every site. The header
@@ -867,13 +867,26 @@ Uses and Used by lists, the delete warning and the reconnect message.)*
 - **Resource list.** The list groups the resources by kind. The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
-  its name, kind, `id` and file. It does not yet read the file's content.
-- **Editor.** The editor shows one resource in two views of the same content.
-  - A form is built from the JSON Schema of the resource's kind.
-  - A JSON view shows the file's content. A change in either view is sent as
-    a JSON Patch with the resource's version in `If-Match`.
-  - A stale version is a `409`. The editor then reads the resource again and
-    keeps the author's unsaved change on screen.
+  its name, kind, `id` and file, and opens it in the editor below.
+- **Editor.** The editor shows one resource in two views of the same draft.
+  - A form is built from the JSON Schema of the resource's kind. The SPA
+    bundles the schemas in `src/Axis.Configuration/Schemas`, the files the
+    server embeds, and loads the one it needs when a resource is selected. The
+    form shows text, number, boolean and enum values, nested objects, and
+    arrays with add and remove. `id`, `kind` and fixed values such as
+    `formatVersion` are read-only. Labels are the property names as written in
+    the schema, without translation. A part the form cannot show, such as
+    `oneOf` or a map like a text resource's `texts`, points to the JSON view.
+  - A JSON view shows the draft as text. A valid edit there updates the form.
+    Invalid JSON shows an error and turns Save off.
+  - Save sends only the changes, as a JSON Patch with the version the editor
+    loaded in `If-Match`. It stays off while nothing has changed. An array
+    whose length changed is replaced as a whole, and an array of the same
+    length is compared item by item. Clearing an optional value removes its
+    key. After a save the editor carries on from the new version.
+  - A stale version is a `409`. The editor keeps the author's draft on screen
+    and offers Reload. Reload reads the resource again and drops the draft.
+    Selecting another resource also drops an unsaved draft, without a warning.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation and the other resource.
@@ -888,8 +901,8 @@ Uses and Used by lists, the delete warning and the reconnect message.)*
 - **Diagnostics panel.** The panel lists the diagnostics of the folder, with
   each one's code, severity, message, file and `path`. It loads them from
   `GET /api/studio/apps/{application}/diagnostics` when an application is
-  picked. *(Planned for M8: the diagnostics that a write returns.)* A
-  diagnostic that names a resource selects it and clears the search, so the
+  picked. After a save, it shows the diagnostics that the save answered
+  instead. A diagnostic that names a resource selects it and clears the search, so the
   resource is listed. *(Planned for M8: opening the file in the editor at the
   diagnostic's `path`.)* A diagnostic that names no resource cannot be
   selected. A diagnostic never blocks a save.

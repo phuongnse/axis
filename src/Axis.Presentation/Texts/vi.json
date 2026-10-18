@@ -143,5 +143,17 @@
   "shell.studio.noDiagnostics": "Không có chẩn đoán nào.",
   "shell.studio.loadFailed": "Không thể tải Studio.",
   "shell.studio.forbidden.title": "Studio không khả dụng",
-  "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio."
+  "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",
+  "shell.studio.form": "Biểu mẫu",
+  "shell.studio.json": "JSON",
+  "shell.studio.save": "Lưu",
+  "shell.studio.saved": "Đã lưu.",
+  "shell.studio.saveFailed": "Không thể lưu tài nguyên.",
+  "shell.studio.conflict": "Người khác đã thay đổi tệp này. Hãy tải lại để xem thay đổi của họ. Tải lại sẽ bỏ thay đổi chưa lưu của bạn.",
+  "shell.studio.reload": "Tải lại",
+  "shell.studio.invalidJson": "JSON không hợp lệ.",
+  "shell.studio.editInJson": "Hãy sửa giá trị này trong chế độ xem JSON.",
+  "shell.studio.addItem": "Thêm",
+  "shell.studio.removeItem": "Xóa",
+  "shell.studio.loadResourceFailed": "Không thể tải tài nguyên."
 }

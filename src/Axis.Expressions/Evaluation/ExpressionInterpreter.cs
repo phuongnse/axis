@@ -166,6 +166,11 @@ public static class ExpressionInterpreter
                 return RuleCall(call, rule);
             }
 
+            if (call.Module is { } module)
+            {
+                throw new InvalidOperationException($"The module rule '{module}:{call.Name}' was not resolved by the type checker.");
+            }
+
             if (!ExpressionFunctions.TryGet(call.Name, out var signature))
             {
                 throw new InvalidOperationException($"The interpreter does not evaluate function '{call.Name}' yet.");

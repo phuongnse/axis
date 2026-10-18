@@ -72,6 +72,7 @@ internal static class ProcessChecker
         IReadOnlySet<string>? declaredPackageIds,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics)
     {
         foreach (var process in processes)
@@ -107,7 +108,7 @@ internal static class ProcessChecker
             ExpressionScope? scope = null;
             if (entity is not null)
             {
-                scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
+                scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
                 CheckConditions(process, scope, Report);
             }
 
@@ -154,10 +155,11 @@ internal static class ProcessChecker
         Func<string, ConnectorResource?> findConnector,
         Func<string, EventResource?> findEvent,
         Func<string, PinnedOperations?> findPackage,
-        IEnumerable<ExpressionRule> rules)
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules)
     {
         var entity = findEntity(process.Entity)!;
-        var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity);
+        var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
 
         ExpressionModel Compile(string expression) => ExpressionModel.Compile(expression, scope, ExpressionType.Boolean);
 
