@@ -20,7 +20,8 @@ does today.
 folders it may edit. See [Studio](configuration.md#studio) for their defaults.
 
 - `Studio:Folders` lists the application folders. With no folder, the API
-  has nothing to edit.
+  has nothing to edit, and every route answers `403`, as `studio: false` on
+  `GET /api/me` says.
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
 
@@ -64,8 +65,8 @@ checked in this order, and the first failure is the response:
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
-   the session's roles, and for a route with `{application}` or `{id}` it
-   needs `Studio:Folders` to be non-empty.
+   the session's roles, and `Studio:Folders` to be non-empty. This holds for
+   every route.
 4. An unknown application, `404`. It is an application that is not in
    `Studio:Folders`.
 5. An unknown resource, `404`.
@@ -90,12 +91,12 @@ from the request.
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
 | List applications | No session | No author role, or no `Studio:Folders` | Not used | Not used |
-| List resources | No session | No author role | Unknown application | Not used |
-| Read | No session | No author role | Unknown application or resource | Not used |
-| Create | No session | No author role, or no CSRF header | Unknown application | The `id` or the target file already exists |
-| Patch | No session | No author role, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
-| Delete | No session | No author role, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
-| Diagnostics | No session | No author role | Unknown application | Not used |
+| List resources | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Read | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
+| Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
+| Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
+| Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
+| Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 
 `400` is a bad body, and `428` a missing `If-Match`, as
 [Order of checks](#order-of-checks) says. `415` answers a body of the wrong
