@@ -498,6 +498,8 @@ flowchart LR
    their file path, each with its entity name as written and its changes in
    file order. A change's `value` stays expression text. No model is produced
    while any error remains.
+
+   *(planned for M8)* The same pass builds the [reference index](#reference-index).
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -955,6 +957,93 @@ API reads them. *(Planned for M8: the routes that write, and the Studio page.)*
   and deployed as today.
 - **Current user.** *(Planned for M8)* `GET /api/me` answers `studio: true` when `Studio:Folders`
   is not empty and the user holds the author role.
+
+## Reference index
+
+*(planned for M8)* Every compile collects each reference it resolves into a
+reference index, as [D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
+agrees. Studio reads it through the [authoring API](authoring.md#references) to
+show where a resource is used and what it uses.
+
+- **Built by the compile.** The index is built in memory, in the same pass as
+  the [Resolve step](#configuration-pipeline). It is not stored in the release
+  and costs nothing at run time. A later feature that needs it at run time
+  builds it again from the release.
+- **Nodes.** A node is one of:
+  - a resource, with its `id`, `kind`, `name` and `file`
+  - a text key
+  - an [extension package](#extension-packages), by its id
+  - a module, by its name
+- **Edges.** An edge runs from a resource and a JSON Pointer path in it to a
+  node, with a relation. The path is the one the compile diagnostics use.
+- **Not an edge.** An unresolved reference is a diagnostic, not an edge. So is
+  a name whose file was not loaded because of its own errors. A resource with
+  errors keeps the edges that did resolve.
+- **Fields are not nodes.** A reference to a field, such as a form section
+  `field` or an `updateRecord` key, gives no edge of its own. The resource's
+  edge to the entity covers it. The same holds for connector operations.
+- **Rule calls are the only edges inside expressions.** A reference path in a
+  filter or a condition gives no edge.
+- **Cost.** The M8 performance issue sets the share of compile time the index
+  may add and the bound on a where-used answer.
+
+| Relation | From | Path | To |
+| --- | --- | --- | --- |
+| `label text` | Any kind with a label, title or message | `…/textKey` | Text key |
+| `text entry` | Text | `/texts/{key}` | Text key |
+| `package` | Application | `/packages/{i}` | Extension package |
+| `module` | Application | `/modules/{i}` | Module |
+| `field target` | Entity, endpoint, data source | `/fields/{i}/target`, `/input/{i}/target`, `/parameters/{i}/target` | Entity |
+| `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
+| `rule call` | Entity, data source, rule, process, policy, trigger | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter`, `/when` of a data change trigger | Rule |
+| `navigation page` | Site | `/navigation/{i}/page` | Page |
+| `widget entity` | Page | `/widgets/{i}/entity` | Entity |
+| `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
+| `widget form` | Page | `/widgets/{i}/form` | Form |
+| `widget form page` | Page | `/widgets/{i}/formPage` | Page |
+| `widget process` | Page | `/widgets/{i}/process` | Process |
+| `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
+| `form entity` | Form | `/entity` | Entity |
+| `seed entity` | Seed | `/entity` | Entity |
+| `data source entity` | Data source | `/entity` | Entity |
+| `field path` | Data source | `/fields/{i}/path` | Entity, one edge for each `reference` hop |
+| `process entity` | Process | `/entity` | Entity |
+| `task form` | Process | `/steps/{i}/form` | Form |
+| `task role` | Process | `/steps/{i}/assignee/role` | Role |
+| `connector call` | Process | `/steps/{i}/connector/name` | Connector |
+| `package operation` | Process | `/steps/{i}/operation` | Extension package |
+| `raised event` | Process | `/steps/{i}/event` | Event |
+| `policy role` | Policy | `/roles/{i}` | Role |
+| `grant` | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
+| `event entity` | Event | `/entity` | Entity |
+| `endpoint entity` | Endpoint | `/entity` | Entity |
+| `endpoint process` | Endpoint | `/process` | Process |
+| `trigger process` | Trigger | `/process` | Process |
+| `trigger event` | Trigger | `/event` | Event |
+| `trigger entity` | Trigger | `/entity` | Entity |
+| `trigger data source` | Trigger | `/dataSource` | Data source |
+| `migration entity` | Migration | `/entity` | Entity |
+| `scenario entity` | Scenario | `/steps/{i}/entity` | Entity |
+| `scenario process` | Scenario | `/steps/{i}/process` | Process |
+| `scenario role` | Scenario | `/users/{user}/{j}`, `/steps/{i}/assignee/role` | Role |
+| `stub connector` | Scenario | `/stubs/{i}/connector/name` | Connector |
+| `stub package` | Scenario | `/stubs/{i}/operation` | Extension package |
+
+- **Label paths.** A `label text` edge sits at the `/textKey` of each label the
+  `AXC0028` check covers: the application label, entity and
+  field labels, the site title, navigation labels, page titles, action labels,
+  form section titles, role labels, data source parameter labels, task and
+  outcome labels, the `startCondition` message and validation messages.
+- **Rule call paths.** A computed field, an aggregate's item expression, an
+  event trigger's `when` and an endpoint's `values` cannot call rules, so they
+  give no `rule call` edge.
+- **Text entries.** Each `text` resource adds a `text entry` edge for every key
+  it holds. So a key's edges list the locales that define it and the labels
+  that use it. A key that one locale lacks is the drift `AXC0027` reports.
+- **Modules.** An application's `modules` entry gives a `module` edge at
+  `/modules/{i}`. See [Modules](#modules). How a reference to a module
+  resource, written `<module id>/<name>`, appears in the index is left to the
+  issue that builds modules.
 
 ## Telemetry export
 
