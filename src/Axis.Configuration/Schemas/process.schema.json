@@ -9,7 +9,7 @@
     "kind": { "const": "process" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/name" },
+    "entity": { "$ref": "#/$defs/qualifiedName" },
     "startCondition": { "$ref": "#/$defs/startCondition" },
     "start": { "$ref": "#/$defs/name" },
     "steps": {
@@ -28,6 +28,11 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
     },
     "stepOperation": {
       "type": "string",
@@ -97,7 +102,7 @@
             "backoff": { "type": "string", "minLength": 1 }
           }
         },
-        "event": { "$ref": "#/$defs/name" },
+        "event": { "$ref": "#/$defs/qualifiedName" },
         "fields": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name" },

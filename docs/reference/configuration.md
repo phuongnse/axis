@@ -845,7 +845,7 @@ sorted by file and then path.
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
 | `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
-| `AXC0208` | A field's `target` or `sequence` in a module entity contains `/`. Reported at that property in `modules/<id>/…`. |
+| `AXC0208` | A field's `target` or `sequence` in a module entity, or the `entity` of a module event, contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
 | `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
@@ -1573,7 +1573,9 @@ An event about a note that was closed, in `events/note-closed.json`:
 ```
 
 - `entity` names the entity the event is about. It is not a child entity.
-  Each occurrence names one record of it.
+  Each occurrence names one record of it. In a [module](#modules) event, it
+  names an entity of the same module without `/`, and the compiler qualifies it
+  as `<module id>/<name>`.
 - `fields` lists the typed payload fields. Their types are the
   [rule parameter types](#resource-file-shape): `text`, `integer`, `decimal`,
   `boolean`, `date` and `date-time`.
@@ -1950,15 +1952,16 @@ This section follows
 installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0212`
 are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
-pinned module's entities, sequences and seeds join the application model, each
-with an id derived from the application `id` and the name
+pinned module's entities, sequences, seeds and events join the application
+model, each with an id derived from the application `id` and the name
 `<module id>/<name>`. A field's `target` and `sequence`, a data source's and a
 form's `entity` and a policy grant's `entity` can name them. A field's
-`target` also covers data source parameters and endpoint inputs. A pinned
-module's texts join the application's texts of the same locale, so its labels
-resolve. Module data sources, rules, forms and events, seeding and activating
-module entities, the API naming of module entities and the codes marked planned
-are *(planned for M8)*.
+`target` also covers data source parameters and endpoint inputs. A process
+`entity`, a raise event step's `event` and an event trigger's `event` can name
+a module entity or event. A pinned module's texts join the application's texts
+of the same locale, so its labels resolve. Module data sources, rules and forms,
+seeding and activating module entities, the API naming of module entities and
+the codes marked planned are *(planned for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -2014,18 +2017,22 @@ The module's manifest is `module.json` at the root of its folder:
   `<module id>/<name>`, for example `departments/Department`. A module resource
   names only resources of its own module, written without a `/`. The compiler
   builds both rules for a field's `target` and `sequence` and for a data
-  source's and a form's `entity`. A name under a module that `modules` does not
-  declare is `AXC0207`, reported at `/entity` for a data source or a form. A
-  module field whose
-  `target` or `sequence` contains `/` is `AXC0208`. An unknown name inside a
-  declared module keeps its existing code, such as `AXC0012`, `AXC0042`,
-  `AXC0066` or `AXC0074`. A policy grant `entity` can name a module entity. One
-  that names an undeclared module keeps the policy's unknown-entity code,
-  `AXC0092`. A module entity sees no rules yet, so it cannot call an
+  source's and a form's `entity`. A module event's `entity` follows the same
+  rule, and an application process `entity`, raise event step `event` and event
+  trigger `event` can name module resources. A name under a module that
+  `modules` does not declare is `AXC0207`, reported at `/entity` for a data
+  source or a form. A step or trigger that names an event under an undeclared
+  module keeps its unknown-event code. A module field whose `target` or
+  `sequence` contains `/`, or a module event whose `entity` does, is `AXC0208`.
+  An unknown name inside a declared module keeps its existing code, such as
+  `AXC0012`, `AXC0042`, `AXC0066` or `AXC0074`. A policy grant `entity` can
+  name a module entity. One that names an undeclared module keeps the policy's
+  unknown-entity code, `AXC0092`. A module entity sees no rules yet, so it
+  cannot call an
   application rule. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. How a module entity
   or data source is named in API URLs is left to the issue that builds modules.
-- **A copy per application.** Entities, sequences and seeds of a module belong
+- **A copy per application.** Entities, sequences, seeds and events of a module belong
   to the application that uses it. The id of each module resource inside an
   application is a UUID v5 of the application `id` and the id written in the
   module file, so two applications in one tenant get separate tables and
@@ -2062,7 +2069,7 @@ The module's manifest is `module.json` at the root of its folder:
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
 | `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
-| `AXC0208` | A field's `target` or `sequence` in a module entity contains `/`. Reported at that property in `modules/<id>/…`. |
+| `AXC0208` | A field's `target` or `sequence` in a module entity, or the `entity` of a module event, contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
 | `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |

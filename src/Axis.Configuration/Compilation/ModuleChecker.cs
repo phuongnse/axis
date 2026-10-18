@@ -18,9 +18,10 @@ namespace Axis.Configuration.Compilation;
 /// be pinned. Otherwise the highest installed version in the range is pinned, and each of its
 /// files is checked as JSON, for a kind a module may hold and against the schema of that kind. The
 /// files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the release. The entities,
-/// sequences and seeds of a pinned module come back as resources named <c>&lt;id&gt;/&lt;name&gt;</c>,
+/// sequences, seeds and events of a pinned module come back as resources named <c>&lt;id&gt;/&lt;name&gt;</c>,
 /// keeping the ids written in the files. Inside a module, a field's <c>target</c> or <c>sequence</c>
-/// names a resource of the same module without <c>/</c>, and is rewritten to its qualified name.
+/// and an event's <c>entity</c> name a resource of the same module without <c>/</c>, and are
+/// rewritten to the qualified name.
 /// </summary>
 internal static class ModuleChecker
 {
@@ -189,20 +190,22 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds and texts of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, events and texts of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
         private readonly List<SequenceResource> _sequences = [];
         private readonly List<SeedResource> _seeds = [];
+        private readonly List<EventResource> _events = [];
         private readonly List<ModuleText> _texts = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _unloadedEventNames = new(StringComparer.OrdinalIgnoreCase);
 
         public ModuleResources ToResources() =>
-            new(_entities, _sequences, _seeds, _texts, _unloadedEntityNames, _unloadedSequenceNames);
+            new(_entities, _sequences, _seeds, _events, _texts, _unloadedEntityNames, _unloadedSequenceNames, _unloadedEventNames);
 
-        /// <summary>Notes the name of an entity or sequence file that failed its schema, so a reference to it is not reported again.</summary>
+        /// <summary>Notes the name of an entity, sequence or event file that failed its schema, so a reference to it is not reported again.</summary>
         public void AddUnloaded(string moduleId, JsonElement root)
         {
             if (root.ValueKind != JsonValueKind.Object
@@ -223,10 +226,13 @@ internal static class ModuleChecker
                 case ResourceKinds.Sequence:
                     _unloadedSequenceNames.Add(qualified);
                     break;
+                case ResourceKinds.Event:
+                    _unloadedEventNames.Add(qualified);
+                    break;
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence or a seed.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, an event or a text.</summary>
         public void Add(string moduleId, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -243,6 +249,14 @@ internal static class ModuleChecker
                     var seed = root.Deserialize<SeedResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _seeds.Add(seed with { Name = $"{moduleId}/{seed.Name}", Entity = $"{moduleId}/{seed.Entity}" });
                     break;
+                case ResourceKinds.Event:
+                    var @event = root.Deserialize<EventResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    _events.Add(@event with
+                    {
+                        Name = $"{moduleId}/{@event.Name}",
+                        Entity = Rewrite(moduleId, @event.Entity, @event.File, @event.Id, "/entity", _unloadedEntityNames, diagnostics)!,
+                    });
+                    break;
                 case ResourceKinds.Text:
                     var text = root.Deserialize<TextResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _texts.Add(new ModuleText(moduleId, text));
@@ -257,42 +271,54 @@ internal static class ModuleChecker
         /// </summary>
         private EntityResource Qualify(string moduleId, EntityResource entity, List<Diagnostic> diagnostics)
         {
-            string? Rewrite(string? value, string path, HashSet<string> unloaded)
-            {
-                if (value is null)
-                {
-                    return null;
-                }
-
-                var qualified = $"{moduleId}/{value}";
-                if (value.Contains('/', StringComparison.Ordinal))
-                {
-                    diagnostics.Add(new Diagnostic(
-                        DiagnosticCodes.QualifiedModuleReference,
-                        $"A module resource names only resources of its own module, without '/'. Write '{value[(value.LastIndexOf('/') + 1)..]}', not '{value}'.",
-                        entity.File,
-                        path,
-                        entity.Id));
-                    unloaded.Add(qualified);
-                }
-
-                return qualified;
-            }
-
             var fields = entity.Fields
                 .Select((field, index) => field with
                 {
-                    Target = Rewrite(field.Target, $"/fields/{index}/target", _unloadedEntityNames),
-                    Sequence = Rewrite(field.Sequence, $"/fields/{index}/sequence", _unloadedSequenceNames),
+                    Target = Rewrite(moduleId, field.Target, entity.File, entity.Id, $"/fields/{index}/target", _unloadedEntityNames, diagnostics),
+                    Sequence = Rewrite(moduleId, field.Sequence, entity.File, entity.Id, $"/fields/{index}/sequence", _unloadedSequenceNames, diagnostics),
                 })
                 .ToList();
             return entity with { Name = $"{moduleId}/{entity.Name}", Fields = fields };
+        }
+
+        /// <summary>
+        /// Rewrites a reference to a resource of the same module to its qualified name. A value that
+        /// already contains <c>/</c> is reported, and its rewritten name is added to
+        /// <paramref name="unloaded"/> so it is left unresolved without a second report.
+        /// </summary>
+        private static string? Rewrite(
+            string moduleId,
+            string? value,
+            string file,
+            Guid id,
+            string path,
+            HashSet<string> unloaded,
+            List<Diagnostic> diagnostics)
+        {
+            if (value is null)
+            {
+                return null;
+            }
+
+            var qualified = $"{moduleId}/{value}";
+            if (value.Contains('/', StringComparison.Ordinal))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.QualifiedModuleReference,
+                    $"A module resource names only resources of its own module, without '/'. Write '{value[(value.LastIndexOf('/') + 1)..]}', not '{value}'.",
+                    file,
+                    path,
+                    id));
+                unloaded.Add(qualified);
+            }
+
+            return qualified;
         }
     }
 }
 
 /// <summary>
-/// The entities, sequences, seeds and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds, events and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The unloaded names are those of module files that
 /// failed their schema or whose reference was reported, so no second diagnostic names them. Both name
 /// sets ignore letter case.
@@ -301,9 +327,11 @@ internal sealed record ModuleResources(
     IReadOnlyList<EntityResource> Entities,
     IReadOnlyList<SequenceResource> Sequences,
     IReadOnlyList<SeedResource> Seeds,
+    IReadOnlyList<EventResource> Events,
     IReadOnlyList<ModuleText> Texts,
     IReadOnlySet<string> UnloadedEntityNames,
-    IReadOnlySet<string> UnloadedSequenceNames);
+    IReadOnlySet<string> UnloadedSequenceNames,
+    IReadOnlySet<string> UnloadedEventNames);
 
 /// <summary>A text resource of a pinned module, with the id of that module.</summary>
 internal sealed record ModuleText(string ModuleId, TextResource Text);

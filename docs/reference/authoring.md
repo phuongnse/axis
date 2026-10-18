@@ -8,7 +8,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The list, read and patch routes are built. *(Planned for M8: the
+in git. The list, read, patch and diagnostics routes are built. *(Planned for M8: the
 other routes, with writes and diagnostics for create and delete.)* It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
@@ -47,7 +47,7 @@ Routes marked *(planned for M8)* are not built yet.
 | *(planned for M8)* `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
 | *(planned for M8)* `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | *(planned for M8)* `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
-| *(planned for M8)* `GET /api/studio/apps/{application}/diagnostics` | `200` with the folder's diagnostics |
+| `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -105,7 +105,7 @@ exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List resources, Read and Patch are built, and
+from the request. The rows for List resources, Read, Patch and Diagnostics are built, and
 the others are *(planned for M8)*.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -187,23 +187,25 @@ Writes are built for patches. *(Planned for M8: new files and deletes.)*
 
 ## Diagnostics
 
-A patch answers with the folder's diagnostics. *(Planned for M8: the same
-for a create and a delete, and
-`GET /api/studio/apps/{application}/diagnostics` to return them on demand.)*
+A patch answers with the folder's diagnostics, and
+`GET /api/studio/apps/{application}/diagnostics` returns them on demand. Both
+are built. *(Planned for M8: the same answer for a create and a delete.)*
 A diagnostic never blocks a save.
 
 - The folder is compiled in memory against the extension packages installed
-  under `Extensions:Path`, see
-  [extension packages](configuration.md#extension-packages). No database is
-  touched.
+  under `Extensions:Path` and the modules installed under `Modules:Path`, see
+  [extension packages](configuration.md#extension-packages) and
+  [modules](configuration.md#modules). No database is touched.
 - The codes, severities and fields are those of
   [startup activation](configuration.md#startup-activation). Each diagnostic
   is `{ code, severity, message, file, path, resourceId }`. `severity` is
-  `error` or `warning`, and `resourceId` is the lower-case id of the resource
-  or `null`.
-- Only the compile diagnostics are listed. The problems of a broken extension
+  `error` or `warning`. `resourceId` is the lower-case id of the resource,
+  or `null` when the problem concerns a whole file or the whole folder.
+- The compile diagnostics are returned, and the problems of a broken extension
   package are not, because they belong to the server's install and not to the
-  folder.
+  folder. The checks that activation runs against a tenant are not part of it
+  either: bindings, name and site path conflicts, and storage changes. They
+  need a tenant database or the tenant's settings.
 - A folder with an error is not activated. Under `scripts/dev.sh`, the
   restart after a saved file then stops the server, as a broken hand edit
   does today.

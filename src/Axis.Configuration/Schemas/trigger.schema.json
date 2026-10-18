@@ -10,7 +10,7 @@
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "type": { "enum": ["event", "dataChange", "schedule"] },
-    "event": { "$ref": "#/$defs/name" },
+    "event": { "$ref": "#/$defs/qualifiedName" },
     "entity": { "$ref": "#/$defs/name" },
     "on": {
       "type": "array",
@@ -65,6 +65,11 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
     }
   }
 }
