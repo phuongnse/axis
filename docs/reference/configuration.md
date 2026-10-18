@@ -938,8 +938,8 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Two server settings control it. They are built, and the authoring
-API reads them. The Studio page lists the resources with a search and shows
-the diagnostics. *(Planned for M8: the Studio editor.)*
+API reads them. The Studio page lists the resources with a search, edits them in a form
+and a JSON view, and shows the diagnostics.
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
