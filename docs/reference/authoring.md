@@ -8,9 +8,9 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The list, read and patch routes are built. *(Planned for M8: the
-other routes, with writes and diagnostics for create and delete.)* It is
-agreed in
+in git. The list, read, patch, create and delete routes are built.
+*(Planned for M8: the applications list, the diagnostics route and the
+references routes.)* It is agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 It never activates a release and touches no database. Under `scripts/dev.sh`,
 a saved file restarts the server, which activates the folder, as a hand edit
@@ -42,9 +42,9 @@ Routes marked *(planned for M8)* are not built yet.
 | *(planned for M8)* `GET /api/studio/apps` | `200` with the applications in `Studio:Folders`, each with its `name` |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file` and `version`. *(Planned for M8: `usedBy`.)* |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
-| *(planned for M8)* `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version }`, a `Location` header and `diagnostics`. The body is the full resource |
+| `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
-| *(planned for M8)* `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
+| `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
 | *(planned for M8)* `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | *(planned for M8)* `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | *(planned for M8)* `GET /api/studio/apps/{application}/diagnostics` | `200` with the folder's diagnostics |
@@ -64,22 +64,22 @@ bytes, in lower-case hex.
 
 - A read sends it as a strong `ETag`, in quotes.
 - A patch sends it back in `If-Match`, as the quoted `ETag` or as the bare
-  hex. `*`, a weak tag and a list of versions count as stale. *(Planned for
-  M8: the same for a delete.)*
+  hex. `*`, a weak tag and a list of versions count as stale. A delete
+  does the same.
 - When the file no longer has that version, the answer is `409` and nothing
   is written. The client reads the resource again and retries. One lock
   covers the check and the write of every write, so two patches that carry the
-  same version cannot both succeed. The lock covers one server process.
-  *(Planned for M8: the same for a delete.)*
-- A patch without `If-Match` is `428`. *(Planned for M8: the same for a
-  delete.)*
+  same version cannot both succeed, and neither can two deletes. The lock
+  covers one server process.
+- A patch or a delete without `If-Match` is `428`.
+- A create sends the new version as an `ETag`, so the client can patch next
+  without reading the resource again.
 
 ## Order of checks
 
 Like the [record API](record-api.md#errors), a request is
 checked in this order, and the first failure is the response. Checks 1 to 5
-are built. Checks 6 to 8 are built for a patch, and checks 6 to 9 are
-*(planned for M8)* for a create or a delete:
+are built. Checks 6 to 9 are built for a patch, a create and a delete:
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
@@ -92,8 +92,10 @@ are built. Checks 6 to 8 are built for a patch, and checks 6 to 9 are
 6. A patch or a delete without `If-Match`, `428`.
 7. A bad body, `400`. That is a body that is not JSON, a patch that is not
    valid RFC 6902, a patch that does not apply, a patch that changes `id` or
-   `kind`, a create without `id` or `kind`, or a create or a delete of the
-   `application.json` manifest.
+   `kind`, a create without a valid `id`, with an unknown `kind` or with a
+   `name` or `locale` that does not form a safe file name, or a create or a
+   delete of the `application.json` manifest. The kind `application` counts as
+   unknown here.
 8. A stale version, `409`.
 9. A create whose `id` or whose target file already exists, `409`.
 
@@ -105,8 +107,8 @@ exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List resources, Read and Patch are built, and
-the others are *(planned for M8)*.
+from the request. The rows for List resources, Read, Create, Patch and Delete
+are built, and the others are *(planned for M8)*.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -122,7 +124,8 @@ the others are *(planned for M8)*.
 
 `400` is a bad body, and `428` a missing `If-Match`, as
 [Order of checks](#order-of-checks) says. `415` answers a body of the wrong
-content type, just before the body is read.
+content type, just before the body is read. A create needs `application/json`
+and a patch needs `application/json-patch+json`.
 
 ## References
 
@@ -159,11 +162,11 @@ agrees.
 
 ## Writes
 
-Writes are built for patches. *(Planned for M8: new files and deletes.)*
+Writes are built for patches, creates and deletes.
 
 - **Atomic.** A write goes to a hidden temporary file in the same folder and
   is then renamed over the target. A reader never sees half a file. A delete removes
-  the file.
+  the file and leaves its kind folder, even when it is empty.
 - **Format.** The file is written as JSON with 2-space indents, LF line ends
   and a final newline. The order of keys is kept, so a patch of one value
   changes one line in git.
@@ -171,8 +174,32 @@ Writes are built for patches. *(Planned for M8: new files and deletes.)*
   `samples/apps/purchase-requests`: `entity` in `entities`, `dataSource` in
   `data-sources`, `policy` in `policies`, and so on. The file name is the
   kebab-case `name`, such as `entities/purchase-request.json`. A `text`
-  resource is named after its locale, such as `texts/en.json`. A patch that
-  changes `name` keeps the file name.
+  resource is named after its locale in lower case, such as `texts/en.json`
+  and `texts/pt-br.json`. A patch that changes `name` keeps the file name. A
+  missing kind folder is created.
+  - **Kind folders.** `entity` in `entities`, `site` in `sites`, `page` in
+    `pages`, `text` in `texts`, `seed` in `seeds`, `dataSource` in
+    `data-sources`, `rule` in `rules`, `sequence` in `sequences`, `process` in
+    `processes`, `form` in `forms`, `role` in `roles`, `policy` in `policies`,
+    `connector` in `connectors`, `event` in `events`, `endpoint` in
+    `endpoints`, `trigger` in `triggers`, `migration` in `migrations` and
+    `scenario` in `scenarios`. The `kind` is matched with its letter case.
+  - **Name pattern.** A create's `name` must be `^[A-Za-z][A-Za-z0-9]*$`
+    with at most 60 characters, which is the pattern of every kind's schema.
+    Letters and digits alone cannot form a path, so `../x` is `400`. A text's
+    `locale` must match the text schema's pattern, `^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$`,
+    with at most 60 characters.
+  - **Kebab-case.** A hyphen goes before a capital that follows a lower-case
+    letter or a digit, or before the last capital of an acronym that a
+    lower-case letter follows. Then everything is lower-cased. So
+    `PurchaseRequestList` is `purchase-request-list`, and `HTTPCall` is
+    `http-call`.
+  - **Checked fields.** A create checks only `id`, `kind`, `name` and, for a
+    text, `locale`. Any other schema problem is saved and shows up as a
+    diagnostic.
+  - **No overwrite.** A create whose `id` is in use, or whose target file
+    exists, is `409`. A create never replaces a file, even when another
+    process writes the folder.
 - **The manifest.** `application.json` at the folder root can be patched. It
   cannot be created or deleted, because
   `AXC0009` (see the diagnostic codes in [configuration.md](configuration.md)) requires it there.
@@ -187,10 +214,10 @@ Writes are built for patches. *(Planned for M8: new files and deletes.)*
 
 ## Diagnostics
 
-A patch answers with the folder's diagnostics. *(Planned for M8: the same
-for a create and a delete, and
-`GET /api/studio/apps/{application}/diagnostics` to return them on demand.)*
-A diagnostic never blocks a save.
+A patch, a create and a delete answer with the folder's diagnostics.
+*(Planned for M8: `GET /api/studio/apps/{application}/diagnostics` to return
+them on demand.)* A diagnostic never blocks a save. A delete that breaks
+references is saved, and the diagnostics list the broken references.
 
 - The folder is compiled in memory against the extension packages installed
   under `Extensions:Path`, see
