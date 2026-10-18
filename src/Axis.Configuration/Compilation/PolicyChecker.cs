@@ -18,7 +18,8 @@ namespace Axis.Configuration.Compilation;
 /// rules, can call <c>currentUser()</c>, and translates to SQL. Every problem of a policy is
 /// reported in one pass. A grant without exactly one target is not checked further, and neither is
 /// a grant whose target is unknown or a child entity. A role or target file that was not loaded
-/// because of its own errors is not reported again.
+/// because of its own errors is not reported again. A data source grant that names a module the
+/// application does not declare is <c>AXC0207</c>, in place of the unknown-target diagnostic.
 /// </summary>
 internal static class PolicyChecker
 {
@@ -46,6 +47,7 @@ internal static class PolicyChecker
         Func<string, EndpointResource?> findEndpoint,
         IReadOnlySet<string> unloadedEndpointNames,
         IEnumerable<ExpressionRule> rules,
+        ModuleReferences moduleReferences,
         List<Diagnostic> diagnostics)
     {
         foreach (var policy in policies)
@@ -77,6 +79,7 @@ internal static class PolicyChecker
                     findEndpoint,
                     unloadedEndpointNames,
                     rules,
+                    moduleReferences,
                     Report);
             }
         }
@@ -157,6 +160,7 @@ internal static class PolicyChecker
         Func<string, EndpointResource?> findEndpoint,
         IReadOnlySet<string> unloadedEndpointNames,
         IEnumerable<ExpressionRule> rules,
+        ModuleReferences moduleReferences,
         Action<string, string, string> report)
     {
         var targets = new[] { grant.Entity, grant.DataSource, grant.Process, grant.Endpoint }.Count(target => target is not null);
@@ -209,7 +213,9 @@ internal static class PolicyChecker
         switch (kind)
         {
             case "dataSource":
-                if (findDataSource(name) is null && !unloadedDataSourceNames.Contains(name))
+                if (findDataSource(name) is null
+                    && !unloadedDataSourceNames.Contains(name)
+                    && !moduleReferences.ReportUndeclared(name, $"{path}/dataSource", report))
                 {
                     report(DiagnosticCodes.UnknownGrantTarget, $"The data source '{name}' was not found. No loaded data source has that name.", $"{path}/dataSource");
                 }

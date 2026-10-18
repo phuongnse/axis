@@ -159,7 +159,7 @@ public static class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
-        var moduleResources = new ModuleResources([], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics);
@@ -167,7 +167,7 @@ public static class ApplicationCompiler
             declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
         }
 
-        // A pinned module's entities, sequences, seeds and events come before the application's own, so a
+        // A pinned module's entities, sequences, seeds, events, data sources and forms come before the application's own, so a
         // step that depends on order sees each module target first. Application resources can name
         // them as '<module id>/<name>', but a module never names an application resource.
         var allEntities = new List<EntityResource>([.. moduleResources.Entities, .. loaded.Entities]);
@@ -177,7 +177,18 @@ public static class ApplicationCompiler
         var unloadedEntityNames = new HashSet<string>(loaded.UnloadedEntityNames.Concat(moduleResources.UnloadedEntityNames), StringComparer.OrdinalIgnoreCase);
         var unloadedSequenceNames = new HashSet<string>(loaded.UnloadedSequenceNames.Concat(moduleResources.UnloadedSequenceNames), StringComparer.OrdinalIgnoreCase);
         var unloadedEventNames = new HashSet<string>(loaded.UnloadedEventNames.Concat(moduleResources.UnloadedEventNames), StringComparer.OrdinalIgnoreCase);
-        loaded = loaded with { UnloadedEntityNames = unloadedEntityNames, UnloadedSequenceNames = unloadedSequenceNames, UnloadedEventNames = unloadedEventNames };
+        var unloadedDataSourceNames = new HashSet<string>(loaded.UnloadedDataSourceNames.Concat(moduleResources.UnloadedDataSourceNames), StringComparer.OrdinalIgnoreCase);
+        var unloadedFormNames = new HashSet<string>(loaded.UnloadedFormNames.Concat(moduleResources.UnloadedFormNames), StringComparer.OrdinalIgnoreCase);
+        loaded = loaded with
+        {
+            DataSources = [.. moduleResources.DataSources, .. loaded.DataSources],
+            Forms = [.. moduleResources.Forms, .. loaded.Forms],
+            UnloadedEntityNames = unloadedEntityNames,
+            UnloadedSequenceNames = unloadedSequenceNames,
+            UnloadedEventNames = unloadedEventNames,
+            UnloadedDataSourceNames = unloadedDataSourceNames,
+            UnloadedFormNames = unloadedFormNames,
+        };
         var moduleReferences = new ModuleReferences(
             new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal),
             new HashSet<string>(modules.Select(pin => pin.Id), StringComparer.Ordinal));
@@ -345,6 +356,7 @@ public static class ApplicationCompiler
             FindEndpoint,
             loaded.UnloadedEndpointNames,
             rules,
+            moduleReferences,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
         EventChecker.Check(
@@ -413,6 +425,16 @@ public static class ApplicationCompiler
             eventsByName[@event.Name] = @event with { Id = ModuleResourceIds.Derive(applicationId, @event.Id) };
         }
 
+        foreach (var dataSource in moduleResources.DataSources)
+        {
+            dataSourcesByName[dataSource.Name] = dataSource with { Id = ModuleResourceIds.Derive(applicationId, dataSource.Id) };
+        }
+
+        foreach (var form in moduleResources.Forms)
+        {
+            formsByName[form.Name] = form with { Id = ModuleResourceIds.Derive(applicationId, form.Id) };
+        }
+
         var entities = allEntities
             .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, IsModuleResource(entity) ? [] : rules))
             .ToList();
@@ -424,9 +446,9 @@ public static class ApplicationCompiler
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
-            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
+            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSourcesByName[dataSource.Name], entities, IsModuleResource(dataSource) ? [] : rules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules)).ToList(),
-            Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
+            Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
@@ -1196,7 +1218,11 @@ public static class ApplicationCompiler
             // A parameter without a usable type would only add noise to the filter's diagnostics.
             if (diagnostics.Count == countBeforeParameters
                 && dataSource.Filter is { } filter
-                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, rules), policyFilter: false) is { } problem)
+                && CheckFilter(
+                    filter,
+                    // Module rules are a separate step, so a module data source sees none and cannot call an application rule.
+                    ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, IsModuleResource(dataSource) ? [] : rules),
+                    policyFilter: false) is { } problem)
             {
                 Report(problem.Code, problem.Message, "/filter");
             }
