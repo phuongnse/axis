@@ -12,8 +12,8 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Milestone **M6, Releases and versioning**, is complete. The current milestone is
-**M7, Inspection and operations**. The [roadmap](docs/roadmap.md) says what each
+Milestone **M7, Inspection and operations**, is complete. The current milestone is
+**M8, Studio and modules**. The [roadmap](docs/roadmap.md) says what each
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 

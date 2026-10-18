@@ -906,7 +906,7 @@ can be read as its history (D21).
     `processInstanceId` and `details`, as stored. `actorName` is the display
     name stored with the audit record. It is `null` for `system`,
     `anonymous` and audit records written before names were stored.
-  - *(planned for M7)* Each item also has `inspectPath`. It is the
+  - *(planned for M8)* Each item also has `inspectPath`. It is the
     [instance detail](processes.md#instance-detail) path of the entry's
     process instance, such as
     `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances/0192f4a9-…`,

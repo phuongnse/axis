@@ -34,7 +34,7 @@ triggers, which start
 processes when something happens, see
 [Events and triggers](#events-and-triggers). Process inspection, where
 authorized users see an instance's graph, path, tasks and calls, is built, except
-that the record history link to an instance is planned for M7. The `inspect`
+that the record history link to an instance is *(planned for M8)*. The `inspect`
 grant, the instance list, the instance detail with its `calls`, the
 `sensitive` flag and the inspector widget are built, see
 [Process inspection](#process-inspection). Operator cancel
@@ -771,7 +771,7 @@ the instances of a process and read one of them. The `inspect` grant and the
 [instance list](#instance-list) and the [instance detail](#instance-detail)
 are built, with the detail's `calls`. The `sensitive` flag, which hides more
 values, is built too. The widget is built. Only the record history link to an
-instance is *(planned for M7)*.
+instance is *(planned for M8)*.
 The user is the user of the
 [session](../architecture.md#sign-in-and-the-session). The
 [process inspector widget](frontend.md) shows the same data.
@@ -2520,7 +2520,7 @@ configuration (see
 
 As environment variables they are `Worker__LeaseDuration`,
 `Worker__PollInterval`, `Worker__MetricsInterval` and `Health__Urls`. What the health endpoints answer is
-in [health checks](../architecture.md#health-checks-planned-for-m7).
+in [health checks](../architecture.md#health-checks).
 
 The server migrates the tenant databases, and the worker does not. Before it
 claims work for a tenant, the worker checks that the processes migrations are
@@ -2587,7 +2587,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. *(Planned for M7.)* `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step. The exception type, or a fixed text that names the step, part, field pointer or message key. Never the exception message or a value, see [Step errors](#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |

@@ -561,7 +561,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       An entry whose details name none of them has no summary. Outcome and
       step names show as declared, such as `approve`. Comments and other
       field values are never shown, because audit records never hold them.
-    - *(planned for M7)* An entry whose `inspectPath` is not `null` links to
+    - *(planned for M8)* An entry whose `inspectPath` is not `null` links to
       the instance page of the first page of the site whose widget is a
       `processInspector` that names the entry's process. The process and the
       instance id are the segments of `inspectPath`. The entry shows no link
@@ -731,7 +731,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `process` and an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
     the list endpoint. The SPA never builds the path itself. *(Planned for
-    M7.)* It will use `process` to link the record history to the page, see
+    M8.)* It will use `process` to link the record history to the page, see
     **History** under the form widget. The widget has `"access": null` and
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.

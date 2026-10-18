@@ -756,7 +756,7 @@ Migrations run forward only.
   a start wait longer. This covers the process start endpoint, the inbound
   endpoint, record API creates and updates, task completion, event delivery,
   `sync` event triggers, update triggers from worker steps and schedule
-  fan-out. *(Planned for M7.)* Operator
+  fan-out. Operator
   [retry](processes.md#retry) and [resolve](processes.md#resolve) take it
   too. A record API create or update always takes it, because the new
   release may add triggers. A delete never starts a process and does not. An
@@ -905,7 +905,7 @@ schema of the tenant database.
   written in the same transaction as the action it records. The record API
   and the process [start endpoint](processes.md#start-endpoint) write them,
   and so do [process steps](processes.md#running-a-step) and
-  [task completions](processes.md#completing-a-task). *(Planned for M7.)* So
+  [task completions](processes.md#completing-a-task). So
   do the [operator commands](processes.md#operator-commands), with the user as
   actor.
 

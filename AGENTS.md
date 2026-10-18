@@ -118,7 +118,7 @@ PostgreSQL runs init scripts only on an empty volume, so an existing local Compo
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
-`binh`, `chau`, `dung` and `giang`, and the development password is `axis` for each. Under `scripts/dev.sh`,
+`binh`, `chau`, `dung` and `giang`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
@@ -165,6 +165,9 @@ works on a fresh clone:
 - The worker serves `/health/live` and `/health/ready` at `http://127.0.0.1:5208` and
   answers `404` elsewhere. `Health__Urls` moves that address. Two workers on one machine
   need different addresses.
+- Neither Docker Compose nor `scripts/dev.sh` starts a telemetry collector, so logs go
+  to the console only. Set `OTEL_EXPORTER_OTLP_ENDPOINT` for the server and the worker to
+  export traces, metrics and logs. See [telemetry export](docs/reference/configuration.md#telemetry-export).
 - Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running with
   its data, and Keycloak and the purchasing system stub keep running. Run
   `docker compose down` to stop them.
