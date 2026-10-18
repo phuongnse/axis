@@ -28,6 +28,7 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 }
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
+builder.Services.AddSingleton<TenantDatabaseGauge>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
     .AddCheck<StartupActivationHealthCheck>("activation", tags: [HealthEndpoints.ReadyTag])

@@ -9,12 +9,14 @@ namespace Axis.Server.Health;
 /// Reports whether every tenant database answers. The tenants are checked in parallel, and a database
 /// that has not answered within <see cref="TenantTimeout"/> counts as not answering. A tenant that does
 /// not answer makes the result Degraded, not Unhealthy, so one tenant cannot take the others offline. Each
-/// one is named in a warning log, and never in the result.
+/// one is named in a warning log, and never in the result. The result per tenant goes to
+/// <see cref="TenantDatabaseGauge"/>.
 /// </summary>
 internal sealed partial class TenantDatabasesHealthCheck(
     TenantOptions tenants,
     ITenantContextAccessor accessor,
     ITenantConnectionFactory connections,
+    TenantDatabaseGauge gauge,
     ILogger<TenantDatabasesHealthCheck> logger) : IHealthCheck
 {
     internal static readonly TimeSpan TenantTimeout = TimeSpan.FromSeconds(2);
@@ -23,7 +25,13 @@ internal sealed partial class TenantDatabasesHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var answers = await Task.WhenAll(tenants.Tenants.Keys.Select(id => AnswersAsync(id, cancellationToken)));
+        var ids = tenants.Tenants.Keys.ToArray();
+        var answers = await Task.WhenAll(ids.Select(id => AnswersAsync(id, cancellationToken)));
+        for (var i = 0; i < ids.Length; i++)
+        {
+            gauge.Record(ids[i], answers[i]);
+        }
+
         return answers.All(answered => answered) ? HealthCheckResult.Healthy() : HealthCheckResult.Degraded();
     }
 

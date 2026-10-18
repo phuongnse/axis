@@ -1,15 +1,18 @@
 using System.Diagnostics.Metrics;
 using Axis.Core.Telemetry;
+using Axis.Server.Health;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.Server.Tests;
 
 /// <summary>
 /// Each instrument of the <c>Axis</c> meter records only the attribute keys that the
-/// <see href="../../docs/reference/processes.md#worker-metrics">worker metrics</see> table lists for it.
+/// <see href="../../docs/reference/processes.md#worker-metrics">worker metrics</see> table lists for it, or the
+/// <see href="../../docs/architecture.md#health-checks">health checks</see> section for the server's gauge.
 /// </summary>
 public sealed class AxisMetricsTests
 {
-    // The table in docs/reference/processes.md, as metric name to the attribute keys it may carry.
+    // The table in docs/reference/processes.md and the health checks section of docs/architecture.md, as metric name to the attribute keys it may carry.
     private static readonly Dictionary<string, string[]> _allowed = new(StringComparer.Ordinal)
     {
         ["axis.work_items.duration"] = ["axis.tenant", "axis.work_item.kind", "axis.outcome"],
@@ -17,6 +20,7 @@ public sealed class AxisMetricsTests
         ["axis.work_items.due"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.work_items.oldest_due_age"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.computed.pending_fields"] = ["axis.tenant", "axis.application"],
+        ["axis.tenant.database.available"] = ["axis.tenant"],
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
     };
 
@@ -38,6 +42,8 @@ public sealed class AxisMetricsTests
         listener.SetMeasurementEventCallback<double>(Record);
         listener.Start();
         using var gauges = new AxisGauges();
+        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var tenantDatabases = new TenantDatabaseGauge(services.GetRequiredService<IMeterFactory>());
 
         void Record<T>(Instrument instrument, T measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
             where T : struct
@@ -63,6 +69,7 @@ public sealed class AxisMetricsTests
         AxisMetrics.RecordCallAttempt("default", null, AxisTelemetry.PackageTag, "PaymentReferences", "reserve", "retryable");
 
         gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
+        tenantDatabases.Record("default", true);
         listener.RecordObservableInstruments();
 
         Assert.Equal([.. _allowed.Keys.Order(StringComparer.Ordinal)], [.. published.Order(StringComparer.Ordinal)]);

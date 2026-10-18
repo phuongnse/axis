@@ -1642,7 +1642,7 @@ The server and the worker emit correlated logs, metrics and traces. Traces,
 the stored `trace_id`, OTLP logs, the log scope and the problem details
 `traceId` are built. So are the standard metrics and the work item duration,
 process instance and call attempt metrics, and the work item gauges and the
-computed fields gauge. The tenant health metric of D37 stays *(planned for M8)*. See
+computed fields gauge. So is the tenant database gauge of D37. See
 [telemetry](architecture.md#telemetry) for the spans and what telemetry never
 holds.
 The owner confirmed these points on issue #479 on 2026-10-17.
@@ -1686,6 +1686,8 @@ The owner confirmed these points on issue #479 on 2026-10-17.
     outcome class.
   - `axis.computed.pending_fields`, a gauge of pending computed fields, see
     [D33](#d33-recomputing-stored-computed-fields--agreed).
+  - `axis.tenant.database.available`, a gauge per tenant, 1 when its database
+    answered the server's last readiness probe and 0 when it did not.
 - **What telemetry may hold:**
   - Attributes name the tenant, application, process, step, connector,
     operation and work item kind.
@@ -1713,7 +1715,7 @@ content.
 The server's readiness covers the platform database and startup activation, and
 one tenant database that is down makes the server degraded, not unhealthy. The
 worker gets its own health endpoints. The server's readiness and the worker's
-health endpoints are built. The tenant metric is *(planned for M8)*. See
+health endpoints are built. So is the tenant metric. See
 [health checks](architecture.md#health-checks) for the answers
 of each endpoint.
 The owner confirmed these points on issue #480 on 2026-10-17.

@@ -722,7 +722,8 @@ is not part of this design.
   `network.protocol.version` and `url.scheme`. So `server.address`,
   `server.port`, `network.peer.address` and `dns.question.name` never reach an
   exporter. The Axis metrics are in
-  [worker metrics](reference/processes.md#worker-metrics).
+  [worker metrics](reference/processes.md#worker-metrics). The server's tenant
+  database gauge is in [health checks](#health-checks).
 
 ### Axis spans
 
@@ -795,7 +796,7 @@ holds table and column names.
 
 The server's `/health/live` and `/health/ready` work as described below, as
 [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed)
-says. The tenant metric is *(planned for M8)*.
+says.
 
 **The answer.** Each endpoint answers JSON of the form
 `{ "status": "Healthy" | "Degraded" | "Unhealthy" }` and nothing else.
@@ -820,8 +821,12 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
 - The tenant database checks run in parallel, and each gives up after 2
   seconds. A database that has not answered by then counts as not answering,
   so a hung database makes the server Degraded and does not stall the probe.
-- The tenant is named in a warning in the logs on every probe, and in a metric
-  labelled with the tenant id *(planned for M8)*, never in the answer.
+- The tenant is named in a warning in the logs on every probe, and in the
+  gauge `axis.tenant.database.available`, never in the answer. The gauge is
+  labelled `axis.tenant` with the tenant id. It is 1 when the tenant database
+  answered the last probe and 0 when it did not. A scrape reads it from memory,
+  so it never queries a tenant database. Before the first probe a tenant has no
+  point.
 - Today the server does not listen until startup activation has finished, see
   [startup activation](reference/configuration.md#startup-activation). So a
   probe gets no answer in that time. The activation rule matters once the
