@@ -200,6 +200,23 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
         using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
     }
 
+    [Theory]
+    [InlineData(AppA)]
+    [InlineData(AppB)]
+    public async Task A_department_whose_code_breaks_the_module_rule_is_refused_in_each_application(string app)
+    {
+        using var client = fixture.CreateClient().SignedInAs("anna");
+
+        using var request = RecordApiFixture.Request(
+            HttpMethod.Post, $"{app}/{Departments}", ModuleAppFixture.Host, """{ "values": { "code": "X", "name": "Short" } }""");
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var error = Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("/values/code", error.Name);
+        Assert.Equal("departments.department.shortCode", Assert.Single(error.Value.EnumerateArray()).GetString());
+    }
+
     private static async Task CreateDepartmentAsync(HttpClient client, string app, string code, string name)
     {
         using var request = RecordApiFixture.Request(

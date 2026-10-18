@@ -1,0 +1,9 @@
+{
+  "id": "3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f06",
+  "kind": "rule",
+  "name": "IsCode",
+  "formatVersion": 1,
+  "parameters": [{ "name": "code", "type": "text" }],
+  "resultType": "boolean",
+  "expression": "length(code) >= 3"
+}

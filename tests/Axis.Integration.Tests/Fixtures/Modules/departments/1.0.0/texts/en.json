@@ -4,5 +4,8 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "departments.department": "Department" }
+  "texts": {
+    "departments.department": "Department",
+    "departments.department.shortCode": "Use at least three characters for the code."
+  }
 }
