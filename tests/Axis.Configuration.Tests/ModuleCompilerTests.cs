@@ -25,6 +25,21 @@ public sealed class ModuleCompilerTests
         """;
     private const string DepartmentName = "departments/Department";
 
+    private const string EventId = "4d6e8f10-2a3b-4c5d-9e6f-7a8b9c0d1e2f";
+    private const string DepartmentRenamed = $$"""
+        { "id": "{{EventId}}", "kind": "event", "name": "DepartmentRenamed", "formatVersion": 1, "entity": "Department",
+          "fields": [ { "name": "name", "type": "text" } ] }
+        """;
+    private const string RenamedProcess = """
+        { "id": "6f8a0b12-3c4d-4e5f-8a6b-9c0d1e2f3a4b", "kind": "process", "name": "RenameReview", "formatVersion": 1,
+          "entity": "departments/Department", "start": "announce",
+          "steps": [
+            { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "departments/DepartmentRenamed",
+              "fields": { "name": "name" }, "next": "done" },
+            { "name": "done", "type": "end" }
+          ] }
+        """;
+
     private const string NamedDepartment = $$"""
         { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1, "displayField": "name",
           "fields": [ { "name": "name", "type": "text", "required": true } ] }
@@ -286,6 +301,88 @@ public sealed class ModuleCompilerTests
             (seed.Name, seed.Id));
         Assert.Equal(new EntityReference(entity.Id, "departments/Department"), seed.Entity);
         Assert.Equal(Guid.Parse(SeedRecordId), Assert.Single(seed.Records).Id);
+    }
+
+    [Fact]
+    public void A_module_event_joins_the_model_with_a_derived_id_and_a_qualified_name()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var @event = Assert.Single(result.Model!.Events);
+        Assert.Equal(
+            (ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(EventId)), "departments/DepartmentRenamed", "modules/departments/DepartmentRenamed.json"),
+            (@event.Id, @event.Name, @event.File));
+        Assert.NotEqual(Guid.Parse(EventId), @event.Id);
+    }
+
+    [Fact]
+    public void A_module_event_names_an_entity_of_its_own_module_without_a_slash()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var department = Assert.Single(result.Model!.Entities);
+        Assert.Equal(new EntityReference(department.Id, DepartmentName), Assert.Single(result.Model.Events).Entity);
+        Assert.Equal(ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(DepartmentId)), department.Id);
+    }
+
+    [Fact]
+    public void A_module_event_whose_entity_names_another_module_with_a_slash_is_reported_once()
+    {
+        using var modules = Modules("1.0.0").With(
+            "departments/1.0.0/DepartmentRenamed.json",
+            DepartmentRenamed.Replace("\"entity\": \"Department\"", "\"entity\": \"people/Person\"", StringComparison.Ordinal));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, "modules/departments/DepartmentRenamed.json", "/entity", Guid.Parse(EventId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_application_process_over_a_module_entity_can_raise_a_module_event()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("processes/rename-review.json", RenamedProcess);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var process = Assert.Single(result.Model!.Processes);
+        Assert.Equal(DepartmentName, process.Entity.Name);
+        var raise = Assert.IsType<RaiseEventStepModel>(process.Steps[0]);
+        Assert.Equal("departments/DepartmentRenamed", raise.Event);
+    }
+
+    [Fact]
+    public void An_application_event_trigger_can_name_a_module_event()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("processes/rename-review.json", RenamedProcess)
+            .With("triggers/on-rename.json", """
+                { "id": "7a9b1c23-4d5e-4f60-8b7c-0d1e2f3a4b5c", "kind": "trigger", "name": "ReviewRenames", "formatVersion": 1,
+                  "type": "event", "event": "departments/DepartmentRenamed", "process": "RenameReview" }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var trigger = Assert.Single(result.Model!.Triggers);
+        Assert.Equal(
+            new EventReference(ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(EventId)), "departments/DepartmentRenamed"),
+            trigger.Event);
     }
 
     [Fact]

@@ -1886,10 +1886,10 @@ the source of truth.
 
 M8 adds modules: versioned folders of resources that applications reuse.
 The manifest, installation, declaring, pinning, the module files stored in
-the release, and the compile of a module's entities, sequences and seeds with
-ids derived from the application are built. So are the `target` and `sequence`
+the release, and the compile of a module's entities, sequences, seeds and events
+with ids derived from the application are built. So are the `target` and `sequence`
 references and the codes `AXC0207` and `AXC0208`. Module data sources, rules,
-forms, events and texts, the sample and the other checks are still
+forms and texts, the sample and the other checks are still
 *(planned for M8)*. Activating module entities, seeding and the record API for
 module entities are built. See the
 [Modules section](reference/configuration.md#modules) of the configuration
