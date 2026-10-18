@@ -56,7 +56,7 @@ keep the option to split hosts later.
   into a release.
 - **Authoring APIs:** the APIs use the same contracts and support partial
   updates.
-- **Studio:** the visual Studio comes later and writes the same resources.
+- **Studio:** a visual Studio writes the same resources.
 
 *Why:* files can be reviewed, diffed and tested in CI, and AI agents can author
 them. Building a visual editor before the contracts settle would mean
@@ -1753,11 +1753,12 @@ answer names nothing that an open endpoint should not show.
 
 ## D38. Studio edits application folders through an authoring API — Agreed
 
-In M8, Studio edits an application's resource files through an authoring API
+Studio edits an application's resource files through an authoring API
 on the server. The routes that list applications, list, read, patch, create and
 delete resources and give diagnostics are built, and so are the Studio page's
 list, search, editor, diagnostics panel, Uses and Used by lists, and the delete
-button with its warning. The rest is *(planned for M8)*. See the
+button with its warning. The rest is *(planned for M9)*: the reconnect message
+and opening a diagnostic at its path. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1819,7 +1820,7 @@ patches that carry a version. Editing the folders on disk keeps git the source
 of truth. It also keeps the schema role out of requests, as
 [D31](#d31-separate-database-roles--agreed) asks, because only startup holds
 it and Studio never activates. The cost is that Studio is a development tool
-in M8. Authoring on a shared server, with drafts and publishing from Studio,
+for now. Authoring on a shared server, with drafts and publishing from Studio,
 would need a database store and run-time activation. That could come with M9
 tenancy. An author can change every policy of an application, so no
 application policy can guard authoring. That is why the author role is an
@@ -1827,7 +1828,7 @@ installation-level setting.
 
 ## D39. Reference index and where a resource is used — Agreed
 
-In M8, every compile collects each reference it resolves into a reference
+Every compile collects each reference it resolves into a reference
 index. Studio reads it through two authoring API routes and shows a **Uses**
 list and a **Used by** list for each resource. The compile already builds the
 index with every relation of the design. Studio's lists and delete warning are
@@ -1865,12 +1866,13 @@ The owner confirmed these points on issue #570 on 2026-10-18.
   - Each resource shows a **Uses** list and a **Used by** list. A Used by entry
     opens the other resource at the path of the reference. A Uses entry opens
     it at its top. An entry expands one more step on request.
-  - There is no graph drawing library in M8. A drawn graph can come later
+  - There is no graph drawing library. A drawn graph can come later
     without changing the index.
 - **Cost:**
-  - The index adds at most a small, stated share to compile time. A where-used
-    answer for an application of typical size stays under a stated bound. The
-    M8 performance issue sets both bounds.
+  - The index adds at most 30% of compile time, or 300 ms when that is more.
+    A where-used answer for an application of typical size returns within 10
+    seconds. The [reference index](reference/configuration.md#reference-index)
+    states both bounds.
 
 *Why:* [Typical application size](domain/knowledge.md#typical-application-size)
 says authoring at 30–90 entities and 150–250 data sources needs a dependency
@@ -1888,7 +1890,7 @@ the source of truth.
 
 ## D40. Reusable modules — Agreed
 
-M8 adds modules: versioned folders of resources that applications reuse.
+Modules are versioned folders of resources that applications reuse.
 The manifest, installation, declaring, pinning, the module files stored in
 the release, and the compile of a module's entities, sequences, seeds, events,
 data sources and forms with ids derived from the application are built. So are the
@@ -1896,8 +1898,8 @@ data sources and forms with ids derived from the application are built. So are t
 application's texts by locale, a module's rules and the calls to them from
 application expressions, and the codes `AXC0207` to `AXC0214`. So are activating
 module entities, seeding and the record API for module entities. So is the
-sample module `departments`. Module validations that call rules and the other
-checks are still *(planned for M8)*. See the
+sample module `departments`. Module validations that call rules are
+*(planned for M9)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner
@@ -1911,7 +1913,7 @@ confirmed these points on issue #571 on 2026-10-18.
     texts and seeds. Processes, pages, roles and policies stay out, because
     they would need application roles and sites to be known inside the module.
     Any other kind in a module is a diagnostic.
-  - A module does not depend on other modules in M8.
+  - A module does not depend on other modules.
 - **Installation and pinning:**
   - Modules are installed per installation under
     `Modules:Path/<id>/<version>/`, as packages are. The server, the worker and
@@ -1952,7 +1954,7 @@ confirmed these points on issue #571 on 2026-10-18.
     application id and the module resource id, as a UUID v5. So two
     applications in one tenant get separate tables and separate counters.
   - A module upgrade that is not additive for its entities is a diagnostic.
-    Modules ship no migrations in M8, so an application also cannot stop using
+    Modules ship no migrations, so an application also cannot stop using
     a module once its tables exist.
 - **Texts:**
   - A module's text keys start with `<module id>.`. A module ships one text
@@ -1960,7 +1962,7 @@ confirmed these points on issue #571 on 2026-10-18.
   - Every locale of the application needs the module's texts for that locale.
     A missing one is a diagnostic.
 - **Packages:** `module.json` keeps an optional `packages`, with the same
-  shape as in `application.json`. No kind a module may hold in M8 can call a
+  shape as in `application.json`. No kind a module may hold can call a
   package operation yet, because only process steps can.
 - **Sample:** `samples/modules/departments`, version `1.0.0`. It has the
   `Department` entity with code, name and manager, a data source over it, a rule
@@ -1968,7 +1970,7 @@ confirmed these points on issue #571 on 2026-10-18.
   and `vi` texts. The build, dev, Compose and E2E scripts install it under
   `artifacts/modules`, as they do the sample package. The second sample
   application uses it. The purchase request sample keeps its own `Department`
-  entity in M8.
+  entity.
 
 *Why:* [Authoring and packaging](domain/knowledge.md#authoring-and-packaging)
 warns against hidden dependencies, so a module is declared, pinned and copied
@@ -1983,7 +1985,7 @@ can only grow additively until modules can ship migrations.
 
 ## D41. Leave requests as the second sample application — Agreed
 
-M8 adds a second, smaller sample application: leave requests. It is built, and
+Leave requests is the second, smaller sample application. It is built, and
 every point below holds. See the
 [Second application section](product-brief.md#second-application-leave-requests)
 of the product brief for the data, flow, security, pages and scenarios. The
