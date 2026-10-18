@@ -14,6 +14,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { StudioEditor } from './StudioEditor'
 
 /** The applications Studio may edit, or why they could not be listed. */
 type AppsState = StudioApplication[] | typeof forbidden | 'failed'
@@ -29,6 +30,8 @@ type FolderState =
  * With one application, it is picked at once. The resources are grouped by kind, and a search narrows them
  * by name or id. The diagnostics panel lists the folder's diagnostics, loaded when the application is
  * picked. A diagnostic that names a resource selects it, and clears the search so the resource is listed.
+ * A selected resource opens in an editor below its details. After a save, the diagnostics panel shows
+ * the diagnostics that the save answered.
  */
 export function StudioPage() {
   const t = useText()
@@ -162,15 +165,23 @@ export function StudioPage() {
             </Flex>
             <div data-testid="studio-resource-details" style={{ flex: 1 }}>
               {selected ? (
-                <Descriptions
-                  title={resourceTitle(selected)}
-                  column={1}
-                  items={[
-                    { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
-                    { key: 'id', label: t('shell.studio.id'), children: selected.id },
-                    { key: 'file', label: t('shell.studio.file'), children: selected.file },
-                  ]}
-                />
+                <Flex vertical gap="middle">
+                  <Descriptions
+                    title={resourceTitle(selected)}
+                    column={1}
+                    items={[
+                      { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
+                      { key: 'id', label: t('shell.studio.id'), children: selected.id },
+                      { key: 'file', label: t('shell.studio.file'), children: selected.file },
+                    ]}
+                  />
+                  <StudioEditor
+                    key={selected.id}
+                    application={application!}
+                    item={selected}
+                    onSaved={(diagnostics) => setFolder({ ...loaded, diagnostics })}
+                  />
+                </Flex>
               ) : (
                 <Typography.Text type="secondary">{t('shell.studio.selectResource')}</Typography.Text>
               )}
