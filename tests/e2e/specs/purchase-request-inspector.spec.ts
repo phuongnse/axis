@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { appPath, createRequest } from '../purchase-requests'
-import { sessionFile, useSession } from '../sessions'
+import { sessionFile, useSession, type SampleUser } from '../sessions'
 
-// The employee anna starts the approval, and the operator giang inspects it.
+// The employee anna starts the approval. The operator giang or the finance reviewer dung inspects it.
 test.use({ storageState: sessionFile('anna') })
 
 const instancesPath = `${appPath}/processes/PurchaseRequestApproval/instances`
@@ -15,18 +15,19 @@ interface InstanceItem {
 }
 
 /**
- * Starts the approval of a new Operations request as anna, then signs in as giang. It returns the
+ * Starts the approval of a new Operations request as anna, then signs in as the inspecting user,
+ * giang unless the test names another. It returns the
  * request id and the id of the instance once the instance waits at manager approval. Specs run in
  * parallel against one database, so the list holds many instances. The newest come first, and the
  * test looks only for its own by subject id.
  */
-async function startWaitingInstance(page: Page) {
+async function startWaitingInstance(page: Page, inspector: SampleUser = 'giang') {
   await useSession(page, 'anna')
   const { id } = await createRequest(page, 'Zz Inspect', 500)
   const started = await page.request.post(instancesPath, { data: { subjectId: id }, headers: csrfHeaders })
   expect(started.status()).toBe(201)
 
-  await useSession(page, 'giang')
+  await useSession(page, inspector)
   let instanceId = ''
   // The worker moves the instance to the manager's task some time after the start.
   await expect(async () => {
@@ -89,4 +90,43 @@ test('the list endpoint answers 403 to an employee and 200 to the operator', asy
 
   await useSession(page, 'giang')
   expect((await page.request.get(instancesPath)).status()).toBe(200)
+})
+
+test('a finance reviewer cancels a waiting request in the inspector and its task leaves the manager inbox', async ({
+  page,
+}) => {
+  const { requestId, instanceId } = await startWaitingInstance(page, 'dung')
+
+  await page.goto(`/purchasing/approvals/${instanceId}`)
+  await expect(page.getByTestId('inspector-instance')).toBeVisible()
+  await expect(page.getByTestId('inspector-command-retry')).toHaveCount(0)
+  await page.getByTestId('inspector-command-cancel').click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Reason').fill('The request was raised by mistake')
+  await dialog.getByRole('button', { name: 'Send' }).click()
+
+  await expect(page.getByTestId('inspector-instance')).toContainText('Cancelled')
+  await expect(page.getByTestId('inspector-command-cancel')).toHaveCount(0)
+
+  await useSession(page, 'chau')
+  await expect(async () => {
+    const response = await page.request.get(`${appPath}/tasks?pageSize=100`)
+    expect(response.status()).toBe(200)
+    const body = (await response.json()) as { items: { subject: { id: string } }[] }
+    expect(body.items.some((item) => item.subject.id === requestId)).toBe(false)
+  }).toPass({ timeout: 30_000 })
+})
+
+test('the operator sees no command buttons and is refused a direct cancel', async ({ page }) => {
+  const { instanceId } = await startWaitingInstance(page)
+
+  await page.goto(`/purchasing/approvals/${instanceId}`)
+  await expect(page.getByTestId('inspector-instance')).toBeVisible()
+  await expect(page.getByTestId(/^inspector-command-/)).toHaveCount(0)
+
+  const cancel = await page.request.post(`${instancesPath}/${instanceId}/cancel`, {
+    data: { reason: 'x' },
+    headers: csrfHeaders,
+  })
+  expect(cancel.status()).toBe(403)
 })

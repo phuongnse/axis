@@ -753,6 +753,19 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     their attempts. A call whose `inputHidden` is `true` shows "hidden" in
     place of its input. A shown input is a list of its top-level properties,
     where a number keeps its source digits.
+  - **Commands.** The page has a Cancel instance and a Retry button for each
+    of those commands that the instance detail's `commands` lists. With none
+    listed, it has no button, and a command name this build does not know is
+    left out. A button opens a dialog that asks for a reason. The reason is
+    required, must not be blank and has at most 500 characters, and Send is
+    blocked until it is valid. On success, the dialog closes and the page reads
+    the instance detail again, so it shows the new state, tasks, calls and
+    `commands`. On a `400`, `403`, `404` or `409`, the dialog shows the
+    problem's title. Any other failure shows a generic text, and a `401`
+    starts sign-in. The Retry dialog first warns when a call on the instance's
+    current step has `failed`, and that call is a package call whose
+    `idempotent` is not `true`. A failed connector call gets no warning. The
+    server still checks every command, so the page never decides who may act.
   - **Labels.** Step labels come from the texts of the instance's `releaseId`,
     loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
     the inbox does. A step without a label shows its name.
@@ -764,7 +777,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     decides who may inspect.
   - The platform texts `shell.inspector.*` hold the column headers, the
     section titles, the instance states, the "hidden" text, the empty texts
-    and the messages.
+    and the messages. The texts `shell.inspector.commands.*` hold the command
+    buttons, the dialog's labels, the reason errors and the retry warning.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a
