@@ -29,6 +29,9 @@ namespace Axis.Server.DataSources;
 /// source parameters are read by <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter or the
 /// read filters is a 400 problem with a fixed title, and each read filter is logged by its policy
 /// and grant. The problem titles never contain text from the request, SQL or storage names.
+/// A data source of a module is written <c>{module id}/{data source name}</c>, as two path segments,
+/// for example <c>data-sources/departments/Departments/rows</c>. It has the same checks as any
+/// other data source, and only that form reaches it.
 /// </summary>
 internal static class DataSourceEndpoints
 {
@@ -38,8 +41,13 @@ internal static class DataSourceEndpoints
 
     public static void MapDataSourceEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var rows = endpoints.MapGroup("/api/apps/{app}/data-sources/{dataSource}/rows");
-        rows.MapGet("", ListAsync);
+        // A data source of the application has one segment, and a data source of a module has the
+        // module id and the data source name as two, so no data source has two URLs.
+        foreach (var pattern in new[] { "/api/apps/{app}/data-sources/{dataSource}/rows", "/api/apps/{app}/data-sources/{module}/{dataSource}/rows" })
+        {
+            var rows = endpoints.MapGroup(pattern);
+            rows.MapGet("", ListAsync);
+        }
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -68,7 +76,7 @@ internal static class DataSourceEndpoints
             return NotFound("No application is active under this name.");
         }
 
-        if (!application.TryGetDataSource(dataSource, out var model))
+        if (!application.TryGetDataSource(DataSourceName(context, dataSource), out var model))
         {
             return NotFound("The application has no data source with this name.");
         }
@@ -146,6 +154,10 @@ internal static class DataSourceEndpoints
 
         return Results.Ok(new DataSourceRowsResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
+
+    // The route of a module data source has a module segment before the data source name.
+    private static string DataSourceName(HttpContext context, string dataSource) =>
+        context.GetRouteValue("module") is string module ? $"{module}/{dataSource}" : dataSource;
 
     private static bool TryParseInteger(string text, out int value) =>
         int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
