@@ -184,7 +184,7 @@ export function StudioPage() {
                     ]}
                   />
                   <StudioEditor
-                    key={selected.id}
+                    key={`editor-${selected.id}`}
                     application={application!}
                     item={selected}
                     path={path}
@@ -199,7 +199,7 @@ export function StudioPage() {
                     }}
                   />
                   <StudioReferences
-                    key={selected.id}
+                    key={`references-${selected.id}`}
                     application={application!}
                     resourceId={selected.id}
                     onOpen={openReference}

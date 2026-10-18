@@ -534,7 +534,7 @@ describe('StudioPage', () => {
     expect(deletes).toHaveLength(1)
     const [, init] = deletes[0]
     expect(new Headers(init!.headers).get('If-Match')).toBe('"b"')
-    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/))
   })
 
   it('does not offer a delete for the application manifest', async () => {
