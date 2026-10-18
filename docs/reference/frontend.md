@@ -860,7 +860,8 @@ and the diagnostics panel are built. *(Planned for M9: the reconnect message.)*
   sees a forbidden page. A signed-out person is sent to sign in.
 - **Address.** The picked application and the selected resource are in the
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
-  them. A Used by entry that opens a resource at a path adds `&path=<path>`.
+  them. A Used by entry or a diagnostic that opens a resource at a path adds
+  `&path=<path>`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
   once.
@@ -893,7 +894,8 @@ and the diagnostics panel are built. *(Planned for M9: the reconnect message.)*
   - Selecting a **Uses** entry opens the other resource at its top.
   - Selecting a **Used by** entry opens the other resource at the path of the
     reference. The path is in the address and the details, and the editor
-    scrolls to the form field for that path. Nothing is highlighted.
+    scrolls to the form field for that path. Nothing is highlighted. A path
+    the form cannot show, such as one inside a map, opens the JSON view instead.
   - An expand control on a resource or text key entry loads one more step, the
     entry's own lists. It loads them once. Collapsing and expanding again shows
     the same lists.
@@ -916,10 +918,10 @@ and the diagnostics panel are built. *(Planned for M9: the reconnect message.)*
   each one's code, severity, message, file and `path`. It loads them from
   `GET /api/studio/apps/{application}/diagnostics` when an application is
   picked. After a save, it shows the diagnostics that the save answered
-  instead. A diagnostic that names a resource selects it and clears the search, so the
-  resource is listed. *(Planned for M9: opening the file in the editor at the
-  diagnostic's `path`.)* A diagnostic that names no resource cannot be
-  selected. A diagnostic never blocks a save.
+  instead. A diagnostic that names a resource selects it, clears the search, and
+  opens the resource at the diagnostic's `path`, as a Used by entry does. A
+  diagnostic with an empty path opens the resource at its top. A diagnostic that
+  names no resource cannot be selected. A diagnostic never blocks a save.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a short reconnect message and retries until the server
   answers. *(Planned for M9.)*

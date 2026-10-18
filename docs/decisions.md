@@ -1757,8 +1757,8 @@ Studio edits an application's resource files through an authoring API
 on the server. The routes that list applications, list, read, patch, create and
 delete resources and give diagnostics are built, and so are the Studio page's
 list, search, editor, diagnostics panel, Uses and Used by lists, and the delete
-button with its warning. The rest is *(planned for M9)*: the reconnect message
-and opening a diagnostic at its path. See the
+button with its warning. A diagnostic also opens its resource at its path. The
+rest is *(planned for M9)*: the reconnect message. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
