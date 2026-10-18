@@ -1,3 +1,4 @@
+import type { CallOutput } from './inspection'
 import type { FieldValue, RecordRow, RecordValue } from './records'
 import type { FieldMetadata } from './site'
 
@@ -62,4 +63,33 @@ export function buildCompleteBody(
   version: number,
 ): string {
   return `{"outcome":${JSON.stringify(outcome)},${buildRecordBody(fields, values, version).slice(1)}`
+}
+
+/**
+ * Writes the body of a call resolve: the reason, the outcome and, for `succeeded`, the outputs in
+ * declared order. Integer and decimal text that is a JSON number goes out as written, with every
+ * digit, and other text as a JSON string. A boolean goes out as `true` or `false`. A value that is
+ * `undefined` or empty is left out.
+ */
+export function buildResolveBody(
+  reason: string,
+  outcome: 'succeeded' | 'failed',
+  outputs: readonly CallOutput[],
+  values: Record<string, string | boolean | undefined>,
+): string {
+  const head = `"reason":${JSON.stringify(reason)},"outcome":${JSON.stringify(outcome)}`
+  if (outcome === 'failed') {
+    return `{${head}}`
+  }
+  const entries = outputs
+    .filter((output) => values[output.name] !== undefined && values[output.name] !== '')
+    .map((output) => {
+      const value = values[output.name]!
+      const written =
+        typeof value === 'string' && (output.type === 'integer' || output.type === 'decimal') && isJsonNumber(value)
+          ? value
+          : JSON.stringify(value)
+      return `${JSON.stringify(output.name)}:${written}`
+    })
+  return `{${head},"output":{${entries.join(',')}}}`
 }

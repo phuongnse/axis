@@ -4,21 +4,15 @@ import {
   appPath,
   createRequest,
   decide,
+  env,
   expectStatus,
+  purchaseOrders,
   recordsPath,
+  requestNumber,
   submit,
   waitForTask,
 } from '../purchase-requests'
 import { useSession } from '../sessions'
-
-/** The value of the environment variable `name`, which scripts/e2e.sh sets. */
-function env(name: string) {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is not set. Run the E2E tests with scripts/e2e.sh.`)
-  }
-  return value
-}
 
 /**
  * Stops the E2E worker process and waits until scripts/e2e.sh has started another one and it is
@@ -35,15 +29,6 @@ async function restartWorker() {
   process.kill(pid, 'SIGTERM')
   await expect.poll(readyCount, { timeout: 60_000 }).toBeGreaterThan(before)
   expect(Number(readFileSync(pidFile, 'utf8').trim())).not.toBe(pid)
-}
-
-/** The request's number, read through the record API. */
-async function requestNumber(page: Page, id: string) {
-  const read = await page.request.get(`${recordsPath}/${id}`)
-  expect(read.ok()).toBe(true)
-  const number = ((await read.json()) as { values: { number: string | null } }).values.number
-  expect(number).toBeTruthy()
-  return number!
 }
 
 /**
@@ -69,14 +54,6 @@ async function expectPaymentReference(page: Page, id: string, pattern: RegExp, t
     await page.goto(`/purchasing/purchaserequestform/${id}`)
     await expect(field).toHaveValue(pattern, { timeout: 1_000 })
   }).toPass({ timeout })
-}
-
-/** The orders that the purchasing system stub holds for the request numbered `number`. */
-async function purchaseOrders(page: Page, number: string) {
-  const response = await page.request.get(`${env('AXIS_E2E_PURCHASING_URL')}/purchase-orders`)
-  expect(response.ok()).toBe(true)
-  const orders = (await response.json()) as { requestNumber: string; orderNumber: string }[]
-  return orders.filter((order) => order.requestNumber === number)
 }
 
 /**

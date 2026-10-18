@@ -90,3 +90,29 @@ export async function expectStatus(page: Page, id: string, status: string) {
     await expect(statusValue(page)).toHaveValue(status, { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 }
+
+/** The value of the environment variable `name`, which scripts/e2e.sh sets. */
+export function env(name: string) {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`${name} is not set. Run the E2E tests with scripts/e2e.sh.`)
+  }
+  return value
+}
+
+/** The request's number, read through the record API. */
+export async function requestNumber(page: Page, id: string) {
+  const read = await page.request.get(`${recordsPath}/${id}`)
+  expect(read.ok()).toBe(true)
+  const number = ((await read.json()) as { values: { number: string | null } }).values.number
+  expect(number).toBeTruthy()
+  return number!
+}
+
+/** The orders that the purchasing system stub holds for the request numbered `number`. */
+export async function purchaseOrders(page: Page, number: string) {
+  const response = await page.request.get(`${env('AXIS_E2E_PURCHASING_URL')}/purchase-orders`)
+  expect(response.ok()).toBe(true)
+  const orders = (await response.json()) as { requestNumber: string; orderNumber: string }[]
+  return orders.filter((order) => order.requestNumber === number)
+}

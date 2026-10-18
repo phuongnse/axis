@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCompleteBody, buildRecordBody, isJsonNumber } from './recordBody'
+import { buildCompleteBody, buildRecordBody, buildResolveBody, isJsonNumber } from './recordBody'
 import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType): FieldMetadata {
@@ -139,5 +139,41 @@ describe('buildCompleteBody', () => {
 
   it('writes the version with empty values when nothing changed', () => {
     expect(buildCompleteBody('reject', fields, {}, 3)).toBe('{"outcome":"reject","version":3,"values":{}}')
+  })
+})
+
+describe('buildResolveBody', () => {
+  const outputs = [
+    { name: 'orderNumber', type: 'text', required: true },
+    { name: 'total', type: 'decimal', required: false },
+    { name: 'count', type: 'integer', required: false },
+    { name: 'confirmed', type: 'boolean', required: false },
+    { name: 'note', type: 'text', required: false },
+  ]
+
+  it('writes numbers as typed, a boolean as JSON, and leaves out empty values', () => {
+    expect(
+      buildResolveBody('Found it', 'succeeded', outputs, {
+        orderNumber: 'PO-1',
+        total: '12345678901234567890.10',
+        count: '7',
+        confirmed: false,
+        note: '',
+      }),
+    ).toBe(
+      '{"reason":"Found it","outcome":"succeeded","output":{"orderNumber":"PO-1","total":12345678901234567890.10,"count":7,"confirmed":false}}',
+    )
+  })
+
+  it('writes number text that is not a JSON number as a string, for the server to reject', () => {
+    expect(buildResolveBody('x', 'succeeded', outputs, { orderNumber: '1', total: '1,5' })).toBe(
+      '{"reason":"x","outcome":"succeeded","output":{"orderNumber":"1","total":"1,5"}}',
+    )
+  })
+
+  it('writes no output for a failed outcome', () => {
+    expect(buildResolveBody('No order', 'failed', outputs, { orderNumber: 'PO-1' })).toBe(
+      '{"reason":"No order","outcome":"failed"}',
+    )
   })
 })

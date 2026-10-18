@@ -102,7 +102,8 @@ const detailText = `{
         }
       ],
       "input": null,
-      "inputHidden": true
+      "inputHidden": true,
+      "resolvable": false
     },
     {
       "id": "0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d",
@@ -115,7 +116,8 @@ const detailText = `{
       "state": "succeeded",
       "attempts": [],
       "input": { "title": "Laptops", "amount": 1250.50, "lines": ["a", "b"] },
-      "inputHidden": false
+      "inputHidden": false,
+      "resolvable": false
     }
   ],
   "commands": []
@@ -149,12 +151,30 @@ function detailWith(commands: string[], failed?: 'package' | 'connector') {
   return JSON.stringify(detail)
 }
 
+const resolvableCallId = '0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'
+
+/** The detail text with its first call `unknown` and resolvable, with three declared outputs. */
+function detailWithResolvable() {
+  const detail = JSON.parse(detailText) as {
+    calls: { state: string; resolvable: boolean; outputs?: { name: string; type: string; required: boolean }[] }[]
+  }
+  detail.calls[0].state = 'unknown'
+  detail.calls[0].resolvable = true
+  detail.calls[0].outputs = [
+    { name: 'orderNumber', type: 'text', required: true },
+    { name: 'total', type: 'decimal', required: false },
+    { name: 'confirmed', type: 'boolean', required: false },
+  ]
+  return JSON.stringify(detail)
+}
+
 function stubApi({
   detail = { status: 200, body: detailText },
   command = { status: 200, body: '{}' },
+  resolve = { status: 200, body: '{}' },
   reloaded,
   releaseTexts = { status: 200, body: JSON.stringify({ locale: 'en', texts: {} }) },
-}: { detail?: Answer; command?: Answer; reloaded?: Answer; releaseTexts?: Answer } = {}) {
+}: { detail?: Answer; command?: Answer; resolve?: Answer; reloaded?: Answer; releaseTexts?: Answer } = {}) {
   let reads = 0
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === `${instancesPath}/${instanceId}`) {
@@ -164,6 +184,9 @@ function stubApi({
     }
     if (init?.method === 'POST' && (url.endsWith('/cancel') || url.endsWith('/retry'))) {
       return new Response(command.body ?? '', { status: command.status })
+    }
+    if (init?.method === 'POST' && url.endsWith('/resolve')) {
+      return new Response(resolve.body ?? '', { status: resolve.status })
     }
     if (url === `/api/sites/e2e/texts/en?release=${releaseId}`) {
       return new Response(releaseTexts.body ?? '', { status: releaseTexts.status })
@@ -440,5 +463,107 @@ describe('ProcessInstancePage', () => {
     expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
       'The command could not be sent.',
     )
+  })
+
+  it('posts a resolve as succeeded with the reason and the typed outputs', async () => {
+    const fetchMock = stubApi({ detail: { status: 200, body: detailWithResolvable() } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'The order exists' } })
+    await userEvent.click(within(dialog).getByLabelText('Succeeded'))
+    fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: 'PO-2026-0001' } })
+    fireEvent.change(within(dialog).getByLabelText('total (decimal)'), { target: { value: '1250.50' } })
+    await userEvent.click(within(dialog).getByLabelText('confirmed (boolean)'))
+    await userEvent.click(await screen.findByTitle('true'))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
+    expect(post[0]).toBe(`${instancesPath}/${instanceId}/calls/${resolvableCallId}/resolve`)
+    const body = post[1]!.body as string
+    expect(body).toContain('"total":1250.50')
+    expect(JSON.parse(body)).toEqual({
+      reason: 'The order exists',
+      outcome: 'succeeded',
+      output: { orderNumber: 'PO-2026-0001', total: 1250.5, confirmed: true },
+    })
+  })
+
+  it('sends a failed resolve without outputs, and blocks a missing outcome or required output', async () => {
+    const fetchMock = stubApi({ detail: { status: 200, body: detailWithResolvable() } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'No order was found' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+    expect(await within(dialog).findByText('Choose an outcome.')).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByLabelText('Succeeded'))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+    expect(await within(dialog).findByText('Enter a value.')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+
+    await userEvent.click(within(dialog).getByLabelText('Failed'))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
+    expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'No order was found', outcome: 'failed' })
+  })
+
+  it('shows the message of a 400 under the output field it names, and keeps the dialog open', async () => {
+    stubApi({
+      detail: { status: 200, body: detailWithResolvable() },
+      resolve: {
+        status: 400,
+        body: JSON.stringify({
+          title: 'The request has errors.',
+          errors: { '/output/orderNumber': ['Must be text.'] },
+        }),
+      },
+    })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Try' } })
+    await userEvent.click(within(dialog).getByLabelText('Succeeded'))
+    fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: '12' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    const field = within(dialog).getByLabelText('orderNumber (text)').closest('.ant-form-item')! as HTMLElement
+    expect(await within(field).findByText('Must be text.')).toBeInTheDocument()
+    expect(within(dialog).getByTestId('inspector-command-error')).toHaveTextContent('The request has errors.')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('shows the Resolve button only on a call the server marks resolvable', async () => {
+    stubApi({ detail: { status: 200, body: detailWithResolvable() } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.getAllByTestId(/^inspector-resolve-/).map((button) => button.getAttribute('data-testid'))).toEqual([
+      `inspector-resolve-${resolvableCallId}`,
+    ])
+    expect(screen.getByTestId(`inspector-resolve-${resolvableCallId}`)).toHaveTextContent('Resolve')
+  })
+
+  it('shows no Resolve button when no call is resolvable', async () => {
+    stubApi()
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.queryByTestId(/^inspector-resolve-/)).not.toBeInTheDocument()
   })
 })
