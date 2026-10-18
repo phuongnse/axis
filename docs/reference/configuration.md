@@ -1006,8 +1006,8 @@ agrees. Studio reads it through the [authoring API](authoring.md#references)
 | `field target` | Entity, data source | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
 | `field target` *(planned for M8)* | Endpoint | `/input/{i}/target` | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
-| `rule call` | Entity, data source, rule | `/validations/{i}/expression`, `/filter`, `/expression` | Rule |
-| `rule call` *(planned for M8)* | Process, policy, trigger | `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter`, `/when` of a data change trigger | Rule |
+| `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter` | Rule |
+| `rule call` *(planned for M8)* | Trigger | `/when` of a data change trigger | Rule |
 | `navigation page` | Site | `/navigation/{i}/page` | Page |
 | `widget entity` | Page | `/widgets/{i}/entity` | Entity |
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
@@ -1019,14 +1019,14 @@ agrees. Studio reads it through the [authoring API](authoring.md#references)
 | `seed entity` | Seed | `/entity` | Entity |
 | `data source entity` | Data source | `/entity` | Entity |
 | `field path` | Data source | `/fields/{i}/path` | Entity, one edge for each `reference` field the path passes through or ends at |
-| `process entity` *(planned for M8)* | Process | `/entity` | Entity |
-| `task form` *(planned for M8)* | Process | `/steps/{i}/form` | Form |
-| `task role` *(planned for M8)* | Process | `/steps/{i}/assignee/role` | Role |
-| `connector call` *(planned for M8)* | Process | `/steps/{i}/connector/name` | Connector |
-| `package operation` *(planned for M8)* | Process | `/steps/{i}/operation` | Extension package |
-| `raised event` *(planned for M8)* | Process | `/steps/{i}/event` | Event |
-| `policy role` *(planned for M8)* | Policy | `/roles/{i}` | Role |
-| `grant` *(planned for M8)* | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
+| `process entity` | Process | `/entity` | Entity |
+| `task form` | Process | `/steps/{i}/form` | Form |
+| `task role` | Process | `/steps/{i}/assignee/role` | Role |
+| `connector call` | Process | `/steps/{i}/connector/name` | Connector |
+| `package operation` | Process | `/steps/{i}/operation` | Extension package |
+| `raised event` | Process | `/steps/{i}/event` | Event |
+| `policy role` | Policy | `/roles/{i}` | Role |
+| `grant` | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
 | `event entity` *(planned for M8)* | Event | `/entity` | Entity |
 | `endpoint entity` *(planned for M8)* | Endpoint | `/entity` | Entity |
 | `endpoint process` *(planned for M8)* | Endpoint | `/process` | Process |

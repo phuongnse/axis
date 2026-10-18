@@ -48,7 +48,7 @@ internal static class ProcessChecker
     /// <summary>
     /// Checks <paramref name="processes"/>, which come in path order. <paramref name="ownerOf"/>
     /// names the owner of a child entity, or gives null for a root entity.
-    /// <paramref name="roleNames"/> holds the declared role names, compared exactly.
+    /// <paramref name="findRole"/> finds a declared role by name, compared exactly.
     /// <paramref name="findConnector"/> finds a loaded connector by name, ignoring letter case, and
     /// <paramref name="findEvent"/> a loaded event. <paramref name="findPackage"/> finds the pinned
     /// package version by id, compared exactly. <paramref name="declaredPackageIds"/> holds the ids
@@ -62,7 +62,7 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, FormResource?> findForm,
         IReadOnlySet<string> unloadedFormNames,
-        IReadOnlySet<string> roleNames,
+        Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
@@ -81,6 +81,11 @@ internal static class ProcessChecker
                 diagnostics.Add(new Diagnostic(code, message, process.File, path, process.Id));
 
             var entity = findEntity(process.Entity);
+            if (entity is not null)
+            {
+                references.Add(process, "/entity", ReferenceRelations.ProcessEntity, ResourceNode.Of(entity));
+            }
+
             if (entity is null)
             {
                 // An entity file that was not loaded because of its own errors is not reported again.
@@ -109,13 +114,13 @@ internal static class ProcessChecker
             if (entity is not null)
             {
                 scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
-                CheckConditions(process, scope, Report);
+                CheckConditions(process, scope, references, Report);
             }
 
             CheckOperations(
-                process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, Report);
+                process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, Report);
 
-            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, roleNames, unloadedRoleNames, Report);
+            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
 
             if (process.StartCondition is { } startCondition)
             {
@@ -507,14 +512,12 @@ internal static class ProcessChecker
     /// Checks the start condition and each decision <c>when</c> as a boolean over
     /// <paramref name="scope"/>. A problem is reported at the expression with its own code.
     /// </summary>
-    private static void CheckConditions(ProcessResource process, ExpressionScope scope, Action<string, string, string> report)
+    private static void CheckConditions(
+        ProcessResource process, ExpressionScope scope, ReferenceIndexBuilder references, Action<string, string, string> report)
     {
         void CheckCondition(string expression, string path)
         {
-            var parsed = ExpressionParser.Parse(expression);
-            ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic
-                : parsed.Diagnostic;
+            var problem = CheckExpression(process, expression, scope, ExpressionType.Boolean, path, references);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, path);
@@ -534,6 +537,28 @@ internal static class ProcessChecker
                 CheckCondition(branches[branch].When, $"/steps/{index}/branches/{branch}/when");
             }
         }
+    }
+
+    /// <summary>
+    /// Parses and type-checks <paramref name="expression"/> against <paramref name="expected"/> and gives its
+    /// problem, or null. When it type-checks, the rules it calls are added to <paramref name="references"/> at <paramref name="path"/>.
+    /// </summary>
+    private static ExpressionDiagnostic? CheckExpression(
+        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        if (!parsed.Succeeded)
+        {
+            return parsed.Diagnostic;
+        }
+
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected);
+        if (check.Succeeded)
+        {
+            references.AddRuleCalls(process, path, check);
+        }
+
+        return check.Diagnostic;
     }
 
     /// <summary>
@@ -557,6 +582,7 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEventNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         for (var index = 0; index < process.Steps.Count; index++)
@@ -569,19 +595,19 @@ internal static class ProcessChecker
 
             if (step.Operation!.Contains('/', StringComparison.Ordinal))
             {
-                CheckPackageCall(step, index, entity, scope, findPackage, declaredPackageIds, report);
+                CheckPackageCall(process, step, index, entity, scope, findPackage, declaredPackageIds, references, report);
                 continue;
             }
 
             if (string.Equals(step.Operation, ProcessStepDefinition.CallConnector, StringComparison.Ordinal))
             {
-                CheckConnectorCall(step, index, entity, scope, findConnector, unloadedConnectorNames, report);
+                CheckConnectorCall(process, step, index, entity, scope, findConnector, unloadedConnectorNames, references, report);
                 continue;
             }
 
             if (string.Equals(step.Operation, ProcessStepDefinition.RaiseEvent, StringComparison.Ordinal))
             {
-                CheckRaiseEvent(step, index, entity, scope, findEntity, findEvent, unloadedEventNames, report);
+                CheckRaiseEvent(process, step, index, entity, scope, findEntity, findEvent, unloadedEventNames, references, report);
                 continue;
             }
 
@@ -630,10 +656,7 @@ internal static class ProcessChecker
                     continue;
                 }
 
-                var parsed = ExpressionParser.Parse(expression);
-                ExpressionDiagnostic? problem = parsed.Succeeded
-                    ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!).Diagnostic
-                    : parsed.Diagnostic;
+                var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references);
                 if (problem is not null)
                 {
                     report(problem.Code, problem.Message, path);
@@ -655,12 +678,14 @@ internal static class ProcessChecker
     /// <c>backoff</c>, when set, is a positive fixed duration.
     /// </summary>
     private static void CheckConnectorCall(
+        ProcessResource process,
         ProcessStepDefinition step,
         int index,
         EntityResource? entity,
         ExpressionScope? scope,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var path = $"/steps/{index}";
@@ -676,17 +701,22 @@ internal static class ProcessChecker
                     $"{path}/connector/name");
             }
         }
-        else if (FindOperation(connector, reference.Operation) is not { } operation)
-        {
-            report(
-                DiagnosticCodes.UnknownConnectorOperation,
-                $"The operation '{reference.Operation}' was not found. The connector '{connector.Name}' has no operation with that name.",
-                $"{path}/connector/operation");
-        }
         else
         {
-            CheckInputs(step, path, operation.Name, ToFields(operation.Input), scope, report);
-            CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+            // The edge goes to the connector, so it does not depend on the operation.
+            references.Add(process, $"{path}/connector/name", ReferenceRelations.ConnectorCall, ResourceNode.Of(connector));
+            if (FindOperation(connector, reference.Operation) is not { } operation)
+            {
+                report(
+                    DiagnosticCodes.UnknownConnectorOperation,
+                    $"The operation '{reference.Operation}' was not found. The connector '{connector.Name}' has no operation with that name.",
+                    $"{path}/connector/operation");
+            }
+            else
+            {
+                CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
+                CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+            }
         }
 
         CheckRetry(step, path, report);
@@ -701,12 +731,14 @@ internal static class ProcessChecker
     /// retry <c>backoff</c>, when set, is a positive fixed duration.
     /// </summary>
     private static void CheckPackageCall(
+        ProcessResource process,
         ProcessStepDefinition step,
         int index,
         EntityResource? entity,
         ExpressionScope? scope,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var path = $"/steps/{index}";
@@ -723,17 +755,22 @@ internal static class ProcessChecker
                     $"{path}/operation");
             }
         }
-        else if (FindPackageOperation(package, operationName) is not { } operation)
-        {
-            report(
-                DiagnosticCodes.UnknownPackageOperation,
-                $"The operation '{operationName}' was not found. Package '{package.Id}' {package.Version} has no operation with that name.",
-                $"{path}/operation");
-        }
         else
         {
-            CheckInputs(step, path, operation.Name, ToFields(operation.Input), scope, report);
-            CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+            // An operation is not a node, so the edge goes to the package whatever the operation's name.
+            references.Add(process, $"{path}/operation", ReferenceRelations.PackageOperation, new PackageNode(package.Id));
+            if (FindPackageOperation(package, operationName) is not { } operation)
+            {
+                report(
+                    DiagnosticCodes.UnknownPackageOperation,
+                    $"The operation '{operationName}' was not found. Package '{package.Id}' {package.Version} has no operation with that name.",
+                    $"{path}/operation");
+            }
+            else
+            {
+                CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
+                CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+            }
         }
 
         CheckRetry(step, path, report);
@@ -757,11 +794,13 @@ internal static class ProcessChecker
         [.. fields.Select(field => new OperationField(field.Name, field.Type, field.Required))];
 
     private static void CheckInputs(
+        ProcessResource process,
         ProcessStepDefinition step,
         string path,
         string operationName,
         IReadOnlyList<OperationField> fields,
         ExpressionScope? scope,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         // The key that first named each input, by the input's declared name.
@@ -794,10 +833,7 @@ internal static class ProcessChecker
                 continue;
             }
 
-            var parsed = ExpressionParser.Parse(expression);
-            ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(input.Type)).Diagnostic
-                : parsed.Diagnostic;
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(input.Type), keyPath, references);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, keyPath);
@@ -903,6 +939,7 @@ internal static class ProcessChecker
     /// the event's entity is not checked when the event's own entity is unknown.
     /// </summary>
     private static void CheckRaiseEvent(
+        ProcessResource process,
         ProcessStepDefinition step,
         int index,
         EntityResource? entity,
@@ -910,6 +947,7 @@ internal static class ProcessChecker
         Func<string, EntityResource?> findEntity,
         Func<string, EventResource?> findEvent,
         IReadOnlySet<string> unloadedEventNames,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var path = $"/steps/{index}";
@@ -927,6 +965,8 @@ internal static class ProcessChecker
 
             return;
         }
+
+        references.Add(process, $"{path}/event", ReferenceRelations.RaisedEvent, ResourceNode.Of(@event));
 
         if (entity is not null && findEntity(@event.Entity) is { } eventEntity && !ReferenceEquals(eventEntity, entity))
         {
@@ -967,10 +1007,7 @@ internal static class ProcessChecker
                 continue;
             }
 
-            var parsed = ExpressionParser.Parse(expression);
-            ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field.Type)).Diagnostic
-                : parsed.Diagnostic;
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field.Type), keyPath, references);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, keyPath);
@@ -1011,7 +1048,7 @@ internal static class ProcessChecker
     /// <summary>
     /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, a
     /// <c>user</c> expression gives <c>text</c> over <paramref name="scope"/>, and a <c>role</c> is
-    /// one of <paramref name="roleNames"/>, compared exactly, unless its file was not loaded. Its
+    /// a role <paramref name="findRole"/> finds, compared exactly, unless its file was not loaded. Its
     /// form is a loaded form whose entity is <paramref name="entity"/>. Its <c>dueIn</c>, when set, is a positive
     /// fixed duration, and its outcome names are unique ignoring letter case. The expression and the
     /// form's entity are not checked when the subject entity is unknown, and the form's entity is not
@@ -1024,8 +1061,9 @@ internal static class ProcessChecker
         Func<string, EntityResource?> findEntity,
         Func<string, FormResource?> findForm,
         IReadOnlySet<string> unloadedFormNames,
-        IReadOnlySet<string> roleNames,
+        Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         for (var index = 0; index < process.Steps.Count; index++)
@@ -1044,17 +1082,21 @@ internal static class ProcessChecker
             }
 
             // A role file that was not loaded because of its own errors is not reported again.
-            if (assignee.Role is { } role && !roleNames.Contains(role) && !unloadedRoleNames.Contains(role))
+            if (assignee.Role is { } role)
             {
-                report(DiagnosticCodes.UnknownTaskRole, $"The role '{role}' was not found. No declared role has that name.", $"{path}/assignee/role");
+                if (findRole(role) is { } roleResource)
+                {
+                    references.Add(process, $"{path}/assignee/role", ReferenceRelations.TaskRole, ResourceNode.Of(roleResource));
+                }
+                else if (!unloadedRoleNames.Contains(role))
+                {
+                    report(DiagnosticCodes.UnknownTaskRole, $"The role '{role}' was not found. No declared role has that name.", $"{path}/assignee/role");
+                }
             }
 
             if (assignee.User is { } user && scope is not null)
             {
-                var parsed = ExpressionParser.Parse(user);
-                ExpressionDiagnostic? problem = parsed.Succeeded
-                    ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Text).Diagnostic
-                    : parsed.Diagnostic;
+                var problem = CheckExpression(process, user, scope, ExpressionType.Text, $"{path}/assignee/user", references);
                 if (problem is not null)
                 {
                     report(problem.Code, problem.Message, $"{path}/assignee/user");
@@ -1064,6 +1106,7 @@ internal static class ProcessChecker
             var formName = step.Form!;
             if (findForm(formName) is { } form)
             {
+                references.Add(process, $"{path}/form", ReferenceRelations.TaskForm, ResourceNode.Of(form));
                 if (entity is not null && findEntity(form.Entity) is { } formEntity && !ReferenceEquals(formEntity, entity))
                 {
                     report(
