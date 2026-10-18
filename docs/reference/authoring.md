@@ -6,9 +6,11 @@ of [architecture.md](../architecture.md) apply: sections marked
 *(planned for Mx)* are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-*(planned for M8)* The authoring API edits the resource files of an
+The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. It is agreed in
+in git. The list and read routes are built. *(Planned for M8: the other
+routes, with `If-Match`, the CSRF header, writes and diagnostics.)* It is
+agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 It never activates a release and touches no database. Under `scripts/dev.sh`,
 a saved file restarts the server, which activates the folder, as a hand edit
@@ -16,51 +18,58 @@ does today.
 
 ## Settings
 
-*(planned for M8)* Two server settings decide who may use the API and which
+Two server settings decide who may use the API and which
 folders it may edit. See [Studio](configuration.md#studio) for their defaults.
 
 - `Studio:Folders` lists the application folders. With no folder, the API
-  has nothing to edit, and every route answers `403`, as `studio: false` on
-  `GET /api/me` says.
+  has nothing to edit, and every route answers `403`. *(Planned for M8:
+  `studio: false` on `GET /api/me` says the same.)*
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
 
 ## Routes
 
-*(planned for M8)* `{application}` is the `name` of the application's manifest,
-such as `PurchaseRequests`, matched ignoring letter case. A resource is
-addressed by its `id`, which is permanent and unique in the application. File
-names and names can change.
+`{application}` is the `name` of the application's manifest,
+such as `PurchaseRequests`, matched ignoring letter case. The server reads the
+manifest of each listed folder on every request, in list order, and the first
+match wins. A resource is addressed by its `id`, which is permanent and unique
+in the application. File names and names can change.
+
+Routes marked *(planned for M8)* are not built yet.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with the applications in `Studio:Folders`, each with its `name` |
-| `GET /api/studio/apps/{application}/resources` | `200` with every resource of the folder. Each item has `id`, `kind`, `name`, `file` and `version` |
+| *(planned for M8)* `GET /api/studio/apps` | `200` with the applications in `Studio:Folders`, each with its `name` |
+| `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file` and `version` |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
-| `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version }`, a `Location` header and `diagnostics`. The body is the full resource |
-| `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }`. The body is `application/json-patch+json`, as RFC 6902 describes |
-| `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
-| `GET /api/studio/apps/{application}/diagnostics` | `200` with the folder's diagnostics |
+| *(planned for M8)* `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version }`, a `Location` header and `diagnostics`. The body is the full resource |
+| *(planned for M8)* `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }`. The body is `application/json-patch+json`, as RFC 6902 describes |
+| *(planned for M8)* `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
+| *(planned for M8)* `GET /api/studio/apps/{application}/diagnostics` | `200` with the folder's diagnostics |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
-letter case.
+letter case, and the answers write it in lower case. A file is a resource only
+when it is a JSON object with a UUID `id` and a string `kind`. Other files are
+left out of the list and cannot be read. When two files share an `id`, the
+first in path order is the resource.
 
 ## Versions
 
-*(planned for M8)* The `version` of a resource is the SHA-256 of its file's
+The `version` of a resource is the SHA-256 of its file's
 bytes, in lower-case hex.
 
 - A read sends it as a strong `ETag`, in quotes.
-- A patch or a delete sends it back in `If-Match`.
-- When the file no longer has that version, the answer is `409`. The client
-  reads the resource again and retries.
-- A patch or a delete without `If-Match` is `428`.
+- *(Planned for M8)* A patch or a delete sends it back in `If-Match`.
+- *(Planned for M8)* When the file no longer has that version, the answer is
+  `409`. The client reads the resource again and retries.
+- *(Planned for M8)* A patch or a delete without `If-Match` is `428`.
 
 ## Order of checks
 
-*(planned for M8)* Like the [record API](record-api.md#errors), a request is
-checked in this order, and the first failure is the response:
+Like the [record API](record-api.md#errors), a request is
+checked in this order, and the first failure is the response. Checks 2 to 5
+are built, and the others are *(planned for M8)*:
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
@@ -84,9 +93,10 @@ exist.
 
 ## Responses
 
-*(planned for M8)* Every error is problem details
+Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request.
+from the request. The rows for List resources and Read are built, and the
+others are *(planned for M8)*.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
