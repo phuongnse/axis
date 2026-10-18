@@ -555,6 +555,8 @@ flowchart LR
      confused with a file. An application without pins has the hash of its
      resources alone. So installing a newer version in range gives the same
      folder a new hash and a new release, and the old release keeps its pin.
+     Module files are hashed as ordinary resource paths under
+     `modules/<id>/` *(planned for M8)*, see [Modules](#modules).
      [Scenario](#test-scenarios) files under `scenarios/` are left out of the
      release and its content hash. So adding or editing a scenario keeps the
      hash and the release.
@@ -1830,6 +1832,99 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
   [Installation](extension-packages.md#installation).
 - How a process calls a package operation is in
   [Package operations](processes.md#package-operations).
+
+## Modules
+
+*(Planned for M8.)* Nothing of this section is built. It follows
+[D40](../decisions.md#d40-reusable-modules--agreed). A module is a versioned
+folder of resources that applications reuse. An application declares the
+modules it uses in `application.json`, with a version range for each:
+
+```json
+{
+  "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
+  "kind": "application",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "modules": [{ "id": "departments", "version": "^1.0.0" }]
+}
+```
+
+The module's manifest is `module.json` at the root of its folder:
+
+```json
+{
+  "kind": "module",
+  "id": "departments",
+  "version": "1.0.0",
+  "label": "Departments"
+}
+```
+
+`departments` is the planned sample module, `samples/modules/departments`.
+
+- **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
+  digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
+  optional `packages`. `packages` has the same shape as in `application.json`,
+  see [Extension packages](#extension-packages). A module has no dependencies
+  on other modules in M8.
+- **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
+  `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
+  not allowed.
+- **Installation.** Modules are installed per installation under
+  `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
+  read them. The scenario runner gets a `--modules` option for the folder.
+- **Declaring.** `modules` is optional. Each entry has an `id` and a `version`.
+  A range has the same forms as for packages: `1.0.0`, `^1.0.0` or `~1.0.0`.
+- **Pinning.** Compilation picks the highest installed version in each range.
+  It copies that version's files into the release as `modules/<id>/…`, so the
+  content hash covers them. The pinned version is the one in the copied
+  `modules/<id>/module.json`. There is no extra release table. A release keeps
+  working when the version is later removed from the installation, because the
+  release holds the files. A newer installed version in range gives a new
+  release at the next activation, as for packages.
+- **References.** An application resource names a module resource as
+  `<module id>/<name>`, for example `departments/Department`. A module resource
+  names only resources of its own module, written without a `/`. An unknown
+  name inside a declared module keeps its existing code, such as `AXC0012` or
+  `AXC0042`. How a module entity or data source is named in API URLs is left to
+  the issue that builds modules.
+- **A copy per application.** Entities, sequences and seeds of a module belong
+  to the application that uses it. The id of each module resource inside an
+  application is derived from the application `id`, so two applications in one
+  tenant get separate tables and counters. See
+  [the physical names in storage](storage.md). A module upgrade must be
+  additive for its entities: `AXC0213`. Modules ship no migrations in M8, and a
+  `migration` cannot name a module entity: `AXC0214`. So an application cannot
+  stop using a module once its tables exist.
+- **Texts.** A module's text keys start with `<module id>.`. A module ships one
+  `text` resource per locale. Each locale of the application needs the module's
+  text for that locale. Module texts join the checks of `AXC0026`, `AXC0027`
+  and `AXC0028`. An application text key may not start with the `<id>.` prefix
+  of a declared module.
+- **Seeds.** The startup seeding step applies a module's seeds for each
+  application that uses the module, into that application's table.
+- **Diagnostics.** A diagnostic in a module file has `file` set to
+  `modules/<id>/<relative path>` and `resourceId` set to the id declared in the
+  file.
+
+| Planned code | Meaning |
+| --- | --- |
+| `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema. Reported at host start, at the failing pointer. |
+| `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. |
+| `AXC0202` | A module file has a kind that a module may not hold. Reported at compile, at `/kind` of that file. |
+| `AXC0203` | A `modules` entry names a module with no installed version. Reported in `application.json` at `/modules/{i}/id`. |
+| `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
+| `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
+| `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
+| `AXC0207` | An application reference names a module that `modules` does not declare. Reported at the referencing property. |
+| `AXC0208` | A module resource reference contains `/`. Reported at that property in `modules/<id>/…`. |
+| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
+| `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
+| `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
+| `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
+| `AXC0213` | The pinned version changes a module entity in a way that is not additive. The message names the module and both versions. Reported at activation, at the module entity file in the release. |
+| `AXC0214` | A `migration`'s `entity` names a module entity. Reported at `/entity`. |
 
 ## Roles and policies
 
