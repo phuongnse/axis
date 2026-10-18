@@ -34,6 +34,11 @@ namespace Axis.Data;
 /// between the check and the write.
 /// </para>
 /// <para>
+/// Right after the history check, when the migration context can check the module upgrade, a module copy that
+/// drops an entity or a field of the active release's copy, or changes a field's type, refuses the activation
+/// with <see cref="DiagnosticCodes.NonAdditiveModuleUpgrade"/> and nothing is applied.
+/// </para>
+/// <para>
 /// With a pending migration the transaction also takes the application's <see cref="StartLock"/>
 /// exclusively, right after the history check, and holds it until commit. A process start that took
 /// it shared commits first, and one that did not yet waits and then pins the new release. An
@@ -123,6 +128,17 @@ public static class EntityProvisioner
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return new ProvisioningResult(history.Diagnostics, []);
+            }
+
+            if (migrations.CheckModuleUpgradeAsync is { } checkModuleUpgrade)
+            {
+                var upgrade = await checkModuleUpgrade(cancellationToken);
+                if (upgrade.Count > 0)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    context.ChangeTracker.Clear();
+                    return new ProvisioningResult(upgrade, []);
+                }
             }
 
             var catalog = await CatalogReader.ReadAsync(connection, npgsqlTransaction, cancellationToken);

@@ -710,6 +710,11 @@ Migrations run forward only.
      right after that read and before any changed-history diagnostic is acted on.
      The schema lock already keeps those rows from changing in between.
   3. Check changed history. Any diagnostic stops the activation. *(Built.)*
+     Right after it, the activation also checks the module upgrade: a module
+     copy that drops an entity or a field, or changes a field's type, against
+     the active release's copy is `AXC0213`. This check runs whether or not a
+     migration is pending, and any diagnostic stops the activation with
+     nothing applied. *(Built.)* See [Modules](configuration.md#modules).
   4. Count old-release work for the destructive changes below. Any such
      work stops the activation with `AXC0178`. *(Built.)* The count runs
      after planning and before the first statement, and only when the plan

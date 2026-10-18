@@ -147,6 +147,25 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
+    public void A_migration_that_names_a_module_entity_is_reported_at_its_entity()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("migrations/0001.json", """
+                { "id": "2b4c6d8e-1f3a-4b5c-9d7e-0a1b2c3d4e5f", "kind": "migration", "name": "DropName", "formatVersion": 1,
+                  "entity": "departments/Department", "changes": [ { "type": "dropField", "field": "name" } ] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationOfModuleEntity, "migrations/0001.json", "/entity"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_data_source_and_a_form_over_an_undeclared_module_are_reported_at_the_entity()
     {
         using var folder = Folder("[]")

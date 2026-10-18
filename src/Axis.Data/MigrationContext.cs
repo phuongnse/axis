@@ -43,6 +43,14 @@ public sealed record MigrationContext(
     public Func<CancellationToken, Task<ActiveComputedFingerprints>>? ReadActiveComputedFingerprintsAsync { get; init; }
 
     /// <summary>
+    /// Checks the module copies of the release being activated against the application's active release and gives
+    /// the diagnostics of a module upgrade that is not additive. Provisioning calls it under the schema lock, right
+    /// after the migration history check, whether or not a migration is pending. A diagnostic stops the activation and
+    /// nothing is applied. When it is <see langword="null"/>, provisioning checks nothing.
+    /// </summary>
+    public Func<CancellationToken, Task<IReadOnlyList<Diagnostic>>>? CheckModuleUpgradeAsync { get; init; }
+
+    /// <summary>
     /// The most rows of one entity that provisioning recomputes inside the activation transaction. An entity with
     /// more affected rows is marked pending and queued for the worker to backfill in batches.
     /// </summary>
