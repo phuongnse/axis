@@ -21,6 +21,10 @@
           "clientRole": true
         },
         {
+          "name": "author",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         }
@@ -238,6 +242,28 @@
       "clientRoles": {
         "axis": [
           "operator"
+        ]
+      }
+    },
+    {
+      "id": "hoa",
+      "username": "hoa",
+      "enabled": true,
+      "email": "hoa@axis.local",
+      "emailVerified": true,
+      "firstName": "Hoa",
+      "lastName": "Author",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "author"
         ]
       }
     },

@@ -11,6 +11,7 @@ using Axis.Server.Http;
 using Axis.Server.Presentation;
 using Axis.Server.Processes;
 using Axis.Server.Records;
+using Axis.Server.Studio;
 using Axis.Server.Telemetry;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -73,6 +74,9 @@ if (startupFolders.Length > 0)
 // Registered after StartupActivation, so a release activated at this start is the one checked.
 builder.Services.AddHostedService<StartupReleaseCheck>();
 
+// Studio is off unless folders and an author role are set, which is the Production default.
+builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
+
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
@@ -105,6 +109,7 @@ app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
 app.MapInboundEndpoints();
 app.MapUserEndpoints();
+app.MapStudioEndpoints();
 app.MapAuthEndpoints();
 
 app.MapFallbackToFile("index.html");
