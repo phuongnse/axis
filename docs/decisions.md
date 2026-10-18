@@ -1829,8 +1829,10 @@ installation-level setting.
 In M8, every compile collects each reference it resolves into a reference
 index. Studio reads it through two authoring API routes and shows a **Uses**
 list and a **Used by** list for each resource. The compile already builds the
-index with its `label text`, `text entry`, `package` and `module` edges. The
-other relations, the authoring API routes and Studio are *(planned for M8)*.
+index with its `label text`, `text entry`, `package`, `module`, entity field,
+rule call, site, page, form, seed and data source edges. The process, policy,
+event, endpoint, connector and other relations, the authoring API routes and
+Studio are *(planned for M8)*.
 See the [reference index](reference/configuration.md#reference-index),
 the [authoring API](reference/authoring.md#references) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1890,13 +1892,13 @@ the source of truth.
 M8 adds modules: versioned folders of resources that applications reuse.
 The manifest, installation, declaring, pinning, the module files stored in
 the release, and the compile of a module's entities, sequences, seeds, events,
-data sources and forms with ids derived from the application are built. So are
-the `target`, `sequence` and `dataSource` references and the codes `AXC0207` and
-`AXC0208`. So are a module's rules and the calls to them from application
-expressions. Module texts, module validations that call rules, the sample and
-the other checks are still *(planned for M8)*. Activating module entities,
-seeding and the record API for
-module entities are built. See the
+data sources and forms with ids derived from the application are built. So are the
+`target`, `sequence` and `dataSource` references, the module texts that join the
+application's texts by locale, a module's rules and the calls to them from
+application expressions, and the codes `AXC0207` to `AXC0214`. So are activating
+module entities, seeding and the record API for module entities. Module
+validations that call rules, the sample and the other checks are still
+*(planned for M8)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner

@@ -26,8 +26,8 @@ namespace Axis.Configuration.Compilation;
 /// processes, events and conditions, checks migrations, their entities, fields and values, checks
 /// scenarios, their users, steps, values and stubs, checks
 /// the extension packages of the manifest and pins each to the highest installed version in its
-/// range, does the same for its modules and takes the files of each pinned module into the
-/// resources, resolves references
+/// range, does the same for its modules, takes the files of each pinned module into the
+/// resources and merges their texts into the application's, resolves references
 /// between entities, forms, pages, sites and seeds, and builds the reference index of the references it resolves.
 /// Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
@@ -157,7 +157,7 @@ public static class ApplicationCompiler
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
-        var references = new ReferenceIndexBuilder(textKeys);
+        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules);
         foreach (var text in loaded.Texts)
         {
             foreach (var key in text.Texts.Keys)
@@ -170,7 +170,7 @@ public static class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
@@ -292,8 +292,11 @@ public static class ApplicationCompiler
         // Role names are lower case only and are matched exactly.
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
+        var texts = loaded.Texts;
         if (loaded.Application is { } application)
         {
+            texts = ModuleTextChecker.Check(application, modules, loaded.Texts, moduleResources.Texts, diagnostics);
+            textKeys.UnionWith(texts.SelectMany(text => text.Texts.Keys));
             CheckTextKey(application.Label, application, "/label", references, diagnostics);
         }
 
@@ -320,7 +323,7 @@ public static class ApplicationCompiler
         // Validations, at their top level, data source filters, process conditions and policy
         // filters call rules, and module rules by their qualified name. Computed fields and
         // aggregate item expressions see no rules.
-        var appRules = RuleChecker.Check(loaded.Rules, diagnostics, moduleRules, declaredModules);
+        var appRules = RuleChecker.Check(loaded.Rules, references, diagnostics, moduleRules, declaredModules);
         var rules = (IReadOnlyList<ExpressionRule>)[.. appRules.Values, .. moduleRules];
         foreach (var entity in allEntities)
         {
@@ -340,7 +343,7 @@ public static class ApplicationCompiler
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, diagnostics);
-        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, diagnostics);
+        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
         ProcessChecker.Check(
             loaded.Processes,
@@ -465,7 +468,7 @@ public static class ApplicationCompiler
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
-            Texts = loaded.Texts,
+            Texts = texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, IsModuleResource(dataSource) ? [] : rules, IsModuleResource(dataSource) ? null : declaredModules)).ToList(),
@@ -500,7 +503,7 @@ public static class ApplicationCompiler
     /// left out of the key check, so its drift is not reported on top. Returns every key that
     /// some locale has.
     /// </summary>
-    private static HashSet<string> CheckTexts(IReadOnlyList<TextResource> texts, List<Diagnostic> diagnostics)
+    internal static HashSet<string> CheckTexts(IReadOnlyList<TextResource> texts, List<Diagnostic> diagnostics)
     {
         var firstFileByLocale = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var checkedTexts = new List<TextResource>();
@@ -654,7 +657,8 @@ public static class ApplicationCompiler
 
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, Report);
-            CheckSequence(field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, Report);
+            AddFieldTarget(entity, field, path, findEntity, references);
+            CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
@@ -772,9 +776,18 @@ public static class ApplicationCompiler
             }
 
             var parsed = ExpressionParser.Parse(validation.Expression);
-            ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic
-                : parsed.Diagnostic;
+            ExpressionDiagnostic? problem = parsed.Succeeded ? null : parsed.Diagnostic;
+            if (parsed.Succeeded)
+            {
+                var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
+                if (check.Succeeded)
+                {
+                    references.AddRuleCalls(entity, $"{path}/expression", check);
+                }
+
+                problem = check.Diagnostic;
+            }
+
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, $"{path}/expression");
@@ -789,12 +802,14 @@ public static class ApplicationCompiler
     /// only that diagnostic, as with any type-specific property.
     /// </summary>
     private static void CheckSequence(
+        Resource owner,
         FieldDefinition field,
         string path,
         ChildOwner? childOwner,
         Func<string, SequenceResource?> findSequence,
         IReadOnlySet<string> unloadedSequenceNames,
         ModuleReferences moduleReferences,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         if (field.Sequence is not { } sequence)
@@ -811,6 +826,11 @@ public static class ApplicationCompiler
         if (problem is not null)
         {
             report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/sequence");
+        }
+
+        if (isText && findSequence(sequence) is { } found)
+        {
+            references.Add(owner, $"{path}/sequence", ReferenceRelations.FieldSequence, ResourceNode.Of(found));
         }
 
         // A sequence file that is in the folder but was not loaded is not reported again; that
@@ -856,6 +876,18 @@ public static class ApplicationCompiler
     /// <summary>Finds a field by name, ignoring letter case, as the model does.</summary>
     internal static FieldDefinition? FindField(EntityResource entity, string name) =>
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Adds the <c>field target</c> edge of a reference or child collection field whose target entity resolves.</summary>
+    private static void AddFieldTarget(
+        Resource owner, FieldDefinition field, string path, Func<string, EntityResource?> findEntity, ReferenceIndexBuilder references)
+    {
+        if (field.Target is { } target
+            && FieldTypes.Parse(field.Type) is FieldType.Reference or FieldType.ChildCollection
+            && findEntity(target) is { } targetEntity)
+        {
+            references.Add(owner, $"{path}/target", ReferenceRelations.FieldTarget, ResourceNode.Of(targetEntity));
+        }
+    }
 
     private static void CheckField(
         FieldDefinition field,
@@ -1030,13 +1062,18 @@ public static class ApplicationCompiler
         IReadOnlyList<SeedResource> seeds,
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, EntityResource?> findEntity,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         var firstFileById = new Dictionary<Guid, string>();
         foreach (var seed in seeds)
         {
+            if (findEntity(seed.Entity) is { } entity)
+            {
+                references.Add(seed, "/entity", ReferenceRelations.SeedEntity, ResourceNode.Of(entity));
+            }
             // An entity file that was not loaded because of its own errors is not reported again.
-            if (findEntity(seed.Entity) is null && !unloadedEntityNames.Contains(seed.Entity))
+            else if (!unloadedEntityNames.Contains(seed.Entity))
             {
                 diagnostics.Add(new Diagnostic(
                     DiagnosticCodes.UnknownSeedEntity,
@@ -1112,6 +1149,8 @@ public static class ApplicationCompiler
                 continue;
             }
 
+            references.Add(dataSource, "/entity", ReferenceRelations.DataSourceEntity, ResourceNode.Of(entity));
+
             // A child entity's rows are read only through its owner's child collection. The rest of
             // the data source is still checked against the entity.
             if (ownersByChildName.TryGetValue(entity.Name, out var owner))
@@ -1126,7 +1165,12 @@ public static class ApplicationCompiler
             for (var index = 0; index < dataSource.Fields.Count; index++)
             {
                 var projected = dataSource.Fields[index];
-                var pathProblem = ResolvePath(entity, projected.Path, findEntity, out var hops);
+                var pathProblem = ResolvePath(
+                    entity,
+                    projected.Path,
+                    findEntity,
+                    target => references.Add(dataSource, $"/fields/{index}/path", ReferenceRelations.FieldPath, ResourceNode.Of(target)),
+                    out var hops);
 
                 // A path that does not resolve, or ends at a child collection, has no column. It is
                 // stored as an invalid path for the sort check.
@@ -1233,28 +1277,30 @@ public static class ApplicationCompiler
                 }
 
                 CheckTextKey(parameter.Label, dataSource, $"{path}/label", references, diagnostics);
+                var parameterField = new FieldDefinition
+                {
+                    Name = parameter.Name,
+                    Type = parameter.Type,
+                    Required = parameter.Required,
+                    Label = parameter.Label,
+                    Values = parameter.Values,
+                    Target = parameter.Target,
+                };
                 CheckField(
-                    new FieldDefinition
-                    {
-                        Name = parameter.Name,
-                        Type = parameter.Type,
-                        Required = parameter.Required,
-                        Label = parameter.Label,
-                        Values = parameter.Values,
-                        Target = parameter.Target,
-                    },
+                    parameterField,
                     path,
                     findEntity,
                     ownersByChildName,
                     loaded.UnloadedEntityNames,
                     moduleReferences,
                     Report);
+                AddFieldTarget(dataSource, parameterField, path, findEntity, references);
             }
 
             // A parameter without a usable type would only add noise to the filter's diagnostics.
-            if (diagnostics.Count == countBeforeParameters
-                && dataSource.Filter is { } filter
-                && CheckFilter(
+            if (diagnostics.Count == countBeforeParameters && dataSource.Filter is { } filter)
+            {
+                var problem = CheckFilter(
                     filter,
                     // Module rules are a separate step, so a module data source sees none and cannot call an application rule.
                     ExpressionScopes.ForDataSource(
@@ -1263,9 +1309,17 @@ public static class ApplicationCompiler
                         findEntity,
                         IsModuleResource(dataSource) ? [] : rules,
                         IsModuleResource(dataSource) ? null : modules),
-                    policyFilter: false) is { } problem)
-            {
-                Report(problem.Code, problem.Message, "/filter");
+                    policyFilter: false,
+                    out var check);
+                if (check is not null)
+                {
+                    references.AddRuleCalls(dataSource, "/filter", check);
+                }
+
+                if (problem is not null)
+                {
+                    Report(problem.Code, problem.Message, "/filter");
+                }
             }
         }
     }
@@ -1328,25 +1382,29 @@ public static class ApplicationCompiler
     /// fields and the named rules, or outside the SQL subset with each rule call inlined. Only a
     /// policy filter can call <c>currentUser()</c>. A filter that calls a rule without a checked
     /// expression, directly or through the rules it calls, is not translated: that rule already has
-    /// its own diagnostic, as for a validation.
+    /// its own diagnostic, as for a validation. <paramref name="check"/> is the type check when it
+    /// succeeds, and null otherwise.
     /// </summary>
-    internal static ExpressionDiagnostic? CheckFilter(string filter, ExpressionScope scope, bool policyFilter)
+    internal static ExpressionDiagnostic? CheckFilter(
+        string filter, ExpressionScope scope, bool policyFilter, out ExpressionCheckResult? check)
     {
+        check = null;
         var parsed = ExpressionParser.Parse(filter);
         if (!parsed.Succeeded)
         {
             return parsed.Diagnostic;
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, policyFilter: policyFilter);
-        if (!check.Succeeded)
+        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, policyFilter: policyFilter);
+        if (!typeCheck.Succeeded)
         {
-            return check.Diagnostic;
+            return typeCheck.Diagnostic;
         }
 
-        return CallsRuleWithoutBody(check, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
+        check = typeCheck;
+        return CallsRuleWithoutBody(typeCheck, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
             ? null
-            : SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path), check).Diagnostic;
+            : SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path), typeCheck).Diagnostic;
     }
 
     /// <summary>
@@ -1364,10 +1422,15 @@ public static class ApplicationCompiler
     /// collection. Returns the problem's message, or null when the path resolves or reaches an
     /// entity that was not loaded, which is reported at that entity's own file. When the path
     /// resolves, <paramref name="hops"/> holds one field per name. It is empty when an entity was
-    /// not loaded.
+    /// not loaded. Each reference field of the path whose target resolves, the last name included,
+    /// is passed to <paramref name="reach"/>, even when the path fails further on.
     /// </summary>
     private static string? ResolvePath(
-        EntityResource root, string path, Func<string, EntityResource?> findEntity, out IReadOnlyList<FieldDefinition> hops)
+        EntityResource root,
+        string path,
+        Func<string, EntityResource?> findEntity,
+        Action<EntityResource> reach,
+        out IReadOnlyList<FieldDefinition> hops)
     {
         var found = new List<FieldDefinition>();
         hops = found;
@@ -1390,9 +1453,17 @@ public static class ApplicationCompiler
             var type = FieldTypes.Parse(field.Type);
             if (index == names.Length - 1)
             {
-                return type == FieldType.ChildCollection
-                    ? $"The path '{path}' names the child collection '{field.Name}'. A data source cannot project a child collection."
-                    : null;
+                if (type == FieldType.ChildCollection)
+                {
+                    return $"The path '{path}' names the child collection '{field.Name}'. A data source cannot project a child collection.";
+                }
+
+                if (type == FieldType.Reference && field.Target is not null && findEntity(field.Target) is { } lastTarget)
+                {
+                    reach(lastTarget);
+                }
+
+                return null;
             }
 
             if (type != FieldType.Reference)
@@ -1407,6 +1478,7 @@ public static class ApplicationCompiler
                 return null;
             }
 
+            reach(target);
             entity = target;
         }
 

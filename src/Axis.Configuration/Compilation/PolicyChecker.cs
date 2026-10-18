@@ -277,7 +277,7 @@ internal static class PolicyChecker
         }
 
         if (grant.Filter is { } filter
-            && ApplicationCompiler.CheckFilter(filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules), policyFilter: true) is { } problem)
+            && ApplicationCompiler.CheckFilter(filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules), policyFilter: true, out _) is { } problem)
         {
             report(problem.Code, problem.Message, $"{path}/filter");
         }

@@ -76,6 +76,15 @@ public sealed class ModuleCompilerTests
           "roles": ["employee"], "grants": [ { "dataSource": "departments/Departments", "actions": ["read"] } ] }
         """;
 
+    private const string LabelledDepartment = $$"""
+        { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1, "label": { "textKey": "departments.department" },
+          "fields": [ { "name": "name", "type": "text", "required": true } ] }
+        """;
+
+    private const string ApplicationTextsEnId = "b7d1e3f5-2a4c-4e6f-8b9a-0c1d2e3f4a5b";
+    private const string ModuleTextsEnId = "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c";
+    private const string ModuleTextsViId = "d9f3a5b7-4c6e-4a81-8d1c-2e3f4a5b6c7d";
+
     [Fact]
     public void A_module_entity_joins_the_model_with_an_id_derived_from_the_application_and_a_qualified_name()
     {
@@ -154,9 +163,11 @@ public sealed class ModuleCompilerTests
     [Fact]
     public void An_application_data_source_form_and_policy_grant_can_name_a_module_entity()
     {
-        using var modules = Modules("1.0.0").With("departments/1.0.0/Department.json", NamedDepartment);
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/Department.json", NamedDepartment)
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""));
         using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
-            .With("texts/en.json", Texts)
+            .With("texts/en.json", EnglishTexts)
             .With("data-sources/departments.json", DataSource(DepartmentName))
             .With("forms/department.json", FormOver(DepartmentName))
             .With("roles/employee.json", Role)
@@ -196,7 +207,7 @@ public sealed class ModuleCompilerTests
     public void A_data_source_and_a_form_over_an_undeclared_module_are_reported_at_the_entity()
     {
         using var folder = Folder("[]")
-            .With("texts/en.json", Texts)
+            .With("texts/en.json", EnglishTexts)
             .With("data-sources/departments.json", DataSource("other/Department"))
             .With("forms/department.json", FormOver("other/Department"));
 
@@ -785,12 +796,45 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
-    public void A_module_data_source_and_form_join_the_model_with_derived_ids_and_qualified_names()
+    public void An_application_locale_without_a_module_text_is_reported_at_the_module_entry()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("TextsEn.json", Texts(ApplicationTextsEnId, "en", """{ "sample.title": "Sample" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingModuleLocale, "application.json", "/modules/0"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'en'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_text_key_without_the_module_prefix_is_reported_in_the_module_file()
     {
         using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "department": "Department" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ModuleTextKeyWithoutPrefix, "modules/departments/TextsEn.json", "/texts/department", Guid.Parse(ModuleTextsEnId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_data_source_and_form_join_the_model_with_derived_ids_and_qualified_names()
+    {
+        using var modules = ModulesWithTexts()
             .With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource)
             .With("departments/1.0.0/forms/DepartmentLayout.json", ModuleForm);
-        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", Texts);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", EnglishTexts);
 
         var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
 
@@ -812,9 +856,9 @@ public sealed class ModuleCompilerTests
     [Fact]
     public void A_table_widget_can_name_a_module_data_source()
     {
-        using var modules = Modules("1.0.0").With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
+        using var modules = ModulesWithTexts().With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
         using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
-            .With("texts/en.json", Texts)
+            .With("texts/en.json", EnglishTexts)
             .With("pages/departments.json", DepartmentsPage);
 
         var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
@@ -829,9 +873,9 @@ public sealed class ModuleCompilerTests
     [Fact]
     public void A_policy_grant_can_name_a_module_data_source()
     {
-        using var modules = Modules("1.0.0").With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
+        using var modules = ModulesWithTexts().With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
         using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
-            .With("texts/en.json", Texts)
+            .With("texts/en.json", EnglishTexts)
             .With("roles/employee.json", Role)
             .With("policies/departments.json", DepartmentsPolicy);
 
@@ -864,10 +908,10 @@ public sealed class ModuleCompilerTests
     [Fact]
     public void A_module_form_whose_entity_names_another_module_with_a_slash_is_reported_once()
     {
-        using var modules = Modules("1.0.0").With(
+        using var modules = ModulesWithTexts().With(
             "departments/1.0.0/forms/DepartmentLayout.json",
             ModuleForm.Replace("\"entity\": \"Department\"", "\"entity\": \"people/Person\"", StringComparison.Ordinal));
-        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", Texts);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", EnglishTexts);
 
         var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
 
@@ -923,7 +967,7 @@ public sealed class ModuleCompilerTests
     public void A_widget_and_a_grant_naming_a_data_source_of_an_undeclared_module_are_reported_at_the_data_source()
     {
         using var folder = Folder("[]")
-            .With("texts/en.json", Texts)
+            .With("texts/en.json", EnglishTexts)
             .With("roles/employee.json", Role)
             .With("pages/departments.json", DepartmentsPage.Replace("departments/", "other/", StringComparison.Ordinal))
             .With("policies/departments.json", DepartmentsPolicy.Replace("departments/", "other/", StringComparison.Ordinal));
@@ -963,6 +1007,10 @@ public sealed class ModuleCompilerTests
         Assert.Contains("IsKept", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
+
+    private static TemporaryFolder ModulesWithTexts() =>
+        Modules("1.0.0").With(
+            "departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""));
 
     private const string ModuleRuleId = "4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e01";
 
@@ -1051,7 +1099,8 @@ public sealed class ModuleCompilerTests
         var modules = Modules("1.0.0")
             .With("departments/1.0.0/IsPositive.json", ModuleRule(ModuleRuleId, "IsPositive", "value > 0"))
             .With("departments/1.0.0/A.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e02", "A", "B(value)"))
-            .With("departments/1.0.0/B.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e03", "B", "value > 0 and value < 100"));
+            .With("departments/1.0.0/B.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e03", "B", "value > 0 and value < 100"))
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.name": "Name" }"""));
         var folder = Folder(declaredModules)
             .With("texts/en.json", RequestTexts)
             .With("entities/request.json", $$"""
@@ -1093,6 +1142,19 @@ public sealed class ModuleCompilerTests
         var validation = Assert.Single(request.Validations);
         Assert.Equal(true, EvaluateRequest(validation, 1L));
         Assert.Equal(false, EvaluateRequest(validation, 0L));
+    }
+
+    [Fact]
+    public void A_module_rule_call_adds_no_rule_call_edge()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, RequestValidation("departments:IsPositive(quantity)"));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.DoesNotContain(result.References.Edges, edge => edge.Relation == ReferenceRelations.RuleCall);
     }
 
     [Fact]
@@ -1197,7 +1259,96 @@ public sealed class ModuleCompilerTests
         Assert.Contains("'departments:A'", diagnostic.Message, StringComparison.Ordinal);
     }
 
-    private const string Texts = """
+    [Fact]
+    public void An_application_text_key_with_a_declared_module_prefix_is_reported_in_the_application_text()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("TextsEn.json", Texts(ApplicationTextsEnId, "en", """{ "departments.name": "Name" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ApplicationTextKeyWithModulePrefix, "TextsEn.json", "/texts/departments.name", Guid.Parse(ApplicationTextsEnId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_entity_label_resolves_through_the_module_text_of_the_application_locale()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/Department.json", LabelledDepartment)
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""))
+            .With("departments/1.0.0/TextsVi.json", Texts(ModuleTextsViId, "vi", """{ "departments.department": "Phòng ban" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("TextsEn.json", Texts(ApplicationTextsEnId, "en", """{ "sample.title": "Sample" }"""));
+        var installed = ModuleCatalog.Load(modules.Path).Modules;
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, installed);
+        var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
+
+        Assert.Empty(compiled.Diagnostics);
+        var text = Assert.Single(compiled.Model!.Texts);
+        Assert.Equal(("en", "Department", "Sample"), (text.Locale, text.Texts["departments.department"], text.Texts["sample.title"]));
+        Assert.Empty(rebuilt.Diagnostics);
+        Assert.Equal("Department", Assert.Single(rebuilt.Model!.Texts).Texts["departments.department"]);
+    }
+
+    [Fact]
+    public void Two_module_text_files_for_one_locale_are_reported_at_the_later_file()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""))
+            .With("departments/1.0.0/TextsEn2.json", Texts(ModuleTextsViId, "EN", """{ "departments.department": "Department" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateLocale, "modules/departments/TextsEn2.json", "/locale"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_text_key_missing_from_another_module_locale_is_reported_in_that_module_file()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""))
+            .With("departments/1.0.0/TextsVi.json", Texts(ModuleTextsViId, "vi", "{}"));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.LocaleDrift, "modules/departments/TextsVi.json", "/texts"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_label_is_missing_when_the_application_has_no_text_resource()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/Department.json", LabelledDepartment)
+            .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingTextKey, "modules/departments/Department.json", "/label/textKey"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    private const string EnglishTexts = """
         { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
           "texts": { "department.main": "Department", "role.employee": "Employee", "pages.departments.title": "Departments" } }
         """;
@@ -1238,4 +1389,8 @@ public sealed class ModuleCompilerTests
         new TemporaryFolder().With("application.json", $$"""
             { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1, "modules": {{modules}} }
             """);
+
+    private static string Texts(string id, string locale, string texts) => $$"""
+        { "id": "{{id}}", "kind": "text", "name": "Texts{{locale}}", "formatVersion": 1, "locale": "{{locale}}", "texts": {{texts}} }
+        """;
 }

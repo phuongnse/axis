@@ -58,6 +58,11 @@ internal static class PresentationChecker
             diagnostics.Add(new Diagnostic(code, message, form.File, path, form.Id));
 
         var entity = findEntity(form.Entity);
+        if (entity is not null)
+        {
+            references.Add(form, "/entity", ReferenceRelations.FormEntity, ResourceNode.Of(entity));
+        }
+
         if (entity is null
             && !loaded.UnloadedEntityNames.Contains(form.Entity)
             && !moduleReferences.ReportUndeclared(form.Entity, "/entity", Report))
@@ -173,7 +178,11 @@ internal static class PresentationChecker
 
                 // The page schema requires the process on an inspector.
                 var processName = widget.Process!;
-                if (findProcess(processName) is null && !loaded.UnloadedProcessNames.Contains(processName))
+                if (findProcess(processName) is { } process)
+                {
+                    references.Add(page, $"{path}/process", ReferenceRelations.WidgetProcess, ResourceNode.Of(process));
+                }
+                else if (!loaded.UnloadedProcessNames.Contains(processName))
                 {
                     Report(
                         DiagnosticCodes.UnknownWidgetProcess,
@@ -230,6 +239,7 @@ internal static class PresentationChecker
             {
                 if (findForm(formName) is { } form)
                 {
+                    references.Add(page, $"{path}/form", ReferenceRelations.WidgetForm, ResourceNode.Of(form));
                     recordEntity = form.Entity;
                 }
                 else if (!loaded.UnloadedFormNames.Contains(formName))
@@ -242,7 +252,11 @@ internal static class PresentationChecker
             }
             else if (widget.Entity is { } entityName)
             {
-                if (findEntity(entityName) is null && !loaded.UnloadedEntityNames.Contains(entityName))
+                if (findEntity(entityName) is { } entity)
+                {
+                    references.Add(page, $"{path}/entity", ReferenceRelations.WidgetEntity, ResourceNode.Of(entity));
+                }
+                else if (!loaded.UnloadedEntityNames.Contains(entityName))
                 {
                     Report(
                         DiagnosticCodes.UnknownWidgetEntity,
@@ -252,6 +266,7 @@ internal static class PresentationChecker
             }
             else if (findDataSource(widget.DataSource!) is { } dataSource)
             {
+                references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
                 recordEntity = dataSource.Entity;
                 grouped = dataSource.Aggregate is not null;
 
@@ -297,6 +312,8 @@ internal static class PresentationChecker
             }
             else if (findPage(formPage) is { } target)
             {
+                references.Add(page, $"{path}/formPage", ReferenceRelations.WidgetFormPage, ResourceNode.Of(target));
+
                 // Rows of a data source carry the id of their root record, so the form must be over
                 // that root entity. A form widget that names a form is over the form's entity, and a
                 // form that is unknown is already reported on the target page.
@@ -355,15 +372,19 @@ internal static class PresentationChecker
                         page.Id));
                 }
             }
-            else if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
+            else
             {
-                // The action starts the process for the form's record, so it must be its subject.
-                diagnostics.Add(new Diagnostic(
-                    DiagnosticCodes.ActionProcessOverOtherEntity,
-                    $"The process '{process.Name}' is over the entity '{process.Entity}', but the form shows records of '{recordEntity}'.",
-                    page.File,
-                    $"{actionPath}/process",
-                    page.Id));
+                references.Add(page, $"{actionPath}/process", ReferenceRelations.ActionProcess, ResourceNode.Of(process));
+                if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
+                {
+                    // The action starts the process for the form's record, so it must be its subject.
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.ActionProcessOverOtherEntity,
+                        $"The process '{process.Name}' is over the entity '{process.Entity}', but the form shows records of '{recordEntity}'.",
+                        page.File,
+                        $"{actionPath}/process",
+                        page.Id));
+                }
             }
         }
     }
@@ -419,7 +440,11 @@ internal static class PresentationChecker
             var path = $"/navigation/{index}";
             ApplicationCompiler.CheckTextKey(entry.Label, site, $"{path}/label", references, diagnostics);
 
-            if (findPage(entry.Page) is null && !loaded.UnloadedPageNames.Contains(entry.Page))
+            if (findPage(entry.Page) is { } page)
+            {
+                references.Add(site, $"{path}/page", ReferenceRelations.NavigationPage, ResourceNode.Of(page));
+            }
+            else if (!loaded.UnloadedPageNames.Contains(entry.Page))
             {
                 Report(
                     DiagnosticCodes.UnknownNavigationPage,
