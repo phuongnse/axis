@@ -1,6 +1,8 @@
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
@@ -16,6 +18,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
     private const string EntityFile = "entities/purchase-request.json";
+
+    private const string EntityId = "d9ccbf89-5004-4d52-8885-2ee377b7caa5";
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"axis-studio-{Guid.NewGuid():N}");
 
@@ -300,6 +304,250 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             .Select(diagnostic => diagnostic.Code)
             .ToList();
         Assert.Equal(expected, codes);
+    }
+
+    [Fact]
+    public async Task Patch_with_the_current_version_changes_only_the_patched_value_and_keeps_key_order()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, EntityFile);
+        var before = File.ReadAllBytes(path);
+        var version = Sha256(path);
+
+        var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", $"\"{version}\"");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var after = File.ReadAllBytes(path);
+        var newVersion = Sha256(path);
+        Assert.NotEqual(version, newVersion);
+        Assert.Equal($"\"{newVersion}\"", response.Headers.ETag?.Tag);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(newVersion, body.RootElement.GetProperty("version").GetString());
+        Assert.Equal(JsonValueKind.Array, body.RootElement.GetProperty("diagnostics").ValueKind);
+        var original = JsonNode.Parse(before)!.AsObject();
+        var patched = JsonNode.Parse(after)!.AsObject();
+        Assert.Equal(original.Select(pair => pair.Key), patched.Select(pair => pair.Key));
+        Assert.Equal("number", patched["displayField"]!.GetValue<string>());
+        original["displayField"] = "number";
+        Assert.True(JsonNode.DeepEquals(original, patched));
+        var text = Encoding.UTF8.GetString(after);
+        Assert.DoesNotContain('\r', text);
+        Assert.EndsWith("}\n", text, StringComparison.Ordinal);
+        Assert.Empty(Directory.EnumerateFiles(Folder, ".*.tmp", SearchOption.AllDirectories));
+
+        var second = await Patch(client, """[{"op":"replace","path":"/displayField","value":"title"}]""", newVersion);
+
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var firstLines = text.Split('\n');
+        var secondLines = File.ReadAllText(path).Split('\n');
+        Assert.Equal(firstLines.Length, secondLines.Length);
+        Assert.Equal(1, firstLines.Zip(secondLines).Count(pair => pair.First != pair.Second));
+    }
+
+    [Fact]
+    public async Task Patch_with_a_stale_version_gets_409_and_leaves_the_file_unchanged()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, EntityFile);
+        var old = Sha256(path);
+        var first = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", old);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var afterFirst = File.ReadAllBytes(path);
+
+        var second = await Patch(client, """[{"op":"replace","path":"/displayField","value":"title"}]""", old);
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal("application/problem+json", second.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(afterFirst, File.ReadAllBytes(path));
+    }
+
+    [Theory]
+    [InlineData("*")]
+    [InlineData("W/\"{0}\"")]
+    [InlineData("\"{0}\", \"{0}\"")]
+    public async Task Patch_with_a_wildcard_weak_or_listed_version_is_stale(string ifMatch)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, EntityFile);
+        var before = File.ReadAllBytes(path);
+
+        var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", string.Format(System.Globalization.CultureInfo.InvariantCulture, ifMatch, Sha256(path)));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public async Task Patch_accepts_the_bare_version_and_either_letter_case_of_the_id()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", Sha256(Path.Combine(Folder, EntityFile)), EntityId.ToUpperInvariant());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("""[{"op":"replace","path":"/id","value":"00000000-0000-0000-0000-000000000009"}]""")]
+    [InlineData("""[{"op":"replace","path":"/id","value":"D9CCBF89-5004-4D52-8885-2EE377B7CAA5"}]""")]
+    [InlineData("""[{"op":"replace","path":"/kind","value":"policy"}]""")]
+    [InlineData("""[{"op":"remove","path":"/id"}]""")]
+    [InlineData("""[{"op":"remove","path":"/kind"}]""")]
+    [InlineData("""[{"op":"replace","path":"","value":[]}]""")]
+    [InlineData("""[{"op":"replace","path":"/missing","value":1}]""")]
+    [InlineData("""[{"op":"bogus","path":"/x"}]""")]
+    [InlineData("{}")]
+    [InlineData("not json")]
+    public async Task Patch_that_changes_id_or_kind_or_is_not_a_valid_patch_gets_400_and_leaves_the_file_unchanged(string patch)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, EntityFile);
+        var before = File.ReadAllBytes(path);
+
+        var response = await Patch(client, patch, Sha256(path));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public async Task Patch_that_breaks_a_reference_is_saved_and_the_answer_lists_the_diagnostic()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, EntityFile);
+
+        var response = await Patch(client, """[{"op":"replace","path":"/fields/3/target","value":"Missing"}]""", Sha256(path));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Missing", JsonNode.Parse(File.ReadAllBytes(path))!["fields"]![3]!["target"]!.GetValue<string>());
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var diagnostic = body.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Single(item => item.GetProperty("code").GetString() == "AXC0012" && item.GetProperty("path").GetString() == "/fields/3/target");
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+        Assert.Equal(EntityFile, diagnostic.GetProperty("file").GetString());
+        Assert.Equal(
+            ["code", "file", "message", "path", "resourceId", "severity"],
+            diagnostic.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+        var resourceId = diagnostic.GetProperty("resourceId");
+        Assert.True(resourceId.ValueKind == JsonValueKind.Null || string.Equals(resourceId.GetString(), resourceId.GetString()!.ToLowerInvariant(), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Patch_without_If_Match_gets_428_and_with_another_content_type_gets_415()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, EntityFile);
+        var before = File.ReadAllBytes(path);
+        const string patch = """[{"op":"replace","path":"/displayField","value":"number"}]""";
+
+        var missing = await Patch(client, patch, ifMatch: null);
+        var wrongType = await Patch(client, patch, Sha256(path), contentType: "application/json");
+
+        Assert.Equal(HttpStatusCode.PreconditionRequired, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, wrongType.StatusCode);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public async Task Patch_without_the_CSRF_header_or_the_author_role_or_a_session_is_refused_and_the_file_is_unchanged()
+    {
+        await using var factory = CreateFactory();
+        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var anonymous = factory.CreateClient();
+        var path = Path.Combine(Folder, EntityFile);
+        var before = File.ReadAllBytes(path);
+        const string patch = """[{"op":"replace","path":"/displayField","value":"number"}]""";
+        var version = Sha256(path);
+
+        var noCsrf = await Patch(hoa, patch, version, csrf: false);
+        var forbidden = await Patch(anna, patch, version);
+        var unauthorized = await Patch(anonymous, patch, version);
+
+        Assert.Equal(HttpStatusCode.Forbidden, noCsrf.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Theory]
+    [InlineData("Unknown", EntityId)]
+    [InlineData("PurchaseRequests", "00000000-0000-0000-0000-000000000001")]
+    [InlineData("PurchaseRequests", "application.json")]
+    public async Task Patch_of_an_unknown_application_or_resource_gets_404(string application, string id)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Patch(client, "[]", "x", id, application);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_does_not_write_through_a_link()
+    {
+        var path = Path.Combine(Folder, EntityFile);
+        var outsideFile = Path.Combine(Outside, "purchase-request.json");
+        File.Move(path, outsideFile);
+        File.CreateSymbolicLink(path, outsideFile);
+        var before = File.ReadAllBytes(outsideFile);
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", Sha256(outsideFile));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(before, File.ReadAllBytes(outsideFile));
+        Assert.True(new FileInfo(path).LinkTarget is not null);
+    }
+
+    [Fact]
+    public async Task Two_patches_with_one_version_sent_together_save_only_one()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var version = Sha256(Path.Combine(Folder, EntityFile));
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(index =>
+            Patch(client, $$"""[{"op":"replace","path":"/label","value":"Label {{index}}"}]""", version)));
+
+        Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
+        Assert.Equal(7, responses.Count(response => response.StatusCode == HttpStatusCode.Conflict));
+    }
+
+    private static async Task<HttpResponseMessage> Patch(
+        HttpClient client,
+        string patch,
+        string? ifMatch,
+        string id = EntityId,
+        string application = "PurchaseRequests",
+        string contentType = "application/json-patch+json",
+        bool csrf = true)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Patch, new Uri($"/api/studio/apps/{application}/resources/{id}", UriKind.Relative))
+        {
+            Content = new StringContent(patch, Encoding.UTF8, contentType),
+        };
+        if (csrf)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return await client.SendAsync(request, CancellationToken);
     }
 
     private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null) =>
