@@ -1003,20 +1003,22 @@ agrees. Studio reads it through the [authoring API](authoring.md#references)
 | `text entry` | Text | `/texts/{key}` | Text key |
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
-| `field target` *(planned for M8)* | Entity, endpoint, data source | `/fields/{i}/target`, `/input/{i}/target`, `/parameters/{i}/target` | Entity |
-| `field sequence` *(planned for M8)* | Entity | `/fields/{i}/sequence` | Sequence |
-| `rule call` *(planned for M8)* | Entity, data source, rule, process, policy, trigger | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter`, `/when` of a data change trigger | Rule |
-| `navigation page` *(planned for M8)* | Site | `/navigation/{i}/page` | Page |
-| `widget entity` *(planned for M8)* | Page | `/widgets/{i}/entity` | Entity |
-| `widget data source` *(planned for M8)* | Page | `/widgets/{i}/dataSource` | Data source |
-| `widget form` *(planned for M8)* | Page | `/widgets/{i}/form` | Form |
-| `widget form page` *(planned for M8)* | Page | `/widgets/{i}/formPage` | Page |
-| `widget process` *(planned for M8)* | Page | `/widgets/{i}/process` | Process |
-| `action process` *(planned for M8)* | Page | `/widgets/{i}/actions/{j}/process` | Process |
-| `form entity` *(planned for M8)* | Form | `/entity` | Entity |
-| `seed entity` *(planned for M8)* | Seed | `/entity` | Entity |
-| `data source entity` *(planned for M8)* | Data source | `/entity` | Entity |
-| `field path` *(planned for M8)* | Data source | `/fields/{i}/path` | Entity, one edge for each `reference` hop |
+| `field target` | Entity, data source | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
+| `field target` *(planned for M8)* | Endpoint | `/input/{i}/target` | Entity |
+| `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
+| `rule call` | Entity, data source, rule | `/validations/{i}/expression`, `/filter`, `/expression` | Rule |
+| `rule call` *(planned for M8)* | Process, policy, trigger | `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter`, `/when` of a data change trigger | Rule |
+| `navigation page` | Site | `/navigation/{i}/page` | Page |
+| `widget entity` | Page | `/widgets/{i}/entity` | Entity |
+| `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
+| `widget form` | Page | `/widgets/{i}/form` | Form |
+| `widget form page` | Page | `/widgets/{i}/formPage` | Page |
+| `widget process` | Page | `/widgets/{i}/process` | Process |
+| `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
+| `form entity` | Form | `/entity` | Entity |
+| `seed entity` | Seed | `/entity` | Entity |
+| `data source entity` | Data source | `/entity` | Entity |
+| `field path` | Data source | `/fields/{i}/path` | Entity, one edge for each `reference` field the path passes through or ends at |
 | `process entity` *(planned for M8)* | Process | `/entity` | Entity |
 | `task form` *(planned for M8)* | Process | `/steps/{i}/form` | Form |
 | `task role` *(planned for M8)* | Process | `/steps/{i}/assignee/role` | Role |
@@ -1044,6 +1046,12 @@ agrees. Studio reads it through the [authoring API](authoring.md#references)
   field labels, the site title, navigation labels, page titles, action labels,
   form section titles, role labels, data source parameter labels, task and
   outcome labels, the `startCondition` message and validation messages.
+- **Direct calls only.** A `rule call` edge goes from the expression that
+  calls a rule to that rule. A rule that calls another rule gives its own
+  `rule call` edge, at its `/expression`. So the caller does not get an edge
+  to the rules that the called rule reaches. A call to a module rule, written
+  `<module id>:<name>`, gives no edge until the modules issue indexes module
+  resources.
 - **Rule call paths.** A computed field, an aggregate's item expression, an
   event trigger's `when` and an endpoint's `values` cannot call rules, so they
   give no `rule call` edge.

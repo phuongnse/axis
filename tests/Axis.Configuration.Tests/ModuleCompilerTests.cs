@@ -936,6 +936,19 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
+    public void A_module_rule_call_adds_no_rule_call_edge()
+    {
+        var (modules, folder) = RuleApplication(DepartmentsModule, RequestValidation("departments:IsPositive(quantity)"));
+        using var _ = modules;
+        using var __ = folder;
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.DoesNotContain(result.References.Edges, edge => edge.Relation == ReferenceRelations.RuleCall);
+    }
+
+    [Fact]
     public void A_data_source_filter_inlines_a_module_rule_and_the_module_rule_it_calls()
     {
         var (modules, folder) = RuleApplication(DepartmentsModule, "[]", ("data-sources/requests.json", """

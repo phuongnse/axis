@@ -29,6 +29,7 @@ internal static class RuleChecker
     /// </summary>
     public static IReadOnlyDictionary<string, ExpressionRule> Check(
         IReadOnlyList<RuleResource> rules,
+        ReferenceIndexBuilder? references,
         List<Diagnostic> diagnostics,
         IReadOnlyCollection<ExpressionRule>? moduleRules = null,
         IReadOnlySet<string>? modules = null)
@@ -89,7 +90,7 @@ internal static class RuleChecker
             }
         }
 
-        new Walk(resources, built, bodies, diagnostics, moduleRules ?? [], modules).Run();
+        new Walk(resources, built, bodies, references, diagnostics, moduleRules ?? [], modules).Run();
         return built;
     }
 
@@ -103,7 +104,8 @@ internal static class RuleChecker
         var rules = new Dictionary<string, ExpressionRule>(StringComparer.OrdinalIgnoreCase);
         foreach (var (moduleId, moduleRules) in modules)
         {
-            foreach (var (name, rule) in Check(moduleRules, diagnostics))
+            // Module rules add no rule-call edges until the modules issue indexes module resources.
+            foreach (var (name, rule) in Check(moduleRules, null, diagnostics))
             {
                 rules[$"{moduleId}/{name}"] = rule with { Module = moduleId };
             }
@@ -120,6 +122,7 @@ internal static class RuleChecker
         Dictionary<string, RuleResource> resources,
         Dictionary<string, ExpressionRule> built,
         Dictionary<string, ExpressionNode> bodies,
+        ReferenceIndexBuilder? references,
         List<Diagnostic> diagnostics,
         IReadOnlyCollection<ExpressionRule> moduleRules,
         IReadOnlySet<string>? modules)
@@ -328,9 +331,13 @@ internal static class RuleChecker
             {
                 diagnostics.Add(new Diagnostic(check.Diagnostic.Code, check.Diagnostic.Message, resource.File, "/expression", resource.Id));
             }
-            else if (!_inCycle.Contains(name))
+            else
             {
-                built[name] = rule with { Body = body, BodyCheck = check };
+                references?.AddRuleCalls(resource, "/expression", check);
+                if (!_inCycle.Contains(name))
+                {
+                    built[name] = rule with { Body = body, BodyCheck = check };
+                }
             }
         }
 
