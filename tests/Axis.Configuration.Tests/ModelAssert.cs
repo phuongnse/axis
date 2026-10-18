@@ -7,9 +7,11 @@ internal static class ModelAssert
 {
     public static void Equal(ApplicationModel expected, ApplicationModel actual)
     {
-        Assert.Equal(expected.Manifest with { Packages = [] }, actual.Manifest with { Packages = [] });
+        Assert.Equal(expected.Manifest with { Packages = [], Modules = [] }, actual.Manifest with { Packages = [], Modules = [] });
         Assert.Equal(expected.Manifest.Packages, actual.Manifest.Packages);
+        Assert.Equal(expected.Manifest.Modules, actual.Manifest.Modules);
         Assert.Equal(expected.Packages, actual.Packages);
+        Assert.Equal(expected.Modules, actual.Modules);
         Assert.Equal(expected.Entities.Count, actual.Entities.Count);
         foreach (var (expectedEntity, actualEntity) in expected.Entities.Zip(actual.Entities))
         {

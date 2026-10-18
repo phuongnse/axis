@@ -117,6 +117,7 @@
   "shell.history.fields": "Đã thay đổi",
   "shell.history.outcome": "Kết quả",
   "shell.history.step": "Bước",
+  "shell.history.openInstance": "Mở phiên bản quy trình",
   "shell.history.action.record.created": "Đã tạo",
   "shell.history.action.record.updated": "Đã cập nhật",
   "shell.history.action.record.deleted": "Đã xóa",

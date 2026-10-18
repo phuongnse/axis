@@ -6,7 +6,7 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled application: its manifest, every entity, site, page, seed, data source, process,
 /// form, policy, event, endpoint and trigger with references resolved, its migrations, its connectors, its roles,
-/// its texts and the extension package versions it pins.
+/// its texts and the extension package and module versions it pins.
 /// </summary>
 public sealed record ApplicationModel
 {
@@ -58,6 +58,9 @@ public sealed record ApplicationModel
 
     /// <summary>The extension package versions the application pins, one per <c>packages</c> entry, in the order written.</summary>
     public IReadOnlyList<PinnedPackageModel> Packages { get; init; } = [];
+
+    /// <summary>The module versions the application pins, one per <c>modules</c> entry, in the order written.</summary>
+    public IReadOnlyList<PinnedModuleModel> Modules { get; init; } = [];
 
     /// <summary>Finds an entity by name, ignoring letter case.</summary>
     public bool TryGetEntity(string name, [NotNullWhen(true)] out EntityModel? entity)

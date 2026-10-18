@@ -561,11 +561,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       An entry whose details name none of them has no summary. Outcome and
       step names show as declared, such as `approve`. Comments and other
       field values are never shown, because audit records never hold them.
-    - *(planned for M8)* An entry whose `inspectPath` is not `null` links to
-      the instance page of the first page of the site whose widget is a
-      `processInspector` that names the entry's process. The process and the
-      instance id are the segments of `inspectPath`. The entry shows no link
-      when the site has no such page.
+    - An entry whose `inspectPath` is not `null` links to the instance page
+      of the first page of the site whose widget is a `processInspector` that
+      names the entry's process. The link reads "Open instance". The process
+      and the instance id are the segments of `inspectPath`. The panel looks
+      at the pages of the site's navigation in order, and loads their page
+      metadata only when an entry has an `inspectPath`. The entry shows no
+      link when no such page is in the navigation.
     - The panel shows 20 entries per page, with a paging control when there
       are more. The page is the panel's own and stays out of the URL.
     - When the history fails to load, an error shows inside the panel, and
@@ -730,8 +732,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `"form": null`, `"formPage": null` and `"tasksPath": null`. It adds
     `process` and an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
-    the list endpoint. The SPA never builds the path itself. *(Planned for
-    M8.)* It will use `process` to link the record history to the page, see
+    the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see
     **History** under the form widget. The widget has `"access": null` and
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.

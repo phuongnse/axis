@@ -558,7 +558,7 @@ flowchart LR
      resources alone. So installing a newer version in range gives the same
      folder a new hash and a new release, and the old release keeps its pin.
      Module files are hashed as ordinary resource paths under
-     `modules/<id>/` *(planned for M8)*, see [Modules](#modules).
+     `modules/<id>/`, see [Modules](#modules).
      [Scenario](#test-scenarios) files under `scenarios/` are left out of the
      release and its content hash. So adding or editing a scenario keeps the
      hash and the release.
@@ -566,7 +566,8 @@ flowchart LR
      Compiling an unchanged folder returns the stored release instead of
      storing a second one, also when two compiles run at the same time.
    - **Content.** A release stores the canonical content of every resource
-     with its relative path, and the exact version of every package it pins,
+     with its relative path, the files of every module it pins under
+     `modules/<id>/`, and the exact version of every package it pins,
      so it can be read back without the folder. Reading it back resolves each
      range against the release's own pins only, never against the packages
      installed now.
@@ -834,6 +835,14 @@ sorted by file and then path.
 | `AXC0192` | A `processInspector` widget's `process` names no loaded process, ignoring letter case. Not reported when the process's file failed to load. Reported at `/widgets/{i}/process`. |
 | `AXC0193` | An `advanceTime` step's `by` is not a positive duration in the form of a task's `dueIn`. Reported at `/steps/{i}/by`. |
 | `AXC0194` | An `advanceTime` step in a scenario without `now`. Reported at `/steps/{i}`. |
+| `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema, or another file of the module version cannot be read. Reported at host start, at the failing pointer. A copy of a module in a stored release without a valid `modules/<id>/module.json` is reported the same way, when the release is rebuilt. |
+| `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. In a stored release, the folder `modules/<id>/` differing from the manifest `id` is reported the same way. |
+| `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. |
+| `AXC0203` | A `modules` entry names a module with no installed version. Reported in `application.json` at `/modules/{i}/id`. |
+| `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
+| `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
+| `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
+| `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 
 ## Startup activation
 
@@ -856,6 +865,10 @@ development or E2E server serves a real application without a separate step.
   [Extension packages](#extension-packages). When a newer version in a range
   was installed since the last start, the folder compiles to a new release
   pinned to it, and that release is activated.
+- **Modules.** Each folder compiles against the modules installed under
+  `Modules:Path`, see [Modules](#modules). When a newer version in a range
+  was installed since the last start, the folder compiles to a new release
+  that pins it and holds its files, and that release is activated.
 - **Before listening.** The step runs before any hosted service starts, so
   the server accepts no request until every tenant is done.
 - **Failures.** Any compile or activation diagnostic, or any error, stops the
@@ -919,29 +932,30 @@ development or E2E server serves a real application without a separate step.
 
 ## Studio
 
-*(planned for M8)* Studio edits application folders through the
+Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
-agrees. Two server settings control it.
+agrees. Two server settings control it. They are built, and the authoring
+API reads them. *(Planned for M8: the routes that write, and the Studio page.)*
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
   or the environment variable `Studio__Folders__0=/path/to/folder`. Relative
   paths are resolved against the server content root. It is empty by default,
   so Production has no Studio. The Development settings list the purchase
-  request sample.
+  request sample. A folder entry that is empty is ignored.
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
   roles claim holds the value may use Studio. It has no default, and with no
-  value nobody may author. Application policies play no part, because an author
-  edits them.
-- **Where Studio writes.** Studio writes only `*.json` files inside the listed
+  value nobody may author. The Development settings set it to `author`.
+  Application policies play no part, because an author edits them.
+- **Where Studio reads and writes.** Studio reads and writes only `*.json` files inside the listed
   folders. It touches no database.
 - **No activation.** Studio never activates a release. Under `scripts/dev.sh`,
   a saved file restarts the server, which activates the folder, see
   [Startup activation](#startup-activation). Elsewhere a folder is committed
   and deployed as today.
-- **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
+- **Current user.** *(Planned for M8)* `GET /api/me` answers `studio: true` when `Studio:Folders`
   is not empty and the user holds the author role.
 
 ## Reference index
@@ -1924,10 +1938,15 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
 
 ## Modules
 
-*(Planned for M8.)* Nothing of this section is built. It follows
-[D40](../decisions.md#d40-reusable-modules--agreed). A module is a versioned
-folder of resources that applications reuse. An application declares the
-modules it uses in `application.json`, with a version range for each:
+This section follows
+[D40](../decisions.md#d40-reusable-modules--agreed). The manifest,
+installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0206`
+and `AXC0212` are built. A pinned module's files are stored in the release and
+checked as JSON, for an allowed kind and against the schema of their kind. They
+do not join the application model yet. References, the copy per application,
+texts, seeds and the codes marked planned are *(planned for M8)*. A module is a
+versioned folder of resources that applications reuse. An application declares
+the modules it uses in `application.json`, with a version range for each:
 
 ```json
 {
@@ -1963,6 +1982,10 @@ The module's manifest is `module.json` at the root of its folder:
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
+  Without the setting no module is installed. A setting that names a missing
+  folder stops the host. A module version with a bad manifest, or with folder
+  names that differ from its manifest, is left out and logged as a warning at
+  start, and the other versions still load.
 - **Declaring.** `modules` is optional. Each entry has an `id` and a `version`.
   A range has the same forms as for packages: `1.0.0`, `^1.0.0` or `~1.0.0`.
 - **Pinning.** Compilation picks the highest installed version in each range.
@@ -1997,21 +2020,24 @@ The module's manifest is `module.json` at the root of its folder:
   `modules/<id>/<relative path>` and `resourceId` set to the id declared in the
   file.
 
-| Planned code | Meaning |
+| Built code | Meaning |
 | --- | --- |
-| `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema. Reported at host start, at the failing pointer. |
-| `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. |
-| `AXC0202` | A module file has a kind that a module may not hold. Reported at compile, at `/kind` of that file. |
+| `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema, or another file of the module version cannot be read. Reported at host start, at the failing pointer. A copy of a module in a stored release without a valid `modules/<id>/module.json` is reported the same way, when the release is rebuilt. |
+| `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. In a stored release, the folder `modules/<id>/` differing from the manifest `id` is reported the same way. |
+| `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. |
 | `AXC0203` | A `modules` entry names a module with no installed version. Reported in `application.json` at `/modules/{i}/id`. |
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
+| `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
+
+| Planned code | Meaning |
+| --- | --- |
 | `AXC0207` | An application reference names a module that `modules` does not declare. Reported at the referencing property. |
 | `AXC0208` | A module resource reference contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
 | `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
-| `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version changes a module entity in a way that is not additive. The message names the module and both versions. Reported at activation, at the module entity file in the release. |
 | `AXC0214` | A `migration`'s `entity` names a module entity. Reported at `/entity`. |
 
@@ -2737,7 +2763,7 @@ To run the scenarios of an application folder, see
 [D32](../decisions.md#d32-test-scenarios--agreed):
 
 ```sh
-dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string> [--extensions <folder>] [--results <folder>]
+dotnet run --project src/Axis.Scenarios -- <folder> --server <connection string> [--extensions <folder>] [--modules <folder>] [--results <folder>]
 ```
 
 The runner runs the scenarios one at a time. Each gets a new
@@ -2749,7 +2775,9 @@ given and runs none of their code. `--extensions` names the folder of installed
 packages, which plays the role of `Extensions:Path`. The command compiles the
 application against them. It prints the problems it finds with a package and carries
 on. Without the option no package is installed, so an application that declares a
-package does not compile. A user's display name is their id.
+package does not compile. `--modules` names the folder of installed modules,
+which plays the role of `Modules:Path`, and works the same way for modules. A
+missing folder is a setup error. A user's display name is their id.
 
 `scripts/integration.sh` runs the scenarios of every application under
 `samples/apps/` from the integration tests, on their Testcontainers PostgreSQL.

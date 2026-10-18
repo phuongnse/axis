@@ -12,6 +12,10 @@ import { sectionsOf, useRecordForm } from './useRecordForm'
 
 interface FormWidgetProps {
   widget: EntityWidgetMetadata
+  /** The path of the application site the form is on. */
+  sitePath: string
+  /** The names of the site's navigation pages, in navigation order. */
+  pages: readonly string[]
   /** The record to edit, or `null` to create one. */
   recordId: string | null
   /** Where save and cancel go: the table page the user came from. */
@@ -39,7 +43,7 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * lists only the processes the user may start. A new record has neither. An action saves the
  * changed fields, then starts its process for the record.
  */
-export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetProps) {
+export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const { entity } = widget
@@ -261,6 +265,8 @@ export function FormWidget({ widget, recordId, returnTo, locale }: FormWidgetPro
       {recordId !== null && (
         <RecordHistory
           key={recordId}
+          sitePath={sitePath}
+          pages={pages}
           recordsPath={entity.recordsPath}
           recordId={recordId}
           fields={entity.fields}

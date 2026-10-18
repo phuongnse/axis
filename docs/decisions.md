@@ -1463,8 +1463,7 @@ without warning is that failure, so Axis refuses it.
 ## D34. Process inspection — Agreed
 
 Authorized users inspect process instances: where an instance is, what it did,
-with which inputs, and why it failed or waits. The design is built, except the
-record history link to an instance *(planned for M8)*. See [processes](reference/processes.md#process-inspection) for the
+with which inputs, and why it failed or waits. The design is built. See [processes](reference/processes.md#process-inspection) for the
 endpoints, the order of checks and the rules that hide values.
 The owner confirmed these points on issue #477 on 2026-10-17, with two
 changes. The changes are the masking bullet, which covers every entity, and
@@ -1755,7 +1754,8 @@ answer names nothing that an open endpoint should not show.
 ## D38. Studio edits application folders through an authoring API — Agreed
 
 In M8, Studio edits an application's resource files through an authoring API
-on the server. Nothing of it is built *(planned for M8)*. See the
+on the server. The routes that list and read resources are built. The rest
+is *(planned for M8)*. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1885,7 +1885,9 @@ the source of truth.
 ## D40. Reusable modules — Agreed
 
 M8 adds modules: versioned folders of resources that applications reuse.
-Nothing of it is built, and every point below is *(planned for M8)*. See the
+The manifest, installation, declaring, pinning and the module files stored in
+the release are built. References, the copy per application, texts, seeds, the
+sample and the other checks are still *(planned for M8)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner

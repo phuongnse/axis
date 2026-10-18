@@ -1,3 +1,4 @@
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Telemetry;
 using Axis.Processes;
@@ -15,7 +16,7 @@ public static class WorkerServiceCollectionExtensions
     /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, or <c>Extensions:Path</c> names a folder that does not exist.
+    /// The tenant, worker or health configuration is invalid, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -48,6 +49,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddWorkerTelemetry(configuration);
         services.AddTenancy(configuration, environment);
         services.AddExtensionPackages(configuration, environment);
+        services.AddModules(configuration, environment);
         services.AddProcesses(environment.IsDevelopment());
         services.AddSingleton(options);
         services.AddSingleton(health);

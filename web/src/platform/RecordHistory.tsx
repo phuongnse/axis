@@ -1,11 +1,17 @@
 import { Alert, Card, Flex, List, Space, Typography } from 'antd'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { historySummary } from './historySummary'
+import { inspectTarget } from './inspection'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
-import type { FieldMetadata } from './site'
+import { fetchPage, type FieldMetadata } from './site'
 import { useText } from './texts'
 
 interface RecordHistoryProps {
+  /** The path of the application site the form is on, for the links to its inspector pages. */
+  sitePath: string
+  /** The names of the site's navigation pages, in navigation order. */
+  pages: readonly string[]
   recordsPath: string
   recordId: string
   /** The entity's fields, to show the labels of the fields an entry names. */
@@ -42,13 +48,17 @@ function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string):
 
 /**
  * The history panel of a saved record: its audit records, newest first, 20 to a page. Each entry
- * shows its action, who did it, when, and a short summary. The page is the panel's own and stays
+ * shows its action, who did it, when, and a short summary. An entry with an `inspectPath` also links
+ * to the instance on the first navigation page whose process inspector names its process. The panel
+ * loads the pages' metadata only when an entry on screen has an `inspectPath`. The page is the panel's own and stays
  * out of the URL. A failed load shows an error inside the panel and leaves the form working.
  */
-export function RecordHistory({ recordsPath, recordId, fields, locale }: RecordHistoryProps) {
+export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, locale }: RecordHistoryProps) {
   const t = useText()
   const [page, setPage] = useState(1)
   const [state, setState] = useState<LoadState>({ failed: false })
+  // The inspector page of each process, once loaded.
+  const [inspectors, setInspectors] = useState<ReadonlyMap<string, string>>()
   const loading = state.page !== page
   const failed = state.failed && !loading
 
@@ -64,6 +74,34 @@ export function RecordHistory({ recordsPath, recordId, fields, locale }: RecordH
       })
     return () => controller.abort()
   }, [recordsPath, recordId, page])
+
+  const wantsLinks = state.result?.items.some((item) => typeof item.inspectPath === 'string') ?? false
+  const inspectorsLoaded = inspectors !== undefined
+
+  useEffect(() => {
+    if (!wantsLinks || inspectorsLoaded) {
+      return
+    }
+    const controller = new AbortController()
+    void Promise.allSettled(pages.map((name) => fetchPage(sitePath, name, controller.signal))).then((results) => {
+      if (controller.signal.aborted) {
+        return
+      }
+      const found = new Map<string, string>()
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.warn(`Loading the page '${pages[index]}' for the history links failed`, result.reason)
+          return
+        }
+        const widget = result.value?.widgets[0]
+        if (widget?.type === 'processInspector' && widget.process !== null && !found.has(widget.process)) {
+          found.set(widget.process, pages[index])
+        }
+      })
+      setInspectors(found)
+    })
+    return () => controller.abort()
+  }, [wantsLinks, inspectorsLoaded, sitePath, pages])
 
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const totalCount = state.result?.totalCount ?? 0
@@ -88,6 +126,8 @@ export function RecordHistory({ recordsPath, recordId, fields, locale }: RecordH
           }
           renderItem={(item) => {
             const summary = historySummary(item, fields, t)
+            const target = typeof item.inspectPath === 'string' ? inspectTarget(item.inspectPath) : null
+            const inspectorPage = target === null ? undefined : inspectors?.get(target.process)
             return (
               <List.Item key={item.id} data-testid="history-entry">
                 <Flex vertical gap={2}>
@@ -99,6 +139,14 @@ export function RecordHistory({ recordsPath, recordId, fields, locale }: RecordH
                     <Typography.Text type="secondary">
                       <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
                     </Typography.Text>
+                    {target !== null && inspectorPage !== undefined && (
+                      <Link
+                        to={`/${sitePath}/${inspectorPage.toLowerCase()}/${target.instanceId}`}
+                        data-testid="history-inspect-link"
+                      >
+                        {t('shell.history.openInstance')}
+                      </Link>
+                    )}
                   </Space>
                   {summary !== null && <Typography.Text type="secondary">{summary}</Typography.Text>}
                 </Flex>

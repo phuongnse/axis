@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { RecordHistory } from './RecordHistory'
 import type { HistoryItem } from './records'
-import type { FieldMetadata, FieldType } from './site'
+import type { FieldMetadata, FieldType, PageMetadata } from './site'
 import { TextProvider } from './TextProvider'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
@@ -39,6 +40,7 @@ const texts: Record<string, string> = {
   'shell.history.fields': 'Changed',
   'shell.history.outcome': 'Outcome',
   'shell.history.step': 'Step',
+  'shell.history.openInstance': 'Open instance',
   'shell.history.action.record.created': 'Created',
   'shell.history.action.record.updated': 'Updated',
   'shell.history.action.process.started': 'Process started',
@@ -61,6 +63,7 @@ function item(action: string, overrides: Partial<HistoryItem> = {}): HistoryItem
     action,
     processInstanceId: null,
     details: {},
+    inspectPath: null,
     ...overrides,
   }
 }
@@ -79,14 +82,62 @@ function stubFetch(...answers: { status: number; body: string }[]) {
   return () => fetchMock.mock.calls.map(([url]) => url)
 }
 
+const navigation = ['Requests', 'Approvals', 'Audit']
+
 function renderHistory() {
   return render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <TextProvider catalogs={catalogs} development={false}>
-        <RecordHistory recordsPath={recordsPath} recordId={recordId} fields={fields} locale="en" />
-      </TextProvider>
-    </ConfigProvider>,
+    <MemoryRouter>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <TextProvider catalogs={catalogs} development={false}>
+          <RecordHistory
+            sitePath="steps"
+            pages={navigation}
+            recordsPath={recordsPath}
+            recordId={recordId}
+            fields={fields}
+            locale="en"
+          />
+        </TextProvider>
+      </ConfigProvider>
+    </MemoryRouter>,
   )
+}
+
+const instanceId = '0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01'
+
+function inspectPath(process: string) {
+  return `/api/apps/StepApp/processes/${process}/instances/${instanceId}`
+}
+
+/** The metadata of a page with one widget: an inspector of `process`, or a table when it is `null`. */
+function pageBody(name: string, process: string | null) {
+  const widget = {
+    type: process === null ? 'table' : 'processInspector',
+    formPage: null,
+    entity: null,
+    dataSource: null,
+    form: null,
+    tasksPath: null,
+    process,
+    instancesPath: process === null ? null : `/api/apps/StepApp/processes/${process}/instances`,
+    actions: [],
+    access: null,
+  }
+  return JSON.stringify({ name, titleKey: `${name}.title`, widgets: [widget] } as unknown as PageMetadata)
+}
+
+/** Stubs `fetch` by URL: the history answers `history`, and a page answers its metadata or a 404. */
+function stubRoutes(history: string, pages: Record<string, string | null>) {
+  const fetchMock = vi.fn(async (input: string) => {
+    if (input.includes('/history?')) {
+      return new Response(history, { status: 200 })
+    }
+    const name = decodeURIComponent(input.split('/pages/')[1])
+    const body = pages[name]
+    return body ? new Response(body, { status: 200 }) : new Response('{}', { status: 404 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return () => fetchMock.mock.calls.map(([url]) => url)
 }
 
 describe('RecordHistory', () => {
@@ -180,5 +231,71 @@ describe('RecordHistory', () => {
 
     await screen.findByTestId('history-entry')
     expect(screen.queryByTitle('1')).toBeNull()
+  })
+
+  it('links an entry to the instance on the first navigation page that inspects its process', async () => {
+    const requests = stubRoutes(
+      page([item('record.updated', { processInstanceId: instanceId, inspectPath: inspectPath('Submit') })]),
+      {
+        Requests: pageBody('Requests', null),
+        Approvals: pageBody('Approvals', 'Submit'),
+        Audit: pageBody('Audit', 'Submit'),
+      },
+    )
+
+    renderHistory()
+
+    const link = await screen.findByTestId('history-inspect-link')
+    expect(link).toHaveTextContent('Open instance')
+    expect(link).toHaveAttribute('href', `/steps/approvals/${instanceId}`)
+    expect(requests()).toContain('/api/sites/steps/pages/Requests')
+    expect(requests()).toContain('/api/sites/steps/pages/Approvals')
+    expect(requests()).toContain('/api/sites/steps/pages/Audit')
+  })
+
+  it('shows no link when no navigation page inspects the entry’s process', async () => {
+    const requests = stubRoutes(
+      page([item('record.updated', { processInstanceId: instanceId, inspectPath: inspectPath('Submit') })]),
+      {
+        Requests: pageBody('Requests', null),
+        Approvals: pageBody('Approvals', 'Decide'),
+        Audit: null,
+      },
+    )
+
+    renderHistory()
+
+    await screen.findByTestId('history-entry')
+    await waitFor(() => expect(requests().filter((url) => String(url).includes('/pages/'))).toHaveLength(3))
+    expect(screen.queryByTestId('history-inspect-link')).toBeNull()
+  })
+
+  it('shows no link and loads no page for an entry without an inspect path', async () => {
+    const requests = stubRoutes(page([item('record.updated', { processInstanceId: instanceId })]), {
+      Approvals: pageBody('Approvals', 'Submit'),
+    })
+
+    renderHistory()
+
+    await screen.findByTestId('history-entry')
+    expect(screen.queryByTestId('history-inspect-link')).toBeNull()
+    expect(requests().filter((url) => String(url).includes('/pages/'))).toEqual([])
+  })
+
+  it('links only the entry that has an inspect path', async () => {
+    stubRoutes(
+      page([
+        item('record.updated', { processInstanceId: instanceId, inspectPath: inspectPath('Submit') }),
+        item('record.created'),
+      ]),
+      { Approvals: pageBody('Approvals', 'Submit') },
+    )
+
+    renderHistory()
+
+    await screen.findByTestId('history-inspect-link')
+    const entries = screen.getAllByTestId('history-entry')
+    expect(entries[0].querySelector('[data-testid="history-inspect-link"]')).not.toBeNull()
+    expect(entries[1].querySelector('[data-testid="history-inspect-link"]')).toBeNull()
   })
 })

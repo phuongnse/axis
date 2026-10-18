@@ -5,4 +5,7 @@ public sealed record ApplicationManifest : Resource
 {
     /// <summary>The extension packages the application uses, in the order written.</summary>
     public IReadOnlyList<ApplicationPackageDefinition> Packages { get; init; } = [];
+
+    /// <summary>The modules the application uses, in the order written.</summary>
+    public IReadOnlyList<ApplicationModuleDefinition> Modules { get; init; } = [];
 }

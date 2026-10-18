@@ -1,3 +1,4 @@
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Data;
 using Axis.Presentation.Sites;
@@ -11,6 +12,7 @@ using Axis.Server.Http;
 using Axis.Server.Presentation;
 using Axis.Server.Processes;
 using Axis.Server.Records;
+using Axis.Server.Studio;
 using Axis.Server.Telemetry;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -42,6 +44,7 @@ builder.Services.AddTenancy(builder.Configuration, builder.Environment);
 // and the worker never reads it.
 builder.Services.AddSingleton(TenantSchemaConnections.Load(builder.Configuration));
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
+builder.Services.AddModules(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
 var oidcTenants = TenantOidcSettings.Load(builder.Configuration);
@@ -72,6 +75,9 @@ if (startupFolders.Length > 0)
 
 // Registered after StartupActivation, so a release activated at this start is the one checked.
 builder.Services.AddHostedService<StartupReleaseCheck>();
+
+// Studio is off unless folders and an author role are set, which is the Production default.
+builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
 
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
@@ -105,6 +111,7 @@ app.MapTaskEndpoints();
 app.MapDataSourceEndpoints();
 app.MapInboundEndpoints();
 app.MapUserEndpoints();
+app.MapStudioEndpoints();
 app.MapAuthEndpoints();
 
 app.MapFallbackToFile("index.html");
