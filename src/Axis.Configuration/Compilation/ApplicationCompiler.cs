@@ -49,7 +49,15 @@ public static class ApplicationCompiler
         string folderPath,
         IReadOnlyCollection<PackageVersion>? installedPackages = null,
         IReadOnlyCollection<InstalledModule>? installedModules = null) =>
-        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? []);
+        Compile(folderPath, installedPackages, installedModules, collectReferences: true);
+
+    /// <summary>Lets the performance tests measure what the reference index adds to a compile.</summary>
+    internal static CompilationResult Compile(
+        string folderPath,
+        IReadOnlyCollection<PackageVersion>? installedPackages,
+        IReadOnlyCollection<InstalledModule>? installedModules,
+        bool collectReferences) =>
+        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? [], collectReferences);
 
     /// <summary>
     /// Compiles resources held in memory, such as the stored resources of a release, against
@@ -79,7 +87,7 @@ public static class ApplicationCompiler
         var copyDiagnostics = new List<Diagnostic>();
         var copies = ReadModuleCopies(moduleResources, copyDiagnostics);
         var applicationResources = resources.Where(resource => !IsModuleCopy(resource)).ToList();
-        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies);
+        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies, collectReferences: true);
         if (copyDiagnostics.Count == 0)
         {
             return result;
@@ -152,12 +160,13 @@ public static class ApplicationCompiler
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
         IReadOnlyCollection<PackageVersion> installedPackages,
-        IReadOnlyCollection<InstalledModule> installedModules)
+        IReadOnlyCollection<InstalledModule> installedModules,
+        bool collectReferences)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
-        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules);
+        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules, collectReferences);
         foreach (var text in loaded.Texts)
         {
             foreach (var key in text.Texts.Keys)

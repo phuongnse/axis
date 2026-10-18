@@ -995,8 +995,9 @@ to show where a resource is used and what it uses.
   edge to the entity covers it. The same holds for connector operations.
 - **Rule calls are the only edges inside expressions.** A reference path in a
   filter or a condition gives no edge.
-- **Cost.** The M8 performance issue sets the share of compile time the index
-  may add and the bound on a where-used answer.
+- **Cost.** The index adds at most 30% of the compile time, or 300 ms when that
+  is more. A where-used answer for an application of typical size returns
+  within 10 seconds.
 
 | Relation | From | Path | To |
 | --- | --- | --- | --- |
