@@ -26,8 +26,8 @@ flowchart LR
   It also hosts Studio's
   [authoring API](reference/authoring.md), which works on the application
   folders that `Studio:Folders` lists and needs a session and the author role.
-  Its routes that list applications, list, read, patch, create and delete resources and give
-  diagnostics are built. *(Planned for M8: the references routes.)*
+  Its routes that list applications, list, read, patch, create and delete resources, give
+  diagnostics and answer where a resource or text key is used are built.
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
   It runs work items, and through them

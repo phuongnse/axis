@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Server.Http;
@@ -15,14 +16,17 @@ namespace Axis.Server.Studio;
 /// <c>{ items: [{ name }] }</c> in folder order. A folder without a readable manifest name is left out,
 /// and a name repeated ignoring letter case appears once. It checks the session (401) and the author role
 /// (403) like the routes below. <c>GET /api/studio/apps/{application}/resources</c> lists every resource of
-/// the folder, sorted by file, each with its <c>id</c>, <c>kind</c>, <c>name</c>, <c>file</c> and
-/// <c>version</c>. <c>GET /api/studio/apps/{application}/resources/{id}</c> returns one resource with its
+/// the folder, sorted by file, each with its <c>id</c>, <c>kind</c>, <c>name</c>, <c>file</c>, <c>version</c> and
+/// <c>usedBy</c> count. <c>GET /api/studio/apps/{application}/resources/{id}</c> returns one resource with its
 /// JSON <c>content</c>, and its <c>version</c> as a quoted <c>ETag</c>. The version is the SHA-256 of the
 /// file's bytes. A request is checked in order: session (401), author role with Studio on (403),
 /// application (404), then resource (404). The problem titles never contain text from the request.
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
 /// <c>GET /api/studio/apps/{application}/diagnostics</c> compiles the folder in memory against the installed
 /// extension packages and modules and answers every compile diagnostic. It touches no database and activates nothing.
+/// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
+/// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
+/// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
 /// <c>PATCH /api/studio/apps/{application}/resources/{id}</c> applies an RFC 6902 JSON Patch to one file
 /// when <c>If-Match</c> holds the file's current version, and answers <c>{ version, diagnostics }</c>.
 /// After the checks above it answers 428 without <c>If-Match</c>, 415 for another content type, 400 for a
@@ -45,6 +49,8 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
     }
@@ -60,7 +66,12 @@ internal static class StudioEndpoints
             [.. StudioFolder.Applications(options).Select(name => new StudioApplicationItem(name))]));
     }
 
-    private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
+    private static async Task<IResult> ListAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -68,10 +79,64 @@ internal static class StudioEndpoints
             return refusal!;
         }
 
+        var usedBy = StudioReferences.Compile(folder, packages, modules).Edges
+            .Select(edge => edge.To)
+            .OfType<ResourceNode>()
+            .GroupBy(node => node.Id)
+            .ToDictionary(group => group.Key, group => group.Count());
         var items = StudioFolder.List(folder)
-            .Select(file => new StudioResourceItem(file.Id.ToString("D"), file.Kind, file.Name, file.File, file.Version))
+            .Select(file => new StudioResourceItem(
+                file.Id.ToString("D"), file.Kind, file.Name, file.File, file.Version, usedBy.GetValueOrDefault(file.Id)))
             .ToList();
         return Results.Ok(new StudioResourceListResponse(items));
+    }
+
+    private static async Task<IResult> ResourceReferencesAsync(
+        string application,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (FindResource(folder, id) is not { } found)
+        {
+            return NotFound(NoResource);
+        }
+
+        var edges = StudioReferences.Compile(folder, packages, modules).Edges;
+        return Results.Ok(new StudioReferencesResponse(
+            StudioReferences.Uses(edges.Where(edge => edge.From.Id == found.Id)),
+            StudioReferences.UsedBy(edges.Where(edge => edge.To is ResourceNode target && target.Id == found.Id))));
+    }
+
+    private static async Task<IResult> TextReferencesAsync(
+        string application,
+        string key,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var usedBy = StudioReferences.Compile(folder, packages, modules).UsedBy(new TextKeyNode(key));
+        if (usedBy.Count == 0)
+        {
+            return NotFound(NoTextKey);
+        }
+
+        return Results.Ok(new StudioTextReferencesResponse(StudioReferences.UsedBy(usedBy)));
     }
 
     private static async Task<IResult> GetAsync(string application, string id, HttpContext httpContext, StudioOptions options)
@@ -269,6 +334,8 @@ internal static class StudioEndpoints
 
     private const string NoResource = "The application has no resource with this id.";
 
+    private const string NoTextKey = "The application has no text key with this name.";
+
     private static StudioFile? FindResource(string folder, string id) =>
         id is { Length: 36 } && Guid.TryParseExact(id, "D", out var guid)
             ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
@@ -317,8 +384,11 @@ internal sealed record StudioApplicationItem(string Name);
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);
 
-/// <summary>One resource in the list. <c>Version</c> is the lower-case SHA-256 hex of the file's bytes.</summary>
-internal sealed record StudioResourceItem(string Id, string Kind, string? Name, string File, string Version);
+/// <summary>
+/// One resource in the list. <c>Version</c> is the lower-case SHA-256 hex of the file's bytes, and <c>UsedBy</c>
+/// is the number of references that point at the resource.
+/// </summary>
+internal sealed record StudioResourceItem(string Id, string Kind, string? Name, string File, string Version, int UsedBy);
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);

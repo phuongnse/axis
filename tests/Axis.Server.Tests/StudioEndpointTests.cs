@@ -149,6 +149,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
+    [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
+    [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
     {
         await using var factory = CreateFactory();
@@ -169,6 +171,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
+    [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
+    [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
     public async Task Studio_is_off_without_an_author_role_or_without_folders(string url)
     {
         foreach (var (folder, role) in new[] { (Folder, ""), ("", "author") })
@@ -191,6 +195,11 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/..%2F..%2Fapplication", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/application.json", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/Unknown/texts/nav.departments/references", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/PurchaseRequests/texts/no.such.key/references", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/Unknown/resources/00000000-0000-0000-0000-000000000001/references", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/PURCHASEREQUESTS/texts/nav.departments/references", HttpStatusCode.OK)]
     public async Task Unknown_application_or_resource_is_404(string url, HttpStatusCode expected)
     {
         await using var factory = CreateFactory();
@@ -851,6 +860,107 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Assert.True(File.Exists(outsideFile));
     }
 
+    [Fact]
+    public async Task Department_lists_what_it_uses_and_every_entry_that_uses_it()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var departmentId = IdOf("entities/department.json");
+        var purchaseRequestId = IdOf(EntityFile);
+        var fields = JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, EntityFile)))!["fields"]!.AsArray();
+        var field = fields.IndexOf(fields.Single(item => item!["name"]!.GetValue<string>() == "department"));
+
+        using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
+
+        var uses = body.RootElement.GetProperty("uses").EnumerateArray().ToList();
+        Assert.Contains(uses, entry => Matches(entry, "label text", "entities/department.json", "/label/textKey")
+            && entry.GetProperty("node").GetProperty("type").GetString() == "text"
+            && entry.GetProperty("node").GetProperty("key").GetString() == "department.label");
+        var usedBy = body.RootElement.GetProperty("usedBy").EnumerateArray().ToList();
+        var entry = Assert.Single(usedBy, item => Matches(item, "field target", EntityFile, $"/fields/{field}/target"));
+        var node = entry.GetProperty("node");
+        Assert.Equal("resource", node.GetProperty("type").GetString());
+        Assert.Equal(purchaseRequestId, node.GetProperty("id").GetString());
+        Assert.Equal("entity", node.GetProperty("kind").GetString());
+        Assert.Equal(EntityFile, node.GetProperty("file").GetString());
+    }
+
+    [Fact]
+    public async Task Resource_list_counts_the_entries_that_use_each_resource()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var departmentId = IdOf("entities/department.json");
+
+        using var list = await GetJson(client, "/api/studio/apps/PurchaseRequests/resources");
+        using var references = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
+
+        var item = list.RootElement.GetProperty("items").EnumerateArray()
+            .Single(entry => entry.GetProperty("id").GetString() == departmentId);
+        var usedBy = item.GetProperty("usedBy").GetInt32();
+        Assert.True(usedBy > 0);
+        Assert.Equal(references.RootElement.GetProperty("usedBy").GetArrayLength(), usedBy);
+    }
+
+    [Fact]
+    public async Task Text_key_lists_the_labels_and_the_text_resources_that_define_it()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var textsEn = IdOf("texts/en.json");
+
+        using var body = await GetJson(client, "/api/studio/apps/PurchaseRequests/texts/nav.departments/references");
+
+        var usedBy = body.RootElement.GetProperty("usedBy").EnumerateArray().ToList();
+        Assert.Contains(usedBy, entry => entry.GetProperty("relation").GetString() == "label text"
+            && entry.GetProperty("file").GetString() == "sites/purchasing.json"
+            && entry.GetProperty("path").GetString()!.EndsWith("/label/textKey", StringComparison.Ordinal)
+            && entry.GetProperty("node").GetProperty("type").GetString() == "resource"
+            && entry.GetProperty("node").GetProperty("kind").GetString() == "site");
+        Assert.Contains(usedBy, entry => Matches(entry, "text entry", "texts/en.json", "/texts/nav.departments")
+            && entry.GetProperty("node").GetProperty("type").GetString() == "resource"
+            && entry.GetProperty("node").GetProperty("kind").GetString() == "text"
+            && entry.GetProperty("node").GetProperty("id").GetString() == textsEn);
+    }
+
+    [Fact]
+    public async Task Text_key_that_only_a_locale_defines_lists_only_text_entries()
+    {
+        var en = Path.Combine(Folder, "texts", "en.json");
+        var text = JsonNode.Parse(File.ReadAllBytes(en))!;
+        text["texts"]!.AsObject()["unused.key"] = "Unused";
+        File.WriteAllText(en, text.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        using var body = await GetJson(client, "/api/studio/apps/PurchaseRequests/texts/unused.key/references");
+
+        var usedBy = body.RootElement.GetProperty("usedBy").EnumerateArray().ToList();
+        Assert.Contains(usedBy, entry => Matches(entry, "text entry", "texts/en.json", "/texts/unused.key"));
+        Assert.All(usedBy, entry => Assert.Equal("text entry", entry.GetProperty("relation").GetString()));
+    }
+
+    [Fact]
+    public async Task References_of_a_folder_with_errors_still_answer_with_the_edges_that_resolved()
+    {
+        var file = Path.Combine(Folder, EntityFile);
+        var purchaseRequest = JsonNode.Parse(File.ReadAllBytes(file))!;
+        purchaseRequest["fields"]!.AsArray()
+            .Single(field => field!["name"]!.GetValue<string>() == "department")!["target"] = "Missing";
+        File.WriteAllText(file, purchaseRequest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var departmentId = IdOf("entities/department.json");
+
+        using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
+
+        var uses = body.RootElement.GetProperty("uses").EnumerateArray().ToList();
+        Assert.Contains(uses, entry => Matches(entry, "label text", "entities/department.json", "/label/textKey"));
+        var usedBy = body.RootElement.GetProperty("usedBy").EnumerateArray().ToList();
+        Assert.DoesNotContain(usedBy, entry => entry.GetProperty("file").GetString() == EntityFile
+            && entry.GetProperty("relation").GetString() == "field target");
+    }
+
     private static async Task<HttpResponseMessage> Patch(
         HttpClient client,
         string patch,
@@ -948,6 +1058,20 @@ public sealed class StudioEndpointTests : IAsyncLifetime
                 new TestIdentity("hoa", "Hoa Author", "author"),
                 new TestIdentity("anna", "Anna Employee", "employee"));
         });
+
+    private static async Task<JsonDocument> GetJson(HttpClient client, string url)
+    {
+        var response = await client.GetAsync(new Uri(url, UriKind.Relative), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+    }
+
+    private static bool Matches(JsonElement entry, string relation, string file, string path) =>
+        entry.GetProperty("relation").GetString() == relation
+        && entry.GetProperty("file").GetString() == file
+        && entry.GetProperty("path").GetString() == path;
+
+    private string IdOf(string file) => JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, file)))!["id"]!.GetValue<string>();
 
     private static string Sha256(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
 
