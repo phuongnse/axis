@@ -310,7 +310,7 @@ public static class ApplicationCompiler
                 diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, textKeys, diagnostics);
+        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, textKeys, diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, textKeys, rules, diagnostics);
         ProcessChecker.Check(
@@ -1041,7 +1041,8 @@ public static class ApplicationCompiler
             if (entity is null)
             {
                 // An entity file that was not loaded because of its own errors is not reported again.
-                if (!loaded.UnloadedEntityNames.Contains(dataSource.Entity))
+                if (!loaded.UnloadedEntityNames.Contains(dataSource.Entity)
+                    && !moduleReferences.ReportUndeclared(dataSource.Entity, "/entity", Report))
                 {
                     Report(
                         DiagnosticCodes.UnknownDataSourceEntity,
