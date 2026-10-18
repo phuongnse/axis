@@ -913,6 +913,33 @@ development or E2E server serves a real application without a separate step.
   with a pending migration leaves nothing applied, so the next start runs the
   migrations again.
 
+## Studio
+
+*(planned for M8)* Studio edits application folders through the
+[authoring API](authoring.md), as
+[D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
+agrees. Two server settings control it.
+
+- **`Studio:Folders`.** An array of application folders that Studio may edit,
+  such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
+  or the environment variable `Studio__Folders__0=/path/to/folder`. Relative
+  paths are resolved against the server content root. It is empty by default,
+  so Production has no Studio. The Development settings list the purchase
+  request sample.
+- **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
+  environment variable is `Studio__AuthorRole`. Only a signed-in user whose
+  roles claim holds the value may use Studio. It has no default, and with no
+  value nobody may author. Application policies play no part, because an author
+  edits them.
+- **Where Studio writes.** Studio writes only `*.json` files inside the listed
+  folders. It touches no database.
+- **No activation.** Studio never activates a release. Under `scripts/dev.sh`,
+  a saved file restarts the server, which activates the folder, see
+  [Startup activation](#startup-activation). Elsewhere a folder is committed
+  and deployed as today.
+- **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
+  is not empty and the user holds the author role.
+
 ## Telemetry export
 
 The server and the worker export traces, logs and metrics with OpenTelemetry,

@@ -812,6 +812,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   button first among its actions. It loads `GET /api/me` each time a shell
   mounts, and shows nothing while it loads or when the load fails. See
   [sign-in and the session](../architecture.md#sign-in-and-the-session).
+  *(Planned for M8: the header also reads `studio` from it, to show the
+  [Studio](#studio) link.)*
   - With nobody signed in, it is a **Sign in** button. It sends the browser
     to `/api/auth/sign-in` with the current path and query string as
     `returnUrl`, so the person comes back to the same page.
@@ -841,3 +843,36 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     both locales of a catalog moves on to the next catalog. Every locale of a
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
+
+## Studio
+
+*(planned for M8)* Studio is where authors edit an application's resources. It
+uses the [authoring API](authoring.md) and writes the same JSON files that git
+keeps, as
+[D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
+agrees.
+
+- **Route.** `/studio` is a platform route, outside every site. The header
+  shows a Studio link only when `GET /api/me` answers `studio: true`. A person
+  who opens the route without the author role gets a `403` from the API and
+  sees an error message.
+- **Application picker.** The first step picks one of the applications that
+  `GET /api/studio/apps` lists.
+- **Resource list.** The list groups the resources by kind. A search box
+  filters it by name and `id`.
+- **Editor.** The editor shows one resource in two views of the same content.
+  - A form is built from the JSON Schema of the resource's kind.
+  - A JSON view shows the file's content. A change in either view is sent as
+    a JSON Patch with the resource's version in `If-Match`.
+  - A stale version is a `409`. The editor then reads the resource again and
+    keeps the author's unsaved change on screen.
+- **Diagnostics panel.** The panel lists the diagnostics that the last write
+  returned. Each item opens its file in the editor, at its `path`. A diagnostic
+  never blocks a save.
+- **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
+  Studio shows a short reconnect message and retries until the server
+  answers.
+- **Out of scope.** Visual process and page designers stay out of scope, see
+  [out of scope for now](../product-brief.md#out-of-scope-for-now).
+- **Texts.** Its texts are the platform texts under `shell.studio.*`, in `en`
+  and `vi`, like the other shell texts.

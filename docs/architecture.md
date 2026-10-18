@@ -23,6 +23,9 @@ flowchart LR
   It is the BFF: the OIDC client and the cookie session. The record API, the
   data source endpoint, the process start endpoint, the task API and the site
   endpoints require a session.
+  *(planned for M8)* It also hosts Studio's
+  [authoring API](reference/authoring.md), which edits the application folders
+  that `Studio:Folders` lists and needs a session and the author role.
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
   It runs work items, and through them
@@ -251,6 +254,11 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
     `GET /api/site`, `GET /api/texts/{locale}` and the `/api/auth` endpoints
     carry no application content and call no policy. Worker steps run as `system`,
     outside policies.
+  - *(planned for M8)* The [authoring API](reference/authoring.md) checks
+    `Studio:AuthorRole`, an installation-level role outside application
+    policies, and calls no policy. An author can change every policy of an
+    application, so a policy cannot guard authoring. See
+    [Studio settings](reference/configuration.md#studio).
   - Record filters from policies limit every record list and single-record
     check of the record API, data source queries and the subject record of a
     process start.
@@ -334,8 +342,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   the session. A role change at the identity provider applies at the next
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
-  `{ "id", "displayName", "roles" }`, and reads the session. Without a
-  session it is a `401`, as today. Record writes, process starts and the
+  `{ "id", "displayName", "roles" }`, and reads the session. *(Planned for M8:
+  it adds a boolean `studio`, true when `Studio:Folders` is not empty and the
+  user holds `Studio:AuthorRole`. See [D38](decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).)*
+  Without a session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
   the user's id and display name.
 - **Sign-in needed.** Without a session, these answer a `401` problem
