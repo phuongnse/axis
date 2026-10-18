@@ -49,8 +49,8 @@ own, separate from the configuration (see [decisions](decisions.md) D7).
    [knowledge](domain/knowledge.md#typical-application-size)) stay responsive to
    author and to use. Every query and expression has a bounded cost.
 6. **Author-friendly.** Resources are readable files with stable identities,
-   so they can be reviewed, diffed and edited by people and AI agents. A visual
-   Studio comes later and uses the same contracts.
+   so they can be reviewed, diffed and edited by people and AI agents. Studio edits
+   the same files through the same contracts.
 
 ## Out of scope for now
 

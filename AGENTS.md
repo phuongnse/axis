@@ -7,7 +7,7 @@
 - [docs/architecture.md](docs/architecture.md) is the target structure.
   [docs/reference/](docs/reference/) holds the detailed behaviour: configuration,
   storage, record API, frontend, expressions, data sources, processes and
-  extension packages. The Studio authoring API *(planned for M8)* is in
+  extension packages. The Studio authoring API is in
   [docs/reference/authoring.md](docs/reference/authoring.md).
 - [docs/domain/concepts.md](docs/domain/concepts.md) defines the vocabulary. Use those
   terms in code, APIs and UI.

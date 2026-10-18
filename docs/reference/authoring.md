@@ -35,8 +35,6 @@ manifest of each listed folder on every request, in list order, and the first
 match wins. A resource is addressed by its `id`, which is permanent and unique
 in the application. File names and names can change.
 
-Routes marked *(planned for M8)* are not built yet.
-
 | Method and path | Response |
 | --- | --- |
 | `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below |

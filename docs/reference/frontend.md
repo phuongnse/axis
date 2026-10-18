@@ -852,7 +852,7 @@ Studio is where authors edit an application's resources. It uses the
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, the resource list with its
 search, the editor, the Uses and Used by lists, the delete button and its warning,
-and the diagnostics panel are built. *(Planned for M8: the reconnect message.)*
+and the diagnostics panel are built. *(Planned for M9: the reconnect message.)*
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -898,7 +898,7 @@ and the diagnostics panel are built. *(Planned for M8: the reconnect message.)*
     entry's own lists. It loads them once. Collapsing and expanding again shows
     the same lists.
   - A package or a module entry is plain text. It cannot be opened or expanded.
-  - There is no drawn graph and no graph drawing library in M8.
+  - There is no drawn graph and no graph drawing library.
 - **Text keys.** A text resource's **Uses** list holds its keys, each as an
   entry. Expanding a key lists the labels that use it and the locales that
   define it, as its **Used by** list.
@@ -917,12 +917,12 @@ and the diagnostics panel are built. *(Planned for M8: the reconnect message.)*
   `GET /api/studio/apps/{application}/diagnostics` when an application is
   picked. After a save, it shows the diagnostics that the save answered
   instead. A diagnostic that names a resource selects it and clears the search, so the
-  resource is listed. *(Planned for M8: opening the file in the editor at the
+  resource is listed. *(Planned for M9: opening the file in the editor at the
   diagnostic's `path`.)* A diagnostic that names no resource cannot be
   selected. A diagnostic never blocks a save.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a short reconnect message and retries until the server
-  answers.
+  answers. *(Planned for M9.)*
 - **Out of scope.** Visual process and page designers stay out of scope, see
   [out of scope for now](../product-brief.md#out-of-scope-for-now).
 - **Texts.** Its texts, including those of the lists above, are the platform

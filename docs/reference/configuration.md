@@ -2015,7 +2015,7 @@ an `IsManager(manager, user)` rule, three seed departments and `en` and `vi` tex
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
   optional `packages`. `packages` has the same shape as in `application.json`,
   see [Extension packages](#extension-packages). A module has no dependencies
-  on other modules in M8.
+  on other modules.
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
   not allowed.
@@ -2069,7 +2069,7 @@ an `IsManager(manager, user)` rule, three seed departments and `en` and `vi` tex
   call chain that passes from an application rule into module rules counts
   toward the 8-deep limit, `AXC0065`. See
   [qualified rule calls](expressions.md#names-and-references). Calling a module
-  rule from module validations is *(planned for M8)*. A module entity or data source filter sees no
+  rule from module validations is *(planned for M9)*. A module entity or data source filter sees no
   rules, so it cannot call an application rule or a module rule. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
@@ -2094,7 +2094,7 @@ an `IsManager(manager, user)` rule, three seed departments and `en` and `vi` tex
   `type` are refused. Other field properties are not compared there. Removing a
   declared module from an application whose active release uses it counts as
   dropping each of its entities. Nothing is applied when activation is
-  refused. Modules ship no migrations in M8, and a `migration` cannot name a
+  refused. Modules ship no migrations, and a `migration` cannot name a
   module entity: `AXC0214`. So an application cannot stop using a module once
   its tables exist.
 - **Texts.** A module's text keys start with `<module id>.`, or `AXC0209` is
