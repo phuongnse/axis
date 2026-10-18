@@ -29,6 +29,7 @@ import {
   type InstanceTask,
   type PathEntry,
 } from './inspection'
+import { ResolveDialog } from './ResolveDialog'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
@@ -286,7 +287,16 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
           bordered
           dataSource={instance.calls}
           locale={{ emptyText: t('shell.inspector.noCalls') }}
-          renderItem={(call) => <CallItem call={call} stepLabel={stepLabel} attemptColumns={attemptColumns} />}
+          renderItem={(call) => (
+            <CallItem
+              call={call}
+              instanceId={instance.id}
+              instancesPath={instancesPath}
+              onChanged={onChanged}
+              stepLabel={stepLabel}
+              attemptColumns={attemptColumns}
+            />
+          )}
         />
       </section>
     </Flex>
@@ -407,13 +417,21 @@ function CommandDialog({ command, instance, instancesPath, onClose, onChanged }:
 
 interface CallItemProps {
   call: InstanceCall
+  instanceId: string
+  instancesPath: string
+  /** Called after a resolve was accepted, so the page reads the instance again. */
+  onChanged: () => void
   stepLabel: (name: string) => string
   attemptColumns: TableColumnsType<CallAttempt>
 }
 
-/** One call: where it goes, its state, its input and its attempts. */
-function CallItem({ call, stepLabel, attemptColumns }: CallItemProps) {
+/**
+ * One call: where it goes, its state, its input and its attempts. A call the server marks resolvable
+ * also has a Resolve button. The page never decides who may resolve.
+ */
+function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attemptColumns }: CallItemProps) {
   const t = useText()
+  const [resolving, setResolving] = useState(false)
   const target = call.connector ?? `${call.package}@${call.version}`
   const input = call.inputHidden ? null : inputEntries(call.input)
   return (
@@ -424,7 +442,22 @@ function CallItem({ call, stepLabel, attemptColumns }: CallItemProps) {
           <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
           <Typography.Text>{`${target} · ${call.operation}`}</Typography.Text>
           <Tag>{call.state}</Tag>
+          {call.resolvable && call.outputs && (
+            <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>
+              {t('shell.inspector.commands.resolve')}
+            </Button>
+          )}
         </Flex>
+        {resolving && call.outputs && (
+          <ResolveDialog
+            call={call}
+            outputs={call.outputs}
+            instanceId={instanceId}
+            instancesPath={instancesPath}
+            onClose={() => setResolving(false)}
+            onChanged={onChanged}
+          />
+        )}
         {call.inputHidden && (
           <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.inspector.hidden')}`}</Typography.Text>
         )}

@@ -168,6 +168,36 @@ public sealed class PurchasingStubTests : IAsyncLifetime
         Assert.Equal(["PR-2026-00041", "PR-2026-00042"], (await ListAsync()).Select(o => o.GetProperty("requestNumber").GetString()));
     }
 
+    [Fact]
+    public async Task An_unknown_request_stores_one_order_answers_without_its_number_and_fails_every_lookup()
+    {
+        using var on = await _client.PostAsync("/test/unknown-request/PR-2026-00042", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, on.StatusCode);
+
+        using var other = await CreateAsync("key-other", "PR-2026-00041");
+        Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+        Assert.NotNull(await OrderNumberAsync(other));
+
+        // The first create stores the order and answers 2xx with a body that has no order number.
+        using var first = await CreateAsync("key-1", "PR-2026-00042");
+        Assert.True(first.IsSuccessStatusCode);
+        using var document = JsonDocument.Parse(await first.Content.ReadAsStringAsync(CancellationToken));
+        Assert.False(document.RootElement.TryGetProperty("orderNumber", out _));
+        Assert.Equal(["PR-2026-00041", "PR-2026-00042"], (await ListAsync()).Select(o => o.GetProperty("requestNumber").GetString()));
+
+        // The switch stays on for lookups, and only the first create misfits.
+        using var lookup = await _client.GetAsync("/purchase-orders/by-key/key-1", CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, lookup.StatusCode);
+        using var again = await CreateAsync("key-1", "PR-2026-00042");
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.NotNull(await OrderNumberAsync(again));
+        Assert.Equal(2, (await ListAsync()).Count);
+
+        // A lookup for another request's key still finds its order.
+        using var found = await _client.GetAsync("/purchase-orders/by-key/key-other", CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, found.StatusCode);
+    }
+
     [Theory]
     [InlineData(null, """{ "requestNumber": "PR-2026-00042", "amount": 120.5 }""")]
     [InlineData("key-1", """{ "amount": 120.5 }""")]

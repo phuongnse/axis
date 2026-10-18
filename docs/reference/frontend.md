@@ -766,6 +766,22 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     current step has `failed`, and that call is a package call whose
     `idempotent` is not `true`. A failed connector call gets no warning. The
     server still checks every command, so the page never decides who may act.
+  - **Resolve.** A call whose `resolvable` is `true` has a Resolve button,
+    whether it is a connector or a package call. A call that is not resolvable
+    has none, because the server decides what may be resolved and by whom. The
+    button opens a dialog that asks for a reason, with the rules of the other
+    commands, and an outcome, `succeeded` or `failed`. The outcome has no
+    default, and Send is blocked until one is chosen. For `succeeded`, the
+    dialog shows one input for each declared output of the call, labelled with
+    its name and type, with the required ones marked and checked before Send.
+    A `boolean` output is a true/false choice, and every other type is text,
+    so a date or date-time is typed as the API takes it. The values go out
+    typed: an integer or decimal keeps every digit, a boolean is `true` or
+    `false`, and an empty optional output is left out. A `failed` outcome sends
+    no output. On success, the dialog closes and the page reads the instance
+    again. On a `400`, the message of each `/output/{name}` error shows under
+    that output's field, and the problem's title shows in the dialog. Any other
+    refusal shows its title, and any other failure shows a generic text.
   - **Labels.** Step labels come from the texts of the instance's `releaseId`,
     loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
     the inbox does. A step without a label shows its name.
@@ -778,7 +794,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - The platform texts `shell.inspector.*` hold the column headers, the
     section titles, the instance states, the "hidden" text, the empty texts
     and the messages. The texts `shell.inspector.commands.*` hold the command
-    buttons, the dialog's labels, the reason errors and the retry warning.
+    buttons, the dialog's labels, the reason errors, the retry warning and the
+    resolve labels and errors.
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

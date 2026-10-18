@@ -955,7 +955,16 @@ platform code, and references nothing under `src/`. The E2E run,
   `POST /test/release-request/{requestNumber}` is called or the caller hangs
   up. Tests use it to stop or overtake a worker while its call is still
   running.
-- Each drop and each hold happens once. The three test endpoints answer `204`.
+- `POST /test/unknown-request/{requestNumber}` makes the purchase order call
+  for that `requestNumber` end `unknown` and stay so. The first create stores
+  its order but answers `201` without an `orderNumber`, and every lookup for
+  the request answers `503`. A dropped response would not do, because the
+  connector declares `idempotency`, so the worker sends the call again under
+  the same key and it succeeds. Only a `2xx` body that does not fit the output
+  goes straight to reconciliation. An operator then
+  [resolves](reference/processes.md#resolve) the call. The switch has no off
+  endpoint, since each spec uses its own request number.
+- Each drop and each hold happens once. Each test endpoint answers `204`.
 - `GET /health` answers `200`.
 
 The stub ignores the `Authorization` header.

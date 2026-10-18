@@ -80,6 +80,13 @@ export interface CallAttempt {
   error: string | null
 }
 
+/** An output the operation of a resolvable call declares. `type` is the field type, such as `text` or `decimal`. */
+export interface CallOutput {
+  name: string
+  type: string
+  required: boolean
+}
+
 /**
  * A connector or package call of the instance. A connector call has `connector`, and a package call
  * has `package` and `version`. `input` is `null`, and `inputHidden` true, when the user may not see it.
@@ -99,6 +106,10 @@ export interface InstanceCall {
   attempts: CallAttempt[]
   input: unknown
   inputHidden: boolean
+  /** Whether the signed-in user may resolve the call now. The server decides. */
+  resolvable: boolean
+  /** The outputs the operation declares. Only a resolvable call has them. */
+  outputs?: CallOutput[]
 }
 
 /** One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls. */
@@ -221,5 +232,35 @@ export async function sendCommand(
   }
   throw new Error(
     `Sending '${command}' to the instance '${id}' of '${instancesPath}' failed with status ${response.status}.`,
+  )
+}
+
+/**
+ * Sends the resolve of an `unknown` call. `body` is the text {@link buildResolveBody} wrote. A 400,
+ * 403, 404 or 409 comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function resolveCall(
+  instancesPath: string,
+  instanceId: string,
+  callId: string,
+  body: string,
+): Promise<CommandResult> {
+  const response = await apiFetch(`${instancesPath}/${instanceId}/calls/${callId}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
+  if (response.ok) {
+    return { ok: true }
+  }
+  if ([400, 403, 404, 409].includes(response.status)) {
+    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+    return {
+      ok: false,
+      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
+    }
+  }
+  throw new Error(
+    `Resolving the call '${callId}' of the instance '${instanceId}' of '${instancesPath}' failed with status ${response.status}.`,
   )
 }

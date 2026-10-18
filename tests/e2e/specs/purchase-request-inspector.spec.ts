@@ -1,6 +1,15 @@
 import { expect, test, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
-import { appPath, createRequest } from '../purchase-requests'
+import {
+  appPath,
+  createRequest,
+  decide,
+  env,
+  purchaseOrders,
+  recordsPath,
+  requestNumber,
+  submit,
+} from '../purchase-requests'
 import { sessionFile, useSession, type SampleUser } from '../sessions'
 
 // The employee anna starts the approval. The operator giang or the finance reviewer dung inspects it.
@@ -129,4 +138,67 @@ test('the operator sees no command buttons and is refused a direct cancel', asyn
     headers: csrfHeaders,
   })
   expect(cancel.status()).toBe(403)
+})
+
+test('a finance reviewer resolves an unknown purchase order call in the inspector and the request is approved', async ({
+  page,
+}) => {
+  // The worker marks the call unknown, then runs its first lookup, which answers 503.
+  test.setTimeout(120_000)
+  await useSession(page, 'anna')
+  const { title, id } = await createRequest(page, 'Zz Resolve', 500)
+  const number = await requestNumber(page, id)
+  // The stub stores the order but answers without its number, and every lookup for it answers 503.
+  const unknown = await page.request.post(`${env('AXIS_E2E_PURCHASING_URL')}/test/unknown-request/${number}`)
+  expect(unknown.status()).toBe(204)
+  await submit(page, id, title)
+
+  await useSession(page, 'chau')
+  await decide(page, title, 'Manager approval', 'Approve')
+
+  await useSession(page, 'dung')
+  let instanceId = ''
+  await expect(async () => {
+    const response = await page.request.get(`${instancesPath}?pageSize=100`)
+    expect(response.status()).toBe(200)
+    const body = (await response.json()) as { items: InstanceItem[] }
+    const item = body.items.find((candidate) => candidate.subjectId === id)
+    expect(item).toBeDefined()
+    instanceId = item!.id
+  }).toPass({ timeout: 30_000 })
+  let callId = ''
+  await expect(async () => {
+    const response = await page.request.get(`${instancesPath}/${instanceId}`)
+    expect(response.status()).toBe(200)
+    const body = (await response.json()) as { calls: { id: string; resolvable: boolean }[] }
+    const call = body.calls.find((candidate) => candidate.resolvable)
+    expect(call).toBeDefined()
+    callId = call!.id
+  }).toPass({ timeout: 60_000 })
+  const orders = await purchaseOrders(page, number)
+  expect(orders).toHaveLength(1)
+  const orderNumber = orders[0].orderNumber
+
+  await page.goto(`/purchasing/approvals/${instanceId}`)
+  await page.getByTestId(`inspector-resolve-${callId}`).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Reason').fill('The order exists in the purchasing system')
+  await dialog.getByLabel('Succeeded').check()
+  await dialog.getByLabel('orderNumber (text)').fill(orderNumber)
+  await dialog.getByRole('button', { name: 'Send' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await expect(async () => {
+    const response = await page.request.get(`${instancesPath}/${instanceId}`)
+    expect(response.status()).toBe(200)
+    expect(((await response.json()) as { state: string }).state).toBe('completed')
+  }).toPass({ timeout: 30_000 })
+
+  await useSession(page, 'anna')
+  const read = await page.request.get(`${recordsPath}/${id}`)
+  expect(read.ok()).toBe(true)
+  const values = ((await read.json()) as { values: { status: string; purchaseOrderNumber: string } }).values
+  expect(values.status).toBe('approved')
+  expect(values.purchaseOrderNumber).toBe(orderNumber)
+  expect((await purchaseOrders(page, number)).map((order) => order.orderNumber)).toEqual([orderNumber])
 })
