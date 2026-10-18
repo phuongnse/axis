@@ -27,8 +27,9 @@ namespace Axis.Configuration.Compilation;
 /// scenarios, their users, steps, values and stubs, checks
 /// the extension packages of the manifest and pins each to the highest installed version in its
 /// range, does the same for its modules and takes the files of each pinned module into the
-/// resources, and resolves references
-/// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
+/// resources, resolves references
+/// between entities, forms, pages, sites and seeds, and builds the reference index of the references it resolves.
+/// Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
 /// </summary>
@@ -155,6 +156,16 @@ public static class ApplicationCompiler
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
+        var textKeys = CheckTexts(loaded.Texts, diagnostics);
+        var references = new ReferenceIndexBuilder(textKeys);
+        foreach (var text in loaded.Texts)
+        {
+            foreach (var key in text.Texts.Keys)
+            {
+                references.Add(text, $"/texts/{EscapePointerSegment(key)}", ReferenceRelations.TextEntry, new TextKeyNode(key));
+            }
+        }
+
         IReadOnlyList<PinnedPackageModel> packages = [];
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
@@ -162,8 +173,8 @@ public static class ApplicationCompiler
         var moduleResources = new ModuleResources([], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
-            packages = PackageChecker.Check(manifest, installedPackages, diagnostics);
-            (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics);
+            packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
+            (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references);
             declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
         }
 
@@ -280,10 +291,9 @@ public static class ApplicationCompiler
         // Role names are lower case only and are matched exactly.
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
 
-        var textKeys = CheckTexts(loaded.Texts, diagnostics);
         if (loaded.Application is { } application)
         {
-            CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
+            CheckTextKey(application.Label, application, "/label", references, diagnostics);
         }
 
         // Package ids are matched exactly. Each pin is an installed version, so it has its manifest's operations.
@@ -299,7 +309,7 @@ public static class ApplicationCompiler
 
         foreach (var role in loaded.Roles)
         {
-            CheckTextKey(role.Label, role.File, role.Id, "/label", textKeys, diagnostics);
+            CheckTextKey(role.Label, role, "/label", references, diagnostics);
         }
 
         // Validations, at their top level, data source filters and process conditions call rules.
@@ -316,14 +326,14 @@ public static class ApplicationCompiler
                 FindSequence,
                 loaded.UnloadedSequenceNames,
                 moduleReferences,
-                textKeys,
+                references,
                 IsModuleResource(entity) ? [] : rules,
                 diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, textKeys, diagnostics);
+        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, diagnostics);
-        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, textKeys, rules, diagnostics);
+        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, diagnostics);
         ProcessChecker.Check(
             loaded.Processes,
             FindEntity,
@@ -339,7 +349,7 @@ public static class ApplicationCompiler
             loaded.UnloadedEventNames,
             FindPackage,
             declaredPackageIds,
-            textKeys,
+            references,
             rules,
             diagnostics);
         PolicyChecker.Check(
@@ -402,7 +412,7 @@ public static class ApplicationCompiler
             declaredPackageIds,
             diagnostics);
 
-        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
+        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics)) { References = references.Build() };
         if (result.HasErrors || loaded.Application is null)
         {
             return result;
@@ -527,25 +537,36 @@ public static class ApplicationCompiler
         return new HashSet<string>(firstTextByKey.Keys, StringComparer.Ordinal);
     }
 
-    /// <summary>Reports a label whose text key no locale has. Unused keys are allowed.</summary>
+    /// <summary>Reports a label whose text key no locale has. Unused keys are allowed. A label that resolves gets a <c>label text</c> edge.</summary>
     internal static void CheckTextKey(
         TextReference? label,
-        string file,
-        Guid? resourceId,
+        Resource owner,
         string pathPrefix,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
-        if (label is not null && !textKeys.Contains(label.TextKey))
+        if (label is null)
+        {
+            return;
+        }
+
+        if (!references.TextKeys.Contains(label.TextKey))
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.MissingTextKey,
                 $"No locale has the text key '{label.TextKey}'.",
-                file,
+                owner.File,
                 $"{pathPrefix}/textKey",
-                resourceId));
+                owner.Id));
+            return;
         }
+
+        references.Add(owner, $"{pathPrefix}/textKey", ReferenceRelations.LabelText, new TextKeyNode(label.TextKey));
     }
+
+    /// <summary>Escapes a text key as an RFC 6901 JSON Pointer segment.</summary>
+    private static string EscapePointerSegment(string segment) =>
+        segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
 
     /// <summary>
     /// Finds the owner of each child entity: the first child collection field, in entity order and
@@ -593,14 +614,14 @@ public static class ApplicationCompiler
         Func<string, SequenceResource?> findSequence,
         IReadOnlySet<string> unloadedSequenceNames,
         ModuleReferences moduleReferences,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, entity.File, path, entity.Id));
 
-        CheckTextKey(entity.Label, entity.File, entity.Id, "/label", textKeys, diagnostics);
+        CheckTextKey(entity.Label, entity, "/label", references, diagnostics);
 
         var childOwner = ownersByChildName.GetValueOrDefault(entity.Name);
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -618,7 +639,7 @@ public static class ApplicationCompiler
                     $"{path}/name");
             }
 
-            CheckTextKey(field.Label, entity.File, entity.Id, $"{path}/label", textKeys, diagnostics);
+            CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, Report);
             CheckSequence(field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, Report);
             CheckCreator(field, path, childOwner, Report);
@@ -656,7 +677,7 @@ public static class ApplicationCompiler
         }
 
         CheckComputedFields(entity, findEntity, Report);
-        CheckValidations(entity, findEntity, textKeys, rules, diagnostics, Report);
+        CheckValidations(entity, findEntity, references, rules, diagnostics, Report);
     }
 
     /// <summary>
@@ -710,7 +731,7 @@ public static class ApplicationCompiler
     private static void CheckValidations(
         EntityResource entity,
         Func<string, EntityResource?> findEntity,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics,
         Action<string, string, string> report)
@@ -726,7 +747,7 @@ public static class ApplicationCompiler
             var validation = entity.Validations[index];
             var path = $"/validations/{index}";
 
-            CheckTextKey(validation.Message, entity.File, entity.Id, $"{path}/message", textKeys, diagnostics);
+            CheckTextKey(validation.Message, entity, $"{path}/message", references, diagnostics);
 
             if (FindField(entity, validation.Field) is null)
             {
@@ -1050,7 +1071,7 @@ public static class ApplicationCompiler
         Func<string, EntityResource?> findEntity,
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         ModuleReferences moduleReferences,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         List<Diagnostic> diagnostics)
     {
@@ -1196,7 +1217,7 @@ public static class ApplicationCompiler
                         $"{path}/name");
                 }
 
-                CheckTextKey(parameter.Label, dataSource.File, dataSource.Id, $"{path}/label", textKeys, diagnostics);
+                CheckTextKey(parameter.Label, dataSource, $"{path}/label", references, diagnostics);
                 CheckField(
                     new FieldDefinition
                     {

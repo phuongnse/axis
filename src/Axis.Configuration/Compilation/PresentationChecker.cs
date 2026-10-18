@@ -20,17 +20,17 @@ internal static class PresentationChecker
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
         ModuleReferences moduleReferences,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         foreach (var form in loaded.Forms)
         {
-            CheckForm(form, loaded, findEntity, moduleReferences, textKeys, diagnostics);
+            CheckForm(form, loaded, findEntity, moduleReferences, references, diagnostics);
         }
 
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, moduleReferences, textKeys, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, moduleReferences, references, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -38,7 +38,7 @@ internal static class PresentationChecker
         var firstFileByPath = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var site in loaded.Sites)
         {
-            CheckSite(site, loaded, findPage, textKeys, textLocales, firstFileByPath, diagnostics);
+            CheckSite(site, loaded, findPage, references, textLocales, firstFileByPath, diagnostics);
         }
     }
 
@@ -51,7 +51,7 @@ internal static class PresentationChecker
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
         ModuleReferences moduleReferences,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
@@ -72,7 +72,7 @@ internal static class PresentationChecker
         for (var sectionIndex = 0; sectionIndex < form.Sections.Count; sectionIndex++)
         {
             var section = form.Sections[sectionIndex];
-            ApplicationCompiler.CheckTextKey(section.Title, form.File, form.Id, $"/sections/{sectionIndex}/title", textKeys, diagnostics);
+            ApplicationCompiler.CheckTextKey(section.Title, form, $"/sections/{sectionIndex}/title", references, diagnostics);
 
             // Without the entity there is nothing to check the fields against.
             if (entity is null)
@@ -111,13 +111,13 @@ internal static class PresentationChecker
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
         ModuleReferences moduleReferences,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
 
-        ApplicationCompiler.CheckTextKey(page.Title, page.File, page.Id, "/title", textKeys, diagnostics);
+        ApplicationCompiler.CheckTextKey(page.Title, page, "/title", references, diagnostics);
 
         for (var index = 0; index < page.Widgets.Count; index++)
         {
@@ -276,7 +276,7 @@ internal static class PresentationChecker
 
             if (isForm)
             {
-                CheckActions(widget, page, path, recordEntity, loaded, findProcess, textKeys, diagnostics);
+                CheckActions(widget, page, path, recordEntity, loaded, findProcess, references, diagnostics);
             }
 
             if (widget.FormPage is not { } formPage)
@@ -333,7 +333,7 @@ internal static class PresentationChecker
         string? recordEntity,
         ApplicationLoadResult loaded,
         Func<string, ProcessResource?> findProcess,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         var actions = widget.Actions ?? [];
@@ -341,7 +341,7 @@ internal static class PresentationChecker
         {
             var action = actions[index];
             var actionPath = $"{path}/actions/{index}";
-            ApplicationCompiler.CheckTextKey(action.Label, page.File, page.Id, $"{actionPath}/label", textKeys, diagnostics);
+            ApplicationCompiler.CheckTextKey(action.Label, page, $"{actionPath}/label", references, diagnostics);
 
             if (findProcess(action.Process) is not { } process)
             {
@@ -372,7 +372,7 @@ internal static class PresentationChecker
         SiteResource site,
         ApplicationLoadResult loaded,
         Func<string, PageResource?> findPage,
-        IReadOnlySet<string> textKeys,
+        ReferenceIndexBuilder references,
         HashSet<string> textLocales,
         Dictionary<string, string> firstFileByPath,
         List<Diagnostic> diagnostics)
@@ -380,7 +380,7 @@ internal static class PresentationChecker
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, site.File, path, site.Id));
 
-        ApplicationCompiler.CheckTextKey(site.Title, site.File, site.Id, "/title", textKeys, diagnostics);
+        ApplicationCompiler.CheckTextKey(site.Title, site, "/title", references, diagnostics);
 
         // A reserved path is reported once and left out of the duplicate check, so one mistake
         // gives one diagnostic.
@@ -417,7 +417,7 @@ internal static class PresentationChecker
         {
             var entry = site.Navigation[index];
             var path = $"/navigation/{index}";
-            ApplicationCompiler.CheckTextKey(entry.Label, site.File, site.Id, $"{path}/label", textKeys, diagnostics);
+            ApplicationCompiler.CheckTextKey(entry.Label, site, $"{path}/label", references, diagnostics);
 
             if (findPage(entry.Page) is null && !loaded.UnloadedPageNames.Contains(entry.Page))
             {
