@@ -28,6 +28,10 @@
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
     },
+    "dataSourceName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$"
+    },
     "textReference": {
       "type": "object",
       "additionalProperties": false,
@@ -43,7 +47,7 @@
       "properties": {
         "type": { "enum": ["table", "form", "taskInbox", "processInspector"] },
         "entity": { "$ref": "#/$defs/name" },
-        "dataSource": { "$ref": "#/$defs/name" },
+        "dataSource": { "$ref": "#/$defs/dataSourceName" },
         "form": { "$ref": "#/$defs/name" },
         "formPage": { "$ref": "#/$defs/name" },
         "process": { "$ref": "#/$defs/name" },

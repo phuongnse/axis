@@ -18,7 +18,8 @@ namespace Axis.Configuration.Compilation;
 /// rules, can call <c>currentUser()</c>, and translates to SQL. Every problem of a policy is
 /// reported in one pass. A grant without exactly one target is not checked further, and neither is
 /// a grant whose target is unknown or a child entity. A role or target file that was not loaded
-/// because of its own errors is not reported again.
+/// because of its own errors is not reported again. A data source grant that names a module the
+/// application does not declare is <c>AXC0207</c>, in place of the unknown-target diagnostic.
 /// </summary>
 internal static class PolicyChecker
 {
@@ -47,6 +48,7 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedEndpointNames,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
+        ModuleReferences moduleReferences,
         IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics)
     {
@@ -85,6 +87,7 @@ internal static class PolicyChecker
                     unloadedEndpointNames,
                     references,
                     rules,
+                    moduleReferences,
                     modules,
                     Report);
             }
@@ -169,6 +172,7 @@ internal static class PolicyChecker
         IReadOnlySet<string> unloadedEndpointNames,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
+        ModuleReferences moduleReferences,
         IReadOnlySet<string> modules,
         Action<string, string, string> report)
     {
@@ -226,7 +230,8 @@ internal static class PolicyChecker
                 {
                     references.Add(policy, $"{path}/dataSource", ReferenceRelations.Grant, ResourceNode.Of(dataSource));
                 }
-                else if (!unloadedDataSourceNames.Contains(name))
+                else if (!unloadedDataSourceNames.Contains(name)
+                    && !moduleReferences.ReportUndeclared(name, $"{path}/dataSource", report))
                 {
                     report(DiagnosticCodes.UnknownGrantTarget, $"The data source '{name}' was not found. No loaded data source has that name.", $"{path}/dataSource");
                 }

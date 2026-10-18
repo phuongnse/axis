@@ -51,6 +51,31 @@ public sealed class ModuleCompilerTests
           "fields": [ { "name": "name", "type": "text", "required": true } ] }
         """;
 
+    private const string DataSourceId = "99999999-9999-4999-8999-999999999902";
+    private const string FormId = "88888888-8888-4888-8888-888888888802";
+    private const string DepartmentsDataSourceName = "departments/Departments";
+
+    private const string ModuleDataSource = $$"""
+        { "id": "{{DataSourceId}}", "kind": "dataSource", "name": "Departments", "formatVersion": 1,
+          "entity": "Department", "fields": [ { "name": "name", "path": "name" } ] }
+        """;
+
+    private const string ModuleForm = $$"""
+        { "id": "{{FormId}}", "kind": "form", "name": "DepartmentLayout", "formatVersion": 1, "entity": "Department",
+          "sections": [ { "title": { "textKey": "department.main" }, "fields": [ { "field": "name" } ] } ] }
+        """;
+
+    private const string DepartmentsPage = """
+        { "id": "66666666-6666-4666-8666-666666666601", "kind": "page", "name": "Departments", "formatVersion": 1,
+          "title": { "textKey": "pages.departments.title" },
+          "widgets": [ { "type": "table", "dataSource": "departments/Departments" } ] }
+        """;
+
+    private const string DepartmentsPolicy = """
+        { "id": "12121212-1212-4212-8212-121212121202", "kind": "policy", "name": "DepartmentsAccess", "formatVersion": 1,
+          "roles": ["employee"], "grants": [ { "dataSource": "departments/Departments", "actions": ["read"] } ] }
+        """;
+
     private const string LabelledDepartment = $$"""
         { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1, "label": { "textKey": "departments.department" },
           "fields": [ { "name": "name", "type": "text", "required": true } ] }
@@ -803,6 +828,190 @@ public sealed class ModuleCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void A_module_data_source_and_form_join_the_model_with_derived_ids_and_qualified_names()
+    {
+        using var modules = ModulesWithTexts()
+            .With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource)
+            .With("departments/1.0.0/forms/DepartmentLayout.json", ModuleForm);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", EnglishTexts);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var applicationId = Guid.Parse(ApplicationId);
+        var department = Assert.Single(result.Model!.Entities);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.Equal(
+            (ModuleResourceIds.Derive(applicationId, Guid.Parse(DataSourceId)), DepartmentsDataSourceName, "modules/departments/data-sources/Departments.json"),
+            (dataSource.Id, dataSource.Name, dataSource.File));
+        Assert.Equal(new EntityReference(department.Id, DepartmentName), dataSource.Entity);
+        var form = Assert.Single(result.Model.Forms);
+        Assert.Equal(
+            (ModuleResourceIds.Derive(applicationId, Guid.Parse(FormId)), "departments/DepartmentLayout", "modules/departments/forms/DepartmentLayout.json"),
+            (form.Id, form.Name, form.File));
+        Assert.Equal(new EntityReference(department.Id, DepartmentName), form.Entity);
+    }
+
+    [Fact]
+    public void A_table_widget_can_name_a_module_data_source()
+    {
+        using var modules = ModulesWithTexts().With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", EnglishTexts)
+            .With("pages/departments.json", DepartmentsPage);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages).Widgets);
+        Assert.Equal(
+            new DataSourceReference(ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(DataSourceId)), DepartmentsDataSourceName),
+            widget.DataSource);
+    }
+
+    [Fact]
+    public void A_policy_grant_can_name_a_module_data_source()
+    {
+        using var modules = ModulesWithTexts().With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", EnglishTexts)
+            .With("roles/employee.json", Role)
+            .With("policies/departments.json", DepartmentsPolicy);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var grant = Assert.Single(Assert.Single(result.Model!.Policies).Grants);
+        Assert.Equal(
+            new DataSourceReference(ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(DataSourceId)), DepartmentsDataSourceName),
+            grant.DataSource);
+    }
+
+    [Fact]
+    public void A_module_data_source_whose_entity_names_another_module_with_a_slash_is_reported_once()
+    {
+        using var modules = Modules("1.0.0").With(
+            "departments/1.0.0/data-sources/Departments.json",
+            ModuleDataSource.Replace("\"entity\": \"Department\"", "\"entity\": \"people/Person\"", StringComparison.Ordinal));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, "modules/departments/data-sources/Departments.json", "/entity", Guid.Parse(DataSourceId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_form_whose_entity_names_another_module_with_a_slash_is_reported_once()
+    {
+        using var modules = ModulesWithTexts().With(
+            "departments/1.0.0/forms/DepartmentLayout.json",
+            ModuleForm.Replace("\"entity\": \"Department\"", "\"entity\": \"people/Person\"", StringComparison.Ordinal));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", EnglishTexts);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, "modules/departments/forms/DepartmentLayout.json", "/entity", Guid.Parse(FormId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_data_source_parameter_target_with_a_slash_is_reported_once()
+    {
+        using var modules = Modules("1.0.0").With(
+            "departments/1.0.0/data-sources/Departments.json",
+            $$"""
+            { "id": "{{DataSourceId}}", "kind": "dataSource", "name": "Departments", "formatVersion": 1,
+              "entity": "Department", "fields": [ { "name": "name", "path": "name" } ],
+              "parameters": [ { "name": "other", "type": "reference", "target": "people/Person" } ] }
+            """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, "modules/departments/data-sources/Departments.json", "/parameters/0/target"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_module_data_source_parameter_can_target_an_entity_of_its_own_module()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/Department.json", NamedDepartment)
+            .With(
+                "departments/1.0.0/data-sources/Departments.json",
+                $$"""
+                { "id": "{{DataSourceId}}", "kind": "dataSource", "name": "Departments", "formatVersion": 1,
+                  "entity": "Department", "fields": [ { "name": "name", "path": "name" } ],
+                  "parameters": [ { "name": "other", "type": "reference", "target": "Department" } ] }
+                """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var parameter = Assert.Single(Assert.Single(result.Model!.DataSources).Parameters);
+        Assert.Equal(DepartmentName, parameter.Target!.Name);
+    }
+
+    [Fact]
+    public void A_widget_and_a_grant_naming_a_data_source_of_an_undeclared_module_are_reported_at_the_data_source()
+    {
+        using var folder = Folder("[]")
+            .With("texts/en.json", EnglishTexts)
+            .With("roles/employee.json", Role)
+            .With("pages/departments.json", DepartmentsPage.Replace("departments/", "other/", StringComparison.Ordinal))
+            .With("policies/departments.json", DepartmentsPolicy.Replace("departments/", "other/", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "pages/departments.json", "/widgets/0/dataSource"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "policies/departments.json", "/grants/0/dataSource"),
+            ],
+            result.Diagnostics
+                .Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path))
+                .OrderBy(diagnostic => diagnostic.File, StringComparer.Ordinal));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_data_source_filter_cannot_call_an_application_rule()
+    {
+        using var modules = Modules("1.0.0").With(
+            "departments/1.0.0/data-sources/Departments.json",
+            ModuleDataSource.Replace("\"fields\"", "\"filter\": \"IsKept()\", \"fields\"", StringComparison.Ordinal));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With(
+            "rules/is-kept.json",
+            """
+            { "id": "77777777-7777-4777-8777-777777777701", "kind": "rule", "name": "IsKept", "formatVersion": 1,
+              "parameters": [], "resultType": "boolean", "expression": "true" }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            ("modules/departments/data-sources/Departments.json", "/filter", Guid.Parse(DataSourceId)),
+            (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("IsKept", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    private static TemporaryFolder ModulesWithTexts() =>
+        Modules("1.0.0").With(
+            "departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department": "Department" }"""));
+
     private const string ModuleRuleId = "4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e01";
 
     private static string ModuleRule(string id, string name, string expression) => $$"""
@@ -1141,7 +1350,7 @@ public sealed class ModuleCompilerTests
 
     private const string EnglishTexts = """
         { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-          "texts": { "department.main": "Department", "role.employee": "Employee" } }
+          "texts": { "department.main": "Department", "role.employee": "Employee", "pages.departments.title": "Departments" } }
         """;
 
     private const string Role = """

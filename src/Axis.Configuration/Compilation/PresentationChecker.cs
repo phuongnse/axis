@@ -30,7 +30,7 @@ internal static class PresentationChecker
 
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, references, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, moduleReferences, references, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -115,6 +115,7 @@ internal static class PresentationChecker
         Func<string, DataSourceResource?> findDataSource,
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -279,7 +280,8 @@ internal static class PresentationChecker
                         $"{path}/dataSource");
                 }
             }
-            else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!))
+            else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!)
+                && !moduleReferences.ReportUndeclared(widget.DataSource!, $"{path}/dataSource", Report))
             {
                 Report(
                     DiagnosticCodes.UnknownWidgetDataSource,
