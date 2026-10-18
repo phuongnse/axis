@@ -20,7 +20,8 @@ namespace Axis.Configuration.Compilation;
 internal static class RuleChecker
 {
     /// <summary>Checks <paramref name="rules"/>, which come in path order, and returns the rules by name, ignoring letter case.</summary>
-    public static IReadOnlyDictionary<string, ExpressionRule> Check(IReadOnlyList<RuleResource> rules, List<Diagnostic> diagnostics)
+    public static IReadOnlyDictionary<string, ExpressionRule> Check(
+        IReadOnlyList<RuleResource> rules, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
     {
         // Rule names are unique ignoring letter case; a second rule with the same name is already
         // reported by the loader, so calls resolve to the first one.
@@ -78,7 +79,7 @@ internal static class RuleChecker
             }
         }
 
-        new Walk(resources, built, bodies, diagnostics).Run();
+        new Walk(resources, built, bodies, references, diagnostics).Run();
         return built;
     }
 
@@ -90,6 +91,7 @@ internal static class RuleChecker
         Dictionary<string, RuleResource> resources,
         Dictionary<string, ExpressionRule> built,
         Dictionary<string, ExpressionNode> bodies,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         private readonly Dictionary<string, bool> _doneByName = new(StringComparer.OrdinalIgnoreCase);
@@ -235,9 +237,13 @@ internal static class RuleChecker
             {
                 diagnostics.Add(new Diagnostic(check.Diagnostic.Code, check.Diagnostic.Message, resource.File, "/expression", resource.Id));
             }
-            else if (!_inCycle.Contains(name))
+            else
             {
-                built[name] = rule with { Body = body, BodyCheck = check };
+                references.AddRuleCalls(resource, "/expression", check);
+                if (!_inCycle.Contains(name))
+                {
+                    built[name] = rule with { Body = body, BodyCheck = check };
+                }
             }
         }
 
