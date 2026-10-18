@@ -110,6 +110,40 @@ public static class InstanceQueries
         return await reader.ReadAsync(cancellationToken) ? ReadInstance(reader) : null;
     }
 
+    /// <summary>
+    /// Reads the process id of each of the instances <paramref name="instanceIds"/> of the application.
+    /// An id that names no instance of the application has no entry. It queries nothing when
+    /// <paramref name="instanceIds"/> is empty.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<Guid, Guid>> ProcessIdsAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        IReadOnlyCollection<Guid> instanceIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(instanceIds);
+
+        var processIds = new Dictionary<Guid, Guid>();
+        if (instanceIds.Count == 0)
+        {
+            return processIds;
+        }
+
+        await using var command = new NpgsqlCommand(
+            "SELECT id, process_id FROM axis.process_instances WHERE application_id = @application AND id = ANY(@ids)",
+            connection);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("ids", instanceIds.ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            processIds[reader.GetGuid(0)] = reader.GetGuid(1);
+        }
+
+        return processIds;
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,

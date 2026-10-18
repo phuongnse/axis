@@ -117,6 +117,7 @@
   "shell.history.fields": "Changed",
   "shell.history.outcome": "Outcome",
   "shell.history.step": "Step",
+  "shell.history.openInstance": "Open instance",
   "shell.history.action.record.created": "Created",
   "shell.history.action.record.updated": "Updated",
   "shell.history.action.record.deleted": "Deleted",

@@ -76,6 +76,20 @@ test('the operator opens an instance waiting for the manager and sees the path a
   }
 })
 
+test('the operator follows a history entry to its approval instance and an employee sees no link', async ({ page }) => {
+  const { requestId, instanceId } = await startWaitingInstance(page)
+
+  await page.goto(`/purchasing/purchaserequestform/${requestId}`)
+  await page.getByTestId('record-history').getByTestId('history-inspect-link').first().click()
+  await expect(page).toHaveURL(new RegExp(`/purchasing/approvals/${instanceId}$`))
+  await expect(page.getByTestId('inspector-instance')).toBeVisible()
+
+  await useSession(page, 'anna')
+  await page.goto(`/purchasing/purchaserequestform/${requestId}`)
+  await expect(page.getByTestId('history-entry').first()).toBeVisible()
+  await expect(page.getByTestId('history-inspect-link')).toHaveCount(0)
+})
+
 test('an employee has no Approvals entry, sees no instance and is refused by the inspection API', async ({ page }) => {
   const { instanceId } = await startWaitingInstance(page)
 

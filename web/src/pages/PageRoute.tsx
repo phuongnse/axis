@@ -1,5 +1,5 @@
 import { PageContainer } from '@ant-design/pro-components'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
@@ -34,11 +34,13 @@ export function PageRoute({ form }: { form?: FormMode }) {
   // Without it, such as in a new tab, save and cancel go to the site, which opens its first page.
   const from: unknown = (location.state as { from?: unknown } | null)?.from
   const returnTo = typeof from === 'string' && from.startsWith(`/${site.path}/`) ? from : `/${site.path}`
+  const pages = useMemo(() => site.navigation.map((entry) => entry.page), [site.navigation])
   // A new page or record starts from a clean state rather than showing the previous one meanwhile.
   return (
     <SitePage
       key={`${site.path}/${page}/${form ?? ''}/${id}`}
       sitePath={site.path}
+      pages={pages}
       name={page}
       locale={locale}
       fallbackLocale={site.locales.fallback}
@@ -51,6 +53,8 @@ export function PageRoute({ form }: { form?: FormMode }) {
 
 interface SitePageProps {
   sitePath: string
+  /** The names of the site's navigation pages, in navigation order. */
+  pages: readonly string[]
   name: string
   locale: string
   fallbackLocale: string
@@ -59,7 +63,7 @@ interface SitePageProps {
   returnTo: string
 }
 
-function SitePage({ sitePath, name, locale, fallbackLocale, form, recordId, returnTo }: SitePageProps) {
+function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo }: SitePageProps) {
   const t = useText()
   const [page, setPage] = useState<PageMetadata | null | 'failed'>()
 
@@ -131,7 +135,14 @@ function SitePage({ sitePath, name, locale, fallbackLocale, form, recordId, retu
     <PageContainer title={t(page.titleKey)}>
       {widget?.type === 'table' && <TableWidget sitePath={sitePath} widget={widget} locale={locale} />}
       {widget?.type === 'form' && hasEntity(widget) && (
-        <FormWidget widget={widget} recordId={recordId} returnTo={returnTo} locale={locale} />
+        <FormWidget
+          widget={widget}
+          sitePath={sitePath}
+          pages={pages}
+          recordId={recordId}
+          returnTo={returnTo}
+          locale={locale}
+        />
       )}
       {widget?.type === 'taskInbox' && (
         <TaskInboxWidget

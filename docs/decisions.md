@@ -1463,8 +1463,7 @@ without warning is that failure, so Axis refuses it.
 ## D34. Process inspection — Agreed
 
 Authorized users inspect process instances: where an instance is, what it did,
-with which inputs, and why it failed or waits. The design is built, except the
-record history link to an instance *(planned for M8)*. See [processes](reference/processes.md#process-inspection) for the
+with which inputs, and why it failed or waits. The design is built. See [processes](reference/processes.md#process-inspection) for the
 endpoints, the order of checks and the rules that hide values.
 The owner confirmed these points on issue #477 on 2026-10-17, with two
 changes. The changes are the masking bullet, which covers every entity, and

@@ -4,6 +4,7 @@ using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
+using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Http;
@@ -246,7 +247,8 @@ internal static class RecordEndpoints
     // Every audit record that names the record is listed, whoever wrote it: the record API, a
     // process start, a step or a task decision. The actor's display name is the one stored with
     // the audit record, so it is null for system, anonymous and audit records written before
-    // names were stored.
+    // names were stored. inspectPath is the instance's detail path when the user may inspect its
+    // process, and null otherwise.
     private static async Task<IResult> HistoryAsync(
         string app,
         string entity,
@@ -304,6 +306,12 @@ internal static class RecordEndpoints
 
         var fields = RecordFieldAccess.Read(application!, user.Roles, model);
         var result = await AuditRecords.ListForRecordAsync(connection, model.Id, recordId, pageNumber, size, cancellationToken);
+        var instanceIds = result.Items
+            .Where(item => item.ProcessInstanceId is not null)
+            .Select(item => item.ProcessInstanceId!.Value)
+            .Distinct()
+            .ToList();
+        var processIds = await InstanceQueries.ProcessIdsAsync(connection, application!.Manifest.Id, instanceIds, cancellationToken);
         var items = result.Items
             .Select(item => new RecordHistoryItem(
                 item.Id,
@@ -312,9 +320,29 @@ internal static class RecordEndpoints
                 item.ActorName,
                 item.Action,
                 item.ProcessInstanceId,
-                VisibleDetails(JsonNode.Parse(item.Details)!, fields)))
+                VisibleDetails(JsonNode.Parse(item.Details)!, fields),
+                InspectPath(application, user.Roles, item.ProcessInstanceId, processIds)))
             .ToList();
         return Results.Ok(new RecordHistoryResponse(items, pageNumber, size, result.TotalCount));
+    }
+
+    // The path is set only when the instance's process is in the active release and the user holds
+    // inspect on it, as the inspection endpoints check, so a path always leads to an answer.
+    private static string? InspectPath(
+        ApplicationModel application,
+        IEnumerable<string> roles,
+        Guid? instanceId,
+        IReadOnlyDictionary<Guid, Guid> processIds)
+    {
+        if (instanceId is not { } instance || !processIds.TryGetValue(instance, out var processId))
+        {
+            return null;
+        }
+
+        var process = application.Processes.FirstOrDefault(candidate => candidate.Id == processId);
+        return process is not null && PolicyEvaluator.AllowsInspect(application, roles, process)
+            ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances/{instance:D}"
+            : null;
     }
 
     // The body is read through a callback, so the command reads it only after the grant and filter
@@ -589,7 +617,9 @@ internal sealed record RecordHistoryResponse(IReadOnlyList<RecordHistoryItem> It
 /// <summary>
 /// One audit record of a record. <see cref="ActorName"/> is the actor's display name as stored with
 /// the audit record, or null for <c>system</c>, <c>anonymous</c> and audit records written before
-/// names were stored.
+/// names were stored. <see cref="InspectPath"/> is the detail path of the process instance that wrote
+/// the audit record, or null when it has none, its process is not in the active release, or the user
+/// holds no <c>inspect</c> grant on the process.
 /// </summary>
 internal sealed record RecordHistoryItem(
     Guid Id,
@@ -598,4 +628,5 @@ internal sealed record RecordHistoryItem(
     string? ActorName,
     string Action,
     Guid? ProcessInstanceId,
-    JsonNode Details);
+    JsonNode Details,
+    string? InspectPath);
