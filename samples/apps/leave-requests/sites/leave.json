@@ -1,0 +1,13 @@
+{
+  "id": "e086888c-adb0-43e3-8a73-bd5b4b3dbf43",
+  "kind": "site",
+  "name": "Leave",
+  "formatVersion": 1,
+  "path": "leave",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "navigation": [
+    { "page": "MyLeaveRequests", "label": { "textKey": "nav.myLeaveRequests" } },
+    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" } }
+  ]
+}

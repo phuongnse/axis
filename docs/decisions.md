@@ -1983,8 +1983,8 @@ can only grow additively until modules can ship migrations.
 
 ## D41. Leave requests as the second sample application — Agreed
 
-M8 adds a second, smaller sample application: leave requests. Nothing of it is
-built, and every point below is *(planned for M8)*. See the
+M8 adds a second, smaller sample application: leave requests. It is built, and
+every point below holds. See the
 [Second application section](product-brief.md#second-application-leave-requests)
 of the product brief for the data, flow, security, pages and scenarios. The
 owner confirmed these points on issue #572 on 2026-10-18.
@@ -1996,6 +1996,8 @@ owner confirmed these points on issue #572 on 2026-10-18.
   - A leave request has a number from the sequence `LR-{yyyy}-{n:5}`, an
     employee, a department, a leave type (`annual`, `sick` or `unpaid`), a
     first day, a last day, days, a reason, a status and a decision comment.
+    The reason is required and is the display field, because a sequence number
+    cannot be required, so it cannot label a request in task lists.
   - Departments come from the `departments` module of
     [D40](#d40-reusable-modules--agreed), with its seed departments.
   - Days are computed as `daysBetween(firstDay, lastDay) + 1`. They count

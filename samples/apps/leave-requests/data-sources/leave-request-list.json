@@ -1,0 +1,17 @@
+{
+  "id": "d48c4d50-6747-4396-968c-2e4d7dc0bc2f",
+  "kind": "dataSource",
+  "name": "LeaveRequestList",
+  "formatVersion": 1,
+  "entity": "LeaveRequest",
+  "fields": [
+    { "name": "number", "path": "number" },
+    { "name": "employee", "path": "employee" },
+    { "name": "department", "path": "department" },
+    { "name": "leaveType", "path": "leaveType" },
+    { "name": "firstDay", "path": "firstDay" },
+    { "name": "lastDay", "path": "lastDay" },
+    { "name": "days", "path": "days" },
+    { "name": "status", "path": "status" }
+  ]
+}

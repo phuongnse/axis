@@ -1,0 +1,7 @@
+{
+  "id": "fb7d1733-b890-421a-852c-cb0d14b643fd",
+  "kind": "role",
+  "name": "employee",
+  "formatVersion": 1,
+  "label": { "textKey": "role.employee" }
+}

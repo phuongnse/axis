@@ -347,7 +347,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const appCopy = path.join(scratch, 'app-copy')
     fs.cpSync(path.join(repoRoot, 'samples/apps/purchase-requests'), appCopy, { recursive: true })
     const texts = path.join(appCopy, 'texts/en.json')
-    const activations = () => run.stdout.split('Activated application').length - 1
+    const activations = () => run.stdout.split('Activated application PurchaseRequests').length - 1
     const workerPids = () =>
       runProcs(run.child.pid)
         .filter((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))

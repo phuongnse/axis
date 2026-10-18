@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
-import { e2eApp, purchaseRequests, serverEnv } from './server-settings'
+import { e2eApp, leaveRequests, purchaseRequests, serverEnv } from './server-settings'
 
 const port = Number(process.env.AXIS_E2E_PORT ?? 5280)
 const baseURL = `http://127.0.0.1:${port}`
@@ -33,8 +33,14 @@ export default defineConfig({
     url: `${baseURL}/health/ready`,
     timeout: 120_000,
     reuseExistingServer: false,
-    // The server compiles and activates both applications in the tenant when it starts: the generic test
-    // application and the purchase request sample.
-    env: { ...serverEnv(baseURL), ActivateOnStartup__0: e2eApp, ActivateOnStartup__1: purchaseRequests },
+    // The server compiles and activates all three applications in the tenant when it starts: the generic
+    // test application, the purchase request sample and the leave request sample. Index 1 replaces the
+    // entry of appsettings.Development.json, so the leave request sample is listed again at index 2.
+    env: {
+      ...serverEnv(baseURL),
+      ActivateOnStartup__0: e2eApp,
+      ActivateOnStartup__1: purchaseRequests,
+      ActivateOnStartup__2: leaveRequests,
+    },
   },
 })

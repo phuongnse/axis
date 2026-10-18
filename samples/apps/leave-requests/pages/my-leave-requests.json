@@ -1,0 +1,8 @@
+{
+  "id": "31e851bb-cd00-4a39-90df-6f7fc458150b",
+  "kind": "page",
+  "name": "MyLeaveRequests",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.myLeaveRequests.title" },
+  "widgets": [{ "type": "table", "dataSource": "LeaveRequestList", "formPage": "LeaveRequestForm" }]
+}

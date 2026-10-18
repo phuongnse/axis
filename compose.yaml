@@ -1,5 +1,5 @@
 # Runs the whole Axis stack from source: PostgreSQL, Keycloak with the development realm at
-# http://localhost:8080, the server with the purchase request sample, at http://localhost:5206,
+# http://localhost:8080, the server with the purchase request and leave request samples, at http://localhost:5206,
 # the worker, and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
 # yet: the server in its container cannot reach Keycloak at the address the browser uses. For
 # development, scripts/dev.sh starts only PostgreSQL, Keycloak and the purchasing system stub from
@@ -62,6 +62,7 @@ services:
       # Only the server reads this setting. Startup activation uses it.
       Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
+      ActivateOnStartup__1: /samples/apps/leave-requests
       # The sample extension package payment-references, which the image holds, that the sample declares.
       Extensions__Path: /extensions
       # The sample module departments, which the image holds.

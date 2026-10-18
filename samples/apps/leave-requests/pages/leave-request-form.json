@@ -1,0 +1,14 @@
+{
+  "id": "fbce81ad-290f-417a-93b5-140fa6ccff38",
+  "kind": "page",
+  "name": "LeaveRequestForm",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.leaveRequestForm.title" },
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "LeaveRequest",
+      "actions": [{ "type": "startProcess", "process": "LeaveRequestApproval", "label": { "textKey": "leaveRequest.submit" } }]
+    }
+  ]
+}

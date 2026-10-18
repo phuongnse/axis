@@ -1,0 +1,56 @@
+{
+  "id": "043b145c-66fe-4510-89e5-3ca816314bda",
+  "kind": "process",
+  "name": "LeaveRequestApproval",
+  "formatVersion": 1,
+  "entity": "LeaveRequest",
+  "startCondition": {
+    "expression": "status in ('draft', 'returned') and lastDay >= firstDay",
+    "message": { "textKey": "leaveRequest.cannotSubmit" }
+  },
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'submitted'" },
+      "next": "managerApproval"
+    },
+    {
+      "name": "managerApproval",
+      "type": "task",
+      "label": { "textKey": "leaveRequest.managerApproval" },
+      "assignee": { "user": "department.manager" },
+      "form": "LeaveRequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "markApproved" },
+        { "name": "return", "label": { "textKey": "task.return" }, "next": "markReturned" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "markRejected" }
+      ]
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "done"
+    },
+    {
+      "name": "markReturned",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'returned'" },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'rejected'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "cfa1d6fe-0bfc-4edf-8d5f-b44fb09e29cf",
+  "kind": "sequence",
+  "name": "LeaveRequestNumber",
+  "formatVersion": 1,
+  "format": "LR-{yyyy}-{n:5}"
+}

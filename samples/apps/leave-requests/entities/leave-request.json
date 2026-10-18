@@ -1,0 +1,49 @@
+{
+  "id": "c8278fd1-fab6-42a2-8fb5-5e294e8eaeb3",
+  "kind": "entity",
+  "name": "LeaveRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "leaveRequest.label" },
+  "displayField": "reason",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "maxLength": 20,
+      "unique": true,
+      "sequence": "LeaveRequestNumber",
+      "label": { "textKey": "leaveRequest.number" }
+    },
+    { "name": "employee", "type": "text", "maxLength": 100, "creator": true, "label": { "textKey": "leaveRequest.employee" } },
+    {
+      "name": "department",
+      "type": "reference",
+      "target": "departments/Department",
+      "required": true,
+      "label": { "textKey": "leaveRequest.department" }
+    },
+    {
+      "name": "leaveType",
+      "type": "enum",
+      "values": ["annual", "sick", "unpaid"],
+      "required": true,
+      "label": { "textKey": "leaveRequest.leaveType" }
+    },
+    { "name": "firstDay", "type": "date", "required": true, "label": { "textKey": "leaveRequest.firstDay" } },
+    { "name": "lastDay", "type": "date", "required": true, "label": { "textKey": "leaveRequest.lastDay" } },
+    {
+      "name": "days",
+      "type": "integer",
+      "expression": "daysBetween(firstDay, lastDay) + 1",
+      "label": { "textKey": "leaveRequest.days" }
+    },
+    { "name": "reason", "type": "text", "required": true, "maxLength": 500, "label": { "textKey": "leaveRequest.reason" } },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": ["draft", "submitted", "approved", "returned", "rejected"],
+      "label": { "textKey": "leaveRequest.status" }
+    },
+    { "name": "decisionComment", "type": "text", "maxLength": 2000, "label": { "textKey": "leaveRequest.decisionComment" } }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "6613186d-8c6f-4e98-b911-6acc1104a5a2",
+  "kind": "application",
+  "name": "LeaveRequests",
+  "formatVersion": 1,
+  "modules": [{ "id": "departments", "version": "^1.0.0" }]
+}

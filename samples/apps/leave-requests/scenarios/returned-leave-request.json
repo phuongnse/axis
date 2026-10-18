@@ -1,0 +1,109 @@
+{
+  "id": "ff16fcd7-2ffe-4582-9bc8-f6ea0fe4af66",
+  "kind": "scenario",
+  "name": "ReturnedLeaveRequestIsResubmitted",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": [
+      "employee"
+    ],
+    "binh": [
+      "department-manager"
+    ],
+    "chau": [
+      "department-manager"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "LeaveRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "department": "d1b09f14-34f5-4831-9708-158361c860df",
+        "leaveType": "annual",
+        "firstDay": "2026-11-02",
+        "lastDay": "2026-11-04",
+        "reason": "Family trip",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "LeaveRequestApproval",
+      "record": "request",
+      "as": "anna"
+    },
+    {
+      "type": "completeTask",
+      "record": "request",
+      "step": "managerApproval",
+      "outcome": "return",
+      "as": "chau"
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": {
+        "status": "returned"
+      }
+    },
+    {
+      "type": "expectInstance",
+      "process": "LeaveRequestApproval",
+      "record": "request",
+      "state": "completed"
+    },
+    {
+      "type": "updateRecord",
+      "record": "request",
+      "as": "anna",
+      "values": {
+        "lastDay": "2026-11-05"
+      }
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": {
+        "days": 4
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "LeaveRequestApproval",
+      "record": "request",
+      "as": "anna"
+    },
+    {
+      "type": "expectTask",
+      "record": "request",
+      "step": "managerApproval",
+      "state": "open"
+    },
+    {
+      "type": "expectTask",
+      "record": "request",
+      "step": "managerApproval",
+      "assignee": {
+        "user": "chau"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "request",
+      "step": "managerApproval",
+      "outcome": "approve",
+      "as": "chau"
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": {
+        "status": "approved"
+      }
+    }
+  ]
+}
