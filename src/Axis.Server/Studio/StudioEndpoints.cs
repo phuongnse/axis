@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Server.Http;
 using Axis.Server.Users;
@@ -17,6 +18,8 @@ namespace Axis.Server.Studio;
 /// file's bytes. A request is checked in order: session (401), author role with Studio on (403),
 /// application (404), then resource (404). The problem titles never contain text from the request.
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
+/// <c>GET /api/studio/apps/{application}/diagnostics</c> compiles the folder in memory against the installed
+/// extension packages and modules and answers every compile diagnostic. It touches no database and activates nothing.
 /// <c>PATCH /api/studio/apps/{application}/resources/{id}</c> applies an RFC 6902 JSON Patch to one file
 /// when <c>If-Match</c> holds the file's current version, and answers <c>{ version, diagnostics }</c>.
 /// After the checks above it answers 428 without <c>If-Match</c>, 415 for another content type, 400 for a
@@ -37,6 +40,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
     }
@@ -74,12 +78,31 @@ internal static class StudioEndpoints
             found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone()));
     }
 
+    private static async Task<IResult> DiagnosticsAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        // The compile step of activation, before it touches a database. The folder is read from disk as
+        // activation reads it, not through the filtered list of the other routes.
+        return Results.Ok(new StudioDiagnosticsResponse(StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
     private static async Task<IResult> PatchAsync(
         string application,
         string id,
         HttpContext httpContext,
         StudioOptions options,
-        PackageCatalog catalog)
+        PackageCatalog packages,
+        ModuleCatalog modules)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -130,14 +153,15 @@ internal static class StudioEndpoints
         }
 
         httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
-        return Results.Ok(new StudioPatchResponse(outcome.Version!, StudioDiagnostics.Compile(folder, catalog)));
+        return Results.Ok(new StudioPatchResponse(outcome.Version!, StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
     private static async Task<IResult> CreateAsync(
         string application,
         HttpContext httpContext,
         StudioOptions options,
-        PackageCatalog catalog)
+        PackageCatalog packages,
+        ModuleCatalog modules)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -185,7 +209,7 @@ internal static class StudioEndpoints
             (string)content["name"]!,
             file,
             outcome.Version!,
-            StudioDiagnostics.Compile(folder, catalog)));
+            StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
     private static async Task<IResult> DeleteAsync(
@@ -193,7 +217,8 @@ internal static class StudioEndpoints
         string id,
         HttpContext httpContext,
         StudioOptions options,
-        PackageCatalog catalog)
+        PackageCatalog packages,
+        ModuleCatalog modules)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -224,7 +249,7 @@ internal static class StudioEndpoints
                 return Problem(StatusCodes.Status409Conflict, "The resource has changed since this version. Read it again.");
         }
 
-        return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, catalog)));
+        return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
     private const string NoResource = "The application has no resource with this id.";
@@ -234,7 +259,7 @@ internal static class StudioEndpoints
             ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
             : null;
 
-    // The checks both routes share: the folder, or the problem that refused the request.
+    // The checks the routes share: the folder, or the problem that refused the request.
     private static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
         string application,
         HttpContext httpContext,
@@ -270,6 +295,9 @@ internal sealed record StudioResourceItem(string Id, string Kind, string? Name, 
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);
+
+/// <summary>The compile diagnostics of a Studio folder, in the compiler's order.</summary>
+internal sealed record StudioDiagnosticsResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);
 
 /// <summary>The answer to a patch: the file's new version and the folder's compile diagnostics.</summary>
 internal sealed record StudioPatchResponse(string Version, IReadOnlyList<StudioDiagnostic> Diagnostics);

@@ -1755,7 +1755,7 @@ answer names nothing that an open endpoint should not show.
 
 In M8, Studio edits an application's resource files through an authoring API
 on the server. The routes that list, read, patch, create and delete resources
-are built. The rest is *(planned for M8)*. See the
+and the diagnostics route are built. The rest is *(planned for M8)*. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1886,10 +1886,10 @@ the source of truth.
 
 M8 adds modules: versioned folders of resources that applications reuse.
 The manifest, installation, declaring, pinning, the module files stored in
-the release, and the compile of a module's entities, sequences and seeds with
-ids derived from the application are built. So are the `target` and `sequence`
+the release, and the compile of a module's entities, sequences, seeds and events
+with ids derived from the application are built. So are the `target` and `sequence`
 references and the codes `AXC0207` and `AXC0208`. Module data sources, rules,
-forms, events and texts, activating module entities, seeding, the sample and
+forms and texts, activating module entities, seeding, the sample and
 the other checks are still *(planned for M8)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
