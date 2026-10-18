@@ -1,0 +1,27 @@
+{
+  "id": "d4dc15ae-9478-48a6-9bf7-2dfec07a5f78",
+  "kind": "form",
+  "name": "LeaveRequestReview",
+  "formatVersion": 1,
+  "entity": "LeaveRequest",
+  "sections": [
+    {
+      "title": { "textKey": "leaveRequest.sections.request" },
+      "fields": [
+        { "field": "number", "readOnly": true },
+        { "field": "employee", "readOnly": true },
+        { "field": "department", "readOnly": true },
+        { "field": "leaveType", "readOnly": true },
+        { "field": "firstDay", "readOnly": true },
+        { "field": "lastDay", "readOnly": true },
+        { "field": "days", "readOnly": true },
+        { "field": "reason", "readOnly": true },
+        { "field": "status", "readOnly": true }
+      ]
+    },
+    {
+      "title": { "textKey": "leaveRequest.sections.decision" },
+      "fields": [{ "field": "decisionComment" }]
+    }
+  ]
+}

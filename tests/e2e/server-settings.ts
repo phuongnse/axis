@@ -2,10 +2,11 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 
-// The server compiles and activates both applications in the tenant when it starts: the generic test
-// application and the purchase request sample.
+// The server compiles and activates all three applications in the tenant when it starts: the generic test
+// application, the purchase request sample and the leave request sample.
 export const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 export const purchaseRequests = path.resolve(repoRoot, 'samples', 'apps', 'purchase-requests')
+export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-requests')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
 export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
 
@@ -37,7 +38,7 @@ const purchasingUrl = required('AXIS_E2E_PURCHASING_URL', 'the address of the pu
 
 /**
  * The environment of a server that listens at `baseURL`. Only the applications to activate are left to the
- * caller: the E2E server activates two, and the activation helper one.
+ * caller: the E2E server activates three, and the activation helper one.
  */
 export function serverEnv(baseURL: string): Record<string, string> {
   return {

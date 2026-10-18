@@ -108,7 +108,7 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 
 ## Second application: leave requests
 
-*(Planned for M8)* A second, smaller application shows that the platform is
+A second, smaller application shows that the platform is
 reused with no platform code change. It lives as configuration in
 `samples/apps/leave-requests/`. It is not platform code. See
 [D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed).
@@ -117,7 +117,8 @@ reused with no platform code change. It lives as configuration in
 
 - **Leave request**: number (sequence `LR-{yyyy}-{n:5}`), employee, department,
   leave type (`annual`, `sick` or `unpaid`), first day, last day, days
-  (computed), reason, status and decision comment.
+  (computed), reason, status and decision comment. The reason is required.
+  It is the display field, so it labels the request in task lists.
 - Days are calendar days, counting both ends:
   `daysBetween(firstDay, lastDay) + 1`. Weekends and holidays are not left out.
 - **Department**: comes from the `departments` module, with its seed

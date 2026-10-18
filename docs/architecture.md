@@ -906,14 +906,16 @@ kinds in the [configuration pipeline](reference/configuration.md#configuration-p
 `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
 heading or table header, so the sections may move within `docs/`.
 
-The E2E server starts with two applications listed in `ActivateOnStartup` (see
+The E2E server starts with three applications listed in `ActivateOnStartup` (see
 [Startup activation](reference/configuration.md#startup-activation)), so Playwright journeys run against
 real metadata and records:
 
 - the generic test application in `tests/e2e/fixtures/e2e-app`, for the
   platform journeys;
 - the purchase request sample in `samples/apps/purchase-requests`, for the
-  purchase request skeleton journeys.
+  purchase request skeleton journeys;
+- the leave request sample in `samples/apps/leave-requests`, for the leave
+  request journeys.
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on

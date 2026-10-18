@@ -1,0 +1,19 @@
+{
+  "id": "9e32c2c7-c8bf-4df3-9ba9-04d2ea3f4f5c",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "entity": "LeaveRequest", "actions": ["read"], "filter": "employee == currentUser()" },
+    {
+      "entity": "LeaveRequest",
+      "actions": ["create", "update"],
+      "filter": "employee == currentUser() and status in ('draft', 'returned')",
+      "fields": ["department", "leaveType", "firstDay", "lastDay", "reason", "status"]
+    },
+    { "entity": "departments/Department", "actions": ["read"] },
+    { "dataSource": "LeaveRequestList", "actions": ["read"] },
+    { "process": "LeaveRequestApproval", "actions": ["start"] }
+  ]
+}

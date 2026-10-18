@@ -1,0 +1,54 @@
+{
+  "id": "00c0f87b-c5c5-4924-b4f0-67ad07f40bd1",
+  "kind": "scenario",
+  "name": "EmployeeCannotReachAnotherRequest",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": [
+      "employee"
+    ],
+    "lan": [
+      "employee"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "LeaveRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "department": "d1b09f14-34f5-4831-9708-158361c860df",
+        "leaveType": "annual",
+        "firstDay": "2026-11-02",
+        "lastDay": "2026-11-04",
+        "reason": "Family trip",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "request",
+      "as": "lan",
+      "values": {
+        "reason": "x"
+      },
+      "expect": "notFound"
+    },
+    {
+      "type": "startProcess",
+      "process": "LeaveRequestApproval",
+      "record": "request",
+      "as": "lan",
+      "expect": "notFound"
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": {
+        "reason": "Family trip"
+      }
+    }
+  ]
+}

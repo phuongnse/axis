@@ -1,0 +1,51 @@
+{
+  "id": "8910cf00-d245-486e-b464-00e02b0d700d",
+  "kind": "scenario",
+  "name": "ManagerCannotDecideAnotherDepartment",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": [
+      "employee"
+    ],
+    "binh": [
+      "department-manager"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "LeaveRequest",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "department": "d1b09f14-34f5-4831-9708-158361c860df",
+        "leaveType": "annual",
+        "firstDay": "2026-11-02",
+        "lastDay": "2026-11-04",
+        "reason": "Family trip",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "LeaveRequestApproval",
+      "record": "request",
+      "as": "anna"
+    },
+    {
+      "type": "completeTask",
+      "record": "request",
+      "step": "managerApproval",
+      "outcome": "approve",
+      "as": "binh",
+      "expect": "denied"
+    },
+    {
+      "type": "expectTask",
+      "record": "request",
+      "step": "managerApproval",
+      "state": "open"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "18da2537-42ee-40ea-b152-8344fc285a49",
+  "kind": "policy",
+  "name": "DepartmentManagerAccess",
+  "formatVersion": 1,
+  "roles": ["department-manager"],
+  "grants": [
+    { "entity": "LeaveRequest", "actions": ["read"], "filter": "departments:IsManager(department.manager, currentUser())" },
+    { "entity": "departments/Department", "actions": ["read"] },
+    { "dataSource": "LeaveRequestList", "actions": ["read"] }
+  ]
+}

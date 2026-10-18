@@ -29,6 +29,8 @@ async function answersReady(url: string): Promise<boolean> {
  * server once more on a spare port, with the settings of the main E2E server, and stops it when it is
  * ready. The server activates before it listens, so the first answer of /health/ready means the release
  * is active. The main server reads the active release on each request and serves it at once.
+ * `ActivateOnStartup__0` replaces only the first entry of appsettings.Development.json, so the leave request
+ * sample, which that file lists second, activates again as an unchanged release.
  * Throws an Error with the server output when the folder does not activate.
  */
 export async function activateFolder(folder: string): Promise<void> {

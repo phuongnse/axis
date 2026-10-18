@@ -761,15 +761,17 @@ public sealed class ScenarioRunnerTests
                 Path.Combine(root, "samples", "apps", application),
                 "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
                 "--extensions", SamplePackages.Path,
+                "--modules", SampleModules.Path,
                 "--results", Path.Combine(root, "artifacts", "test-results"),
             ],
             output,
             CancellationToken);
 
         Assert.True(exitCode == 0, output.ToString());
-        if (application == "purchase-requests")
+        var suites = new Dictionary<string, string> { ["purchase-requests"] = "PurchaseRequests", ["leave-requests"] = "LeaveRequests" };
+        if (suites.TryGetValue(application, out var suiteName))
         {
-            var suite = XDocument.Load(Path.Combine(root, "artifacts", "test-results", "scenarios-PurchaseRequests.xml")).Root!.Element("testsuite")!;
+            var suite = XDocument.Load(Path.Combine(root, "artifacts", "test-results", $"scenarios-{suiteName}.xml")).Root!.Element("testsuite")!;
             Assert.Equal("5", suite.Attribute("tests")!.Value);
             Assert.Equal("0", suite.Attribute("failures")!.Value);
         }
