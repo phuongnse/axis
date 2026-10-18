@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Telemetry;
@@ -28,7 +29,7 @@ namespace Axis.Server.Applications;
 /// and the seed records use the tenant's <c>ConnectionString</c>. Any diagnostic or error stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown.
 /// Readiness reports Unhealthy until the last tenant is done, and stays so when a tenant fails.
-/// Restarting with unchanged folders and installed packages stores no new release and only
+/// Restarting with unchanged folders, installed packages and installed modules stores no new release and only
 /// refreshes the activation time.
 /// </summary>
 internal sealed partial class StartupActivation(
@@ -36,6 +37,7 @@ internal sealed partial class StartupActivation(
     TenantOptions tenants,
     TenantSchemaConnections schemaConnections,
     PackageCatalog packages,
+    ModuleCatalog modules,
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
     IHostEnvironment environment,
@@ -107,7 +109,7 @@ internal sealed partial class StartupActivation(
             activity?.SetTag(AxisTelemetry.TenantTag, tenantId);
             try
             {
-                var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, cancellationToken);
+                var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken);
                 activity?.SetTag(AxisTelemetry.ApplicationTag, compiled.Model?.Manifest.Name);
                 LogDiagnostics(compiled.Diagnostics, folder, tenantId);
                 if (compiled.Release is null || compiled.Model is null)

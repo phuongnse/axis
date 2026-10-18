@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
@@ -25,9 +26,10 @@ namespace Axis.Configuration.Compilation;
 /// processes, events and conditions, checks migrations, their entities, fields and values, checks
 /// scenarios, their users, steps, values and stubs, checks
 /// the extension packages of the manifest and pins each to the highest installed version in its
-/// range, and resolves references
+/// range, does the same for its modules and takes the files of each pinned module into the
+/// resources, and resolves references
 /// between entities, forms, pages, sites and seeds. Every problem is reported, together with the loader's, in one
-/// sorted list. An application without errors also gets its content hash, which covers its pins.
+/// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
 /// </summary>
 public static class ApplicationCompiler
@@ -39,21 +41,114 @@ public static class ApplicationCompiler
     public const int MaxPrecision = 1000;
 
     /// <summary>
-    /// Compiles the folder at <paramref name="folderPath"/> against <paramref name="installedPackages"/>.
-    /// Null means no package is installed.
+    /// Compiles the folder at <paramref name="folderPath"/> against <paramref name="installedPackages"/>
+    /// and <paramref name="installedModules"/>. Null means none is installed.
     /// </summary>
-    public static CompilationResult Compile(string folderPath, IReadOnlyCollection<PackageVersion>? installedPackages = null) =>
-        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? []);
+    public static CompilationResult Compile(
+        string folderPath,
+        IReadOnlyCollection<PackageVersion>? installedPackages = null,
+        IReadOnlyCollection<InstalledModule>? installedModules = null) =>
+        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? []);
 
     /// <summary>
     /// Compiles resources held in memory, such as the stored resources of a release, against
-    /// <paramref name="installedPackages"/>. Null means no package is installed.
+    /// <paramref name="installedPackages"/>. Null means no package is installed. Entries under
+    /// <c>modules/&lt;id&gt;/</c> are the release's own copies of its pinned modules, and the
+    /// application compiles against those copies alone.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
-    public static CompilationResult Compile(IReadOnlyList<ResourceContent> resources, IReadOnlyCollection<PackageVersion>? installedPackages = null) =>
-        Compile(ApplicationLoader.Load(resources), installedPackages ?? []);
+    public static CompilationResult Compile(IReadOnlyList<ResourceContent> resources, IReadOnlyCollection<PackageVersion>? installedPackages = null)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
 
-    private static CompilationResult Compile(ApplicationLoadResult loaded, IReadOnlyCollection<PackageVersion> installedPackages)
+        static bool IsModuleCopy(ResourceContent resource) =>
+            resource.Path.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
+
+        // The loader only sees the application's own resources, so a repeated path among the copies is caught here.
+        var moduleResources = resources.Where(IsModuleCopy).ToList();
+        var copyPaths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var resource in moduleResources)
+        {
+            if (!copyPaths.Add(resource.Path))
+            {
+                throw new ArgumentException($"The resource path '{resource.Path}' appears more than once.", nameof(resources));
+            }
+        }
+
+        var copyDiagnostics = new List<Diagnostic>();
+        var copies = ReadModuleCopies(moduleResources, copyDiagnostics);
+        var applicationResources = resources.Where(resource => !IsModuleCopy(resource)).ToList();
+        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies);
+        if (copyDiagnostics.Count == 0)
+        {
+            return result;
+        }
+
+        return result with
+        {
+            Diagnostics = DiagnosticOrder.Sort([.. result.Diagnostics, .. copyDiagnostics]),
+            Model = null,
+            ContentHash = null,
+            Resources = [],
+        };
+    }
+
+    /// <summary>
+    /// Groups the <c>modules/&lt;id&gt;/…</c> resources of a release into one installed module per
+    /// id, each read from its own <c>module.json</c>. A copy without a valid manifest, or whose
+    /// manifest id differs from its folder, is reported and left out.
+    /// </summary>
+    private static List<InstalledModule> ReadModuleCopies(IEnumerable<ResourceContent> copies, List<Diagnostic> diagnostics)
+    {
+        var modules = new List<InstalledModule>();
+        foreach (var group in copies.GroupBy(copy => copy.Path.Split('/')[1], StringComparer.Ordinal).OrderBy(group => group.Key, StringComparer.Ordinal))
+        {
+            var prefix = $"{ApplicationLoader.ModulesFolderPrefix}{group.Key}/";
+            var files = group
+                .Where(copy => copy.Path.Length > prefix.Length)
+                .Select(copy => new ResourceContent(copy.Path[prefix.Length..], copy.Content))
+                .OrderBy(copy => copy.Path, StringComparer.Ordinal)
+                .ToList();
+            var manifestFile = prefix + ModuleCatalog.ManifestFileName;
+            var manifestContent = files.FirstOrDefault(file => file.Path == ModuleCatalog.ManifestFileName);
+            if (manifestContent is null)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ModuleManifestInvalid,
+                    $"The manifest '{ModuleCatalog.ManifestFileName}' is missing.",
+                    manifestFile,
+                    ""));
+                continue;
+            }
+
+            var problems = new List<Diagnostic>();
+            var manifest = ModuleCatalog.ReadManifest(manifestContent.Content, manifestFile, problems);
+            if (manifest is null)
+            {
+                diagnostics.AddRange(problems);
+                continue;
+            }
+
+            if (!string.Equals(manifest.Id, group.Key, StringComparison.Ordinal))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ModuleFolderMismatch,
+                    $"The id '{manifest.Id}' differs from its folder name '{group.Key}'.",
+                    manifestFile,
+                    "/id"));
+                continue;
+            }
+
+            modules.Add(new InstalledModule(manifest, files));
+        }
+
+        return modules;
+    }
+
+    private static CompilationResult Compile(
+        ApplicationLoadResult loaded,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
@@ -146,11 +241,14 @@ public static class ApplicationCompiler
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
         IReadOnlyList<PinnedPackageModel> packages = [];
+        IReadOnlyList<PinnedModuleModel> modules = [];
+        IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         if (loaded.Application is { } application)
         {
             CheckTextKey(application.Label, application.File, application.Id, "/label", textKeys, diagnostics);
             packages = PackageChecker.Check(application, installedPackages, diagnostics);
+            (modules, moduleFiles) = ModuleChecker.Check(application, installedModules, diagnostics);
             declaredPackageIds = new HashSet<string>(application.Packages.Select(package => package.Id), StringComparer.Ordinal);
         }
 
@@ -293,12 +391,18 @@ public static class ApplicationCompiler
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules)).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = packages,
+            Modules = modules,
         };
+
+        // The pinned modules' files are stored with the application's own, in ordinal path order.
+        IReadOnlyList<ResourceContent> resources = moduleFiles.Count == 0
+            ? loaded.Resources
+            : [.. loaded.Resources.Concat(moduleFiles).OrderBy(resource => resource.Path, StringComparer.Ordinal)];
         return result with
         {
             Model = model,
-            ContentHash = ContentHash.Compute(loaded.Resources, packages),
-            Resources = loaded.Resources,
+            ContentHash = ContentHash.Compute(resources, packages),
+            Resources = resources,
         };
     }
 

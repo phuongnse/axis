@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
@@ -47,7 +48,8 @@ public static class ScenarioRunner
     /// A cancelled run still drops the database, then throws <see cref="OperationCanceledException"/>.
     /// An action that makes more than <paramref name="workItemLimit"/> work items run fails the scenario.
     /// <paramref name="packages"/> are the installed extension packages whose manifests the application
-    /// is compiled against, or null for none.
+    /// is compiled against, or null for none. <paramref name="modules"/> are the installed modules it is
+    /// compiled against, or null for none.
     /// </summary>
     public static async Task<ScenarioResult> RunAsync(
         string folder,
@@ -56,9 +58,11 @@ public static class ScenarioRunner
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken,
         int workItemLimit = WorkItemLimit,
-        PackageCatalog? packages = null)
+        PackageCatalog? packages = null,
+        ModuleCatalog? modules = null)
     {
         packages ??= PackageCatalog.Empty;
+        modules ??= ModuleCatalog.Empty;
         var stopwatch = Stopwatch.StartNew();
         var database = $"axis_scenario_{Guid.NewGuid():N}";
         ScenarioResult Result(string? failure) => new(scenario.Name, scenario.File, database, stopwatch.Elapsed, failure);
@@ -82,7 +86,7 @@ public static class ScenarioRunner
 
             // The setting reaches every connection of the scenario, including the work item runner's.
             var connectionString = now is { } time ? WithNow(builder.ConnectionString, time) : builder.ConnectionString;
-            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, connectionString, now, loggerFactory, workItemLimit, packages, cancellationToken);
+            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, connectionString, now, loggerFactory, workItemLimit, packages, modules, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -132,6 +136,7 @@ public static class ScenarioRunner
         ILoggerFactory loggerFactory,
         int workItemLimit,
         PackageCatalog packages,
+        ModuleCatalog modules,
         CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);
@@ -143,7 +148,7 @@ public static class ScenarioRunner
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
 
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, cancellationToken);
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken);
         if (compiled.Release is null || compiled.Model is null)
         {
             return Setup("could not be compiled", compiled.Diagnostics);

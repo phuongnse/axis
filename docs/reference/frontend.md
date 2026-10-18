@@ -867,6 +867,17 @@ agrees.
     a JSON Patch with the resource's version in `If-Match`.
   - A stale version is a `409`. The editor then reads the resource again and
     keeps the author's unsaved change on screen.
+- **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
+  list, from the [references routes](authoring.md#references). Each entry shows
+  its relation and the other resource.
+  - Selecting an entry opens that resource at the entry's path.
+  - An expand control on an entry loads one more step, the entry's own lists.
+  - There is no drawn graph and no graph drawing library in M8.
+- **Text keys.** A text key opens its **Used by** list, which shows the labels
+  that use it and the locales that define it.
+- **Delete warning.** When a resource's `usedBy` count is above 0, Studio warns
+  before a delete and names the count. The warning does not block the delete.
+  The next diagnostics report what broke.
 - **Diagnostics panel.** The panel lists the diagnostics that the last write
   returned. Each item opens its file in the editor, at its `path`. A diagnostic
   never blocks a save.
@@ -875,5 +886,5 @@ agrees.
   answers.
 - **Out of scope.** Visual process and page designers stay out of scope, see
   [out of scope for now](../product-brief.md#out-of-scope-for-now).
-- **Texts.** Its texts are the platform texts under `shell.studio.*`, in `en`
-  and `vi`, like the other shell texts.
+- **Texts.** Its texts, including those of the lists above, are the platform
+  texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
