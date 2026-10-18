@@ -8,8 +8,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The list and read routes are built. *(Planned for M8: the other
-routes, with `If-Match`, the CSRF header, writes and diagnostics.)* It is
+in git. The list, read and diagnostics routes are built. *(Planned for M8: the other
+routes, with `If-Match`, the CSRF header and writes.)* It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 It never activates a release and touches no database. Under `scripts/dev.sh`,
@@ -45,7 +45,7 @@ Routes marked *(planned for M8)* are not built yet.
 | *(planned for M8)* `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version }`, a `Location` header and `diagnostics`. The body is the full resource |
 | *(planned for M8)* `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }`. The body is `application/json-patch+json`, as RFC 6902 describes |
 | *(planned for M8)* `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
-| *(planned for M8)* `GET /api/studio/apps/{application}/diagnostics` | `200` with the folder's diagnostics |
+| `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -95,7 +95,7 @@ exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List resources and Read are built, and the
+from the request. The rows for List resources, Read and Diagnostics are built, and the
 others are *(planned for M8)*.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -141,9 +141,9 @@ content type, before the body is read.
 
 ## Diagnostics
 
-*(planned for M8)* Every write answers with the folder's diagnostics, and
-`GET /api/studio/apps/{application}/diagnostics` returns them on demand. A
-diagnostic never blocks a save.
+`GET /api/studio/apps/{application}/diagnostics` returns the folder's
+diagnostics on demand, and is built. *(Planned for M8: every write answers
+with them too.)* A diagnostic never blocks a save.
 
 - The folder is compiled in memory against the extension packages installed
   under `Extensions:Path`, see
@@ -151,7 +151,13 @@ diagnostic never blocks a save.
   touched.
 - The codes, severities and fields are those of
   [startup activation](configuration.md#startup-activation). Each diagnostic
-  is `{ code, severity, file, path, message }`.
+  is `{ code, severity, message, file, path, resourceId }`. `severity` is
+  `error` or `warning`. `resourceId` is the lower-case id of the resource,
+  or `null` when the problem concerns a whole file or the whole folder.
+- The route returns compile diagnostics only. The checks that activation runs
+  against a tenant are not part of it: bindings, name and site path
+  conflicts, and storage changes. They need a tenant database or the
+  tenant's settings.
 - A folder with an error is not activated. Under `scripts/dev.sh`, the
   restart after a saved file then stops the server, as a broken hand edit
   does today.

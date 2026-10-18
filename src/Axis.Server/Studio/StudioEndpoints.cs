@@ -1,4 +1,7 @@
 using System.Text.Json;
+using Axis.Configuration.Compilation;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Packages;
 using Axis.Server.Http;
 using Axis.Server.Users;
 
@@ -13,6 +16,8 @@ namespace Axis.Server.Studio;
 /// file's bytes. A request is checked in order: session (401), author role with Studio on (403),
 /// application (404), then resource (404). The problem titles never contain text from the request.
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
+/// <c>GET /api/studio/apps/{application}/diagnostics</c> compiles the folder in memory against the installed
+/// extension packages and answers every compile diagnostic. It touches no database and activates nothing.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -20,6 +25,7 @@ internal static class StudioEndpoints
     {
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
     }
 
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
@@ -56,7 +62,21 @@ internal static class StudioEndpoints
             found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone()));
     }
 
-    // The checks both routes share: the folder, or the problem that refused the request.
+    private static async Task<IResult> DiagnosticsAsync(string application, HttpContext httpContext, StudioOptions options, PackageCatalog packages)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        // The compile step of activation, before it touches a database. The folder is read from disk as
+        // activation reads it, not through the filtered list of the other routes.
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions);
+        return Results.Ok(new StudioDiagnosticsResponse([.. compiled.Diagnostics.Select(StudioDiagnostic.From)]));
+    }
+
+    // The checks the routes share: the folder, or the problem that refused the request.
     private static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
         string application,
         HttpContext httpContext,
@@ -91,3 +111,21 @@ internal sealed record StudioResourceItem(string Id, string Kind, string? Name, 
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);
+
+/// <summary>The compile diagnostics of a Studio folder, in the compiler's order.</summary>
+internal sealed record StudioDiagnosticsResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>
+/// One diagnostic. <c>Severity</c> is <c>error</c> or <c>warning</c>. <c>ResourceId</c> is the lower-case id,
+/// or null when the problem concerns a whole file or the whole folder.
+/// </summary>
+internal sealed record StudioDiagnostic(string Code, string Severity, string Message, string File, string Path, string? ResourceId)
+{
+    public static StudioDiagnostic From(Diagnostic diagnostic) => new(
+        diagnostic.Code,
+        diagnostic.Severity == DiagnosticSeverity.Warning ? "warning" : "error",
+        diagnostic.Message,
+        diagnostic.File,
+        diagnostic.Path,
+        diagnostic.ResourceId?.ToString("D"));
+}

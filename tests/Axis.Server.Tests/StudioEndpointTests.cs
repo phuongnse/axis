@@ -1,6 +1,9 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Axis.Configuration.Compilation;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -89,6 +92,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Theory]
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
+    [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
     {
         await using var factory = CreateFactory();
@@ -107,6 +111,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Theory]
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
+    [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
     public async Task Studio_is_off_without_an_author_role_or_without_folders(string url)
     {
         foreach (var (folder, role) in new[] { (Folder, ""), ("", "author") })
@@ -123,6 +128,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
     [Theory]
     [InlineData("/api/studio/apps/Unknown/resources", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/Unknown/diagnostics", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PURCHASEREQUESTS/resources", HttpStatusCode.OK)]
     [InlineData("/api/studio/apps/Unknown/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
@@ -199,6 +205,62 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Assert.DoesNotContain("b-second.json", text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Author_gets_no_errors_for_a_valid_folder()
+    {
+        // The factory's databases are unreachable, so a 200 also shows that the route opens no connection.
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/diagnostics", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var diagnostics = body.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, item => item.GetProperty("severity").GetString() == "error");
+    }
+
+    [Fact]
+    public async Task Author_gets_every_diagnostic_with_the_codes_activation_reports()
+    {
+        var entityPath = Path.Combine(Folder, EntityFile);
+        var entity = File.ReadAllText(entityPath);
+        const string target = "\"target\": \"Department\"";
+        Assert.Contains(target, entity, StringComparison.Ordinal);
+        File.WriteAllText(entityPath, entity.Replace(target, "\"target\": \"NoSuchEntity\"", StringComparison.Ordinal));
+        const string scenarioFile = "scenarios/returned-request.json";
+        var scenarioPath = Path.Combine(Folder, scenarioFile);
+        File.WriteAllText(scenarioPath, File.ReadAllText(scenarioPath).Replace("\"formatVersion\": 1,", "\"formatVersion\": 1,\n  \"noSuchProperty\": true,", StringComparison.Ordinal));
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/diagnostics", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var actual = body.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(item => (
+                item.GetProperty("code").GetString()!,
+                item.GetProperty("severity").GetString()!,
+                item.GetProperty("message").GetString()!,
+                item.GetProperty("file").GetString()!,
+                item.GetProperty("path").GetString()!,
+                item.GetProperty("resourceId").GetString()))
+            .ToList();
+        Assert.Contains(actual, item => item.Item1 == DiagnosticCodes.UnknownReferenceTarget && item.Item4 == EntityFile);
+        Assert.Contains(actual, item => item.Item1 == DiagnosticCodes.SchemaViolation && item.Item4 == scenarioFile);
+        var expected = ApplicationCompiler.Compile(Folder, SamplePackages.Versions).Diagnostics
+            .Select(diagnostic => (
+                diagnostic.Code,
+                diagnostic.Severity == DiagnosticSeverity.Warning ? "warning" : "error",
+                diagnostic.Message,
+                diagnostic.File,
+                diagnostic.Path,
+                diagnostic.ResourceId?.ToString("D")))
+            .ToList();
+        Assert.Equal(expected, actual);
+    }
+
     private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author") =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -207,6 +269,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
+            builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Studio:Folders:0", folder ?? Folder);
             builder.UseSetting("Studio:AuthorRole", authorRole);
             builder.UseTestOidc("default");
