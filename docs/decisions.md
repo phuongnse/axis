@@ -1754,8 +1754,8 @@ answer names nothing that an open endpoint should not show.
 ## D38. Studio edits application folders through an authoring API — Agreed
 
 In M8, Studio edits an application's resource files through an authoring API
-on the server. The routes that list and read resources and the patch route
-are built. The rest is *(planned for M8)*. See the
+on the server. The routes that list, read, patch, create and delete resources
+and the diagnostics route are built. The rest is *(planned for M8)*. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1827,8 +1827,10 @@ installation-level setting.
 
 In M8, every compile collects each reference it resolves into a reference
 index. Studio reads it through two authoring API routes and shows a **Uses**
-list and a **Used by** list for each resource. Nothing of it is built
-*(planned for M8)*. See the [reference index](reference/configuration.md#reference-index),
+list and a **Used by** list for each resource. The compile already builds the
+index with its `label text`, `text entry`, `package` and `module` edges. The
+other relations, the authoring API routes and Studio are *(planned for M8)*.
+See the [reference index](reference/configuration.md#reference-index),
 the [authoring API](reference/authoring.md#references) and the
 [Studio section of the frontend](reference/frontend.md#studio).
 The owner confirmed these points on issue #570 on 2026-10-18.
