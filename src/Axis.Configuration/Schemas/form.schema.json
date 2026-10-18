@@ -9,7 +9,7 @@
     "kind": { "const": "form" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/name" },
+    "entity": { "$ref": "#/$defs/entityName" },
     "sections": {
       "type": "array",
       "minItems": 1,
@@ -21,6 +21,10 @@
       "type": "string",
       "format": "uuid",
       "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "entityName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$"
     },
     "name": {
       "type": "string",
