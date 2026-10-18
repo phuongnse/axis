@@ -8,8 +8,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The list and read routes are built. *(Planned for M8: the other
-routes, with `If-Match`, the CSRF header, writes and diagnostics.)* It is
+in git. The list, read and patch routes are built. *(Planned for M8: the
+other routes, with writes and diagnostics for create and delete.)* It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 It never activates a release and touches no database. Under `scripts/dev.sh`,
@@ -43,7 +43,7 @@ Routes marked *(planned for M8)* are not built yet.
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file` and `version`. *(Planned for M8: `usedBy`.)* |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | *(planned for M8)* `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version }`, a `Location` header and `diagnostics`. The body is the full resource |
-| *(planned for M8)* `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }`. The body is `application/json-patch+json`, as RFC 6902 describes |
+| `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | *(planned for M8)* `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
 | *(planned for M8)* `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | *(planned for M8)* `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
@@ -63,16 +63,23 @@ The `version` of a resource is the SHA-256 of its file's
 bytes, in lower-case hex.
 
 - A read sends it as a strong `ETag`, in quotes.
-- *(Planned for M8)* A patch or a delete sends it back in `If-Match`.
-- *(Planned for M8)* When the file no longer has that version, the answer is
-  `409`. The client reads the resource again and retries.
-- *(Planned for M8)* A patch or a delete without `If-Match` is `428`.
+- A patch sends it back in `If-Match`, as the quoted `ETag` or as the bare
+  hex. `*`, a weak tag and a list of versions count as stale. *(Planned for
+  M8: the same for a delete.)*
+- When the file no longer has that version, the answer is `409` and nothing
+  is written. The client reads the resource again and retries. One lock
+  covers the check and the write of every write, so two patches that carry the
+  same version cannot both succeed. The lock covers one server process.
+  *(Planned for M8: the same for a delete.)*
+- A patch without `If-Match` is `428`. *(Planned for M8: the same for a
+  delete.)*
 
 ## Order of checks
 
 Like the [record API](record-api.md#errors), a request is
-checked in this order, and the first failure is the response. Checks 2 to 5
-are built, and the others are *(planned for M8)*:
+checked in this order, and the first failure is the response. Checks 1 to 5
+are built. Checks 6 to 8 are built for a patch, and checks 6 to 9 are
+*(planned for M8)* for a create or a delete:
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
@@ -98,8 +105,8 @@ exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List resources and Read are built, and the
-others are *(planned for M8)*.
+from the request. The rows for List resources, Read and Patch are built, and
+the others are *(planned for M8)*.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -115,7 +122,7 @@ others are *(planned for M8)*.
 
 `400` is a bad body, and `428` a missing `If-Match`, as
 [Order of checks](#order-of-checks) says. `415` answers a body of the wrong
-content type, before the body is read.
+content type, just before the body is read.
 
 ## References
 
@@ -152,10 +159,10 @@ agrees.
 
 ## Writes
 
-*(planned for M8)*
+Writes are built for patches. *(Planned for M8: new files and deletes.)*
 
-- **Atomic.** A write goes to a temporary file in the same folder and is then
-  renamed over the target. A reader never sees half a file. A delete removes
+- **Atomic.** A write goes to a hidden temporary file in the same folder and
+  is then renamed over the target. A reader never sees half a file. A delete removes
   the file.
 - **Format.** The file is written as JSON with 2-space indents, LF line ends
   and a final newline. The order of keys is kept, so a patch of one value
@@ -171,7 +178,8 @@ agrees.
   `AXC0009` (see the diagnostic codes in [configuration.md](configuration.md)) requires it there.
 - **Paths.** A path is resolved and must stay under the application folder,
   so `..` and links cannot leave it. Only `*.json` files are read or written.
-- **Patches.** A patch may not change `id` or `kind`. Every other change is
+- **Patches.** A patch may not change `id` or `kind`, and a change of letter case
+  alone counts as a change. Every other change is
   allowed, including one that breaks the resource. The new content is written
   and the diagnostics report the breakage.
 - **Never an activation.** A write never compiles against a database, never
@@ -179,9 +187,10 @@ agrees.
 
 ## Diagnostics
 
-*(planned for M8)* Every write answers with the folder's diagnostics, and
-`GET /api/studio/apps/{application}/diagnostics` returns them on demand. A
-diagnostic never blocks a save.
+A patch answers with the folder's diagnostics. *(Planned for M8: the same
+for a create and a delete, and
+`GET /api/studio/apps/{application}/diagnostics` to return them on demand.)*
+A diagnostic never blocks a save.
 
 - The folder is compiled in memory against the extension packages installed
   under `Extensions:Path`, see
@@ -189,7 +198,12 @@ diagnostic never blocks a save.
   touched.
 - The codes, severities and fields are those of
   [startup activation](configuration.md#startup-activation). Each diagnostic
-  is `{ code, severity, file, path, message }`.
+  is `{ code, severity, message, file, path, resourceId }`. `severity` is
+  `error` or `warning`, and `resourceId` is the lower-case id of the resource
+  or `null`.
+- Only the compile diagnostics are listed. The problems of a broken extension
+  package are not, because they belong to the server's install and not to the
+  folder.
 - A folder with an error is not activated. Under `scripts/dev.sh`, the
   restart after a saved file then stops the server, as a broken hand edit
   does today.

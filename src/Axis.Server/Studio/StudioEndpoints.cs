@@ -1,11 +1,15 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Axis.Configuration.Packages;
 using Axis.Server.Http;
 using Axis.Server.Users;
+using Json.Patch;
+using Microsoft.Net.Http.Headers;
 
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// The read side of the authoring API, for an author who edits the application folders in
+/// The authoring API, for an author who edits the application folders in
 /// <c>Studio:Folders</c>. <c>GET /api/studio/apps/{application}/resources</c> lists every resource of
 /// the folder, sorted by file, each with its <c>id</c>, <c>kind</c>, <c>name</c>, <c>file</c> and
 /// <c>version</c>. <c>GET /api/studio/apps/{application}/resources/{id}</c> returns one resource with its
@@ -13,6 +17,11 @@ namespace Axis.Server.Studio;
 /// file's bytes. A request is checked in order: session (401), author role with Studio on (403),
 /// application (404), then resource (404). The problem titles never contain text from the request.
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
+/// <c>PATCH /api/studio/apps/{application}/resources/{id}</c> applies an RFC 6902 JSON Patch to one file
+/// when <c>If-Match</c> holds the file's current version, and answers <c>{ version, diagnostics }</c>.
+/// After the checks above it answers 428 without <c>If-Match</c>, 415 for another content type, 400 for a
+/// bad patch or a patch that changes <c>id</c> or <c>kind</c>, and 409 for a stale version. A schema or
+/// compile error never blocks the save.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -20,6 +29,7 @@ internal static class StudioEndpoints
     {
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
+        endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
     }
 
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
@@ -44,10 +54,9 @@ internal static class StudioEndpoints
             return refusal!;
         }
 
-        if (id is not { Length: 36 } || !Guid.TryParseExact(id, "D", out var guid)
-            || StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid) is not { } found)
+        if (FindResource(folder, id) is not { } found)
         {
-            return NotFound("The application has no resource with this id.");
+            return NotFound(NoResource);
         }
 
         using var content = JsonDocument.Parse(found.Bytes);
@@ -55,6 +64,72 @@ internal static class StudioEndpoints
         return Results.Ok(new StudioResourceResponse(
             found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone()));
     }
+
+    private static async Task<IResult> PatchAsync(
+        string application,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog catalog)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (FindResource(folder, id) is not { } found)
+        {
+            return NotFound(NoResource);
+        }
+
+        var request = httpContext.Request;
+        if (request.Headers.IfMatch.Count == 0)
+        {
+            return Problem(StatusCodes.Status428PreconditionRequired, "The patch needs the version it was made from in If-Match.");
+        }
+
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json-patch+json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json-patch+json.");
+        }
+
+        JsonPatch patch;
+        try
+        {
+            patch = (await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted)).Deserialize<JsonPatch>()
+                ?? throw new JsonException();
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException or InvalidOperationException)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The body is not a valid JSON Patch.");
+        }
+
+        var outcome = await StudioWrites.PatchAsync(
+            folder, found.Id, patch, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+        switch (outcome.Refusal)
+        {
+            case StudioPatchRefusal.NotFound:
+                return NotFound(NoResource);
+            case StudioPatchRefusal.DoesNotApply:
+                return Problem(StatusCodes.Status400BadRequest, "The patch does not apply to the resource.");
+            case StudioPatchRefusal.ChangesIdOrKind:
+                return Problem(StatusCodes.Status400BadRequest, "A patch may not change id or kind.");
+            case StudioPatchRefusal.Stale:
+                return Problem(StatusCodes.Status409Conflict, "The resource has changed since this version. Read it again.");
+        }
+
+        httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        return Results.Ok(new StudioPatchResponse(outcome.Version!, StudioDiagnostics.Compile(folder, catalog)));
+    }
+
+    private const string NoResource = "The application has no resource with this id.";
+
+    private static StudioFile? FindResource(string folder, string id) =>
+        id is { Length: 36 } && Guid.TryParseExact(id, "D", out var guid)
+            ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
+            : null;
 
     // The checks both routes share: the folder, or the problem that refused the request.
     private static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
@@ -79,8 +154,9 @@ internal static class StudioEndpoints
             : (null, NotFound("No Studio folder holds an application with this name."));
     }
 
-    private static IResult NotFound(string title) =>
-        Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
+    private static IResult NotFound(string title) => Problem(StatusCodes.Status404NotFound, title);
+
+    private static IResult Problem(int statusCode, string title) => Results.Problem(statusCode: statusCode, title: title);
 }
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
@@ -91,3 +167,6 @@ internal sealed record StudioResourceItem(string Id, string Kind, string? Name, 
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);
+
+/// <summary>The answer to a patch: the file's new version and the folder's compile diagnostics.</summary>
+internal sealed record StudioPatchResponse(string Version, IReadOnlyList<StudioDiagnostic> Diagnostics);

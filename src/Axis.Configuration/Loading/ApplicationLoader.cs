@@ -24,7 +24,7 @@ public static class ApplicationLoader
 
     private static readonly JsonDocumentOptions _documentOptions = new() { AllowDuplicateProperties = false };
 
-    private static readonly JsonSerializerOptions _serializerOptions = new()
+    internal static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = false,
@@ -241,61 +241,61 @@ public static class ApplicationLoader
                 switch (kind)
                 {
                     case ResourceKinds.Application when file == ManifestFileName:
-                        application = root.Deserialize<ApplicationManifest>(_serializerOptions)! with { File = file };
+                        application = root.Deserialize<ApplicationManifest>(SerializerOptions)! with { File = file };
                         break;
                     case ResourceKinds.Entity:
-                        entities.Add(root.Deserialize<EntityResource>(_serializerOptions)! with { File = file });
+                        entities.Add(root.Deserialize<EntityResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Site:
-                        sites.Add(root.Deserialize<SiteResource>(_serializerOptions)! with { File = file });
+                        sites.Add(root.Deserialize<SiteResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Page:
-                        pages.Add(root.Deserialize<PageResource>(_serializerOptions)! with { File = file });
+                        pages.Add(root.Deserialize<PageResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Text:
-                        texts.Add(root.Deserialize<TextResource>(_serializerOptions)! with { File = file });
+                        texts.Add(root.Deserialize<TextResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Seed:
-                        seeds.Add(root.Deserialize<SeedResource>(_serializerOptions)! with { File = file });
+                        seeds.Add(root.Deserialize<SeedResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.DataSource:
-                        dataSources.Add(root.Deserialize<DataSourceResource>(_serializerOptions)! with { File = file });
+                        dataSources.Add(root.Deserialize<DataSourceResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Rule:
-                        rules.Add(root.Deserialize<RuleResource>(_serializerOptions)! with { File = file });
+                        rules.Add(root.Deserialize<RuleResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Sequence:
-                        sequences.Add(root.Deserialize<SequenceResource>(_serializerOptions)! with { File = file });
+                        sequences.Add(root.Deserialize<SequenceResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Process:
-                        processes.Add(root.Deserialize<ProcessResource>(_serializerOptions)! with { File = file });
+                        processes.Add(root.Deserialize<ProcessResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Form:
-                        forms.Add(root.Deserialize<FormResource>(_serializerOptions)! with { File = file });
+                        forms.Add(root.Deserialize<FormResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Role:
-                        roles.Add(root.Deserialize<RoleResource>(_serializerOptions)! with { File = file });
+                        roles.Add(root.Deserialize<RoleResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Policy:
-                        policies.Add(root.Deserialize<PolicyResource>(_serializerOptions)! with { File = file });
+                        policies.Add(root.Deserialize<PolicyResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Connector:
-                        connectors.Add(root.Deserialize<ConnectorResource>(_serializerOptions)! with { File = file });
+                        connectors.Add(root.Deserialize<ConnectorResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Event:
-                        events.Add(root.Deserialize<EventResource>(_serializerOptions)! with { File = file });
+                        events.Add(root.Deserialize<EventResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Endpoint:
-                        endpoints.Add(root.Deserialize<EndpointResource>(_serializerOptions)! with { File = file });
+                        endpoints.Add(root.Deserialize<EndpointResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Trigger:
-                        triggers.Add(root.Deserialize<TriggerResource>(_serializerOptions)! with { File = file });
+                        triggers.Add(root.Deserialize<TriggerResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Migration:
-                        migrations.Add(root.Deserialize<MigrationResource>(_serializerOptions)! with { File = file });
+                        migrations.Add(root.Deserialize<MigrationResource>(SerializerOptions)! with { File = file });
                         break;
                     case ResourceKinds.Scenario:
-                        scenarios.Add(root.Deserialize<ScenarioResource>(_serializerOptions)! with { File = file });
+                        scenarios.Add(root.Deserialize<ScenarioResource>(SerializerOptions)! with { File = file });
                         break;
                 }
             }

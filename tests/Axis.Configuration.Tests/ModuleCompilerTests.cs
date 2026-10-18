@@ -16,6 +16,225 @@ public sealed class ModuleCompilerTests
           "fields": [ { "name": "name", "type": "text", "required": true } ] }
         """;
 
+    private const string SequenceId = "7e2a4b90-3c1d-4f6e-8a0b-9d5c1e2f3a04";
+    private const string SeedId = "9b4c6d12-5e3f-4a70-8c2d-1f6e3a4b5c08";
+    private const string SeedRecordId = "3a5b7c9d-1e2f-4a3b-9c4d-5e6f7a8b9c0d";
+    private const string PersonRequest = $$"""
+        { "id": "a1b2c3d4-0000-4000-8000-000000000001", "kind": "entity", "name": "Request", "formatVersion": 1,
+          "fields": [ { "name": "department", "type": "reference", "target": "{{DepartmentName}}" } ] }
+        """;
+    private const string DepartmentName = "departments/Department";
+
+    private const string NamedDepartment = $$"""
+        { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1, "displayField": "name",
+          "fields": [ { "name": "name", "type": "text", "required": true } ] }
+        """;
+
+    [Fact]
+    public void A_module_entity_joins_the_model_with_an_id_derived_from_the_application_and_a_qualified_name()
+    {
+        using var modules = Modules("1.0.0", "1.2.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "^1.0.0" }]""");
+        var installed = ModuleCatalog.Load(modules.Path).Modules;
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, installed);
+        var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
+
+        Assert.Empty(compiled.Diagnostics);
+        var entity = Assert.Single(compiled.Model!.Entities);
+        var expected = ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(DepartmentId));
+        Assert.Equal((expected, DepartmentName, "modules/departments/Department.json"), (entity.Id, entity.Name, entity.File));
+        Assert.NotEqual(Guid.Parse(DepartmentId), entity.Id);
+        Assert.Equal(expected, Assert.Single(rebuilt.Model!.Entities).Id);
+    }
+
+    [Fact]
+    public void A_module_entity_id_stays_the_same_when_another_version_is_pinned()
+    {
+        using var first = Modules("1.0.0");
+        using var second = Modules("1.2.0");
+        using var folderOne = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+        using var folderTwo = Folder("""[{ "id": "departments", "version": "1.2.0" }]""");
+
+        var one = ApplicationCompiler.Compile(folderOne.Path, null, ModuleCatalog.Load(first.Path).Modules);
+        var two = ApplicationCompiler.Compile(folderTwo.Path, null, ModuleCatalog.Load(second.Path).Modules);
+
+        Assert.Equal(Assert.Single(one.Model!.Entities).Id, Assert.Single(two.Model!.Entities).Id);
+    }
+
+    [Fact]
+    public void Two_applications_get_different_ids_for_the_same_module_entity()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+        using var other = new TemporaryFolder().With("application.json", $$"""
+            { "id": "1f2e3d4c-5b6a-4788-9a0b-1c2d3e4f5a6b", "kind": "application", "name": "Other", "formatVersion": 1,
+              "modules": [{ "id": "departments", "version": "1.0.0" }] }
+            """);
+        var installed = ModuleCatalog.Load(modules.Path).Modules;
+
+        var first = ApplicationCompiler.Compile(folder.Path, null, installed);
+        var second = ApplicationCompiler.Compile(other.Path, null, installed);
+
+        Assert.NotEqual(Assert.Single(first.Model!.Entities).Id, Assert.Single(second.Model!.Entities).Id);
+    }
+
+    [Fact]
+    public void The_UUID_v5_helper_matches_the_RFC_9562_example()
+    {
+        var dnsNamespace = Guid.Parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+
+        Assert.Equal(Guid.Parse("2ed6657d-e927-568b-95e1-2665a8aea6a2"), ModuleResourceIds.Create(dnsNamespace, "www.example.com"));
+    }
+
+    [Fact]
+    public void An_application_field_can_target_a_module_entity()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/Department.json", NamedDepartment);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("Request.json", PersonRequest);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var request = result.Model!.Entities.Single(entity => entity.Name == "Request");
+        var target = result.Model.Entities.Single(entity => entity.Name == DepartmentName);
+        var field = Assert.Single(request.Fields);
+        Assert.Equal(new EntityReference(target.Id, DepartmentName), field.Target);
+        Assert.Equal(ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(DepartmentId)), field.Target!.Id);
+        Assert.Equal("name", field.TargetDisplayField);
+        Assert.Equal([DepartmentName, "Request"], result.Model.Entities.Select(entity => entity.Name));
+    }
+
+    [Fact]
+    public void A_reference_to_an_undeclared_module_is_reported_at_the_target()
+    {
+        using var folder = Folder("[]").With("Request.json", PersonRequest.Replace(DepartmentName, "people/Person", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UndeclaredModuleReference, "Request.json", "/fields/0/target"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'people'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_name_the_pinned_module_lacks_keeps_the_unknown_entity_code()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("Request.json", PersonRequest.Replace(DepartmentName, "departments/Missing", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownReferenceTarget, "Request.json", "/fields/0/target"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_reference_under_a_module_that_could_not_be_pinned_is_not_reported_again()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "^2.0.0" }]""").With("Request.json", PersonRequest);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(DiagnosticCodes.NoModuleVersionInRange, Assert.Single(result.Diagnostics).Code);
+    }
+
+    [Fact]
+    public void A_module_entity_field_that_names_another_module_with_a_slash_is_reported_once()
+    {
+        using var modules = Modules("1.0.0").With(
+            "departments/1.0.0/Employee.json",
+            """
+            { "id": "8a0b2e44-1c3d-4e5f-8a6b-7c8d9e0f1a2b", "kind": "entity", "name": "Employee", "formatVersion": 1,
+              "fields": [ { "name": "person", "type": "reference", "target": "people/Person" } ] }
+            """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, "modules/departments/Employee.json", "/fields/0/target", Guid.Parse("8a0b2e44-1c3d-4e5f-8a6b-7c8d9e0f1a2b")),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_entity_field_names_a_resource_of_its_own_module_without_a_slash()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/Department.json", NamedDepartment)
+            .With(
+                "departments/1.0.0/Employee.json",
+                """
+                { "id": "8a0b2e44-1c3d-4e5f-8a6b-7c8d9e0f1a2b", "kind": "entity", "name": "Employee", "formatVersion": 1,
+                  "fields": [ { "name": "department", "type": "reference", "target": "Department" } ] }
+                """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var employee = result.Model!.Entities.Single(entity => entity.Name == "departments/Employee");
+        Assert.Equal(DepartmentName, Assert.Single(employee.Fields).Target!.Name);
+    }
+
+    [Fact]
+    public void A_module_sequence_and_seed_join_the_model_with_derived_ids_and_qualified_names()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/Department.json", $$"""
+                { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1,
+                  "fields": [ { "name": "code", "type": "text", "sequence": "Codes" } ] }
+                """)
+            .With("departments/1.0.0/Codes.json", $$"""
+                { "id": "{{SequenceId}}", "kind": "sequence", "name": "Codes", "formatVersion": 1, "format": "D-{n:4}" }
+                """)
+            .With("departments/1.0.0/Departments.json", $$"""
+                { "id": "{{SeedId}}", "kind": "seed", "name": "Departments", "formatVersion": 1, "entity": "Department",
+                  "records": [ { "id": "{{SeedRecordId}}", "values": { "code": "D-0001" } } ] }
+                """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var applicationId = Guid.Parse(ApplicationId);
+        var entity = Assert.Single(result.Model!.Entities);
+        var sequence = Assert.Single(entity.Fields).Sequence!;
+        Assert.Equal(("departments/Codes", ModuleResourceIds.Derive(applicationId, Guid.Parse(SequenceId))), (sequence.Name, sequence.Id));
+        var seed = Assert.Single(result.Model.Seeds);
+        Assert.Equal(
+            ("departments/Departments", ModuleResourceIds.Derive(applicationId, Guid.Parse(SeedId))),
+            (seed.Name, seed.Id));
+        Assert.Equal(new EntityReference(entity.Id, "departments/Department"), seed.Entity);
+        Assert.Equal(Guid.Parse(SeedRecordId), Assert.Single(seed.Records).Id);
+    }
+
+    [Fact]
+    public void A_module_field_naming_a_missing_sequence_of_its_module_is_reported_in_the_module_file()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/Department.json", $$"""
+            { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1,
+              "fields": [ { "name": "code", "type": "text", "sequence": "Codes" } ] }
+            """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownSequence, "modules/departments/Department.json", "/fields/0/sequence", Guid.Parse(DepartmentId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+    }
+
     [Fact]
     public void A_caret_range_pins_the_highest_installed_version_and_stores_its_files()
     {
