@@ -813,8 +813,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   button first among its actions. It loads `GET /api/me` each time a shell
   mounts, and shows nothing while it loads or when the load fails. See
   [sign-in and the session](../architecture.md#sign-in-and-the-session).
-  *(Planned for M8: the header also reads `studio` from it, to show the
-  [Studio](#studio) link.)*
+  The header also reads `studio` from it, and shows the [Studio](#studio)
+  link beside the button when it is `true`.
   - With nobody signed in, it is a **Sign in** button. It sends the browser
     to `/api/auth/sign-in` with the current path and query string as
     `returnUrl`, so the person comes back to the same page.
@@ -847,20 +847,27 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 ## Studio
 
-*(planned for M8)* Studio is where authors edit an application's resources. It
-uses the [authoring API](authoring.md) and writes the same JSON files that git
-keeps, as
+Studio is where authors edit an application's resources. It uses the
+[authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
-agrees.
+agrees. The route, the link, the application picker, the resource list with its
+search and the diagnostics panel are built. *(Planned for M8: the editor, the
+Uses and Used by lists, the delete warning and the reconnect message.)*
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
   who opens the route without the author role gets a `403` from the API and
-  sees an error message.
+  sees a forbidden page. A signed-out person is sent to sign in.
+- **Address.** The picked application and the selected resource are in the
+  address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
+  them.
 - **Application picker.** The first step picks one of the applications that
-  `GET /api/studio/apps` lists.
-- **Resource list.** The list groups the resources by kind. A search box
-  filters it by name and `id`.
+  `GET /api/studio/apps` lists. With only one application, it is picked at
+  once.
+- **Resource list.** The list groups the resources by kind. The kind shows as
+  written in the files, such as `entity`, without translation. A search box
+  filters it by name and `id`, ignoring letter case. Selecting a resource shows
+  its name, kind, `id` and file. It does not yet read the file's content.
 - **Editor.** The editor shows one resource in two views of the same content.
   - A form is built from the JSON Schema of the resource's kind.
   - A JSON view shows the file's content. A change in either view is sent as
@@ -878,9 +885,14 @@ agrees.
 - **Delete warning.** When a resource's `usedBy` count is above 0, Studio warns
   before a delete and names the count. The warning does not block the delete.
   The next diagnostics report what broke.
-- **Diagnostics panel.** The panel lists the diagnostics that the last write
-  returned. Each item opens its file in the editor, at its `path`. A diagnostic
-  never blocks a save.
+- **Diagnostics panel.** The panel lists the diagnostics of the folder, with
+  each one's code, severity, message, file and `path`. It loads them from
+  `GET /api/studio/apps/{application}/diagnostics` when an application is
+  picked. *(Planned for M8: the diagnostics that a write returns.)* A
+  diagnostic that names a resource selects it and clears the search, so the
+  resource is listed. *(Planned for M8: opening the file in the editor at the
+  diagnostic's `path`.)* A diagnostic that names no resource cannot be
+  selected. A diagnostic never blocks a save.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a short reconnect message and retries until the server
   answers.
