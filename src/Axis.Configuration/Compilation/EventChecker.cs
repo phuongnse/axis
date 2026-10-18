@@ -21,6 +21,7 @@ internal static class EventChecker
         Func<string, EntityResource?> findEntity,
         Func<string, string?> ownerOf,
         IReadOnlySet<string> unloadedEntityNames,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         foreach (var @event in events)
@@ -40,7 +41,12 @@ internal static class EventChecker
                         "/entity");
                 }
             }
-            else if (ownerOf(entity.Name) is { } owner)
+            else
+            {
+                references.Add(@event, "/entity", ReferenceRelations.EventEntity, ResourceNode.Of(entity));
+            }
+
+            if (entity is not null && ownerOf(entity.Name) is { } owner)
             {
                 Report(
                     DiagnosticCodes.EventOverChildEntity,

@@ -279,7 +279,6 @@ public static class ApplicationCompiler
         EndpointResource? FindEndpoint(string name) => endpointsByName.GetValueOrDefault(name);
 
         // Role names are lower case only and are matched exactly.
-        var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
         var rolesByName = new Dictionary<string, RoleResource>(StringComparer.Ordinal);
         foreach (var role in loaded.Roles)
         {
@@ -383,6 +382,7 @@ public static class ApplicationCompiler
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
             loaded.UnloadedEntityNames,
+            references,
             diagnostics);
         EndpointChecker.Check(
             loaded.Endpoints,
@@ -392,6 +392,7 @@ public static class ApplicationCompiler
             FindProcess,
             loaded.UnloadedProcessNames,
             (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
+            references,
             diagnostics);
         TriggerChecker.Check(
             loaded.Triggers,
@@ -405,11 +406,12 @@ public static class ApplicationCompiler
             loaded.UnloadedDataSourceNames,
             rules,
             declaredModules,
+            references,
             diagnostics);
-        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, diagnostics);
+        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);
         ScenarioChecker.Check(
             loaded.Scenarios,
-            roleNames,
+            FindRole,
             loaded.UnloadedRoleNames,
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
@@ -420,6 +422,7 @@ public static class ApplicationCompiler
             loaded.UnloadedConnectorNames,
             FindPackage,
             declaredPackageIds,
+            references,
             diagnostics);
 
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics)) { References = references.Build() };
@@ -863,7 +866,7 @@ public static class ApplicationCompiler
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Adds the <c>field target</c> edge of a reference or child collection field whose target entity resolves.</summary>
-    private static void AddFieldTarget(
+    internal static void AddFieldTarget(
         Resource owner, FieldDefinition field, string path, Func<string, EntityResource?> findEntity, ReferenceIndexBuilder references)
     {
         if (field.Target is { } target

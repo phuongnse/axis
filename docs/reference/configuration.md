@@ -1004,10 +1004,10 @@ agrees. Studio reads it through the [authoring API](authoring.md#references)
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
 | `field target` | Entity, data source | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
-| `field target` *(planned for M8)* | Endpoint | `/input/{i}/target` | Entity |
+| `field target` | Endpoint | `/input/{i}/target` | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
 | `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter` | Rule |
-| `rule call` *(planned for M8)* | Trigger | `/when` of a data change trigger | Rule |
+| `rule call` | Trigger | `/when` of a data change trigger | Rule |
 | `navigation page` | Site | `/navigation/{i}/page` | Page |
 | `widget entity` | Page | `/widgets/{i}/entity` | Entity |
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
@@ -1027,19 +1027,19 @@ agrees. Studio reads it through the [authoring API](authoring.md#references)
 | `raised event` | Process | `/steps/{i}/event` | Event |
 | `policy role` | Policy | `/roles/{i}` | Role |
 | `grant` | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
-| `event entity` *(planned for M8)* | Event | `/entity` | Entity |
-| `endpoint entity` *(planned for M8)* | Endpoint | `/entity` | Entity |
-| `endpoint process` *(planned for M8)* | Endpoint | `/process` | Process |
-| `trigger process` *(planned for M8)* | Trigger | `/process` | Process |
-| `trigger event` *(planned for M8)* | Trigger | `/event` | Event |
-| `trigger entity` *(planned for M8)* | Trigger | `/entity` | Entity |
-| `trigger data source` *(planned for M8)* | Trigger | `/dataSource` | Data source |
-| `migration entity` *(planned for M8)* | Migration | `/entity` | Entity |
-| `scenario entity` *(planned for M8)* | Scenario | `/steps/{i}/entity` | Entity |
-| `scenario process` *(planned for M8)* | Scenario | `/steps/{i}/process` | Process |
-| `scenario role` *(planned for M8)* | Scenario | `/users/{user}/{j}`, `/steps/{i}/assignee/role` | Role |
-| `stub connector` *(planned for M8)* | Scenario | `/stubs/{i}/connector/name` | Connector |
-| `stub package` *(planned for M8)* | Scenario | `/stubs/{i}/operation` | Extension package |
+| `event entity` | Event | `/entity` | Entity |
+| `endpoint entity` | Endpoint | `/entity` | Entity |
+| `endpoint process` | Endpoint | `/process` | Process |
+| `trigger process` | Trigger | `/process` | Process |
+| `trigger event` | Trigger | `/event` | Event |
+| `trigger entity` | Trigger | `/entity` | Entity |
+| `trigger data source` | Trigger | `/dataSource` | Data source |
+| `migration entity` | Migration | `/entity` | Entity |
+| `scenario entity` | Scenario | `/steps/{i}/entity` | Entity |
+| `scenario process` | Scenario | `/steps/{i}/process` | Process |
+| `scenario role` | Scenario | `/users/{user}/{j}`, `/steps/{i}/assignee/role` | Role |
+| `stub connector` | Scenario | `/stubs/{i}/connector/name` | Connector |
+| `stub package` | Scenario | `/stubs/{i}/operation` | Extension package |
 
 - **Label paths.** A `label text` edge sits at the `/textKey` of each label the
   `AXC0028` check covers: the application label, entity and

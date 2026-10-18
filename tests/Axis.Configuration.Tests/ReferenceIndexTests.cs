@@ -1,3 +1,4 @@
+using System.Reflection;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
@@ -362,71 +363,231 @@ public sealed class ReferenceIndexTests
     }
 
     [Fact]
-    public void A_clean_folder_produces_an_edge_for_each_relation_this_index_builds()
+    public void A_clean_folder_gives_the_event_endpoint_trigger_migration_and_scenario_edges()
     {
-        using var folder = SalesFolder("IsHuge(quantity)")
-            .With("rules/is-huge.json", IsHuge)
-            .With("data-sources/large-orders.json", DataSource("LargeOrders", "IsLarge(quantity)"))
-            .With("data-sources/order-customers.json", DataSource("OrderCustomers", fields: """[ { "name": "customerName", "path": "customer.name" } ]"""))
-            .With("seeds/customers.json", """
-                { "id": "99999999-9999-4999-8999-999999999991", "kind": "seed", "name": "Customers", "formatVersion": 1, "entity": "Customer",
-                  "records": [ { "id": "99999999-9999-4999-8999-999999999992", "values": { "name": "Acme" } } ] }
+        using var packages = new TemporaryFolder().Install("1.0.0");
+        using var folder = FullFolder();
+
+        var result = ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(
+            [(ReferenceRelations.EventEntity, "/entity", "Order")],
+            EdgesFrom(result, "OrderChecked"));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                (ReferenceRelations.EndpointEntity, "/entity", "Order"),
+                (ReferenceRelations.EndpointProcess, "/process", "OrderReview"),
+                (ReferenceRelations.FieldTarget, "/input/0/target", "Customer"),
+            },
+            EdgesFrom(result, "ImportOrder"));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                (ReferenceRelations.TriggerProcess, "/process", "OrderReview"),
+                (ReferenceRelations.TriggerEvent, "/event", "OrderChecked"),
+            },
+            EdgesFrom(result, "OnChecked"));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                (ReferenceRelations.TriggerProcess, "/process", "OrderReview"),
+                (ReferenceRelations.TriggerEntity, "/entity", "Order"),
+                (ReferenceRelations.RuleCall, "/when", "IsLarge"),
+            },
+            EdgesFrom(result, "OnChange"));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                (ReferenceRelations.TriggerProcess, "/process", "OrderReview"),
+                (ReferenceRelations.TriggerDataSource, "/dataSource", "LargeOrders"),
+            },
+            EdgesFrom(result, "Nightly"));
+        Assert.Equal(
+            [(ReferenceRelations.MigrationEntity, "/entity", "Order")],
+            EdgesFrom(result, "RenameQty"));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                (ReferenceRelations.ScenarioRole, "/users/anna/0", "approver"),
+                (ReferenceRelations.StubConnector, "/stubs/0/connector/name", "PurchasingSystem"),
+                (ReferenceRelations.StubPackage, "/stubs/1/operation", "test-package"),
+                (ReferenceRelations.ScenarioEntity, "/steps/0/entity", "Order"),
+                (ReferenceRelations.ScenarioProcess, "/steps/1/process", "OrderReview"),
+                (ReferenceRelations.ScenarioRole, "/steps/2/assignee/role", "approver"),
+            },
+            EdgesFrom(result, "OrderFlow"));
+    }
+
+    [Fact]
+    public void A_scenario_with_an_unknown_task_step_reports_it_and_keeps_its_role_edges()
+    {
+        using var folder = FullFolder().With("scenarios/order-flow.json", ScenarioWithUnknownTaskStep);
+        using var packages = new TemporaryFolder().Install("1.0.0");
+
+        var result = ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownScenarioStep, "scenarios/order-flow.json", "/steps/1/step"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                (ReferenceRelations.ScenarioRole, "/users/anna/0", "approver"),
+                (ReferenceRelations.ScenarioEntity, "/steps/0/entity", "Order"),
+                (ReferenceRelations.ScenarioRole, "/steps/1/assignee/role", "approver"),
+            },
+            EdgesFrom(result, "OrderFlow"));
+    }
+
+    [Fact]
+    public void An_event_over_a_child_entity_reports_it_and_keeps_its_entity_edge()
+    {
+        using var folder = SalesFolder("IsLarge(quantity)")
+            .With("entities/order.json", """
+                { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
+                  "fields": [
+                    { "name": "number", "type": "text", "sequence": "OrderNumber" },
+                    { "name": "quantity", "type": "integer" },
+                    { "name": "customer", "type": "reference", "target": "Customer" },
+                    { "name": "lines", "type": "child-collection", "target": "OrderLine" } ],
+                  "validations": [ { "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
                 """)
-            .With("forms/order-entry.json", """
-                { "id": "88888888-8888-4888-8888-888888888881", "kind": "form", "name": "OrderEntry", "formatVersion": 1, "entity": "Order",
-                  "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "quantity" } ] } ] }
+            .With("entities/order-line.json", """
+                { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
+                  "fields": [ { "name": "quantity", "type": "integer" } ] }
                 """)
-            .With("processes/order-review.json", """
-                { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
-                  "entity": "Order", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
-                """)
-            .With("pages/orders.json", PresentationCompilerTests.Page(
-                "Orders",
-                """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""",
-                "55555555-5555-4555-8555-555555555551"))
-            .With("pages/order-list.json", PresentationCompilerTests.Page(
-                "OrderList",
-                """{ "type": "table", "dataSource": "LargeOrders" }""",
-                "55555555-5555-4555-8555-555555555553"))
-            .With("pages/order-review.json", PresentationCompilerTests.Page(
-                "OrderReviewPage",
-                """{ "type": "processInspector", "process": "OrderReview" }""",
-                "55555555-5555-4555-8555-555555555554"))
-            .With("pages/order-form.json", PresentationCompilerTests.Page(
-                "OrderForm",
-                """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } } ] }""",
-                "55555555-5555-4555-8555-555555555552",
-                "orderForm.title"))
-            .With("sites/sales.json", """
-                { "id": "66666666-6666-4666-8666-666666666661", "kind": "site", "name": "Sales", "formatVersion": 1, "path": "sales",
-                  "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
-                  "navigation": [ { "page": "Orders", "label": { "textKey": "nav.orders" } } ] }
+            .With("events/line-added.json", """
+                { "id": "5c1e7a2b-3d4f-4a6b-8c9d-0e1f2a3b4c5d", "kind": "event", "name": "LineAdded", "formatVersion": 1, "entity": "OrderLine",
+                  "fields": [] }
                 """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
-        Assert.Empty(result.Diagnostics);
-        var relations = result.References.Edges.Select(edge => edge.Relation).ToHashSet();
-        Assert.All(_expectedRelations, relation => Assert.Contains(relation, relations));
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.EventOverChildEntity, "events/line-added.json", "/entity"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(
+            [(ReferenceRelations.EventEntity, "/entity", "OrderLine")],
+            EdgesFrom(result, "LineAdded"));
     }
 
-    private static readonly string[] _expectedRelations =
-    [
-        ReferenceRelations.FieldTarget,
-        ReferenceRelations.FieldSequence,
-        ReferenceRelations.RuleCall,
-        ReferenceRelations.NavigationPage,
-        ReferenceRelations.WidgetEntity,
-        ReferenceRelations.WidgetDataSource,
-        ReferenceRelations.WidgetForm,
-        ReferenceRelations.WidgetFormPage,
-        ReferenceRelations.WidgetProcess,
-        ReferenceRelations.ActionProcess,
-        ReferenceRelations.FormEntity,
-        ReferenceRelations.SeedEntity,
-        ReferenceRelations.DataSourceEntity,
-        ReferenceRelations.FieldPath,
-    ];
+    [Fact]
+    public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_department_entity()
+    {
+        var result = ApplicationCompiler.Compile(
+            Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
+
+        Assert.Empty(result.Diagnostics);
+        var edges = result.References.Edges
+            .Where(edge => edge.To is ResourceNode { Kind: ResourceKinds.Entity, Name: "Department" })
+            .Select(edge => (edge.From.File, edge.Path, edge.Relation));
+        Assert.Equivalent(
+            new (string, string, string)[]
+            {
+                ("entities/purchase-request.json", "/fields/3/target", ReferenceRelations.FieldTarget),
+                ("data-sources/purchase-request-list.json", "/fields/2/path", ReferenceRelations.FieldPath),
+                ("data-sources/requests-by-department.json", "/fields/0/path", ReferenceRelations.FieldPath),
+                ("seeds/departments.json", "/entity", ReferenceRelations.SeedEntity),
+                ("pages/departments.json", "/widgets/0/entity", ReferenceRelations.WidgetEntity),
+                ("endpoints/submit-purchase-request.json", "/input/1/target", ReferenceRelations.FieldTarget),
+                ("policies/department-manager-access.json", "/grants/1/entity", ReferenceRelations.Grant),
+                ("policies/finance-reviewer-access.json", "/grants/1/entity", ReferenceRelations.Grant),
+                ("policies/operator-access.json", "/grants/1/entity", ReferenceRelations.Grant),
+                ("policies/employee-access.json", "/grants/2/entity", ReferenceRelations.Grant),
+            },
+            edges);
+    }
+
+    [Fact]
+    public void Every_relation_in_the_relation_list_is_built_by_some_fixture()
+    {
+        var expected = typeof(ReferenceRelations)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.IsLiteral)
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .ToList();
+        Assert.Equal(39, expected.Count);
+
+        var relations = new HashSet<string>();
+        using (var packages = new TemporaryFolder().Install("1.0.0"))
+        using (var folder = FullFolder())
+        {
+            relations.UnionWith(RelationsOf(ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions)));
+        }
+
+        using (var folder = SalesPresentationFolder())
+        {
+            relations.UnionWith(RelationsOf(ApplicationCompiler.Compile(folder.Path)));
+        }
+
+        using (var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/order.json", Order("order.label", "order.label"))
+            .With("texts/en.json", TextsEn))
+        {
+            relations.UnionWith(RelationsOf(ApplicationCompiler.Compile(folder.Path)));
+        }
+
+        using (var modules = new TemporaryFolder().With("departments/1.0.0/module.json", ModuleCatalogTests.Manifest("departments", "1.0.0")))
+        using (var folder = new TemporaryFolder().With("application.json", ApplicationWithPackageAndModule))
+        {
+            relations.UnionWith(RelationsOf(ApplicationCompiler.Compile(
+                folder.Path, [new PackageVersion("test-package", "1.0.0")], ModuleCatalog.Load(modules.Path).Modules)));
+        }
+
+        Assert.DoesNotContain(expected, relation => !relations.Contains(relation));
+    }
+
+    private static HashSet<string> RelationsOf(CompilationResult result)
+    {
+        Assert.Empty(result.Diagnostics);
+        return result.References.Edges.Select(edge => edge.Relation).ToHashSet();
+    }
+
+    /// <summary>The sales folder with a seed, forms, processes, pages and a site, which gives the presentation edges.</summary>
+    private static TemporaryFolder SalesPresentationFolder() =>
+        SalesFolder("IsHuge(quantity)")
+        .With("rules/is-huge.json", IsHuge)
+        .With("data-sources/large-orders.json", DataSource("LargeOrders", "IsLarge(quantity)"))
+        .With("data-sources/order-customers.json", DataSource("OrderCustomers", fields: """[ { "name": "customerName", "path": "customer.name" } ]"""))
+        .With("seeds/customers.json", """
+            { "id": "99999999-9999-4999-8999-999999999991", "kind": "seed", "name": "Customers", "formatVersion": 1, "entity": "Customer",
+              "records": [ { "id": "99999999-9999-4999-8999-999999999992", "values": { "name": "Acme" } } ] }
+            """)
+        .With("forms/order-entry.json", """
+            { "id": "88888888-8888-4888-8888-888888888881", "kind": "form", "name": "OrderEntry", "formatVersion": 1, "entity": "Order",
+              "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "quantity" } ] } ] }
+            """)
+        .With("processes/order-review.json", """
+            { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+              "entity": "Order", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
+            """)
+        .With("pages/orders.json", PresentationCompilerTests.Page(
+            "Orders",
+            """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""",
+            "55555555-5555-4555-8555-555555555551"))
+        .With("pages/order-list.json", PresentationCompilerTests.Page(
+            "OrderList",
+            """{ "type": "table", "dataSource": "LargeOrders" }""",
+            "55555555-5555-4555-8555-555555555553"))
+        .With("pages/order-review.json", PresentationCompilerTests.Page(
+            "OrderReviewPage",
+            """{ "type": "processInspector", "process": "OrderReview" }""",
+            "55555555-5555-4555-8555-555555555554"))
+        .With("pages/order-form.json", PresentationCompilerTests.Page(
+            "OrderForm",
+            """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } } ] }""",
+            "55555555-5555-4555-8555-555555555552",
+            "orderForm.title"))
+        .With("sites/sales.json", """
+            { "id": "66666666-6666-4666-8666-666666666661", "kind": "site", "name": "Sales", "formatVersion": 1, "path": "sales",
+              "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+              "navigation": [ { "page": "Orders", "label": { "textKey": "nav.orders" } } ] }
+            """);
 
     private static List<(string From, string Path, string To)> FieldPathEdges(CompilationResult result) =>
         result.References.Edges
@@ -556,6 +717,54 @@ public sealed class ReferenceIndexTests
                   { "endpoint": "ImportOrder", "actions": ["invoke"] }
                 ]
                 """));
+
+    /// <summary>
+    /// <see cref="ProcessFolder"/> with an endpoint that has a reference input, the three trigger types,
+    /// a migration and a scenario with a user role, an assignee role and a connector and a package stub.
+    /// </summary>
+    private static TemporaryFolder FullFolder() =>
+        ProcessFolder()
+            .With("endpoints/import-order.json", """
+                { "id": "99999999-9999-4999-8999-999999999901", "kind": "endpoint", "name": "ImportOrder", "formatVersion": 1,
+                  "entity": "Order", "process": "OrderReview",
+                  "input": [ { "name": "customer", "type": "reference", "target": "Customer" } ],
+                  "values": { "customer": "customer" } }
+                """)
+            .With("triggers/on-checked.json", """
+                { "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01", "kind": "trigger", "name": "OnChecked", "formatVersion": 1, "type": "event",
+                  "event": "OrderChecked", "process": "OrderReview" }
+                """)
+            .With("triggers/on-change.json", """
+                { "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02", "kind": "trigger", "name": "OnChange", "formatVersion": 1, "type": "dataChange",
+                  "entity": "Order", "on": ["update"], "when": "IsLarge(quantity)", "process": "OrderReview" }
+                """)
+            .With("triggers/nightly.json", """
+                { "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03", "kind": "trigger", "name": "Nightly", "formatVersion": 1, "type": "schedule",
+                  "schedule": "0 6 * * *", "timeZone": "Europe/Berlin", "dataSource": "LargeOrders", "process": "OrderReview" }
+                """)
+            .With("migrations/rename-qty.json", """
+                { "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01", "kind": "migration", "name": "RenameQty", "formatVersion": 1, "entity": "Order",
+                  "changes": [ { "type": "renameField", "from": "qty", "to": "quantity" } ] }
+                """)
+            .With("scenarios/order-flow.json", """
+                { "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01", "kind": "scenario", "name": "OrderFlow", "formatVersion": 1,
+                  "users": { "anna": ["approver"] },
+                  "stubs": [
+                    { "connector": { "name": "PurchasingSystem", "operation": "count" }, "output": {} },
+                    { "operation": "test-package/sum", "output": {} } ],
+                  "steps": [
+                    { "type": "createRecord", "entity": "Order", "as": "anna", "save": "order", "values": {} },
+                    { "type": "startProcess", "process": "OrderReview", "record": "order", "as": "anna" },
+                    { "type": "expectTask", "record": "order", "step": "approve", "assignee": { "role": "approver" } } ] }
+                """);
+
+    private static string ScenarioWithUnknownTaskStep => """
+        { "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01", "kind": "scenario", "name": "OrderFlow", "formatVersion": 1,
+          "users": { "anna": ["approver"] },
+          "steps": [
+            { "type": "createRecord", "entity": "Order", "as": "anna", "save": "order", "values": {} },
+            { "type": "expectTask", "record": "order", "step": "missing", "assignee": { "role": "approver" } } ] }
+        """;
 
     private static string Order(string entityLabelKey, string fieldLabelKey) => $$"""
         { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
