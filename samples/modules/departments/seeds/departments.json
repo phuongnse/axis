@@ -1,0 +1,13 @@
+{
+  "id": "14c2ed09-94d1-4469-923a-192bec78595a",
+  "kind": "seed",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "sync": true,
+  "records": [
+    { "id": "5619ff72-c9b7-49d7-872e-72f15778485b", "values": { "code": "FIN", "name": "Finance", "manager": "dung" } },
+    { "id": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5", "values": { "code": "ENG", "name": "Engineering", "manager": "binh" } },
+    { "id": "d1b09f14-34f5-4831-9708-158361c860df", "values": { "code": "OPS", "name": "Operations", "manager": "chau" } }
+  ]
+}

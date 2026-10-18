@@ -1,0 +1,13 @@
+{
+  "id": "b17654ec-7154-46ea-a201-eb35484677a7",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "departments.department.label": "Phòng ban",
+    "departments.department.code": "Mã",
+    "departments.department.name": "Tên",
+    "departments.department.manager": "Người quản lý"
+  }
+}

@@ -64,6 +64,8 @@ services:
       ActivateOnStartup__0: /samples/apps/purchase-requests
       # The sample extension package payment-references, which the image holds, that the sample declares.
       Extensions__Path: /extensions
+      # The sample module departments, which the image holds.
+      Modules__Path: /modules
       # The purchasing system stub on the Compose network. The token is in appsettings.Development.json.
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
     ports:
@@ -93,6 +95,8 @@ services:
       DOTNET_ENVIRONMENT: Development
       # The sample extension package payment-references, which the image holds.
       Extensions__Path: /extensions
+      # The sample module departments, which the image holds.
+      Modules__Path: /modules
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
     # Healthy once the tenant database is migrated and the loop polls. The health address

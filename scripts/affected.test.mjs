@@ -58,6 +58,12 @@ describe('matches', () => {
     }
   })
 
+  test('covers the sample modules for both suites', () => {
+    for (const matchers of Object.values(smokeSuites)) {
+      assert.equal(matches('samples/modules/departments/module.json', matchers), true)
+    }
+  })
+
   test('covers the purchasing system stub for both suites', () => {
     for (const matchers of Object.values(smokeSuites)) {
       assert.equal(matches('tests/Axis.PurchasingStub/PurchasingStubApp.cs', matchers), true)

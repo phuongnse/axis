@@ -1,0 +1,12 @@
+{
+  "id": "173d6ea7-dda3-4380-bac9-24f7c8caa40e",
+  "kind": "rule",
+  "name": "IsManager",
+  "formatVersion": 1,
+  "parameters": [
+    { "name": "manager", "type": "text" },
+    { "name": "user", "type": "text" }
+  ],
+  "resultType": "boolean",
+  "expression": "manager == user"
+}

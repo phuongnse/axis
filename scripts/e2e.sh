@@ -193,7 +193,7 @@ run_worker() {
   while true; do
     DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
       Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
-      Extensions__Path="$root/artifacts/extensions" \
+      Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
       Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
       Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \

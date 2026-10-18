@@ -238,6 +238,10 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
 
+    // The sample module departments is installed where Modules:Path points, and the server loads it.
+    assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/departments/1.0.0/module.json')))
+    assert.doesNotMatch(run.stdout, /The module version is not loaded/)
+
     // Keycloak serves the development realm, and starts before the server.
     const discovery = await fetch(`http://localhost:${ports.keycloak}/realms/axis/.well-known/openid-configuration`)
     assert.equal(discovery.status, 200)

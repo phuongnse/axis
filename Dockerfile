@@ -1,6 +1,7 @@
 # Builds Axis from source and runs the server with the purchase request sample. The server is
 # the last stage, so it is the default target. The worker stage runs the worker host with its health
 # endpoints, and the purchasing stage runs the purchasing system stub from tests/Axis.PurchasingStub.
+# The images hold the sample module departments in /modules.
 # For local use: the Development environment and the sample credentials are not for production.
 
 # The SPA. Vite writes it to ../src/Axis.Server/wwwroot, the server's web root.
@@ -32,6 +33,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS worker
 WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
+COPY samples/modules/departments/ /modules/departments/1.0.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
 
@@ -57,6 +59,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
+COPY samples/modules/departments/ /modules/departments/1.0.0/
 COPY samples/ /samples/
 USER $APP_UID
 EXPOSE 8080
