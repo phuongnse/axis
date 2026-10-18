@@ -8,8 +8,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, resource list, read, patch, create, delete and diagnostics
-routes are built. *(Planned for M8: the references routes.)* It is
+in git. The application list, resource list, read, patch, create, delete, diagnostics
+and references routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 It never activates a release and touches no database. Under `scripts/dev.sh`,
@@ -40,13 +40,13 @@ Routes marked *(planned for M8)* are not built yet.
 | Method and path | Response |
 | --- | --- |
 | `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below |
-| `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file` and `version`. *(Planned for M8: `usedBy`.)* |
+| `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
-| *(planned for M8)* `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
-| *(planned for M8)* `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
+| `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
+| `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
 
 `file` is the path of the resource's file relative to the application folder,
@@ -54,8 +54,8 @@ written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
 letter case, and the answers write it in lower case. A file is a resource only
 when it is a JSON object with a UUID `id` and a string `kind`. Other files are
 left out of the list and cannot be read. When two files share an `id`, the
-first in path order is the resource. *(Planned for M8)* `usedBy` is the number
-of entries in the resource's `usedBy` list, see [References](#references).
+first in path order is the resource. `usedBy` is the number of entries in the
+resource's `usedBy` list, see [References](#references).
 
 ## Versions
 
@@ -107,8 +107,8 @@ exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Create, Patch, Delete and Diagnostics
-are built, and the others are *(planned for M8)*.
+from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
+Resource references and Text key references are built.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -129,8 +129,7 @@ and a patch needs `application/json-patch+json`.
 
 ## References
 
-*(planned for M8)* The two references routes answer where a resource or a text
-key is used. They read the [reference index](configuration.md#reference-index)
+The two references routes answer where a resource or a text key is used. They read the [reference index](configuration.md#reference-index)
 that every compile builds, as
 [D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
 agrees.
@@ -142,7 +141,8 @@ agrees.
   the labels that use the key and the `text` resources that define it. A key
   that a label uses but no locale defines still answers with its uses, so an
   author who opens a missing key from an `AXC0028` diagnostic sees where it is
-  used. `{key}` is matched ordinally, as keys are compared.
+  used. `{key}` is matched ordinally, as keys are compared. A key that contains
+  `/` cannot be addressed, because the route does not decode `%2F`.
 - **Entry.** Each entry is `{ relation, file, path, node }`.
   - `relation` is the name of the relation, such as `task form`.
   - `file` and `path` are always in the resource that holds the reference. So
@@ -150,9 +150,10 @@ agrees.
     one. An entry opens its resource at that path.
   - `node` is the other end: `{ type: "resource", id, kind, name, file }`,
     `{ type: "text", key }`, `{ type: "package", id }` or
-    `{ type: "module", name }`. In `usedBy`, it names the resource that holds
+    `{ type: "module", id }`. In `usedBy`, it names the resource that holds
     the reference.
-- **Order.** Entries are in path order of the using file, then by path.
+- **Order.** Entries are sorted by the using file, then by path, both with
+  ordinal string comparison. So `/steps/10` sorts before `/steps/2`.
 - **Compiled in memory.** The folder is compiled in memory, as for
   [diagnostics](#diagnostics), and no database is touched. A folder with errors
   still answers with the edges that resolved.

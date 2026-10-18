@@ -974,7 +974,7 @@ and a JSON view, and shows the diagnostics.
 Every compile collects each reference it resolves into a reference index, as
 [D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
 agrees. Studio reads it through the [authoring API](authoring.md#references)
-*(planned for M8)* to show where a resource is used and what it uses.
+to show where a resource is used and what it uses.
 
 - **Built by the compile.** The index is built in memory, in the same pass as
   the [Resolve step](#configuration-pipeline). It is not stored in the release
