@@ -68,7 +68,7 @@ flowchart LR
      [Entity logic](#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
-     reserved by the platform (`api`, `health`, `assets`), or one that an
+     reserved by the platform (`api`, `health`, `assets`, `studio`), or one that an
      earlier site of the application already uses in path order, is
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in
@@ -938,7 +938,9 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Two server settings control it. They are built, and the authoring
-API reads them. *(Planned for M8: the routes that create and delete, and the Studio page.)*
+API reads them. The Studio page lists the resources with a search and shows
+the diagnostics. *(Planned for M8: the routes that create and delete, and the
+Studio editor.)*
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
@@ -957,7 +959,7 @@ API reads them. *(Planned for M8: the routes that create and delete, and the Stu
   a saved file restarts the server, which activates the folder, see
   [Startup activation](#startup-activation). Elsewhere a folder is committed
   and deployed as today.
-- **Current user.** *(Planned for M8)* `GET /api/me` answers `studio: true` when `Studio:Folders`
+- **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
   is not empty and the user holds the author role.
 
 ## Reference index

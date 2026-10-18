@@ -7,6 +7,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Tests;
+using Axis.Server.Studio;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -70,6 +71,55 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Author_lists_the_applications_of_the_folders()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var item = Assert.Single(body.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal("PurchaseRequests", item.GetProperty("name").GetString());
+        Assert.Equal(["name"], item.EnumerateObject().Select(property => property.Name));
+    }
+
+    [Fact]
+    public void Applications_skip_a_folder_without_a_manifest_name_and_keep_the_first_of_a_repeated_name()
+    {
+        var copy = Path.Combine(_root, "copy");
+        CopyDirectory(Folder, copy);
+        var upper = Path.Combine(_root, "upper");
+        CopyDirectory(Folder, upper);
+        File.WriteAllText(Path.Combine(upper, "application.json"), """{ "name": "PURCHASEREQUESTS" }""");
+        var second = Path.Combine(_root, "second");
+        CopyDirectory(Folder, second);
+        File.WriteAllText(Path.Combine(second, "application.json"), """{ "name": "Second" }""");
+
+        var names = StudioFolder.Applications(new StudioOptions([Outside, Folder, upper, copy, second], "author"));
+
+        Assert.Equal(["PurchaseRequests", "Second"], names);
+    }
+
+    [Fact]
+    public async Task Me_answers_studio_only_for_an_author_while_Studio_is_on()
+    {
+        foreach (var (user, role, expected) in new[] { ("hoa", "author", true), ("anna", "author", false), ("hoa", "", false) })
+        {
+            await using var factory = CreateFactory(authorRole: role);
+            using var client = factory.CreateClient().SignedInAs(user);
+
+            var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal(user, body.RootElement.GetProperty("id").GetString());
+            Assert.Equal(expected, body.RootElement.GetProperty("studio").GetBoolean());
+        }
+    }
+
+    [Fact]
     public async Task Author_reads_a_resource_by_id_in_either_letter_case()
     {
         await using var factory = CreateFactory();
@@ -95,6 +145,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData("/api/studio/apps")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
@@ -114,6 +165,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData("/api/studio/apps")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]

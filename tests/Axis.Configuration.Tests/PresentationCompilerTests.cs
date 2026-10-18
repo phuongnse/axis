@@ -286,6 +286,7 @@ public sealed class PresentationCompilerTests
     [InlineData("api")]
     [InlineData("health")]
     [InlineData("assets")]
+    [InlineData("studio")]
     public void Site_path_reserved_by_the_platform_is_reported_at_the_path(string path)
     {
         using var folder = Folder().With("sites/sales.json", Site(path: path));

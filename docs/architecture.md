@@ -26,7 +26,7 @@ flowchart LR
   It also hosts Studio's
   [authoring API](reference/authoring.md), which works on the application
   folders that `Studio:Folders` lists and needs a session and the author role.
-  Its routes that list, read and patch resources are built.
+  Its routes that list applications, list and read resources, patch resources and give diagnostics are built.
   *(Planned for M8: the routes that create and delete resources.)*
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
@@ -344,9 +344,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   the session. A role change at the identity provider applies at the next
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
-  `{ "id", "displayName", "roles" }`, and reads the session. *(Planned for M8:
-  it adds a boolean `studio`, true when `Studio:Folders` is not empty and the
-  user holds `Studio:AuthorRole`. See [D38](decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).)*
+  `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
+  `studio`, true when `Studio:Folders` is not empty and the user holds
+  `Studio:AuthorRole`. See [D38](decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
   the user's id and display name.

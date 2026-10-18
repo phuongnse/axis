@@ -26,28 +26,36 @@ internal static class StudioFolder
     /// The first listed folder whose manifest <c>name</c> is <paramref name="application"/>, ignoring
     /// letter case, or null. The manifest is read on every call, so an edited name takes effect at once.
     /// </summary>
-    public static string? Find(StudioOptions options, string application)
-    {
-        foreach (var folder in options.Folders)
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(folder, ManifestFile)));
-                if (document.RootElement is { ValueKind: JsonValueKind.Object } root
-                    && root.TryGetProperty("name", out var name)
-                    && name.ValueKind == JsonValueKind.String
-                    && string.Equals(name.GetString(), application, StringComparison.OrdinalIgnoreCase))
-                {
-                    return folder;
-                }
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
-            {
-                // A folder without a readable manifest has no application name to match.
-            }
-        }
+    public static string? Find(StudioOptions options, string application) =>
+        options.Folders.FirstOrDefault(folder =>
+            string.Equals(ReadName(folder), application, StringComparison.OrdinalIgnoreCase));
 
-        return null;
+    /// <summary>
+    /// The manifest <c>name</c> of each listed folder, in list order. A folder without a readable manifest
+    /// name is left out. Of names equal ignoring letter case, the first is kept, as <see cref="Find"/> takes it.
+    /// </summary>
+    public static IReadOnlyList<string> Applications(StudioOptions options)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return [.. options.Folders.Select(ReadName).OfType<string>().Where(seen.Add)];
+    }
+
+    private static string? ReadName(string folder)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(folder, ManifestFile)));
+            return document.RootElement is { ValueKind: JsonValueKind.Object } root
+                && root.TryGetProperty("name", out var name)
+                && name.ValueKind == JsonValueKind.String
+                    ? name.GetString()
+                    : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // A folder without a readable manifest has no application name.
+            return null;
+        }
     }
 
     /// <summary>
