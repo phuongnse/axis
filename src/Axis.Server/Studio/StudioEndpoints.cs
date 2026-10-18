@@ -11,7 +11,10 @@ namespace Axis.Server.Studio;
 
 /// <summary>
 /// The authoring API, for an author who edits the application folders in
-/// <c>Studio:Folders</c>. <c>GET /api/studio/apps/{application}/resources</c> lists every resource of
+/// <c>Studio:Folders</c>. <c>GET /api/studio/apps</c> lists the application names of those folders, as
+/// <c>{ items: [{ name }] }</c> in folder order. A folder without a readable manifest name is left out,
+/// and a name repeated ignoring letter case appears once. It checks the session (401) and the author role
+/// (403) like the routes below. <c>GET /api/studio/apps/{application}/resources</c> lists every resource of
 /// the folder, sorted by file, each with its <c>id</c>, <c>kind</c>, <c>name</c>, <c>file</c> and
 /// <c>version</c>. <c>GET /api/studio/apps/{application}/resources/{id}</c> returns one resource with its
 /// JSON <c>content</c>, and its <c>version</c> as a quoted <c>ETag</c>. The version is the SHA-256 of the
@@ -25,15 +28,36 @@ namespace Axis.Server.Studio;
 /// After the checks above it answers 428 without <c>If-Match</c>, 415 for another content type, 400 for a
 /// bad patch or a patch that changes <c>id</c> or <c>kind</c>, and 409 for a stale version. A schema or
 /// compile error never blocks the save.
+/// <c>POST /api/studio/apps/{application}/resources</c> writes a new resource from its JSON body into its
+/// kind's folder and answers 201 with <c>{ id, kind, name, file, version, diagnostics }</c>. After the checks
+/// above it answers 415 for a content type other than <c>application/json</c>, 400 for a body that is not
+/// a resource or whose <c>id</c>, <c>kind</c> or <c>name</c> cannot form a safe file name, and 409 when the
+/// <c>id</c> or the file exists. <c>DELETE /api/studio/apps/{application}/resources/{id}</c> removes one
+/// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
+/// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
 /// </summary>
 internal static class StudioEndpoints
 {
     public static void MapStudioEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/studio/apps", AppsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
+        endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
+    }
+
+    private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
+    {
+        if (await RefuseAsync(httpContext, options) is { } refusal)
+        {
+            return refusal;
+        }
+
+        return Results.Ok(new StudioApplicationListResponse(
+            [.. StudioFolder.Applications(options).Select(name => new StudioApplicationItem(name))]));
     }
 
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
@@ -133,18 +157,114 @@ internal static class StudioEndpoints
             folder, found.Id, patch, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
-            case StudioPatchRefusal.NotFound:
+            case StudioWriteRefusal.NotFound:
                 return NotFound(NoResource);
-            case StudioPatchRefusal.DoesNotApply:
+            case StudioWriteRefusal.DoesNotApply:
                 return Problem(StatusCodes.Status400BadRequest, "The patch does not apply to the resource.");
-            case StudioPatchRefusal.ChangesIdOrKind:
+            case StudioWriteRefusal.ChangesIdOrKind:
                 return Problem(StatusCodes.Status400BadRequest, "A patch may not change id or kind.");
-            case StudioPatchRefusal.Stale:
+            case StudioWriteRefusal.Stale:
                 return Problem(StatusCodes.Status409Conflict, "The resource has changed since this version. Read it again.");
         }
 
         httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
         return Results.Ok(new StudioPatchResponse(outcome.Version!, StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> CreateAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var request = httpContext.Request;
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        JsonObject content;
+        try
+        {
+            content = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) as JsonObject
+                ?? throw new JsonException();
+        }
+        catch (JsonException)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The body is not a resource.");
+        }
+
+        if (StudioFileNames.NewFile(content, out var id, out var problem) is not { } file)
+        {
+            return Problem(StatusCodes.Status400BadRequest, problem!);
+        }
+
+        var outcome = await StudioWrites.CreateAsync(folder, id, file, content, httpContext.RequestAborted);
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.Exists:
+                return Problem(StatusCodes.Status409Conflict, "A resource with this id or file already exists.");
+            case not null:
+                return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
+        }
+
+        var location = $"/api/studio/apps/{Uri.EscapeDataString(application)}/resources/{id:D}";
+        httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        return Results.Created(location, new StudioCreateResponse(
+            id.ToString("D"),
+            (string)content["kind"]!,
+            (string)content["name"]!,
+            file,
+            outcome.Version!,
+            StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        string application,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (FindResource(folder, id) is not { } found)
+        {
+            return NotFound(NoResource);
+        }
+
+        var request = httpContext.Request;
+        if (request.Headers.IfMatch.Count == 0)
+        {
+            return Problem(StatusCodes.Status428PreconditionRequired, "The delete needs the version it was read at in If-Match.");
+        }
+
+        var outcome = await StudioWrites.DeleteAsync(
+            folder, found.Id, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.NotFound:
+                return NotFound(NoResource);
+            case StudioWriteRefusal.Manifest:
+                return Problem(StatusCodes.Status400BadRequest, "The manifest cannot be created or deleted.");
+            case StudioWriteRefusal.Stale:
+                return Problem(StatusCodes.Status409Conflict, "The resource has changed since this version. Read it again.");
+        }
+
+        return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
     private const string NoResource = "The application has no resource with this id.";
@@ -154,22 +274,28 @@ internal static class StudioEndpoints
             ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
             : null;
 
-    // The checks the routes share: the folder, or the problem that refused the request.
+    // The session and role checks every route shares: the problem that refuses the request, or null.
+    private static async Task<IResult?> RefuseAsync(HttpContext httpContext, StudioOptions options)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        return options.Allows(user.Roles)
+            ? null
+            : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the author role.");
+    }
+
+    // The checks the application routes share: the folder, or the problem that refused the request.
     private static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
         string application,
         HttpContext httpContext,
         StudioOptions options)
     {
-        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        if (await RefuseAsync(httpContext, options) is { } refusal)
         {
-            return (null, Grants.SignInRequired());
-        }
-
-        if (!options.Allows(user.Roles))
-        {
-            return (null, Results.Problem(
-                statusCode: StatusCodes.Status403Forbidden,
-                title: "You do not hold the author role."));
+            return (null, refusal);
         }
 
         return StudioFolder.Find(options, application) is { } folder
@@ -181,6 +307,12 @@ internal static class StudioEndpoints
 
     private static IResult Problem(int statusCode, string title) => Results.Problem(statusCode: statusCode, title: title);
 }
+
+/// <summary>The applications of the Studio folders, in folder order.</summary>
+internal sealed record StudioApplicationListResponse(IReadOnlyList<StudioApplicationItem> Items);
+
+/// <summary>One application in the list: the <c>name</c> in its manifest.</summary>
+internal sealed record StudioApplicationItem(string Name);
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);
@@ -196,3 +328,10 @@ internal sealed record StudioDiagnosticsResponse(IReadOnlyList<StudioDiagnostic>
 
 /// <summary>The answer to a patch: the file's new version and the folder's compile diagnostics.</summary>
 internal sealed record StudioPatchResponse(string Version, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>The answer to a create: the new resource's identity and version, and the folder's compile diagnostics.</summary>
+internal sealed record StudioCreateResponse(
+    string Id, string Kind, string Name, string File, string Version, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>The answer to a delete: the folder's compile diagnostics, which show the references it broke.</summary>
+internal sealed record StudioDeleteResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);

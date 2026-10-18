@@ -21,7 +21,7 @@ internal static class RuleChecker
 {
     /// <summary>Checks <paramref name="rules"/>, which come in path order, and returns the rules by name, ignoring letter case.</summary>
     public static IReadOnlyDictionary<string, ExpressionRule> Check(
-        IReadOnlyList<RuleResource> rules, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
+        IReadOnlyList<RuleResource> rules, ReferenceIndexBuilder? references, List<Diagnostic> diagnostics)
     {
         // Rule names are unique ignoring letter case; a second rule with the same name is already
         // reported by the loader, so calls resolve to the first one.
@@ -84,6 +84,26 @@ internal static class RuleChecker
     }
 
     /// <summary>
+    /// Checks each module's rules on their own, so a module rule calls only rules of its module, and
+    /// returns them by <c>&lt;module id&gt;/&lt;name&gt;</c>, ignoring letter case.
+    /// </summary>
+    public static IReadOnlyDictionary<string, ExpressionRule> CheckModules(
+        IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> modules, List<Diagnostic> diagnostics)
+    {
+        var rules = new Dictionary<string, ExpressionRule>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (moduleId, moduleRules) in modules)
+        {
+            // Module rules add no rule-call edges until the modules issue indexes module resources.
+            foreach (var (name, rule) in Check(moduleRules, null, diagnostics))
+            {
+                rules[$"{moduleId}/{name}"] = rule;
+            }
+        }
+
+        return rules;
+    }
+
+    /// <summary>
     /// A depth-first walk over the rule calls, in path order. A rule's body is checked once every
     /// rule it calls is done, so the rules it calls already carry their checked bodies.
     /// </summary>
@@ -91,7 +111,7 @@ internal static class RuleChecker
         Dictionary<string, RuleResource> resources,
         Dictionary<string, ExpressionRule> built,
         Dictionary<string, ExpressionNode> bodies,
-        ReferenceIndexBuilder references,
+        ReferenceIndexBuilder? references,
         List<Diagnostic> diagnostics)
     {
         private readonly Dictionary<string, bool> _doneByName = new(StringComparer.OrdinalIgnoreCase);
@@ -239,7 +259,7 @@ internal static class RuleChecker
             }
             else
             {
-                references.AddRuleCalls(resource, "/expression", check);
+                references?.AddRuleCalls(resource, "/expression", check);
                 if (!_inCycle.Contains(name))
                 {
                     built[name] = rule with { Body = body, BodyCheck = check };
