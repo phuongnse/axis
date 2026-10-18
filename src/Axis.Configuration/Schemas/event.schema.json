@@ -9,7 +9,7 @@
     "kind": { "const": "event" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/name" },
+    "entity": { "$ref": "#/$defs/qualifiedName" },
     "fields": {
       "type": "array",
       "items": { "$ref": "#/$defs/field" }
@@ -25,6 +25,11 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
     },
     "field": {
       "type": "object",
