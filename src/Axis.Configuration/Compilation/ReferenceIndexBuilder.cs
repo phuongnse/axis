@@ -9,10 +9,12 @@ internal sealed class ReferenceIndexBuilder
     private readonly List<ReferenceEdge> _edges = [];
     private readonly HashSet<ReferenceEdge> _added = [];
     private readonly Dictionary<string, RuleResource> _rulesByName;
+    private readonly bool _collect;
 
-    public ReferenceIndexBuilder(IReadOnlySet<string> textKeys, IReadOnlyList<RuleResource> rules)
+    public ReferenceIndexBuilder(IReadOnlySet<string> textKeys, IReadOnlyList<RuleResource> rules, bool collect)
     {
         TextKeys = textKeys;
+        _collect = collect;
 
         // Rule names are unique ignoring letter case; a second rule with the same name is already
         // reported by the loader, so calls resolve to the first one.
@@ -28,6 +30,11 @@ internal sealed class ReferenceIndexBuilder
 
     public void Add(Resource from, string path, string relation, ReferenceNode to)
     {
+        if (!_collect)
+        {
+            return;
+        }
+
         var edge = new ReferenceEdge(ResourceNode.Of(from), path, relation, to);
         if (_added.Add(edge))
         {
@@ -38,6 +45,11 @@ internal sealed class ReferenceIndexBuilder
     /// <summary>Adds one rule-call edge for each rule the checked expression calls directly.</summary>
     public void AddRuleCalls(Resource from, string path, ExpressionCheckResult check)
     {
+        if (!_collect)
+        {
+            return;
+        }
+
         foreach (var rule in check.RuleCalls.Values)
         {
             // A module rule may share its name with an application rule, so it is not looked up by name.
