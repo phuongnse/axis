@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
+using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
 using Axis.Server.Health;
 using Axis.Server.Tests;
@@ -54,6 +56,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         var (healthyStatus, healthyBody) = await ReadyAsync(client);
         Assert.Equal(HttpStatusCode.OK, healthyStatus);
         Assert.Equal(Healthy, healthyBody);
+        Assert.Equal(new Dictionary<string, long> { ["a"] = 1, ["b"] = 1 }, ReadGauge(factory));
 
         await StopAsync(a, b);
         try
@@ -62,6 +65,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
 
             Assert.Equal(HttpStatusCode.OK, status);
             Assert.Equal(Degraded, body);
+            Assert.Equal(new Dictionary<string, long> { ["a"] = 1, ["b"] = 0 }, ReadGauge(factory));
             Assert.Contains(logs.Entries, entry => entry.StartsWith("Warning: The database of tenant b does not answer.", StringComparison.Ordinal));
             Assert.DoesNotContain(logs.Entries, entry => entry.Contains("tenant a does not answer", StringComparison.Ordinal));
 
@@ -74,6 +78,26 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         {
             await AllowConnectionsAsync(a, b);
         }
+    }
+
+    [Fact]
+    public async Task Reading_the_tenant_database_gauge_opens_no_database_connection()
+    {
+        var (a, b) = await CreateDatabasesAsync();
+        await using var factory = CreateFactory(a, b, RecordsApp, new LogCollector(), services =>
+        {
+            services.AddSingleton(provider => new CountingTenantConnectionFactory(
+                new TenantConnectionFactory(provider.GetRequiredService<TenantOptions>(), provider.GetRequiredService<ITenantContextAccessor>())));
+            services.AddSingleton<ITenantConnectionFactory>(provider => provider.GetRequiredService<CountingTenantConnectionFactory>());
+        });
+        using var client = factory.CreateClient();
+        await ReadyAsync(client);
+        var opened = factory.Services.GetRequiredService<CountingTenantConnectionFactory>().Opened;
+
+        var readings = new[] { ReadGauge(factory), ReadGauge(factory), ReadGauge(factory) };
+
+        Assert.Equal(opened, factory.Services.GetRequiredService<CountingTenantConnectionFactory>().Opened);
+        Assert.All(readings, reading => Assert.Equal(new Dictionary<string, long> { ["a"] = 1, ["b"] = 1 }, reading));
     }
 
     [Fact]
@@ -158,6 +182,35 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         request.Headers.Host = HostA;
         using var response = await client.SendAsync(request, CancellationToken);
         return (response.StatusCode, await response.Content.ReadAsStringAsync(CancellationToken));
+    }
+
+    // Reads the gauge of this server only. Test servers share the process, so the listener
+    // takes only instruments whose meter came from this server's meter factory.
+    private static Dictionary<string, long> ReadGauge(WebApplicationFactory<Program> factory)
+    {
+        var meterFactory = factory.Services.GetRequiredService<IMeterFactory>();
+        var values = new Dictionary<string, long>(StringComparer.Ordinal);
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Scope == meterFactory && instrument.Name == AxisMetrics.TenantDatabaseAvailable)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == AxisTelemetry.TenantTag)
+                {
+                    values[(string)tag.Value!] = measurement;
+                }
+            }
+        });
+        listener.Start();
+        listener.RecordObservableInstruments();
+        return values;
     }
 
     // The tenant's database cannot be stopped, since every test class shares one PostgreSQL container.
@@ -278,6 +331,22 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
             }
 
             return connection;
+        }
+
+        public void Dispose() => inner.Dispose();
+    }
+
+    /// <summary>Counts the connections opened through <paramref name="inner"/>.</summary>
+    private sealed class CountingTenantConnectionFactory(TenantConnectionFactory inner) : ITenantConnectionFactory, IDisposable
+    {
+        private int _opened;
+
+        public int Opened => Volatile.Read(ref _opened);
+
+        public ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _opened);
+            return inner.OpenConnectionAsync(cancellationToken);
         }
 
         public void Dispose() => inner.Dispose();

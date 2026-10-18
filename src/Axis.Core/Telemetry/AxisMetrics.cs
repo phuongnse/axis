@@ -31,6 +31,9 @@ public static class AxisMetrics
     /// <summary>The attempts of connector calls and package operations. Lookups are not attempts.</summary>
     public const string CallAttempts = "axis.calls.attempts";
 
+    /// <summary>Whether each tenant database answered the last readiness probe of the server, 1 or 0, by tenant.</summary>
+    public const string TenantDatabaseAvailable = "axis.tenant.database.available";
+
     /// <summary>
     /// The attribute keys that the HTTP client and DNS metrics keep. Any other key, such as
     /// <c>server.address</c>, <c>server.port</c>, <c>network.peer.address</c> or <c>dns.question.name</c>,

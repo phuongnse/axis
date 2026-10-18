@@ -239,7 +239,10 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         await MigrateAsync(tenantA);
 
         // Between the last migration and the grant step the worker may see its tables as read-only and log a
-        // failed poll. It polls again, so only errors after the grant step count.
+        // failed poll. A poll that began before the grants can also log its failure after MigrateAsync returns.
+        // The worker logs that the tenant is ready only after its release check read the granted tables, so
+        // every poll after that log began after the grants. Only errors after it count.
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Tenant a is ready for work.")));
         var loggedAfterGrants = logs.Entries.Count;
         var item = await EnqueueAsync(tenantA, "a", RecordKind);
         await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1);
