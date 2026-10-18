@@ -2,6 +2,7 @@ using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Typing;
 
@@ -35,6 +36,7 @@ internal static class TriggerChecker
         IReadOnlySet<string> unloadedDataSourceNames,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         foreach (var trigger in triggers)
@@ -43,7 +45,11 @@ internal static class TriggerChecker
                 diagnostics.Add(new Diagnostic(code, message, trigger.File, path, trigger.Id));
 
             var process = findProcess(trigger.Process);
-            if (process is null && !unloadedProcessNames.Contains(trigger.Process))
+            if (process is not null)
+            {
+                references.Add(trigger, "/process", ReferenceRelations.TriggerProcess, ResourceNode.Of(process));
+            }
+            else if (!unloadedProcessNames.Contains(trigger.Process))
             {
                 // A process file that was not loaded because of its own errors is not reported again.
                 Report(
@@ -54,13 +60,13 @@ internal static class TriggerChecker
 
             if (trigger.Type == "dataChange")
             {
-                CheckDataChange(trigger, process, findEntity, unloadedEntityNames, rules, modules, Report);
+                CheckDataChange(trigger, process, findEntity, unloadedEntityNames, rules, modules, references, Report);
                 continue;
             }
 
             if (trigger.Type == "schedule")
             {
-                CheckSchedule(trigger, process, findEntity, findDataSource, unloadedDataSourceNames, Report);
+                CheckSchedule(trigger, process, findEntity, findDataSource, unloadedDataSourceNames, references, Report);
                 continue;
             }
 
@@ -80,6 +86,8 @@ internal static class TriggerChecker
                 // The condition cannot be checked without the event's payload.
                 continue;
             }
+
+            references.Add(trigger, "/event", ReferenceRelations.TriggerEvent, ResourceNode.Of(@event));
 
             // An unknown entity has a diagnostic of its own on the event or the process.
             if (process is not null
@@ -119,6 +127,7 @@ internal static class TriggerChecker
         IReadOnlySet<string> unloadedEntityNames,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var entityName = trigger.Entity!;
@@ -135,6 +144,8 @@ internal static class TriggerChecker
 
             return;
         }
+
+        references.Add(trigger, "/entity", ReferenceRelations.TriggerEntity, ResourceNode.Of(entity));
 
         // An unknown entity has a diagnostic of its own on the process.
         if (process is not null
@@ -170,9 +181,23 @@ internal static class TriggerChecker
         if (trigger.When is { } when)
         {
             var parsed = ExpressionParser.Parse(when);
-            var problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression!, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules), ExpressionType.Boolean).Diagnostic
-                : parsed.Diagnostic;
+            ExpressionDiagnostic? problem;
+            if (parsed.Succeeded)
+            {
+                var check = ExpressionTypeChecker.Check(
+                    parsed.Expression!, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules), ExpressionType.Boolean);
+                if (check.Succeeded)
+                {
+                    references.AddRuleCalls(trigger, "/when", check);
+                }
+
+                problem = check.Diagnostic;
+            }
+            else
+            {
+                problem = parsed.Diagnostic;
+            }
+
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, "/when");
@@ -190,6 +215,7 @@ internal static class TriggerChecker
         Func<string, EntityResource?> findEntity,
         Func<string, DataSourceResource?> findDataSource,
         IReadOnlySet<string> unloadedDataSourceNames,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         if (!CronSchedule.TryParse(trigger.Schedule!, out _, out var cronError))
@@ -219,6 +245,8 @@ internal static class TriggerChecker
 
             return;
         }
+
+        references.Add(trigger, "/dataSource", ReferenceRelations.TriggerDataSource, ResourceNode.Of(dataSource));
 
         if (dataSource.Aggregate is not null)
         {

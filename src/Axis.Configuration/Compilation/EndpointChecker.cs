@@ -37,6 +37,7 @@ internal static class EndpointChecker
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
         Action<FieldDefinition, string, Action<string, string, string>> checkInputField,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         foreach (var endpoint in endpoints)
@@ -56,7 +57,12 @@ internal static class EndpointChecker
                         "/entity");
                 }
             }
-            else if (ownerOf(entity.Name) is { } owner)
+            else
+            {
+                references.Add(endpoint, "/entity", ReferenceRelations.EndpointEntity, ResourceNode.Of(entity));
+            }
+
+            if (entity is not null && ownerOf(entity.Name) is { } owner)
             {
                 Report(
                     DiagnosticCodes.EndpointOverChildEntity,
@@ -75,7 +81,12 @@ internal static class EndpointChecker
                         "/process");
                 }
             }
-            else if (entity is not null && findEntity(process.Entity) is { } subject && !ReferenceEquals(subject, entity))
+            else
+            {
+                references.Add(endpoint, "/process", ReferenceRelations.EndpointProcess, ResourceNode.Of(process));
+            }
+
+            if (process is not null && entity is not null && findEntity(process.Entity) is { } subject && !ReferenceEquals(subject, entity))
             {
                 // The call starts the process on the record it creates, so that record is its subject.
                 Report(
@@ -85,7 +96,7 @@ internal static class EndpointChecker
             }
 
             var countBeforeInput = diagnostics.Count;
-            CheckInput(endpoint, findEntity, ownerOf, checkInputField, Report);
+            CheckInput(endpoint, findEntity, ownerOf, checkInputField, references, Report);
             var inputValid = diagnostics.Count == countBeforeInput;
 
             if (endpoint.Wait is { } wait
@@ -185,6 +196,7 @@ internal static class EndpointChecker
         Func<string, EntityResource?> findEntity,
         Func<string, string?> ownerOf,
         Action<FieldDefinition, string, Action<string, string, string>> checkInputField,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -200,20 +212,19 @@ internal static class EndpointChecker
                     $"{path}/name");
             }
 
-            checkInputField(
-                new FieldDefinition
-                {
-                    Name = input.Name,
-                    Type = input.Type,
-                    Required = input.Required,
-                    MaxLength = input.MaxLength,
-                    Precision = input.Precision,
-                    Scale = input.Scale,
-                    Values = input.Values,
-                    Target = input.Target,
-                },
-                path,
-                report);
+            var definition = new FieldDefinition
+            {
+                Name = input.Name,
+                Type = input.Type,
+                Required = input.Required,
+                MaxLength = input.MaxLength,
+                Precision = input.Precision,
+                Scale = input.Scale,
+                Values = input.Values,
+                Target = input.Target,
+            };
+            checkInputField(definition, path, report);
+            ApplicationCompiler.AddFieldTarget(endpoint, definition, path, findEntity, references);
 
             // An unknown target is reported by the field check.
             if (FieldTypes.Parse(input.Type) == FieldType.ChildCollection

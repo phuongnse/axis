@@ -28,7 +28,7 @@ internal static class ScenarioChecker
     /// <summary>Checks <paramref name="scenarios"/>, which come in path order.</summary>
     public static void Check(
         IReadOnlyList<ScenarioResource> scenarios,
-        IReadOnlySet<string> roleNames,
+        Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         Func<string, EntityResource?> findEntity,
         Func<string, string?> childOwnerOf,
@@ -39,6 +39,7 @@ internal static class ScenarioChecker
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         // Duplicate process names are reported by the loader, so names resolve to the first process.
@@ -53,13 +54,17 @@ internal static class ScenarioChecker
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, scenario.File, path, scenario.Id));
 
-            bool KnownRole(string role) => roleNames.Contains(role) || unloadedRoleNames.Contains(role);
+            bool KnownRole(string role) => findRole(role) is not null || unloadedRoleNames.Contains(role);
 
             foreach (var (user, roles) in scenario.Users)
             {
                 for (var index = 0; index < roles.Count; index++)
                 {
-                    if (!KnownRole(roles[index]))
+                    if (findRole(roles[index]) is { } role)
+                    {
+                        references.Add(scenario, $"/users/{Escape(user)}/{index}", ReferenceRelations.ScenarioRole, ResourceNode.Of(role));
+                    }
+                    else if (!KnownRole(roles[index]))
                     {
                         Report(
                             DiagnosticCodes.UnknownScenarioRole,
@@ -78,6 +83,8 @@ internal static class ScenarioChecker
                     unloadedConnectorNames,
                     findPackage,
                     declaredPackageIds,
+                    scenario,
+                    references,
                     Report);
             }
 
@@ -103,11 +110,15 @@ internal static class ScenarioChecker
                         $"{path}/assignee/user");
                 }
 
-                if (step.Assignee?.Role is { } assigneeRole && !KnownRole(assigneeRole))
+                if (step.Assignee?.Role is { } assigneeRole && findRole(assigneeRole) is { } assigneeRoleResource)
+                {
+                    references.Add(scenario, $"{path}/assignee/role", ReferenceRelations.ScenarioRole, ResourceNode.Of(assigneeRoleResource));
+                }
+                else if (step.Assignee?.Role is { } unknownRole && !KnownRole(unknownRole))
                 {
                     Report(
                         DiagnosticCodes.UnknownScenarioRole,
-                        $"The role '{assigneeRole}' was not found. No loaded role has that name.",
+                        $"The role '{unknownRole}' was not found. No loaded role has that name.",
                         $"{path}/assignee/role");
                 }
 
@@ -134,7 +145,7 @@ internal static class ScenarioChecker
                 EntityResource? entity = null;
                 if (step.Type == ScenarioStepDefinition.CreateRecord)
                 {
-                    entity = ResolveEntity(step.Entity!, $"{path}/entity", findEntity, childOwnerOf, unloadedEntityNames, Report);
+                    entity = ResolveEntity(scenario, step.Entity!, $"{path}/entity", findEntity, childOwnerOf, unloadedEntityNames, references, Report);
                     if (step.Save is { } save && !aliases.TryAdd(save, entity))
                     {
                         Report(
@@ -151,7 +162,7 @@ internal static class ScenarioChecker
                         $"{path}/record");
                 }
 
-                CheckProcessReferences(step, path, entity, findEntity, processes, processesByName, unloadedProcessNames, Report);
+                CheckProcessReferences(scenario, step, path, entity, findEntity, processes, processesByName, unloadedProcessNames, references, Report);
 
                 if (step.Values is { } values && entity is not null)
                 {
@@ -166,11 +177,13 @@ internal static class ScenarioChecker
     /// reported again. A child entity is reported, because only its owner's records hold it.
     /// </summary>
     private static EntityResource? ResolveEntity(
+        ScenarioResource scenario,
         string name,
         string path,
         Func<string, EntityResource?> findEntity,
         Func<string, string?> childOwnerOf,
         IReadOnlySet<string> unloadedEntityNames,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         if (findEntity(name) is not { } entity)
@@ -185,6 +198,8 @@ internal static class ScenarioChecker
 
             return null;
         }
+
+        references.Add(scenario, path, ReferenceRelations.ScenarioEntity, ResourceNode.Of(entity));
 
         if (childOwnerOf(entity.Name) is { } owner)
         {
@@ -203,6 +218,7 @@ internal static class ScenarioChecker
     /// entity does not resolve, such as one over an unknown alias, is checked as far as it can be.
     /// </summary>
     private static void CheckProcessReferences(
+        ScenarioResource scenario,
         ScenarioStepDefinition step,
         string path,
         EntityResource? entity,
@@ -210,6 +226,7 @@ internal static class ScenarioChecker
         IReadOnlyList<ProcessResource> processes,
         Dictionary<string, ProcessResource> processesByName,
         IReadOnlySet<string> unloadedProcessNames,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         if (step.Type is ScenarioStepDefinition.StartProcess or ScenarioStepDefinition.ExpectInstance)
@@ -227,6 +244,8 @@ internal static class ScenarioChecker
 
                 return;
             }
+
+            references.Add(scenario, $"{path}/process", ReferenceRelations.ScenarioProcess, ResourceNode.Of(process));
 
             // A process over an unknown entity has a diagnostic of its own.
             if (entity is not null && findEntity(process.Entity) is { } processEntity && !ReferenceEquals(processEntity, entity))
@@ -372,12 +391,15 @@ internal static class ScenarioChecker
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        ScenarioResource scenario,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         IReadOnlyList<string>? outputs = null;
         if (stub.Connector is { } reference)
         {
-            if (findConnector(reference.Name) is not { } connector)
+            var connector = findConnector(reference.Name);
+            if (connector is null)
             {
                 if (!unloadedConnectorNames.Contains(reference.Name))
                 {
@@ -387,16 +409,20 @@ internal static class ScenarioChecker
                         $"{path}/connector/name");
                 }
             }
-            else if (ProcessChecker.FindOperation(connector, reference.Operation) is not { } operation)
-            {
-                report(
-                    DiagnosticCodes.UnknownStubOperation,
-                    $"The operation '{reference.Operation}' was not found. The connector '{connector.Name}' has no operation with that name.",
-                    $"{path}/connector/operation");
-            }
             else
             {
-                outputs = [.. operation.Output.Select(field => field.Name)];
+                references.Add(scenario, $"{path}/connector/name", ReferenceRelations.StubConnector, ResourceNode.Of(connector));
+                if (ProcessChecker.FindOperation(connector, reference.Operation) is not { } operation)
+                {
+                    report(
+                        DiagnosticCodes.UnknownStubOperation,
+                        $"The operation '{reference.Operation}' was not found. The connector '{connector.Name}' has no operation with that name.",
+                        $"{path}/connector/operation");
+                }
+                else
+                {
+                    outputs = [.. operation.Output.Select(field => field.Name)];
+                }
             }
         }
         else
@@ -416,16 +442,20 @@ internal static class ScenarioChecker
                         $"{path}/operation");
                 }
             }
-            else if (ProcessChecker.FindPackageOperation(package, operationName) is not { } operation)
-            {
-                report(
-                    DiagnosticCodes.UnknownStubOperation,
-                    $"The operation '{operationName}' was not found. Package '{package.Id}' {package.Version} has no operation with that name.",
-                    $"{path}/operation");
-            }
             else
             {
-                outputs = [.. operation.Output.Select(field => field.Name)];
+                references.Add(scenario, $"{path}/operation", ReferenceRelations.StubPackage, new PackageNode(package.Id));
+                if (ProcessChecker.FindPackageOperation(package, operationName) is not { } operation)
+                {
+                    report(
+                        DiagnosticCodes.UnknownStubOperation,
+                        $"The operation '{operationName}' was not found. Package '{package.Id}' {package.Version} has no operation with that name.",
+                        $"{path}/operation");
+                }
+                else
+                {
+                    outputs = [.. operation.Output.Select(field => field.Name)];
+                }
             }
         }
 

@@ -39,6 +39,7 @@ internal static class MigrationChecker
         IReadOnlyList<MigrationResource> migrations,
         Func<string, EntityResource?> findEntity,
         IReadOnlySet<string> unloadedEntityNames,
+        ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
         var groups = new Dictionary<string, List<MigrationResource>>(StringComparer.OrdinalIgnoreCase);
@@ -87,6 +88,14 @@ internal static class MigrationChecker
                 }
 
                 continue;
+            }
+
+            if (entity is not null)
+            {
+                foreach (var migration in group)
+                {
+                    references.Add(migration, "/entity", ReferenceRelations.MigrationEntity, ResourceNode.Of(entity));
+                }
             }
 
             CheckEntity(group, entity, diagnostics);

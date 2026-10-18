@@ -1829,10 +1829,8 @@ installation-level setting.
 In M8, every compile collects each reference it resolves into a reference
 index. Studio reads it through two authoring API routes and shows a **Uses**
 list and a **Used by** list for each resource. The compile already builds the
-index with its `label text`, `text entry`, `package`, `module`, entity field,
-rule call, site, page, form, seed, data source, process and policy edges. The
-event, endpoint, trigger, migration and scenario relations, the authoring API
-routes and Studio are *(planned for M8)*.
+index with every relation of the design. Only the authoring API routes and
+Studio are *(planned for M8)*.
 See the [reference index](reference/configuration.md#reference-index),
 the [authoring API](reference/authoring.md#references) and the
 [Studio section of the frontend](reference/frontend.md#studio).

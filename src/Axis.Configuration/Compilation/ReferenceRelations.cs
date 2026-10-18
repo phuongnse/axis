@@ -29,4 +29,17 @@ public static class ReferenceRelations
     public const string RaisedEvent = "raised event";
     public const string PolicyRole = "policy role";
     public const string Grant = "grant";
+    public const string EventEntity = "event entity";
+    public const string EndpointEntity = "endpoint entity";
+    public const string EndpointProcess = "endpoint process";
+    public const string TriggerProcess = "trigger process";
+    public const string TriggerEvent = "trigger event";
+    public const string TriggerEntity = "trigger entity";
+    public const string TriggerDataSource = "trigger data source";
+    public const string MigrationEntity = "migration entity";
+    public const string ScenarioEntity = "scenario entity";
+    public const string ScenarioProcess = "scenario process";
+    public const string ScenarioRole = "scenario role";
+    public const string StubConnector = "stub connector";
+    public const string StubPackage = "stub package";
 }
