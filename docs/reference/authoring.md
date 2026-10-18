@@ -35,16 +35,19 @@ names and names can change.
 | Method and path | Response |
 | --- | --- |
 | `GET /api/studio/apps` | `200` with the applications in `Studio:Folders`, each with its `name` |
-| `GET /api/studio/apps/{application}/resources` | `200` with every resource of the folder. Each item has `id`, `kind`, `name`, `file` and `version` |
+| `GET /api/studio/apps/{application}/resources` | `200` with every resource of the folder. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy` |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version }`, a `Location` header and `diagnostics`. The body is the full resource |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }`. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
+| `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
+| `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with the folder's diagnostics |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
-letter case.
+letter case. `usedBy` is the number of entries in the resource's `usedBy` list,
+see [References](#references).
 
 ## Versions
 
@@ -69,7 +72,7 @@ checked in this order, and the first failure is the response:
    every route.
 4. An unknown application, `404`. It is an application that is not in
    `Studio:Folders`.
-5. An unknown resource, `404`.
+5. An unknown resource or text key, `404`.
 6. A patch or a delete without `If-Match`, `428`.
 7. A bad body, `400`. That is a body that is not JSON, a patch that is not
    valid RFC 6902, a patch that does not apply, a patch that changes `id` or
@@ -96,11 +99,46 @@ from the request.
 | Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
 | Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
+| Resource references | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
+| Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 
 `400` is a bad body, and `428` a missing `If-Match`, as
 [Order of checks](#order-of-checks) says. `415` answers a body of the wrong
 content type, before the body is read.
+
+## References
+
+*(planned for M8)* The two references routes answer where a resource or a text
+key is used. They read the [reference index](configuration.md#reference-index)
+that every compile builds, as
+[D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
+agrees.
+
+- **Resource route.** `GET .../resources/{id}/references` answers
+  `{ uses, usedBy }`. `uses` lists what the resource refers to. `usedBy` lists
+  what refers to it.
+- **Text key route.** `GET .../texts/{key}/references` answers `{ usedBy }`:
+  the labels that use the key and the `text` resources that define it. A key
+  that a label uses but no locale defines still answers with its uses, so an
+  author who opens a missing key from an `AXC0028` diagnostic sees where it is
+  used. `{key}` is matched ordinally, as keys are compared.
+- **Entry.** Each entry is `{ relation, file, path, node }`.
+  - `relation` is the name of the relation, such as `task form`.
+  - `file` and `path` are always in the resource that holds the reference. So
+    for `usedBy` they point into the other resource, and for `uses` into this
+    one. An entry opens its resource at that path.
+  - `node` is the other end: `{ type: "resource", id, kind, name, file }`,
+    `{ type: "text", key }`, `{ type: "package", id }` or
+    `{ type: "module", name }`. In `usedBy`, it names the resource that holds
+    the reference.
+- **Order.** Entries are in path order of the using file, then by path.
+- **Compiled in memory.** The folder is compiled in memory, as for
+  [diagnostics](#diagnostics), and no database is touched. A folder with errors
+  still answers with the edges that resolved.
+- **The list's `usedBy`.** The resource list gives each resource's `usedBy`
+  count, so Studio can warn before a delete. The warning never blocks the
+  delete. The next compile reports what broke.
 
 ## Writes
 
