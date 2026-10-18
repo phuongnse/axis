@@ -155,5 +155,16 @@
   "shell.studio.editInJson": "Edit this value in the JSON view.",
   "shell.studio.addItem": "Add",
   "shell.studio.removeItem": "Remove",
-  "shell.studio.loadResourceFailed": "The resource could not be loaded."
+  "shell.studio.loadResourceFailed": "The resource could not be loaded.",
+  "shell.studio.uses": "Uses",
+  "shell.studio.usedBy": "Used by",
+  "shell.studio.noReferences": "None.",
+  "shell.studio.expand": "Expand",
+  "shell.studio.collapse": "Collapse",
+  "shell.studio.referencesFailed": "The references could not be loaded.",
+  "shell.studio.delete": "Delete",
+  "shell.studio.cancel": "Cancel",
+  "shell.studio.deleteConfirm": "Delete this resource?",
+  "shell.studio.deleteUsedBy": "References that point at this resource, which will break:",
+  "shell.studio.deleteFailed": "The resource could not be deleted."
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { filterResources, groupByKind, type StudioResourceItem } from './studio'
 
 function resource(id: string, kind: string, name: string | null, file: string): StudioResourceItem {
-  return { id, kind, name, file, version: 'v' }
+  return { id, kind, name, file, version: 'v', usedBy: 0 }
 }
 
 const items = [

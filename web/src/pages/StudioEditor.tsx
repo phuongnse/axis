@@ -1,7 +1,8 @@
-import { Alert, Button, Flex, Input, Tabs } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import {
+  deleteStudioResource,
   fetchStudioResource,
   patchStudioResource,
   type StudioDiagnostic,
@@ -24,21 +25,45 @@ function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** The form field of the longest prefix of `path` that the form shows, so a path inside a field lands on that field. */
+function fieldElement(root: HTMLElement, path: string): HTMLElement | undefined {
+  const fields = new Map<string, HTMLElement>()
+  for (const element of root.querySelectorAll<HTMLElement>('[data-testid^="studio-field-"]')) {
+    fields.set(element.getAttribute('data-testid')!.slice('studio-field-'.length), element)
+  }
+  let prefix = path
+  while (prefix !== '') {
+    const element = fields.get(prefix)
+    if (element) {
+      return element
+    }
+    prefix = prefix.slice(0, Math.max(prefix.lastIndexOf('/'), 0))
+  }
+  return undefined
+}
+
 /**
  * The editor of one resource. A form built from the kind's JSON Schema and a JSON view edit one draft. Save sends
  * only the difference from what was loaded, as a JSON Patch with the loaded version. A `409` keeps the draft and
- * offers Reload, which reads the file again and drops the draft.
+ * offers Reload, which reads the file again and drops the draft. Delete asks first and warns with the number of
+ * references to the resource, and it is off for the application manifest. When `path` is set, the editor scrolls
+ * to the field that holds it once the resource has loaded.
  */
 export function StudioEditor({
   application,
   item,
+  path,
   onSaved,
+  onDeleted,
 }: {
   application: string
   item: StudioResourceItem
+  path: string | null
   onSaved: (diagnostics: StudioDiagnostic[]) => void
+  onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
+  const rootRef = useRef<HTMLDivElement>(null)
   const [loaded, setLoaded] = useState<Loaded>()
   const [schema, setSchema] = useState<JsonSchema>()
   const [loadFailed, setLoadFailed] = useState(false)
@@ -50,6 +75,9 @@ export function StudioEditor({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteFailed, setDeleteFailed] = useState(false)
 
   function adopt(resource: StudioResource) {
     setLoaded({ content: resource.content, version: resource.version })
@@ -79,6 +107,14 @@ export function StudioEditor({
   }, [application, item.id, item.kind])
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
+  const isLoaded = loaded !== undefined
+
+  useEffect(() => {
+    if (!isLoaded || path === null || !rootRef.current) {
+      return
+    }
+    fieldElement(rootRef.current, path)?.scrollIntoView?.({ block: 'center' })
+  }, [isLoaded, path])
 
   if (loadFailed) {
     return (
@@ -150,8 +186,28 @@ export function StudioEditor({
     }
   }
 
+  async function remove() {
+    setDeleting(true)
+    setDeleteFailed(false)
+    try {
+      const result = await deleteStudioResource(application, item.id, loaded!.version)
+      setDeleteOpen(false)
+      if (result.status === 'conflict') {
+        setConflict(true)
+        return
+      }
+      onDeleted(result.diagnostics)
+    } catch (error) {
+      console.warn(`Deleting the resource '${item.id}' failed`, error)
+      setDeleteOpen(false)
+      setDeleteFailed(true)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
-    <Flex vertical gap="small" data-testid="studio-editor">
+    <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef}>
       <Tabs
         items={[
           {
@@ -193,12 +249,42 @@ export function StudioEditor({
         />
       )}
       {saveFailed && <Alert data-testid="studio-save-error" type="error" message={t('shell.studio.saveFailed')} />}
+      {deleteFailed && (
+        <Alert data-testid="studio-delete-error" type="error" message={t('shell.studio.deleteFailed')} />
+      )}
       <Flex gap="small" align="center">
         <Button type="primary" disabled={patch.length === 0 || jsonInvalid || conflict || saving} onClick={save}>
           {t('shell.studio.save')}
         </Button>
+        {item.kind !== 'application' && (
+          <Button danger onClick={() => setDeleteOpen(true)}>
+            {t('shell.studio.delete')}
+          </Button>
+        )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
+      <Modal
+        open={deleteOpen}
+        title={t('shell.studio.deleteConfirm')}
+        okText={t('shell.studio.delete')}
+        okButtonProps={{ danger: true }}
+        cancelText={t('shell.studio.cancel')}
+        confirmLoading={deleting}
+        onOk={remove}
+        onCancel={() => setDeleteOpen(false)}
+      >
+        {item.usedBy > 0 && (
+          <Alert
+            data-testid="studio-delete-warning"
+            type="warning"
+            message={
+              <>
+                {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
+              </>
+            }
+          />
+        )}
+      </Modal>
     </Flex>
   )
 }

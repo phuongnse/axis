@@ -15,6 +15,7 @@ import {
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
+import { StudioReferences } from './StudioReferences'
 
 /** The applications Studio may edit, or why they could not be listed. */
 type AppsState = StudioApplication[] | typeof forbidden | 'failed'
@@ -30,14 +31,16 @@ type FolderState =
  * With one application, it is picked at once. The resources are grouped by kind, and a search narrows them
  * by name or id. The diagnostics panel lists the folder's diagnostics, loaded when the application is
  * picked. A diagnostic that names a resource selects it, and clears the search so the resource is listed.
- * A selected resource opens in an editor below its details. After a save, the diagnostics panel shows
- * the diagnostics that the save answered.
+ * A selected resource opens in an editor below its details, with its Uses and Used by lists under the editor. A
+ * Used by entry opens its resource at the path of the reference, as `&path=`. After a save, the diagnostics panel
+ * shows the diagnostics that the save answered. After a delete, the resource leaves the list.
  */
 export function StudioPage() {
   const t = useText()
   const [params, setParams] = useSearchParams()
   const application = params.get('app')
   const resourceId = params.get('resource')
+  const path = params.get('path')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
@@ -92,6 +95,10 @@ export function StudioPage() {
 
   function selectResource(id: string) {
     setParams({ app: application!, resource: id })
+  }
+
+  function openReference(id: string, referencePath: string | null) {
+    setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) })
   }
 
   function selectDiagnostic(id: string) {
@@ -173,13 +180,29 @@ export function StudioPage() {
                       { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
                       { key: 'id', label: t('shell.studio.id'), children: selected.id },
                       { key: 'file', label: t('shell.studio.file'), children: selected.file },
+                      ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
                     ]}
                   />
                   <StudioEditor
                     key={selected.id}
                     application={application!}
                     item={selected}
+                    path={path}
                     onSaved={(diagnostics) => setFolder({ ...loaded, diagnostics })}
+                    onDeleted={(diagnostics) => {
+                      setFolder({
+                        ...loaded,
+                        resources: loaded.resources.filter((item) => item.id !== selected.id),
+                        diagnostics,
+                      })
+                      setParams({ app: application! })
+                    }}
+                  />
+                  <StudioReferences
+                    key={selected.id}
+                    application={application!}
+                    resourceId={selected.id}
+                    onOpen={openReference}
                   />
                 </Flex>
               ) : (
