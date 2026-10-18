@@ -119,7 +119,7 @@ PostgreSQL runs init scripts only on an empty volume, so an existing local Compo
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
-`binh`, `chau`, `dung` and `giang`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. *(Planned for M8)* The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. *(Planned for M8)* `hoa` holds the `author` role, which opens Studio at http://localhost:5173/studio under `scripts/dev.sh`. Under `scripts/dev.sh`,
+`binh`, `chau`, `dung`, `giang` and `hoa`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. *(Planned for M8)* The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. `hoa` holds the `author` role, which lets the authoring API list and read the purchase request sample's resources under `scripts/dev.sh`. *(Planned for M8)* The Studio page at http://localhost:5173/studio opens for `hoa`. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the

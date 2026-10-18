@@ -23,9 +23,11 @@ flowchart LR
   It is the BFF: the OIDC client and the cookie session. The record API, the
   data source endpoint, the process start endpoint, the task API and the site
   endpoints require a session.
-  *(planned for M8)* It also hosts Studio's
-  [authoring API](reference/authoring.md), which edits the application folders
-  that `Studio:Folders` lists and needs a session and the author role.
+  It also hosts Studio's
+  [authoring API](reference/authoring.md), which works on the application
+  folders that `Studio:Folders` lists and needs a session and the author role.
+  Its routes that list and read resources are built.
+  *(Planned for M8: the routes that write.)*
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
   It runs work items, and through them
@@ -254,7 +256,7 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
     `GET /api/site`, `GET /api/texts/{locale}` and the `/api/auth` endpoints
     carry no application content and call no policy. Worker steps run as `system`,
     outside policies.
-  - *(planned for M8)* The [authoring API](reference/authoring.md) checks
+  - The [authoring API](reference/authoring.md) checks
     `Studio:AuthorRole`, an installation-level role outside application
     policies, and calls no policy. An author can change every policy of an
     application, so a policy cannot guard authoring. See
@@ -407,7 +409,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   page starts a sign-in that cannot complete.
   - It holds the purchase request users with fixed ids: `anna` and `lan`
     the employees, `binh` and `chau` the department managers, `dung` the
-    finance reviewer, and `giang` the operator. Seed data and E2E journeys already name these ids.
+    finance reviewer, `giang` the operator, and `hoa` the author. Seed data and E2E journeys already name these ids.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
