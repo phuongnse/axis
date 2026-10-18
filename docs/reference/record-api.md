@@ -39,6 +39,12 @@ no session. The bearer token check, the endpoint call with its `output` and
 release. Both match ignoring letter case. `{id}` is a record id in the
 hyphenated 8-4-4-4-12 hex form, in either letter case.
 
+A module entity's `{entity}` is written `{module id}/{entity name}`, for example
+`entities/departments/Department/records`, and matches ignoring letter case. It
+is two path segments, and only that form reaches a module entity. An entity of
+the application has one segment. A module entity named `records` cannot be listed
+or created, because the route that reads a record by id takes that URL.
+
 ## Record shape
 
 ```json

@@ -11,7 +11,10 @@ namespace Axis.Server.Studio;
 
 /// <summary>
 /// The authoring API, for an author who edits the application folders in
-/// <c>Studio:Folders</c>. <c>GET /api/studio/apps/{application}/resources</c> lists every resource of
+/// <c>Studio:Folders</c>. <c>GET /api/studio/apps</c> lists the application names of those folders, as
+/// <c>{ items: [{ name }] }</c> in folder order. A folder without a readable manifest name is left out,
+/// and a name repeated ignoring letter case appears once. It checks the session (401) and the author role
+/// (403) like the routes below. <c>GET /api/studio/apps/{application}/resources</c> lists every resource of
 /// the folder, sorted by file, each with its <c>id</c>, <c>kind</c>, <c>name</c>, <c>file</c> and
 /// <c>version</c>. <c>GET /api/studio/apps/{application}/resources/{id}</c> returns one resource with its
 /// JSON <c>content</c>, and its <c>version</c> as a quoted <c>ETag</c>. The version is the SHA-256 of the
@@ -37,12 +40,24 @@ internal static class StudioEndpoints
 {
     public static void MapStudioEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/studio/apps", AppsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
+    }
+
+    private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
+    {
+        if (await RefuseAsync(httpContext, options) is { } refusal)
+        {
+            return refusal;
+        }
+
+        return Results.Ok(new StudioApplicationListResponse(
+            [.. StudioFolder.Applications(options).Select(name => new StudioApplicationItem(name))]));
     }
 
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
@@ -259,22 +274,28 @@ internal static class StudioEndpoints
             ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
             : null;
 
-    // The checks the routes share: the folder, or the problem that refused the request.
+    // The session and role checks every route shares: the problem that refuses the request, or null.
+    private static async Task<IResult?> RefuseAsync(HttpContext httpContext, StudioOptions options)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        return options.Allows(user.Roles)
+            ? null
+            : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the author role.");
+    }
+
+    // The checks the application routes share: the folder, or the problem that refused the request.
     private static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
         string application,
         HttpContext httpContext,
         StudioOptions options)
     {
-        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        if (await RefuseAsync(httpContext, options) is { } refusal)
         {
-            return (null, Grants.SignInRequired());
-        }
-
-        if (!options.Allows(user.Roles))
-        {
-            return (null, Results.Problem(
-                statusCode: StatusCodes.Status403Forbidden,
-                title: "You do not hold the author role."));
+            return (null, refusal);
         }
 
         return StudioFolder.Find(options, application) is { } folder
@@ -286,6 +307,12 @@ internal static class StudioEndpoints
 
     private static IResult Problem(int statusCode, string title) => Results.Problem(statusCode: statusCode, title: title);
 }
+
+/// <summary>The applications of the Studio folders, in folder order.</summary>
+internal sealed record StudioApplicationListResponse(IReadOnlyList<StudioApplicationItem> Items);
+
+/// <summary>One application in the list: the <c>name</c> in its manifest.</summary>
+internal sealed record StudioApplicationItem(string Name);
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);

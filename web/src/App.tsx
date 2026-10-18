@@ -7,6 +7,7 @@ import { PageRoute } from './pages/PageRoute'
 import { PlatformContext, type Platform, type PlatformTexts } from './pages/context'
 import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
+import { StudioPage } from './pages/StudioPage'
 import { readStoredLocale } from './platform/locale'
 import { fetchSite, type SiteMetadata } from './platform/site'
 import { fetchTexts, type TextMap } from './platform/texts'
@@ -75,6 +76,14 @@ export function App({ development }: { development: boolean }) {
           element={
             <PlatformShellRoute>
               <HomePage />
+            </PlatformShellRoute>
+          }
+        />
+        <Route
+          path="studio"
+          element={
+            <PlatformShellRoute>
+              <StudioPage />
             </PlatformShellRoute>
           }
         />

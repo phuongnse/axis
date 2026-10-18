@@ -126,5 +126,22 @@
   "shell.history.action.process.completed": "Đã hoàn thành quy trình",
   "shell.history.action.process.failed": "Quy trình thất bại",
   "shell.history.action.task.created": "Đã tạo nhiệm vụ",
-  "shell.history.action.task.completed": "Đã quyết định nhiệm vụ"
+  "shell.history.action.task.completed": "Đã quyết định nhiệm vụ",
+  "shell.studio.link": "Studio",
+  "shell.studio.title": "Studio",
+  "shell.studio.application": "Ứng dụng",
+  "shell.studio.noApplications": "Không có ứng dụng nào trong Studio.",
+  "shell.studio.search": "Tìm theo tên hoặc id",
+  "shell.studio.resources": "Tài nguyên",
+  "shell.studio.noResources": "Không có tài nguyên nào khớp.",
+  "shell.studio.selectResource": "Chọn một tài nguyên.",
+  "shell.studio.kind": "Loại",
+  "shell.studio.id": "Id",
+  "shell.studio.file": "Tệp",
+  "shell.studio.path": "Đường dẫn",
+  "shell.studio.diagnostics": "Chẩn đoán",
+  "shell.studio.noDiagnostics": "Không có chẩn đoán nào.",
+  "shell.studio.loadFailed": "Không thể tải Studio.",
+  "shell.studio.forbidden.title": "Studio không khả dụng",
+  "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio."
 }

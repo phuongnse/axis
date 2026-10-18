@@ -498,7 +498,7 @@ removed. Everything in this decision is in place. See
   the next sign-in.
 - **Current user:** `GET /api/me` keeps its shape and reads the session.
   [D38](#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
-  adds a `studio` field *(planned for M8)*.
+  adds a `studio` field.
 - **Sign-in needed:** every endpoint under `/api/apps/`, and the site and
   page metadata, answer `401` without a session. The platform shell's texts
   and `/health` stay open.
@@ -1754,8 +1754,9 @@ answer names nothing that an open endpoint should not show.
 ## D38. Studio edits application folders through an authoring API — Agreed
 
 In M8, Studio edits an application's resource files through an authoring API
-on the server. The routes that list, read, patch, create and delete resources
-and the diagnostics route are built. The rest is *(planned for M8)*. See the
+on the server. The routes that list applications, list, read, patch, create and
+delete resources and give diagnostics are built, and so are the Studio page's
+list, search and diagnostics panel. The rest is *(planned for M8)*. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1890,10 +1891,10 @@ M8 adds modules: versioned folders of resources that applications reuse.
 The manifest, installation, declaring, pinning, the module files stored in
 the release, and the compile of a module's entities, sequences, seeds and events
 with ids derived from the application are built. So are the `target` and `sequence`
-references, the module texts that join the application's texts by locale, and
-the codes `AXC0207` to `AXC0211`. Module data sources, rules and forms,
-activating module entities, seeding, the sample and the other checks are still
-*(planned for M8)*. See the
+references, the module texts that join the application's texts by locale, the
+codes `AXC0207` to `AXC0211`, activating module entities, seeding and the record
+API for module entities are built. Module data sources, rules and forms, the
+sample and the other checks are still *(planned for M8)*. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner
@@ -1927,8 +1928,11 @@ confirmed these points on issue #571 on 2026-10-18.
   - A module resource names only resources of its own module.
   - A reference to an undeclared module, or to a name the pinned version lacks,
     is a diagnostic.
-  - How a module entity or data source is named in API URLs is left to the
-    issue that builds modules.
+  - The record API writes a module entity's name as two path segments,
+    `{module id}/{entity name}`, for example
+    `/api/apps/{app}/entities/departments/Department/records`.
+  - How a module data source is named in API URLs is left to the issue that
+    builds module data sources.
 - **A copy per application:**
   - Module entities, sequences and seeds belong to the application that uses
     the module. Applications never share stored data. Shared master data would
