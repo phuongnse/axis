@@ -499,7 +499,7 @@ flowchart LR
    file order. A change's `value` stays expression text. No model is produced
    while any error remains.
 
-   *(planned for M8)* The same pass builds the [reference index](#reference-index).
+   The same pass builds the [reference index](#reference-index).
 3. **Check.** Each entity's [validations](#entity-logic) are parsed and
    type-checked against the entity's own fields and its child collections,
    which only [aggregates](expressions.md#aggregates) accept, and must be
@@ -962,10 +962,10 @@ API reads them. *(Planned for M8: the routes that create and delete, and the Stu
 
 ## Reference index
 
-*(planned for M8)* Every compile collects each reference it resolves into a
-reference index, as [D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
-agrees. Studio reads it through the [authoring API](authoring.md#references) to
-show where a resource is used and what it uses.
+Every compile collects each reference it resolves into a reference index, as
+[D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
+agrees. Studio reads it through the [authoring API](authoring.md#references)
+*(planned for M8)* to show where a resource is used and what it uses.
 
 - **Built by the compile.** The index is built in memory, in the same pass as
   the [Resolve step](#configuration-pipeline). It is not stored in the release
@@ -975,7 +975,7 @@ show where a resource is used and what it uses.
   - a resource, with its `id`, `kind`, `name` and `file`
   - a text key
   - an [extension package](#extension-packages), by its id
-  - a module, by its name
+  - a module, by its id
 - **Edges.** An edge runs from a resource and a JSON Pointer path in it to a
   node, with a relation. The path is the one the compile diagnostics use.
 - **Not an edge.** An unresolved reference is a diagnostic, not an edge. So is
@@ -995,41 +995,41 @@ show where a resource is used and what it uses.
 | `text entry` | Text | `/texts/{key}` | Text key |
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
-| `field target` | Entity, endpoint, data source | `/fields/{i}/target`, `/input/{i}/target`, `/parameters/{i}/target` | Entity |
-| `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
-| `rule call` | Entity, data source, rule, process, policy, trigger | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter`, `/when` of a data change trigger | Rule |
-| `navigation page` | Site | `/navigation/{i}/page` | Page |
-| `widget entity` | Page | `/widgets/{i}/entity` | Entity |
-| `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
-| `widget form` | Page | `/widgets/{i}/form` | Form |
-| `widget form page` | Page | `/widgets/{i}/formPage` | Page |
-| `widget process` | Page | `/widgets/{i}/process` | Process |
-| `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
-| `form entity` | Form | `/entity` | Entity |
-| `seed entity` | Seed | `/entity` | Entity |
-| `data source entity` | Data source | `/entity` | Entity |
-| `field path` | Data source | `/fields/{i}/path` | Entity, one edge for each `reference` hop |
-| `process entity` | Process | `/entity` | Entity |
-| `task form` | Process | `/steps/{i}/form` | Form |
-| `task role` | Process | `/steps/{i}/assignee/role` | Role |
-| `connector call` | Process | `/steps/{i}/connector/name` | Connector |
-| `package operation` | Process | `/steps/{i}/operation` | Extension package |
-| `raised event` | Process | `/steps/{i}/event` | Event |
-| `policy role` | Policy | `/roles/{i}` | Role |
-| `grant` | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
-| `event entity` | Event | `/entity` | Entity |
-| `endpoint entity` | Endpoint | `/entity` | Entity |
-| `endpoint process` | Endpoint | `/process` | Process |
-| `trigger process` | Trigger | `/process` | Process |
-| `trigger event` | Trigger | `/event` | Event |
-| `trigger entity` | Trigger | `/entity` | Entity |
-| `trigger data source` | Trigger | `/dataSource` | Data source |
-| `migration entity` | Migration | `/entity` | Entity |
-| `scenario entity` | Scenario | `/steps/{i}/entity` | Entity |
-| `scenario process` | Scenario | `/steps/{i}/process` | Process |
-| `scenario role` | Scenario | `/users/{user}/{j}`, `/steps/{i}/assignee/role` | Role |
-| `stub connector` | Scenario | `/stubs/{i}/connector/name` | Connector |
-| `stub package` | Scenario | `/stubs/{i}/operation` | Extension package |
+| `field target` *(planned for M8)* | Entity, endpoint, data source | `/fields/{i}/target`, `/input/{i}/target`, `/parameters/{i}/target` | Entity |
+| `field sequence` *(planned for M8)* | Entity | `/fields/{i}/sequence` | Sequence |
+| `rule call` *(planned for M8)* | Entity, data source, rule, process, policy, trigger | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter`, `/when` of a data change trigger | Rule |
+| `navigation page` *(planned for M8)* | Site | `/navigation/{i}/page` | Page |
+| `widget entity` *(planned for M8)* | Page | `/widgets/{i}/entity` | Entity |
+| `widget data source` *(planned for M8)* | Page | `/widgets/{i}/dataSource` | Data source |
+| `widget form` *(planned for M8)* | Page | `/widgets/{i}/form` | Form |
+| `widget form page` *(planned for M8)* | Page | `/widgets/{i}/formPage` | Page |
+| `widget process` *(planned for M8)* | Page | `/widgets/{i}/process` | Process |
+| `action process` *(planned for M8)* | Page | `/widgets/{i}/actions/{j}/process` | Process |
+| `form entity` *(planned for M8)* | Form | `/entity` | Entity |
+| `seed entity` *(planned for M8)* | Seed | `/entity` | Entity |
+| `data source entity` *(planned for M8)* | Data source | `/entity` | Entity |
+| `field path` *(planned for M8)* | Data source | `/fields/{i}/path` | Entity, one edge for each `reference` hop |
+| `process entity` *(planned for M8)* | Process | `/entity` | Entity |
+| `task form` *(planned for M8)* | Process | `/steps/{i}/form` | Form |
+| `task role` *(planned for M8)* | Process | `/steps/{i}/assignee/role` | Role |
+| `connector call` *(planned for M8)* | Process | `/steps/{i}/connector/name` | Connector |
+| `package operation` *(planned for M8)* | Process | `/steps/{i}/operation` | Extension package |
+| `raised event` *(planned for M8)* | Process | `/steps/{i}/event` | Event |
+| `policy role` *(planned for M8)* | Policy | `/roles/{i}` | Role |
+| `grant` *(planned for M8)* | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
+| `event entity` *(planned for M8)* | Event | `/entity` | Entity |
+| `endpoint entity` *(planned for M8)* | Endpoint | `/entity` | Entity |
+| `endpoint process` *(planned for M8)* | Endpoint | `/process` | Process |
+| `trigger process` *(planned for M8)* | Trigger | `/process` | Process |
+| `trigger event` *(planned for M8)* | Trigger | `/event` | Event |
+| `trigger entity` *(planned for M8)* | Trigger | `/entity` | Entity |
+| `trigger data source` *(planned for M8)* | Trigger | `/dataSource` | Data source |
+| `migration entity` *(planned for M8)* | Migration | `/entity` | Entity |
+| `scenario entity` *(planned for M8)* | Scenario | `/steps/{i}/entity` | Entity |
+| `scenario process` *(planned for M8)* | Scenario | `/steps/{i}/process` | Process |
+| `scenario role` *(planned for M8)* | Scenario | `/users/{user}/{j}`, `/steps/{i}/assignee/role` | Role |
+| `stub connector` *(planned for M8)* | Scenario | `/stubs/{i}/connector/name` | Connector |
+| `stub package` *(planned for M8)* | Scenario | `/stubs/{i}/operation` | Extension package |
 
 - **Label paths.** A `label text` edge sits at the `/textKey` of each label the
   `AXC0028` check covers: the application label, entity and

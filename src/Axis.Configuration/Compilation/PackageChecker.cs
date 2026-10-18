@@ -18,7 +18,8 @@ internal static class PackageChecker
     public static IReadOnlyList<PinnedPackageModel> Check(
         ApplicationManifest application,
         IReadOnlyCollection<PackageVersion> installed,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        ReferenceIndexBuilder references)
     {
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, application.File, path, application.Id));
@@ -77,6 +78,7 @@ internal static class PackageChecker
             }
 
             pins.Add(new PinnedPackageModel(package.Id, package.Version, pinned));
+            references.Add(application, path, ReferenceRelations.Package, new PackageNode(package.Id));
         }
 
         return pins;

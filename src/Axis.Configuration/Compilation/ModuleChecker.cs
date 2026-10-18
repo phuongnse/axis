@@ -47,7 +47,8 @@ internal static class ModuleChecker
     public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources) Check(
         ApplicationManifest application,
         IReadOnlyCollection<InstalledModule> installed,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        ReferenceIndexBuilder references)
     {
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, application.File, path, application.Id));
@@ -108,6 +109,7 @@ internal static class ModuleChecker
             }
 
             pins.Add(new PinnedModuleModel(module.Id, module.Version, pinned));
+            references.Add(application, path, ReferenceRelations.Module, new ModuleNode(module.Id));
             var pinnedModule = installed.First(candidate =>
                 string.Equals(candidate.Manifest.Id, module.Id, StringComparison.Ordinal)
                 && string.Equals(candidate.Manifest.Version, pinned, StringComparison.Ordinal));
