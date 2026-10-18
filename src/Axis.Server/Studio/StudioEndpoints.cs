@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Server.Http;
 using Axis.Server.Users;
@@ -17,7 +18,7 @@ namespace Axis.Server.Studio;
 /// application (404), then resource (404). The problem titles never contain text from the request.
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
 /// <c>GET /api/studio/apps/{application}/diagnostics</c> compiles the folder in memory against the installed
-/// extension packages and answers every compile diagnostic. It touches no database and activates nothing.
+/// extension packages and modules and answers every compile diagnostic. It touches no database and activates nothing.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -62,7 +63,7 @@ internal static class StudioEndpoints
             found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone()));
     }
 
-    private static async Task<IResult> DiagnosticsAsync(string application, HttpContext httpContext, StudioOptions options, PackageCatalog packages)
+    private static async Task<IResult> DiagnosticsAsync(string application, HttpContext httpContext, StudioOptions options, PackageCatalog packages, ModuleCatalog modules)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -72,7 +73,7 @@ internal static class StudioEndpoints
 
         // The compile step of activation, before it touches a database. The folder is read from disk as
         // activation reads it, not through the filtered list of the other routes.
-        var compiled = ApplicationCompiler.Compile(folder, packages.Versions);
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
         return Results.Ok(new StudioDiagnosticsResponse([.. compiled.Diagnostics.Select(StudioDiagnostic.From)]));
     }
 

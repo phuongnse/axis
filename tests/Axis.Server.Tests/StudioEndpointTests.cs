@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -261,7 +262,47 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Assert.Equal(expected, actual);
     }
 
-    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author") =>
+    [Fact]
+    public async Task Diagnostics_compile_against_the_installed_modules()
+    {
+        var modules = Path.Combine(_root, "modules");
+        Directory.CreateDirectory(Path.Combine(modules, "cost-centers", "1.0.0"));
+        File.WriteAllText(
+            Path.Combine(modules, "cost-centers", "1.0.0", "module.json"),
+            """{ "kind": "module", "id": "cost-centers", "version": "1.0.0", "label": "Cost centers" }""");
+        File.WriteAllText(
+            Path.Combine(modules, "cost-centers", "1.0.0", "CostCenter.json"),
+            $$"""
+            { "id": "{{Guid.NewGuid()}}", "kind": "entity", "name": "CostCenter", "formatVersion": 1,
+              "fields": [ { "name": "name", "type": "text", "required": true } ] }
+            """);
+        var applicationPath = Path.Combine(Folder, "application.json");
+        File.WriteAllText(
+            applicationPath,
+            File.ReadAllText(applicationPath).Replace(
+                "\"formatVersion\": 1,",
+                "\"formatVersion\": 1,\n  \"modules\": [{ \"id\": \"cost-centers\", \"version\": \"^1.0.0\" }],",
+                StringComparison.Ordinal));
+        var withoutModules = ApplicationCompiler.Compile(Folder, SamplePackages.Versions).Diagnostics;
+        Assert.Contains(withoutModules, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownModule);
+        await using var factory = CreateFactory(modulesPath: modules);
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/diagnostics", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var codes = body.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(item => item.GetProperty("code").GetString()!)
+            .ToList();
+        Assert.DoesNotContain(DiagnosticCodes.UnknownModule, codes);
+        var expected = ApplicationCompiler.Compile(Folder, SamplePackages.Versions, ModuleCatalog.Load(modules).Modules).Diagnostics
+            .Select(diagnostic => diagnostic.Code)
+            .ToList();
+        Assert.Equal(expected, codes);
+    }
+
+    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -270,6 +311,11 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            if (modulesPath is not null)
+            {
+                builder.UseSetting("Modules:Path", modulesPath);
+            }
+
             builder.UseSetting("Studio:Folders:0", folder ?? Folder);
             builder.UseSetting("Studio:AuthorRole", authorRole);
             builder.UseTestOidc("default");

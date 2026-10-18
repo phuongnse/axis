@@ -184,9 +184,9 @@ diagnostics on demand, and is built. *(Planned for M8: every write answers
 with them too.)* A diagnostic never blocks a save.
 
 - The folder is compiled in memory against the extension packages installed
-  under `Extensions:Path`, see
-  [extension packages](configuration.md#extension-packages). No database is
-  touched.
+  under `Extensions:Path` and the modules installed under `Modules:Path`, see
+  [extension packages](configuration.md#extension-packages) and
+  [modules](configuration.md#modules). No database is touched.
 - The codes, severities and fields are those of
   [startup activation](configuration.md#startup-activation). Each diagnostic
   is `{ code, severity, message, file, path, resourceId }`. `severity` is
