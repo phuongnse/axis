@@ -197,4 +197,6 @@ public static class DiagnosticCodes
     public const string DuplicateApplicationModule = "AXC0206";
     public const string QualifiedModuleReference = "AXC0208";
     public const string ReservedModulesFolder = "AXC0212";
+    public const string NonAdditiveModuleUpgrade = "AXC0213";
+    public const string MigrationOfModuleEntity = "AXC0214";
 }
