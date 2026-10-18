@@ -262,7 +262,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
         Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
         Assert.True(call.GetProperty("inputHidden").GetBoolean());
-        Assert.DoesNotContain("500", call.ToString(), StringComparison.Ordinal);
+        Assert.False(call.TryGetProperty("amount", out _));
     }
 
     [Fact]
