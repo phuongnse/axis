@@ -19,7 +19,8 @@ namespace Axis.Configuration.Compilation;
 /// files is checked as JSON, for a kind a module may hold and against the schema of that kind. The
 /// files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the release. The entities,
 /// sequences, seeds, events, data sources and forms of a pinned module come back as resources named
-/// <c>&lt;id&gt;/&lt;name&gt;</c>, keeping the ids written in the files. Inside a module, a field's
+/// <c>&lt;id&gt;/&lt;name&gt;</c>, keeping the ids written in the files. Its rules come back by module,
+/// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
 /// parameter's <c>target</c> name a resource of the same module without <c>/</c>, and are rewritten to
 /// the qualified name.
@@ -193,12 +194,13 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, events, data sources and forms of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources and forms of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
         private readonly List<SequenceResource> _sequences = [];
         private readonly List<SeedResource> _seeds = [];
+        private readonly List<(string ModuleId, List<RuleResource> Rules)> _rules = [];
         private readonly List<EventResource> _events = [];
         private readonly List<DataSourceResource> _dataSources = [];
         private readonly List<FormResource> _forms = [];
@@ -213,6 +215,7 @@ internal static class ModuleChecker
                 _entities,
                 _sequences,
                 _seeds,
+                [.. _rules.Select(module => (module.ModuleId, (IReadOnlyList<RuleResource>)module.Rules))],
                 _events,
                 _dataSources,
                 _forms,
@@ -255,7 +258,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, an event, a data source or a form.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source or a form.</summary>
         public void Add(string moduleId, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -271,6 +274,17 @@ internal static class ModuleChecker
                 case ResourceKinds.Seed:
                     var seed = root.Deserialize<SeedResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _seeds.Add(seed with { Name = $"{moduleId}/{seed.Name}", Entity = $"{moduleId}/{seed.Entity}" });
+                    break;
+                case ResourceKinds.Rule:
+                    var rule = root.Deserialize<RuleResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    var module = _rules.Find(entry => entry.ModuleId == moduleId);
+                    if (module.Rules is null)
+                    {
+                        module = (moduleId, []);
+                        _rules.Add(module);
+                    }
+
+                    module.Rules.Add(rule);
                     break;
                 case ResourceKinds.Event:
                     var @event = root.Deserialize<EventResource>(ApplicationLoader.SerializerOptions)! with { File = file };
@@ -371,7 +385,8 @@ internal static class ModuleChecker
 
 /// <summary>
 /// The entities, sequences, seeds, events, data sources and forms of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
-/// carrying the ids written in the module files. The unloaded names are those of module files that
+/// carrying the ids written in the module files. The rules come by module, in pin order, each in path
+/// order and under its plain name. The unloaded names are those of module files that
 /// failed their schema or whose reference was reported, so no second diagnostic names them. Both name
 /// sets ignore letter case.
 /// </summary>
@@ -379,6 +394,7 @@ internal sealed record ModuleResources(
     IReadOnlyList<EntityResource> Entities,
     IReadOnlyList<SequenceResource> Sequences,
     IReadOnlyList<SeedResource> Seeds,
+    IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> Rules,
     IReadOnlyList<EventResource> Events,
     IReadOnlyList<DataSourceResource> DataSources,
     IReadOnlyList<FormResource> Forms,

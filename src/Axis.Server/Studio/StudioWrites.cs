@@ -6,24 +6,28 @@ using Json.Patch;
 
 namespace Axis.Server.Studio;
 
-/// <summary>What a patch did: the new version and its bytes, or the reason it was refused.</summary>
-internal sealed record StudioPatchOutcome(StudioPatchRefusal? Refusal, string? Version)
+/// <summary>What a write did: the file's new version, or the reason it was refused.</summary>
+internal sealed record StudioWriteOutcome(StudioWriteRefusal? Refusal, string? Version)
 {
-    public static StudioPatchOutcome Refused(StudioPatchRefusal refusal) => new(refusal, null);
+    public static StudioWriteOutcome Refused(StudioWriteRefusal refusal) => new(refusal, null);
 }
 
-internal enum StudioPatchRefusal
+internal enum StudioWriteRefusal
 {
     NotFound,
     DoesNotApply,
     ChangesIdOrKind,
     Stale,
+    Exists,
+    Manifest,
+    UnsafePath,
 }
 
 /// <summary>
 /// Writes to the resource files of a Studio folder. One lock covers the whole check-version-then-write step
 /// of every write, so two patches that carry the same version cannot both pass the check. The lock covers
-/// this server process only.
+/// this server process only. A create refuses to replace a file, so it holds even when another process
+/// writes the folder.
 /// </summary>
 internal static class StudioWrites
 {
@@ -43,7 +47,7 @@ internal static class StudioWrites
     /// this order: the resource, whether the patch applies, whether it changes <c>id</c> or <c>kind</c>, then
     /// the version. Nothing is written when one fails.
     /// </summary>
-    public static async Task<StudioPatchOutcome> PatchAsync(
+    public static async Task<StudioWriteOutcome> PatchAsync(
         string folder, Guid id, JsonPatch patch, string ifMatch, CancellationToken cancellationToken)
     {
         await _lock.WaitAsync(cancellationToken);
@@ -52,7 +56,7 @@ internal static class StudioWrites
             if (StudioFolder.List(folder).FirstOrDefault(file => file.Id == id) is not { } current
                 || Target(folder, current.File) is not { } target)
             {
-                return StudioPatchOutcome.Refused(StudioPatchRefusal.NotFound);
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.NotFound);
             }
 
             JsonNode? original;
@@ -65,27 +69,116 @@ internal static class StudioWrites
             }
             catch (Exception exception) when (exception is JsonException or InvalidOperationException or ArgumentException)
             {
-                return StudioPatchOutcome.Refused(StudioPatchRefusal.DoesNotApply);
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.DoesNotApply);
             }
 
             if (patched is not JsonObject patchedObject || original is not JsonObject originalObject)
             {
-                return StudioPatchOutcome.Refused(StudioPatchRefusal.DoesNotApply);
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.DoesNotApply);
             }
 
             if (!SameString(originalObject, patchedObject, "id") || !SameString(originalObject, patchedObject, "kind"))
             {
-                return StudioPatchOutcome.Refused(StudioPatchRefusal.ChangesIdOrKind);
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.ChangesIdOrKind);
             }
 
             if (!string.Equals(Unquote(ifMatch), current.Version, StringComparison.Ordinal))
             {
-                return StudioPatchOutcome.Refused(StudioPatchRefusal.Stale);
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
             }
 
             var bytes = Serialize(patchedObject);
             await ReplaceAsync(target, bytes, cancellationToken);
-            return new StudioPatchOutcome(null, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+            return new StudioWriteOutcome(null, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Writes a new resource file <paramref name="file"/> into <paramref name="folder"/>, creating its kind
+    /// folder when it is missing. It refuses when the folder already has a resource with <paramref name="id"/>
+    /// or the target file exists, and it never replaces a file. Nothing is written when it refuses.
+    /// </summary>
+    public static async Task<StudioWriteOutcome> CreateAsync(
+        string folder, Guid id, string file, JsonObject content, CancellationToken cancellationToken)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (StudioFolder.List(folder).Any(existing => existing.Id == id))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
+            }
+
+            if (Target(folder, file) is not { } target)
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.UnsafePath);
+            }
+
+            if (File.Exists(target) || Directory.Exists(target))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
+            }
+
+            var bytes = Serialize(content);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            var temporary = TemporaryName(target);
+            try
+            {
+                await File.WriteAllBytesAsync(temporary, bytes, cancellationToken);
+                File.Move(temporary, target, overwrite: false);
+            }
+            catch (IOException) when (File.Exists(target))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
+            }
+            finally
+            {
+                if (File.Exists(temporary))
+                {
+                    File.Delete(temporary);
+                }
+            }
+
+            return new StudioWriteOutcome(null, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Deletes the file of the resource <paramref name="id"/> when <paramref name="ifMatch"/> is its current
+    /// version. The checks run in this order: the resource, whether it is the manifest, then the version.
+    /// </summary>
+    public static async Task<StudioWriteOutcome> DeleteAsync(
+        string folder, Guid id, string ifMatch, CancellationToken cancellationToken)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (StudioFolder.List(folder).FirstOrDefault(file => file.Id == id) is not { } current
+                || Target(folder, current.File) is not { } target)
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.NotFound);
+            }
+
+            if (current.File == "application.json")
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Manifest);
+            }
+
+            if (!string.Equals(Unquote(ifMatch), current.Version, StringComparison.Ordinal))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
+            }
+
+            File.Delete(target);
+            return new StudioWriteOutcome(null, null);
         }
         finally
         {
@@ -139,9 +232,12 @@ internal static class StudioWrites
     }
 
     // A hidden temporary name that is not *.json, so neither the list nor the dev script's watcher sees it.
+    private static string TemporaryName(string target) =>
+        Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
+
     private static async Task ReplaceAsync(string target, byte[] bytes, CancellationToken cancellationToken)
     {
-        var temporary = Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
+        var temporary = TemporaryName(target);
         try
         {
             await File.WriteAllBytesAsync(temporary, bytes, cancellationToken);

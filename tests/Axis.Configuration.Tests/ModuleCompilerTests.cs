@@ -1,8 +1,12 @@
+using System.Text.Json;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
 
 namespace Axis.Configuration.Tests;
 
@@ -939,7 +943,78 @@ public sealed class ModuleCompilerTests
         Assert.Null(result.Model);
     }
 
-    /// <summary>An installation root with each version of the <c>departments</c> module, holding its manifest and one entity.</summary>
+    private const string ModuleRuleId = "4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e01";
+
+    private static string ModuleRule(string id, string name, string expression) => $$"""
+        { "id": "{{id}}", "kind": "rule", "name": "{{name}}", "formatVersion": 1,
+          "parameters": [{ "name": "value", "type": "integer" }], "resultType": "boolean", "expression": "{{expression}}" }
+        """;
+
+    [Fact]
+    public void A_module_rule_can_call_another_rule_of_its_module()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/A.json", ModuleRule(ModuleRuleId, "A", "B(value)"))
+            .With("departments/1.0.0/B.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e02", "B", "value > 0"));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_module_rule_that_calls_an_application_rule_is_reported_in_the_module_file()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/IsActive.json", ModuleRule(ModuleRuleId, "IsActive", "IsUrgent(value)"));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("IsUrgent.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e03", "IsUrgent", "value > 0"));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownFunction, "modules/departments/IsActive.json", "/expression", (Guid?)Guid.Parse(ModuleRuleId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Two_module_rules_that_call_each_other_are_reported_once_in_the_module()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/A.json", ModuleRule(ModuleRuleId, "A", "B(value)"))
+            .With("departments/1.0.0/B.json", ModuleRule("4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e02", "B", "A(value)"));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.RuleCallCycle, diagnostic.Code);
+        Assert.StartsWith("modules/departments/", diagnostic.File, StringComparison.Ordinal);
+        Assert.Equal("/expression", diagnostic.Path);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void The_module_rule_check_returns_each_rule_by_module_id_and_name()
+    {
+        var rule = JsonSerializer.Deserialize<RuleResource>(
+            ModuleRule(ModuleRuleId, "IsActive", "value > 0"), ApplicationLoader.SerializerOptions)! with
+        {
+            File = "modules/departments/IsActive.json",
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        var rules = RuleChecker.CheckModules([("departments", [rule])], diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(["departments/IsActive"], rules.Keys);
+        Assert.NotNull(rules["departments/IsActive"].Body);
+    }
+
     private const string Texts = """
         { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
           "texts": { "department.main": "Department", "role.employee": "Employee", "pages.departments.title": "Departments" } }
@@ -964,6 +1039,7 @@ public sealed class ModuleCompilerTests
           "roles": ["employee"], "grants": [ { "entity": "{{entity}}", "actions": ["read"] } ] }
         """;
 
+    /// <summary>An installation root with each version of the <c>departments</c> module, holding its manifest and one entity.</summary>
     private static TemporaryFolder Modules(params string[] versions)
     {
         var root = new TemporaryFolder();
