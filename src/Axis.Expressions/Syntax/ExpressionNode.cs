@@ -23,8 +23,12 @@ public sealed record NameNode(int Offset, string Name) : ExpressionNode(Offset);
 /// <summary>One <c>.name</c> step of a path. <see cref="ExpressionNode.Offset"/> is the <c>.</c>.</summary>
 public sealed record MemberNode(int Offset, ExpressionNode Target, string Name) : ExpressionNode(Offset);
 
-/// <summary>A function or rule call, including <c>date('…')</c> and <c>dateTime('…')</c>.</summary>
-public sealed record CallNode(int Offset, string Name, IReadOnlyList<ExpressionNode> Arguments) : ExpressionNode(Offset);
+/// <summary>
+/// A function or rule call, including <c>date('…')</c> and <c>dateTime('…')</c>.
+/// <see cref="Module"/> is the module id of a qualified rule call such as <c>departments:IsManager(x)</c>,
+/// and null otherwise. A qualified call's <see cref="ExpressionNode.Offset"/> is the module id.
+/// </summary>
+public sealed record CallNode(int Offset, string Name, IReadOnlyList<ExpressionNode> Arguments, string? Module = null) : ExpressionNode(Offset);
 
 public sealed record UnaryNode(int Offset, UnaryOperator Operator, ExpressionNode Operand) : ExpressionNode(Offset);
 

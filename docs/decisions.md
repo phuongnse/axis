@@ -1890,9 +1890,10 @@ M8 adds modules: versioned folders of resources that applications reuse.
 The manifest, installation, declaring, pinning, the module files stored in
 the release, and the compile of a module's entities, sequences, seeds and events
 with ids derived from the application are built. So are the `target` and `sequence`
-references and the codes `AXC0207` and `AXC0208`. Module data sources, rules,
-forms and texts, the sample and the other checks are still
-*(planned for M8)*. Activating module entities, seeding and the record API for
+references and the codes `AXC0207` and `AXC0208`. So are a module's rules and
+the calls to them from application expressions. Module data sources, forms and
+texts, module validations that call rules, the sample and the other checks are
+still *(planned for M8)*. Activating module entities, seeding and the record API for
 module entities are built. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
@@ -1930,6 +1931,12 @@ confirmed these points on issue #571 on 2026-10-18.
   - The record API writes a module entity's name as two path segments,
     `{module id}/{entity name}`, for example
     `/api/apps/{app}/entities/departments/Department/records`.
+  - An application expression calls a module rule as `<module id>:<name>(…)`,
+    for example `departments:IsManager(x)`, with no spaces around the `:`. `/`
+    is already division and `.` is already a path step, so the `:` keeps every
+    expression that parses today unchanged. The owner confirmed this syntax on
+    issue #617 on 2026-10-18. A call to a rule of an undeclared module is
+    `AXC0207`.
   - How a module data source is named in API URLs is left to the issue that
     builds module data sources.
 - **A copy per application:**

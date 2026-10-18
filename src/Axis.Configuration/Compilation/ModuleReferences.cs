@@ -1,4 +1,5 @@
 using Axis.Configuration.Diagnostics;
+using Axis.Expressions.Diagnostics;
 
 namespace Axis.Configuration.Compilation;
 
@@ -27,7 +28,7 @@ internal sealed class ModuleReferences(IReadOnlySet<string> declared, IReadOnlyS
         if (!declared.Contains(moduleId))
         {
             report(
-                DiagnosticCodes.UndeclaredModuleReference,
+                ExpressionDiagnosticCodes.UndeclaredModuleReference,
                 $"The name '{name}' refers to the module '{moduleId}', which the application does not declare. Add '{moduleId}' to 'modules' in application.json.",
                 path);
             return true;

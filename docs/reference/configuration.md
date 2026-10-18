@@ -842,7 +842,7 @@ sorted by file and then path.
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
-| `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity` or the expression's pointer. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, or the `entity` of a module event, contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 
@@ -1954,7 +1954,8 @@ form's `entity` and a policy grant's `entity` can name them. A field's
 `target` also covers data source parameters and endpoint inputs. A process
 `entity`, a raise event step's `event` and an event trigger's `event` can name
 a module entity or event. A pinned module's rules are checked with the rule
-checks, inside their module, see [References](#modules). Activation provisions
+checks, inside their module, and application expressions call them, see
+[References](#modules). Activation provisions
 the module's entities as the application's own tables, startup seeding applies
 the module's seeds, and the record API serves module entities. Module data
 sources, forms and texts, and the codes marked planned are
@@ -2030,9 +2031,18 @@ The module's manifest is `module.json` at the root of its folder:
   apply to it and are reported in the module file. A call to an application
   rule, or to a rule of another module, is `AXC0050` at `/expression` of the
   module file. The compiler keeps each module rule as `<module id>/<name>`.
-  Calling it from application expressions and from module validations is
-  *(planned for M8)*. A module entity sees no rules yet, so it cannot call an
-  application rule. Module entities come before the application's own entities
+  An application expression calls it as `<module id>:<name>(…)`, such as
+  `departments:IsManager(x)`, with no spaces around the `:`. A rule, a
+  validation, a data source filter, a process condition and a policy filter can
+  call it. The interpreter runs its body, and a filter's SQL inlines it with the
+  module rules it calls. The rule name ignores letter case and the module id
+  must match exactly. A module that `modules` does not declare is `AXC0207` at
+  the expression's pointer. A rule the declared module lacks is `AXC0050`. A
+  call chain that passes from an application rule into module rules counts
+  toward the 8-deep limit, `AXC0065`. See
+  [qualified rule calls](expressions.md#names-and-references). Calling a module
+  rule from module validations is *(planned for M8)*. A module entity sees no
+  rules yet, so it cannot call an application rule or a module rule. Module entities come before the application's own entities
   in the model, in the order of `modules` and then by path. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
@@ -2072,7 +2082,7 @@ The module's manifest is `module.json` at the root of its folder:
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
-| `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity` or the expression's pointer. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, or the `entity` of a module event, contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 

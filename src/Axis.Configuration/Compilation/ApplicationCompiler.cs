@@ -189,8 +189,9 @@ public static class ApplicationCompiler
         var unloadedSequenceNames = new HashSet<string>(loaded.UnloadedSequenceNames.Concat(moduleResources.UnloadedSequenceNames), StringComparer.OrdinalIgnoreCase);
         var unloadedEventNames = new HashSet<string>(loaded.UnloadedEventNames.Concat(moduleResources.UnloadedEventNames), StringComparer.OrdinalIgnoreCase);
         loaded = loaded with { UnloadedEntityNames = unloadedEntityNames, UnloadedSequenceNames = unloadedSequenceNames, UnloadedEventNames = unloadedEventNames };
+        var declaredModules = new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal);
         var moduleReferences = new ModuleReferences(
-            new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal),
+            declaredModules,
             new HashSet<string>(modules.Select(pin => pin.Id), StringComparer.Ordinal));
 
         // Entity names are unique ignoring letter case; a second entity with the same name is
@@ -301,13 +302,15 @@ public static class ApplicationCompiler
             CheckTextKey(role.Label, role, "/label", references, diagnostics);
         }
 
-        // Validations, at their top level, data source filters and process conditions call rules.
-        // Computed fields and aggregate item expressions see no rules.
-        var rules = RuleChecker.Check(loaded.Rules, diagnostics).Values;
+        // A module rule sees only the rules of its own module. Application expressions call it
+        // as '<module id>:<name>(…)', so the module rules are checked first.
+        var moduleRules = RuleChecker.CheckModules(moduleResources.Rules, diagnostics).Values.ToList();
 
-        // A module rule sees only the rules of its own module. A later step lets application
-        // expressions call it by '<module id>/<name>'.
-        _ = RuleChecker.CheckModules(moduleResources.Rules, diagnostics);
+        // Validations, at their top level, data source filters, process conditions and policy
+        // filters call rules, and module rules by their qualified name. Computed fields and
+        // aggregate item expressions see no rules.
+        var appRules = RuleChecker.Check(loaded.Rules, diagnostics, moduleRules, declaredModules);
+        var rules = (IReadOnlyList<ExpressionRule>)[.. appRules.Values, .. moduleRules];
         foreach (var entity in allEntities)
         {
             // A module entity sees no rules yet, so it cannot call an application rule or a module rule.
@@ -321,12 +324,13 @@ public static class ApplicationCompiler
                 moduleReferences,
                 references,
                 IsModuleResource(entity) ? [] : rules,
+                IsModuleResource(entity) ? null : declaredModules,
                 diagnostics);
         }
 
         PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, diagnostics);
-        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, diagnostics);
+        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
         ProcessChecker.Check(
             loaded.Processes,
             FindEntity,
@@ -344,6 +348,7 @@ public static class ApplicationCompiler
             declaredPackageIds,
             references,
             rules,
+            declaredModules,
             diagnostics);
         PolicyChecker.Check(
             loaded.Policies,
@@ -359,6 +364,7 @@ public static class ApplicationCompiler
             FindEndpoint,
             loaded.UnloadedEndpointNames,
             rules,
+            declaredModules,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
         EventChecker.Check(
@@ -387,6 +393,7 @@ public static class ApplicationCompiler
             FindDataSource,
             loaded.UnloadedDataSourceNames,
             rules,
+            declaredModules,
             diagnostics);
         MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, diagnostics);
         ScenarioChecker.Check(
@@ -428,7 +435,7 @@ public static class ApplicationCompiler
         }
 
         var entities = allEntities
-            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, IsModuleResource(entity) ? [] : rules))
+            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, IsModuleResource(entity) ? [] : rules, IsModuleResource(entity) ? null : declaredModules))
             .ToList();
         var model = new ApplicationModel
         {
@@ -438,15 +445,15 @@ public static class ApplicationCompiler
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = loaded.Texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
-            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules)).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules)).ToList(),
+            DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(dataSource, entities, rules, declaredModules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules, declaredModules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(form, entitiesByName)).ToList(),
             Roles = loaded.Roles,
-            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules)).ToList(),
+            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules, declaredModules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
             Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
-            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules)).ToList(),
+            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules, declaredModules)).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = packages,
             Modules = modules,
@@ -598,6 +605,7 @@ public static class ApplicationCompiler
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string>? modules,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
@@ -659,7 +667,7 @@ public static class ApplicationCompiler
         }
 
         CheckComputedFields(entity, findEntity, Report);
-        CheckValidations(entity, findEntity, references, rules, diagnostics, Report);
+        CheckValidations(entity, findEntity, references, rules, modules, diagnostics, Report);
     }
 
     /// <summary>
@@ -715,6 +723,7 @@ public static class ApplicationCompiler
         Func<string, EntityResource?> findEntity,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string>? modules,
         List<Diagnostic> diagnostics,
         Action<string, string, string> report)
     {
@@ -723,7 +732,7 @@ public static class ApplicationCompiler
             return;
         }
 
-        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity, modules: modules);
         for (var index = 0; index < entity.Validations.Count; index++)
         {
             var validation = entity.Validations[index];
@@ -1055,6 +1064,7 @@ public static class ApplicationCompiler
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics)
     {
         foreach (var dataSource in loaded.DataSources)
@@ -1221,7 +1231,7 @@ public static class ApplicationCompiler
             // A parameter without a usable type would only add noise to the filter's diagnostics.
             if (diagnostics.Count == countBeforeParameters
                 && dataSource.Filter is { } filter
-                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, rules), policyFilter: false) is { } problem)
+                && CheckFilter(filter, ExpressionScopes.ForDataSource(entity.Fields, dataSource.Parameters, findEntity, rules, modules), policyFilter: false) is { } problem)
             {
                 Report(problem.Code, problem.Message, "/filter");
             }
@@ -1375,13 +1385,14 @@ public static class ApplicationCompiler
         EntityResource entity,
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, SequenceResource> sequencesByName,
-        IEnumerable<ExpressionRule> rules)
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string>? modules)
     {
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
         var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName, sequencesByName)).ToList();
-        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity, modules: modules);
         return new EntityModel
         {
             Id = entity.Id,
@@ -1527,7 +1538,7 @@ public static class ApplicationCompiler
     /// parameters, paths through reference fields and the named rules.
     /// </summary>
     private static DataSourceModel BuildDataSource(
-        DataSourceResource dataSource, IReadOnlyList<EntityModel> entities, IEnumerable<ExpressionRule> rules)
+        DataSourceResource dataSource, IReadOnlyList<EntityModel> entities, IEnumerable<ExpressionRule> rules, IReadOnlySet<string> modules)
     {
         EntityModel? Find(string name) =>
             entities.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -1572,7 +1583,7 @@ public static class ApplicationCompiler
             Fields = fields,
             Parameters = parameters,
             Filter = dataSource.Filter is { } filter
-                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find, rules), ExpressionType.Boolean)
+                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find, rules, modules), ExpressionType.Boolean)
                 : null,
             Aggregate = dataSource.Aggregate is { } aggregate
                 ? new DataSourceAggregateModel(
