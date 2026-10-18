@@ -103,7 +103,9 @@ public sealed class SampleAppFixture : IAsyncLifetime
                 new TestIdentity("chau", "Chau Operations Manager", "department-manager"),
                 new TestIdentity("binh", "Binh Engineering Manager", "department-manager"),
                 new TestIdentity("dung", "Dung Finance Reviewer", "finance-reviewer"),
-                new TestIdentity("hoa", "Hoa Finance Reviewer", "finance-reviewer"));
+                new TestIdentity("hoa", "Hoa Finance Reviewer", "finance-reviewer"),
+                new TestIdentity("giang", "Giang Operator", "operator"),
+                new TestIdentity("khanh", "Khanh Operator Reviewer", "operator", "finance-reviewer"));
         });
 
         // Creating a client starts the server, which migrates the database and activates the sample first.

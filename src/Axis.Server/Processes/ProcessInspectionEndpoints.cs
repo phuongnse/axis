@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
@@ -29,10 +30,11 @@ namespace Axis.Server.Processes;
 /// <para>
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
-/// its tasks and its calls. A call lists its attempts and lookups, and its stored input only when
+/// its tasks, its calls and the operator <c>commands</c> the user may take on it. A call lists its attempts and lookups, and its stored input only when
 /// the user may read every field that the step's input and output mapping reads or writes, on any
 /// entity, and none of them is sensitive in the pinned or the active release. Otherwise the input is
-/// null and marked hidden. The pinned release gives the fields the
+/// null and marked hidden. The commands come from the user's <c>retry</c> and <c>cancel</c> grants and the states, and a call is
+/// <c>resolvable</c> with its declared <c>outputs</c> by the <c>resolve</c> grant, so two users can see one instance differently. The pinned release gives the fields the
 /// mapping uses and the active release gives the fields the user may read. The checks run in the order of the list, then the id
 /// is parsed. A <c>read</c> filter that reads a computed field that is being recomputed is a 409,
 /// as in the list, before any instance is looked up. A malformed id, an unknown id, an instance of another process, and an instance whose
@@ -173,6 +175,7 @@ internal static class ProcessInspectionEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        PackageCatalog packages,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -241,6 +244,20 @@ internal static class ProcessInspectionEndpoints
         var mappings = new Dictionary<string, IReadOnlySet<MappedField>?>(StringComparer.Ordinal);
         var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == model.Id);
         var pinnedSubject = pinned.FindEntity(entity.Id);
+        var allowsResolve = PolicyEvaluator.AllowsResolve(application, user.Roles, model);
+        var commands = new List<string>();
+        if (row.State == ProcessStarts.Failed && PolicyEvaluator.AllowsRetry(application, user.Roles, model))
+        {
+            commands.Add("retry");
+        }
+
+        if (row.State is ProcessStarts.Running or ProcessStarts.Waiting
+            && !calls.Any(call => call.State is ConnectorCalls.Sending or ConnectorCalls.Unknown)
+            && PolicyEvaluator.AllowsCancel(application, user.Roles, model))
+        {
+            commands.Add("cancel");
+        }
+
         return Results.Ok(new ProcessInstanceDetailResponse(
             row.Id,
             model.Name,
@@ -282,6 +299,9 @@ internal static class ProcessInspectionEndpoints
 
                     var hidden = call.Input is not null
                         && (!Readable(application, user.Roles, fields) || Sensitive(pinned, application, fields));
+                    var outputs = allowsResolve && call.State == ConnectorCalls.Unknown && row.State == ProcessStarts.Waiting && row.Step == call.Step
+                        ? DeclaredOutputs(pinned, call, packages)
+                        : null;
                     return new ProcessInstanceCall(
                         call.Id,
                         call.Kind,
@@ -289,6 +309,7 @@ internal static class ProcessInspectionEndpoints
                         call.Connector,
                         call.Package,
                         call.Version,
+                        call.Idempotent,
                         call.Operation,
                         call.State,
                         call.Attempts
@@ -302,9 +323,29 @@ internal static class ProcessInspectionEndpoints
                                 attempt.Error))
                             .ToList(),
                         call.Input is null || hidden ? null : JsonNode.Parse(call.Input),
-                        hidden);
+                        hidden,
+                        outputs is not null,
+                        outputs);
                 })
-                .ToList()));
+                .ToList(),
+            commands));
+    }
+
+    // The outputs the call's operation declares in the pinned release or the installed package
+    // version, or null when either is missing, so that a resolve would fail.
+    private static List<ProcessCallOutput>? DeclaredOutputs(ApplicationModel pinned, ProcessCallDetail call, PackageCatalog packages)
+    {
+        if (call.Connector is { } connectorName)
+        {
+            var operation = pinned.Connectors
+                .FirstOrDefault(candidate => string.Equals(candidate.Name, connectorName, StringComparison.OrdinalIgnoreCase))
+                ?.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase));
+            return operation?.Output.Select(field => new ProcessCallOutput(field.Name, FieldTypes.Name(field.Type), field.Required)).ToList();
+        }
+
+        var packageOperation = packages.Find(call.Package!, call.Version!)
+            ?.Manifest.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase));
+        return packageOperation?.Output.Select(field => new ProcessCallOutput(field.Name, FieldTypes.Name(field.Type), field.Required)).ToList();
     }
 
     // The fields the step's mapping reads or writes in the pinned release, or null, which hides the
@@ -434,7 +475,11 @@ internal sealed record ProcessInstanceListItem(
     DateTime CreatedAt,
     DateTime? EndedAt);
 
-/// <summary>One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.</summary>
+/// <summary>
+/// One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
+/// <paramref name="Commands"/> lists the operator commands (<c>retry</c>, <c>cancel</c>) that the user holds the grant for and
+/// that the instance's state and calls allow.
+/// </summary>
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
     string Process,
@@ -447,7 +492,8 @@ internal sealed record ProcessInstanceDetailResponse(
     ProcessGraph Graph,
     IReadOnlyList<ProcessPathEntry> Path,
     IReadOnlyList<ProcessInstanceTask> Tasks,
-    IReadOnlyList<ProcessInstanceCall> Calls);
+    IReadOnlyList<ProcessInstanceCall> Calls,
+    IReadOnlyList<string> Commands);
 
 /// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
 internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);
@@ -478,7 +524,10 @@ internal sealed record ProcessInstanceTask(
 /// call has <paramref name="Connector"/> and a package call has <paramref name="Package"/> and
 /// <paramref name="Version"/>. <paramref name="Input"/> is null, and <paramref name="InputHidden"/> true,
 /// when the user may not read every field the step's mapping uses, or when one of them is sensitive
-/// in the pinned or the active release.
+/// in the pinned or the active release. A package call has <paramref name="Idempotent"/>, as stored when the call was staged.
+/// <paramref name="Resolvable"/> is true when the user holds <c>resolve</c>, the call is <c>unknown</c>, the instance
+/// is <c>waiting</c> on the call's step, and the pinned release or the installed package version declares the
+/// operation. Only then are its declared <paramref name="Outputs"/> listed.
 /// </summary>
 internal sealed record ProcessInstanceCall(
     Guid Id,
@@ -487,11 +536,17 @@ internal sealed record ProcessInstanceCall(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Connector,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Package,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Version,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Idempotent,
     string Operation,
     string State,
     IReadOnlyList<ProcessCallAttemptEntry> Attempts,
     JsonNode? Input,
-    bool InputHidden);
+    bool InputHidden,
+    bool Resolvable,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ProcessCallOutput>? Outputs);
+
+/// <summary>An output that a call's operation declares, with its field type and whether a resolve must give it.</summary>
+internal sealed record ProcessCallOutput(string Name, string Type, bool Required);
 
 /// <summary>An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.</summary>
 internal sealed record ProcessCallAttemptEntry(
