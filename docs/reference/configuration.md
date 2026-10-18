@@ -842,7 +842,7 @@ sorted by file and then path.
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
-| `AXC0207` | A field's `target` or `sequence` names a module that `modules` does not declare. Reported at `/fields/{i}/target` or `/fields/{i}/sequence`. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 
@@ -1947,10 +1947,12 @@ and `AXC0212` are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences and seeds join the application model, each
 with an id derived from the application `id` and the name
-`<module id>/<name>`. A field's `target` and `sequence` can name them, which
-also covers data source parameters and endpoint inputs. A pinned module's rules
-are checked with the rule checks, inside their module, see
-[References](#modules). Module data sources, forms, events and texts, seeding and activating module entities, the API
+`<module id>/<name>`. A field's `target` and `sequence`, a data source's and a
+form's `entity` and a policy grant's `entity` can name them. A field's
+`target` also covers data source parameters and endpoint inputs. A pinned
+module's rules are checked with the rule checks, inside their module, see
+[References](#modules). Module data sources, forms, events and texts, seeding
+and activating module entities, the API
 naming of module entities and the codes marked planned are *(planned for M8)*.
 A module is a
 versioned folder of resources that applications reuse. An application declares
@@ -2006,19 +2008,23 @@ The module's manifest is `module.json` at the root of its folder:
 - **References.** An application resource names a module resource as
   `<module id>/<name>`, for example `departments/Department`. A module resource
   names only resources of its own module, written without a `/`. The compiler
-  builds both rules for a field's `target` and `sequence`. A name under a
-  module that `modules` does not declare is `AXC0207`. A module field whose
+  builds both rules for a field's `target` and `sequence` and for a data
+  source's and a form's `entity`. A name under a module that `modules` does not
+  declare is `AXC0207`, reported at `/entity` for a data source or a form. A
+  module field whose
   `target` or `sequence` contains `/` is `AXC0208`. An unknown name inside a
-  declared module keeps its existing code, such as `AXC0012` or `AXC0066`. A
-  policy grant `entity` that names an undeclared module keeps the policy's
-  unknown-entity code. A module rule calls only rules of its own module, by
-  plain name, such as `isActive(x)`. The rule checks, `AXC0055`, `AXC0056`,
-  `AXC0057` and `AXC0065`, and the type check of its expression apply to it and
-  are reported in the module file. A call to an application rule, or to a rule
-  of another module, is `AXC0050` at `/expression` of the module file. The
-  compiler keeps each module rule as `<module id>/<name>`. Calling it from
-  application expressions and from module validations is *(planned for M8)*. A
-  module entity sees no rules yet, so it cannot call an application rule. Module entities come before the application's own entities
+  declared module keeps its existing code, such as `AXC0012`, `AXC0042`,
+  `AXC0066` or `AXC0074`. A policy grant `entity` can name a module entity. One
+  that names an undeclared module keeps the policy's unknown-entity code,
+  `AXC0092`. A module rule calls only rules of its own module, by plain name,
+  such as `isActive(x)`. The rule checks, `AXC0055`, `AXC0056`, `AXC0057` and
+  `AXC0065`, and the type check of its expression apply to it and are reported
+  in the module file. A call to an application rule, or to a rule of another
+  module, is `AXC0050` at `/expression` of the module file. The compiler keeps
+  each module rule as `<module id>/<name>`. Calling it from application
+  expressions and from module validations is *(planned for M8)*. A module
+  entity sees no rules yet, so it cannot call an application rule. Module
+  entities come before the application's own entities
   in the model, in the order of `modules` and then by path. How a module entity
   or data source is named in API URLs is left to the issue that builds modules.
 - **A copy per application.** Entities, sequences and seeds of a module belong
@@ -2052,7 +2058,7 @@ The module's manifest is `module.json` at the root of its folder:
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`. |
 | `AXC0205` | No installed version meets the range. The message lists the installed versions. Reported at `/modules/{i}/version`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
-| `AXC0207` | A field's `target` or `sequence` names a module that `modules` does not declare. Reported at `/fields/{i}/target` or `/fields/{i}/sequence`. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, or a data source's or form's `entity`, names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence` or `/entity`. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity contains `/`. Reported at that property in `modules/<id>/…`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 

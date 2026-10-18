@@ -110,6 +110,76 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
+    public void An_application_data_source_form_and_policy_grant_can_name_a_module_entity()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/Department.json", NamedDepartment);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", Texts)
+            .With("data-sources/departments.json", DataSource(DepartmentName))
+            .With("forms/department.json", FormOver(DepartmentName))
+            .With("roles/employee.json", Role)
+            .With("policies/departments.json", PolicyOver(DepartmentName));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var expected = ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(DepartmentId));
+        var model = result.Model!;
+        Assert.Equal(new EntityReference(expected, DepartmentName), Assert.Single(model.DataSources).Entity);
+        Assert.Equal(new EntityReference(expected, DepartmentName), Assert.Single(model.Forms).Entity);
+        var grant = Assert.Single(Assert.Single(model.Policies).Grants);
+        Assert.Equal(new EntityReference(expected, DepartmentName), grant.Entity);
+    }
+
+    [Fact]
+    public void A_data_source_and_a_form_over_an_undeclared_module_are_reported_at_the_entity()
+    {
+        using var folder = Folder("[]")
+            .With("texts/en.json", Texts)
+            .With("data-sources/departments.json", DataSource("other/Department"))
+            .With("forms/department.json", FormOver("other/Department"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UndeclaredModuleReference, "data-sources/departments.json", "/entity"),
+                (DiagnosticCodes.UndeclaredModuleReference, "forms/department.json", "/entity"),
+            ],
+            result.Diagnostics
+                .Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path))
+                .OrderBy(diagnostic => diagnostic.File, StringComparer.Ordinal));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_data_source_over_a_name_the_pinned_module_lacks_keeps_the_unknown_entity_code()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("data-sources/departments.json", DataSource("departments/Missing"));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownDataSourceEntity, "data-sources/departments.json", "/entity"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_data_source_under_a_module_that_could_not_be_pinned_is_not_reported_again()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "^2.0.0" }]""")
+            .With("data-sources/departments.json", DataSource(DepartmentName));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(DiagnosticCodes.NoModuleVersionInRange, Assert.Single(result.Diagnostics).Code);
+    }
+
+    [Fact]
     public void A_reference_to_an_undeclared_module_is_reported_at_the_target()
     {
         using var folder = Folder("[]").With("Request.json", PersonRequest.Replace(DepartmentName, "people/Person", StringComparison.Ordinal));
@@ -571,7 +641,6 @@ public sealed class ModuleCompilerTests
         Assert.Null(result.Model);
     }
 
-    /// <summary>An installation root with each version of the <c>departments</c> module, holding its manifest and one entity.</summary>
     private const string ModuleRuleId = "4d6e8f10-2a3b-4c5d-9e7f-1a2b3c4d5e01";
 
     private static string ModuleRule(string id, string name, string expression) => $$"""
@@ -644,6 +713,31 @@ public sealed class ModuleCompilerTests
         Assert.NotNull(rules["departments/IsActive"].Body);
     }
 
+    private const string Texts = """
+        { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "department.main": "Department", "role.employee": "Employee" } }
+        """;
+
+    private const string Role = """
+        { "id": "44444444-4444-4444-8444-444444444401", "kind": "role", "name": "employee", "formatVersion": 1, "label": { "textKey": "role.employee" } }
+        """;
+
+    private static string DataSource(string entity) => $$"""
+        { "id": "99999999-9999-4999-8999-999999999901", "kind": "dataSource", "name": "Departments", "formatVersion": 1,
+          "entity": "{{entity}}", "fields": [ { "name": "name", "path": "name" } ] }
+        """;
+
+    private static string FormOver(string entity) => $$"""
+        { "id": "88888888-8888-4888-8888-888888888801", "kind": "form", "name": "DepartmentLayout", "formatVersion": 1, "entity": "{{entity}}",
+          "sections": [ { "title": { "textKey": "department.main" }, "fields": [ { "field": "name" } ] } ] }
+        """;
+
+    private static string PolicyOver(string entity) => $$"""
+        { "id": "12121212-1212-4212-8212-121212121201", "kind": "policy", "name": "DepartmentAccess", "formatVersion": 1,
+          "roles": ["employee"], "grants": [ { "entity": "{{entity}}", "actions": ["read"] } ] }
+        """;
+
+    /// <summary>An installation root with each version of the <c>departments</c> module, holding its manifest and one entity.</summary>
     private static TemporaryFolder Modules(params string[] versions)
     {
         var root = new TemporaryFolder();

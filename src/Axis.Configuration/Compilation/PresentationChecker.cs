@@ -19,12 +19,13 @@ internal static class PresentationChecker
         Func<string, DataSourceResource?> findDataSource,
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
+        ModuleReferences moduleReferences,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
         foreach (var form in loaded.Forms)
         {
-            CheckForm(form, loaded, findEntity, textKeys, diagnostics);
+            CheckForm(form, loaded, findEntity, moduleReferences, textKeys, diagnostics);
         }
 
         foreach (var page in loaded.Pages)
@@ -49,6 +50,7 @@ internal static class PresentationChecker
         FormResource form,
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
+        ModuleReferences moduleReferences,
         IReadOnlySet<string> textKeys,
         List<Diagnostic> diagnostics)
     {
@@ -56,7 +58,9 @@ internal static class PresentationChecker
             diagnostics.Add(new Diagnostic(code, message, form.File, path, form.Id));
 
         var entity = findEntity(form.Entity);
-        if (entity is null && !loaded.UnloadedEntityNames.Contains(form.Entity))
+        if (entity is null
+            && !loaded.UnloadedEntityNames.Contains(form.Entity)
+            && !moduleReferences.ReportUndeclared(form.Entity, "/entity", Report))
         {
             Report(
                 DiagnosticCodes.UnknownFormEntity,
