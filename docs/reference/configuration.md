@@ -1976,8 +1976,8 @@ a module entity or event. A table widget's `dataSource` and a policy grant's
 of the same locale, so its labels resolve. A pinned module's rules are checked
 with the rule checks, inside their module, and application expressions call them,
 see [References](#modules). Activation provisions the module's entities as the
-application's own tables, startup seeding applies the module's seeds, and the record
-API serves module entities.
+application's own tables, startup seeding applies the module's seeds, the record
+API serves module entities, and the data source endpoint serves module data sources.
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -2069,8 +2069,10 @@ The module's manifest is `module.json` at the root of its folder:
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
   `/api/apps/{app}/entities/departments/Department/records`. See the
-  [record API routes](record-api.md#routes). How a module data source is named
-  in API URLs is left to the issue that builds modules.
+  [record API routes](record-api.md#routes). The data source endpoint writes a
+  module data source's name the same way, `{module id}/{data source name}`, for
+  example `/api/apps/{app}/data-sources/departments/Departments/rows`. See
+  [the data source endpoint](data-sources.md#endpoint).
 - **A copy per application.** Entities, sequences, seeds, events, data sources and forms of a module belong
   to the application that uses it. The id of each module resource inside an
   application is a UUID v5 of the application `id` and the id written in the

@@ -1,0 +1,11 @@
+{
+  "id": "3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f06",
+  "kind": "dataSource",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "fields": [
+    { "name": "code", "path": "code" },
+    { "name": "name", "path": "name" }
+  ]
+}

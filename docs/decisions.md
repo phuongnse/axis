@@ -1939,8 +1939,10 @@ confirmed these points on issue #571 on 2026-10-18.
     expression that parses today unchanged. The owner confirmed this syntax on
     issue #617 on 2026-10-18. A call to a rule of an undeclared module is
     `AXC0207`.
-  - How a module data source is named in API URLs is left to the issue that
-    builds module data sources.
+  - The data source endpoint writes a module data source's name as two path
+    segments, `{module id}/{data source name}`, for example
+    `/api/apps/{app}/data-sources/departments/Departments/rows`. This matches
+    how the record API names module entities. Only that form reaches it.
 - **A copy per application:**
   - Module entities, sequences and seeds belong to the application that uses
     the module. Applications never share stored data. Shared master data would

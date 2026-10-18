@@ -12,6 +12,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     private const string AppA = "/api/apps/ModuleAppA";
     private const string AppB = "/api/apps/ModuleAppB";
     private const string Departments = "entities/departments/Department/records";
+    private const string DepartmentsDataSource = "data-sources/departments/Departments/rows";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -140,6 +141,63 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
             using var response = await granted.SendAsync(request, CancellationToken);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
         }
+    }
+
+    [Fact]
+    public async Task The_module_data_source_returns_the_seeded_departments_to_a_user_with_a_grant()
+    {
+        using var client = fixture.CreateClient().SignedInAs("anna");
+
+        using var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{DepartmentsDataSource}?pageSize=100", ModuleAppFixture.Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var codes = body.RootElement.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("values").GetProperty("code").GetString()!)
+            .ToList();
+        Assert.Contains("FIN", codes);
+        Assert.Contains("ENG", codes);
+    }
+
+    [Fact]
+    public async Task The_module_data_source_needs_its_own_grant()
+    {
+        using var withoutGrant = fixture.CreateClient().SignedInAs("anna");
+        using var withoutRole = fixture.CreateClient().SignedInAs("binh");
+
+        // In ModuleAppB, anna reads the module entity but holds no grant on the data source.
+        using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppB}/{Departments}", ModuleAppFixture.Host))
+        {
+            using var response = await withoutGrant.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppB}/{DepartmentsDataSource}", ModuleAppFixture.Host))
+        {
+            using var response = await withoutGrant.SendAsync(request, CancellationToken);
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        }
+
+        using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{DepartmentsDataSource}", ModuleAppFixture.Host))
+        {
+            using var response = await withoutRole.SendAsync(request, CancellationToken);
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        }
+    }
+
+    [Theory]
+    [InlineData("data-sources/payroll/Departments/rows")]
+    [InlineData("data-sources/departments/Payroll/rows")]
+    [InlineData("data-sources/Departments/rows")]
+    public async Task A_module_data_source_path_that_names_nothing_is_a_404(string path)
+    {
+        using var client = fixture.CreateClient().SignedInAs("anna");
+
+        using var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{path}", ModuleAppFixture.Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
     }
 
     private static async Task CreateDepartmentAsync(HttpClient client, string app, string code, string name)
