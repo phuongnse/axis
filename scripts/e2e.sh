@@ -10,6 +10,8 @@
 # stops it. The main server then serves the new release. The release-pinning spec activates
 # tests/e2e/fixtures/release-app that way. The purchase request release spec activates a changed copy
 # of the purchase request sample, and activates the committed sample again when it ends.
+# Studio edits a copy of the purchase request sample, which this script makes in a temporary folder for
+# each run and deletes on exit, so a spec that saves a resource never changes a file under samples/.
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
 # can restart it: it writes the restart file, then stops the worker process. The run fails if the
 # worker exits without a restart request, or never finds the tenant database migrated.
@@ -38,6 +40,9 @@ worker_pid=""
 worker_dir="$(mktemp -d)"
 export AXIS_E2E_WORKER_PID_FILE="$worker_dir/worker.pid"
 export AXIS_E2E_WORKER_RESTART_FILE="$worker_dir/restart"
+studio_dir="$(mktemp -d)"
+cp -R samples/apps/purchase-requests "$studio_dir/purchase-requests"
+export AXIS_E2E_STUDIO_FOLDER="$studio_dir/purchase-requests"
 
 # stop_worker: stops the restart loop first, so it starts no new worker, then the worker itself.
 stop_worker() {
@@ -52,6 +57,7 @@ stop_worker() {
 
 cleanup() {
   stop_worker
+  rm -rf "$studio_dir"
   if [ -n "$purchasing_pid" ]; then
     kill "$purchasing_pid" 2>/dev/null || true
     wait "$purchasing_pid" 2>/dev/null || true

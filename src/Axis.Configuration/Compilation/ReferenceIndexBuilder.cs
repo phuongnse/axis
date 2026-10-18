@@ -40,7 +40,11 @@ internal sealed class ReferenceIndexBuilder
     {
         foreach (var rule in check.RuleCalls.Values)
         {
-            Add(from, path, ReferenceRelations.RuleCall, ResourceNode.Of(_rulesByName[rule.Name]));
+            // A module rule may share its name with an application rule, so it is not looked up by name.
+            if (rule.Module is null)
+            {
+                Add(from, path, ReferenceRelations.RuleCall, ResourceNode.Of(_rulesByName[rule.Name]));
+            }
         }
     }
 

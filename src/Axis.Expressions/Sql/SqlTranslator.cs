@@ -179,6 +179,11 @@ public static class SqlTranslator
                 return RuleCall(call, rule);
             }
 
+            if (call.Module is { } module)
+            {
+                throw NotTranslated($"{module}:{call.Name}", call.Offset);
+            }
+
             if (!ExpressionFunctions.TryGet(call.Name, out var signature))
             {
                 throw NotTranslated(call.Name, call.Offset);

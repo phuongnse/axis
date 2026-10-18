@@ -230,6 +230,38 @@ public sealed class SqlTranslatorTests
     }
 
     [Fact]
+    public void Qualified_call_inlines_the_module_rule_and_the_module_rule_it_calls()
+    {
+        // A module rule calls the rules of its own module by their bare names, so only the called one carries the module.
+        var inner = Rule("Inner", "value < 100", ExpressionType.Boolean, [], ("value", ExpressionType.Integer));
+        var outer = Rule("Outer", "value > 0 and Inner(value)", ExpressionType.Boolean, [inner], ("value", ExpressionType.Integer)) with { Module = "departments" };
+        var parsed = ExpressionParser.Parse("departments:Outer(i)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, new ExpressionScope(_fields, [outer], modules: ["departments"]), ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, check);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Contains("\"i\" > @f0", result.Sql, StringComparison.Ordinal);
+        Assert.Contains("\"i\" < @f1", result.Sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Qualified_call_without_a_resolved_rule_is_never_a_built_in_function()
+    {
+        var parsed = ExpressionParser.Parse("departments:abs(i) == 1");
+        var other = ExpressionParser.Parse("i == 1");
+        Assert.True(parsed.Succeeded && other.Succeeded);
+        var check = ExpressionTypeChecker.Check(other.Expression, _scope, ExpressionType.Boolean);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, check);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("'departments:abs'", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Rule_known_by_its_signature_only_is_outside_the_subset()
     {
         var signatureOnly = new ExpressionRule("Broken", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean);

@@ -58,6 +58,12 @@ public sealed class ExpressionParserTests
     [InlineData("a.b.c", "(. (. a b) c)")]
     [InlineData("f(a).b", "(. (call f a) b)")]
     [InlineData("f()", "(call f)")]
+    // A qualified rule call, and a division that looks like one.
+    [InlineData("departments:IsManager(x)", "(call departments:IsManager x)")]
+    [InlineData("total/ratio(x)", "(/ total (call ratio x))")]
+    [InlineData("a-b:c(x)", "(call a-b:c x)")]
+    [InlineData("a - b:c(x)", "(- a (call b:c x))")]
+    [InlineData("not m:r(a, 1) and n:s()", "(and (not (call m:r a 1)) (call n:s))")]
     [InlineData("count (lines)", "(call count lines)")]
     [InlineData("1.x", "(. 1 x)")]
     [InlineData("a<=b", "(<= a b)")]
@@ -91,6 +97,17 @@ public sealed class ExpressionParserTests
         var value = Assert.IsType<DecimalLiteral>(number).Value;
         Assert.Equal(12.50m, value);
         Assert.Equal(2, value.Scale);
+    }
+
+    [Fact]
+    public void A_qualified_call_keeps_the_module_id_and_points_at_it()
+    {
+        var result = ExpressionParser.Parse("a + departments:IsManager(x)");
+
+        Assert.True(result.Succeeded);
+        var call = Assert.IsType<CallNode>(Assert.IsType<BinaryNode>(result.Expression).Right);
+        Assert.Equal(("departments", "IsManager", 4), (call.Module, call.Name, call.Offset));
+        Assert.Null(Assert.IsType<CallNode>(ExpressionParser.Parse("f(x)").Expression).Module);
     }
 
     [Fact]
@@ -170,6 +187,10 @@ public sealed class ExpressionParserTests
     [InlineData("Null(1)", 4)]
     [InlineData("not", 3)]
     [InlineData("1 2", 2)]
+    [InlineData("departments:IsManager", 21)]
+    [InlineData("departments : IsManager(x)", 12)]
+    [InlineData("departments:1(x)", 11)]
+    [InlineData("x in (m:r(1))", 6)]
     public void A_syntax_error_gives_one_diagnostic_at_its_offset(string text, int offset)
     {
         var result = ExpressionParser.Parse(text);
@@ -192,6 +213,7 @@ public sealed class ExpressionParserTests
     [InlineData("x in ()", "The list after 'in' is empty at character 7. Give at least one item.")]
     [InlineData("a == = b", "Unexpected '=' at character 6. Use '==' to compare.")]
     [InlineData("a # b", "Unexpected character '#' at character 3.")]
+    [InlineData("m:Rule + 1", "A module rule must be called, as in 'm:Rule(…)', at character 8.")]
     public void Syntax_error_messages_name_the_position_and_the_token(string text, string message)
     {
         var result = ExpressionParser.Parse(text);
