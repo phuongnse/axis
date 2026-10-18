@@ -280,6 +280,13 @@ public static class ApplicationCompiler
 
         // Role names are lower case only and are matched exactly.
         var roleNames = new HashSet<string>(loaded.Roles.Select(role => role.Name), StringComparer.Ordinal);
+        var rolesByName = new Dictionary<string, RoleResource>(StringComparer.Ordinal);
+        foreach (var role in loaded.Roles)
+        {
+            rolesByName.TryAdd(role.Name, role);
+        }
+
+        RoleResource? FindRole(string name) => rolesByName.GetValueOrDefault(name);
 
         var texts = loaded.Texts;
         if (loaded.Application is { } application)
@@ -341,7 +348,7 @@ public static class ApplicationCompiler
             loaded.UnloadedEntityNames,
             FindForm,
             loaded.UnloadedFormNames,
-            roleNames,
+            FindRole,
             loaded.UnloadedRoleNames,
             FindConnector,
             loaded.UnloadedConnectorNames,
@@ -355,7 +362,7 @@ public static class ApplicationCompiler
             diagnostics);
         PolicyChecker.Check(
             loaded.Policies,
-            roleNames,
+            FindRole,
             loaded.UnloadedRoleNames,
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
@@ -366,6 +373,7 @@ public static class ApplicationCompiler
             loaded.UnloadedProcessNames,
             FindEndpoint,
             loaded.UnloadedEndpointNames,
+            references,
             rules,
             declaredModules,
             diagnostics);

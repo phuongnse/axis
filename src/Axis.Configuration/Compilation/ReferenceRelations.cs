@@ -21,4 +21,12 @@ public static class ReferenceRelations
     public const string SeedEntity = "seed entity";
     public const string DataSourceEntity = "data source entity";
     public const string FieldPath = "field path";
+    public const string ProcessEntity = "process entity";
+    public const string TaskForm = "task form";
+    public const string TaskRole = "task role";
+    public const string ConnectorCall = "connector call";
+    public const string PackageOperation = "package operation";
+    public const string RaisedEvent = "raised event";
+    public const string PolicyRole = "policy role";
+    public const string Grant = "grant";
 }
