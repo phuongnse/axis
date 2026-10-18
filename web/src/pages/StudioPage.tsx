@@ -30,10 +30,11 @@ type FolderState =
  * `/studio?app=PurchaseRequests&resource=<id>`. A person without the author role sees a forbidden page.
  * With one application, it is picked at once. The resources are grouped by kind, and a search narrows them
  * by name or id. The diagnostics panel lists the folder's diagnostics, loaded when the application is
- * picked. A diagnostic that names a resource selects it, and clears the search so the resource is listed.
- * A selected resource opens in an editor below its details, with its Uses and Used by lists under the editor. A
- * Used by entry opens its resource at the path of the reference, as `&path=`. After a save, the diagnostics panel
- * shows the diagnostics that the save answered. After a delete, the resource leaves the list.
+ * picked. A diagnostic that names a resource selects it, clears the search, and opens it at the diagnostic's path,
+ * as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
+ * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
+ * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
+ * list.
  */
 export function StudioPage() {
   const t = useText()
@@ -101,9 +102,9 @@ export function StudioPage() {
     setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) })
   }
 
-  function selectDiagnostic(id: string) {
+  function selectDiagnostic(id: string, diagnosticPath: string) {
     setSearch('')
-    selectResource(id)
+    openReference(id, diagnosticPath)
   }
 
   if (apps === undefined) {
@@ -236,7 +237,7 @@ function DiagnosticRow({
   onSelect,
 }: {
   diagnostic: StudioDiagnostic
-  onSelect: (resourceId: string) => void
+  onSelect: (resourceId: string, path: string) => void
 }) {
   const t = useText()
   const content = (
@@ -255,7 +256,11 @@ function DiagnosticRow({
   return resourceId === null ? (
     <div style={{ padding: '4px 15px' }}>{content}</div>
   ) : (
-    <Button type="text" style={{ height: 'auto', textAlign: 'left' }} onClick={() => onSelect(resourceId)}>
+    <Button
+      type="text"
+      style={{ height: 'auto', textAlign: 'left' }}
+      onClick={() => onSelect(resourceId, diagnostic.path)}
+    >
       {content}
     </Button>
   )

@@ -42,12 +42,18 @@ function fieldElement(root: HTMLElement, path: string): HTMLElement | undefined 
   return undefined
 }
 
+/** Whether the form points to the JSON view for this field, as it does for a `oneOf`, a map or an unknown node. */
+function isJsonOnlyField(field: HTMLElement): boolean {
+  return field.querySelector(':scope > [data-testid="studio-json-only"]') !== null
+}
+
 /**
  * The editor of one resource. A form built from the kind's JSON Schema and a JSON view edit one draft. Save sends
  * only the difference from what was loaded, as a JSON Patch with the loaded version. A `409` keeps the draft and
  * offers Reload, which reads the file again and drops the draft. Delete asks first and warns with the number of
- * references to the resource, and it is off for the application manifest. When `path` is set, the editor scrolls
- * to the field that holds it once the resource has loaded.
+ * references to the resource, and it is off for the application manifest. When `path` is set, the editor opens the
+ * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
+ * show opens the JSON view instead.
  */
 export function StudioEditor({
   application,
@@ -78,6 +84,9 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
+  const [tab, setTab] = useState<'form' | 'json'>('form')
+  // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
+  const pendingField = useRef<HTMLElement | null>(null)
 
   function adopt(resource: StudioResource) {
     setLoaded({ content: resource.content, version: resource.version })
@@ -110,11 +119,24 @@ export function StudioEditor({
   const isLoaded = loaded !== undefined
 
   useEffect(() => {
-    if (!isLoaded || path === null || !rootRef.current) {
+    if (!isLoaded || !path || !rootRef.current) {
       return
     }
-    fieldElement(rootRef.current, path)?.scrollIntoView?.({ block: 'center' })
+    const field = fieldElement(rootRef.current, path)
+    if (field === undefined || isJsonOnlyField(field)) {
+      setTab('json')
+      return
+    }
+    pendingField.current = field
+    setTab('form')
   }, [isLoaded, path])
+
+  useEffect(() => {
+    if (tab === 'form' && pendingField.current) {
+      pendingField.current.scrollIntoView?.({ block: 'center' })
+      pendingField.current = null
+    }
+  })
 
   if (loadFailed) {
     return (
@@ -209,6 +231,8 @@ export function StudioEditor({
   return (
     <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef}>
       <Tabs
+        activeKey={tab}
+        onChange={(key) => setTab(key as 'form' | 'json')}
         items={[
           {
             key: 'form',
