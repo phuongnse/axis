@@ -159,7 +159,7 @@ public static class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
-        var moduleResources = new ModuleResources([], [], [], [], new HashSet<string>(), new HashSet<string>());
+        var moduleResources = new ModuleResources([], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics);
@@ -167,15 +167,17 @@ public static class ApplicationCompiler
             declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
         }
 
-        // A pinned module's entities, sequences and seeds come before the application's own, so a
+        // A pinned module's entities, sequences, seeds and events come before the application's own, so a
         // step that depends on order sees each module target first. Application resources can name
         // them as '<module id>/<name>', but a module never names an application resource.
         var allEntities = new List<EntityResource>([.. moduleResources.Entities, .. loaded.Entities]);
         var allSequences = new List<SequenceResource>([.. moduleResources.Sequences, .. loaded.Sequences]);
         var allSeeds = new List<SeedResource>([.. moduleResources.Seeds, .. loaded.Seeds]);
+        var allEvents = new List<EventResource>([.. moduleResources.Events, .. loaded.Events]);
         var unloadedEntityNames = new HashSet<string>(loaded.UnloadedEntityNames.Concat(moduleResources.UnloadedEntityNames), StringComparer.OrdinalIgnoreCase);
         var unloadedSequenceNames = new HashSet<string>(loaded.UnloadedSequenceNames.Concat(moduleResources.UnloadedSequenceNames), StringComparer.OrdinalIgnoreCase);
-        loaded = loaded with { UnloadedEntityNames = unloadedEntityNames, UnloadedSequenceNames = unloadedSequenceNames };
+        var unloadedEventNames = new HashSet<string>(loaded.UnloadedEventNames.Concat(moduleResources.UnloadedEventNames), StringComparer.OrdinalIgnoreCase);
+        loaded = loaded with { UnloadedEntityNames = unloadedEntityNames, UnloadedSequenceNames = unloadedSequenceNames, UnloadedEventNames = unloadedEventNames };
         var moduleReferences = new ModuleReferences(
             new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal),
             new HashSet<string>(modules.Select(pin => pin.Id), StringComparer.Ordinal));
@@ -248,7 +250,7 @@ public static class ApplicationCompiler
 
         // Event names follow the same rule too.
         var eventsByName = new Dictionary<string, EventResource>(StringComparer.OrdinalIgnoreCase);
-        foreach (var @event in loaded.Events)
+        foreach (var @event in allEvents)
         {
             eventsByName.TryAdd(@event.Name, @event);
         }
@@ -350,7 +352,7 @@ public static class ApplicationCompiler
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
         EventChecker.Check(
-            loaded.Events,
+            allEvents,
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
             loaded.UnloadedEntityNames,
@@ -410,6 +412,11 @@ public static class ApplicationCompiler
             sequencesByName[sequence.Name] = sequence with { Id = ModuleResourceIds.Derive(applicationId, sequence.Id) };
         }
 
+        foreach (var @event in moduleResources.Events)
+        {
+            eventsByName[@event.Name] = @event with { Id = ModuleResourceIds.Derive(applicationId, @event.Id) };
+        }
+
         var entities = allEntities
             .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, IsModuleResource(entity) ? [] : rules))
             .ToList();
@@ -427,7 +434,7 @@ public static class ApplicationCompiler
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
-            Events = loaded.Events.Select(@event => EventChecker.Build(@event, FindEntity)).ToList(),
+            Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules)).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),

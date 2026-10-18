@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 
 namespace Axis.Server.Studio;
@@ -11,14 +12,14 @@ namespace Axis.Server.Studio;
 internal sealed record StudioDiagnostic(string Code, string Severity, string Message, string File, string Path, string? ResourceId);
 
 /// <summary>
-/// Compiles a Studio folder in memory, against the installed extension packages and no database, and
+/// Compiles a Studio folder in memory, against the installed extension packages and modules and no database, and
 /// lists the compile diagnostics in the compiler's order. The problems of a broken extension package are
 /// not listed. They belong to the server's install, not to the folder.
 /// </summary>
 internal static class StudioDiagnostics
 {
-    public static IReadOnlyList<StudioDiagnostic> Compile(string folder, PackageCatalog catalog) =>
-        [.. ApplicationCompiler.Compile(folder, catalog.Versions).Diagnostics.Select(Map)];
+    public static IReadOnlyList<StudioDiagnostic> Compile(string folder, PackageCatalog packages, ModuleCatalog modules) =>
+        [.. ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).Diagnostics.Select(Map)];
 
     private static StudioDiagnostic Map(Diagnostic diagnostic) => new(
         diagnostic.Code,
