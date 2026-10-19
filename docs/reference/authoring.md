@@ -12,9 +12,10 @@ in git. The application list, resource list, read, patch, create, delete, diagno
 and references routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
-Its edit routes never activate a release and touch no database. Under
-`scripts/dev.sh`, a saved file restarts the server, which activates the folder,
-as a hand edit does today. Going live from Studio is
+Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
+restarts the server, which activates the folder, as a hand edit does today.
+*(planned for M10)* A write will take a lock in the platform database. Reads
+and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing) *(planned for M10)*. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
@@ -76,8 +77,16 @@ bytes, in lower-case hex.
 - When the file no longer has that version, the answer is `409` and nothing
   is written. The client reads the resource again and retries. One lock
   covers the check and the write of every write, so two patches that carry the
-  same version cannot both succeed, and neither can two deletes. The lock
-  covers one server process.
+  same version cannot both succeed, and neither can two deletes. Today the
+  lock is in the server process.
+- *(planned for M10)* The lock moves to a PostgreSQL advisory lock in the
+  platform database, so it holds across server replicas that share the folder.
+  It is keyed by the folder. A create checks that its `id` is unused anywhere
+  in the folder, so a lock per file would let two creates with the same `id`
+  both succeed. The server takes it over `ConnectionStrings:Platform`, for the
+  check and the write. It needs no grant. A write that cannot take the lock
+  answers `503` and writes nothing. Every replica must mount the folder at the
+  same path. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - A patch or a delete without `If-Match` is `428`.
 - A create sends the new version as an `ETag`, so the client can patch next
   without reading the resource again.
