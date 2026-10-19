@@ -12,7 +12,7 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   chau: ["department-manager"],
   dung: ["finance-reviewer"],
   giang: ["operator"],
-  hoa: ["author"],
+  hoa: ["author", "publisher"],
 };
 
 /** The file where the setup step saves `user`'s browser session. */

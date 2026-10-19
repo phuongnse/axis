@@ -24,7 +24,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.release_activations` (the activation history with release numbers),
     see [Release history](#release-history). It also owns
     `axis.publish_requests` (the requests that Studio stores and the publisher
-    runs). The publisher runs them. The routes are _(planned for M10)_, see
+    runs). The server inserts and reads them, and the publisher runs them. See
     [Publish requests and release history](#publish-requests-and-release-history). The caller
     supplies the tenant database connection. Other modules read and set the
     active release and its site paths only through `IActiveReleaseStore`;
@@ -332,7 +332,7 @@ Which connection string each step uses. The server does this today:
 | Grants for the runtime database role, before and after the migrations                                                              | `SchemaConnectionString` |
 | Schedule trigger state                                                                                                             | `ConnectionString`       |
 | Seed records                                                                                                                       | `ConnectionString`       |
-| Publish routes of the server _(planned for M10)_: insert a request, read requests                                                  | `ConnectionString`       |
+| Publish routes of the server: insert a request, read requests                                                                      | `ConnectionString`       |
 | Release history route of the server: read the release history                                                                      | `ConnectionString`       |
 | Publisher: claim and finish a request, compile, store, activate, write the history and the audit record                            | `SchemaConnectionString` |
 | Publisher: seed records                                                                                                            | `ConnectionString`       |
@@ -371,14 +371,14 @@ host with one database role:
 | Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record _(planned for M10)_ | `axis-admin publisher`          | The tenant's schema role           |
 | Seeding of a publish request _(planned for M10)_                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
-| Insert and read publish requests _(planned for M10)_                                                                    | Server                          | The tenant's runtime role          |
+| Insert and read publish requests                                                                                        | Server                          | The tenant's runtime role          |
 | Read the release history                                                                                                | Server                          | The tenant's runtime role          |
 | Runtime role check                                                                                                      | `Axis.Admin`, server and worker | The tenant's runtime role          |
 | Requests and work items                                                                                                 | Server and worker               | The tenant's runtime role          |
 
 - **No tenant schema connection.** The server holds no tenant schema
   connection. It runs no tenant migration and no grant step. The worker never
-  held one. This stays true when Studio publishes _(planned for M10)_: the
+  held one. This stays true when Studio publishes: the
   server only inserts a request over the runtime role, and `axis-admin
 publisher` runs it with the tenant's schema role.
 - **The publisher.** _(Planned for M10.)_ It reads the tenants from the
@@ -1166,15 +1166,16 @@ schema of the tenant database.
 `Axis.Configuration` owns both tables, in the `axis`
 schema of each tenant database. `axis.publish_requests` is built, and so is the
 [publisher](administration.md#publisher) for `publish` requests under
-`Tenancy:Source=directory`. The release history is built too. The routes of the
-publish requests are _(planned for M10)_. See
+`Tenancy:Source=directory`. The server inserts `validate` and `publish` requests through the
+[authoring API](authoring.md#publishing). The release history is built too. The routes for rollback and preview are
+planned for M10. See
 [D47](../decisions.md#d47-publishing-from-studio--agreed) and the
 [authoring API](authoring.md#publishing).
 
 ### Publish requests
 
 `axis.publish_requests` holds one row per request. The server inserts a row
-over the runtime role _(planned for M10)_. Only the publisher changes a row,
+over the runtime role, for `validate` and `publish`. A `rollback` row is _(planned for M10)_. Only the publisher changes a row,
 over the schema role.
 An index on `(application_id, status, requested_at, id)` serves the claim.
 
@@ -1185,7 +1186,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
 | `target`            | `text`              | *(Planned for M10.)* `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
-| `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every resource file of the folder. Null for `rollback` |
+| `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback` |
 | `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
 | `label`             | `text`, null        | The optional label, up to 100 characters                                                                                               |
 | `note`              | `text`, null        | The optional note, up to 2000 characters                                                                                               |
