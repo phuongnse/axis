@@ -39,6 +39,16 @@ public sealed class WorkerOptionsTests
     }
 
     [Fact]
+    public void Under_directory_without_a_platform_connection_the_worker_stops_at_startup_naming_the_setting()
+    {
+        var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]), platform: null);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("ConnectionStrings:Platform", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Under_directory_with_a_valid_secret_key_the_worker_is_built()
     {
         var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]));
@@ -64,13 +74,17 @@ public sealed class WorkerOptionsTests
         Assert.Contains("Tenancy:Source", exception.Message, StringComparison.Ordinal);
     }
 
-    private static HostApplicationBuilder WorkerBuilder(string source, string? secretKey)
+    private static HostApplicationBuilder WorkerBuilder(
+        string source,
+        string? secretKey,
+        string? platform = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis")
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = source,
             ["Platform:SecretKey"] = secretKey,
+            ["ConnectionStrings:Platform"] = platform,
             ["Tenants:a:Hosts:0"] = "a.example.test",
 
             // No database is opened: the worker is built, never started.

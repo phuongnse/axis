@@ -12,12 +12,13 @@ public static class WorkerServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the tenancy and processes services, the installed extension packages and the
-    /// background service that runs the due work items of every configured tenant, and the health checks
-    /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Only a worker
+    /// background service that runs the due work items of every tenant, and the health checks
+    /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
+    /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Tenancy:Source</c> is unknown, <c>Platform:SecretKey</c> is missing or invalid under
+    /// The tenant, worker or health configuration is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c> or <c>Platform:SecretKey</c> is missing or invalid under
     /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -48,13 +49,32 @@ public static class WorkerServiceCollectionExtensions
             throw new InvalidOperationException($"'{HealthOptions.SectionName}:{nameof(HealthOptions.Urls)}' must not be empty.");
         }
 
+        WorkerTenantCatalog catalog;
         if (TenancySettings.Source(configuration) == TenancySource.Directory)
         {
-            services.AddSingleton(TenantSecretCipher.Load(configuration));
+            var platformConnectionString = configuration.GetConnectionString("Platform");
+            if (string.IsNullOrWhiteSpace(platformConnectionString))
+            {
+                throw new InvalidOperationException("ConnectionStrings:Platform is required when Tenancy:Source is 'directory'.");
+            }
+
+            var cipher = TenantSecretCipher.Load(configuration);
+            services.AddSingleton(cipher);
+
+            // The worker reads the directory when it runs, and retries until a read works. It ignores a Tenants section.
+            catalog = WorkerTenantCatalog.FromDirectory(
+                platformConnectionString,
+                cipher,
+                configuration.GetSection(TenantOptions.SectionName).Exists());
+        }
+        else
+        {
+            catalog = WorkerTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment));
         }
 
         services.AddWorkerTelemetry(configuration);
-        services.AddTenancy(configuration, environment);
+        services.AddTenancy(catalog);
+        services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);
         services.AddProcesses(environment.IsDevelopment());
@@ -64,6 +84,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<WorkerHealth>();
         services.AddHealthChecks()
             .AddCheck<WorkerLoopHealthCheck>("loop", tags: [WorkerHealthEndpoints.LiveTag, WorkerHealthEndpoints.ReadyTag])
+            .AddCheck<TenantDirectoryHealthCheck>("directory", tags: [WorkerHealthEndpoints.ReadyTag])
             .AddCheck<TenantMigrationsHealthCheck>("migrations", tags: [WorkerHealthEndpoints.ReadyTag]);
         services.AddSingleton<StartupCheckState>();
         services.AddSingleton<AxisGauges>();
