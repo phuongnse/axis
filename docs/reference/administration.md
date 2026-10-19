@@ -32,6 +32,8 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](configuration.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
+| `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
+| `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads it. An unset value is `Production`. |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
@@ -588,24 +590,32 @@ runs until it is stopped.
 `publisher`
 
 It takes no option. It has no HTTP endpoint and listens on no port, so nothing
-can call it. The `axis-admin` image runs it. Both production installs start one,
-see [installation](installation.md). *(Planned for M10:)* `scripts/dev.sh`,
-Docker Compose and the E2E script start one too.
+can call it. The `axis-admin` image runs it. Both production installs start
+one, see [installation](installation.md). `scripts/dev.sh`, the Docker Compose
+file in the repository root and the E2E script each start one too.
 
 **What is built.** The command runs `publish` and `validate` requests for
-`Tenancy:Source=directory`. These stay *(planned for M10)*: `rollback`
-requests, the configuration source, preview requests and the release history. A
-request of a kind that is not built is never claimed, so it stays `queued`.
+`Tenancy:Source=directory` and for `Tenancy:Source=configuration`. These stay
+*(planned for M10)*: `rollback` requests, preview requests and the release
+history. A request of a kind that is not built is never claimed, so it stays
+`queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
 
-- `Tenancy:Source`, which must be `directory`. It reads
-  `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and decrypts the
-  schema role of each tenant. See [database roles](storage.md#database-roles).
-  Any other value, and an unset one, exits with code 2 with a message that
-  names the setting. *(Planned for M10:)* Under `configuration` it reads the
-  `Tenants` section and each tenant's `SchemaConnectionString`.
-- `Tenancy:RefreshInterval`, how often it reads the tenant directory again.
+- `Tenancy:Source`, `configuration` or `directory`. An unset value is
+  `configuration`, as for the server and the worker. Any other value exits with
+  code 2 with a message that names the setting.
+  - Under `directory` it reads `ConnectionStrings:PlatformSchema` and
+    `Platform:SecretKey`, and decrypts the schema role of each tenant. See
+    [database roles](storage.md#database-roles).
+  - Under `configuration` it reads the `Tenants` section, as the server does, and
+    connects to each tenant with its `SchemaConnectionString`. It seeds over its
+    `ConnectionString`. It also reads `DOTNET_ENVIRONMENT`. A `Tenants` section
+    that is not valid, or a tenant with no `SchemaConnectionString`, exits with
+    code 2. The message names the setting and never holds a value.
+- `Tenancy:RefreshInterval`, how often it reads the tenant directory again. It
+  reads and checks it only under `directory`. The `Tenants` section never
+  changes while the process runs.
 - `Extensions:Path` and `Modules:Path`, as `activate` reads them. An unset path
   gives an empty catalog, and a set path whose folder does not exist is a
   settings error.
@@ -618,9 +628,16 @@ polls once a second. That interval is fixed and has no setting.
 one of this build, and it reads the directory again every
 `Tenancy:RefreshInterval`. A `suspended`, `provisioning` or out of date tenant
 is skipped, and its requests stay `queued`. It runs no migration of the tenant
-schema itself. `activate` does none either. *(Planned for M10:)* Under
-`configuration` it waits until the server has migrated each tenant database, as
-the worker does.
+schema itself. `activate` does none either.
+
+Under `configuration` it serves each tenant of the `Tenants` section once the
+server has migrated that tenant's database, as the worker does. A tenant counts as
+migrated when none of the configuration, data and processes contexts has a
+pending migration. Until then it writes `<tenant> waiting: the database is not
+migrated yet.` once, skips the tenant and checks again each poll round. When the
+database is migrated it writes `<tenant> ready` once, and claims requests from
+then on. It does not check a tenant again after that, so a later schema change
+needs a restart of the publisher. The `directory` source writes neither line.
 
 **Claiming.** Each poll round, for each served tenant, it claims the oldest
 `queued` `publish` or `validate` request with `FOR UPDATE SKIP LOCKED`. It sets the request
@@ -715,7 +732,8 @@ request, or the request is claimed twice.
 
 **Exit codes.** `0` after a stop on `SIGTERM` or Ctrl+C. `1` when it cannot read
 its tenants at start or stops on an error that it cannot recover from. `2` for a
-usage error or a missing or bad setting. A request that fails is not an exit
+usage error or a missing or bad setting, which includes a tenant under
+`configuration` that has no `SchemaConnectionString`. A request that fails is not an exit
 code, because it is stored on the request.
 
 ## What else to back up

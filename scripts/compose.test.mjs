@@ -64,6 +64,7 @@ test('the stack runs from source', { timeout }, async () => {
   if (up.status !== 0) {
     compose(['logs', 'server'], { stdio: 'inherit' })
     compose(['logs', 'worker'], { stdio: 'inherit' })
+    compose(['logs', 'publisher'], { stdio: 'inherit' })
     compose(['logs', 'keycloak'], { stdio: 'inherit' })
     compose(['logs', 'purchasing'], { stdio: 'inherit' })
     assert.fail(`docker compose up exited with ${up.status}`)
@@ -134,6 +135,7 @@ test('the stack runs from source', { timeout }, async () => {
 
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
+  assert.match(services.stdout, /^publisher$/m, `${services.stdout}${services.stderr}`)
   // The worker polls once a second, so it finds the migrated database soon after the server is up.
   let logs = ''
   for (let i = 0; i < 30 && !logs.includes('Tenant default is ready for work'); i++) {
@@ -141,6 +143,13 @@ test('the stack runs from source', { timeout }, async () => {
     logs = compose(['logs', 'worker']).stdout
   }
   assert.match(logs, /Tenant default is ready for work/, logs)
+  // The publisher waits for the server's migration the same way, then writes one ready line.
+  let publisherLogs = ''
+  for (let i = 0; i < 30 && !publisherLogs.includes('default ready'); i++) {
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1000))
+    publisherLogs = compose(['logs', 'publisher']).stdout
+  }
+  assert.match(publisherLogs, /default ready/, publisherLogs)
 
   // `up --wait` returned, so the worker's health check on /health/ready passed.
   const ps = compose(['ps', '--format', 'json', 'worker'])
@@ -195,7 +204,7 @@ test('the default ports are 5206, 5432, 8080 and 5207 on 127.0.0.1', () => {
   assert.deepEqual(published('purchasing'), ['127.0.0.1:5207->8080'])
 })
 
-test('the server runs on both database roles of each tenant and the worker only on the runtime roles', () => {
+test('the server and the publisher run on both database roles and the worker only on the runtime role', () => {
   const config = compose(['config', '--format', 'json'])
   assert.equal(config.status, 0, config.stderr)
   const { services } = JSON.parse(config.stdout)
@@ -214,6 +223,9 @@ test('the server runs on both database roles of each tenant and the worker only 
     [],
   )
   assert.match(worker.Tenants__default__ConnectionString, /Username=axis_runtime;/)
+  const publisher = services.publisher.environment
+  assert.match(publisher.Tenants__default__ConnectionString, /Username=axis_runtime;/)
+  assert.match(publisher.Tenants__default__SchemaConnectionString, /Username=axis_schema;/)
   assert.match(worker['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
 })
 

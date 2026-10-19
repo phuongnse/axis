@@ -23,11 +23,12 @@ namespace Axis.Admin;
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
 /// lost its claim changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is
-/// running, then ends the loop.
+/// running, then ends the loop. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
+/// see <see cref="IPublisherTenants"/>.
 /// </summary>
 internal sealed class Publisher(
-    ActivateSettings settings,
-    TimeSpan refreshInterval,
+    ReleaseSettings settings,
+    IPublisherTenants tenants,
     TimeSpan leaseDuration,
     TextWriter output,
     TextWriter error,
@@ -86,21 +87,20 @@ internal sealed class Publisher(
         WHERE id = @id AND status = 'running' AND claims = @claims
         """;
 
-    private IReadOnlyList<TenantRow> _served = [];
-    private Dictionary<string, ActivationBindings> _bindings = [];
+    private IReadOnlyList<PublisherTenant> _served = [];
 
     public async Task<int> RunAsync()
     {
         try
         {
-            var problem = await AdminCommands.PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, stopping);
+            var problem = await tenants.CheckAsync(stopping);
             if (problem is not null)
             {
                 error.WriteLine(problem);
                 return 1;
             }
 
-            await ReadDirectoryAsync();
+            _served = await tenants.ReadAsync(stopping);
         }
         catch (OperationCanceledException)
         {
@@ -115,12 +115,12 @@ internal sealed class Publisher(
         var lastRead = Stopwatch.StartNew();
         while (!stopping.IsCancellationRequested)
         {
-            if (lastRead.Elapsed >= refreshInterval)
+            if (lastRead.Elapsed >= tenants.ReadInterval)
             {
                 lastRead.Restart();
                 try
                 {
-                    await ReadDirectoryAsync();
+                    _served = await tenants.ReadAsync(stopping);
                 }
                 catch (OperationCanceledException)
                 {
@@ -134,14 +134,14 @@ internal sealed class Publisher(
             }
 
             var claimed = false;
-            foreach (var row in _served)
+            foreach (var tenant in _served)
             {
                 if (stopping.IsCancellationRequested)
                 {
                     break;
                 }
 
-                claimed |= await RunNextAsync(row);
+                claimed |= await RunNextAsync(tenant);
             }
 
             if (!claimed)
@@ -160,28 +160,15 @@ internal sealed class Publisher(
         return 0;
     }
 
-    private async Task ReadDirectoryAsync()
-    {
-        await using var platform = new PlatformDbContext(
-            new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.Platform.PlatformConnectionString).Options);
-        var rows = await platform.Tenants.AsNoTracking().ToListAsync(stopping);
-        var served = rows
-            .Where(row => row.Status == "active" && row.SchemaVersion == TenantSchemaVersion.Current)
-            .OrderBy(row => row.Id, StringComparer.Ordinal)
-            .ToList();
-        _bindings = await AdminCommands.ReadBindingsAsync(platform, [.. served.Select(row => row.Id)], stopping);
-        _served = served;
-    }
-
     // Claims and runs one request of the tenant. Returns whether one was claimed.
-    private async Task<bool> RunNextAsync(TenantRow row)
+    private async Task<bool> RunNextAsync(PublisherTenant tenant)
     {
-        var id = row.Id;
-        await using var steps = new TenantDatabaseSteps(settings.Platform.Cipher, row, row.DatabaseHost, row.DatabasePort, CancellationToken.None);
+        var id = tenant.Id;
+        await using var connections = tenant.Connect();
         ClaimedRequest? request;
         try
         {
-            request = await ClaimAsync(steps, id);
+            request = await ClaimAsync(connections, id);
         }
         catch (Exception exception)
         {
@@ -197,7 +184,7 @@ internal sealed class Publisher(
         output.WriteLine($"{id} claim ok");
         try
         {
-            await RunRequestAsync(row, steps, request);
+            await RunRequestAsync(tenant, connections, request);
         }
         catch (Exception exception)
         {
@@ -207,9 +194,9 @@ internal sealed class Publisher(
         return true;
     }
 
-    private async Task<ClaimedRequest?> ClaimAsync(TenantDatabaseSteps steps, string tenant)
+    private async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections, string tenant)
     {
-        var connection = await steps.SchemaConnectionAsync();
+        var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         await using (var lockCommand = new NpgsqlCommand("SELECT pg_advisory_xact_lock(@key)", connection, transaction))
         {
@@ -273,13 +260,13 @@ internal sealed class Publisher(
         }
     }
 
-    private async Task RunRequestAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request)
+    private async Task RunRequestAsync(PublisherTenant tenant, ITenantConnections connections, ClaimedRequest request)
     {
         using var renewing = new CancellationTokenSource();
-        var renewal = RenewAsync(steps, request, renewing.Token);
+        var renewal = RenewAsync(connections, request, renewing.Token);
         try
         {
-            await RunRequestCoreAsync(row, steps, request, renewing, renewal);
+            await RunRequestCoreAsync(tenant, connections, request, renewing, renewal);
         }
         finally
         {
@@ -288,8 +275,8 @@ internal sealed class Publisher(
     }
 
     private async Task RunRequestCoreAsync(
-        TenantRow row,
-        TenantDatabaseSteps steps,
+        PublisherTenant tenant,
+        ITenantConnections connections,
         ClaimedRequest request,
         CancellationTokenSource renewing,
         Task renewal)
@@ -300,37 +287,39 @@ internal sealed class Publisher(
         if (request.Kind == "validate")
         {
             var valid = await activation.ValidateAsync(
-                row,
-                steps,
-                _bindings[row.Id],
+                tenant.Id,
+                tenant.SchemaVersion,
+                connections,
+                tenant.Bindings,
                 files is null
                     ? null
                     : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics);
             await StopRenewalAsync(renewing, renewal);
-            await FinishAsync(row, steps, request, new ReleaseRun(valid, null), diagnostics, audit: false);
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(valid, null), diagnostics, audit: false);
             return;
         }
 
         ReleaseRun run;
         if (files is null)
         {
-            output.WriteLine($"{row.Id} compile failed: The snapshot cannot be read.");
+            output.WriteLine($"{tenant.Id} compile failed: The snapshot cannot be read.");
             run = new ReleaseRun(false, null);
         }
         else
         {
             run = await activation.RunAsync(
-                row,
-                steps,
-                _bindings[row.Id],
+                tenant.Id,
+                tenant.SchemaVersion,
+                connections,
+                tenant.Bindings,
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics);
         }
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
-        await FinishAsync(row, steps, request, run, diagnostics, audit: true);
+        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: true);
     }
 
     private static async Task StopRenewalAsync(CancellationTokenSource renewing, Task renewal)
@@ -348,7 +337,7 @@ internal sealed class Publisher(
 
     // Renews the lease every third of its length on a connection of its own, because activation uses the main one. It stops
     // when no row changes: the request ended, or another publisher claimed it again.
-    private async Task RenewAsync(TenantDatabaseSteps steps, ClaimedRequest request, CancellationToken token)
+    private async Task RenewAsync(ITenantConnections connections, ClaimedRequest request, CancellationToken token)
     {
         NpgsqlConnection? connection = null;
         try
@@ -358,7 +347,7 @@ internal sealed class Publisher(
             {
                 try
                 {
-                    connection ??= await steps.OpenSchemaConnectionAsync();
+                    connection ??= await connections.OpenSchemaConnectionAsync();
                     await using var command = new NpgsqlCommand(RenewSql, connection);
                     command.Parameters.AddWithValue("lease", leaseDuration);
                     command.Parameters.AddWithValue("id", request.Id);
@@ -430,9 +419,9 @@ internal sealed class Publisher(
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
     // validate has no audit record. A publisher that lost its claim changes nothing and writes no record.
-    private async Task FinishAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit)
+    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit)
     {
-        var connection = await steps.SchemaConnectionAsync();
+        var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         int changed;
         await using (var command = new NpgsqlCommand(FinishSql, connection, transaction))
@@ -448,7 +437,7 @@ internal sealed class Publisher(
         if (changed == 0)
         {
             await transaction.RollbackAsync();
-            output.WriteLine($"{row.Id} claim failed: Another publisher claimed the request again.");
+            output.WriteLine($"{tenantId} claim failed: Another publisher claimed the request again.");
             return;
         }
 

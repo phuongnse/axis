@@ -4,8 +4,15 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Axis.Admin;
+using Axis.Configuration.Storage;
+using Axis.Configuration.Tests;
+using Axis.Data.Storage;
+using Axis.Processes.Storage;
+using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -375,7 +382,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
-    public async Task Publisher_exits_0_after_a_stop_and_2_for_an_extra_argument_or_a_tenant_source_that_is_not_directory()
+    public async Task Publisher_exits_0_after_a_stop_and_2_for_an_extra_argument_an_invalid_source_or_a_missing_tenant_configuration()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         await CreateTenantsAsync(scenario);
@@ -402,10 +409,86 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
             Assert.Empty(result.Output);
         });
         Assert.StartsWith("Usage:", extra.Error[0], StringComparison.Ordinal);
-        Assert.All([unset, configuration, invalid], result => Assert.Contains("Tenancy:Source", result.Error[0], StringComparison.Ordinal));
+        Assert.All([unset, configuration], result => Assert.Contains("Tenants", result.Error[0], StringComparison.Ordinal));
+        Assert.Contains("Tenancy:Source", invalid.Error[0], StringComparison.Ordinal);
         Assert.DoesNotContain("nowhere", invalid.Error[0], StringComparison.Ordinal);
         Assert.Contains("Tenancy:RefreshInterval", refresh.Error[0], StringComparison.Ordinal);
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Under_the_configuration_source_a_queued_publish_runs_and_its_release_becomes_active()
+    {
+        var schema = await MigratedTenantDatabaseAsync();
+        var request = await QueueConfiguredAsync(schema, await SnapshotAsync(null));
+
+        var result = await RunConfiguredPublisherAsync(schema, request);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Empty(result.Error);
+        Assert.Equal("default ready", result.Output[0]);
+        Assert.Equal("default claim ok", result.Output[1]);
+        Assert.Equal(_steps.Select(step => $"default {step} ok"), result.Output.Skip(2));
+        Assert.Equal("succeeded", await ConfiguredScalarAsync(schema, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var release = await ConfiguredScalarAsync(schema, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'");
+        Assert.NotNull(release);
+        Assert.Equal(release, await ConfiguredScalarAsync(schema, "SELECT release_id FROM axis.active_releases"));
+        Assert.Equal(1L, await ConfiguredScalarAsync(schema, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+        Assert.All(
+            result.Output.Concat(result.Error),
+            line =>
+            {
+                Assert.DoesNotContain("Password", line, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(schema, line, StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public async Task Under_the_configuration_source_a_publisher_started_before_the_migration_waits_and_then_runs_the_request()
+    {
+        var schema = await database.CreateDatabaseAsync("publisher", CancellationToken);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        var output = new SynchronizedWriter();
+        var run = RunConfiguredAsync(ConfiguredSettings(schema), output, stop.Token);
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken);
+            Assert.False(run.IsCompleted);
+            Assert.Contains("default waiting", output.Lines().Single(), StringComparison.Ordinal);
+
+            await MigrateAsync(schema);
+            var request = await QueueConfiguredAsync(schema, await SnapshotAsync(null));
+            await WaitForStatusAsync(schema, request, run);
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        var result = await run;
+        var lines = output.Lines();
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(["default waiting: the database is not migrated yet.", "default ready", "default claim ok"], lines.Take(3));
+        Assert.Equal(1, lines.Count(line => line.StartsWith("default waiting", StringComparison.Ordinal)));
+        Assert.Equal(1, lines.Count(line => line == "default ready"));
+    }
+
+    [Fact]
+    public async Task Under_the_configuration_source_a_tenant_without_a_schema_connection_string_exits_2_and_names_the_setting()
+    {
+        var schema = await MigratedTenantDatabaseAsync();
+        var settings = ConfiguredSettings(schema);
+        settings.Remove("Tenants:default:SchemaConnectionString");
+        var output = new SynchronizedWriter();
+
+        var result = await RunConfiguredAsync(settings, output, CancellationToken);
+
+        Assert.Equal(2, result.Exit);
+        Assert.Empty(output.Lines());
+        var message = Assert.Single(result.Error);
+        Assert.Contains("Tenants:default:SchemaConnectionString", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Password", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(PostgreSqlServer.RolePassword + ";", message, StringComparison.Ordinal);
     }
 
     // A publisher whose lease is short, so that a test sees renewal and reclaim in seconds.
@@ -534,6 +617,11 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
         await using var connection = new NpgsqlConnection(scenario.TenantConnectionString(tenant, row.RuntimeUser, password));
+        return await InsertRequestAsync(connection, snapshot, kind);
+    }
+
+    private static async Task<Guid> InsertRequestAsync(NpgsqlConnection connection, string snapshot, string kind)
+    {
         await connection.OpenAsync(CancellationToken);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
@@ -548,6 +636,103 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = snapshot });
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
+    }
+
+    // A tenant database that the server would have migrated and granted.
+    private async Task<string> MigratedTenantDatabaseAsync()
+    {
+        var schema = await database.CreateDatabaseAsync("publisher", CancellationToken);
+        await MigrateAsync(schema);
+        return schema;
+    }
+
+    private static async Task MigrateAsync(string schema)
+    {
+        await using (var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(schema).Options))
+        {
+            await configuration.Database.MigrateAsync(CancellationToken);
+        }
+
+        await using (var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(schema).Options))
+        {
+            await data.Database.MigrateAsync(CancellationToken);
+        }
+
+        await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(schema).Options))
+        {
+            await processes.Database.MigrateAsync(CancellationToken);
+        }
+
+        await PostgreSqlServer.GrantRuntimeRoleAsync(schema, CancellationToken);
+    }
+
+    // The settings of one tenant, 'default', under the configuration source.
+    private static Dictionary<string, string?> ConfiguredSettings(string schema) => new()
+    {
+        ["Tenancy:Source"] = "configuration",
+        ["Tenants:default:Hosts:0"] = "default.example.test",
+        ["Tenants:default:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(schema),
+        ["Tenants:default:SchemaConnectionString"] = schema,
+        [$"Tenants:default:Bindings:{UrlBinding}:Kind"] = "url",
+        [$"Tenants:default:Bindings:{UrlBinding}:Value"] = "https://purchasing.example.test",
+        [$"Tenants:default:Bindings:{SecretBinding}:Kind"] = "secret",
+        [$"Tenants:default:Bindings:{SecretBinding}:Value"] = "binding-secret-value",
+        ["Extensions:Path"] = SamplePackages.Path,
+        ["Modules:Path"] = SampleModules.Path,
+    };
+
+    private static async Task<AdminResult> RunConfiguredAsync(Dictionary<string, string?> settings, SynchronizedWriter output, CancellationToken stop)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        using var error = new StringWriter();
+        var exit = await AdminCommands.RunAsync(["publisher"], configuration, output, error, stop);
+        return new AdminResult(exit, output.Lines(), error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    // Runs the publisher until the request is final, then stops it and returns its result.
+    private static async Task<AdminResult> RunConfiguredPublisherAsync(string schema, Guid request)
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        var output = new SynchronizedWriter();
+        var run = RunConfiguredAsync(ConfiguredSettings(schema), output, stop.Token);
+        try
+        {
+            await WaitForStatusAsync(schema, request, run);
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        return await run;
+    }
+
+    private static async Task WaitForStatusAsync(string schema, Guid request, Task<AdminResult> run)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (!run.IsCompleted && DateTime.UtcNow < deadline)
+        {
+            var status = await ConfiguredScalarAsync(schema, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+            if (status is "succeeded" or "failed")
+            {
+                Assert.Equal("succeeded", status);
+                return;
+            }
+
+            await Task.Delay(200, CancellationToken);
+        }
+
+        Assert.Fail("The request did not succeed in time.");
+    }
+
+    private static Task<object?> ConfiguredScalarAsync(string schema, string sql) =>
+        PostgreSqlServer.AdminScalarAsync(schema, sql, CancellationToken);
+
+    // Stores a request over the runtime role, as the server will.
+    private static async Task<Guid> QueueConfiguredAsync(string schema, string snapshot)
+    {
+        await using var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(schema));
+        return await InsertRequestAsync(connection, snapshot, "publish");
     }
 
     private static async Task<string> ApplicationIdAsync()
@@ -603,4 +788,28 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
     private static Task<object?> ScalarAsync(AdminScenario scenario, string id, string sql) =>
         PostgreSqlServer.AdminScalarAsync(new NpgsqlConnectionStringBuilder(scenario.Platform) { Database = $"axis_{id}" }.ConnectionString, sql, CancellationToken);
+
+    // The test reads the output while the publisher writes it.
+    private sealed class SynchronizedWriter : StringWriter
+    {
+        private readonly object _lock = new();
+
+        public override void WriteLine(string? value)
+        {
+            lock (_lock)
+            {
+                base.WriteLine(value);
+            }
+        }
+
+        public override string ToString()
+        {
+            lock (_lock)
+            {
+                return base.ToString();
+            }
+        }
+
+        public string[] Lines() => ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
 }
