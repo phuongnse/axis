@@ -3,6 +3,7 @@ using Axis.Configuration.Packages;
 using Axis.Data;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
+using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.DataSources;
@@ -34,6 +35,10 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 // built, because sign-in registers one client per tenant. Under configuration, nothing about the platform
 // schema is read.
 ITenantCatalog tenants;
+
+// The tenants whose sign-in client is registered. Under directory this is every active tenant, also one that is not served yet
+// because its schema version is not this server's, so a tenant that migrate brings up later can sign people in without a restart.
+ITenantCatalog signInTenants;
 if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
 {
     // Read first, so a bad value stops the start even when the database is not there.
@@ -69,9 +74,13 @@ if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
     await PlatformMigration.ApplyAsync(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole), CancellationToken.None);
     var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
 
+    // The server serves a tenant only on its own schema version. Axis.Admin migrate brings a tenant there.
+    var otherSchema = loaded.OnOtherSchemaVersion(TenantSchemaVersion.Current);
+
     // The tenants served at start count as checked: the release check runs the role check on them before the server listens.
-    var directory = new TenantDirectoryCatalog(loaded);
+    var directory = new TenantDirectoryCatalog(loaded.Withhold(otherSchema));
     tenants = directory;
+    signInTenants = loaded;
 
     // Registered first, so it logs before the release check runs.
     builder.Services.AddSingleton(cipher);
@@ -82,12 +91,14 @@ if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
     builder.Services.AddSingleton(new TenantDirectoryStart(
         readerRole,
         tenants.Tenants.Count,
-        builder.Configuration.GetSection(TenantOptions.SectionName).Exists()));
+        builder.Configuration.GetSection(TenantOptions.SectionName).Exists(),
+        otherSchema));
     builder.Services.AddHostedService<TenantDirectoryStartLog>();
 }
 else
 {
     tenants = ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment);
+    signInTenants = tenants;
 
     // Fails startup when a tenant has no schema connection string. Only startup activation uses it,
     // and the worker never uses it.
@@ -108,7 +119,7 @@ builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
-var oidcTenants = TenantOidcSettings.Load(tenants);
+var oidcTenants = TenantOidcSettings.Load(signInTenants);
 
 // The development, E2E and test servers run over http, where a Secure cookie never comes back.
 var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");

@@ -16,20 +16,23 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
 
     private readonly HashSet<string> _unavailableHosts = new(StringComparer.OrdinalIgnoreCase);
     private readonly IReadOnlyDictionary<string, string> _databaseKeys;
+    private readonly IReadOnlyDictionary<string, string> _schemaVersions;
 
     public DirectoryTenantCatalog(IEnumerable<TenantEntry> tenants)
-        : this(tenants, [], new Dictionary<string, string>())
+        : this(tenants, [], new Dictionary<string, string>(), new Dictionary<string, string>())
     {
     }
 
     internal DirectoryTenantCatalog(
         IEnumerable<TenantEntry> tenants,
         IEnumerable<string> unavailableHosts,
-        IReadOnlyDictionary<string, string> databaseKeys)
+        IReadOnlyDictionary<string, string> databaseKeys,
+        IReadOnlyDictionary<string, string> schemaVersions)
     {
         ArgumentNullException.ThrowIfNull(tenants);
 
         _databaseKeys = databaseKeys;
+        _schemaVersions = schemaVersions;
         _unavailableHosts.UnionWith(unavailableHosts);
 
         Tenants = [.. tenants.OrderBy(tenant => tenant.Id, StringComparer.Ordinal)];
@@ -64,7 +67,49 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         return new DirectoryTenantCatalog(
             Tenants.Except(withheld),
             _unavailableHosts.Concat(withheld.SelectMany(tenant => tenant.Hosts)),
-            _databaseKeys.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+            _databaseKeys.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+            _schemaVersions.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// The ids of the tenants of this catalog whose recorded schema version is not <paramref name="schemaVersion"/>, in
+    /// ordinal order. A host serves only the tenants on its own schema version.
+    /// </summary>
+    public IReadOnlyList<string> OnOtherSchemaVersion(string schemaVersion)
+    {
+        ArgumentNullException.ThrowIfNull(schemaVersion);
+
+        return [.. Tenants
+            .Select(tenant => tenant.Id)
+            .Where(id => !_schemaVersions.TryGetValue(id, out var version) || !string.Equals(version, schemaVersion, StringComparison.Ordinal))];
+    }
+
+    /// <summary>
+    /// Reads the recorded schema version of every active tenant, keyed by tenant id. It reads two columns and no secret.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The directory cannot be read. The message names <c>ConnectionStrings:Platform</c> and holds no connection value.
+    /// </exception>
+    public static async Task<IReadOnlyDictionary<string, string>> ReadSchemaVersionsAsync(
+        string platformConnectionString,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options;
+            await using var context = new PlatformDbContext(options);
+            var rows = await context.Tenants.AsNoTracking()
+                .Where(tenant => tenant.Status == "active")
+                .Select(tenant => new { tenant.Id, tenant.SchemaVersion })
+                .ToListAsync(cancellationToken);
+            return rows.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal);
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            throw new InvalidOperationException("The tenant directory could not be read over ConnectionStrings:Platform.", exception);
+        }
     }
 
     /// <summary>
@@ -129,7 +174,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 bindings.Where(binding => binding.TenantId == row.Id),
                 cipher)),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
-            active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal));
+            active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
+            active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal));
     }
 
     private static bool IsActive(TenantRow row) => row.Status == "active";

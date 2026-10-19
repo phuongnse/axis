@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.Tenancy.Platform;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 
@@ -15,10 +17,13 @@ internal static partial class AdminCommands
 
     public const string PlatformSetting = "ConnectionStrings:PlatformSchema";
 
+    private const string Provisioning = "provisioning";
+
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
     private const string Usage =
-        "Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>";
+        "Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>\n"
+        + "       migrate [--tenant <id>] [--parallel <n>]";
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -32,6 +37,11 @@ internal static partial class AdminCommands
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
+        if (args.Length > 0 && args[0] == "migrate")
+        {
+            return await MigrateAsync(args, configuration, output, error, cancellationToken);
+        }
+
         var request = ParseTenantCreate(args);
         if (request is null)
         {
@@ -39,7 +49,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var settings = ReadSettings(configuration, out var problem);
+        var settings = ReadCreateSettings(configuration, out var problem);
         if (settings is null)
         {
             error.WriteLine(problem);
@@ -103,19 +113,121 @@ internal static partial class AdminCommands
             : new TenantCreateRequest(args[2], hosts, authority, clientId);
     }
 
+    private static async Task<int> MigrateAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var request = ParseMigrate(args);
+        if (request is null)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        if (request.Parallel < 1)
+        {
+            error.WriteLine("--parallel must be 1 or more.");
+            return 2;
+        }
+
+        var settings = ReadSettings(configuration, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        IReadOnlyList<TenantRow> tenants;
+        try
+        {
+            if (!await PlatformTablesExistAsync(settings, cancellationToken))
+            {
+                // With no directory there is no tenant to migrate, and the install runs this before the first server start.
+                error.WriteLine("The platform tables do not exist, so there is no tenant to migrate.");
+                return 0;
+            }
+
+            await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.PlatformConnectionString).Options);
+            var rows = await platform.Tenants.AsNoTracking().ToListAsync(cancellationToken);
+            tenants = [.. rows.OrderBy(row => row.Id, StringComparer.Ordinal)];
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+        catch (PostgresException exception)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used: {exception.MessageText}");
+            return 2;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used to connect to the platform database.");
+            return 2;
+        }
+
+        if (request.Tenant is not null)
+        {
+            var found = tenants.FirstOrDefault(row => row.Id == request.Tenant);
+            if (found is null)
+            {
+                error.WriteLine($"The tenant '{request.Tenant}' does not exist.");
+                return 2;
+            }
+
+            if (found.Status == Provisioning)
+            {
+                error.WriteLine($"The tenant '{request.Tenant}' is still provisioning. Finish it with tenant create.");
+                return 2;
+            }
+
+            tenants = [found];
+        }
+        else
+        {
+            tenants = [.. tenants.Where(row => row.Status != Provisioning)];
+        }
+
+        return await new TenantMigrate(settings, tenants, request.Parallel, output, cancellationToken).RunAsync();
+    }
+
+    private static MigrateRequest? ParseMigrate(string[] args)
+    {
+        string? tenant = null;
+        int? parallel = null;
+        for (var i = 1; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            switch (args[i])
+            {
+                case "--tenant" when tenant is null:
+                    tenant = args[i + 1];
+                    break;
+                case "--parallel" when parallel is null && int.TryParse(args[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out var value):
+                    parallel = value;
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return new MigrateRequest(tenant, parallel ?? 1);
+    }
+
+    /// <summary>Reads the settings that every command needs: the platform database and the key of the tenant secrets.</summary>
     private static AdminSettings? ReadSettings(IConfiguration configuration, out string problem)
     {
         problem = "";
-        var admin = configuration[AdminSetting];
         var platform = configuration[PlatformSetting];
-        var secret = configuration[ClientSecretSetting];
         var key = configuration[TenantSecretCipher.KeySetting];
-
-        if (string.IsNullOrWhiteSpace(admin))
-        {
-            problem = $"The setting {AdminSetting} is required.";
-            return null;
-        }
 
         if (string.IsNullOrWhiteSpace(platform))
         {
@@ -129,28 +241,14 @@ internal static partial class AdminCommands
             return null;
         }
 
-        if (string.IsNullOrEmpty(secret))
-        {
-            problem = $"The environment variable {ClientSecretSetting} is required.";
-            return null;
-        }
-
-        NpgsqlConnectionStringBuilder adminBuilder;
         string platformConnection;
         try
         {
-            adminBuilder = new NpgsqlConnectionStringBuilder(admin) { Pooling = false };
             platformConnection = new NpgsqlConnectionStringBuilder(platform) { Pooling = false }.ConnectionString;
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException)
         {
-            problem = $"The setting {AdminSetting} or {PlatformSetting} is not a valid connection string.";
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(adminBuilder.Host))
-        {
-            problem = $"The setting {AdminSetting} names no host.";
+            problem = $"The setting {PlatformSetting} is not a valid connection string.";
             return null;
         }
 
@@ -166,11 +264,64 @@ internal static partial class AdminCommands
             return null;
         }
 
-        return new AdminSettings(adminBuilder, platformConnection, cipher, secret);
+        return new AdminSettings(platformConnection, cipher);
+    }
+
+    /// <summary>Reads the settings of <c>tenant create</c>: the common ones, the admin role and the OIDC client secret.</summary>
+    private static CreateSettings? ReadCreateSettings(IConfiguration configuration, out string problem)
+    {
+        problem = "";
+        var admin = configuration[AdminSetting];
+        var secret = configuration[ClientSecretSetting];
+
+        if (string.IsNullOrWhiteSpace(admin))
+        {
+            problem = $"The setting {AdminSetting} is required.";
+            return null;
+        }
+
+        var common = ReadSettings(configuration, out problem);
+        if (common is null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(secret))
+        {
+            problem = $"The environment variable {ClientSecretSetting} is required.";
+            return null;
+        }
+
+        NpgsqlConnectionStringBuilder adminBuilder;
+        try
+        {
+            adminBuilder = new NpgsqlConnectionStringBuilder(admin) { Pooling = false };
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException)
+        {
+            problem = $"The setting {AdminSetting} is not a valid connection string.";
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(adminBuilder.Host))
+        {
+            problem = $"The setting {AdminSetting} names no host.";
+            return null;
+        }
+
+        return new CreateSettings(adminBuilder, common.PlatformConnectionString, common.Cipher, secret);
+    }
+
+    private static async Task<bool> PlatformTablesExistAsync(AdminSettings settings, CancellationToken cancellationToken)
+    {
+        await using var platform = new NpgsqlConnection(settings.PlatformConnectionString);
+        await platform.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("SELECT to_regclass('platform.tenants') IS NOT NULL", platform);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
     /// <summary>Returns the reason to refuse the command, or null. It checks the admin role and the input before any tenant work.</summary>
-    private static async Task<string?> ValidateAsync(AdminSettings settings, TenantCreateRequest request, CancellationToken cancellationToken)
+    private static async Task<string?> ValidateAsync(CreateSettings settings, TenantCreateRequest request, CancellationToken cancellationToken)
     {
         try
         {
@@ -226,10 +377,7 @@ internal static partial class AdminCommands
 
         try
         {
-            await using var platform = new NpgsqlConnection(settings.PlatformConnectionString);
-            await platform.OpenAsync(cancellationToken);
-            await using var command = new NpgsqlCommand("SELECT to_regclass('platform.tenants') IS NOT NULL", platform);
-            if (!(bool)(await command.ExecuteScalarAsync(cancellationToken))!)
+            if (!await PlatformTablesExistAsync(settings, cancellationToken))
             {
                 return "The platform tables do not exist. Start the server once under Tenancy:Source=directory, which creates them.";
             }
@@ -252,8 +400,14 @@ internal static partial class AdminCommands
 
 internal sealed record TenantCreateRequest(string Id, IReadOnlyList<string> Hosts, string OidcAuthority, string OidcClientId);
 
-internal sealed record AdminSettings(
+internal sealed record MigrateRequest(string? Tenant, int Parallel);
+
+/// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
+internal record AdminSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
+
+/// <summary>The settings of <c>tenant create</c>, which also needs the admin role and the OIDC client secret.</summary>
+internal sealed record CreateSettings(
     NpgsqlConnectionStringBuilder Admin,
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
-    string OidcClientSecret);
+    string OidcClientSecret) : AdminSettings(PlatformConnectionString, Cipher);

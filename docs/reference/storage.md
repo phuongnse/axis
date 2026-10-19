@@ -318,7 +318,7 @@ server holds no tenant schema connection, see
 
 *(Partly built for M9.)* See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
-Only `tenant create` is built. Under `Tenancy:Source=directory`, `tenant create` creates
+`tenant create` and `migrate` are built. Under `Tenancy:Source=directory`, `tenant create` creates
 the two database roles of a tenant, its database and the ownership, with no
 superuser. See [administration](administration.md). Each step below runs on one
 host with one database role:
@@ -339,7 +339,8 @@ host with one database role:
 - **Platform schema.** The server still holds `ConnectionStrings:PlatformSchema`
   at start, for the platform migrations. So "no schema connection" means no
   tenant schema connection.
-- **Tenant schema version.** Each tenant database migrates on its own. A host
+- **Tenant schema version.** Each tenant database migrates on its own, with
+  `Axis.Admin migrate`, which records the version in the directory. A host
   serves a tenant only when the tenant's schema version is the host's own, see
   [tenant directory](../architecture.md#tenant-directory).
 

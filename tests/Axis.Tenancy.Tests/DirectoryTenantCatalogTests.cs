@@ -36,6 +36,22 @@ public sealed class DirectoryTenantCatalogTests
         Assert.Empty(previous.DatabaseChanges(previous));
     }
 
+    [Fact]
+    public void On_other_schema_version_lists_the_tenants_that_differ_in_ordinal_order_and_survives_withhold()
+    {
+        var catalog = Catalog(("c", "key-c"), ("a", "key-a"), ("b", "key-b"));
+        catalog = new DirectoryTenantCatalog(
+            catalog.Tenants,
+            [],
+            new Dictionary<string, string> { ["a"] = "k", ["b"] = "k", ["c"] = "k" },
+            new Dictionary<string, string> { ["a"] = "2", ["b"] = "1", ["c"] = "3" });
+
+        Assert.Equal(["a", "b", "c"], catalog.OnOtherSchemaVersion("0"));
+        Assert.Equal(["b", "c"], catalog.OnOtherSchemaVersion("2"));
+        Assert.Equal(["b"], catalog.Withhold(["a"]).OnOtherSchemaVersion("3"));
+        Assert.Empty(catalog.Withhold(["a", "b", "c"]).OnOtherSchemaVersion("9"));
+    }
+
     private static DirectoryTenantCatalog Catalog(params (string Id, string Key)[] tenants) =>
         new(
             tenants.Select(tenant => new TenantEntry(
@@ -46,5 +62,6 @@ public sealed class DirectoryTenantCatalogTests
                 Oidc: null,
                 new Dictionary<string, TenantBinding>())),
             [],
-            tenants.ToDictionary(tenant => tenant.Id, tenant => tenant.Key));
+            tenants.ToDictionary(tenant => tenant.Id, tenant => tenant.Key),
+            new Dictionary<string, string>());
 }

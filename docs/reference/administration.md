@@ -6,7 +6,7 @@ activate releases, and back up and restore tenants. It follows
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
-Only `tenant create` is built. Every other command is still planned. Today a
+`tenant create` and `migrate` are built. Every other command is still planned. Today a
 tenant can also come from the `Tenants` section, where the server migrates and
 activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -28,7 +28,7 @@ connection. There is no HTTP API for provisioning in M9.
 
 | Setting | Environment variable | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. See [admin settings](configuration.md#admin-settings). |
+| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](configuration.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate` and `tenant restore` read it. |
@@ -354,7 +354,7 @@ The old tenant stays in the directory, because there is no tenant delete.
 
 ## Migrate
 
-*(Planned for M9.)* `migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
+*(Built for M9.)* `migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
 that this build of `Axis.Admin` ships.
 
 | Option | Meaning |
@@ -375,7 +375,18 @@ resumed.
 5. `version`: record the schema version in the directory.
 
 Steps 1 to 3 run as the tenant's schema role and step 4 as its runtime role.
-Step 5 writes over `ConnectionStrings:PlatformSchema`.
+Step 5 writes over `ConnectionStrings:PlatformSchema`. `migrate` reaches each
+tenant database on the host and port that the directory records for it. It reads
+only `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`. It does not
+read `Admin:ConnectionString` or `AXIS_OIDC_CLIENT_SECRET`, so a routine upgrade
+needs no admin role. A tenant stops at its first failed step. Each step writes
+one line, `<tenant> <step> ok` or `<tenant> <step> failed: <message>`, and with
+`--parallel` the lines of different tenants can interleave.
+
+**No platform tables.** When the `platform` tables do not exist, there is no
+tenant to migrate. `migrate` writes a note to standard error and exits `0`. So
+the install can run it before the first server start, see
+[installation](installation.md).
 
 **Schema version.** A tenant's schema version is the id of the newest EF Core
 migration across the configuration, data and processes contexts. It is stored
@@ -401,7 +412,8 @@ The window ends when the new hosts run. A tenant whose migration failed stays
 at its old version, so the old hosts keep serving it, and the new hosts answer
 `503` for it until `migrate` works for it.
 
-**Exit codes.** `0` when every tenant succeeded, also when there is none. `1`
+**Exit codes.** `0` when every tenant succeeded, also when there is none or when
+the `platform` tables do not exist. `1`
 when at least one tenant failed. `2` for an unknown `--tenant`, a `--tenant`
 that is `provisioning`, a `--parallel` below 1 or a missing setting.
 

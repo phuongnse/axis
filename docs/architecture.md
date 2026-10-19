@@ -47,7 +47,7 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Axis.Admin** *(partly built for M9: only `tenant create`)* is the console host that the platform
+- **Axis.Admin** *(partly built for M9: `tenant create` and `migrate`)* is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
   the [tenant directory](#tenant-directory), holds an admin connection to the
@@ -59,8 +59,8 @@ flowchart LR
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
   settings *(the server reads the tenant directory again every refresh
-  interval, and the worker reads it once at start; the worker refresh is
-  planned for M9)*.
+  interval, and the worker reads the schema versions every poll round and the
+  rest once at start; the full worker refresh is planned for M9)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -71,7 +71,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Scenarios/         console host that runs an application's test scenarios
-  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; only `tenant create` is built)
+  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; `tenant create` and `migrate` are built)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -256,15 +256,18 @@ with its decrypted runtime password. It never reads
 `ConnectionStrings:PlatformSchema`. It stops at start when
 `ConnectionStrings:Platform` is missing. If the first read fails, it logs the
 failure once, retries every `Worker:PollInterval` and is not ready until a read
-works. It ignores a `Tenants` section and logs a warning.
+works. It ignores a `Tenants` section and logs a warning. It also reads the
+schema version of every tenant again at each poll round, and claims no work for
+a tenant whose version is not its own, see the table below.
 
 The server reads the directory again every `Tenancy:RefreshInterval`, without a
 restart. A tenant added as `active` is served after the next refresh, once its
 runtime database role check passes. A host of a `suspended` or `provisioning`
 tenant answers `503`, and a removed host answers `404`. A changed database
-setting gets a new connection pool. The worker refresh, Degraded readiness for
-a failed refresh, the check of the schema version and sign-in for a tenant
-added at a refresh are not built. A change to the directory applies to the
+setting gets a new connection pool. A tenant whose schema version is not the
+server's is not served, see the table below. The worker refresh, Degraded
+readiness for a failed refresh and sign-in for a tenant added at a refresh are
+not built. A change to the directory applies to the
 worker only after a restart, and a changed OIDC setting applies to the server
 only after a restart.
 
@@ -291,7 +294,7 @@ What a host answers for a tenant, once the directory is in use:
 | --- | --- |
 | An `active` tenant | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client is registered then *(not built yet, planned for M9: a tenant added at a refresh has no sign-in until a restart)*. |
 | A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
-| A tenant whose schema version is not the host's *(not built yet, planned for M9)* | `503`, like a suspended tenant. The worker claims none of its work. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). |
+| A tenant whose schema version is not the host's | `503`, like a suspended tenant, from the first directory refresh that reads the other version. The server logs one warning when a tenant joins this state. The worker re-reads the schema versions at each poll round and claims none of its work, new or old. It starts again once `Axis.Admin migrate` has brought the tenant to the worker's version, with no restart. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). The server registers the sign-in client of such a tenant at start all the same, so a tenant that `migrate` brings up later can sign people in without a restart. |
 | A removed or unknown host | `404`, as today. |
 | A refresh that fails | The last good directory stays in use and an error is logged. Readiness is Degraded *(not built yet, planned for M9)*, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
 | The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
@@ -945,6 +948,10 @@ good directory. Under `directory`, no startup activation runs, because
 `ActivateOnStartup` must be empty, so "startup activation has finished" holds
 from the start.
 
+- A tenant on another schema version than the server's is not served, so it
+  counts neither against readiness nor as a tenant database that does not
+  answer. One tenant whose migration failed cannot keep a deploy from being
+  ready.
 - One tenant database that is down makes the server Degraded and not
   Unhealthy, so one tenant cannot take the others offline, see
   [tenancy](#tenancy-d10). Requests for that tenant fail and the others work.
@@ -972,6 +979,11 @@ migrated is only logged. Under `Tenancy:Source=directory`, the worker answers
 [tenant directory](#tenant-directory) has worked, while `/health/live` stays
 `200`. *(Planned for M9.)* A failed refresh of the directory makes the worker
 Degraded (`200`).
+
+A tenant that waits for its schema version, see
+[tenant directory](#tenant-directory), counts as ready for `/health/ready`, and
+the worker stays Healthy while it waits. One tenant whose migration failed
+cannot keep the worker from being ready.
 
 The loop counts as stalled when it has not polled within twice
 `Worker:LeaseDuration`, one minute by default. A poll interval would be too

@@ -2516,7 +2516,8 @@ Under `Tenancy:Source=directory`, the worker reads its tenants from the
 them. It never uses `ConnectionStrings:PlatformSchema`. It reads the directory
 once at start. If that read fails, it logs the failure once, retries every
 `Worker:PollInterval` and is not ready until a read works. A change to the
-directory applies after a restart of the worker. *(Planned for M9.)* The worker
+directory applies after a restart of the worker, except the schema version of
+a tenant, which the worker reads again at each poll round. *(Planned for M9.)* The worker
 refreshes the directory, and it claims no new work for a tenant that is not
 `active`. Work it already claimed finishes.
 
@@ -2537,10 +2538,14 @@ applied to the tenant database. Until they are, it skips the tenant and logs
 once that it is waiting. Once they are, it logs that the tenant is ready for
 work and starts claiming. So the worker can start before the server.
 
-*(Planned for M9.)* That holds under `Tenancy:Source=configuration`. Under
+That holds under `Tenancy:Source=configuration`. Under
 `directory`, [`Axis.Admin migrate`](administration.md#migrate) migrates the
-tenant databases, and the server does not. The worker skips a tenant whose
-schema version is not its own, and claims none of its work.
+tenant databases, and the server does not. The worker reads the recorded schema
+version of every tenant at each poll round. It skips a tenant whose schema
+version is not its own and claims none of its work, until `migrate` has brought
+the tenant to its version. It then runs the work without a restart. A tenant
+that waits for its schema version logs once and does not make the worker not
+ready.
 
 ### Worker metrics
 

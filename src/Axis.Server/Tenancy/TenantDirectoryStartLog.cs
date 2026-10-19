@@ -1,11 +1,12 @@
 namespace Axis.Server.Tenancy;
 
 /// <summary>What the server learned while it loaded the tenant directory at start.</summary>
-internal sealed record TenantDirectoryStart(string ReaderRole, int TenantCount, bool TenantsSectionIgnored);
+/// <param name="SchemaWithheld">The ids of the active tenants that are not served because their schema version is not the server's.</param>
+internal sealed record TenantDirectoryStart(string ReaderRole, int TenantCount, bool TenantsSectionIgnored, IReadOnlyList<string> SchemaWithheld);
 
 /// <summary>
 /// Under <c>Tenancy:Source=directory</c>, logs the platform migrations, the ignored <c>Tenants</c> section and the
-/// number of tenants loaded. The load itself runs before the host is built, so this service reports it when the host
+/// number of tenants loaded and each tenant held back for its schema version. The load itself runs before the host is built, so this service reports it when the host
 /// starts. It logs no host name and no connection value.
 /// </summary>
 internal sealed partial class TenantDirectoryStartLog(
@@ -21,6 +22,11 @@ internal sealed partial class TenantDirectoryStartLog(
         }
 
         LogLoaded(start.TenantCount);
+        foreach (var id in start.SchemaWithheld)
+        {
+            LogSchemaWithheld(id);
+        }
+
         return Task.CompletedTask;
     }
 
@@ -39,6 +45,9 @@ internal sealed partial class TenantDirectoryStartLog(
 
     [LoggerMessage(LogLevel.Warning, "The Tenants section is ignored because Tenancy:Source is 'directory'.")]
     private partial void LogTenantsSectionIgnored();
+
+    [LoggerMessage(LogLevel.Warning, "Tenant {TenantId} is not served: its schema version is not this server's. Run Axis.Admin migrate.")]
+    private partial void LogSchemaWithheld(string tenantId);
 
     [LoggerMessage(LogLevel.Information, "Loaded {TenantCount} active tenant(s) from the tenant directory.")]
     private partial void LogLoaded(int tenantCount);

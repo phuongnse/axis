@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
-using Axis.Configuration.Storage;
 using Axis.Data.Naming;
-using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +17,7 @@ internal sealed class TenantCreate : IAsyncDisposable
 {
     private const string Provisioning = "provisioning";
 
-    private readonly AdminSettings _settings;
+    private readonly CreateSettings _settings;
     private readonly TenantCreateRequest _request;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
@@ -32,9 +30,9 @@ internal sealed class TenantCreate : IAsyncDisposable
 
     private TenantRow? _row;
     private NpgsqlConnection? _adminConnection;
-    private NpgsqlConnection? _schemaConnection;
+    private TenantDatabaseSteps? _steps;
 
-    public TenantCreate(AdminSettings settings, TenantCreateRequest request, TextWriter output, CancellationToken cancellationToken)
+    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _request = request;
@@ -60,10 +58,10 @@ internal sealed class TenantCreate : IAsyncDisposable
 
             if (await Step("roles", EnsureRolesAsync)
                 && await Step("database", EnsureDatabaseAsync)
-                && await Step("grants", GrantAsync)
-                && await Step("migrations", MigrateAsync)
-                && await Step("grants", GrantAsync)
-                && await Step("role-check", CheckRuntimeRoleAsync)
+                && await Step("grants", () => Steps.GrantAsync())
+                && await Step("migrations", () => Steps.MigrateAsync())
+                && await Step("grants", () => Steps.GrantAsync())
+                && await Step("role-check", () => Steps.CheckRuntimeRoleAsync())
                 && await Step("version", ActivateAsync))
             {
                 return 0;
@@ -85,10 +83,10 @@ internal sealed class TenantCreate : IAsyncDisposable
             _adminConnection = null;
         }
 
-        if (_schemaConnection is not null)
+        if (_steps is not null)
         {
-            await _schemaConnection.DisposeAsync();
-            _schemaConnection = null;
+            await _steps.DisposeAsync();
+            _steps = null;
         }
 
         await _platform.DisposeAsync();
@@ -167,6 +165,10 @@ internal sealed class TenantCreate : IAsyncDisposable
     private static bool IsHostConflict(Exception exception) =>
         exception is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } };
 
+    // The steps of the database run with the host and port of the admin connection, where the database was created.
+    private TenantDatabaseSteps Steps =>
+        _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, _cancellationToken);
+
     private async Task EnsureRolesAsync()
     {
         await EnsureRoleAsync(_schemaRole, TenantSecretFields.SchemaPassword, row => row.SchemaPassword, (row, value) => row.SchemaPassword = value);
@@ -229,49 +231,10 @@ internal sealed class TenantCreate : IAsyncDisposable
         await ExecuteAsync(admin, $"CREATE DATABASE {EntityNaming.Quote(_database)} OWNER {EntityNaming.Quote(_schemaRole)}");
     }
 
-    private async Task GrantAsync()
-    {
-        var connection = await SchemaConnectionAsync();
-        var database = EntityNaming.Quote(_database);
-        var runtime = EntityNaming.Quote(_runtimeRole);
-        // Without this, any login role of the server could connect to the tenant database.
-        await ExecuteAsync(
-            connection,
-            $"REVOKE CONNECT, TEMPORARY ON DATABASE {database} FROM PUBLIC; GRANT CONNECT, TEMPORARY ON DATABASE {database} TO {runtime}");
-        await RuntimeRoleGrants.ApplyAsync(connection, _runtimeRole, _cancellationToken);
-    }
-
-    private async Task MigrateAsync()
-    {
-        var connection = await SchemaConnectionAsync();
-        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
-        await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connection).Options);
-        await using var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connection).Options);
-        await configuration.Database.MigrateAsync(_cancellationToken);
-        await data.Database.MigrateAsync(_cancellationToken);
-        await processes.Database.MigrateAsync(_cancellationToken);
-    }
-
-    private async Task CheckRuntimeRoleAsync()
-    {
-        var password = _settings.Cipher.Decrypt(_id, TenantSecretFields.RuntimePassword, _row!.RuntimePassword).Reveal();
-        await using var connection = new NpgsqlConnection(TenantConnectionString(_runtimeRole, password));
-        await connection.OpenAsync(_cancellationToken);
-        await RuntimeRoleCheck.CheckAsync(connection, _id, _cancellationToken);
-    }
-
     private async Task ActivateAsync()
     {
-        var connection = await SchemaConnectionAsync();
-        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
-        await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connection).Options);
-        await using var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connection).Options);
-        var applied = (await configuration.Database.GetAppliedMigrationsAsync(_cancellationToken))
-            .Concat(await data.Database.GetAppliedMigrationsAsync(_cancellationToken))
-            .Concat(await processes.Database.GetAppliedMigrationsAsync(_cancellationToken));
-
         var row = _row!;
-        row.SchemaVersion = applied.Max(StringComparer.Ordinal) ?? "";
+        row.SchemaVersion = await Steps.ReadSchemaVersionAsync();
         row.Status = "active";
         row.Version++;
         await _platform.SaveChangesAsync(_cancellationToken);
@@ -295,14 +258,7 @@ internal sealed class TenantCreate : IAsyncDisposable
         return true;
     }
 
-    // Never ToString(): an Npgsql message can name the host.
-    private static string Safe(Exception exception) => exception switch
-    {
-        OperationCanceledException => "canceled",
-        InvalidOperationException invalid => invalid.Message,
-        PostgresException postgres => postgres.MessageText,
-        _ => exception.GetType().Name,
-    };
+    private static string Safe(Exception exception) => TenantDatabaseSteps.Safe(exception);
 
     private void Ok(string step)
     {
@@ -327,30 +283,6 @@ internal sealed class TenantCreate : IAsyncDisposable
 
         return _adminConnection;
     }
-
-    private async Task<NpgsqlConnection> SchemaConnectionAsync()
-    {
-        if (_schemaConnection is null)
-        {
-            var password = _settings.Cipher.Decrypt(_id, TenantSecretFields.SchemaPassword, _row!.SchemaPassword).Reveal();
-            var connection = new NpgsqlConnection(TenantConnectionString(_schemaRole, password));
-            await connection.OpenAsync(_cancellationToken);
-            _schemaConnection = connection;
-        }
-
-        return _schemaConnection;
-    }
-
-    private string TenantConnectionString(string user, string password) =>
-        new NpgsqlConnectionStringBuilder
-        {
-            Host = _admin.Host,
-            Port = _admin.Port,
-            Database = _database,
-            Username = user,
-            Password = password,
-            Pooling = false,
-        }.ConnectionString;
 
     private async Task ExecuteAsync(NpgsqlConnection connection, string sql)
     {

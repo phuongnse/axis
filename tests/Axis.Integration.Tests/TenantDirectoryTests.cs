@@ -5,6 +5,7 @@ using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
@@ -255,6 +256,61 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         Assert.DoesNotContain("Sales-a", list, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_server_applies_no_tenant_migration_under_directory()
+    {
+        var role = NewRole();
+        var schemaConnection = await database.CreateDatabaseAsync("directory_empty", CancellationToken);
+        await PostgreSqlServer.AdminScalarAsync(schemaConnection, $"CREATE ROLE {role.Name} LOGIN PASSWORD '{role.Password}'", CancellationToken);
+        var builder = new NpgsqlConnectionStringBuilder(schemaConnection);
+        var empty = new DirectoryTenant("empty", "empty.example.test", builder.Host!, builder.Port, builder.Database!, role);
+        var platform = await PreparePlatformAsync(empty);
+        await using var factory = CreateFactory(platform, new LogCollector());
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal(
+            0L,
+            await PostgreSqlServer.AdminScalarAsync(
+                schemaConnection,
+                "SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')",
+                CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_tenant_on_another_schema_version_answers_503_and_is_served_once_it_is_on_the_servers_version()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+        await UpdateTenantAsync(platform, "b", row => row.SchemaVersion = "20000101000000_Old");
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(platform, logs);
+        using var client = factory.CreateClient().SignedInAs("anna");
+
+        await ListAsync(client, "a.example.test");
+        using var held = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, held.StatusCode);
+        Assert.Contains(
+            logs.Entries,
+            entry => entry.StartsWith("Warning:", StringComparison.Ordinal) && entry.Contains("Tenant b is not served: its schema version", StringComparison.Ordinal));
+
+        await RefreshAsync(factory);
+        await RefreshAsync(factory);
+        Assert.Single(logs.Entries, entry => entry.Contains("Tenant b is not served", StringComparison.Ordinal));
+
+        await UpdateTenantAsync(platform, "b", row => row.SchemaVersion = TenantSchemaVersion.Current);
+        await RefreshAsync(factory);
+        await ListAsync(client, "b.example.test");
+
+        // A served tenant that falls behind is withheld again and its pool is dropped.
+        await UpdateTenantAsync(platform, "b", row => row.SchemaVersion = "29990101000000_New");
+        await RefreshAsync(factory);
+        using var behind = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, behind.StatusCode);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string platform, LogCollector logs, params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -345,6 +401,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             {
                 Id = tenant.Id,
                 Status = "active",
+                SchemaVersion = TenantSchemaVersion.Current,
                 DatabaseHost = tenant.DatabaseHost,
                 DatabasePort = tenant.DatabasePort,
                 DatabaseName = tenant.DatabaseName,

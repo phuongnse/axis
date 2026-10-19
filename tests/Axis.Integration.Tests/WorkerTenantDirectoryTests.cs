@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Axis.Admin;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
@@ -132,6 +133,43 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
             entry => entry.StartsWith("Warning:", StringComparison.Ordinal) && entry.Contains("Tenants section is ignored", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task A_tenant_on_another_schema_version_runs_no_work_and_does_not_block_readiness_until_migrate_has_run()
+    {
+        var a = (await PrepareTenantAsync("a")) with { SchemaVersion = "20000101000000_Old" };
+        var item = await EnqueueAsync(a);
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs);
+        await app.StartAsync(CancellationToken);
+        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+
+        await WaitUntilAsync(
+            () => Task.FromResult(logs.Entries.Any(entry => entry.Contains("Tenant a waits: its schema version", StringComparison.Ordinal))),
+            "The tenant did not wait.");
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+
+        Assert.Empty(await RunsAsync(a));
+        Assert.Equal((HttpStatusCode.OK, "Healthy"), await GetAsync(client, "/health/ready"));
+        Assert.Single(logs.Entries, entry => entry.Contains("Tenant a waits", StringComparison.Ordinal));
+
+        var settings = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:PlatformSchema"] = platform,
+            ["Platform:SecretKey"] = TestSecretKey,
+        };
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var exit = await AdminCommands.RunAsync(["migrate"], new ConfigurationBuilder().AddInMemoryCollection(settings).Build(), output, error, CancellationToken);
+        Assert.True(exit == 0, $"{output}{error}");
+
+        await WaitUntilAsync(async () => await RunsAsync(a) is { Count: 1 }, "The work did not run after migrate.");
+        Assert.Equal(item, (await RunsAsync(a)).Single().ItemId);
+        Assert.Equal((HttpStatusCode.OK, "Healthy"), await GetAsync(client, "/health/ready"));
+    }
+
     private static WebApplication BuildWorker(string platform, LogCollector logs, params (string Key, string Value)[] extraSettings)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -200,6 +238,7 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
             {
                 Id = tenant.Id,
                 Status = "active",
+                SchemaVersion = tenant.SchemaVersion ?? TenantSchemaVersion.Current,
                 DatabaseHost = tenant.DatabaseHost,
                 DatabasePort = tenant.DatabasePort,
                 DatabaseName = tenant.DatabaseName,
@@ -271,7 +310,11 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
 
     private sealed record Role(string Name, string Password);
 
-    private sealed record DirectoryTenant(string Id, string DatabaseHost, int DatabasePort, string DatabaseName, Role Role, string SchemaConnectionString);
+    private sealed record DirectoryTenant(string Id, string DatabaseHost, int DatabasePort, string DatabaseName, Role Role, string SchemaConnectionString)
+    {
+        /// <summary>The schema version the directory records for the tenant. Null means the worker's own.</summary>
+        public string? SchemaVersion { get; init; }
+    }
 
     private sealed record Run(Guid ItemId, string TenantId, string DatabaseName, string RoleName);
 
