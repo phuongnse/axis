@@ -17,7 +17,8 @@ namespace Axis.Data;
 /// Provisions the entity tables of a compiled application in the tenant database. Planning and
 /// applying run in one transaction that holds one fixed advisory lock, so entity schema changes
 /// are serialized and each plan is applied to the catalog it was made from. The DDL and the
-/// provisioning records commit together, or neither does.
+/// provisioning records commit together, or neither does. A caller that already owns a transaction on the
+/// context gets the same work under a savepoint instead, and commits or rolls back itself.
 /// <para>
 /// The lock does not block runtime writes to entity tables, so a statement can still fail, for
 /// example adding a <c>NOT NULL</c> column after a row was inserted following the catalog read.
@@ -67,8 +68,8 @@ public static class EntityProvisioner
 
     /// <summary>
     /// Plans <paramref name="model"/> against the tenant database behind <paramref name="context"/>
-    /// and applies the plan when it has no diagnostics. The model must have no migrations. Call it
-    /// outside an explicit transaction.
+    /// and applies the plan when it has no diagnostics. The model must have no migrations. See the
+    /// migration overload for the transaction it runs in.
     /// </summary>
     public static Task<ProvisioningResult> ProvisionAsync(
         ApplicationModel model,
@@ -90,7 +91,10 @@ public static class EntityProvisioner
     /// <paramref name="migrations"/> can set the active release, it then writes it through
     /// <see cref="MigrationContext.SetActiveReleaseAsync"/> before it commits, and sets
     /// <see cref="ProvisioningResult.ActiveReleaseSet"/>. An applied migration whose file changed or
-    /// is gone gives a diagnostic and nothing is applied. Call it outside an explicit transaction.
+    /// is gone gives a diagnostic and nothing is applied. It starts its own transaction and commits it. When
+    /// <paramref name="context"/> already has a transaction, the caller owns it: the work runs under a savepoint, a
+    /// refusal rolls back to the savepoint, and a success releases the savepoint without committing. The caller's
+    /// transaction stays usable after a refusal. After an exception, it is the caller's to roll back.
     /// </summary>
     public static async Task<ProvisioningResult> ProvisionAsync(
         ApplicationModel model,
@@ -102,9 +106,21 @@ public static class EntityProvisioner
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(migrations);
 
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        const string savepoint = "axis_provision";
+        var outer = context.Database.CurrentTransaction;
+        await using var owned = outer is null ? await context.Database.BeginTransactionAsync(cancellationToken) : null;
+        var transaction = owned ?? outer!;
+        if (outer is not null)
+        {
+            await outer.CreateSavepointAsync(savepoint, cancellationToken);
+        }
+
         var connection = (NpgsqlConnection)context.Database.GetDbConnection();
         var npgsqlTransaction = (NpgsqlTransaction)transaction.GetDbTransaction();
+
+        // A refusal undoes the work: the whole transaction when this method owns it, else back to the savepoint.
+        Task UndoAsync() =>
+            owned is not null ? owned.RollbackAsync(cancellationToken) : outer!.RollbackToSavepointAsync(savepoint, cancellationToken);
 
         try
         {
@@ -126,7 +142,7 @@ public static class EntityProvisioner
 
             if (history.Diagnostics.Count > 0)
             {
-                await transaction.RollbackAsync(cancellationToken);
+                await UndoAsync();
                 return new ProvisioningResult(history.Diagnostics, []);
             }
 
@@ -135,7 +151,7 @@ public static class EntityProvisioner
                 var upgrade = await checkModuleUpgrade(cancellationToken);
                 if (upgrade.Count > 0)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    await UndoAsync();
                     context.ChangeTracker.Clear();
                     return new ProvisioningResult(upgrade, []);
                 }
@@ -150,7 +166,7 @@ public static class EntityProvisioner
             var plan = SchemaPlanner.Plan(model, catalog, records, history.Pending, storedEntityIds);
             if (plan.Diagnostics.Count > 0)
             {
-                await transaction.RollbackAsync(cancellationToken);
+                await UndoAsync();
                 return new ProvisioningResult(plan.Diagnostics, []);
             }
 
@@ -159,7 +175,7 @@ public static class EntityProvisioner
                 var blocked = CheckOldReleaseWork(plan.DestructiveChanges, await migrations.ReadOldReleaseWorkAsync(npgsqlTransaction, cancellationToken));
                 if (blocked.Count > 0)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    await UndoAsync();
                     context.ChangeTracker.Clear();
                     return new ProvisioningResult(blocked, []);
                 }
@@ -175,7 +191,7 @@ public static class EntityProvisioner
                 catch (PostgresException exception) when (command.Convert is not null)
                 {
                     // The message is fixed: PostgreSQL's own text can quote a stored value.
-                    await transaction.RollbackAsync(cancellationToken);
+                    await UndoAsync();
                     context.ChangeTracker.Clear();
                     return ConvertFailed(
                         command.Convert,
@@ -184,7 +200,7 @@ public static class EntityProvisioner
 
                 if (counted > 0 && command.Fill is { } fill)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    await UndoAsync();
                     context.ChangeTracker.Clear();
                     return new ProvisioningResult(
                         [
@@ -200,7 +216,7 @@ public static class EntityProvisioner
 
                 if (counted > 0 && command.Convert is { CountsDisallowed: true } convert)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    await UndoAsync();
                     context.ChangeTracker.Clear();
                     return ConvertFailed(convert, $"The convert of '{convert.Field}' leaves {counted} records with a value the field does not list.");
                 }
@@ -246,13 +262,21 @@ public static class EntityProvisioner
                 var refused = await setActiveRelease(transaction.GetDbTransaction(), cancellationToken);
                 if (refused.Count > 0)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    await UndoAsync();
                     context.ChangeTracker.Clear();
                     return new ProvisioningResult(refused, []);
                 }
             }
 
-            await transaction.CommitAsync(cancellationToken);
+            if (owned is not null)
+            {
+                await owned.CommitAsync(cancellationToken);
+            }
+            else
+            {
+                await outer!.ReleaseSavepointAsync(savepoint, cancellationToken);
+            }
+
             return new ProvisioningResult([], plan.Statements) { ActiveReleaseSet = activeReleaseSet };
         }
         catch
