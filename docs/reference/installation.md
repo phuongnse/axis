@@ -289,7 +289,7 @@ The chart has no Job for them.
 rendered manifests against the Kubernetes schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
 Job and the secret references. `scripts/setup.sh` installs the pinned Helm,
-kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. M9 has no test
+kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
 ## Upgrade
@@ -329,10 +329,10 @@ These are not decided yet.
   error and exits with code 0, so running it first, as the order above does, is
   safe on a first install.
 - **Deployment bindings.** No admin command sets a tenant's deployment
-  bindings, see [administration](administration.md#not-in-m9). So an
+  bindings, see [administration](administration.md#not-built-yet). So an
   installation cannot set the purchasing system binding of the purchase request
   sample through the admin tool alone.
-- **Rotating the installation key.** M9 has no rotation, see
+- **Rotating the installation key.** Axis has no rotation, see
   [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
   After a leaked `Platform:SecretKey`, every stored secret must be set again by
   hand.

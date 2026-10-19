@@ -38,8 +38,8 @@
 | **M6** | Releases and versioning | Done | Immutable releases with full pinning, waiting instances finishing on their old release, schema evolution with migrations, separate database roles for runtime access and schema changes, text resource lifecycle, configuration test scenarios in CI. |
 | **M7** | Inspection and operations | Done | The process inspector, with its graph, path, attempts, input and output, and failures, and its widget. Correlated logs, metrics and traces, and health checks of the server and the worker. Operator cancel, retry and resolve for process work and calls. The purchase request sample has an Approvals inspector page for its `operator` role. Carried over from M6 and built: the recompute of stored computed fields ([D33](decisions.md#d33-recomputing-stored-computed-fields--agreed)), the start checks on the runtime database role, and event deliveries and schedule triggers in test scenarios. |
 | **M8** | Studio and modules | Done | Visual authoring that uses the same resource contracts, a dependency graph and a "where is this used" view, reusable modules, and a second sample application, leave requests (see [D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed)). Carried over from M7 and built: the tenant health metric of [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed). |
-| **M9** | Tenancy and deployment | Next | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. Carried over from M8 and built: opening a diagnostic at its path, and the Studio reconnect message. Carried over from M8: module validations that call rules. |
-| **M10** | Hardening | Planned | Performance SLOs and load tests, FAPI 2.0 profile, security verification against an agreed ASVS level, custom widgets. |
+| **M9** | Tenancy and deployment | Done | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. Carried over from M8 and built: opening a diagnostic at its path, the Studio reconnect message, and module validations that call rules. |
+| **M10** | Hardening | Next | Performance SLOs and load tests, FAPI 2.0 profile, security verification against an agreed ASVS level, custom widgets. |
 
 M3 is complete. See the closed
 [M3 milestone](https://github.com/phuongnse/axis/milestone/3?closed=1) on
@@ -65,7 +65,11 @@ M8 is complete. See the closed
 [M8 milestone](https://github.com/phuongnse/axis/milestone/8?closed=1) on
 GitHub.
 
-M9 is next. See the
+M9 is complete. See the closed
+[M9 milestone](https://github.com/phuongnse/axis/milestone/9?closed=1) on
+GitHub.
+
+M10 is next. See the
 [milestones](https://github.com/phuongnse/axis/milestones) on GitHub.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4

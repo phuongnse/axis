@@ -633,7 +633,7 @@ retries and reconciliation.
   where the name is used decides its kind: `baseUrl` needs a `url` binding,
   and `auth` needs a `secret` binding.
 - **Where values live:** per tenant, in `Tenants:{id}:Bindings:{name}` of
-  the server and worker configuration, until the tenant directory in M9.
+  the server and worker configuration under `Tenancy:Source=configuration`.
   Both hosts must hold them. Under `Tenancy:Source=directory`,
   [D42](#d42-tenant-directory-in-the-platform-database--agreed) moves binding
   values and secrets into the tenant directory, and it stores secrets
@@ -1288,7 +1288,7 @@ The owner confirmed these points for issue #414 on 2026-10-16.
 - **Creating the database roles:**
   - Axis creates no database roles or databases. Whoever installs Axis does,
     while tenants come from the `Tenants` section.
-  - *(Built for M9.)* Under `Tenancy:Source=directory`, `tenant create`
+  - Under `Tenancy:Source=directory`, `tenant create`
     creates them, see
     [D43](#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
   - Docker Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the test fixtures
@@ -1758,7 +1758,7 @@ The owner confirmed these points on issue #480 on 2026-10-17.
   - Docker Compose gives the worker a health check on `/health/ready`.
 - **Tenant directory:**
   [D42](#d42-tenant-directory-in-the-platform-database--agreed) adds a
-  Degraded state on both hosts for a failed directory refresh, from M9. The
+  Degraded state on both hosts for a failed directory refresh. The
   worker is then no longer never Degraded. Both are built.
 
 *Why:* [Operations](domain/knowledge.md#operations) asks that failed and stuck
@@ -1839,8 +1839,7 @@ of truth. It also keeps the schema role out of requests, as
 [D31](#d31-separate-database-roles--agreed) asks, because only startup holds
 it and Studio never activates. The cost is that Studio is a development tool
 for now. Authoring on a shared server, with drafts and publishing from Studio,
-would need a database store and run-time activation. That could come with M9
-tenancy. An author can change every policy of an application, so no
+would need a database store and run-time activation. That could come later. An author can change every policy of an application, so no
 application policy can guard authoring. That is why the author role is an
 installation-level setting.
 
@@ -2055,8 +2054,7 @@ platform change it needs is a gap to raise, not to hide in the sample.
 ## D42. Tenant directory in the platform database — Agreed
 
 The server and the worker learn their tenants from a tenant directory in the
-platform database, and pick up changes without a restart. This is planned for
-M9. The tenant catalog contract, the `platform` schema and the directory source
+platform database, and pick up changes without a restart. The tenant catalog contract, the `platform` schema and the directory source
 of the server and the worker are built. Under `directory` the server creates the
 schema at start and reads the directory every `Tenancy:RefreshInterval`. It
 serves new tenants, answers `503` for tenants that are not `active` and `404`
@@ -2111,7 +2109,7 @@ The owner confirmed these points on issue #639 on 2026-10-18.
   - No API, log, problem details or backup manifest holds a decrypted secret.
     A value is decrypted only at the moment of use, as `SecretValue` does
     today.
-  - Rotating the installation key is out of scope for M9. After a leaked key,
+  - Rotating the installation key is out of scope. After a leaked key,
     every stored secret must be set again by hand.
 - **Changes without restart:**
   - Both hosts read the directory again every `Tenancy:RefreshInterval`, 30
@@ -2169,10 +2167,8 @@ serving from the last good directory while it still shows the problem.
 ## D43. Tenant provisioning and migrations across tenant databases — Agreed
 
 A platform operator creates tenants, migrates every tenant database and
-activates releases with a command-line admin host, `Axis.Admin`. This is
-planned for M9. Only `tenant create`, `tenant backup`, `tenant suspend`,
-`tenant resume`, `tenant list`, `migrate` and `activate` are built. Until the rest is, tenants can
-come from the `Tenants` section and the server migrates and activates at start, as in
+activates releases with a command-line admin host, `Axis.Admin`. Tenants can still come from the `Tenants` section, where the
+server migrates and activates at start, as in
 [D31](#d31-separate-database-roles--agreed). See
 [administration](reference/administration.md) for every command,
 [database roles](reference/storage.md#database-roles) for who holds which
@@ -2182,7 +2178,7 @@ The owner confirmed these points on issue #640 on 2026-10-19.
 
 - **Admin host:**
   - `Axis.Admin` is a console host that the platform operator runs. There is
-    no HTTP API for provisioning in M9.
+    no HTTP API for provisioning.
   - It is the only host that writes the tenant directory of
     [D42](#d42-tenant-directory-in-the-platform-database--agreed). It writes
     it over `ConnectionStrings:PlatformSchema`, the role that owns the
@@ -2213,14 +2209,14 @@ The owner confirmed these points on issue #640 on 2026-10-19.
     hyphen gives a quoted role and database name.
   - The new database goes on the same database server as
     `Admin:ConnectionString`. The directory records that server's host and
-    port. M9 has one database server.
+    port. Axis has one database server.
   - Running it again for a `provisioning` tenant finishes what is missing. For
     an `active` or `suspended` tenant it fails and changes nothing.
 - **Suspend, resume and list:**
   - `tenant suspend <id>` and `tenant resume <id>` set the status. Hosts pick
     the change up at their next refresh.
   - `tenant list` prints each tenant's id, status, hosts and schema version.
-  - There is no tenant delete in M9.
+  - There is no tenant delete.
 - **Migrations across tenant databases:**
   - `migrate` applies the grants and the configuration, data and processes
     migrations to every tenant database, or to one with `--tenant <id>`. It
@@ -2271,7 +2267,7 @@ migrate on their own, so one broken tenant database no longer stops the
 others. The cost is that tenants can sit on different schema versions, so a
 host refuses a tenant whose version it does not expect. A version taken from
 the code needs no number that someone must remember to raise. Deleting a tenant
-destroys data, so suspend covers M9. Role names that derive from the tenant id
+destroys data, so suspend is used instead. Role names that derive from the tenant id
 make the roles easy to find, at the cost of quoted names for ids with a hyphen.
 Writing the directory over the schema role of the `platform` schema keeps the
 admin role limited to creating databases and roles.
@@ -2323,7 +2319,7 @@ The owner confirmed these points on issue #641 on 2026-10-19.
     `migrate`.
   - PostgreSQL, the OIDC provider and the source of secrets are external.
   - `helm lint` and `helm template`, validated against the Kubernetes schemas,
-    check the chart. M9 has no test against a live cluster.
+    check the chart. Axis has no test against a live cluster.
 - **Upgrades:**
   - An upgrade backs up the databases and runs `migrate` with the new admin
     image. Then it rolls out the new server and worker. This is the order of
@@ -2356,7 +2352,7 @@ rollback. Pushing images is a workflow change, which NexKit may not make.
 ## D45. Tenant backup and restore — Agreed
 
 A platform operator backs up one tenant into an archive that holds no secret,
-and restores it into a new, suspended tenant. The backup and the restore are built for M9. See [tenant backup](reference/administration.md#tenant-backup) and
+and restores it into a new, suspended tenant. The backup and the restore are built. See [tenant backup](reference/administration.md#tenant-backup) and
 [tenant restore](reference/administration.md#tenant-restore) for the commands,
 the manifest and every refusal.
 The owner confirmed these points on issue #642 on 2026-10-19.

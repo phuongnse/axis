@@ -101,6 +101,12 @@ which hold no samples or development settings. Build one with
 and runs all three in the `images` suite, from `scripts/images.test.mjs`. The default target is still
 the development server.
 
+`Axis.Admin` is the console tool that the platform operator runs. It creates, suspends,
+resumes, lists, backs up and restores tenants, and it migrates and activates them. Run it with
+`dotnet run --project src/Axis.Admin -- <command>`, or with the `axis-admin` image. See
+[administration](docs/reference/administration.md). The production install is in `deploy/compose/`
+and `deploy/helm/axis/`, see [installation](docs/reference/installation.md).
+
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
 with the purchase request and leave request samples at http://localhost:5206, the worker, and the purchasing
