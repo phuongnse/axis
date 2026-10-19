@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Axis.Tenancy;
 
-/// <summary>Where the server learns its tenants, set by <c>Tenancy:Source</c>.</summary>
+/// <summary>Where the server and the worker learn their tenants, set by <c>Tenancy:Source</c>.</summary>
 public enum TenancySource
 {
     /// <summary>The <c>Tenants</c> section of the host configuration. This is the default.</summary>
@@ -19,7 +19,7 @@ public static class TenancySettings
 
     public const string RefreshIntervalSetting = "Tenancy:RefreshInterval";
 
-    /// <summary>How often the server re-reads the tenant directory when <c>Tenancy:RefreshInterval</c> is not set.</summary>
+    /// <summary>How often the server and the worker re-read the tenant directory when <c>Tenancy:RefreshInterval</c> is not set.</summary>
     public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromSeconds(30);
 
     /// <summary>
@@ -43,7 +43,7 @@ public static class TenancySettings
     }
 
     /// <summary>
-    /// Reads <c>Tenancy:RefreshInterval</c>, how often the server re-reads the tenant directory. A missing or blank
+    /// Reads <c>Tenancy:RefreshInterval</c>, how often the server and the worker re-read the tenant directory. A missing or blank
     /// value is 30 seconds. Only the <c>directory</c> source uses it.
     /// </summary>
     /// <exception cref="InvalidOperationException">The value is not a positive time span.</exception>

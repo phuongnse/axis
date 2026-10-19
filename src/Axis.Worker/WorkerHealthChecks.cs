@@ -27,9 +27,14 @@ internal sealed class TenantMigrationsHealthCheck(WorkerHealth health) : IHealth
         Task.FromResult(health.AllTenantsMigrated ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy());
 }
 
-/// <summary>Unhealthy until the worker has read the tenant directory once. Never Degraded.</summary>
+/// <summary>
+/// Unhealthy until the worker has read the tenant directory once. Degraded while the last read failed, because the worker
+/// keeps running the last good read.
+/// </summary>
 internal sealed class TenantDirectoryHealthCheck(WorkerTenantCatalog catalog) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default) =>
-        Task.FromResult(catalog.IsLoaded ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy());
+        Task.FromResult(!catalog.IsLoaded
+            ? HealthCheckResult.Unhealthy()
+            : catalog.RefreshFailed ? HealthCheckResult.Degraded() : HealthCheckResult.Healthy());
 }

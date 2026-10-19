@@ -1086,16 +1086,18 @@ the first read fails, the start stops with an error that names
 `ConnectionStrings:Platform`. If a later read fails, it keeps serving the last
 good read and logs an error. Under `directory` the worker needs
 `ConnectionStrings:Platform` and `Platform:SecretKey`, reads its `active` tenants
-once over that connection, and also ignores a `Tenants` section with a warning.
+over that connection, and also ignores a `Tenants` section with a warning.
 It never reads `ConnectionStrings:PlatformSchema`. If its first read fails, it
-retries every `Worker:PollInterval` and is not ready until a read works. The
-worker does not read the directory again, and Degraded readiness for a failed
-refresh is not built. Neither is sign-in for a tenant added at a refresh.
+retries every `Worker:PollInterval` and is not ready until a read works. Then it
+reads the directory again every `Tenancy:RefreshInterval`. It keeps the last good
+read when a refresh fails, and `/health/ready` is Degraded until a refresh works.
+The server's Degraded readiness for a failed refresh is not built. Neither is
+sign-in for a tenant added at a refresh.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
-| `Tenancy:RefreshInterval` | `00:00:30` | How often the server reads the tenant directory again *(the worker refresh is planned for M9)*. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the server's start, naming the setting. |
+| `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed under `directory`. A missing or invalid key stops the start. |
 | `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema. Both hosts need it under `directory`. |
 | `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
