@@ -1,0 +1,47 @@
+namespace Axis.Configuration.Storage;
+
+/// <summary>
+/// A request to validate, publish or roll back an application, stored by the server and run by the
+/// publisher. The server only inserts a row. The publisher changes its status and lease.
+/// </summary>
+public sealed class PublishRequest
+{
+    public required Guid Id { get; init; }
+
+    /// <summary>The <c>id</c> of the application manifest.</summary>
+    public required Guid ApplicationId { get; init; }
+
+    /// <summary><c>validate</c>, <c>publish</c> or <c>rollback</c>.</summary>
+    public required string Kind { get; init; }
+
+    /// <summary><c>queued</c>, <c>running</c>, <c>succeeded</c> or <c>failed</c>.</summary>
+    public required string Status { get; init; }
+
+    /// <summary>The resource files as a JSON array, or null for a rollback.</summary>
+    public string? Snapshot { get; init; }
+
+    public Guid? ReleaseId { get; init; }
+
+    public string? Label { get; init; }
+
+    public string? Note { get; init; }
+
+    public required string RequestedBy { get; init; }
+
+    public string? RequestedByName { get; init; }
+
+    public DateTimeOffset RequestedAt { get; init; }
+
+    public string? ClaimedBy { get; init; }
+
+    public DateTimeOffset? LeaseUntil { get; init; }
+
+    public int Claims { get; init; }
+
+    public DateTimeOffset? StartedAt { get; init; }
+
+    public DateTimeOffset? FinishedAt { get; init; }
+
+    /// <summary>The diagnostics as a JSON array.</summary>
+    public string? Diagnostics { get; init; }
+}
