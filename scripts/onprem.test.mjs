@@ -1,7 +1,8 @@
 // Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the three
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and Keycloak, creates two tenants, activates the leave request sample and checks each tenant's
-// site and sign-in, suspend and resume, and an unknown host. Requires Docker and openssl, and the
+// site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
+// publisher runs in each tenant. Requires Docker and openssl, and the
 // sample modules in artifacts/modules (scripts/build.sh). Run from scripts/e2e.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL, Keycloak over
@@ -10,13 +11,13 @@
 // the server in this test trusts the certificate authority, through SSL_CERT_FILE.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -32,6 +33,7 @@ const secretFiles = {
   server: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -73,7 +75,7 @@ describe('the example holds no secret', () => {
     })
     assert.equal(rendered.status, 0, rendered.stderr)
     const config = JSON.parse(rendered.stdout)
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'server', 'worker'])
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'publisher', 'server', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
@@ -95,6 +97,11 @@ describe('the example holds no secret', () => {
     assert.deepEqual(config.services.admin.profiles, ['admin'])
     assert.equal(config.services.server.profiles, undefined)
     assert.equal(config.services.worker.profiles, undefined)
+    const publisher = config.services.publisher
+    assert.equal(publisher.profiles, undefined)
+    assert.ok((publisher.ports ?? []).length === 0, 'the publisher publishes a port')
+    assert.deepEqual(publisher.command, ['publisher'])
+    assert.match(publisher.image, /axis-admin:/)
     for (const secret of Object.values(config.secrets)) assert.ok(secret.file, 'a secret has no file')
   })
 })
@@ -126,7 +133,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'worker']) {
+    for (const service of ['server', 'worker', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -258,6 +265,7 @@ describe('the on-premises installation', () => {
               volumes: [`${certs}:/run/test-ca:ro`],
             },
             worker: { environment: refresh },
+            publisher: { environment: refresh },
           },
         }),
       )
@@ -325,6 +333,9 @@ describe('the on-premises installation', () => {
       const ready200 = await waitFor(() => server('localhost', '/health/ready'), 200, 120)
       assert.equal(ready200.status, 200, 'the server never answered /health/ready with 200')
 
+      // The publisher exits until the server has created the platform tables, so it starts now.
+      run(['up', '-d', 'publisher'])
+
       // Step 4, create two tenants. The client secret passes through from the shell.
       for (const [id, host] of Object.entries(hosts)) {
         const create = admin(
@@ -391,6 +402,52 @@ describe('the on-premises installation', () => {
       assert.equal(resume.status, 0, `tenant resume\n${resume.stdout}${resume.stderr}`)
       const resumed = await waitFor(() => server(hosts.two, '/leave'), 200, 60)
       assert.equal(resumed.status, 200, `${hosts.two} did not serve /leave after resume`)
+
+      // Queue one publish request of the leave request sample in each tenant. The installed publisher runs both.
+      const application = join(root, 'samples/apps/leave-requests')
+      const applicationId = JSON.parse(readFileSync(join(application, 'application.json'), 'utf8')).id
+      const snapshot = JSON.stringify(
+        files(application)
+          .filter((file) => file.endsWith('.json'))
+          .map((file) => ({ file: relative(application, file).split(sep).join('/'), bytes: readFileSync(file) }))
+          .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+          .map(({ file, bytes }) => ({
+            file,
+            version: createHash('sha256').update(bytes).digest('hex'),
+            content: bytes.toString('utf8'),
+          })),
+      )
+      assert.ok(!snapshot.includes('$snap$'))
+      const psql = (id, sql) =>
+        compose(['exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', `axis_${id}`, '-v', 'ON_ERROR_STOP=1', '-tA'], {
+          input: sql,
+        })
+      const queued = {}
+      for (const id of Object.keys(hosts)) {
+        const insert = psql(
+          id,
+          `INSERT INTO axis.publish_requests (id, application_id, kind, status, snapshot, requested_by, requested_at)
+VALUES (gen_random_uuid(), '${applicationId}', 'publish', 'queued', $snap$${snapshot}$snap$::jsonb, 'onprem-test', clock_timestamp())
+RETURNING id;`,
+        )
+        assert.equal(insert.status, 0, `queue a publish request for ${id}\n${insert.stdout}${insert.stderr}`)
+        queued[id] = insert.stdout.trim().split('\n')[0]
+        assert.match(queued[id], /^[0-9a-f-]{36}$/)
+      }
+      for (const [id, request] of Object.entries(queued)) {
+        let status = ''
+        for (let i = 0; i < 60 && status !== 'succeeded'; i++) {
+          if (i > 0) await sleep(1000)
+          const result = psql(id, `select status from axis.publish_requests where id = '${request}'`)
+          assert.equal(result.status, 0, result.stderr)
+          status = result.stdout.trim()
+          if (status === 'failed') break
+        }
+        assert.equal(status, 'succeeded', `the publish request of ${id} did not succeed`)
+      }
+      const publisherLog = compose(['logs', '--no-color', '--no-log-prefix', 'publisher']).stdout
+      for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
+      assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
     } catch (error) {
       dumpLogs()
       throw error

@@ -53,7 +53,35 @@ public static class ReleaseCompiler
         ArgumentNullException.ThrowIfNull(installedPackages);
         ArgumentNullException.ThrowIfNull(installedModules);
 
-        var compiled = ApplicationCompiler.Compile(folderPath, installedPackages, installedModules);
+        return await StoreAsync(ApplicationCompiler.Compile(folderPath, installedPackages, installedModules), context, cancellationToken);
+    }
+
+    /// <summary>
+    /// Compiles <paramref name="files"/>, the files of an application held in memory such as a publish snapshot, against
+    /// <paramref name="installedPackages"/> and <paramref name="installedModules"/>, and stores the release as the folder
+    /// overload does. The same files give the same content hash as the folder that holds them.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static async Task<ReleaseCompilationResult> CompileAsync(
+        IReadOnlyList<ResourceContent> files,
+        ConfigurationDbContext context,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(installedPackages);
+        ArgumentNullException.ThrowIfNull(installedModules);
+
+        return await StoreAsync(ApplicationCompiler.CompileFiles(files, installedPackages, installedModules), context, cancellationToken);
+    }
+
+    private static async Task<ReleaseCompilationResult> StoreAsync(
+        CompilationResult compiled,
+        ConfigurationDbContext context,
+        CancellationToken cancellationToken)
+    {
         if (compiled.Model is null || compiled.ContentHash is null)
         {
             return new ReleaseCompilationResult(null, null, compiled.Diagnostics);

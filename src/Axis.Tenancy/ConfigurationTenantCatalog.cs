@@ -50,6 +50,15 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
         section.Bind(options.Tenants);
 
         var problems = TenantOptionsValidator.Validate(options).ToList();
+        foreach (var (id, settings) in options.Tenants.OrderBy(tenant => tenant.Key, StringComparer.Ordinal))
+        {
+            if (!string.IsNullOrWhiteSpace(settings.PreviewOf) && section.GetSection(id).GetSection("Oidc").Exists())
+            {
+                problems.Add(
+                    $"Tenant '{id}' is a preview tenant and has its own Oidc block. A preview tenant uses the Oidc settings of its main tenant '{settings.PreviewOf}'.");
+            }
+        }
+
         if (!environment.IsDevelopment())
         {
             problems.AddRange(SecretBindingSources.Validate(configuration, options));
@@ -65,7 +74,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
 
     /// <summary>
     /// Builds a catalog from tenant options that already passed <see cref="TenantOptionsValidator"/>. It has no schema
-    /// connection and no sign-in settings, which <see cref="Load"/> reads from the configuration section.
+    /// connection and no sign-in settings, which <see cref="Load"/> reads from the configuration section. It does not
+    /// copy a main tenant's sign-in settings into its preview tenant.
     /// </summary>
     public static ConfigurationTenantCatalog FromOptions(TenantOptions options)
     {
@@ -86,13 +96,21 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                     : new TenantBinding(binding.Kind!, binding.Value, null);
             }
 
+            // A preview tenant signs people in with its main tenant's settings, but never takes the main tenant's
+            // EndpointAudience, so it accepts no machine-caller bearer token. Its bindings are only its own.
+            var main = string.IsNullOrWhiteSpace(settings.PreviewOf) ? null : settings.PreviewOf;
+            var oidc = main is null
+                ? Oidc(tenantSection?.GetSection("Oidc"))
+                : Oidc(section?.GetSection(main).GetSection("Oidc")) is { } mainOidc ? mainOidc with { EndpointAudience = null } : null;
+
             return new TenantEntry(
                 id,
                 [.. settings.Hosts],
                 new SecretValue(settings.ConnectionString!),
                 Secret(tenantSection?["SchemaConnectionString"]),
-                Oidc(tenantSection?.GetSection("Oidc")),
-                bindings);
+                oidc,
+                bindings,
+                main);
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>

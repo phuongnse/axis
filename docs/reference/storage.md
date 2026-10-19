@@ -1159,9 +1159,11 @@ schema of the tenant database.
 
 ## Publish requests and release history
 
-`Axis.Configuration` owns both tables, in the `axis` schema of each tenant
-database. `axis.publish_requests` and the release history are built. The
-routes of the publish requests and the publisher are _(planned for M10)_. See
+`Axis.Configuration` owns both tables, in the `axis`
+schema of each tenant database. `axis.publish_requests` is built, and so is the
+[publisher](administration.md#publisher) for `publish` requests under
+`Tenancy:Source=directory`. The release history is built too. The routes of the
+publish requests are _(planned for M10)_. See
 [D47](../decisions.md#d47-publishing-from-studio--agreed) and the
 [authoring API](authoring.md#publishing).
 
@@ -1169,7 +1171,7 @@ routes of the publish requests and the publisher are _(planned for M10)_. See
 
 `axis.publish_requests` holds one row per request. The server inserts a row
 over the runtime role _(planned for M10)_. Only the publisher changes a row,
-over the schema role _(planned for M10)_.
+over the schema role.
 An index on `(application_id, status, requested_at, id)` serves the claim.
 
 | Column              | Type                | Meaning                                                                                                                                |
@@ -1193,14 +1195,18 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `finished_at`       | `timestamptz`, null | When it reached `succeeded` or `failed`                                                                                                |
 | `diagnostics`       | `jsonb`, null       | The diagnostics, as an array                                                                                                           |
 
-- **A snapshot.** `content` is the file's JSON as the author saw it, and
-  `version` is its SHA-256, as in [Versions](authoring.md#versions). A later
-  edit never changes a stored snapshot.
-- **Claim.** The publisher takes the oldest `queued` row of an application with
+- **A snapshot.** `content` is the file's text as a JSON string, not an embedded
+  object, so the file reads back exactly as the author saw it. `version` is the
+  SHA-256 of the file's bytes, as in [Versions](authoring.md#versions). A later
+  edit never changes a stored snapshot. The publisher compiles the snapshot from
+  these texts alone.
+- **Claim.** The publisher takes the oldest `queued` `publish` row of an application with
   `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by`, `lease_until` and
-  adds 1 to `claims`. A `running` row whose `lease_until` has passed is claimed
+  adds 1 to `claims`. It skips an application that has a `running` row.
+  *(Planned for M10:)* A `running` row whose `lease_until` has passed is claimed
   again the same way. A row with `claims` of 3 and an expired lease becomes
-  `failed` with `AXC0215`.
+  `failed` with `AXC0215`. Until then a row stays `running` when its publisher
+  dies, and the publisher claims no `validate` or `rollback` row.
 - **Preview target.** *(Planned for M10.)* A row with `target` `preview` is
   stored in the session tenant's database and run against that tenant's preview
   tenant, see [preview](authoring.md#preview). Its history row lives in the
@@ -1245,8 +1251,8 @@ TRUNCATE` statement trigger raise SQLSTATE `23001`, as for `audit_records`.
 - **Every path.** Startup activation, `axis-admin activate`, a publish and a
   rollback each add a row. The actor is the user for a publish and a rollback,
   `startup` for a startup and `operator` for `axis-admin activate`. A publish
-  and a rollback _(planned for M10)_ pass their user, label, note and request
-  to the activation, which stores them as given.
+  passes its user, label, note and request to the activation, which stores them
+  as given. A rollback _(planned for M10)_ will do the same.
 - **Backfill.** The migration that creates the table adds one row for each
   application's current active release, with number 1, the actor `unknown`, the
   activation time of `axis.active_releases` and no request. Without it the
@@ -1273,8 +1279,8 @@ have at activation. See also [rollback](authoring.md#rollback).
 
 ### Audit records of publishing
 
-Each `publish` and `rollback` writes one record in `axis.audit_records`, in the
-transaction that sets the request's final status. The actor is the requesting
+Each `publish` writes one record in `axis.audit_records`, in the
+transaction that sets the request's final status. *(Planned for M10:)* So does each `rollback`. The actor is the requesting
 user, and `application_id` is the application `id`. *(Planned for M10.)* A
 preview request writes no audit record. The preview tenant's release history
 records who published it.
@@ -1287,5 +1293,6 @@ records who published it.
 | `release.rollbackFailed` | A `rollback` failed    |
 
 `details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are
-null when the request failed before a release was known. A `validate` writes
+null when the request failed before a release was known. Until the
+[release history](#release-history) exists, `number` is always null. A `validate` writes
 no audit record.

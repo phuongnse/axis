@@ -19,7 +19,7 @@ An installation has three hosts:
 - The admin host, `Axis.Admin`, is a command-line tool. A platform operator
   runs it to create tenants, migrate tenant databases and activate releases.
   See [administration](administration.md).
-- *(Planned for M10.)* The publisher, `axis-admin publisher`, is a
+- The publisher, `axis-admin publisher`, is a
   long-running command of the same host. It runs the publish requests that
   Studio stores, see [publisher](administration.md#publisher). It holds the
   schema role of every active tenant, so run it apart from the server. It has
@@ -99,15 +99,16 @@ Read the rules of each setting in
 
 This installs Axis on one machine with Docker Compose. PostgreSQL and the OIDC
 provider run elsewhere. The example lives in `deploy/compose/`. Its
-`compose.yaml` has the server, the worker and the admin host. The server and
+`compose.yaml` has the server, the worker, the publisher and the admin host. The server and
 the worker run the production images with a read-only root file system. The
 admin host runs only when asked, through `docker compose run --rm admin`, so
 `docker compose up` does not start it. The file holds no password, client
-secret or key. *(Planned for M10:)* `compose.yaml` also has a `publisher`
-service. It runs the `axis-admin` image with the command `publisher`, and
-`docker compose up` starts it. It gets the `ConnectionStrings__PlatformSchema`
-and `Platform__SecretKey` files and not `Admin__ConnectionString`. It
-publishes no port.
+secret or key. The `publisher` service runs the `axis-admin` image with the
+command `publisher`, and `docker compose up` starts it. It gets the
+`ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
+`Admin__ConnectionString`. It publishes no port. Its `stop_grace_period` is six
+minutes, longer than the five-minute lease, so a stop lets the running request
+finish.
 
 Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
 registry prefix. The comment at the top of `compose.yaml` lists every variable.
@@ -140,8 +141,8 @@ file is named after its setting, and its content is the value.
 | File | Mounted in |
 | --- | --- |
 | `ConnectionStrings__Platform` | server, worker |
-| `ConnectionStrings__PlatformSchema` | server, admin, publisher *(planned for M10)* |
-| `Platform__SecretKey` | server, worker, admin, publisher *(planned for M10)* |
+| `ConnectionStrings__PlatformSchema` | server, admin, publisher |
+| `Platform__SecretKey` | server, worker, admin, publisher |
 | `Admin__ConnectionString` | admin |
 
 Write each file with `printf '%s'`, so it has no trailing newline. Make the
@@ -164,7 +165,9 @@ the admin container only.
    nothing to migrate and exits with code 0.
 3. Start the server and the worker with `docker compose up -d server worker`.
    Wait until `/health/ready` answers `200` on both. The server creates the
-   `platform` tables at start, and `tenant create` needs them.
+   `platform` tables at start, and `tenant create` needs them. Then start the
+   publisher with `docker compose up -d publisher`. It exits with code 1 until
+   the server has created those tables, so start it only after `/health/ready`.
 4. Create a tenant with
    `docker compose run --rm admin tenant create <id> --host <host> --oidc-authority <url> --oidc-client-id <id>`.
    Put the client secret in `AXIS_OIDC_CLIENT_SECRET`. It passes through from
@@ -198,7 +201,8 @@ everything the test adds, so `deploy/compose/compose.yaml` stays as an
 operator uses it. The test then:
 
 1. Creates the database roles with the SQL above and writes the secret files.
-2. Runs `migrate`, starts the server and the worker, and waits for `/health/ready`.
+2. Runs `migrate`, starts the server and the worker, waits for `/health/ready`,
+   and then starts the publisher.
 3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts.
 4. Activates the leave request sample, `samples/apps/leave-requests`, for both.
    The sample needs the `departments` module, so the test mounts it from
@@ -210,7 +214,11 @@ operator uses it. The test then:
 6. Checks that a host no tenant holds answers `404`. Suspends tenant `two`,
    checks that it answers `503` while `one` still serves, then resumes it and
    checks that it serves again.
-7. *(planned for M10)* Starts two server replicas behind a TLS proxy, signs in
+7. Queues one publish request of the leave request sample in each tenant, over
+   `psql`, and checks that the installed publisher runs both to `succeeded`.
+   The publisher's log shows `one claim ok` and `two claim ok`, and the
+   `publisher` service is still running.
+8. *(planned for M10)* Starts two server replicas behind a TLS proxy, signs in
    through the proxy, restarts one replica and checks that the session still
    works on both.
 
@@ -225,11 +233,13 @@ This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
 PostgreSQL, the OIDC provider and the source of secrets are external.
 
 The chart has one Deployment for the server and one for the worker, and a
-Service for the server. *(Planned for M10:)* It also has a Deployment for the
-publisher, with one replica, that runs the `axis-admin` image with the command
-`publisher`. It has no Service and no probe, because the publisher has no HTTP
-endpoint. Its termination grace period is longer than the longest publish
-request. It mounts the same secrets as the migrate Job. It has no Ingress. Each Deployment has a startup,
+Service for the server. It also has a Deployment for the publisher, with one
+replica, that runs the `axis-admin` image with the command `publisher`. The
+Deployment uses the `Recreate` strategy, so a rollout never runs two
+publishers. It has no Service, no container port and no probe, because the
+publisher has no HTTP endpoint. Its termination grace period is 360 seconds,
+longer than the five-minute lease. It mounts the same secrets as the migrate
+Job. It has no Ingress. The server and worker Deployments each have a startup,
 liveness and readiness probe, see
 [health checks](../architecture.md#health-checks). The chart sets
 `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
@@ -267,7 +277,7 @@ secrets:
 
 Each pod mounts only the secrets it needs as files in `/run/secrets`. The
 server gets all three, the worker gets the first and the last, and the migrate
-Job gets the last two. The Job has no `Admin:ConnectionString`.
+Job and the publisher get the last two. Neither has an `Admin:ConnectionString`.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -277,12 +287,14 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `image.tag` | the chart's `appVersion` | Tag of all three images. |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
-| `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. |
+| `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
 | `server.replicas` | 1 | Server replicas. *(planned for M10)* Any number works once the key ring is shared, see [several server replicas](#several-server-replicas). |
 | `worker.replicas` | 1 | Worker replicas. |
 | `studio.persistence` | none | *(planned for M10)* A Kubernetes volume source for the Studio folders, mounted on every server replica at the same path. Use it when Studio is on. It needs a `ReadWriteMany` storage class. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
+| `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
+| `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
 | `extensions.volume`, `modules.volume` | empty | Any Kubernetes volume source, mounted read-only at `/extensions` and `/modules`. Empty uses the empty folders of the image. |
@@ -307,7 +319,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job and the secret references. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment and the secret references. `scripts/setup.sh` installs the pinned Helm,
 kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
@@ -358,7 +370,7 @@ says. So migrate first and roll out the hosts second.
    `pg_dump` from the admin image. Back up each tenant with
    [`tenant backup`](administration.md#tenant-backup).
 2. Run `migrate` with the new admin image.
-3. Roll out the new server and the new worker.
+3. Roll out the new server, the new worker and the new publisher.
 
 Between steps 2 and 3, migrated tenants answer `503`. A tenant whose migration
 failed keeps its old version. See [migrate](administration.md#migrate) for the

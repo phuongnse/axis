@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
 
 namespace Axis.Admin;
@@ -18,6 +19,12 @@ internal static class AdminProgram
             e.Cancel = true;
             cancellation.Cancel();
         };
+
+        using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+        {
+            context.Cancel = true;
+            cancellation.Cancel();
+        });
 
         return await AdminCommands.RunAsync(args, configuration, Console.Out, Console.Error, cancellation.Token);
     }

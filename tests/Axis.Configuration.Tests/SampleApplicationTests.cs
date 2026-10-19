@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Releases;
 
 namespace Axis.Configuration.Tests;
 
@@ -25,6 +26,22 @@ public sealed class SampleApplicationTests
         Assert.NotNull(number.Sequence);
         Assert.Equal("PurchaseRequestNumber", number.Sequence.Name);
         Assert.Equal("PR-{yyyy}-{n:5}", number.Sequence.Format);
+    }
+
+    [Fact]
+    public void Purchase_request_sample_held_in_memory_compiles_to_the_content_hash_of_its_folder()
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
+        var files = Directory.EnumerateFiles(folder, "*.json", SearchOption.AllDirectories)
+            .Select(file => new ResourceContent(Path.GetRelativePath(folder, file).Replace('\\', '/'), File.ReadAllText(file)))
+            .ToList();
+
+        var fromFolder = ApplicationCompiler.Compile(folder, SamplePackages.Versions);
+        var fromFiles = ApplicationCompiler.CompileFiles(files, SamplePackages.Versions, null);
+
+        Assert.Empty(fromFiles.Diagnostics);
+        Assert.NotNull(fromFolder.ContentHash);
+        Assert.Equal(fromFolder.ContentHash, fromFiles.ContentHash);
     }
 
     [Fact]
