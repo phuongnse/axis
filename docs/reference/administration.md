@@ -7,7 +7,7 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 Only `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`migrate` and `version` are built. Every other command is still planned. Today a
+`migrate`, `activate` and `version` are built. Every other command is still planned. Today a
 tenant can also come from the `Tenants` section, where the server migrates and
 activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -113,7 +113,7 @@ Hosts serve the tenant after their next refresh, see
 [tenant directory](../architecture.md#tenant-directory). The server serves a
 new tenant, with its sign-in, after its next refresh. The worker runs the
 tenant's work after its next refresh. A new tenant also has no application
-until `activate` is built.
+until `activate` has run for it.
 
 **Settings and the platform tables.** The command checks its settings before any
 tenant work. It refuses an admin role that is a superuser, or a member of one,
@@ -456,8 +456,9 @@ that is `provisioning`, a `--parallel` below 1 or a missing setting.
 
 ## Activate
 
-*(Planned for M9.)* `activate <folder> [--tenant <id>]` compiles an application folder and
-activates its release.
+*(Built for M9.)* `activate <folder> [--tenant <id>]` compiles an application folder and
+activates its release. A running server serves the new release at its next request,
+with no restart.
 
 | Option | Meaning |
 | --- | --- |
@@ -468,7 +469,13 @@ It uses the same compile diagnostics, extension packages, modules, recompute
 limit and seeding as
 [startup activation](configuration.md#startup-activation), and does not repeat
 them here. Packages come from `Extensions:Path` and modules from `Modules:Path`.
-`Activation:InlineRecomputeLimit` applies as it does there.
+`Activation:InlineRecomputeLimit` applies as it does there, and a value that is
+not a positive whole number is a settings error. An unset `Extensions:Path` or
+`Modules:Path` gives an empty catalog, as on the server. A set path whose folder
+does not exist is a settings error that names the setting and not the path.
+A problem of an installed package or module is written to standard error.
+The tool always refuses an `http` URL binding, because `http` is allowed only in
+Development, which uses startup activation.
 
 **Steps for each tenant.**
 
@@ -481,17 +488,24 @@ them here. Packages come from `Extensions:Path` and modules from `Modules:Path`.
 4. `seed`: insert the seed records and write the schedule trigger state.
 
 Steps 2 and 3 run as the tenant's schema role. Step 4 runs as its runtime role.
-The tool runs no EF Core migrations. A diagnostic is written as a `failed` line
-with its code, file and path.
+The tool runs no EF Core migrations. Each step writes one `ok` line. Each error
+diagnostic of a failed step is written as its own line,
+`<tenant> <step> failed: <code> <file> <path>: <message>`, so one run shows every
+problem. The warnings of a step that succeeds go to standard error, as
+`<tenant> warning <code> <file> <path>: <message>`. A line never names a host,
+a password or a connection string.
 
 **Failures.** Each tenant succeeds or fails on its own. The previously active
 release of a failed tenant stays active, and the other tenants continue. So
 tenants can run different releases until `activate` works for all of them. The
-command exits `1` at the end.
+command exits `1` at the end. A `seed` failure happens after activation has
+committed, so the new release stays active, as it does with startup activation.
+Only a `compile` or `activate` failure keeps the previous release.
 
 **Exit codes.** `0` when every tenant succeeded, also when none is `active`. `1`
 when at least one tenant failed. `2` for a folder that does not exist, an
-unknown `--tenant`, a `--tenant` that is `provisioning` or a missing setting.
+unknown `--tenant`, a `--tenant` that is `provisioning`, a bad option or a missing
+or bad setting.
 
 ## What else to back up
 

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Axis.Admin;
+using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
@@ -57,6 +58,10 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
             builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
             builder.UseSetting("Platform:SecretKey", TestSecretKey);
+
+            // A release that pins an extension package or uses a module needs them to be rebuilt.
+            builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
         });
 
@@ -108,7 +113,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         CancellationTokenSource? stop = null,
         string? adminConnectionString = null,
         bool withClientSecret = true,
-        string? path = null)
+        string? path = null,
+        IReadOnlyDictionary<string, string?>? extra = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -117,7 +123,14 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             ["Platform:SecretKey"] = TestSecretKey,
             ["AXIS_OIDC_CLIENT_SECRET"] = withClientSecret ? _clientSecret : null,
             ["PATH"] = path,
+            ["Extensions:Path"] = SamplePackages.Path,
+            ["Modules:Path"] = SampleModules.Path,
         };
+        foreach (var (name, value) in extra ?? new Dictionary<string, string?>())
+        {
+            settings[name] = value;
+        }
+
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();
         output ??= new StringWriter();
