@@ -1,22 +1,22 @@
 # Runs the whole Axis stack from source: PostgreSQL, Keycloak with the development realm at
 # http://localhost:8080, the server with the purchase request and leave request samples, at http://localhost:5206,
-# the worker, and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
+# the worker, the publisher and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
 # yet: the server in its container cannot reach Keycloak at the address the browser uses. For
 # development, scripts/dev.sh starts only PostgreSQL, Keycloak and the purchasing system stub from
-# here and runs the server, the worker and the SPA with hot reload.
+# here and runs the server, the worker, the publisher and the SPA with hot reload.
 # The development settings are in src/Axis.Server/appsettings.Development.json.
 # All four ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206),
 # AXIS_POSTGRES_PORT (default 5432), AXIS_KEYCLOAK_PORT (default 8080) and AXIS_PURCHASING_PORT
 # (default 5207) change the host ports.
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start. It creates the two database
-# roles: the server runs startup activation as axis_schema and serves requests as axis_runtime, and
-# the worker runs only as axis_runtime. axis stays the bootstrap superuser. It also creates the
-# preview tenant's database axis_preview and its two roles, axis_preview_schema and
-# axis_preview_runtime, which the server and the worker use the same way for the tenant
-# default-preview. The server serves that tenant at http://preview.localhost:5206 and activates both
-# samples on it. It has no deployment bindings. PostgreSQL runs the file only on an empty volume,
-# so a volume from before the roles or before the preview database needs `docker compose down -v`
-# once. That deletes its data.
+# roles: the server runs startup activation as axis_schema and serves requests as axis_runtime, the
+# worker runs only as axis_runtime, and the publisher runs its steps as axis_schema. axis stays the
+# bootstrap superuser. It also creates the preview tenant's database axis_preview and its two roles,
+# axis_preview_schema and axis_preview_runtime, which the server and the worker use the same way for
+# the tenant default-preview. The server serves that tenant at http://preview.localhost:5206 and
+# activates both samples on it. It has no deployment bindings. The publisher serves only the tenant
+# default. PostgreSQL runs the file only on an empty volume, so a volume from before the roles or
+# before the preview database needs `docker compose down -v` once. That deletes its data.
 services:
   postgres:
     image: postgres:18-alpine
@@ -119,6 +119,30 @@ services:
       retries: 3
       start_period: 180s
       start_interval: 2s
+
+  # Runs the publish requests of Studio for the tenant. It waits until the server has migrated the tenant
+  # database, then writes `default ready`. The development target holds the sample extension package and
+  # module that the purchase request sample declares. The tenant settings are repeated here because the
+  # admin host reads no appsettings file. The token is in appsettings.Development.json of the server.
+  publisher:
+    build:
+      context: .
+      target: publisher
+    command: ["publisher"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      Extensions__Path: /extensions
+      Modules__Path: /modules
+      Tenants__default__Hosts__0: localhost
+      Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
+      Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
+      Tenants__default__Bindings__PurchasingSystemUrl__Kind: url
+      Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
+      Tenants__default__Bindings__PurchasingSystemToken__Kind: secret
+      Tenants__default__Bindings__PurchasingSystemToken__Value: axis-development-purchasing-token
 
   # The purchasing system stub from tests/Axis.PurchasingStub. It keeps its orders in memory.
   purchasing:

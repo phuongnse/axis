@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Runs Axis locally: PostgreSQL, Keycloak and the purchasing system stub in Docker, the server
-# and the worker under dotnet watch and the SPA on Vite, in one terminal. The server starts once
+# and the worker under dotnet watch, the publisher and the SPA on Vite, in one terminal. The server starts once
 # PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
 # server signs people in through that realm at /api/auth/sign-in. The SPA does not offer it yet.
-# The worker starts once the server has migrated the tenant databases. A change to a JSON file
+# The worker and the publisher start once the server has migrated the tenant databases. The
+# publisher runs the publish requests of Studio. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
-# activates the edited configuration. The worker and the SPA keep running. Ctrl+C stops the
-# server, the worker and the SPA. PostgreSQL, Keycloak and the purchasing system stub keep
-# running.
+# activates the edited configuration. The worker, the publisher and the SPA keep running. Ctrl+C
+# stops the server, the worker, the publisher and the SPA. PostgreSQL, Keycloak and the purchasing
+# system stub keep running.
 # The server runs startup activation as the database role axis_schema and serves requests as
-# axis_runtime. The worker runs only as axis_runtime. Docker Compose creates both roles.
+# axis_runtime. The worker runs only as axis_runtime. The publisher runs its steps as axis_schema
+# and seeds as axis_runtime. Docker Compose creates both roles.
+# The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code
+# needs a restart of this script. The admin host reads no appsettings file, so this script sets the
+# publisher's tenant settings as environment variables of its process only. It serves only the
+# tenant default.
 # The preview tenant default-preview serves at http://preview.localhost:5206 from the server and at
 # http://preview.localhost:5173 through the SPA. It has its own database axis_preview and its own
 # roles, axis_preview_schema and axis_preview_runtime, which Docker Compose creates, and no
@@ -102,6 +108,7 @@ fingerprint() {
 state="$(mktemp -d)"
 server=""
 worker=""
+publisher=""
 web=""
 
 # Prefixes each line with the process name. It ignores SIGINT so it keeps draining output
@@ -177,12 +184,12 @@ stop_processes() {
   for pid in $pids; do kill -KILL "$pid" 2>/dev/null || true; done
 }
 
-# Stops the server, the worker and the SPA. Safe to call twice.
+# Stops the server, the worker, the publisher and the SPA. Safe to call twice.
 stopped=0
 stop() {
   [ "$stopped" -eq 0 ] || return 0
   stopped=1
-  stop_processes $server $worker $web
+  stop_processes $server $worker $publisher $web
 }
 
 cleanup() {
@@ -199,6 +206,11 @@ dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj --nolog
 # The server reads the module catalog only when it starts, so this runs once, before the server.
 log "Installing the sample modules"
 bash scripts/lib/install-sample-modules.sh
+
+# The publisher runs from this build. dotnet watch would build the shared projects at the same time as
+# the worker's and risk file-lock failures, so it is built here, before the server starts.
+log "Building the publisher"
+dotnet build src/Axis.Admin/Axis.Admin.csproj --nologo -v quiet
 
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.
@@ -239,23 +251,28 @@ while :; do
     break
   fi
   if [ -e "$state/server-exited-$generation" ] || ! kill -0 "$server" 2>/dev/null; then
-    log "The server exited. Stopping the worker and the SPA."
+    log "The server exited. Stopping the worker, the publisher and the SPA."
     code=1
     break
   fi
   if ! kill -0 "$web" 2>/dev/null; then
-    log "The SPA dev server exited. Stopping the server and the worker."
+    log "The SPA dev server exited. Stopping the server, the worker and the publisher."
     code=1
     break
   fi
   if [ -n "$worker" ] && { [ -e "$state/worker-exited" ] || ! kill -0 "$worker" 2>/dev/null; }; then
-    log "The worker exited. Stopping the server and the SPA."
+    log "The worker exited. Stopping the server, the publisher and the SPA."
+    code=1
+    break
+  fi
+  if [ -n "$publisher" ] && ! kill -0 "$publisher" 2>/dev/null; then
+    log "The publisher exited. Stopping the server, the worker and the SPA."
     code=1
     break
   fi
   # Restart the server when the application configuration changes. An editor or git may write
-  # several files in a row, so wait until two checks 0.5 seconds apart agree. The worker keeps
-  # running, because it needs only the migrated databases.
+  # several files in a row, so wait until two checks 0.5 seconds apart agree. The worker and the
+  # publisher keep running, because they need only the migrated databases.
   # A signal sent to the process group also ends the fingerprint subshell, which must not count
   # as a change.
   if [ "$(fingerprint)" != "$watched" ] && [ "$interrupted" -eq 0 ]; then
@@ -280,6 +297,25 @@ while :; do
       </dev/null > >(prefix worker) 2>&1 &
     worker=$!
     disown "$worker"
+  fi
+  # The publisher waits for the migrations too, and is not restarted with the server. Its settings are
+  # set in this subshell only: the schema role is for its steps, and the runtime role is for seeding.
+  if [ -z "$publisher" ] && [ -e "$state/server-listening" ]; then
+    log "The server has migrated the tenant databases. Starting the publisher."
+    (export DOTNET_ENVIRONMENT=Development \
+      Extensions__Path="$PWD/artifacts/extensions" \
+      Modules__Path="$PWD/artifacts/modules" \
+      Tenants__default__Hosts__0=localhost \
+      Tenants__default__ConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_runtime;Password=axis" \
+      Tenants__default__SchemaConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_schema;Password=axis" \
+      Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
+      Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$purchasing_port" \
+      Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
+      Tenants__default__Bindings__PurchasingSystemToken__Value=axis-development-purchasing-token
+      exec dotnet src/Axis.Admin/bin/Debug/net10.0/Axis.Admin.dll publisher) \
+      </dev/null > >(prefix publisher) 2>&1 &
+    publisher=$!
+    disown "$publisher"
   fi
   sleep 1 || true
 done
