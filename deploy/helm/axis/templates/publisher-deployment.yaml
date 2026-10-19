@@ -1,0 +1,51 @@
+# The publisher has no HTTP endpoint, so it has no port, probe or Service.
+# It always runs one replica, and Recreate never runs two during a rollout.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-publisher
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: publisher
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "axis.selectorLabels" (dict "root" . "component" "publisher") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "axis.labels" . | nindent 8 }}
+        app.kubernetes.io/component: publisher
+    spec:
+      automountServiceAccountToken: false
+      # Longer than the five-minute lease, so a stop lets the running request finish.
+      terminationGracePeriodSeconds: {{ .Values.publisher.terminationGracePeriodSeconds }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "axis.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: publisher
+          image: {{ include "axis.image" (dict "root" . "repository" .Values.migrate.repository) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - publisher
+          env:
+            {{- include "axis.hostEnv" . | nindent 12 }}
+          securityContext:
+            {{- include "axis.containerSecurityContext" . | nindent 12 }}
+          {{- with .Values.publisher.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- include "axis.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "axis.volumes" (dict "root" . "entries" (list "platformSchemaConnection" "platformSecretKey")) | nindent 8 }}
