@@ -49,7 +49,8 @@ internal sealed class TenantActivate(
     {
         await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, cancellationToken);
         var run = await new TenantReleaseActivation(inlineRecomputeLimit, output, error, cancellationToken).RunAsync(
-            row,
+            row.Id,
+            row.SchemaVersion,
             steps,
             bindings[row.Id],
             configuration => ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken),

@@ -28,26 +28,26 @@ internal sealed class TenantReleaseActivation(
     CancellationToken cancellationToken)
 {
     /// <summary>
-    /// Runs the steps for <paramref name="row"/>. Every diagnostic of compile, activate and seed, warnings included, is added
+    /// Runs the steps for the tenant <paramref name="id"/>, whose directory entry or build records <paramref name="schemaVersion"/>. Every diagnostic of compile, activate and seed, warnings included, is added
     /// to <paramref name="diagnostics"/>.
     /// </summary>
     public async Task<ReleaseRun> RunAsync(
-        TenantRow row,
-        TenantDatabaseSteps steps,
+        string id,
+        string schemaVersion,
+        ITenantConnections connections,
         ActivationBindings bindings,
         Func<ConfigurationDbContext, Task<ReleaseCompilationResult>> compile,
         List<Diagnostic> diagnostics)
     {
-        var id = row.Id;
         ConfigurationDbContext? configuration = null;
         DataDbContext? data = null;
         ReleaseCompilationResult? compiled = null;
         try
         {
-            var succeeded = await Step(id, "version", () => CheckVersionAsync(row))
+            var succeeded = await Step(id, "version", () => CheckVersionAsync(schemaVersion))
                 && await Step(id, "compile", async () =>
                 {
-                    var connection = await steps.SchemaConnectionAsync();
+                    var connection = await connections.SchemaConnectionAsync();
                     configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
                     data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connection).Options);
                     compiled = await compile(configuration);
@@ -69,7 +69,7 @@ internal sealed class TenantReleaseActivation(
                         throw new DiagnosticsFailure(activated.Diagnostics);
                     }
                 })
-                && await Step(id, "seed", () => SeedAsync(steps, id, compiled!, diagnostics));
+                && await Step(id, "seed", () => SeedAsync(connections, id, compiled!, diagnostics));
             return new ReleaseRun(succeeded, compiled?.Release?.Id);
         }
         finally
@@ -90,15 +90,15 @@ internal sealed class TenantReleaseActivation(
 
     // The hosts compare the version recorded in the directory with their build's to decide whether to serve a tenant,
     // so this does the same and reads no tenant database.
-    private static Task CheckVersionAsync(TenantRow row) =>
-        row.SchemaVersion == TenantSchemaVersion.Current
+    private static Task CheckVersionAsync(string schemaVersion) =>
+        schemaVersion == TenantSchemaVersion.Current
             ? Task.CompletedTask
             : throw new InvalidOperationException("The tenant database is not on this build's schema version. Run migrate first.");
 
-    private async Task SeedAsync(TenantDatabaseSteps steps, string id, ReleaseCompilationResult compiled, List<Diagnostic> diagnostics)
+    private async Task SeedAsync(ITenantConnections connections, string id, ReleaseCompilationResult compiled, List<Diagnostic> diagnostics)
     {
         var model = compiled.Model!;
-        await using var runtime = await steps.OpenRuntimeConnectionAsync();
+        await using var runtime = await connections.OpenRuntimeConnectionAsync();
         await TriggerSchedules.ActivateAsync(runtime, id, model, compiled.Release!.Id, cancellationToken);
         if (model.Seeds.Count > 0)
         {

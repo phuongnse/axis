@@ -19,11 +19,12 @@ namespace Axis.Admin;
 /// with the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A request ends
 /// <c>succeeded</c> or <c>failed</c>, with its diagnostics, and the audit record is written in the same transaction. A
 /// request of another tenant, and one that is not a <c>publish</c>, stays queued. Every step runs as the tenant's schema role,
-/// and a stop finishes the request that is running, then ends the loop.
+/// and a stop finishes the request that is running, then ends the loop. The tenants come from the tenant directory or from
+/// the <c>Tenants</c> configuration section, see <see cref="IPublisherTenants"/>.
 /// </summary>
 internal sealed class Publisher(
-    ActivateSettings settings,
-    TimeSpan refreshInterval,
+    ReleaseSettings settings,
+    IPublisherTenants tenants,
     TextWriter output,
     TextWriter error,
     CancellationToken stopping)
@@ -58,21 +59,20 @@ internal sealed class Publisher(
         WHERE id = @id
         """;
 
-    private IReadOnlyList<TenantRow> _served = [];
-    private Dictionary<string, ActivationBindings> _bindings = [];
+    private IReadOnlyList<PublisherTenant> _served = [];
 
     public async Task<int> RunAsync()
     {
         try
         {
-            var problem = await AdminCommands.PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, stopping);
+            var problem = await tenants.CheckAsync(stopping);
             if (problem is not null)
             {
                 error.WriteLine(problem);
                 return 1;
             }
 
-            await ReadDirectoryAsync();
+            _served = await tenants.ReadAsync(stopping);
         }
         catch (OperationCanceledException)
         {
@@ -87,12 +87,12 @@ internal sealed class Publisher(
         var lastRead = Stopwatch.StartNew();
         while (!stopping.IsCancellationRequested)
         {
-            if (lastRead.Elapsed >= refreshInterval)
+            if (lastRead.Elapsed >= tenants.ReadInterval)
             {
                 lastRead.Restart();
                 try
                 {
-                    await ReadDirectoryAsync();
+                    _served = await tenants.ReadAsync(stopping);
                 }
                 catch (OperationCanceledException)
                 {
@@ -106,14 +106,14 @@ internal sealed class Publisher(
             }
 
             var claimed = false;
-            foreach (var row in _served)
+            foreach (var tenant in _served)
             {
                 if (stopping.IsCancellationRequested)
                 {
                     break;
                 }
 
-                claimed |= await RunNextAsync(row);
+                claimed |= await RunNextAsync(tenant);
             }
 
             if (!claimed)
@@ -132,28 +132,15 @@ internal sealed class Publisher(
         return 0;
     }
 
-    private async Task ReadDirectoryAsync()
-    {
-        await using var platform = new PlatformDbContext(
-            new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.Platform.PlatformConnectionString).Options);
-        var rows = await platform.Tenants.AsNoTracking().ToListAsync(stopping);
-        var served = rows
-            .Where(row => row.Status == "active" && row.SchemaVersion == TenantSchemaVersion.Current)
-            .OrderBy(row => row.Id, StringComparer.Ordinal)
-            .ToList();
-        _bindings = await AdminCommands.ReadBindingsAsync(platform, [.. served.Select(row => row.Id)], stopping);
-        _served = served;
-    }
-
     // Claims and runs one request of the tenant. Returns whether one was claimed.
-    private async Task<bool> RunNextAsync(TenantRow row)
+    private async Task<bool> RunNextAsync(PublisherTenant tenant)
     {
-        var id = row.Id;
-        await using var steps = new TenantDatabaseSteps(settings.Platform.Cipher, row, row.DatabaseHost, row.DatabasePort, CancellationToken.None);
+        var id = tenant.Id;
+        await using var connections = tenant.Connect();
         ClaimedRequest? request;
         try
         {
-            request = await ClaimAsync(steps);
+            request = await ClaimAsync(connections);
         }
         catch (Exception exception)
         {
@@ -169,7 +156,7 @@ internal sealed class Publisher(
         output.WriteLine($"{id} claim ok");
         try
         {
-            await RunRequestAsync(row, steps, request);
+            await RunRequestAsync(tenant, connections, request);
         }
         catch (Exception exception)
         {
@@ -179,9 +166,9 @@ internal sealed class Publisher(
         return true;
     }
 
-    private static async Task<ClaimedRequest?> ClaimAsync(TenantDatabaseSteps steps)
+    private static async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections)
     {
-        var connection = await steps.SchemaConnectionAsync();
+        var connection = await connections.SchemaConnectionAsync();
         await using var command = new NpgsqlCommand(ClaimSql, connection);
         command.Parameters.AddWithValue("me", _claimedBy);
         command.Parameters.AddWithValue("lease", LeaseDuration);
@@ -199,27 +186,28 @@ internal sealed class Publisher(
             await reader.IsDBNullAsync(4) ? null : reader.GetString(4));
     }
 
-    private async Task RunRequestAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request)
+    private async Task RunRequestAsync(PublisherTenant tenant, ITenantConnections connections, ClaimedRequest request)
     {
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
         ReleaseRun run;
         if (files is null)
         {
-            output.WriteLine($"{row.Id} compile failed: The snapshot cannot be read.");
+            output.WriteLine($"{tenant.Id} compile failed: The snapshot cannot be read.");
             run = new ReleaseRun(false, null);
         }
         else
         {
             run = await new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None).RunAsync(
-                row,
-                steps,
-                _bindings[row.Id],
+                tenant.Id,
+                tenant.SchemaVersion,
+                connections,
+                tenant.Bindings,
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics);
         }
 
-        await FinishAsync(steps, request, run, diagnostics);
+        await FinishAsync(connections, request, run, diagnostics);
     }
 
     // The snapshot is an array of { file, version, content }, where content is the file's text as a JSON string. Null means
@@ -263,9 +251,9 @@ internal sealed class Publisher(
     }
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record.
-    private static async Task FinishAsync(TenantDatabaseSteps steps, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics)
+    private static async Task FinishAsync(ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics)
     {
-        var connection = await steps.SchemaConnectionAsync();
+        var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         await using (var command = new NpgsqlCommand(FinishSql, connection, transaction))
         {

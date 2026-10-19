@@ -16,6 +16,9 @@
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
 # can restart it: it writes the restart file, then stops the worker process. The run fails if the
 # worker exits without a restart request, or never finds the tenant database migrated.
+# One publisher, `axis-admin publisher`, runs against the same database and writes
+# artifacts/logs/e2e-publisher.log. It waits until the server has migrated the database, then runs the
+# publish requests of Studio. The run fails if it exits during the run or never finds the database migrated.
 # The purchasing system stub from tests/Axis.PurchasingStub runs from the build output on
 # $AXIS_E2E_PURCHASING_PORT (default 5281). Specs find it at $AXIS_E2E_PURCHASING_URL. The run
 # fails if it never answers. The server and the worker run in Development, because only
@@ -42,6 +45,7 @@ keycloak_image="quay.io/keycloak/keycloak:26.4"
 keycloak_container="axis-e2e-keycloak-$$"
 
 purchasing_pid=""
+publisher_pid=""
 worker_pid=""
 worker_dir="$(mktemp -d)"
 export AXIS_E2E_WORKER_PID_FILE="$worker_dir/worker.pid"
@@ -63,6 +67,10 @@ stop_worker() {
 
 cleanup() {
   stop_worker
+  if [ -n "$publisher_pid" ]; then
+    kill "$publisher_pid" 2>/dev/null || true
+    wait "$publisher_pid" 2>/dev/null || true
+  fi
   rm -rf "$studio_dir"
   if [ -n "$purchasing_pid" ]; then
     kill "$purchasing_pid" 2>/dev/null || true
@@ -174,8 +182,10 @@ fi
 export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
 export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
 export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
+publisher_log="$root/artifacts/logs/e2e-publisher.log"
 : >"$AXIS_E2E_SERVER_LOG"
 : >"$AXIS_E2E_WORKER_LOG"
+: >"$publisher_log"
 
 # The init script gives both roles the development password axis. The bootstrap superuser axis keeps $password.
 export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_runtime;Password=axis"
@@ -215,6 +225,21 @@ run_worker() {
 run_worker &
 worker_pid=$!
 
+# The publisher waits for the server's migration as the worker does. The admin host reads no appsettings
+# file, so the tenant settings are here. It gets the schema role for its steps and the runtime role for
+# seeding, and runs in Development for the http stub, as the worker does. It runs from the built dll, so
+# that kill stops it.
+DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
+  Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" \
+  Tenants__default__SchemaConnectionString="$schema_database" \
+  Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
+  Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
+  Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
+  Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
+  Tenants__default__Bindings__PurchasingSystemToken__Value=e2e-token \
+  dotnet src/Axis.Admin/bin/Release/net10.0/Axis.Admin.dll publisher >>"$publisher_log" 2>&1 &
+publisher_pid=$!
+
 AXIS_E2E_SCHEMA_DATABASE="$schema_database" run_suite playwright tests/e2e npm test --prefix tests/e2e
 playwright_status=$status
 
@@ -228,6 +253,16 @@ elif ! grep -qF 'Tenant default is ready for work' "$AXIS_E2E_WORKER_LOG"; then
 fi
 if [ "$worker_failed" -ne 0 ]; then status=1; fi
 stop_worker
+
+publisher_failed=0
+if ! kill -0 "$publisher_pid" 2>/dev/null; then
+  echo "The Axis publisher exited before Playwright finished." >&2
+  publisher_failed=1
+elif ! grep -qF 'default ready' "$publisher_log"; then
+  echo "The Axis publisher never found the E2E database migrated." >&2
+  publisher_failed=1
+fi
+if [ "$publisher_failed" -ne 0 ]; then status=1; fi
 
 # print_log TITLE FILE
 print_log() {
@@ -247,6 +282,9 @@ if [ "$playwright_status" -ne 0 ]; then
 fi
 if [ "$playwright_status" -ne 0 ] || [ "$worker_failed" -ne 0 ]; then
   print_log "Axis worker log" "$AXIS_E2E_WORKER_LOG"
+fi
+if [ "$playwright_status" -ne 0 ] || [ "$publisher_failed" -ne 0 ]; then
+  print_log "Axis publisher log" "$publisher_log"
 fi
 
 run_suite_if_affected compose . node --test --test-reporter=spec --test-reporter-destination=stdout \

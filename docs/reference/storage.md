@@ -329,8 +329,8 @@ Which connection string each step uses. The server does this today:
 | Schedule trigger state                                                                                                             | `ConnectionString`       |
 | Seed records                                                                                                                       | `ConnectionString`       |
 | Publish routes of the server _(planned for M10)_: insert a request, read requests and the release history                          | `ConnectionString`       |
-| Publisher _(planned for M10)_: claim, renew and finish a request, compile, store, activate, write the history and the audit record | `SchemaConnectionString` |
-| Publisher _(planned for M10)_: seed records                                                                                        | `ConnectionString`       |
+| Publisher: claim and finish a request, compile, store, activate and write the audit record _(renew and the history are planned for M10)_ | `SchemaConnectionString` |
+| Publisher: seed records                                                                                                            | `ConnectionString`       |
 | Start release check (`AXC0146`) and the runtime database role check, in the server and the worker                                  | `ConnectionString`       |
 | Server requests: record API, data sources, process starts, endpoints, tasks, sites                                                 | `ConnectionString`       |
 | Worker                                                                                                                             | `ConnectionString` only  |
@@ -341,11 +341,12 @@ tenant is done. Under `Tenancy:Source=directory`, the
 server holds no tenant schema connection, see
 [under the directory source](#under-the-directory-source).
 
-_(Planned for M10:)_ the publisher, `axis-admin publisher`, runs every
-publish request. Under `Tenancy:Source=configuration` it uses each tenant's
-`SchemaConnectionString`, so it holds the schema role. The server still opens
-that connection only during startup activation, and runs no publish request
-itself.
+The publisher, `axis-admin publisher`, runs every publish request. Under
+`Tenancy:Source=configuration` it uses each tenant's `SchemaConnectionString`,
+so it holds the schema role. It waits until the server has migrated the tenant
+database, and seeds over `ConnectionString`. The server still opens that
+connection only during startup activation, and runs no publish request itself.
+A publisher in the production installs is planned for M10.
 
 ### Under the directory source
 

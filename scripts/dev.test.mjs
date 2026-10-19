@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'artifacts', 'wwwroot', 'playwright-report', 'test-results'])
 const project = `axis-dev-test-${process.pid}`
-const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|vite/
+const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|Axis\.Admin|vite/
 
 let copy
 let scratch
@@ -104,18 +104,18 @@ async function waitForOutput(run, pattern, timeoutMs = 300_000) {
   assert.fail(`No output matching ${pattern} after ${timeoutMs} ms.\n${run.stdout}\n${run.stderr}`)
 }
 
-/** The leftover processes of a finished run: its Vite by its port, and the server and worker of this copy. */
+/** The leftover processes of a finished run: its Vite by its port, and the server, worker and publisher of this copy. */
 function leftoverProcs() {
   return execFileSync('ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' })
     .split('\n')
     .filter(
       (line) =>
         (/vite/.test(line) && line.includes(`--port ${ports.web}`)) ||
-        (/Axis\.(Server|Worker)/.test(line) && line.includes(copy)),
+        (/Axis\.(Server|Worker|Admin)/.test(line) && line.includes(copy)),
     )
 }
 
-/** The server, worker, dotnet watch and Vite processes below the dev.sh process. */
+/** The server, worker, publisher, dotnet watch and Vite processes below the dev.sh process. */
 function runProcs(rootPid) {
   const rows = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
     .split('\n')
@@ -233,7 +233,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true })
   })
 
-  it('installs the SPA packages, serves the app through Vite, starts the worker and stops cleanly on SIGINT', async () => {
+  it('installs the SPA packages, serves the app through Vite, starts the worker and the publisher and stops cleanly on SIGINT', async () => {
     const run = startDev()
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
@@ -259,6 +259,13 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(listening >= 0, run.stdout)
     assert.ok(run.stdout.indexOf('[worker]') > listening, `Worker output before the server listened:\n${run.stdout}`)
 
+    // The publisher starts after the server has migrated, and finds the tenant database migrated at once.
+    await waitForOutput(run, /\[publisher\] .*default ready/)
+    assert.ok(
+      run.stdout.search(/\[publisher\]/) > listening,
+      `Publisher output before the server listened:\n${run.stdout}`,
+    )
+
     // The worker answers ready on its health address once it has found the tenant database migrated.
     const workerReady = await fetch(`http://127.0.0.1:${ports.workerHealth}/health/ready`)
     assert.equal(workerReady.status, 200)
@@ -272,6 +279,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(procs.some((p) => /vite/.test(p.command)), `No Vite process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Server/.test(p.command)), `No server process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Worker/.test(p.command)), `No worker process in:\n${JSON.stringify(procs)}`)
+    assert.ok(procs.some((p) => /Axis\.Admin/.test(p.command)), `No publisher process in:\n${JSON.stringify(procs)}`)
 
     interrupt(run)
     assert.equal(await exitsWithin(run, 60_000), 130)

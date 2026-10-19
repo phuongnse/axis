@@ -19,7 +19,7 @@ internal sealed class TenantDatabaseSteps(
     TenantRow row,
     string host,
     int port,
-    CancellationToken cancellationToken) : IAsyncDisposable
+    CancellationToken cancellationToken) : ITenantConnections
 {
     private NpgsqlConnection? _schemaConnection;
 

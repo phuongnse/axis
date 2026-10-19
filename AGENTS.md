@@ -88,8 +88,8 @@ exception is a smoke test that NexKit's `NEXKIT_BASE_SHA` shows no change can af
 skipped and the summary lists it as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local
 runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
 goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
-`artifacts/logs/e2e-worker.log`, and the purchasing system stub output to
-`artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a
+`artifacts/logs/e2e-worker.log`, the E2E publisher output to `artifacts/logs/e2e-publisher.log`, and the
+purchasing system stub output to `artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a
 summary per suite and the failed tests with their `file:line`. On GitHub Actions
 the summary goes to the job summary and each failed test becomes an error
 annotation.
@@ -113,14 +113,15 @@ and `deploy/helm/axis/`, see [installation](docs/reference/installation.md).
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
-with the purchase request and leave request samples at http://localhost:5206, the worker, and the purchasing
+with the purchase request and leave request samples at http://localhost:5206, the worker, the publisher, and the purchasing
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. The images hold the `departments` sample module in `/modules`.
-*(Planned for M10:)* Compose also starts one publisher, `axis-admin publisher`, which runs the
+Compose also starts one publisher, `axis-admin publisher`, which runs the
 publish requests of Studio. See [D47](docs/decisions.md#d47-publishing-from-studio--agreed).
+It has no port and no health check, and writes `default ready` once the server has migrated the tenant database.
 `docker compose logs server` shows the activation diagnostics,
-and `docker compose logs worker` shows the worker output. `docker compose ps` shows the worker
+`docker compose logs worker` shows the worker output and `docker compose logs publisher` shows the publisher output. `docker compose ps` shows the worker
 healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The worker's
 health address `http://127.0.0.1:5208` stays inside its container. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
@@ -170,9 +171,12 @@ works on a fresh clone:
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
   script's own messages start with `[dev]`. The SPA proxies `/api` and `/health`
   to the server.
-- *(Planned for M10:)* It also runs one publisher, `axis-admin publisher`, with
+- It also runs one publisher, `axis-admin publisher`, with
   its lines starting with `[publisher]`. It starts once the server has
-  migrated the tenant databases. See
+  migrated the tenant databases. It runs from the built `Axis.Admin.dll`, not under
+  `dotnet watch`, so a change to its code needs a restart of the script. The script
+  sets its tenant settings as environment variables of that process only, because
+  `Axis.Admin` reads no `appsettings` file. See
   [publisher](docs/reference/administration.md#publisher).
 - *(Planned for M10:)* Development, Compose and E2E configure one preview tenant, where an
   author tries an application before publishing it. See
@@ -200,10 +204,10 @@ works on a fresh clone:
 - Neither Docker Compose nor `scripts/dev.sh` starts a telemetry collector, so logs go
   to the console only. Set `OTEL_EXPORTER_OTLP_ENDPOINT` for the server and the worker to
   export traces, metrics and logs. See [telemetry export](docs/reference/configuration.md#telemetry-export).
-- Ctrl+C stops the server, the worker and the SPA. PostgreSQL keeps running with
+- Ctrl+C stops the server, the worker, the publisher and the SPA. PostgreSQL keeps running with
   its data, and Keycloak and the purchasing system stub keep running. Run
   `docker compose down` to stop them.
-  If any of the three exits on its own, the others stop too and the script
+  If any of the four exits on its own, the others stop too and the script
   exits non-zero.
 - To run the worker on its own, run `dotnet run --project src/Axis.Worker`. It
   reads its tenants from its `Tenants` section, as the server does, and runs

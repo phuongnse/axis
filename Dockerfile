@@ -1,6 +1,7 @@
 # Builds Axis from source and runs the server with the purchase request sample. The server is
 # the last stage, so it is the default target. The worker stage runs the worker host with its health
-# endpoints, and the purchasing stage runs the purchasing system stub from tests/Axis.PurchasingStub.
+# endpoints, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
+# system stub from tests/Axis.PurchasingStub.
 # The images hold the sample module departments in /modules.
 # For local use: the Development environment and the sample credentials are not for production.
 #
@@ -23,7 +24,7 @@ COPY web/ ./
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
 RUN npm run build
 
-# The server, published with the SPA in its web root, the worker and the sample extension package.
+# The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
@@ -33,6 +34,7 @@ COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -o /app \
     && test -f /app/wwwroot/index.html
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -o /worker
+RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -o /admin
 # The sample extension package, installed in /src/artifacts/extensions/payment-references/1.0.0.
 RUN dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj -c Release \
     && test -f /src/artifacts/extensions/payment-references/1.0.0/axis-package.json
@@ -45,6 +47,16 @@ COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.0.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
+
+# The development publisher, which runs the publish requests of Studio. It needs the sample extension package and
+# module that the purchase request sample declares, so it is not the production axis-admin image, which holds neither.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS publisher
+WORKDIR /app
+COPY --from=build /admin .
+COPY --from=build /src/artifacts/extensions /extensions
+COPY samples/modules/departments/ /modules/departments/1.0.0/
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
 # The purchasing system stub, a test fixture that stands in for the sample's purchasing system.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS purchasing-build

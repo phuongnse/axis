@@ -9,6 +9,8 @@ using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 namespace Axis.Admin;
@@ -24,6 +26,8 @@ internal static partial class AdminCommands
     public const string PlatformSetting = "ConnectionStrings:PlatformSchema";
 
     public const string InlineRecomputeLimitSetting = "Activation:InlineRecomputeLimit";
+
+    public const string DotnetEnvironmentSetting = "DOTNET_ENVIRONMENT";
 
     private const string Provisioning = "provisioning";
 
@@ -529,13 +533,10 @@ internal static partial class AdminCommands
         }
 
         // A setting's own message holds its value, so these say only which setting is wrong.
+        TenancySource source;
         try
         {
-            if (TenancySettings.Source(configuration) != TenancySource.Directory)
-            {
-                error.WriteLine($"The setting {TenancySettings.SourceSetting} must be 'directory'. The publisher serves no other tenant source yet.");
-                return 2;
-            }
+            source = TenancySettings.Source(configuration);
         }
         catch (InvalidOperationException)
         {
@@ -543,6 +544,17 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        return source == TenancySource.Directory
+            ? await DirectoryPublisherAsync(configuration, output, error, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, output, error, cancellationToken);
+    }
+
+    private static async Task<int> DirectoryPublisherAsync(
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
         TimeSpan refreshInterval;
         try
         {
@@ -561,7 +573,52 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await new Publisher(settings, refreshInterval, output, error, cancellationToken).RunAsync();
+        return await new Publisher(
+            new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
+            new DirectoryPublisherTenants(settings.Platform, refreshInterval),
+            output,
+            error,
+            cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> ConfigurationPublisherAsync(
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        ConfigurationTenantCatalog catalog;
+        try
+        {
+            catalog = ConfigurationTenantCatalog.Load(configuration, new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production));
+        }
+        catch (InvalidOperationException exception)
+        {
+            // The tenant check's messages name a setting or a tenant and never a value.
+            error.WriteLine(exception.Message);
+            return 2;
+        }
+
+        foreach (var entry in catalog.Tenants.Where(entry => entry.SchemaConnectionString is null))
+        {
+            error.WriteLine($"The setting {TenantOptions.SectionName}:{entry.Id}:SchemaConnectionString is required.");
+            return 2;
+        }
+
+        var settings = ReadReleaseSettings(configuration, error, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        var allowHttp = (configuration[DotnetEnvironmentSetting] ?? Environments.Production) == Environments.Development;
+        return await new Publisher(
+            settings,
+            new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output),
+            output,
+            error,
+            cancellationToken).RunAsync();
     }
 
     /// <summary>
@@ -631,6 +688,14 @@ internal static partial class AdminCommands
             return null;
         }
 
+        var release = ReadReleaseSettings(configuration, error, out problem);
+        return release is null ? null : new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit);
+    }
+
+    // The part of the activate settings that needs no platform database: the catalogs and the inline recompute limit.
+    private static ReleaseSettings? ReadReleaseSettings(IConfiguration configuration, TextWriter error, out string problem)
+    {
+        problem = string.Empty;
         var limit = ReleaseActivator.DefaultInlineRecomputeLimit;
         var limitText = configuration[InlineRecomputeLimitSetting];
         if (!string.IsNullOrWhiteSpace(limitText)
@@ -673,7 +738,7 @@ internal static partial class AdminCommands
             error.WriteLine($"{diagnostic.Code} {diagnostic.File} {diagnostic.Path}: {diagnostic.Message}");
         }
 
-        return new ActivateSettings(platform, packages, modules, limit);
+        return new ReleaseSettings(packages, modules, limit);
     }
 
     private static string? ResolveFolder(string? setting) =>
@@ -999,6 +1064,21 @@ internal sealed record PlatformSettings(string PlatformConnectionString, TenantS
 
 /// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules and the inline recompute limit.</summary>
 internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit);
+
+/// <summary>The settings of the release steps that need no platform database: the loaded packages and modules and the inline recompute limit.</summary>
+internal sealed record ReleaseSettings(PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit);
+
+/// <summary>The host environment that the tenant configuration check reads, from <c>DOTNET_ENVIRONMENT</c>. This host has no other.</summary>
+internal sealed class AdminEnvironment(string environmentName) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environmentName;
+
+    public string ApplicationName { get; set; } = "Axis.Admin";
+
+    public string ContentRootPath { get; set; } = Directory.GetCurrentDirectory();
+
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+}
 
 internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 

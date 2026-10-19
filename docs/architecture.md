@@ -62,11 +62,12 @@ flowchart LR
   [administration](reference/administration.md) and
   [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
-  *(Planned for M10:)* Its `publisher` command is a long-running part of the
+  Its `publisher` command is a long-running part of the
   same host. It reads the tenants as the server does, connects to each tenant
   database with that tenant's schema role, and runs the publish requests that
   Studio stores. It has no HTTP endpoint, and the server holds no tenant schema
-  connection. See [publisher](reference/administration.md#publisher) and
+  connection. Starting one in the production installs is planned for M10. See
+  [publisher](reference/administration.md#publisher) and
   [D47](decisions.md#d47-publishing-from-studio--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
