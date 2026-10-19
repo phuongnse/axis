@@ -3,28 +3,37 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Server.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
 /// <summary>
 /// Sign-in through the development realm in Keycloak, with the code flow and PKCE, and the cookie
 /// session it leaves. Tenant a is served at localhost and tenant b at b.example.test, and both sign
-/// in at the same realm. The test drives Keycloak's login form as a browser would.
+/// in at the same realm. The test drives Keycloak's login form as a browser would. Each tenant has a
+/// migrated database, where sign-in and sign-out write their audit records. The server sits behind
+/// a listed proxy, so every request carries the client address 203.0.113.7.
 /// </summary>
-public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifetime
+public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
-    // Port 1 on loopback refuses connections immediately. No test here touches a database.
-    private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
+    private const string Proxy = "10.0.0.5";
+    private const string ClientAddress = "203.0.113.7";
+    private const string UserAgent = "AxisAuditProbe/1.0";
     private const string HostB = "b.example.test";
+    private const string AuditSelect = "SELECT actor, actor_name, action, application_id, details::text FROM axis.audit_records";
 
     // The realm's client accepts redirects to http://localhost:5206/*, the development server.
     private static readonly Uri _serverAddress = new("http://localhost:5206");
 
     private readonly List<string> _serverResponses = [];
+    private readonly Dictionary<string, string> _databases = [];
     private Uri? _authority;
     private WebApplicationFactory<Program>? _factory;
 
@@ -141,22 +150,164 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifeti
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
     }
 
+    [Fact]
+    public async Task Sign_in_writes_one_audit_record_with_the_user_and_the_client_address()
+    {
+        using var client = CreateClient();
+
+        await SignInAsync(client, "anna", "/");
+
+        var record = Assert.Single(await ReadAuditAsync("a", "session.signedIn"));
+        Assert.Equal("anna", record.Actor);
+        Assert.Equal("Anna Employee", record.ActorName);
+        Assert.Null(record.ApplicationId);
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
+        Assert.False(details.RootElement.TryGetProperty("reason", out _));
+        Assert.Empty(await ReadAuditAsync("b"));
+    }
+
+    [Fact]
+    public async Task Sign_out_writes_one_audit_record_and_a_refused_sign_out_writes_none()
+    {
+        using var client = CreateClient();
+        await SignInAsync(client, "anna", "/");
+
+        var refused = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out", csrfHeader: false);
+
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Empty(await ReadAuditAsync("a", "session.signedOut"));
+
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+
+        Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
+        var record = Assert.Single(await ReadAuditAsync("a", "session.signedOut"));
+        Assert.Equal("anna", record.Actor);
+        Assert.Equal("Anna Employee", record.ActorName);
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
+    }
+
+    [Fact]
+    public async Task Sign_out_without_a_session_writes_no_audit_record()
+    {
+        using var client = CreateClient();
+
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+
+        Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
+        Assert.Empty(await ReadAuditAsync("a"));
+    }
+
+    [Fact]
+    public async Task A_callback_with_the_state_of_another_tenants_sign_in_is_refused_and_recorded_in_the_tenant_of_its_host()
+    {
+        using var client = CreateClient();
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
+        var state = Regex.Match(challenge.Headers.Location!.Query, "[?&]state=(?<state>[^&]+)").Groups["state"].Value;
+        Assert.NotEmpty(state);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri($"/api/auth/callback?code=x&state={state}", UriKind.Relative));
+        request.Headers.Host = HostB;
+        request.Headers.Add("X-Forwarded-For", ClientAddress);
+        using var callback = await Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false })
+            .SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.InternalServerError, callback.StatusCode);
+        var record = Assert.Single(await ReadAuditAsync("b", "session.signInRefused"));
+        Assert.Equal("anonymous", record.Actor);
+        Assert.Null(record.ActorName);
+        Assert.Null(record.ApplicationId);
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal("otherTenant", details.RootElement.GetProperty("reason").GetString());
+        Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
+        Assert.Empty(await ReadAuditAsync("a"));
+    }
+
+    [Fact]
+    public async Task A_callback_with_no_readable_state_is_refused_as_an_invalid_state()
+    {
+        using var client = CreateClient();
+
+        var callback = await SendAsync(client, HttpMethod.Get, "/api/auth/callback?code=x&state=not-a-state");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, callback.StatusCode);
+        var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal("invalidState", details.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task A_callback_with_an_error_from_the_identity_provider_is_refused_as_a_provider_error()
+    {
+        using var client = CreateClient();
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
+        var state = Regex.Match(challenge.Headers.Location!.Query, "[?&]state=(?<state>[^&]+)").Groups["state"].Value;
+
+        var callback = await SendAsync(client, HttpMethod.Get, $"/api/auth/callback?error=access_denied&state={state}");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, callback.StatusCode);
+        var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal("providerError", details.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task No_audit_record_holds_a_token_the_session_cookie_or_the_user_agent()
+    {
+        using var client = CreateClient();
+        var signIn = await SignInAsync(client, "anna", "/");
+        await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+
+        foreach (var tenant in new[] { "a", "b" })
+        {
+            await using var connection = new NpgsqlConnection(_databases[tenant]);
+            await connection.OpenAsync(CancellationToken);
+            await using var command = new NpgsqlCommand("SELECT row_to_json(a)::text FROM axis.audit_records a", connection);
+            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+            while (await reader.ReadAsync(CancellationToken))
+            {
+                var row = reader.GetString(0);
+                Assert.DoesNotMatch(JwtPattern(), row);
+                Assert.DoesNotContain(signIn.SessionCookie, row, StringComparison.Ordinal);
+                Assert.DoesNotContain(UserAgent, row, StringComparison.Ordinal);
+            }
+        }
+
+        Assert.Equal(2, (await ReadAuditAsync("a")).Count);
+    }
+
     public async ValueTask InitializeAsync()
     {
+        foreach (var tenant in new[] { "a", "b" })
+        {
+            var connectionString = await database.CreateDatabaseAsync($"signin_{tenant}", CancellationToken);
+            _databases[tenant] = connectionString;
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(CancellationToken);
+            await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+            await using var data = DataDatabaseFixture.CreateContext(connection);
+            await configuration.Database.MigrateAsync(CancellationToken);
+            await data.Database.MigrateAsync(CancellationToken);
+            await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString, CancellationToken);
+        }
+
         _authority = await keycloak.StartAsync();
         var authority = _authority.ToString();
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            builder.UseSetting("ConnectionStrings:Platform", _databases["a"]);
             builder.UseSetting("Tenants:a:Hosts:0", "localhost");
-            builder.UseSetting("Tenants:a:ConnectionString", UnreachableDatabase);
-            builder.UseSetting("Tenants:a:SchemaConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_databases["a"]));
+            builder.UseSetting("Tenants:a:SchemaConnectionString", _databases["a"]);
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
-            builder.UseSetting("Tenants:b:ConnectionString", UnreachableDatabase);
-            builder.UseSetting("Tenants:b:SchemaConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_databases["b"]));
+            builder.UseSetting("Tenants:b:SchemaConnectionString", _databases["b"]);
+            builder.UseSetting("ForwardedHeaders:KnownProxies:0", Proxy);
             UseKeycloak(builder, "a", authority);
             UseKeycloak(builder, "b", authority);
+            builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, ProxyStartupFilter>());
         });
     }
 
@@ -245,6 +396,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifeti
     private async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, bool csrfHeader = true)
     {
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
+        request.Headers.Add("X-Forwarded-For", ClientAddress);
+        request.Headers.UserAgent.ParseAdd(UserAgent);
         if (csrfHeader && method != HttpMethod.Get)
         {
             request.Headers.Add("X-Axis-Csrf", "1");
@@ -256,6 +409,33 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifeti
         return response;
     }
 
+    private async Task<List<AuditRow>> ReadAuditAsync(string tenant, string? action = null)
+    {
+        await using var connection = new NpgsqlConnection(_databases[tenant]);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            action is null ? AuditSelect : $"{AuditSelect} WHERE action = @action",
+            connection);
+        if (action is not null)
+        {
+            command.Parameters.AddWithValue("action", action);
+        }
+
+        var rows = new List<AuditRow>();
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add(new AuditRow(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetGuid(3),
+                reader.GetString(4)));
+        }
+
+        return rows;
+    }
+
     // A JWT is three base64url parts, and its header always starts with eyJ, which is {" encoded.
     [GeneratedRegex(@"eyJ[\w-]+\.[\w-]+\.")]
     private static partial Regex JwtPattern();
@@ -264,4 +444,20 @@ public sealed partial class SignInTests(KeycloakFixture keycloak) : IAsyncLifeti
     private static partial Regex FormActionPattern();
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
+
+    private sealed record AuditRow(string Actor, string? ActorName, string Action, Guid? ApplicationId, string Details);
+
+    /// <summary>Gives every request the address of the listed proxy, so the forwarded headers apply.</summary>
+    private sealed class ProxyStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((context, nextMiddleware) =>
+            {
+                context.Connection.RemoteIpAddress = IPAddress.Parse(Proxy);
+                return nextMiddleware(context);
+            });
+            next(app);
+        };
+    }
 }

@@ -860,6 +860,11 @@ running a publish request. It is reported on the request, with an empty file and
 path, see [lifecycle](authoring.md#lifecycle). It joins the table when the
 publisher is built.
 
+*(Planned for M10.)* `AXC0216` is not in the table above either. It means that
+the main tenant has no preview tenant when a preview request runs, see
+[preview](authoring.md#preview). It is reported on the request, with an empty
+file and path. It joins the table when the publisher runs preview requests.
+
 ## Startup activation
 
 The server can compile and activate application folders when it starts, so a
@@ -1165,6 +1170,40 @@ As environment variables they are `Tenancy__Source`,
   a committed development key. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
+
+### Preview tenants
+
+*(Planned for M10.)* A tenant can be the preview tenant of another tenant, as
+[D48](../decisions.md#d48-preview-tenants--agreed) agrees. See
+[preview tenants](../architecture.md#preview-tenants) for how the hosts treat
+it. Under `Tenancy:Source=configuration`, the tenant setting
+`Tenants:{id}:PreviewOf` names the main tenant. As an environment variable it is
+`Tenants__<id>__PreviewOf`. Under `directory`, the operator sets it with
+[`tenant create --preview-of`](administration.md#tenant-create).
+
+```json
+"Tenants": {
+  "default": { "Hosts": [ "localhost" ], "ConnectionString": "...", "SchemaConnectionString": "...", "Oidc": { "...": "..." } },
+  "default-preview": { "PreviewOf": "default", "Hosts": [ "preview.localhost" ], "ConnectionString": "...", "SchemaConnectionString": "..." }
+}
+```
+
+- **Its own settings.** A preview tenant has its own `Hosts`,
+  `ConnectionString`, `SchemaConnectionString` and `Bindings`, as any tenant
+  does. Its database is never the main tenant's.
+- **Sign-in.** A preview tenant has no `Oidc` block. It copies its main
+  tenant's `Authority`, `ClientId`, `ClientSecret` and `Claims`. It does not copy
+  `EndpointAudience`, so the preview accepts no machine-caller token. A
+  preview tenant with its own `Oidc` block stops the start.
+- **Bindings.** The bindings are empty unless the tenant sets some. A preview
+  never takes its main tenant's bindings, so it never calls a real system by
+  accident. See [deployment bindings](#deployment-bindings).
+- **Rules.** A tenant has at most one preview tenant, and a preview tenant has
+  none. `PreviewOf` that names an unknown tenant or a preview tenant, and two
+  tenants that name the same main tenant, stop the start. See
+  [tenant configuration](../architecture.md#tenant-configuration).
+- **Development.** Development, Docker Compose and the E2E script configure one
+  preview tenant.
 
 ## Forwarded headers
 
@@ -1592,7 +1631,12 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   bad binding at once. Startup activation passes in each tenant's bindings,
   so a bad binding stops the start. A tenant is checked only when a release
   is activated for it. Under `directory` the bindings come from the tenant's
-  directory entry.
+  directory entry. *(Planned for M10:)* on a
+  [preview tenant](#preview-tenants), a binding that is missing is `AXC0100`
+  with severity warning, not an error. Activation goes on, and a call that needs
+  the binding fails at run time, where the inspector shows it. A binding of the
+  wrong kind (`AXC0100`) and an `http` URL outside Development (`AXC0101`) stay
+  errors.
 - **Startup check.** A binding whose `Kind` is missing or is not `url` or
   `secret`, whose `Value` is blank, or a `url` binding whose value is not an
   absolute `http` or `https` URL, fails startup like the other

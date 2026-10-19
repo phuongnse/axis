@@ -36,4 +36,10 @@ public static class AuditActions
     public const string OperationCalled = "operation.called";
 
     public const string OperationCallResolved = "operation.callResolved";
+
+    public const string SessionSignedIn = "session.signedIn";
+
+    public const string SessionSignedOut = "session.signedOut";
+
+    public const string SessionSignInRefused = "session.signInRefused";
 }

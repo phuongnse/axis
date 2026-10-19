@@ -1079,26 +1079,26 @@ schema of the tenant database.
   [task completions](processes.md#completing-a-task). So
   do the [operator commands](processes.md#operator-commands), with the user as
   actor. The BFF session writes them too for sign-in, sign-out and a refused
-  sign-in, see the session actions below _(planned for M10)_.
+  sign-in, see the session actions below.
 
-  | Column                | Type                                                 | Meaning                                                                                                                                                                                                                                                              |
-  | --------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `id`                  | `uuid`                                               | A version 7 UUID                                                                                                                                                                                                                                                     |
-  | `occurred_at`         | `timestamptz`                                        | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it                                                                                                                                                            |
-  | `actor`               | `text`                                               | A user id, or `system` for the worker. The record API and the process start endpoint need a session, so they never write `anonymous`. Only process starts from before M4, with nobody signed in, have it. `session.signInRefused` also writes it _(planned for M10)_ |
-  | `actor_name`          | `text`, null                                         | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added                                                                                                                       |
-  | `action`              | `text`                                               | The action, such as `record.created`                                                                                                                                                                                                                                 |
-  | `application_id`      | `uuid`, null for session actions _(planned for M10)_ | The application `id`. A session action belongs to no application                                                                                                                                                                                                     |
-  | `entity_id`           | `uuid`, null                                         | The entity `id`, when the action concerns a record                                                                                                                                                                                                                   |
-  | `record_id`           | `uuid`, null                                         | The record id                                                                                                                                                                                                                                                        |
-  | `process_instance_id` | `uuid`, null                                         | The process instance id                                                                                                                                                                                                                                              |
-  | `details`             | `jsonb`                                              | An object that depends on the action                                                                                                                                                                                                                                 |
+  | Column                | Type                             | Meaning                                                                                                                                                                                                                                          |
+  | --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `id`                  | `uuid`                           | A version 7 UUID                                                                                                                                                                                                                                 |
+  | `occurred_at`         | `timestamptz`                    | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it                                                                                                                                        |
+  | `actor`               | `text`                           | A user id, or `system` for the worker. The record API and the process start endpoint need a session, so they never write `anonymous`. Only process starts from before M4, with nobody signed in, have it. `session.signInRefused` also writes it |
+  | `actor_name`          | `text`, null                     | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added                                                                                                   |
+  | `action`              | `text`                           | The action, such as `record.created`                                                                                                                                                                                                             |
+  | `application_id`      | `uuid`, null for session actions | The application `id`. A session action belongs to no application                                                                                                                                                                                 |
+  | `entity_id`           | `uuid`, null                     | The entity `id`, when the action concerns a record                                                                                                                                                                                               |
+  | `record_id`           | `uuid`, null                     | The record id                                                                                                                                                                                                                                    |
+  | `process_instance_id` | `uuid`, null                     | The process instance id                                                                                                                                                                                                                          |
+  | `details`             | `jsonb`                          | An object that depends on the action                                                                                                                                                                                                             |
   - Application and entity are stored by their stable resource ids, never by
     name, so a rename keeps the history.
   - _(Planned for M10.)_ A `publish` and a `rollback` write an audit record
     when they succeed and when they fail, see
     [publish requests and release history](#publish-requests-and-release-history).
-  - **Session actions** _(planned for M10)_. The
+  - **Session actions.** The
     BFF session writes three actions, see
     [D50](../decisions.md#d50-sign-in-audit-records-and-security-scanning-in-ci--agreed)
     and [sign-in and the session](../architecture.md#sign-in-and-the-session).
@@ -1114,6 +1114,16 @@ schema of the tenant database.
       provider, and a provider error.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are
       null.
+    - `clientAddress` is always present. It is the address as text, with an
+      IPv4-mapped IPv6 address written as IPv4, or `null` when the server sees
+      no address.
+    - A `session.signedIn` or `session.signedOut` record commits before its
+      action takes effect. If it cannot be written, the callback fails and
+      creates no session, or sign-out fails with a `500` and the session stays.
+      If a `session.signInRefused` record cannot be written, the server logs a
+      warning and the callback still answers its `500`.
+    - `otherTenant` means the callback's `state` came from a sign-in that
+      another tenant's client started.
     - They never hold a token, a cookie or the user agent.
     - A session that expires writes nothing. A sign-out with no session writes
       nothing.
@@ -1166,6 +1176,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                          |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                   |
 | `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
+| `target`            | `text`              | *(Planned for M10.)* `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
 | `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every resource file of the folder. Null for `rollback` |
 | `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
@@ -1189,6 +1200,13 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
   adds 1 to `claims`. A `running` row whose `lease_until` has passed is claimed
   again the same way. A row with `claims` of 3 and an expired lease becomes
   `failed` with `AXC0215`.
+- **Preview target.** *(Planned for M10.)* A row with `target` `preview` is
+  stored in the session tenant's database and run against that tenant's preview
+  tenant, see [preview](authoring.md#preview). Its history row lives in the
+  preview tenant's `release_activations` and keeps this row's `id` as
+  `request_id`. That `request_id` points at a request in another database, so no
+  foreign key can hold it. The publisher sets the row `failed` with `AXC0216`
+  when the main tenant no longer has a preview tenant.
 - **Final.** A `succeeded` or `failed` row is never changed again.
 - **Size and age.** No limit on the size of a snapshot is set, and nothing
   deletes old requests. Large folders or many requests grow the table. A later
@@ -1256,7 +1274,9 @@ have at activation. See also [rollback](authoring.md#rollback).
 
 Each `publish` and `rollback` writes one record in `axis.audit_records`, in the
 transaction that sets the request's final status. The actor is the requesting
-user, and `application_id` is the application `id`.
+user, and `application_id` is the application `id`. *(Planned for M10.)* A
+preview request writes no audit record. The preview tenant's release history
+records who published it.
 
 | Action                   | When                   |
 | ------------------------ | ---------------------- |

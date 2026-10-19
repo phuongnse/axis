@@ -49,7 +49,7 @@ public static class AuditRecords
         command.Parameters.AddWithValue("actor", entry.Actor);
         command.Parameters.Add(new NpgsqlParameter("actorName", NpgsqlDbType.Text) { Value = entry.ActorName is { } name ? name : DBNull.Value });
         command.Parameters.AddWithValue("action", entry.Action);
-        command.Parameters.AddWithValue("application", entry.ApplicationId);
+        command.Parameters.Add(Uuid("application", entry.ApplicationId));
         command.Parameters.Add(Uuid("entity", entry.EntityId));
         command.Parameters.Add(Uuid("record", entry.RecordId));
         command.Parameters.Add(Uuid("process", entry.ProcessInstanceId));

@@ -99,6 +99,24 @@ creates one tenant.
 | `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. |
 | `--oidc-authority <url>` | The authority of the tenant's identity provider. |
 | `--oidc-client-id <id>` | The OIDC client id. The client secret comes from `AXIS_OIDC_CLIENT_SECRET`. |
+| `--preview-of <main>` | *(Planned for M10.)* Makes the tenant the preview tenant of the main tenant `<main>`. |
+| `--binding <name>=<value>` | *(Planned for M10.)* A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
+
+**Preview tenant.** *(Planned for M10.)* With `--preview-of`, the command creates
+a [preview tenant](../architecture.md#preview-tenants) as
+[D48](../decisions.md#d48-preview-tenants--agreed) agrees. The steps below stay
+the same, and the entry also names its main tenant.
+
+- It takes no `--oidc-*` option and does not read `AXIS_OIDC_CLIENT_SECRET`,
+  because the preview uses its main tenant's sign-in settings. An `--oidc-*`
+  option together with `--preview-of` is a usage error.
+- `--binding` without `--preview-of` is a usage error. A binding that is not
+  `<name>=<value>`, or whose value is not an absolute `http` or `https` URL, is
+  a usage error. No binding value is printed.
+- Without `--binding` the preview has no bindings. See
+  [preview tenants](configuration.md#preview-tenants).
+- The command exits `2` when `<main>` is not in the directory, is itself a
+  preview tenant, or already has a preview tenant.
 
 **Steps, in order.** Each step writes its own line.
 
@@ -218,6 +236,7 @@ the id:
 | `status` | `provisioning`, `active` or `suspended`. |
 | `hosts` | The tenant's hosts, separated by commas. |
 | `schema version` | The recorded schema version, or `-` when it is empty. |
+| `preview of` | *(Planned for M10.)* The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
 
 It takes no option. It never prints a password, an OIDC secret, a binding value
 or a connection string.
@@ -323,6 +342,9 @@ what is missing:
   one of its migrations.
 - The tenant id exists in the directory as `active` or `suspended`.
 - A host belongs to another tenant, ignoring letter case.
+- *(Planned for M10.)* The archive is of a preview tenant. Preview data is
+  disposable, so the operator creates the preview again with
+  [`tenant create --preview-of`](#tenant-create).
 - A package version with `required` set to `true` is not installed under
   `Extensions:Path`. The message lists every missing version, not only the first.
 - `AXIS_OIDC_CLIENT_SECRET` is missing.
@@ -614,6 +636,16 @@ role unless it says otherwise.
    final status, then set the request `succeeded` or `failed` and store its
    diagnostics.
 
+**Preview requests.** A request with target `preview` is stored in the main
+tenant's database, see [preview](authoring.md#preview). The publisher runs its
+steps against the main tenant's preview tenant, with that tenant's database and
+schema role. It compiles, activates and seeds there, and adds the history row to
+the preview tenant's release history. It writes no audit record. It sets the
+request `succeeded` or `failed` in the main tenant's database. It fails the
+request with `AXC0216` when the main tenant no longer has a preview tenant. Under
+`directory` it runs the request only while the preview tenant is `active` and at
+this build's schema version. Otherwise the request stays `queued`.
+
 Activating the same content hash twice changes nothing, so a request that runs
 again does no harm. An activation of the release that is already active adds no
 history row.
@@ -670,7 +702,8 @@ admin host carries the same version in its OCI label, see
 - Moving a tenant to another database server.
 - Commands that set a tenant's deployment bindings, claim names or endpoint
   audience. D43 does not say how they are written. `tenant create` sets none
-  of them, so they stay empty until a later issue decides.
+  of them, so they stay empty until a later issue decides. *(Planned for M10:)*
+  the one exception is `--binding` on a `tenant create --preview-of`.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.
