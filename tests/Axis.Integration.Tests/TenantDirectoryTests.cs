@@ -7,6 +7,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -116,6 +117,22 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
 
         Assert.Contains("ConnectionStrings:Platform", exception.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(wrongPassword, exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_start_stops_naming_the_tenant_and_the_binding_but_not_the_value_when_a_url_binding_is_not_a_url()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(
+            [new TenantBindingRow { TenantId = "a", Name = "PurchasingUrl", Kind = DeploymentBindingKinds.Url, Url = "not-a-url/secretmarker" }],
+            a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("Tenant 'a' binding 'PurchasingUrl' is not an absolute http or https URL.", exception.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secretmarker", exception.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -324,7 +341,10 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
     }
 
     /// <summary>Creates a platform database with the directory tables and one active tenant row per tenant.</summary>
-    private async Task<string> PreparePlatformAsync(params DirectoryTenant[] tenants)
+    private Task<string> PreparePlatformAsync(params DirectoryTenant[] tenants) => PreparePlatformAsync([], tenants);
+
+    /// <summary>Creates a platform database with the directory tables, one active tenant row per tenant and the given bindings.</summary>
+    private async Task<string> PreparePlatformAsync(TenantBindingRow[] bindings, params DirectoryTenant[] tenants)
     {
         var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
         await using (var context = PlatformContext(platform))
@@ -332,11 +352,13 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             await context.Database.MigrateAsync(CancellationToken);
         }
 
-        await AddTenantsAsync(platform, tenants);
+        await AddTenantsAsync(platform, tenants, bindings);
         return platform;
     }
 
-    private static async Task AddTenantsAsync(string platform, params DirectoryTenant[] tenants)
+    private static Task AddTenantsAsync(string platform, params DirectoryTenant[] tenants) => AddTenantsAsync(platform, tenants, []);
+
+    private static async Task AddTenantsAsync(string platform, DirectoryTenant[] tenants, TenantBindingRow[] bindings)
     {
         await using var context = PlatformContext(platform);
         foreach (var tenant in tenants)
@@ -359,6 +381,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             context.TenantHosts.Add(new TenantHostRow { TenantId = tenant.Id, Host = tenant.Host });
         }
 
+        context.TenantBindings.AddRange(bindings);
         await context.SaveChangesAsync(CancellationToken);
     }
 
