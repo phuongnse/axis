@@ -35,7 +35,8 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
 - `Studio:PublisherRole` *(planned for M10)* names the roles claim value that
   may publish and roll back, on top of the author role. With no value, nobody
   may publish or roll back. `validate`, the request status and the release
-  history need the author role only.
+  history need the author role only. A `preview` needs the author role only
+  too, see [Preview](#preview).
 
 ## Routes
 
@@ -124,6 +125,11 @@ delete. Checks 4, 6 for a request or a release, and 8 for a publish body are
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
+*(Planned for M10.)* A check 5b sits between checks 5 and 6, on `preview` only.
+When the session's tenant has no preview tenant, the answer is `409`. It comes
+after the unknown application `404`, so a caller cannot learn from it which
+applications exist.
+
 The session comes before the role, and the roles before the application. So a
 caller without the roles cannot find out which applications, resources,
 requests or releases exist.
@@ -133,7 +139,7 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
-Resource references and Text key references are built. The rows for Validate, Publish, Request status,
+Resource references and Text key references are built. The rows for Validate, Publish, Preview, Request status,
 Release history and Rollback are *(planned for M10)*.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -151,10 +157,12 @@ Release history and Rollback are *(planned for M10)*.
 | Publish *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
 | Request status *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
 | Release history *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Preview *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no preview tenant |
 | Rollback *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
 
-`400` is a bad body, and `428` a missing `If-Match`, as
-[Order of checks](#order-of-checks) says. `400` also answers a bad `publish`
+The `409` of Preview is problem details titled "This tenant has no preview
+tenant." *(planned for M10)*. It names no tenant. `400` is a bad body, and `428`
+a missing `If-Match`, as [Order of checks](#order-of-checks) says. `400` also answers a bad `publish`
 body *(planned for M10)*. A successful `validate`, `publish` or `rollback`
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
@@ -294,11 +302,13 @@ host publishes to that tenant only.
 | --- | --- |
 | `POST /api/studio/apps/{application}/validate` | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role |
 | `POST /api/studio/apps/{application}/publish` | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role |
+| `POST /api/studio/apps/{application}/preview` | `202` with the request and a `Location` header. It takes no body. It needs the author role only. `409` when the tenant has no preview tenant, see [Preview](#preview) |
 | `GET /api/studio/apps/{application}/requests/{id}` | `200` with the request, its status and its diagnostics |
 | `GET /api/studio/apps/{application}/releases` | `200` with the activation history, newest first, and which release is active |
 | `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It takes no body. It needs the author role and the publisher role |
 
-`validate` and `rollback` take no body, and a body that is sent is ignored.
+`validate`, `preview` and `rollback` take no body, and a body that is sent is
+ignored.
 `{id}` of a request is its UUID. `{id}` of a release is the release id from
 the history. The answers for `401`, `403`, `404` and the CSRF header are those
 of the rest of the API, see [Order of checks](#order-of-checks) and
@@ -306,13 +316,14 @@ of the rest of the API, see [Order of checks](#order-of-checks) and
 
 ### The request
 
-A request is shown as `{ id, application, kind, status, label, note, requestedBy, requestedAt, startedAt, finishedAt, releaseId, diagnostics }`.
+A request is shown as `{ id, application, kind, target, status, label, note, requestedBy, requestedAt, startedAt, finishedAt, releaseId, diagnostics }`.
 
 | Field | Meaning |
 | --- | --- |
 | `id` | The request id, a UUID |
 | `application` | The application `name` |
 | `kind` | `validate`, `publish` or `rollback` |
+| `target` | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Every other route writes `tenant` |
 | `status` | `queued`, `running`, `succeeded` or `failed` |
 | `label` | The optional label of a `publish`, up to 100 characters, or null |
 | `note` | The optional note of a `publish`, up to 2000 characters, or null |
@@ -345,6 +356,35 @@ A request is shown as `{ id, application, kind, status, label, note, requestedBy
 - **Order.** For one tenant and application the publisher runs requests one at
   a time, oldest first. When two publishes are queued, the newer one ends up
   live.
+
+### Preview
+
+*(Planned for M10.)* `POST .../preview` tries an application on the session
+tenant's [preview tenant](../architecture.md#preview-tenants) before it goes
+live. [D48](../decisions.md#d48-preview-tenants--agreed) agrees the route. The
+request has the kind `publish` and the target `preview`.
+
+- **Who may.** The author role is enough. It needs no publisher role, because
+  nothing goes live for real users.
+- **Where it is stored and where it runs.** The request is stored in the
+  session tenant's database, so Studio polls `GET .../requests/{id}` on the main
+  host as for any request. The publisher runs it against the preview tenant's
+  database, see [preview requests](administration.md#publisher).
+- **History.** The activation goes in the preview tenant's own release history,
+  with the request id. `GET .../releases` on the main host still shows only the
+  main tenant's history. The preview's release number is its own.
+- **Audit.** A preview writes no audit record, like `validate`. The preview's
+  history records who published it.
+- **A preview that is not served.** A request stays `queued` while the preview
+  tenant is not served. If the main tenant loses its preview tenant after the
+  request was stored, the request ends `failed` with `AXC0216`.
+- **Not required.** Publishing to the main tenant does not need a preview first.
+- **Data.** A preview starts with the application's seed data. Records created
+  in it stay until the operator recreates the preview tenant. Studio cannot reset
+  it.
+- **Bindings.** A preview has its own bindings, empty by default. A missing
+  binding is a warning at activation, and the call fails at run time. See
+  [preview tenants](configuration.md#preview-tenants).
 
 ### Lifecycle
 
