@@ -1092,7 +1092,6 @@ It never reads `ConnectionStrings:PlatformSchema`. If its first read fails, it
 retries every `Worker:PollInterval` and is not ready until a read works. Then it
 reads the directory again every `Tenancy:RefreshInterval`. It keeps the last good
 read when a refresh fails, and `/health/ready` is Degraded until a refresh works.
-Sign-in for a tenant added at a refresh is not built.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
