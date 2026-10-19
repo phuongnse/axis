@@ -16,7 +16,7 @@ Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
 restarts the server, which activates the folder, as a hand edit does today.
 *(planned for M10)* A write will take a lock in the platform database. Reads
 and diagnostics touch no database. Going live from Studio is
-[Publishing](#publishing). `validate` and `publish` are built, `preview`, the release history and `rollback`
+[Publishing](#publishing). `validate`, `publish` and the release history are built, `preview` and `rollback`
 are *(planned for M10)*. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
@@ -294,7 +294,7 @@ saved, and the diagnostics list the broken references.
 
 An author validates, publishes and rolls back an
 application from Studio. `validate`, `publish` and the request status are built.
-`preview`, the release history and `rollback` are *(planned for M10)*. The server never activates in its own process and
+`preview` and `rollback` are *(planned for M10)*. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -448,7 +448,7 @@ newest first.
 - Activating the release that is already active adds no row and keeps the
   number. Otherwise every restart under `scripts/dev.sh` would fill the history
   with copies.
-- *(Planned for M10.)* `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
+- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
   empty. It is built. Studio will use it to hide the publish and rollback buttons.
 
