@@ -148,9 +148,12 @@ The `platform` schema, its migrations, the read-only grant, the secret cipher
 and the directory source of the server and the worker are built. `Axis.Admin
 tenant create` writes the tables and encrypts the stored passwords and the OIDC
 client secret. `tenant suspend` and `tenant resume` change a tenant's status,
-and `tenant restore` adds a suspended tenant. Under `Tenancy:Source=configuration`
+and `tenant restore` adds a suspended tenant. Today, under `Tenancy:Source=configuration`
 the platform database holds no tables, and its connection string only serves the
-readiness check. Under `Tenancy:Source=directory` the server creates the tables at
+readiness check. *(planned for M10)* That changes: the platform tables exist
+under both tenant sources, because the server also keeps its data protection
+keys there, see [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+Under `Tenancy:Source=directory` the server creates the tables at
 start, then reads the `active` tenants, their hosts and their bindings over
 `ConnectionStrings:Platform`. Both hosts read them again every
 `Tenancy:RefreshInterval`. The server and the worker keep each password, the client
@@ -171,6 +174,11 @@ and creates no tables. See
   there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
   inherits rights through membership.
+- **One write grant.** *(planned for M10)* The same role also gets `INSERT` on
+  `platform.data_protection_keys`, and on no other table. Key rotation happens
+  while the server runs, so the server must add keys. It never updates or
+  deletes one. The Studio write lock is a PostgreSQL advisory lock. It needs
+  no grant, see [authoring API](authoring.md#versions).
 - **The writer.** `Axis.Admin` writes the directory over
   `ConnectionStrings:PlatformSchema`, see
   [administration](administration.md) and
@@ -178,11 +186,12 @@ and creates no tables. See
 
 The tables:
 
-| Table                      | Columns                                                                                                                                                                                                                                                                                                                     |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`         | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience and the `schema_version` |
-| `platform.tenant_hosts`    | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
-| `platform.tenant_bindings` | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
+| Table | Columns |
+| --- | --- |
+| `platform.tenants` | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience and the `schema_version` |
+| `platform.tenant_hosts` | The tenant id and the host. The host is unique on `lower(host)` across all tenants |
+| `platform.tenant_bindings` | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case |
+| `platform.data_protection_keys` *(planned for M10)* | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.
@@ -207,7 +216,10 @@ a tenant only when this value is the one the host was built for, see
   id, one zero byte, and the UTF-8 bytes of the field name. The field names are
   `runtime_password`, `schema_password`, `oidc_client_secret`, and `binding:`
   followed by the binding name in lower case. Every writer must use these
-  exact bytes and names.
+  exact bytes and names. *(planned for M10)* A data protection key uses an
+  empty tenant id, so the associated data is one zero byte and the field name
+  `data_protection_key:` followed by the key's `id`. A tenant id is never
+  empty, so a key and a tenant field cannot be swapped.
 - **Decryption.** A value is decrypted only at the moment of use, as
   `SecretValue` does today. No API, log, problem details or backup manifest
   holds a decrypted value.

@@ -501,6 +501,10 @@ removed. Everything in this decision is in place. See
   - It holds the user id, the display name, the roles and the tenant id.
   - It holds no tokens, and no token reaches the browser.
   - It ends after 8 hours, or after 1 hour without requests.
+  - *(planned for M10)* The cookie is protected with a key ring shared by every
+    replica, and behind a named proxy the server uses the forwarded scheme and
+    host. See
+    [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **Bound to its tenant:** a session used on another tenant's host is no
   session.
 - **Roles:** read from the roles claim at sign-in. A role change applies at
@@ -1822,6 +1826,9 @@ The owner confirmed these points on issue #569 on 2026-10-18.
   - Every write answers with the folder's diagnostics. `GET .../diagnostics`
     compiles the folder in memory against the installed packages, with the
     same codes as activation. It touches no database.
+  - *(planned for M10)* A write takes a lock in the platform database, so the
+    version check holds across server replicas. See
+    [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **Studio in the SPA:**
   - A platform route, `/studio`, outside every site. The header shows it to
     authors only.
@@ -2147,6 +2154,10 @@ The owner confirmed these points on issue #639 on 2026-10-18.
   - The server applies the platform migrations over a separate setting,
     `ConnectionStrings:PlatformSchema`. It uses it only at start, as D31 does
     for the tenant databases.
+  - *(planned for M10)* The read-only role gains `INSERT` on the data
+    protection key table, and under `configuration` the server now creates the
+    platform tables too. See
+    [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **First load:** the server stops its start when it cannot load the directory
   the first time, because there is no earlier directory that is safe to serve.
   The worker waits and retries, and it is not ready until the first load
@@ -2340,9 +2351,10 @@ The owner confirmed these points on issue #641 on 2026-10-19.
   - A test against a live Kubernetes cluster.
   - A downgrade.
   - Publishing images by NexKit.
-  - Deciding where the ASP.NET data protection key ring lives. Sessions across
-    replicas and restarts need a shared one. The guide lists it as an open
-    point.
+  - Deciding where the ASP.NET data protection key ring lives, and forwarded
+    headers. Sessions across replicas and restarts need a shared key ring.
+    [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed) now decides
+    both.
 
 _Why:_ an image with development settings or sample credentials would weaken
 every installation, so the production images hold none. Compose suits one
@@ -2519,6 +2531,90 @@ format change. M11 and M12 run in parallel because Studio editors can build on
 today's runtime while the page model grows. The cost is that some editors
 change again in M12.
 
+## D49. Several server replicas behind a TLS proxy — Agreed
+
+M10 runs the server as several replicas behind a reverse proxy that ends TLS.
+That is what a shared Studio server needs. Nothing in this decision is built
+yet. See the [installation guide](reference/installation.md#several-server-replicas),
+the [forwarded headers settings](reference/configuration.md#forwarded-headers),
+the [platform database](reference/storage.md#platform-database) and the
+[authoring API](reference/authoring.md#versions).
+The owner confirmed these points on issue #706 on 2026-10-19.
+
+- **Shared key ring:**
+  - The server keeps its ASP.NET data protection keys in a new platform table,
+    `platform.data_protection_keys`. Every replica reads the same keys.
+  - Sessions survive a restart and work on every replica.
+  - Each key is encrypted at rest with `Platform:SecretKey`, the way tenant
+    secrets are
+    ([D42](#d42-tenant-directory-in-the-platform-database--agreed)).
+  - The associated data of a key is an empty tenant id, one zero byte and the
+    field name `data_protection_key:` followed by the key's id. This is the
+    byte layout of tenant secrets. A tenant id is never empty, so a key and a
+    tenant field cannot be swapped.
+  - The server's read-only platform role gets `INSERT` on that table and on
+    nothing else. Key rotation happens while the server runs, so the server
+    must be able to add keys. Rows are only inserted, never updated or deleted.
+  - The platform tables exist under both tenant sources. Under
+    `Tenancy:Source=configuration` the server also applies the platform
+    migrations. So the server needs `ConnectionStrings:PlatformSchema` and
+    `Platform:SecretKey` there too. Development uses a committed development
+    key. Development, Compose and the tests keep one code path.
+- **Forwarded headers:**
+  - Two new server settings name the proxies that count:
+    `ForwardedHeaders:KnownProxies` lists IP addresses and
+    `ForwardedHeaders:KnownNetworks` lists CIDR ranges.
+  - The server reads `X-Forwarded-For`, `X-Forwarded-Proto` and
+    `X-Forwarded-Host` only from those addresses. With both settings empty,
+    which is the default, it reads none.
+  - No proxy is trusted until it is named. Loopback is not trusted by default.
+  - The server reads one hop, the nearest proxy. A client then cannot spoof the
+    scheme or the host through a chain of proxies.
+  - The server never reads `X-Forwarded-Prefix`.
+  - Tenant resolution, cookie security and OIDC redirect addresses use the
+    scheme and host that result.
+  - An entry that cannot be read stops the start and names the setting. The
+    worker reads neither setting.
+- **Studio across replicas:**
+  - Studio folders live on a volume that every replica mounts at the same
+    path.
+  - A write takes a PostgreSQL advisory lock in the platform database, over
+    `ConnectionStrings:Platform`. The version check and the write happen under
+    that lock, so it holds across replicas. An advisory lock needs no grant.
+  - The lock is keyed by the folder alone. A create checks that its `id` is
+    unused anywhere in the folder. A lock per file would let two creates with
+    the same `id` both succeed.
+  - A write that cannot take the lock answers `503` and writes nothing.
+- **Installs:**
+  - The Helm chart drops the one-replica limit of the server.
+    `studio.persistence` mounts a shared folder volume when Studio is on. In
+    Kubernetes that needs a `ReadWriteMany` storage class.
+  - The on-premises Compose install can run two server replicas behind a TLS
+    proxy.
+  - The on-premises smoke test does so. It checks that a session survives
+    restarting one replica.
+- **Effect on earlier decisions:**
+  - D23 keeps its session rules. The key ring and the forwarded headers change
+    where the cookie key lives and which scheme and host the server sees.
+  - D38 keeps its write rules. The write lock moves from the server process to
+    the platform database.
+  - D42 keeps its tenant directory. The read-only platform role gains `INSERT`
+    on one table, and the platform tables now exist under `configuration` too.
+  - D44 decides the key ring and the forwarded headers, which it left open.
+
+*Why:* a shared Studio server needs more than one replica, and the server
+cannot do that today. Its sessions end at every restart. A second replica
+cannot read the first one's cookies. Behind a proxy that ends TLS, the server
+sees plain HTTP, which breaks secure cookies and OIDC redirect addresses. Two
+replicas that share a folder could both accept a write with the same version.
+A key table in the platform database gives every replica the same keys without
+a writable root file system, at the cost of one `INSERT` grant to a read-only
+role. Platform tables under both tenant sources give one code path for keys and
+locks, at the cost of platform tables in development databases. Trusting no
+proxy until it is named keeps a client from setting the scheme or the host. A
+shared volume for Studio folders keeps one copy of each file. In Kubernetes it
+needs a `ReadWriteMany` storage class.
+
 ## D50. Sign-in audit records and security scanning in CI — Agreed
 
 M10 adds two security baselines _(planned for M10)_. Sign-in, sign-out and refused sign-ins leave
@@ -2542,7 +2638,8 @@ The owner confirmed these points on issue #707 on 2026-10-19.
     records no user. The reason is `otherTenant`, `invalidToken`,
     `invalidState` or `providerError`. `providerError` covers a person who
     cancels at the identity provider, and a provider error.
-  - Every record holds the client address, after the forwarded headers rules.
+  - Every record holds the client address, after the forwarded headers rules of
+    [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
     None holds a token, a cookie or the user agent.
   - A session that expires writes nothing. A sign-out with no session writes
     nothing.

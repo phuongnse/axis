@@ -461,7 +461,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     nothing, because there is no tenant database.
   - Each record holds the client address, and never a token, a cookie or the
     user agent. The address follows the
-    [forwarded headers](reference/installation.md#open-points) rules.
+    [forwarded headers](reference/configuration.md#forwarded-headers) rules of
+    [D49](decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
   - It holds the user id, the display name, the roles and the tenant id.
   - It holds no access, refresh or ID token, and no token reaches the
@@ -471,6 +472,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     so the hour counts from the last request.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
+  - *(planned for M10)* The cookie is protected with a key ring that every
+    server replica shares. The keys are in the platform database, so a session
+    survives a restart and works on every replica. Behind a named proxy, the
+    callback and sign-out addresses and the cookie's Secure flag use the
+    forwarded scheme and host. See [D49](decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed) and the
+    [forwarded headers settings](reference/configuration.md#forwarded-headers).
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.
