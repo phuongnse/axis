@@ -556,7 +556,9 @@ a missing binding is an `AXC0100` warning and not an error, as
    else runs for it.
 2. `compile`: compile the folder against the tenant database and store its
    release.
-3. `activate`: activate the release.
+3. `activate`: activate the release. This adds a row with the actor `operator`
+   to the [release history](storage.md#release-history), unless the release is
+   already the active one.
 4. `seed`: insert the seed records and write the schedule trigger state.
 
 Steps 2 and 3 run as the tenant's schema role. Step 4 runs as its runtime role.
@@ -596,9 +598,8 @@ file in the repository root and the E2E script each start one too.
 
 **What is built.** The command runs `publish` and `validate` requests for
 `Tenancy:Source=directory` and for `Tenancy:Source=configuration`. These stay
-*(planned for M10)*: `rollback` requests, preview requests and the release
-history. A request of a kind that is not built is never claimed, so it stays
-`queued`.
+*(planned for M10)*: `rollback` requests and preview requests. A request of a
+kind that is not built is never claimed, so it stays `queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
 
@@ -678,8 +679,9 @@ role unless it says otherwise.
    runtime role. The compile reads the snapshot's files, never the application
    folder on any disk. A snapshot that cannot be read, because it is not an array of
    `{ file, version, content }` or names a file twice, fails at `compile`
-   and stores no release. *(Planned for M10:)* Activation adds a row to the
-   [release history](storage.md#publish-requests-and-release-history).
+   and stores no release. Activation adds a row to the
+   [release history](storage.md#release-history) with the requesting user, the
+   label, the note and the request id, unless the release is already active.
 4. For `validate`: run the `compile` and every check of
    `activate` against the tenant inside one transaction, then roll the
    transaction back. It stores no release, adds no history row and seeds
@@ -716,7 +718,7 @@ tenant is `active` and at this build's schema version. Otherwise the request
 stays `queued`.
 
 Activating the same content hash twice changes nothing, so a request that runs
-again does no harm. *(Planned for M10:)* An activation of the release that is
+again does no harm. An activation of the release that is
 already active adds no history row.
 
 **Failures.** A request fails on its own and does not stop the others. The

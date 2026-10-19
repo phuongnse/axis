@@ -189,6 +189,70 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("releases", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ReleaseActivationRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activated_at");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("ActorName")
+                        .HasColumnType("text")
+                        .HasColumnName("actor_name");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("Label")
+                        .HasColumnType("text")
+                        .HasColumnName("label");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_release_activations");
+
+                    b.HasIndex("ReleaseId")
+                        .HasDatabaseName("ix_release_activations_release_id");
+
+                    b.HasIndex("ApplicationId", "ReleaseId")
+                        .HasDatabaseName("ix_release_activations_application_id_release_id");
+
+                    b.HasIndex("ApplicationId", "ActivatedAt", "Id")
+                        .HasDatabaseName("ix_release_activations_application_id_activated_at");
+
+                    b.ToTable("release_activations", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.ReleaseComputedFingerprint", b =>
                 {
                     b.Property<Guid>("ReleaseId")
@@ -273,6 +337,16 @@ namespace Axis.Configuration.Storage.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_active_sites_active_releases_application_id");
+                });
+
+            modelBuilder.Entity("Axis.Configuration.Storage.ReleaseActivationRow", b =>
+                {
+                    b.HasOne("Axis.Configuration.Storage.Release", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_release_activations_releases_release_id");
                 });
 
             modelBuilder.Entity("Axis.Configuration.Storage.ReleaseComputedFingerprint", b =>

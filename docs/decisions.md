@@ -2546,8 +2546,11 @@ change again in M12.
 An author validates, publishes and rolls back an application from Studio. The
 server never gets schema rights. It stores a **publish request**, and a
 separate **publisher** runs it. Every activation also gets a release number in
-a per-tenant history. This decision is planned for M10. Only the publish request
-table is built so far. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+a per-tenant history. This decision is planned for M10. The release history
+and its `GET .../releases` route are built, and so is the publish request
+table. The publisher runs `publish` and `validate` requests, and a `publish`
+writes its audit record. The Studio publish routes, rollback and
+`studioPublisher` are not built. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M10, the [authoring API](reference/authoring.md#publishing) for the routes,
 the [publisher](reference/administration.md#publisher) and the
 [publish request and release history tables](reference/storage.md#publish-requests-and-release-history).
