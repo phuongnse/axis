@@ -138,6 +138,52 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
   development environments run activation as the schema role and everything
   else as the runtime role. See [Database roles](#database-roles).
 
+## Platform database
+
+*(Planned for M9.)* See
+[D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
+None of it is built. The platform database holds no tables today, and its
+connection string only serves the readiness check. Under
+`Tenancy:Source=directory`, it holds the tenant directory, see
+[tenant directory](../architecture.md#tenant-directory).
+
+- **The `platform` schema.** Its EF Core migrations ship with Axis, with their
+  history in `platform.__platform_migrations`. The server applies them at
+  start over `ConnectionStrings:PlatformSchema`, and uses that setting for
+  nothing else.
+- **Read-only hosts.** Both hosts read the directory over
+  `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
+  and `SELECT` on its tables, and nothing else. The writer is left to a later
+  provisioning decision.
+
+The tables:
+
+| Table | Columns |
+| --- | --- |
+| `platform.tenants` | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names and the endpoint audience |
+| `platform.tenant_hosts` | The tenant id and the host. The host is unique on `lower(host)` across all tenants |
+| `platform.tenant_bindings` | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case |
+
+The tenant `version` grows on every change to the tenant, its hosts or its
+bindings.
+
+- **Where secrets are stored.** Each of these is stored encrypted, and nowhere
+  else:
+  - the runtime and schema database passwords, in `platform.tenants`;
+  - the OIDC client secret, in `platform.tenants`;
+  - the value of a `secret` binding, in `platform.tenant_bindings`.
+- **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
+  nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
+  installation key `Platform:SecretKey`, see
+  [tenancy settings](configuration.md#tenancy-settings). The associated data
+  is the tenant id and the field name, so a value copied to another tenant or
+  field does not decrypt.
+- **Decryption.** A value is decrypted only at the moment of use, as
+  `SecretValue` does today. No API, log, problem details or backup manifest
+  holds a decrypted value.
+- **No key rotation.** M9 has none. After a leaked key, every stored secret
+  must be set again by hand.
+
 ## Database roles
 
 See [D31](../decisions.md#d31-separate-database-roles--agreed). The two

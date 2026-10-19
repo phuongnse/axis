@@ -1065,6 +1065,33 @@ to show where a resource is used and what it uses.
   resource, written `<module id>/<name>`, appears in the index is left to the
   issue that builds modules.
 
+## Tenancy settings
+
+*(Planned for M9.)* See
+[D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
+and [tenant directory](../architecture.md#tenant-directory). None of these
+settings exist yet.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
+| `Tenancy:RefreshInterval` | `00:00:30` | How often both hosts read the tenant directory again. It must be positive. |
+| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed under `directory`. A missing or invalid key stops the start. |
+| `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema. Both hosts need it under `directory`. |
+| `ConnectionStrings:PlatformSchema` | none | The role that applies the platform migrations. Only the server reads it, and only at start. |
+
+As environment variables they are `Tenancy__Source`,
+`Tenancy__RefreshInterval`, `Platform__SecretKey`,
+`ConnectionStrings__Platform` and `ConnectionStrings__PlatformSchema`.
+
+- **Secret key source.** `Platform:SecretKey` comes from the environment or a
+  mounted secret file. Only in Development may a committed file hold it.
+- **Default source.** Development, `scripts/dev.sh`, Docker Compose and the
+  tests keep `Tenancy:Source=configuration`.
+- **Where secrets live.** Under `directory`, the encrypted values are in the
+  platform database, see
+  [platform database](storage.md#platform-database).
+
 ## Telemetry export
 
 The server and the worker export traces, logs and metrics with OpenTelemetry,
@@ -1403,7 +1430,10 @@ reconciles is in [Connector calls](processes.md#connector-calls).
 - **Where values live.** Each tenant holds its values in
   `Tenants:{id}:Bindings:{name}` of the host configuration, until the tenant
   directory in M9. Each binding has a `Kind`, `url` or `secret`, and a
-  `Value`. The server and the worker must both hold them.
+  `Value`. The server and the worker must both hold them. *(Planned for M9.)*
+  Under `Tenancy:Source=directory`, the values live in the
+  [tenant directory](../architecture.md#tenant-directory) instead, and `secret`
+  values are stored encrypted.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
   `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
