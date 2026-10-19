@@ -34,7 +34,8 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 // built, because sign-in registers one client per tenant. Under configuration, nothing about the platform
 // schema is read.
 ITenantCatalog tenants;
-if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
+var directorySource = TenancySettings.Source(builder.Configuration) == TenancySource.Directory;
+if (directorySource)
 {
     // Read first, so a bad value stops the start even when the database is not there.
     var refreshInterval = TenancySettings.RefreshInterval(builder.Configuration);
@@ -76,6 +77,7 @@ if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
     // Registered first, so it logs before the release check runs.
     builder.Services.AddSingleton(cipher);
     builder.Services.AddSingleton(directory);
+    builder.Services.AddSingleton<TenantDirectoryRefreshStatus>();
     builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval));
     builder.Services.AddSingleton<TenantDirectoryRefresh>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<TenantDirectoryRefresh>());
@@ -96,10 +98,21 @@ else
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<TenantDatabaseGauge>();
-builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
+
+// Under directory, the server serves its tenants from the last good read while the platform database is down.
+// Readiness is Degraded then, not Unhealthy, so a load balancer keeps the server in service.
+var health = builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>(
+        "database",
+        failureStatus: directorySource ? HealthStatus.Degraded : HealthStatus.Unhealthy,
+        tags: [HealthEndpoints.ReadyTag])
     .AddCheck<StartupActivationHealthCheck>("activation", tags: [HealthEndpoints.ReadyTag])
     .AddCheck<TenantDatabasesHealthCheck>("tenant-databases", failureStatus: HealthStatus.Degraded, tags: [HealthEndpoints.ReadyTag]);
+if (directorySource)
+{
+    health.AddCheck<TenantDirectoryHealthCheck>("tenant-directory", failureStatus: HealthStatus.Degraded, tags: [HealthEndpoints.ReadyTag]);
+}
+
 // Every problem details answer carries the request's trace id.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemTraceId.Apply);
 builder.Services.AddServerTelemetry(builder.Configuration);
