@@ -49,6 +49,13 @@
         "resources": { "type": "object" }
       }
     },
+    "publisher": {
+      "type": "object",
+      "properties": {
+        "resources": { "type": "object" },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 }
+      }
+    },
     "migrate": {
       "type": "object",
       "properties": {

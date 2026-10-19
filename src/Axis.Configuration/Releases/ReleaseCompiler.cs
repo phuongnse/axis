@@ -27,8 +27,9 @@ public static class ReleaseCompiler
     /// <summary>
     /// Compiles <paramref name="folderPath"/> against <paramref name="installedPackages"/> and stores
     /// the release through <paramref name="context"/>, which the caller connects to the tenant
-    /// database. Call it outside an explicit transaction: when a concurrent compile stores the same
-    /// release first, the context's change tracker is cleared and the stored release is returned.
+    /// database. It also runs in a transaction that the caller enlisted the context in, and the caller then
+    /// commits or rolls back the release. When a concurrent compile stores the same release first, the
+    /// context's change tracker is cleared and the stored release is returned.
     /// </summary>
     public static Task<ReleaseCompilationResult> CompileAsync(
         string folderPath,

@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using Axis.Configuration.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace Axis.Configuration.Releases;
@@ -112,6 +113,12 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(sitePaths);
+
+        // The caller already enlisted this context, so the transaction stays as it is after the write.
+        if (context.Database.CurrentTransaction?.GetDbTransaction() == transaction)
+        {
+            return await WriteAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        }
 
         // EF throws InvalidOperationException here when the transaction is on another connection.
         await context.Database.UseTransactionAsync(transaction, cancellationToken);

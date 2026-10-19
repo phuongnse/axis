@@ -1197,12 +1197,12 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
   SHA-256 of the file's bytes, as in [Versions](authoring.md#versions). A later
   edit never changes a stored snapshot. The publisher compiles the snapshot from
   these texts alone.
-- **Claim.** The publisher takes the oldest `queued` `publish` row of an application with
+- **Claim.** The publisher takes the oldest `queued` `publish` or `validate` row of an application with
   `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by`, `lease_until` and
   adds 1 to `claims`. It skips an application that has a `running` row.
   A `running` row whose `lease_until` has passed is claimed again the same way.
   A row with `claims` of 3 and an expired lease becomes `failed` with `AXC0215`.
-  The publisher claims no `validate` or `rollback` row.
+  The publisher claims no `rollback` row.
 - **Preview target.** *(Planned for M10.)* A row with `target` `preview` is
   stored in the session tenant's database and run against that tenant's preview
   tenant, see [preview](authoring.md#preview). Its history row lives in the

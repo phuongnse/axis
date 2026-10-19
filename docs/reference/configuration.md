@@ -853,7 +853,7 @@ sorted by file and then path.
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
-| `AXC0215` | The publisher stopped three times while running a publish request. Reported on the request, with an empty file and path, see [lifecycle](authoring.md#lifecycle). |
+| `AXC0215` | The publisher stopped three times while running a publish or validate request. Reported on the request, with an empty file and path, see [lifecycle](authoring.md#lifecycle). |
 
 *(Planned for M10.)* `AXC0216` is not in the table above. It means that
 the main tenant has no preview tenant when a preview request runs, see

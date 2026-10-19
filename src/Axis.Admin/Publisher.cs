@@ -14,15 +14,16 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c> requests that Studio stores in the tenant databases, until it is stopped. Each
-/// poll round it claims the oldest queued request of every active tenant that is on this build's schema version and runs it
-/// with the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A request ends
-/// <c>succeeded</c> or <c>failed</c>, with its diagnostics, and the audit record is written in the same transaction. A
-/// request of another tenant, and one that is not a <c>publish</c>, stays queued. While a request runs, the publisher renews
-/// its lease. A running request whose lease has run out is claimed again, and the third such claim to run out ends it
-/// <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that lost its claim
-/// changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is running, then ends
-/// the loop.
+/// <c>publisher</c>: runs the <c>publish</c> and <c>validate</c> requests that Studio stores in the tenant databases, until it
+/// is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
+/// version. A <c>publish</c> runs the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A
+/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A request ends
+/// <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> writes its audit record in the same transaction,
+/// and a <c>validate</c> writes none. A request of another tenant, and a <c>rollback</c>, stays queued. While a request runs,
+/// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
+/// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
+/// lost its claim changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is
+/// running, then ends the loop.
 /// </summary>
 internal sealed class Publisher(
     ActivateSettings settings,
@@ -47,8 +48,8 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
-        WHERE kind = 'publish' AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
-        RETURNING id, application_id, requested_by, requested_by_name
+        WHERE kind IN ('publish', 'validate') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        RETURNING id, application_id, requested_by, requested_by_name, kind
         """;
 
     // clock_timestamp() and not now(): now() is fixed when the transaction starts, before the wait for the lock.
@@ -56,7 +57,7 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.kind = 'publish'
+          WHERE r.kind IN ('publish', 'validate')
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
@@ -67,7 +68,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.claims
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims
         """;
 
     private const string RenewSql =
@@ -233,7 +234,8 @@ internal sealed class Publisher(
                     await reader.IsDBNullAsync(2) ? null : reader.GetString(2),
                     reader.GetString(3),
                     await reader.IsDBNullAsync(4) ? null : reader.GetString(4),
-                    reader.GetInt32(5));
+                    reader.GetString(5),
+                    reader.GetInt32(6));
             }
         }
 
@@ -241,11 +243,11 @@ internal sealed class Publisher(
         return claimed;
     }
 
-    // A running request that was claimed three times and whose lease ran out again ends failed, with its audit record.
+    // A running request that was claimed three times and whose lease ran out again ends failed. A publish gets its audit record.
     private async Task FailExhaustedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string tenant)
     {
         const string message = "The publisher stopped three times while running the request.";
-        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName)>();
+        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind)>();
         await using (var command = new NpgsqlCommand(ExhaustedSql, connection, transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb)
@@ -256,13 +258,17 @@ internal sealed class Publisher(
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3)));
+                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4)));
             }
         }
 
         foreach (var request in exhausted)
         {
-            await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, null);
+            if (request.Kind == "publish")
+            {
+                await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, null);
+            }
+
             output.WriteLine($"{tenant} claim failed: {DiagnosticCodes.PublishClaimsExhausted} {message}");
         }
     }
@@ -290,6 +296,22 @@ internal sealed class Publisher(
     {
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
+        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None);
+        if (request.Kind == "validate")
+        {
+            var valid = await activation.ValidateAsync(
+                row,
+                steps,
+                _bindings[row.Id],
+                files is null
+                    ? null
+                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                diagnostics);
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(row, steps, request, new ReleaseRun(valid, null), diagnostics, audit: false);
+            return;
+        }
+
         ReleaseRun run;
         if (files is null)
         {
@@ -298,7 +320,7 @@ internal sealed class Publisher(
         }
         else
         {
-            run = await new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None).RunAsync(
+            run = await activation.RunAsync(
                 row,
                 steps,
                 _bindings[row.Id],
@@ -308,7 +330,7 @@ internal sealed class Publisher(
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
-        await FinishAsync(row, steps, request, run, diagnostics);
+        await FinishAsync(row, steps, request, run, diagnostics, audit: true);
     }
 
     private static async Task StopRenewalAsync(CancellationTokenSource renewing, Task renewal)
@@ -406,9 +428,9 @@ internal sealed class Publisher(
         }
     }
 
-    // The final status, the diagnostics and the audit record commit together, so a request never ends without its record.
-    // A publisher that lost its claim changes nothing and writes no record.
-    private async Task FinishAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics)
+    // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
+    // validate has no audit record. A publisher that lost its claim changes nothing and writes no record.
+    private async Task FinishAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit)
     {
         var connection = await steps.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -430,7 +452,11 @@ internal sealed class Publisher(
             return;
         }
 
-        await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, run.Succeeded, run.ReleaseId);
+        if (audit)
+        {
+            await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, run.Succeeded, run.ReleaseId);
+        }
+
         await transaction.CommitAsync();
     }
 
@@ -467,5 +493,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, int Claims);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims);
 }
