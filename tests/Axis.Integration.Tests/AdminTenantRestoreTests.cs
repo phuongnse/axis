@@ -190,9 +190,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         {
             ("unreadable", unreadable, null, "the archive cannot be read"),
             ("format", unknownFormat, null, "format 2"),
-            ("newer", newer, null, "schema version"),
-            ("unknown version", unknownVersion, null, "schema version"),
-            ("taken host", file, AdminBackupFixture.Host.ToUpperInvariant(), "a host belongs to another tenant"),
+            ("newer", newer, null, "99991231235959_Future"),
+            ("unknown version", unknownVersion, null, "20000101000000_Unknown"),
+            ("taken host", file, AdminBackupFixture.Host.ToUpperInvariant(), $"a host belongs to another tenant: {AdminBackupFixture.Host.ToUpperInvariant()}"),
             ("package", missingPackage, null, "missing-package 9.9.9"),
         };
 
@@ -217,6 +217,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var before = await scenario.SnapshotAsync();
         var existing = await RestoreAsync(file, fixture.TenantId, "other.example.test");
         Assert.Equal(2, existing.Exit);
+        Assert.Contains(fixture.TenantId, existing.Output.Single(), StringComparison.Ordinal);
         Assert.Contains("already exists", existing.Output.Single(), StringComparison.Ordinal);
         Assert.Equal(before, await scenario.SnapshotAsync());
 
@@ -260,6 +261,55 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         }
 
         await AssertNothingCreatedAsync(noSecretId, entriesBefore);
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task An_archive_with_several_problems_reports_every_one_and_creates_nothing()
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+        var scenario = fixture.Scenario;
+        var several = Rewrite(
+            file,
+            folder.Path,
+            "several",
+            manifest =>
+            {
+                manifest["schemaVersion"] = "99991231235959_Future";
+                ((JsonArray)manifest["packages"]!).Add(new JsonObject { ["id"] = "missing-package", ["version"] = "9.9.9", ["required"] = true });
+
+                // A module that is not installed never refuses a restore.
+                ((JsonArray)manifest["modules"]!).Add(new JsonObject { ["id"] = "missing-module", ["version"] = "9.9.9" });
+            });
+        var id = scenario.NewTenantId();
+        var entries = await scenario.CountEntriesAsync();
+
+        var result = await RestoreAsync(several, id, AdminBackupFixture.Host);
+
+        Assert.Equal(2, result.Exit);
+        Assert.Equal(3, result.Output.Length);
+        Assert.All(result.Output, line => Assert.StartsWith($"{id} check failed: ", line, StringComparison.Ordinal));
+        var text = string.Join('\n', result.Output);
+        Assert.Contains("99991231235959_Future", text, StringComparison.Ordinal);
+        Assert.Contains("missing-package 9.9.9", text, StringComparison.Ordinal);
+        Assert.Contains(AdminBackupFixture.Host, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("missing-module", text, StringComparison.Ordinal);
+        Assert.Empty(result.Error);
+        await AssertNothingCreatedAsync(id, entries);
+
+        // The id and host checks need no manifest, so they run for an archive that cannot be read.
+        var unreadable = Path.Combine(folder.Path, "unreadable.tar");
+        await File.WriteAllBytesAsync(unreadable, System.Security.Cryptography.RandomNumberGenerator.GetBytes(4096), CancellationToken);
+        var before = await scenario.SnapshotAsync();
+        var both = await RestoreAsync(unreadable, fixture.TenantId, $"{id}.example.test");
+        Assert.Equal(2, both.Exit);
+        Assert.Equal(2, both.Output.Length);
+        Assert.Single(both.Output, line => line.Contains("already exists", StringComparison.Ordinal) && line.Contains(fixture.TenantId, StringComparison.Ordinal));
+        Assert.Single(both.Output, line => line.Contains("the archive cannot be read", StringComparison.Ordinal));
+        Assert.Equal(before, await scenario.SnapshotAsync());
+
         await scenario.AssertNoSecretsAsync();
     }
 
