@@ -87,6 +87,82 @@ public sealed class TenantOptionsValidatorTests
     }
 
     [Fact]
+    public void A_preview_tenant_of_a_configured_main_tenant_has_no_problems()
+    {
+        var options = Tenants.Options(
+            ("main", ["a.example.test"], Tenants.ConnectionString),
+            ("main-preview", ["b.example.test"], Tenants.ConnectionString),
+            ("other", ["c.example.test"], Tenants.ConnectionString))
+            .WithPreviewOf("main-preview", "main");
+
+        Assert.Empty(TenantOptionsValidator.Validate(options));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_PreviewOf_counts_as_unset(string? previewOf)
+    {
+        var options = Tenants.Options(("default", ["localhost"], Tenants.ConnectionString))
+            .WithPreviewOf("default", previewOf);
+
+        Assert.Empty(TenantOptionsValidator.Validate(options));
+    }
+
+    [Fact]
+    public void PreviewOf_that_names_an_unknown_tenant_is_named()
+    {
+        var options = Tenants.Options(("preview", ["localhost"], Tenants.ConnectionString))
+            .WithPreviewOf("preview", "missing");
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Equal("Tenant 'preview' names 'missing' in PreviewOf, which is not a configured tenant.", problem);
+    }
+
+    [Fact]
+    public void PreviewOf_that_names_a_preview_tenant_is_named()
+    {
+        var options = Tenants.Options(
+            ("main", ["a.example.test"], Tenants.ConnectionString),
+            ("preview", ["b.example.test"], Tenants.ConnectionString),
+            ("second", ["c.example.test"], Tenants.ConnectionString))
+            .WithPreviewOf("preview", "main")
+            .WithPreviewOf("second", "preview");
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Equal("Tenant 'second' names 'preview' in PreviewOf, which is itself a preview tenant.", problem);
+    }
+
+    [Fact]
+    public void A_tenant_that_names_itself_in_PreviewOf_is_a_preview_of_a_preview_tenant()
+    {
+        var options = Tenants.Options(("loop", ["localhost"], Tenants.ConnectionString))
+            .WithPreviewOf("loop", "loop");
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Equal("Tenant 'loop' names 'loop' in PreviewOf, which is itself a preview tenant.", problem);
+    }
+
+    [Fact]
+    public void Two_tenants_with_the_same_PreviewOf_are_named()
+    {
+        var options = Tenants.Options(
+            ("main", ["a.example.test"], Tenants.ConnectionString),
+            ("preview-b", ["b.example.test"], Tenants.ConnectionString),
+            ("preview-a", ["c.example.test"], Tenants.ConnectionString))
+            .WithPreviewOf("preview-b", "main")
+            .WithPreviewOf("preview-a", "main");
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Equal("Tenants 'preview-a' and 'preview-b' both name 'main' in PreviewOf. A tenant has at most one preview tenant.", problem);
+    }
+
+    [Fact]
     public void Every_problem_is_reported()
     {
         var options = Tenants.Options(

@@ -49,7 +49,35 @@ public static class TenantOptionsValidator
             }
         }
 
+        AddPreviewProblems(options, problems);
         return problems;
+    }
+
+    // A tenant whose PreviewOf is its own id is a preview tenant, so the second rule refuses it.
+    private static void AddPreviewProblems(TenantOptions options, List<string> problems)
+    {
+        var previewsByMain = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (tenantId, settings) in options.Tenants.OrderBy(tenant => tenant.Key, StringComparer.Ordinal))
+        {
+            var main = settings?.PreviewOf;
+            if (string.IsNullOrWhiteSpace(main))
+            {
+                continue;
+            }
+
+            if (!options.Tenants.TryGetValue(main, out var mainSettings))
+            {
+                problems.Add($"Tenant '{tenantId}' names '{main}' in PreviewOf, which is not a configured tenant.");
+            }
+            else if (!string.IsNullOrWhiteSpace(mainSettings?.PreviewOf))
+            {
+                problems.Add($"Tenant '{tenantId}' names '{main}' in PreviewOf, which is itself a preview tenant.");
+            }
+            else if (!previewsByMain.TryAdd(main, tenantId))
+            {
+                problems.Add($"Tenants '{previewsByMain[main]}' and '{tenantId}' both name '{main}' in PreviewOf. A tenant has at most one preview tenant.");
+            }
+        }
     }
 
     private static void AddBindingProblems(string tenantId, TenantSettings? settings, List<string> problems)

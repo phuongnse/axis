@@ -17,6 +17,12 @@ public sealed class TenantSettings
 
     public string? ConnectionString { get; set; }
 
+    /// <summary>
+    /// The id of the main tenant when this is a preview tenant. A blank value counts as unset. A preview tenant signs
+    /// people in with its main tenant's settings, without <c>EndpointAudience</c>.
+    /// </summary>
+    public string? PreviewOf { get; set; }
+
     /// <summary>The tenant's deployment bindings keyed by binding name, matched ignoring letter case.</summary>
     public Dictionary<string, DeploymentBindingSettings> Bindings { get; } = new(StringComparer.OrdinalIgnoreCase);
 }

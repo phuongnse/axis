@@ -898,9 +898,11 @@ development or E2E server serves a real application without a separate step.
   that pins it and holds its files, and that release is activated.
 - **Before listening.** The step runs before any hosted service starts, so
   the server accepts no request until every tenant is done.
-- **Failures.** Any compile or activation diagnostic, or any error, stops the
-  start and the process exits. Each diagnostic is logged with its code, file
-  and path, together with the folder and tenant. An error after provisioning
+- **Failures.** Any compile or activation diagnostic that is an error, or any
+  exception, stops the start and the process exits. Each diagnostic is logged
+  with its code, file and path, together with the folder and tenant. A warning,
+  such as a missing binding on a [preview tenant](#preview-tenants), is logged
+  and does not stop the start. An error after provisioning
   committed is logged with the folder and tenant too. The previously active
   release stays active, and the first failing tenant stops the whole start,
   so no server runs with some tenants on old releases and others on new ones.
@@ -1170,12 +1172,13 @@ As environment variables they are `Tenancy__Source`,
 
 ### Preview tenants
 
-*(Planned for M10.)* A tenant can be the preview tenant of another tenant, as
+A tenant can be the preview tenant of another tenant, as
 [D48](../decisions.md#d48-preview-tenants--agreed) agrees. See
 [preview tenants](../architecture.md#preview-tenants) for how the hosts treat
 it. Under `Tenancy:Source=configuration`, the tenant setting
 `Tenants:{id}:PreviewOf` names the main tenant. As an environment variable it is
-`Tenants__<id>__PreviewOf`. Under `directory`, the operator sets it with
+`Tenants__<id>__PreviewOf`. A blank value counts as unset. *(Planned for M10:)*
+under `directory`, the operator sets it with
 [`tenant create --preview-of`](administration.md#tenant-create).
 
 ```json
@@ -1199,8 +1202,8 @@ it. Under `Tenancy:Source=configuration`, the tenant setting
   none. `PreviewOf` that names an unknown tenant or a preview tenant, and two
   tenants that name the same main tenant, stop the start. See
   [tenant configuration](../architecture.md#tenant-configuration).
-- **Development.** Development, Docker Compose and the E2E script configure one
-  preview tenant.
+- **Development.** *(Planned for M10:)* Development, Docker Compose and the E2E
+  script configure one preview tenant.
 
 ## Forwarded headers
 
@@ -1628,9 +1631,9 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   bad binding at once. Startup activation passes in each tenant's bindings,
   so a bad binding stops the start. A tenant is checked only when a release
   is activated for it. Under `directory` the bindings come from the tenant's
-  directory entry. *(Planned for M10:)* on a
+  directory entry. On a
   [preview tenant](#preview-tenants), a binding that is missing is `AXC0100`
-  with severity warning, not an error. Activation goes on, and a call that needs
+  with severity warning, not an error. Startup activation logs the warning. Activation goes on, and a call that needs
   the binding fails at run time, where the inspector shows it. A binding of the
   wrong kind (`AXC0100`) and an `http` URL outside Development (`AXC0101`) stay
   errors.

@@ -14,9 +14,10 @@ public sealed record ActivationBinding(string Kind, Uri? Url)
 /// <summary>
 /// The deployment bindings of the tenant a release is activated for, keyed by binding name and
 /// matched ignoring letter case, and whether a <c>url</c> binding may use <c>http</c>, as it may
-/// only in Development.
+/// only in Development. On a preview tenant, <paramref name="IsPreview"/>, a missing binding is an activation warning
+/// and not an error.
 /// </summary>
-public sealed record ActivationBindings(string TenantId, IReadOnlyDictionary<string, ActivationBinding> Bindings, bool AllowHttp)
+public sealed record ActivationBindings(string TenantId, IReadOnlyDictionary<string, ActivationBinding> Bindings, bool AllowHttp, bool IsPreview = false)
 {
     /// <summary>A tenant with no bindings, for an application without connectors.</summary>
     public static ActivationBindings None(string tenantId) =>

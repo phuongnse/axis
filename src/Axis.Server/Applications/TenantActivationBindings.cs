@@ -24,6 +24,6 @@ internal static class TenantActivationBindings
                 binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null);
         }
 
-        return new ActivationBindings(tenant.Id, bindings, AllowHttp: allowHttp);
+        return new ActivationBindings(tenant.Id, bindings, AllowHttp: allowHttp, IsPreview: tenant.PreviewOf is not null);
     }
 }
