@@ -60,6 +60,23 @@ public static class ApplicationCompiler
         Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? [], collectReferences);
 
     /// <summary>
+    /// Compiles the files of an application held in memory, such as a publish snapshot, as the folder overload compiles a
+    /// folder: the paths are the application's own, relative with <c>/</c>, and the pinned modules come from
+    /// <paramref name="installedModules"/>. Null means none is installed. Unlike the overload for the resources of a stored
+    /// release, an entry under <c>modules/</c> is not a release copy of a module.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static CompilationResult CompileFiles(
+        IReadOnlyList<ResourceContent> files,
+        IReadOnlyCollection<PackageVersion>? installedPackages,
+        IReadOnlyCollection<InstalledModule>? installedModules)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true);
+    }
+
+    /// <summary>
     /// Compiles resources held in memory, such as the stored resources of a release, against
     /// <paramref name="installedPackages"/>. Null means no package is installed. Entries under
     /// <c>modules/&lt;id&gt;/</c> are the release's own copies of its pinned modules, and the
