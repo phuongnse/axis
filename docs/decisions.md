@@ -139,7 +139,8 @@ Requiring full FAPI early would block every milestone.
 - **First milestones:** tenants come from a configuration file. A test with
   two tenant databases proves that no data leaks between them.
 - **Later milestone:** the tenant directory, provisioning, migrations across
-  many databases and hosting profiles.
+  many databases and hosting profiles. The tenant directory is in
+  [D42](#d42-tenant-directory-in-the-platform-database--agreed).
 
 *Why:* adding tenant context afterwards touches every query and job, which is
 expensive. Building full tenant management before there is a second customer
@@ -483,6 +484,9 @@ removed. Everything in this decision is in place. See
     an incomplete one.
   - The client secret comes from the environment, never from a committed
     file outside development fixtures.
+  - Under `Tenancy:Source=directory`, the `Oidc` settings and the encrypted
+    client secret come from the tenant directory, see
+    [D42](#d42-tenant-directory-in-the-platform-database--agreed).
 - **Endpoints:** `GET /api/auth/sign-in?returnUrl=` redirects to the
   identity provider. A `returnUrl` that is not a local path is a `400`. The
   callback creates the session and redirects to `returnUrl`.
@@ -628,7 +632,10 @@ retries and reconciliation.
   and `auth` needs a `secret` binding.
 - **Where values live:** per tenant, in `Tenants:{id}:Bindings:{name}` of
   the server and worker configuration, until the tenant directory in M9.
-  Both hosts must hold them.
+  Both hosts must hold them. Under `Tenancy:Source=directory`,
+  [D42](#d42-tenant-directory-in-the-platform-database--agreed) moves binding
+  values and secrets into the tenant directory, and it stores secrets
+  encrypted.
 - **Binding kinds in host configuration:** each binding has a `Kind`, `url`
   or `secret`, and a `Value`. A secret is set with an environment variable,
   such as `Tenants__default__Bindings__PurchasingSystemToken__Value`.
@@ -1742,6 +1749,10 @@ The owner confirmed these points on issue #480 on 2026-10-17.
   - A worker loop that stops polling makes `/health/live` fail, so an
     orchestrator restarts it.
   - Docker Compose gives the worker a health check on `/health/ready`.
+- **Tenant directory:**
+  [D42](#d42-tenant-directory-in-the-platform-database--agreed) adds a
+  Degraded state on both hosts for a failed directory refresh, from M9. The
+  worker is then no longer never Degraded.
 
 *Why:* [Operations](domain/knowledge.md#operations) asks that failed and stuck
 work is visible. Without a health endpoint, a stuck worker shows only when
@@ -2033,3 +2044,101 @@ owner confirmed these points on issue #572 on 2026-10-18.
 do, and it uses the departments module of [D40](#d40-reusable-modules--agreed).
 It needs no package or connector. So it shows reuse without platform code. Any
 platform change it needs is a gap to raise, not to hide in the sample.
+
+## D42. Tenant directory in the platform database — Agreed
+
+The server and the worker learn their tenants from a tenant directory in the
+platform database, and pick up changes without a restart. This is planned for
+M9 and none of it is built. Until then tenants come from the `Tenants`
+section, as in [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).
+See [tenant directory](architecture.md#tenant-directory) for what each host
+answers, [tenancy settings](reference/configuration.md#tenancy-settings) for
+the settings and [platform database](reference/storage.md#platform-database)
+for the tables and the encryption.
+The owner confirmed these points on issue #639 on 2026-10-18.
+
+- **Two tenant sources:**
+  - The setting `Tenancy:Source` is `configuration` or `directory`. It
+    defaults to `configuration`, which is today's behaviour. Development,
+    `scripts/dev.sh`, Docker Compose and the tests keep it.
+  - With `directory`, both hosts read tenants only from the platform
+    database. A `Tenants` section is then ignored, and the start logs a
+    warning when one is present.
+  - Both sources answer through one tenant catalog contract, so request
+    resolution, tenant connections, deployment bindings and sign-in do not
+    know the source.
+- **What the directory holds:**
+  - It is a `platform` schema in the platform database, with EF Core
+    migrations shipped with Axis. The server applies them at start, as it does
+    for tenant databases.
+  - A tenant has an `id` under the same rule as today, a `status`
+    (`provisioning`, `active` or `suspended`), its hosts, its database, its
+    OIDC settings and its deployment bindings.
+  - Hosts are unique across all tenants, ignoring letter case.
+  - The database is the server host, the port, the database name, and the
+    runtime and schema user names.
+  - Every entry has a `version` that grows on each change.
+- **Secrets:**
+  - Database passwords, the OIDC client secret and `secret` binding values are
+    stored encrypted, never in plain text.
+  - Encryption is AES-256-GCM with an installation key from the setting
+    `Platform:SecretKey`, 32 bytes in base64. It comes from the environment or
+    a mounted secret file, never from a committed file outside Development. A
+    missing or invalid key stops the start.
+  - Each encrypted value is bound to its tenant and field through the
+    AES-GCM associated data: the tenant id and the field name. Someone with
+    write access to the table cannot copy one tenant's secret onto another
+    tenant, because it no longer decrypts.
+  - No API, log, problem details or backup manifest holds a decrypted secret.
+    A value is decrypted only at the moment of use, as `SecretValue` does
+    today.
+  - Rotating the installation key is out of scope for M9. After a leaked key,
+    every stored secret must be set again by hand.
+- **Changes without restart:**
+  - Both hosts read the directory again every `Tenancy:RefreshInterval`, 30
+    seconds by default.
+  - A new `active` tenant is served after the next refresh, and its OIDC
+    client is registered then.
+  - A `suspended` or `provisioning` tenant answers `503` problem details
+    titled "This tenant is not available.". The worker claims none of its new
+    work, and work already claimed finishes.
+  - A removed host answers `404`, as an unknown host does today.
+  - A refresh that cannot reach the platform database keeps the last good
+    directory and logs an error. A tenant suspended during that outage keeps
+    running until the next successful refresh.
+  - A tenant that first appears at a refresh is served only after the runtime
+    database role check of
+    [D31](#d31-separate-database-roles--agreed) passes. Until then it answers
+    `503`, like a suspended tenant.
+- **Who writes the directory:** only a later provisioning decision defines the
+  writer. The server and the worker only read the directory. Who migrates,
+  grants and activates the database of a tenant added after start is left to
+  that decision too.
+- **Platform connection strings:**
+  - `ConnectionStrings:Platform` becomes a role that may only read the
+    `platform` schema. Under `directory`, both hosts need it. The worker has
+    no platform connection today.
+  - The server applies the platform migrations over a separate setting,
+    `ConnectionStrings:PlatformSchema`. It uses it only at start, as D31 does
+    for the tenant databases.
+- **First load:** the server stops its start when it cannot load the directory
+  the first time, because there is no earlier directory that is safe to serve.
+  The worker waits and retries, and it is not ready until the first load
+  works.
+- **Readiness:**
+  - When a refresh fails, `/health/ready` answers Degraded (`200`) on both
+    hosts. Unhealthy would pull the hosts out of service, which defeats keeping
+    the last good directory.
+  - This lifts the rule of
+    [D37](#d37-health-checks-for-the-server-and-the-worker--agreed) that the
+    worker is never Degraded.
+
+*Why:* a new tenant, a suspended tenant or a changed secret must take effect
+without editing the configuration of both hosts and restarting them.
+[D25](#d25-connectors-deployment-bindings-and-secrets--agreed) has no secret
+store, and provisioning creates database roles with generated passwords that
+the hosts must read without a restart. Keeping `configuration` as the default
+avoids rewriting every test fixture and development script, at the cost of two
+code paths behind one contract. Encrypting each value with its tenant and field
+bound in makes a copied value useless. Degraded readiness keeps the hosts
+serving from the last good directory while it still shows the problem.

@@ -45,9 +45,10 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Platform database** stores installation-level data: the tenant directory
-  and platform settings *(tenant directory planned for M9; tenants come from
-  server configuration until then)*.
+- **Platform database** stores installation-level data: the
+  [tenant directory](#tenant-directory) in its `platform` schema, and platform
+  settings *(tenant directory planned for M9; tenants come from server
+  configuration until then)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -132,7 +133,9 @@ Moved to [reference/record-api.md](reference/record-api.md).
   current tenant. Without a tenant context, data access fails.
 - **Scoping.** Cache keys, file storage paths, job records and log scopes all
   include the tenant.
-- **Tenant source.** Until M9, tenants come from server configuration.
+- **Tenant source.** Today tenants come from server configuration. From M9
+  the setting `Tenancy:Source` chooses between that source and the
+  [tenant directory](#tenant-directory) *(planned for M9)*.
 
 ### Tenant configuration
 
@@ -210,6 +213,44 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 }
 ```
 
+### Tenant directory
+
+*(Planned for M9.)* It follows
+[D42](decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
+None of it is built. Today the `Tenants` section above is the only source.
+
+- **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
+  default, or `directory`. Both answer through one tenant catalog contract, so
+  request resolution, tenant connections, deployment bindings and sign-in do
+  not know the source. Under `directory` both hosts read tenants only from the
+  `platform` schema of the platform database, see
+  [platform database](reference/storage.md#platform-database), and a `Tenants`
+  section is ignored. The start logs a warning when one is present.
+- **Refresh.** Both hosts read the directory again every
+  `Tenancy:RefreshInterval`, 30 seconds by default, see
+  [tenancy settings](reference/configuration.md#tenancy-settings). A changed
+  host, database or OIDC setting applies at the next refresh.
+- **Read only.** The hosts read the directory over a database role that may
+  only read the `platform` schema. A later provisioning decision defines who
+  writes it.
+
+What a host answers for a tenant, once the directory is in use:
+
+| Case | Answer |
+| --- | --- |
+| An `active` tenant | The tenant is served after the next refresh, and its OIDC client is registered then. |
+| A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
+| A removed or unknown host | `404`, as today. |
+| A refresh that fails | The last good directory stays in use and an error is logged. Readiness is Degraded, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
+| The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
+
+- **New tenants.** A tenant that first appears at a refresh is served only
+  after the runtime database role check passes, see
+  [database roles](reference/storage.md#database-roles). Until then it answers
+  `503`, like a suspended tenant. Who migrates, grants and activates the
+  database of a tenant added after start is left to the provisioning decision.
+- **Health exemption.** Paths under `/health` stay exempt from resolution.
+
 ### Request resolution
 
 - **Host matching.** Middleware in `Axis.Server` runs before static files and
@@ -222,6 +263,10 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
   host. This covers API and SPA paths alike.
 - **Health exemption.** Paths under `/health` are not resolved, so
   `/health/live` and `/health/ready` answer for any host.
+- **Tenant not available.** *(Planned for M9.)* Under
+  `Tenancy:Source=directory`, a host of a tenant that is not `active` answers
+  `503` problem details titled "This tenant is not available.". It names
+  neither the tenant nor the host. See [tenant directory](#tenant-directory).
 - **Log scope.** While a resolved request runs, the logging scope carries
   `TenantId` with the tenant id.
 
@@ -306,12 +351,17 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   for the tenant configuration, when a tenant has no `Oidc` block, or when
   its `Authority`, `ClientId` or `ClientSecret` is missing or blank. Only the
   server reads and checks the block. The worker reads the same `Tenants`
-  section but signs nobody in, so it ignores `Oidc`.
+  section but signs nobody in, so it ignores `Oidc`. *(Planned for M9.)* Under
+  `Tenancy:Source=directory`, the `Oidc` settings of a tenant come from the
+  [tenant directory](#tenant-directory), not from `Tenants`.
 - **Secret.** The client secret comes from the environment, such as
   `Tenants__default__Oidc__ClientSecret`. It is never in a committed file,
   except the development fixtures, which are never valid outside
   `Development` and tests. `appsettings.Development.json` and the E2E server
-  use the development realm's secret.
+  use the development realm's secret. *(Planned for M9.)* Under
+  `Tenancy:Source=directory`, the client secret is stored encrypted in the
+  tenant directory, see
+  [platform database](reference/storage.md#platform-database).
 - **Endpoints.**
   - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity
     provider. `returnUrl` must start with a single `/`. A value that does
@@ -827,6 +877,13 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
 | Degraded | `200` | The platform database answers and activation has finished, but at least one tenant database does not answer. |
 | Unhealthy | `503` | The platform database does not answer, or startup activation has not finished for every tenant. |
 
+*(Planned for M9.)* Under `Tenancy:Source=directory`, the rows above hold
+until the first load of the [tenant directory](#tenant-directory) has worked.
+The server does not listen before that. After the first load, a platform
+database that does not answer is a failed refresh, and it makes the server
+Degraded (`200`), not Unhealthy. The server then keeps serving from the last
+good directory.
+
 - One tenant database that is down makes the server Degraded and not
   Unhealthy, so one tenant cannot take the others offline, see
   [tenancy](#tenancy-d10). Requests for that tenant fail and the others work.
@@ -847,9 +904,12 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
 **Worker.** The worker serves only `/health/live` and `/health/ready`, on the
 address `Health:Urls`. The default is `http://127.0.0.1:5208`, so nothing
 outside the host reaches it until someone changes the setting. See
-[worker settings](reference/processes.md#worker-settings). The worker is never
-Degraded. A tenant database that stops answering after the worker saw it
-migrated is only logged.
+[worker settings](reference/processes.md#worker-settings). Today the worker is
+never Degraded. A tenant database that stops answering after the worker saw it
+migrated is only logged. *(Planned for M9.)* Under
+`Tenancy:Source=directory`, a failed refresh of the
+[tenant directory](#tenant-directory) makes the worker Degraded (`200`), and
+the worker is not ready until the first load has worked.
 
 The loop counts as stalled when it has not polled within twice
 `Worker:LeaseDuration`, one minute by default. A poll interval would be too

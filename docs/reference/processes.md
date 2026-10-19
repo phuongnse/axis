@@ -2509,6 +2509,10 @@ further occurrence runs, but a running fan-out finishes.
 The worker polls every tenant database in the `Tenants` section of its
 configuration (see
 [Tenant configuration](../architecture.md#tenant-configuration)).
+*(Planned for M9.)* Under `Tenancy:Source=directory`, the worker reads its
+tenants from the [tenant directory](../architecture.md#tenant-directory)
+instead. It refreshes the directory, and it claims no new work for a tenant that
+is not `active`. Work it already claimed finishes.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
